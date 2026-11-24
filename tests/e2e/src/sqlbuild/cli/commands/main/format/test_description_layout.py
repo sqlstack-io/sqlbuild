@@ -152,7 +152,7 @@ def test_given_model_description_when_formatting_then_layout_is_canonical_and_te
         project_name="shop",
         repo_files={
             "sqlbuild_project.toml": _PROJECT_FILE,
-            "models/customers.sql": test_case.header + _BODY,
+            "sql/models/customers.sql": test_case.header + _BODY,
         },
     )
     before: dict[str, str] = stored_descriptions(project_dir)
@@ -168,7 +168,7 @@ def test_given_model_description_when_formatting_then_layout_is_canonical_and_te
     assert formatted.returncode == 0, formatted.stdout + formatted.stderr
     assert checked.returncode == 0, checked.stdout + checked.stderr
     assert ", 0 changed)" in checked.stderr
-    model: str = (project_dir / "models/customers.sql").read_text()
+    model: str = (project_dir / "sql/models/customers.sql").read_text()
     assert model == test_case.expected_header + _BODY
     assert stored_descriptions(project_dir) == before
     assert stored_column_descriptions(project_dir) == columns_before
@@ -180,11 +180,11 @@ def test_given_model_description_when_formatting_then_layout_is_canonical_and_te
         QuoteFixTestCase(
             description="model_and_wrapped_macro_descriptions",
             files={
-                "models/customers.sql": (
+                "sql/models/customers.sql": (
                     'MODEL (\n  description "Matches a title (\\"Miss\\").",\n);\n'
                     "\nSELECT @sql.title('Miss') AS title\n"
                 ),
-                "macros/sql/title.sql": (
+                "sql/macros/sql/title.sql": (
                     "MACRO (\n"
                     "  description \"True when a name starts with a woman's title: Mme, Mlle, "
                     "Miss, Mrs, Ms. Any case,\n"
@@ -197,10 +197,10 @@ def test_given_model_description_when_formatting_then_layout_is_canonical_and_te
                 ("description-quotes", "title.sql", 2, "applied"),
             ],
             expected_starts={
-                "models/customers.sql": (
+                "sql/models/customers.sql": (
                     'MODEL (\n  description """Matches a title ("Miss").""",\n);\n'
                 ),
-                "macros/sql/title.sql": (
+                "sql/macros/sql/title.sql": (
                     "MACRO (\n"
                     '  description """\n'
                     "    True when a name starts with a woman's title: Mme, Mlle, Miss, Mrs, Ms. "
@@ -214,11 +214,11 @@ def test_given_model_description_when_formatting_then_layout_is_canonical_and_te
         QuoteFixTestCase(
             description="model_and_macro_descriptions_doubling_quotes",
             files={
-                "models/customers.sql": (
+                "sql/models/customers.sql": (
                     'MODEL (\n  description "say ""hi"" now",\n);\n'
                     "\nSELECT @sql.title('Miss') AS title\n"
                 ),
-                "macros/sql/title.sql": (
+                "sql/macros/sql/title.sql": (
                     'MACRO (\n  description "say ""hi"" now",\n'
                     "  arguments (value VARCHAR),\n  returns VARCHAR,\n);\n\n@value\n"
                 ),
@@ -228,8 +228,8 @@ def test_given_model_description_when_formatting_then_layout_is_canonical_and_te
                 ("description-quotes", "title.sql", 2, "applied"),
             ],
             expected_starts={
-                "models/customers.sql": 'MODEL (\n  description """say "hi" now""",\n);\n',
-                "macros/sql/title.sql": 'MACRO (\n  description """say "hi" now""",\n',
+                "sql/models/customers.sql": 'MODEL (\n  description """say "hi" now""",\n);\n',
+                "sql/macros/sql/title.sql": 'MACRO (\n  description """say "hi" now""",\n',
             },
             expected_description='say "hi" now',
         ),
@@ -309,8 +309,8 @@ def test_given_macro_description_when_formatting_then_its_text_survives_and_it_c
         project_name="shop",
         repo_files={
             "sqlbuild_project.toml": _PROJECT_FILE,
-            "macros/sql/lowered.sql": test_case.macro,
-            "models/customers.sql": (
+            "sql/macros/sql/lowered.sql": test_case.macro,
+            "sql/models/customers.sql": (
                 "MODEL (description \"Customers.\");\n\nSELECT @sql.lowered('Miss') AS title\n"
             ),
         },
@@ -324,7 +324,7 @@ def test_given_macro_description_when_formatting_then_its_text_survives_and_it_c
     )
 
     assert formatted.returncode == 0, formatted.stdout + formatted.stderr
-    assert (project_dir / "macros/sql/lowered.sql").read_text() == test_case.expected_macro
+    assert (project_dir / "sql/macros/sql/lowered.sql").read_text() == test_case.expected_macro
     assert compiled.returncode == 0, compiled.stdout + compiled.stderr
 
 
@@ -333,7 +333,7 @@ def test_given_macro_description_when_formatting_then_its_text_survives_and_it_c
     [
         RefusedQuoteFixTestCase(
             description="macro_with_another_header_error",
-            path="macros/sql/title.sql",
+            path="sql/macros/sql/title.sql",
             contents=(
                 'MACRO (\n  description "say \\"hi\\"",\n  arguments (value VARCHAR),\n'
                 "  returns VARCHAR,\n  unknown_key x,\n);\n\n@value\n"
@@ -342,7 +342,7 @@ def test_given_macro_description_when_formatting_then_its_text_survives_and_it_c
         ),
         RefusedQuoteFixTestCase(
             description="model_with_another_header_error",
-            path="models/orders.sql",
+            path="sql/models/orders.sql",
             contents=(
                 'MODEL (\n  description "say \\"hi\\"",\n  tags ["a" "b",\n);\n'
                 "\nSELECT 1 AS order_id\n"
@@ -361,7 +361,7 @@ def test_given_file_still_broken_after_quote_fix_when_format_fix_then_it_is_left
         repo_files={
             "sqlbuild_project.toml": _PROJECT_FILE,
             test_case.path: test_case.contents,
-            "models/customers.sql": (
+            "sql/models/customers.sql": (
                 'MODEL (\n  description "Matches \\"Miss\\".",\n);\n\nSELECT 1 AS customer_id\n'
             ),
         },

@@ -1472,3 +1472,10 @@ class DynamicCompileE2ETestCase:
     daily_totals_header: str
     expected_exit_code: int
     expected_fragments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class PythonLayoutBuildTestCase:
+    description: str
+    repo_files: dict[str, str]
+    expected_build_fragments: tuple[str, ...]

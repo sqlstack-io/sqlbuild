@@ -46,7 +46,7 @@ Write the name as exactly one double-quoted string, with no spaces or comments i
 ```text
 error[P012]: __ref(stg_orders) is not a valid __ref() call
   model: fact_orders
-  --> models/marts/fact_orders.sql:24:6
+  --> sql/models/marts/fact_orders.sql:24:6
      |
   24 | FROM __ref(stg_orders) o
      |      ^^^^^^^^^^^^^^^^^

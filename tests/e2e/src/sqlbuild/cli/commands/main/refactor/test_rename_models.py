@@ -46,10 +46,10 @@ _TAGGED_SOURCES: str = (
         ModelRefactorE2ETestCase(
             description="rename keeps the folder and rewrites refs and fixtures",
             command=("rename", "model:stg_orders", "stg_order_lines"),
-            expected_removed="models/staging/stg_orders.sql",
-            expected_file="models/staging/stg_order_lines.sql",
+            expected_removed="sql/models/staging/stg_orders.sql",
+            expected_file="sql/models/staging/stg_order_lines.sql",
             expected_fragments={
-                "models/marts/fact_orders.sql": ('__ref("stg_order_lines")',),
+                "sql/models/marts/fact_orders.sql": ('__ref("stg_order_lines")',),
                 "tests/unit/test_fact_orders.sql": ("__ref__stg_order_lines AS (",),
             },
             expected_relation="stg_order_lines",
@@ -57,12 +57,12 @@ _TAGGED_SOURCES: str = (
         ModelRefactorE2ETestCase(
             description="rename rewrites seed and source relationships audits",
             command=("rename", "model:stg_orders", "stg_order_lines"),
-            expected_removed="models/staging/stg_orders.sql",
-            expected_file="models/staging/stg_order_lines.sql",
+            expected_removed="sql/models/staging/stg_orders.sql",
+            expected_file="sql/models/staging/stg_order_lines.sql",
             expected_fragments={
-                "seeds/customers.yml": ('to: __ref("stg_order_lines")',),
-                "sources/customers.yml": ("to: '__ref(\"stg_order_lines\")'",),
-                "models/staging/stg_order_lines.sql": ("migrate_from stg_orders",),
+                "sql/seeds/customers.yml": ('to: __ref("stg_order_lines")',),
+                "sql/sources/customers.yml": ("to: '__ref(\"stg_order_lines\")'",),
+                "sql/models/staging/stg_order_lines.sql": ("migrate_from stg_orders",),
             },
             expected_relation="stg_order_lines",
             extra_files=CUSTOMER_DECLARATIONS,
@@ -70,19 +70,19 @@ _TAGGED_SOURCES: str = (
         ModelRefactorE2ETestCase(
             description="rename keeps tagged sources after quoted values holding ' # '",
             command=("rename", "model:stg_orders", "stg_order_lines"),
-            expected_removed="models/staging/stg_orders.sql",
-            expected_file="models/staging/stg_order_lines.sql",
-            expected_fragments={"sources/archived.yml": (_TAGGED_SOURCES,)},
+            expected_removed="sql/models/staging/stg_orders.sql",
+            expected_file="sql/models/staging/stg_order_lines.sql",
+            expected_fragments={"sql/sources/archived.yml": (_TAGGED_SOURCES,)},
             expected_relation="stg_order_lines",
-            extra_files={"sources/archived.yml": _TAGGED_SOURCES},
+            extra_files={"sql/sources/archived.yml": _TAGGED_SOURCES},
         ),
         ModelRefactorE2ETestCase(
             description="rename rewrites reusable schema relationships audits",
             command=("rename", "model:stg_orders", "stg_order_lines"),
-            expected_removed="models/staging/stg_orders.sql",
-            expected_file="models/staging/stg_order_lines.sql",
+            expected_removed="sql/models/staging/stg_orders.sql",
+            expected_file="sql/models/staging/stg_order_lines.sql",
             expected_fragments={
-                "models/marts/_sqlbuild/_schemas/order_shape.sql": (
+                "sql/models/marts/_sqlbuild/_schemas/order_shape.sql": (
                     '(to __ref("stg_order_lines"), field customer_id)',
                 ),
             },
@@ -92,10 +92,10 @@ _TAGGED_SOURCES: str = (
         ModelRefactorE2ETestCase(
             description="rename rewrites cursor_inputs keys of incremental consumers",
             command=("rename", "model:stg_orders", "stg_order_lines"),
-            expected_removed="models/staging/stg_orders.sql",
-            expected_file="models/staging/stg_order_lines.sql",
+            expected_removed="sql/models/staging/stg_orders.sql",
+            expected_file="sql/models/staging/stg_order_lines.sql",
             expected_fragments={
-                "models/marts/order_history.sql": (
+                "sql/models/marts/order_history.sql": (
                     "stg_order_lines order_date,",
                     '__ref("stg_order_lines")',
                 ),
@@ -105,20 +105,20 @@ _TAGGED_SOURCES: str = (
         ),
         ModelRefactorE2ETestCase(
             description="move to a new file renames the model after the file",
-            command=("mv", "model:fact_orders", "models/reporting/order_facts.sql"),
-            expected_removed="models/marts/fact_orders.sql",
-            expected_file="models/reporting/order_facts.sql",
+            command=("mv", "model:fact_orders", "sql/models/reporting/order_facts.sql"),
+            expected_removed="sql/models/marts/fact_orders.sql",
+            expected_file="sql/models/reporting/order_facts.sql",
             expected_fragments={
-                "models/marts/customer_totals.sql": ('__ref("order_facts")',),
+                "sql/models/marts/customer_totals.sql": ('__ref("order_facts")',),
                 "tests/unit/test_order_facts.sql": ("__expected__order_facts AS (",),
             },
             expected_relation="order_facts",
         ),
         ModelRefactorE2ETestCase(
             description="move into a folder keeps the model name",
-            command=("mv", "model:customer_totals", "models/reporting/"),
-            expected_removed="models/marts/customer_totals.sql",
-            expected_file="models/reporting/customer_totals.sql",
+            command=("mv", "model:customer_totals", "sql/models/reporting/"),
+            expected_removed="sql/models/marts/customer_totals.sql",
+            expected_file="sql/models/reporting/customer_totals.sql",
             expected_fragments={},
             expected_relation="customer_totals",
         ),
@@ -155,8 +155,8 @@ def test_given_model_refactor_when_applied_then_project_tests_and_builds(
             command=("rename", "model:stg_orders", "stg_order_lines", "--dry-run"),
             expected_paths=frozenset(
                 {
-                    "models/staging/stg_order_lines.sql",
-                    "models/marts/fact_orders.sql",
+                    "sql/models/staging/stg_order_lines.sql",
+                    "sql/models/marts/fact_orders.sql",
                     "tests/unit/test_fact_orders.sql",
                 }
             ),
@@ -222,7 +222,7 @@ def test_given_dry_run_json_when_refactoring_then_nothing_is_written(
             expected_old_name_type="VIEW",
             expected_order_ids=(1, 2, 3, 4),
             extra_files=order_history_copy(),
-            removed_files=("models/marts/order_history_copy.sql",),
+            removed_files=("sql/models/marts/order_history_copy.sql",),
         ),
         ModelMigrationE2ETestCase(
             description="incremental built before rename matching",
@@ -255,7 +255,7 @@ def test_given_built_model_when_renamed_then_build_migrates_its_relation(
         project_dir, "rename", "model:order_history", "order_ledger"
     )
     remove_files(project_dir=project_dir, paths=test_case.removed_files)
-    header: str = (project_dir / "models/marts/order_ledger.sql").read_text(encoding="utf-8")
+    header: str = (project_dir / "sql/models/marts/order_ledger.sql").read_text(encoding="utf-8")
     load_raw_orders(project_dir=project_dir, order_ids=(3, 4))
     second: subprocess.CompletedProcess[str] = sqb(project_dir, "build")
 
@@ -274,16 +274,16 @@ def test_given_built_model_when_renamed_then_build_migrates_its_relation(
     [
         PendingMigrationRefactorE2ETestCase(
             description="move to another folder under the same name carries migrate_from",
-            command=("mv", "model:order_ledger", "models/reporting/"),
+            command=("mv", "model:order_ledger", "sql/models/reporting/"),
             expected_returncode=0,
-            expected_file="models/reporting/order_ledger.sql",
+            expected_file="sql/models/reporting/order_ledger.sql",
             expected_output="Compiled: ok",
         ),
         PendingMigrationRefactorE2ETestCase(
             description="rename on top of an undeployed migration is refused",
             command=("rename", "model:order_ledger", "order_journal"),
             expected_returncode=1,
-            expected_file="models/marts/order_ledger.sql",
+            expected_file="sql/models/marts/order_ledger.sql",
             expected_output="still declares migrate_from",
         ),
     ],

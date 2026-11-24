@@ -205,7 +205,7 @@ pub(super) fn inserted_entry(contents: &str) -> Result<Option<String>, RefactorE
 
 fn yaml_file(contents: &str) -> Vec<DiscoveredFile> {
     vec![DiscoveredFile {
-        path: "sources/raw.yml".to_owned(),
+        path: "sql/sources/raw.yml".to_owned(),
         contents: contents.to_owned(),
     }]
 }
@@ -258,7 +258,7 @@ pub(super) fn owned_span_pair(spans: (ExpectedSpans, ExpectedSpans)) -> (Spans, 
 pub(super) fn model(name: &str, materialized: Option<&str>, schema: &str) -> ModelFacts {
     ModelFacts {
         name: name.to_owned(),
-        path: format!("models/{name}.sql"),
+        path: format!("sql/models/{name}.sql"),
         deps: Vec::new(),
         query_sql: "SELECT 1".to_owned(),
         authored_query_sql: "SELECT 1".to_owned(),
@@ -497,7 +497,7 @@ pub(super) fn plan_consumer(
         },
     )?;
     let body = BodyContext {
-        path: "models/consumer.sql",
+        path: "sql/models/consumer.sql",
         contents: &text,
         mapping: BodyMapping::Authored(0),
         fallback_offset: 0,
@@ -633,7 +633,7 @@ pub(super) fn owner_header_parts(
     .into_iter()
     .map(|(name, body)| AuthoredFile {
         role: SqlFileRole::Audit,
-        path: format!("audits/generic/{name}.sql"),
+        path: format!("sql/audits/generic/{name}.sql"),
         contents: format!("AUDIT ();\n{body}\n"),
         texts: vec![body.to_owned()],
     })
@@ -669,7 +669,7 @@ pub(super) fn followed_unit_tests(
     rebound: &[&str],
 ) -> Result<FollowedTests, RefactorError> {
     let mut orders: ModelFacts = model("orders", Some("view"), "analytics");
-    orders.path = "models/marts/orders.sql".to_owned();
+    orders.path = "sql/models/marts/orders.sql".to_owned();
     let mut project_facts = facts("/nonexistent/project", vec![orders]);
     for (path, name, targets) in tests {
         project_facts.authored_files.push(AuthoredFile {

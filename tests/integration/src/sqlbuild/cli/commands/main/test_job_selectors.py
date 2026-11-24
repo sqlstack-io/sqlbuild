@@ -15,15 +15,15 @@ _MODEL_FILES: dict[str, str] = {
         'name = "demo"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
         '[connection]\ndatabase = "demo.duckdb"\n\n[targets.dev]\n\n[targets.prod]\n'
     ),
-    "models/stg_orders.sql": (
+    "sql/models/stg_orders.sql": (
         "MODEL (description 'Staged orders.', materialized table, tags [staging]);\n"
         "SELECT 1 AS order_id\n"
     ),
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         "MODEL (description 'Orders.', materialized table, tags [finance]);\n"
         'SELECT order_id FROM __ref("stg_orders")\n'
     ),
-    "models/customers.sql": (
+    "sql/models/customers.sql": (
         "MODEL (description 'Customers.', materialized table);\nSELECT 7 AS customer_id\n"
     ),
 }

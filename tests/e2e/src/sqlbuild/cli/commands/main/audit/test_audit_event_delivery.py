@@ -69,7 +69,7 @@ def test_given_many_audits_when_running_then_audit_completed_events_arrive_durin
         repo_files={
             "sqlbuild_project.toml": delivery_project_toml(lifecycle_config=""),
             **delivery_model_files(),
-            "sinks/orders_events.py": recording_sink_source(
+            "python/event_sinks/orders_events.py": recording_sink_source(
                 event_kinds="{LifecycleEventKind.AUDIT, LifecycleEventKind.RESOURCE}",
                 delay_seconds=0,
             ),
@@ -136,11 +136,11 @@ def test_given_slow_sink_and_zero_drain_when_auditing_then_warns_with_counts_and
         repo_files={
             "sqlbuild_project.toml": delivery_project_toml(
                 lifecycle_config=(
-                    f'\n[sinks.lifecycle]\nshutdown_timeout = "{test_case.shutdown_timeout}"\n'
+                    f'\n[event_sinks.lifecycle]\nshutdown_timeout = "{test_case.shutdown_timeout}"\n'
                 )
             ),
             **delivery_model_files(),
-            "sinks/orders_events.py": recording_sink_source(
+            "python/event_sinks/orders_events.py": recording_sink_source(
                 event_kinds="{LifecycleEventKind.AUDIT}", delay_seconds=0.4
             ),
         },
@@ -191,11 +191,11 @@ def test_given_slow_sink_and_raised_drain_when_auditing_then_delivers_all_withou
         repo_files={
             "sqlbuild_project.toml": delivery_project_toml(
                 lifecycle_config=(
-                    f'\n[sinks.lifecycle]\nshutdown_timeout = "{test_case.shutdown_timeout}"\n'
+                    f'\n[event_sinks.lifecycle]\nshutdown_timeout = "{test_case.shutdown_timeout}"\n'
                 )
             ),
             **delivery_model_files(),
-            "sinks/orders_events.py": recording_sink_source(
+            "python/event_sinks/orders_events.py": recording_sink_source(
                 event_kinds="{LifecycleEventKind.AUDIT}", delay_seconds=0.4
             ),
         },
@@ -225,17 +225,17 @@ def test_given_slow_sink_and_raised_drain_when_auditing_then_delivers_all_withou
         InvalidDrainTimeoutE2ETestCase(
             "negative duration",
             '"-5s"',
-            "sinks.lifecycle.shutdown_timeout must be a fixed duration from '0s' to '10m'",
+            "event_sinks.lifecycle.shutdown_timeout must be a fixed duration from '0s' to '10m'",
         ),
         InvalidDrainTimeoutE2ETestCase(
             "bare number",
             "5",
-            "sinks.lifecycle.shutdown_timeout must be a fixed duration from '0s' to '10m'",
+            "event_sinks.lifecycle.shutdown_timeout must be a fixed duration from '0s' to '10m'",
         ),
         InvalidDrainTimeoutE2ETestCase(
             "above upper bound",
             '"1h"',
-            "sinks.lifecycle.shutdown_timeout must be a fixed duration from '0s' to '10m'",
+            "event_sinks.lifecycle.shutdown_timeout must be a fixed duration from '0s' to '10m'",
         ),
     ),
     ids=lambda case: case.description,
@@ -250,11 +250,11 @@ def test_given_invalid_drain_timeout_when_auditing_then_fails_with_config_error(
         repo_files={
             "sqlbuild_project.toml": delivery_project_toml(
                 lifecycle_config=(
-                    f"\n[sinks.lifecycle]\nshutdown_timeout = {test_case.shutdown_timeout_toml}\n"
+                    f"\n[event_sinks.lifecycle]\nshutdown_timeout = {test_case.shutdown_timeout_toml}\n"
                 )
             ),
             **delivery_model_files(),
-            "sinks/orders_events.py": recording_sink_source(
+            "python/event_sinks/orders_events.py": recording_sink_source(
                 event_kinds="{LifecycleEventKind.AUDIT}", delay_seconds=0
             ),
         },
@@ -297,7 +297,9 @@ def test_given_sink_slow_once_when_building_then_later_and_outcome_events_still_
         repo_files={
             "sqlbuild_project.toml": delivery_project_toml(lifecycle_config=""),
             **delivery_model_files(),
-            "sinks/orders_events.py": slow_once_sink_source(slow_call=test_case.slow_call),
+            "python/event_sinks/orders_events.py": slow_once_sink_source(
+                slow_call=test_case.slow_call
+            ),
         },
     )
 

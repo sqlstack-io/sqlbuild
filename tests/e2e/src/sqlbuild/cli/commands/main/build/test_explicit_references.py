@@ -35,6 +35,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     run_sqb,
     table_exists,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 _EMITTING_MACROS: str = (
     EXPLICIT_REFERENCE_MACROS
@@ -45,7 +46,7 @@ _SECOND_EMITTING_MACROS: str = (
     "def customers_base():\n    return 'SELECT * FROM __ref(\"stg_customers\")'\n"
 )
 _UNDECLARED_HOOKS: str = EXPLICIT_REFERENCE_HOOKS + '    ctx.relation(model("all_orders"))\n'
-_AUDITS: str = "models/sales/_sqlbuild"
+_AUDITS: str = "sql/models/sales/_sqlbuild"
 _AUDIT_READING: str = (
     "AUDIT ();\nSELECT s.order_id FROM @relation s\n"
     'LEFT JOIN __ref("{read}") a USING (order_id) WHERE a.order_id IS NULL\n'
@@ -76,10 +77,10 @@ _RUNTIME_TASK: str = (
 
 
 _COUNTRY_SEED_FILES: dict[str, str] = {
-    "seeds/countries.yml": (
+    "sql/seeds/countries.yml": (
         "seeds:\n  - name: countries\n    description: Test seed countries.\n    columns:\n      - name: code\n        type: VARCHAR\n"
     ),
-    "seeds/countries.csv": "code\nGB\nFR\n",
+    "sql/seeds/countries.csv": "code\nGB\nFR\n",
 }
 _SEED_TASK: str = (
     "from sqlbuild.refs import seed\n"
@@ -161,8 +162,8 @@ def test_given_python_seed_and_model_dependencies_when_building_then_graph_selec
         repo_files=explicit_reference_project_files(
             overrides={
                 **_COUNTRY_SEED_FILES,
-                "python/tasks/countries.py": _SEED_TASK,
-                "python/checks/orders.py": _MODEL_CHECK,
+                "python/nodes/tasks/countries/asset.py": _SEED_TASK,
+                "python/nodes/checks/orders/checks.py": _MODEL_CHECK,
             }
         ),
     )
@@ -284,7 +285,7 @@ def test_given_both_way_selector_when_building_then_it_expands_from_the_selected
         tmp_path=tmp_path,
         project_name="explicit_refs",
         repo_files=explicit_reference_project_files(
-            overrides={"python/tasks/exports.py": _SIBLING_TASKS}
+            overrides={**node_module_files("python/nodes/tasks/exports.py", _SIBLING_TASKS)}
         ),
     )
 
@@ -366,7 +367,7 @@ def test_given_typed_macro_references_and_hook_reads_when_building_then_graph_an
             expected_output_fragments=(
                 "error[P006]: model:hidden depends on model:stg_orders_eu through macro "
                 "orders_base()",
-                "--> models/sales/_sqlbuild/_macros/python/unions.py",
+                "--> sql/models/sales/_sqlbuild/_macros/python/unions.py",
                 '@py.orders_base(__ref("stg_orders_eu"))',
                 "[references]\n            enforce_explicit = false",
             ),
@@ -382,31 +383,34 @@ def test_given_typed_macro_references_and_hook_reads_when_building_then_graph_an
         ),
         ExplicitReferenceFailureE2ETestCase(
             description="literal SQL naming a project relation fails compile",
-            overrides={"python/tasks/export.py": _LITERAL_TASK},
+            overrides={"python/nodes/tasks/export/asset.py": _LITERAL_TASK},
             command=("--no-color", "compile"),
             expected_exit_code=1,
             expected_output_fragments=(
                 "error[P008]: asset:export_orders names model:stg_customers as 'stg_customers'",
-                "--> python/tasks/export.py:8",
+                "--> python/nodes/tasks/export/asset.py:8",
                 "[references]\n            enforce_explicit = false",
             ),
         ),
         ExplicitReferenceFailureE2ETestCase(
             description="check literal SQL naming an undeclared model fails compile",
-            overrides={"python/checks/orders.py": _LITERAL_CHECK},
+            overrides={"python/nodes/checks/orders/checks.py": _LITERAL_CHECK},
             command=("--no-color", "compile"),
             expected_exit_code=1,
             expected_output_fragments=(
                 "error[P008]: check:orders_present names model:stg_customers as 'stg_customers'",
-                "--> python/checks/orders.py:9",
+                "--> python/nodes/checks/orders/checks.py:9",
                 'declare it with depends_on=model("stg_customers")',
             ),
         ),
         ExplicitReferenceFailureE2ETestCase(
             description="loader literal SQL naming a source fails compile with ctx.source help",
             overrides={
-                "sources/raw.yml": _RAW_SOURCES,
-                "python/loaders/raw.py": explicit_reference_literal_loader(table="raw_regions"),
+                "sql/sources/raw.yml": _RAW_SOURCES,
+                **node_module_files(
+                    "python/nodes/loaders/raw.py",
+                    explicit_reference_literal_loader(table="raw_regions"),
+                ),
             },
             command=("--no-color", "compile"),
             expected_exit_code=1,
@@ -418,8 +422,11 @@ def test_given_typed_macro_references_and_hook_reads_when_building_then_graph_an
         ExplicitReferenceFailureE2ETestCase(
             description="loader literal SQL naming a model fails compile",
             overrides={
-                "sources/raw.yml": _RAW_SOURCES,
-                "python/loaders/raw.py": explicit_reference_literal_loader(table="stg_customers"),
+                "sql/sources/raw.yml": _RAW_SOURCES,
+                **node_module_files(
+                    "python/nodes/loaders/raw.py",
+                    explicit_reference_literal_loader(table="stg_customers"),
+                ),
             },
             command=("--no-color", "compile"),
             expected_exit_code=1,
@@ -455,7 +462,7 @@ def test_given_implicit_reference_when_running_command_then_it_fails_with_guidan
     [
         ExplicitReferenceRuntimeWarningE2ETestCase(
             description="run-time hard-coded name warns while the build succeeds",
-            overrides={"python/tasks/export.py": _RUNTIME_TASK},
+            overrides={"python/nodes/tasks/export/asset.py": _RUNTIME_TASK},
             enforce_explicit=True,
             expected_exit_code=0,
             expected_warning_fragments=(
@@ -466,11 +473,12 @@ def test_given_implicit_reference_when_running_command_then_it_fails_with_guidan
         ExplicitReferenceRuntimeWarningE2ETestCase(
             description="enforcement disabled allows every implicit reference",
             overrides={
-                "python/tasks/export.py": _RUNTIME_TASK,
+                "python/nodes/tasks/export/asset.py": _RUNTIME_TASK,
                 EXPLICIT_REFERENCE_MACRO_PATH: _EMITTING_MACROS,
                 f"{EXPLICIT_REFERENCE_MODELS}/hidden.sql": _EMITTING_MODEL,
-                "python/tasks/literal.py": _LITERAL_TASK.replace(
-                    "export_orders", "count_customers"
+                **node_module_files(
+                    "python/nodes/tasks/literal.py",
+                    _LITERAL_TASK.replace("export_orders", "count_customers"),
                 ),
             },
             enforce_explicit=False,
@@ -521,7 +529,7 @@ def test_given_runtime_hard_coded_relation_when_building_then_it_warns_without_f
     [
         ExplicitReferenceRuntimeWarningE2ETestCase(
             description="check naming an undeclared model at run time warns and passes",
-            overrides={"python/checks/orders.py": _RUNTIME_CHECK},
+            overrides={"python/nodes/checks/orders/checks.py": _RUNTIME_CHECK},
             enforce_explicit=True,
             expected_exit_code=0,
             expected_warning_fragments=(
@@ -569,12 +577,12 @@ def test_given_check_runtime_hard_coded_relation_when_building_then_it_warns_wit
             description="two ref-emitting macros and a hard-coded task name all report at once",
             overrides={
                 EXPLICIT_REFERENCE_MACRO_PATH: _EMITTING_MACROS,
-                "models/sales/_sqlbuild/_macros/python/customers.py": _SECOND_EMITTING_MACROS,
+                "sql/models/sales/_sqlbuild/_macros/python/customers.py": _SECOND_EMITTING_MACROS,
                 f"{EXPLICIT_REFERENCE_MODELS}/hidden.sql": _EMITTING_MODEL,
                 f"{EXPLICIT_REFERENCE_MODELS}/hidden_customers.sql": (
                     "MODEL (description 'Test model hidden_customers.', materialized table);\n@py.customers_base()\n"
                 ),
-                "python/tasks/export.py": _LITERAL_TASK,
+                "python/nodes/tasks/export/asset.py": _LITERAL_TASK,
             },
             expected_output_fragments=(
                 "error[P006]: model:hidden depends on model:stg_orders_eu through macro "
@@ -627,11 +635,11 @@ def test_given_check_runtime_hard_coded_relation_when_building_then_it_warns_wit
             expected_output_fragments=(
                 "error[P004]: Singular audit 'one_customers'",
                 "error[P004]: Singular audit 'one_orders'",
-                "--> models/sales/_sqlbuild/audits/singular/one_orders.sql",
+                "--> sql/models/sales/_sqlbuild/audits/singular/one_orders.sql",
                 "error[P005]: Audit 'a_check' on model 'orders_a' reads model 'orders_a_summary'",
                 "error[P005]: Audit 'b_check' on model 'customers_b' reads model "
                 "'customers_b_summary'",
-                "--> models/sales/_sqlbuild/_audits/generic/a_check.sql",
+                "--> sql/models/sales/_sqlbuild/_audits/generic/a_check.sql",
                 "4 errors",
             ),
             expected_json_diagnostics=(
@@ -647,8 +655,8 @@ def test_given_check_runtime_hard_coded_relation_when_building_then_it_warns_wit
         CollectedCompileDiagnosticsE2ETestCase(
             description="every declaration placement error reports on its own",
             overrides={
-                "audits/generic/eu_check.sql": _NULL_AUDIT,
-                "audits/generic/us_check.sql": _NULL_AUDIT,
+                "sql/audits/generic/eu_check.sql": _NULL_AUDIT,
+                "sql/audits/generic/us_check.sql": _NULL_AUDIT,
                 f"{_AUDITS}/audits/generic/unused_check.sql": _NULL_AUDIT,
                 f"{EXPLICIT_REFERENCE_MODELS}/stg_orders_eu.sql": (
                     "MODEL (description 'Test model stg_orders_eu.', materialized table, audits [eu_check]);\n"
@@ -663,7 +671,7 @@ def test_given_check_runtime_hard_coded_relation_when_building_then_it_warns_wit
                 "error[S010]: Unused inherited declaration 'audit:unused_check'",
                 "error[S024]: Declaration 'audit:eu_check'",
                 "error[S024]: Declaration 'audit:us_check'",
-                "--> audits/generic/eu_check.sql",
+                "--> sql/audits/generic/eu_check.sql",
                 "3 errors",
             ),
             expected_json_diagnostics=(

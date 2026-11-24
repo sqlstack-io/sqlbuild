@@ -4,7 +4,7 @@ from pathlib import Path
 
 from sqlbuild._native import optional_named_bool, optional_named_string
 
-AUTHORED_VALUES_FILE_PATH: Path = Path("models/orders.yml")
+AUTHORED_VALUES_FILE_PATH: Path = Path("sql/models/orders.yml")
 AUTHORED_VALUES_LABEL: str = "model 'orders'"
 
 

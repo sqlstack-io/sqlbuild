@@ -70,7 +70,7 @@ fn given_rule_findings_when_a_location_reports_a_failed_load_then_only_bounded_l
             let finding = LocationRuleFinding {
                 code: "SQBRMODEL102".into(),
                 message: "m".repeat(test_case.message_chars),
-                path: Some("models/orders.sql".into()),
+                path: Some("sql/models/orders.sql".into()),
                 line: Some(2),
             };
             let report = LocationHealthReport {

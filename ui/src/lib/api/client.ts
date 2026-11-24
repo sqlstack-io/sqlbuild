@@ -1,4 +1,5 @@
 import type {
+	DiscoveredSet,
 	AdhocRunCheck,
 	PlanResult,
 	PlanPage,
@@ -39,6 +40,9 @@ import type {
 	IgnoredAuditFailure,
 	RunCostRow,
 	CostSummary,
+	CostSelection,
+	CostSelectionQuery,
+	CostSeriesGroup,
 	AutomaticWithdrawal,
 	ConditionShape,
 	NodeBuildCost,
@@ -87,6 +91,8 @@ export interface ApiClient extends PlatformApi {
 	 * through the shared catalog store (`$lib/state/catalog.svelte`), which reads it once per snapshot.
 	 */
 	listCatalogNodes(scope: Scope): Promise<CatalogNode[]>;
+	/** The current snapshot's discovered sets and the nodes their items became; none before a publication. */
+	readDiscovered(scope: Scope): Promise<DiscoveredSet[]>;
 	/** Every node's build state at the current status version, for applying `node_status` changes to a listing. */
 	listNodeStates(scope: Scope): Promise<NodeStates>;
 	/** `listing` and `checks` are current `listCatalogNodes` and `listChecks` results the caller already holds, so they aren't read again. */
@@ -127,6 +133,10 @@ export interface ApiClient extends PlatformApi {
 	listRunCost(scope: Scope, runId: string): Promise<RunCostRow[]>;
 	/** Estimated query cost of the runs that started in the last `days` days, by job, warehouse size and node. */
 	getCostSummary(scope: Scope, days: number): Promise<CostSummary>;
+	/** A selection's estimated query cost over the last `query.days` whole UTC days, job by node. */
+	readCostSelection(scope: Scope, query: CostSelectionQuery): Promise<CostSelection>;
+	/** Daily credits of up to 200 groups of a selection, in the groups' order. */
+	readCostSeries(scope: Scope, query: CostSelectionQuery, groups: CostSeriesGroup[]): Promise<number[][]>;
 	/** One node's estimated query cost per build over the last `days` days, newest first. */
 	listNodeCosts(scope: Scope, nodeKey: string, days: number): Promise<NodeBuildCost[]>;
 	/** One statement's SQL, fetched when its row is expanded. `view.sql` */

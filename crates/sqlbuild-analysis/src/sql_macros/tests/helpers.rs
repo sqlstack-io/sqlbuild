@@ -24,7 +24,7 @@ impl FakeHost {
         let definitions = macros
             .iter()
             .map(|(name, source)| {
-                let path: String = format!("macros/sql/{name}.sql");
+                let path: String = format!("sql/macros/sql/{name}.sql");
                 let definition = parse_sql_macro(name, &path, source).expect("valid macro");
                 ((*name).to_owned(), Arc::new(definition))
             })

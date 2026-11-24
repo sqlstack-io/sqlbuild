@@ -97,7 +97,7 @@ reporting_currency = "USD"
 valuation_date = "2026-03-31"
 # Customer shown by the order lookup report; override per run with --vars.
 lookup_customer_id = "C000001"
-# Volume multiplier for the synthetic data loaders in python/loaders; 1 is the small default.
+# Volume multiplier for the synthetic data loaders in python/nodes/loaders; 1 is the small default.
 data_scale = "1"
 # >>> edge-case area (scripts/core_project.py leaves this block out of the core copy)
 # Last load of the edge-case delivery change log to include; "1" replays the first load only (see
@@ -119,7 +119,7 @@ ignore = ["SQLCLEAN021", "SQBRCONTRACT101"]
 
 [[rules.rule_exceptions]]
 rule = "SQLCLEAN018"
-path = "models/staging/_sqlbuild/macros/sql/cdc_latest.sql"
+path = "sql/models/staging/_sqlbuild/macros/sql/cdc_latest.sql"
 reason = """
 The macro cannot see its callers' keys on its own. Every call site is still checked, against the
 unique, non-null _seq that each change-log source declares.
@@ -127,7 +127,7 @@ unique, non-null _seq that each change-log source declares.
 
 [[rules.rule_exceptions]]
 rule = "SQLCLEAN018"
-path = "models/marts/core/dim_date.sql"
+path = "sql/models/marts/core/dim_date.sql"
 reason = """
 SEQ4() is distinct for every row of one GENERATOR call, so ordering by it is unique. ROW_NUMBER()
 renumbers it because SEQ4() alone may leave gaps.
@@ -135,7 +135,7 @@ renumbers it because SEQ4() alone may leave gaps.
 
 [[rules.rule_exceptions]]
 rule = "SQLCLEAN018"
-path = "models/staging/clickstream/stg_app_events.sql"
+path = "sql/models/staging/clickstream/stg_app_events.sql"
 reason = """
 Append-only feeds redeliver rows, so the source id repeats across loads and only (id, _loaded_at)
 is unique, which the source's unique_per_delivery audit checks. Rules cannot use a two-column key
@@ -145,7 +145,7 @@ whichever copy ranks first.
 
 [[rules.rule_exceptions]]
 rule = "SQLCLEAN018"
-path = "models/staging/clickstream/stg_email_events.sql"
+path = "sql/models/staging/clickstream/stg_email_events.sql"
 reason = """
 Append-only feeds redeliver rows, so the source id repeats across loads and only (id, _loaded_at)
 is unique, which the source's unique_per_delivery audit checks. Rules cannot use a two-column key
@@ -155,7 +155,7 @@ whichever copy ranks first.
 
 [[rules.rule_exceptions]]
 rule = "SQLCLEAN018"
-path = "models/staging/clickstream/stg_experiment_assignments.sql"
+path = "sql/models/staging/clickstream/stg_experiment_assignments.sql"
 reason = """
 Append-only feeds redeliver rows, so the source id repeats across loads and only (id, _loaded_at)
 is unique, which the source's unique_per_delivery audit checks. Rules cannot use a two-column key
@@ -165,7 +165,7 @@ whichever copy ranks first.
 
 [[rules.rule_exceptions]]
 rule = "SQLCLEAN018"
-path = "models/staging/clickstream/stg_search_queries.sql"
+path = "sql/models/staging/clickstream/stg_search_queries.sql"
 reason = """
 Append-only feeds redeliver rows, so the source id repeats across loads and only (id, _loaded_at)
 is unique, which the source's unique_per_delivery audit checks. Rules cannot use a two-column key
@@ -175,7 +175,7 @@ whichever copy ranks first.
 
 [[rules.rule_exceptions]]
 rule = "SQLCLEAN018"
-path = "models/staging/clickstream/stg_web_events.sql"
+path = "sql/models/staging/clickstream/stg_web_events.sql"
 reason = """
 Append-only feeds redeliver rows, so the source id repeats across loads and only (id, _loaded_at)
 is unique, which the source's unique_per_delivery audit checks. Rules cannot use a two-column key
@@ -185,7 +185,7 @@ whichever copy ranks first.
 
 [[rules.rule_exceptions]]
 rule = "SQLCLEAN018"
-path = "models/staging/finance/stg_settlement_reports.sql"
+path = "sql/models/staging/finance/stg_settlement_reports.sql"
 reason = """
 Append-only feeds redeliver rows, so the source id repeats across loads and only (id, _loaded_at)
 is unique, which the source's unique_per_delivery audit checks. Rules cannot use a two-column key
@@ -195,7 +195,7 @@ whichever copy ranks first.
 
 [[rules.rule_exceptions]]
 rule = "SQLCLEAN018"
-path = "models/staging/fulfilment/stg_carrier_webhook_errors.sql"
+path = "sql/models/staging/fulfilment/stg_carrier_webhook_errors.sql"
 reason = """
 Append-only feeds redeliver rows, so the source id repeats across loads and only (id, _loaded_at)
 is unique, which the source's unique_per_delivery audit checks. Rules cannot use a two-column key
@@ -205,7 +205,7 @@ whichever copy ranks first.
 
 [[rules.rule_exceptions]]
 rule = "SQLCLEAN018"
-path = "models/staging/fulfilment/stg_carrier_webhooks.sql"
+path = "sql/models/staging/fulfilment/stg_carrier_webhooks.sql"
 reason = """
 Append-only feeds redeliver rows, so the source id repeats across loads and only (id, _loaded_at)
 is unique, which the source's unique_per_delivery audit checks. Rules cannot use a two-column key
@@ -215,7 +215,7 @@ whichever copy ranks first.
 
 [[rules.rule_exceptions]]
 rule = "SQLCLEAN018"
-path = "models/staging/inventory/stg_stock_movements.sql"
+path = "sql/models/staging/inventory/stg_stock_movements.sql"
 reason = """
 Append-only feeds redeliver rows, so the source id repeats across loads and only (id, _loaded_at)
 is unique, which the source's unique_per_delivery audit checks. Rules cannot use a two-column key
@@ -225,7 +225,7 @@ whichever copy ranks first.
 
 [[rules.rule_exceptions]]
 rule = "SQLCLEAN018"
-path = "models/staging/partners/stg_partner_orders.sql"
+path = "sql/models/staging/partners/stg_partner_orders.sql"
 reason = """
 Append-only feeds redeliver rows, so the source id repeats across loads and only (id, _loaded_at)
 is unique, which the source's unique_per_delivery audit checks. Rules cannot use a two-column key
@@ -235,7 +235,7 @@ whichever copy ranks first.
 
 [[rules.rule_exceptions]]
 rule = "SQLCLEAN034"
-path = "models/staging/_sqlbuild/macros/sql/load_metadata.sql"
+path = "sql/models/staging/_sqlbuild/macros/sql/load_metadata.sql"
 reason = """
 A column-list macro body is a select list by construction. Its columns are inserted into the
 caller's own CTE, where the rule is checked again.
@@ -243,7 +243,7 @@ caller's own CTE, where the rule is checked again.
 
 [[rules.rule_exceptions]]
 rule = "SQLCLEAN034"
-path = "macros/sql/money_columns.sql"
+path = "sql/macros/sql/money_columns.sql"
 reason = """
 A column-list macro body is a select list by construction. Its columns are inserted into the
 caller's own CTE, where the rule is checked again.
@@ -251,7 +251,7 @@ caller's own CTE, where the rule is checked again.
 
 [[rules.rule_exceptions]]
 rule = "SQLCLEAN028"
-path = "models/intermediate/catalogue/int_category_paths.sql"
+path = "sql/models/intermediate/catalogue/int_category_paths.sql"
 reason = """
 LEVEL and the CONNECT_BY_ROOT operator are hierarchical-query pseudo-columns that cannot be
 qualified with a table alias.
@@ -259,7 +259,7 @@ qualified with a table alias.
 
 [[rules.rule_exceptions]]
 rule = "SQBRTEST202"
-path = "models/intermediate/catalogue/int_category_paths.sql"
+path = "sql/models/intermediate/catalogue/int_category_paths.sql"
 reason = """
 Unit-test fixture checking treats the LEVEL pseudo-column as a column the mocked categories
 relation must supply, so no test of this model can compile yet. The
@@ -268,7 +268,7 @@ category_tree__rolls_sales_up_built_paths scenario builds the hierarchy from a s
 
 [[rules.rule_exceptions]]
 rule = "SQBRTEST202"
-path = "models/intermediate/clickstream/int_cart_funnel.sql"
+path = "sql/models/intermediate/clickstream/int_cart_funnel.sql"
 reason = """
 Unit-test fixture checking treats the FILTER, TRANSFORM and REDUCE lambda parameters (i, acc, q) as
 columns the mocked relations must supply, so no test of this model can compile yet. The
@@ -277,7 +277,7 @@ cart_funnel__assigns_furthest_stage_per_session scenario covers the funnel inste
 
 [[rules.rule_exceptions]]
 rule = "SQLCLEAN038"
-path = "models/marts/executive/rpt_executive_kpis_daily.sql"
+path = "sql/models/marts/executive/rpt_executive_kpis_daily.sql"
 relation = "metric_regions"
 reason = """
 The KPI grid is every reporting day for every region and metric pair that has ever had a value, so
@@ -287,7 +287,7 @@ days without activity report zero instead of disappearing. Both sides are small 
 # >>> edge-case area (scripts/core_project.py leaves this block out of the core copy)
 [[rules.rule_ignores]]
 rules = ["SQLCLEAN027"]
-paths = ["models/marts/edge_cases/rpt_edge_stock_reconciliation.sql"]
+paths = ["sql/models/marts/edge_cases/rpt_edge_stock_reconciliation.sql"]
 reason = """
 The edge case selects the key columns that FULL OUTER JOIN ... USING merges. They belong to neither
 side, so qualifying them with either alias would drop the keys of rows found only on the other side.
@@ -295,7 +295,7 @@ side, so qualifying them with either alias would drop the keys of rows found onl
 
 [[rules.rule_ignores]]
 rules = ["SQLCLEAN003", "SQLCLEAN023", "SQLCLEAN027", "SQLCLEAN051"]
-paths = ["models/intermediate/edge_cases/int_edge_join_keys.sql"]
+paths = ["sql/models/intermediate/edge_cases/int_edge_join_keys.sql"]
 reason = """
 The edge cases read the merged key of RIGHT JOIN ... USING and of a USING join followed by an outer
 join unqualified, because it belongs to neither side; the side aliases are then unused. An ASOF
@@ -306,8 +306,8 @@ under test.
 [[rules.rule_ignores]]
 rules = ["SQLCLEAN018"]
 paths = [
-  "models/intermediate/edge_cases/int_edge_grouped_windows.sql",
-  "models/intermediate/edge_cases/int_edge_null_arithmetic.sql",
+  "sql/models/intermediate/edge_cases/int_edge_grouped_windows.sql",
+  "sql/models/intermediate/edge_cases/int_edge_null_arithmetic.sql",
 ]
 reason = """
 The ranking windows order by the group code of a grouped query and by the check id, both unique
@@ -316,7 +316,7 @@ where they are ranked, which Rules cannot prove through a GROUP BY or a CTE.
 
 [[rules.rule_ignores]]
 rules = ["SQLCLEAN022"]
-paths = ["models/intermediate/edge_cases/int_edge_analysis_patterns.sql"]
+paths = ["sql/models/intermediate/edge_cases/int_edge_analysis_patterns.sql"]
 reason = """
 The edge case leaves two calculated columns unaliased on purpose, and reads them by the names
 Snowflake gives them.
@@ -324,21 +324,21 @@ Snowflake gives them.
 
 [[rules.rule_ignores]]
 rules = ["SQLCLEAN022"]
-paths = ["models/intermediate/edge_cases/int_edge_check_unnamed_labels.sql"]
+paths = ["sql/models/intermediate/edge_cases/int_edge_check_unnamed_labels.sql"]
 reason = """
 The edge case leaves a literal unaliased on purpose, and reads it by the name Snowflake gives it.
 """
 
 [[rules.rule_ignores]]
 rules = ["SQLCLEAN044"]
-paths = ["models/intermediate/edge_cases/_sqlbuild/_hooks/sql/create_edge_running_peaks.sql"]
+paths = ["sql/models/intermediate/edge_cases/_sqlbuild/_hooks/sql/create_edge_running_peaks.sql"]
 reason = """
 The hook creates a JavaScript function, whose body Snowflake takes as one dollar-quoted string.
 """
 
 [[rules.rule_ignores]]
 rules = ["SQLCLEAN039"]
-paths = ["models/intermediate/edge_cases/int_edge_basket_line_sku_parts.sql"]
+paths = ["sql/models/intermediate/edge_cases/int_edge_basket_line_sku_parts.sql"]
 reason = """
 The edge case reads the line through a derived table nested in a comma-joined LATERAL on purpose:
 that shape is the case under test.
@@ -347,8 +347,8 @@ that shape is the case under test.
 [[rules.rule_ignores]]
 rules = ["SQLCLEAN034"]
 paths = [
-  "models/intermediate/edge_cases/int_edge_expression_spans.sql",
-  "models/intermediate/edge_cases/int_edge_reference_qualified_spans.sql",
+  "sql/models/intermediate/edge_cases/int_edge_expression_spans.sql",
+  "sql/models/intermediate/edge_cases/int_edge_reference_qualified_spans.sql",
 ]
 reason = """
 These edge cases keep their macro calls, variable, literals and reference calls in the terminal
@@ -358,7 +358,7 @@ the compiled SQL must differ from the authored text.
 
 [[rules.rule_ignores]]
 rules = ["SQLCLEAN040"]
-paths = ["models/intermediate/edge_cases/int_edge_amount_bit_reads.sql"]
+paths = ["sql/models/intermediate/edge_cases/int_edge_amount_bit_reads.sql"]
 reason = """
 The edge case joins the group list with a comma after an explicit join on purpose, and Rules read
 the comma-joined relation as part of the preceding ON condition.
@@ -366,7 +366,7 @@ the comma-joined relation as part of the preceding ON condition.
 
 [[rules.rule_ignores]]
 rules = ["SQLCLEAN033"]
-paths = ["models/intermediate/edge_cases/int_edge_sku_text_reads.sql"]
+paths = ["sql/models/intermediate/edge_cases/int_edge_sku_text_reads.sql"]
 reason = """
 The edge case attaches a comment to a text literal on purpose, the shape that parsers keep as an
 annotated expression.
@@ -374,7 +374,7 @@ annotated expression.
 
 [[rules.rule_ignores]]
 rules = ["SQLCLEAN027", "SQLCLEAN028"]
-paths = ["models/intermediate/edge_cases/int_edge_category_walk.sql"]
+paths = ["sql/models/intermediate/edge_cases/int_edge_category_walk.sql"]
 reason = """
 LEVEL and CONNECT_BY_ROOT belong to the walk, not to a relation, so they cannot be qualified, and
 the edge case reads a column named level from another relation unqualified inside a scalar

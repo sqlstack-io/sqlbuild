@@ -36,7 +36,7 @@ def write_varied_compile_project(*, project_dir: Path, model_count: int) -> None
     write_dense_compile_project(
         project_dir=project_dir, model_count=model_count, rule_select=DENSE_ALL_RULE_SELECT
     )
-    for index, model in enumerate(sorted((project_dir / "models").rglob("*.sql"))):
+    for index, model in enumerate(sorted((project_dir / "sql" / "models").rglob("*.sql"))):
         contents: str = model.read_text(encoding="utf-8")
         replacements: dict[str, str] = _dependency_replacements(
             index=index, contents=contents, model_count=model_count

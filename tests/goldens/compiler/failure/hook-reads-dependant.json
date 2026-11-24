@@ -11,20 +11,20 @@
      "message": "Python hook 'note_refresh' on model 'stg_orders' reads model 'customer_totals', which depends on 'stg_orders'; a hook runs as part of its model, so it cannot wait for a resource built from that model",
      "resource_type": "model",
      "resource_name": "stg_orders",
-     "path": "models/staging/_sqlbuild/_hooks/python/notes.py",
+     "path": "sql/models/staging/_sqlbuild/_hooks/python/notes.py",
      "help": "attach the hook to a model built after 'customer_totals', or drop the read and use ctx.destination for 'stg_orders' itself"
     }
    ]
   }
  ],
  "compiled": {
-  "models/marts/customer_totals.sql": [
+  "sql/models/marts/customer_totals.sql": [
    "SELECT customer_id, SUM(amount) AS total_amount",
    "FROM __ref(\"stg_orders\")",
    "GROUP BY customer_id",
    ""
   ],
-  "models/staging/stg_orders.sql": [
+  "sql/models/staging/stg_orders.sql": [
    "SELECT order_id, customer_id, amount, status",
    "FROM __source(\"raw_orders\")",
    ""
@@ -38,8 +38,8 @@
     "name": "customer_totals",
     "resource_type": "model",
     "package_name": "failure_corpus",
-    "path": "models/marts/customer_totals.sql",
-    "original_file_path": "models/marts/customer_totals.sql",
+    "path": "sql/models/marts/customer_totals.sql",
+    "original_file_path": "sql/models/marts/customer_totals.sql",
     "unique_id": "model.failure_corpus.customer_totals",
     "fqn": [
      "failure_corpus",
@@ -107,8 +107,8 @@
     "name": "stg_orders",
     "resource_type": "model",
     "package_name": "failure_corpus",
-    "path": "models/staging/stg_orders.sql",
-    "original_file_path": "models/staging/stg_orders.sql",
+    "path": "sql/models/staging/stg_orders.sql",
+    "original_file_path": "sql/models/staging/stg_orders.sql",
     "unique_id": "model.failure_corpus.stg_orders",
     "fqn": [
      "failure_corpus",
@@ -159,7 +159,7 @@
          "type": "python",
          "name": "note_refresh",
          "kwargs": {},
-         "relative_path": "models/staging/_sqlbuild/_hooks/python/notes.py",
+         "relative_path": "sql/models/staging/_sqlbuild/_hooks/python/notes.py",
          "definition_hash": "5d9bbe39d4017828edf4fac4743dc8253cd0f9b3d65779e5f9cff6100bee89dd",
          "version_hash": "38cb2db363acaa4f13ad2ac96e920b672895acf529c55e86c75d1ab2c73137a9"
         }
@@ -193,8 +193,8 @@
     "name": "raw_orders",
     "resource_type": "source",
     "package_name": "failure_corpus",
-    "path": "sources/raw.yml",
-    "original_file_path": "sources/raw.yml",
+    "path": "sql/sources/raw.yml",
+    "original_file_path": "sql/sources/raw.yml",
     "unique_id": "source.failure_corpus.raw_orders",
     "fqn": [
      "failure_corpus",

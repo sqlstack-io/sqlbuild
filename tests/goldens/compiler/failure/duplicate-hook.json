@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D011",
-     "message": "Duplicate hook name 'note_refresh' found in hooks/python/first.py and hooks/python/second.py"
+     "message": "Duplicate hook name 'note_refresh' found in sql/hooks/python/first.py and sql/hooks/python/second.py"
     }
    ]
   }

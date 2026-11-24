@@ -5,7 +5,7 @@ description: "Loaders, assets, and checks as first-class nodes in the SQLBuild g
 
 Python nodes let your project grow beyond warehouse-only SQL while keeping the SQL graph clean. They are ordinary Python functions, decorated to become nodes in the same DAG as your SQL models, and they run as part of `sqb build`.
 
-There are three kinds. The decorator says what each function is, so all of them live under one `python/` folder:
+There are three kinds. The decorator says what each function is, so all of them live under one `python/nodes/` folder:
 
 | Kind | Decorator | Purpose |
 |------|-----------|---------|
@@ -23,25 +23,44 @@ All three share the same decorator conventions, dependency model, selection synt
 
 Nodes can also be generated programmatically with [`@factory`](/docs/concepts/python-nodes/factories) instead of authored one at a time.
 
-## The `python/` folder
+## The `python/nodes/` folder
 
-Anything that runs as part of the pipeline graph goes in `python/`: loaders, assets, checks, [factories](/docs/concepts/python-nodes/factories), and the helper modules they import. SQLBuild imports every `.py` file under `python/` recursively (except `__init__.py`) and registers each decorated function by its decorator. Undecorated functions and helper-only modules are allowed and never become nodes.
+Anything that runs as part of the pipeline graph goes in `python/nodes/`: loaders, assets, checks, [factories](/docs/concepts/python-nodes/factories), and the helper modules they import. SQLBuild imports every `.py` file under `python/nodes/` recursively (except `__init__.py`) and registers each decorated function by its decorator. Undecorated functions and helper-only modules are allowed and never become nodes.
 
-How you organize files inside `python/` is up to you. The playgrounds group nodes by kind:
+Each node lives in a folder of its own under `python/nodes/`, in a file named for what it declares:
+
+| File | Declares |
+|------|----------|
+| `loader.py` | one `@loader` |
+| `asset.py` | one `@asset` |
+| `checks.py` | `@check` functions, or a factory that makes only checks |
+| `loaders.py` | a `@factory` that makes only loaders |
+| `assets.py` | a `@factory` that makes only assets |
+| `factory.py` | a `@factory` that makes more than one kind |
+
+A folder holds one of these declaration files, plus `checks.py` for the checks of its node. Any other
+file name for a declaration fails compilation with `D011`, which names the file the declaration
+belongs in:
+
+```text
+error[D011]: @asset 'orders_export' is declared in python/nodes/orders/export/node.py; an @asset is declared in asset.py
+```
+
+Helper modules, `main.py`, and role files such as `constants.py` and `models.py` may sit beside the
+declaration file. `@discover` and `@audit_factory` functions are not node declarations and may sit in
+any module under `python/nodes/`. The playgrounds group nodes by kind:
 
 ```
-python/
-  _helpers.py          # shared helpers, not nodes
-  loaders/orders.py
-  assets/orders_inputs.py
-  assets/orders_export.py
-  checks/orders_export.py
-  factories/regional.py
+python/nodes/
+  loaders/orders/loader.py
+  assets/prepare_raw_orders/asset.py
+  assets/orders_export/asset.py
+  checks/orders_export/checks.py
 ```
 
-Grouping by domain (`python/orders/`, `python/customers/`) works just as well, and a single file may mix kinds. A project that selects the [Python Rules](/docs/concepts/rules/python-rules#laying-out-python) commits to grouping by domain, with each node in its own [unit folder](/docs/concepts/rules/python-rules#writing-nodes-as-units) holding `node.py` and `main.py`: `SQBRPYTHON001` reports node-kind folders such as `python/loaders/` and modules directly under `python/`, and `SQBRPYTHON012` reports nodes declared outside a unit's `node.py`. Import other project modules through the `python` package, for example `from python.assets.orders_inputs import prepare_raw_orders` or `from python._helpers import normalize_status`.
+Grouping by domain (`python/nodes/orders/`, `python/nodes/customers/`) works just as well. A project that selects the [Python Rules](/docs/concepts/rules/python-rules#laying-out-python) commits to grouping by domain, with each node in its own [unit folder](/docs/concepts/rules/python-rules#writing-nodes-as-units) holding its declaration file and `main.py`: `SQBRPYTHON001` reports node-kind folders such as `python/nodes/loaders/` and modules directly under `python/nodes/`. Import other project modules by their path, for example `from python.nodes.assets.prepare_raw_orders.asset import prepare_raw_orders` or `from python.providers.warehouse_client.provider import WarehouseClient`.
 
-Code that extends SQLBuild itself keeps its own folder, such as `rules/`, `materializations/`, `adapters/`, `providers/`, `sinks/`, `hooks/python/`, `functions/python/`, and `macros/`. Python outside the supported locations fails compilation with `D016`; see [Project Python](/docs/concepts/project-configuration#project-python) for the full list.
+Code that extends SQLBuild itself keeps its own folder, such as `rules/`, `python/materializations/`, `python/adapters/`, `python/providers/`, `python/event_sinks/`, `sql/hooks/python/`, `sql/functions/python/`, and `sql/macros/`. Python outside the supported locations fails compilation with `D016`; see [Project layout](/docs/concepts/project-configuration#project-layout) for the full list.
 
 ## The SQL boundary
 

@@ -35,7 +35,9 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
         GraphBoundaryCompileTestCase(
             description="a cycle through a task, models, a source and its loader fails compile",
             project_settings=ALLOW_ROUND_TRIPS,
-            edited_files={"python/tasks/scoring.py": round_trip_refusal("cycle_task.py")},
+            edited_files={
+                "python/nodes/tasks/scoring/asset.py": round_trip_refusal("cycle_task.py"),
+            },
             expected_exit_code=1,
             expected_output_fragments=(
                 "S000",
@@ -48,8 +50,8 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
             description="a cycle of model refs alone fails compile with the plan's message",
             project_settings=ALLOW_ROUND_TRIPS,
             edited_files={
-                "models/order_totals.sql": round_trip_refusal("order_totals.sql"),
-                "models/order_ranks.sql": round_trip_refusal("order_ranks.sql"),
+                "sql/models/order_totals.sql": round_trip_refusal("order_totals.sql"),
+                "sql/models/order_ranks.sql": round_trip_refusal("order_ranks.sql"),
             },
             expected_exit_code=1,
             expected_output_fragments=(
@@ -71,8 +73,10 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
             description="a task depending on a terminal loader instead of its source fails compile",
             project_settings="",
             edited_files={
-                "python/tasks/scoring.py": round_trip_refusal("unread_task.py"),
-                "python/tasks/reporting.py": round_trip_refusal("terminal_loader_reader.py"),
+                "python/nodes/tasks/scoring/asset.py": round_trip_refusal("unread_task.py"),
+                "python/nodes/tasks/reporting/asset.py": round_trip_refusal(
+                    "terminal_loader_reader.py"
+                ),
             },
             expected_exit_code=1,
             expected_output_fragments=(

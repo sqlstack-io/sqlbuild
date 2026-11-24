@@ -63,22 +63,22 @@ fn given_relative_paths_when_classifying_headers_then_only_plain_models_scan_one
     let test_cases = [
         crate::lint_text::tests::test_types::FirstHeaderTestCase {
             description: "a plain model file",
-            relative_parts: &["models", "staging", "orders.sql"],
+            relative_parts: &["sql", "models", "staging", "orders.sql"],
             expected_first_only: true,
         },
         crate::lint_text::tests::test_types::FirstHeaderTestCase {
             description: "a scoped declaration file under models",
-            relative_parts: &["models", "_enums", "status.sql"],
+            relative_parts: &["sql", "models", "_enums", "status.sql"],
             expected_first_only: false,
         },
         crate::lint_text::tests::test_types::FirstHeaderTestCase {
             description: "a declaration group file under models",
-            relative_parts: &["models", "_sqlbuild", "orders.sql"],
+            relative_parts: &["sql", "models", "_sqlbuild", "orders.sql"],
             expected_first_only: false,
         },
         crate::lint_text::tests::test_types::FirstHeaderTestCase {
             description: "a file named like a folder is still a model",
-            relative_parts: &["models", "enums.sql"],
+            relative_parts: &["sql", "models", "enums.sql"],
             expected_first_only: true,
         },
         crate::lint_text::tests::test_types::FirstHeaderTestCase {
@@ -108,12 +108,20 @@ fn given_project_paths_when_classifying_named_roles_then_kinds_match_python() {
     let test_cases = [
         crate::lint_text::tests::test_types::RoleKindTestCase {
             description: "a generic audit",
-            relative_parts: &["audits", "generic", "not_null.sql"],
+            relative_parts: &["sql", "audits", "generic", "not_null.sql"],
             expected_kind: Some("audit"),
         },
         crate::lint_text::tests::test_types::RoleKindTestCase {
             description: "a local SQL hook in a declaration group",
-            relative_parts: &["models", "orders", "_sqlbuild", "_hooks", "sql", "h.sql"],
+            relative_parts: &[
+                "sql",
+                "models",
+                "orders",
+                "_sqlbuild",
+                "_hooks",
+                "sql",
+                "h.sql",
+            ],
             expected_kind: Some("sql_hook"),
         },
         crate::lint_text::tests::test_types::RoleKindTestCase {
@@ -123,7 +131,7 @@ fn given_project_paths_when_classifying_named_roles_then_kinds_match_python() {
         },
         crate::lint_text::tests::test_types::RoleKindTestCase {
             description: "a plain model",
-            relative_parts: &["models", "orders.sql"],
+            relative_parts: &["sql", "models", "orders.sql"],
             expected_kind: None,
         },
     ];

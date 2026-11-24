@@ -67,7 +67,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                 sources:
                   - name: raw_orders
@@ -77,7 +77,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 """
                 ).strip()
                 + "\n",
-                "models/staging/stg_orders.sql": dedent(
+                "sql/models/staging/stg_orders.sql": dedent(
                     """
                 MODEL (description "Test model stg_orders.", materialized view);
 
@@ -90,7 +90,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 """
                 ).strip()
                 + "\n",
-                "models/marts/fact_orders.sql": dedent(
+                "sql/models/marts/fact_orders.sql": dedent(
                     """
                 MODEL (description "Test model fact_orders.", materialized table);
 
@@ -99,7 +99,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 """
                 ).strip()
                 + "\n",
-                "models/marts/hourly_order_activity.sql": dedent(
+                "sql/models/marts/hourly_order_activity.sql": dedent(
                     """
                 MODEL (description "Test model hourly_order_activity.",
                   materialized incremental,
@@ -126,7 +126,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 """
                 ).strip()
                 + "\n",
-                "models/marts/daily_activity_rollup.sql": dedent(
+                "sql/models/marts/daily_activity_rollup.sql": dedent(
                     """
                 MODEL (description "Test model daily_activity_rollup.",
                   materialized incremental,
@@ -153,7 +153,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 """
                 ).strip()
                 + "\n",
-                "models/marts/hourly_activity_with_daily_context.sql": dedent(
+                "sql/models/marts/hourly_activity_with_daily_context.sql": dedent(
                     """
                 MODEL (description "Test model hourly_activity_with_daily_context.",
                   materialized incremental,

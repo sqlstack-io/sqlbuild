@@ -226,7 +226,7 @@ pub(super) fn kept_plans(count: usize, limits: (usize, usize)) -> Mutex<Option<P
 }
 
 /// The file `orders_plan` is defined in, in the discovered-set tests.
-pub(super) const PLAN_FILE: &str = "python/plan/node.py";
+pub(super) const PLAN_FILE: &str = "python/nodes/plan/node.py";
 
 /// The stamps of `paths`, the ones in `edited` with another size.
 pub(super) fn stamps(

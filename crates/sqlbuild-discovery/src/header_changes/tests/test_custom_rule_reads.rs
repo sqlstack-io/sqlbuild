@@ -13,7 +13,7 @@ fn given_custom_rule_facts_when_a_header_changes_then_reads_of_changed_keys_are_
         },
         CustomRuleReadsTestCase {
             description: "a model's enum column types are decided by its columns",
-            fact_key: vec!["columns.enum_types", "models/orders.sql"],
+            fact_key: vec!["columns.enum_types", "sql/models/orders.sql"],
             changed: vec!["columns"],
             expected_reason: Some("a custom rule reads orders's columns"),
         },
@@ -25,7 +25,7 @@ fn given_custom_rule_facts_when_a_header_changes_then_reads_of_changed_keys_are_
         },
         CustomRuleReadsTestCase {
             description: "a fact no changed key decides is ignored",
-            fact_key: vec!["materialized", "models/orders.sql"],
+            fact_key: vec!["materialized", "sql/models/orders.sql"],
             changed: vec!["description"],
             expected_reason: None,
         },
@@ -42,7 +42,7 @@ fn given_custom_rule_facts_when_a_header_changes_then_reads_of_changed_keys_are_
         assert_eq!(
             custom_rule_reads(
                 &facts,
-                ("models/orders.sql", "orders"),
+                ("sql/models/orders.sql", "orders"),
                 &keys(&test_case.changed)
             )
             .as_deref(),

@@ -253,6 +253,8 @@ export const RECALL_EVENT_TYPES = [
 	// A Python node's `ctx.log` line: few, deliberate, kept as events.
 	'node_log',
 	'invocation_started',
+	// A finished step of the worker's command: discovered, compiled, matched, connected, inspected, planned, or a saved discovered set.
+	'invocation_phase',
 	'invocation_completed',
 	'invocation_failed',
 	'resource_attempt_started',
@@ -298,6 +300,17 @@ export type RunEvent = {
 	message: string;
 	/** For `audit_completed`: which check ran, how it came out and how many rows it found. */
 	check?: RunEventCheck | null;
+	/** For `invocation_phase`: which step finished, how long it took, what it counted, what it is about and its sub-steps. */
+	phase?: RunEventPhase | null;
+};
+
+/** One finished step of a worker's command before its nodes run. */
+export type RunEventPhase = {
+	phase: string;
+	durationMs: number | null;
+	count: number | null;
+	name: string | null;
+	detail: string | null;
 };
 
 /** A check's result in a run: its name as declared, its outcome, the rows it found, and its identity for its evidence. */
@@ -343,21 +356,24 @@ export type RunCostRow = {
 	seconds: number;
 	bytesScanned: number;
 	credits: number;
-	/** Null without a configured credit price; the UI never guesses one. */
+	/** Null without a price per credit; the UI never guesses one. */
 	usd: number | null;
+	/** Where `usd`'s price per credit came from (`PriceSource`); null without one. */
+	priceSource: PriceSource | null;
 	status: Exclude<RunCostStatus, 'none'>;
 	statementsExpected: number;
 	statementsObserved: number;
 };
 
-export type RunCostResource = { nodeKey: string; credits: number; usd: number | null; seconds: number; queryCount: number; bytesScanned: number; warehouses: string[] };
-export type RunCostWarehouse = { name: string; size: string; credits: number; usd: number | null; seconds: number; queryCount: number };
+export type RunCostResource = { nodeKey: string; credits: number; usd: number | null; priceSource: PriceSource | null; seconds: number; queryCount: number; bytesScanned: number; warehouses: string[] };
+export type RunCostWarehouse = { name: string; size: string; credits: number; usd: number | null; priceSource: PriceSource | null; seconds: number; queryCount: number };
 
 /** A run's estimated query cost, with its resources and warehouses most expensive first. */
 export type RunCostBreakdown = {
 	status: RunCostStatus;
 	credits: number;
 	usd: number | null;
+	priceSource: PriceSource | null;
 	seconds: number;
 	queryCount: number;
 	statementsExpected: number;
@@ -373,8 +389,9 @@ export type CostGroup = { key: string | null; credits: number; usd: number | nul
 export type CostSummary = {
 	since: string;
 	credits: number;
-	/** Null when any run in the window had no configured credit price. */
+	/** Null when any run in the window had no price per credit. */
 	usd: number | null;
+	priceSource: PriceSource | null;
 	runs: number;
 	/** Runs whose cost is still pending or partial, which a later build re-reads. */
 	incompleteRuns: number;
@@ -383,6 +400,67 @@ export type CostSummary = {
 	/** Every node that ran, keyed by node key. */
 	byNode: CostGroup[];
 };
+
+/**
+ * Where a price per credit came from: the project's `[cost] usd_per_credit`, the account's rate
+ * sheet, the list price for its region (an estimate), or several of the first two.
+ */
+export type PriceSource = 'config' | 'rate_sheet' | 'list_price' | 'mixed';
+
+/** The price a cost read's dollars use, and where it came from. */
+export type CostPrice = { usdPerCredit: number; source: PriceSource };
+
+/** One job's estimated query cost on one node over a period, and in the period before it. */
+export type CostFact = {
+	/** Null for builds no server run started (by hand or from the command line). */
+	job: string | null;
+	nodeKey: string;
+	/** The node's folder: without `sql/models/` for SQL models (empty at its top), other roots as published, `other` when unknown. */
+	folder: string;
+	credits: number;
+	previousCredits: number;
+	usd: number | null;
+	previousUsd: number | null;
+	seconds: number;
+	runs: number;
+	queries: number;
+	bytesScanned: number;
+};
+
+/** Credits per day of a cost read's period, for one job or top-level folder (`key`). */
+export type CostSeries = { key: string | null; credits: number[] };
+
+/** A selection's estimated query cost over a period of whole UTC days, job by node, with daily series. */
+export type CostSelection = {
+	snapshotId: string | null;
+	since: string;
+	days: number;
+	/** The period's days, `YYYY-MM-DD`, oldest first; every series follows them. */
+	dates: string[];
+	/** Why `sqb` refuses the selection; facts and series are then empty. */
+	error: SelectionProblem | null;
+	/** Null unless every observation had a configured credit price. */
+	price: CostPrice | null;
+	credits: number;
+	previousCredits: number;
+	usd: number | null;
+	previousUsd: number | null;
+	runs: number;
+	incompleteRuns: number;
+	queries: number;
+	seconds: number;
+	bytesScanned: number;
+	/** Most expensive first. */
+	facts: CostFact[];
+	jobDaily: CostSeries[];
+	folderDaily: CostSeries[];
+};
+
+/** A cost read's period and selection, as `sqb build --select … --exclude …` takes it. */
+export type CostSelectionQuery = { days: number; select: string; exclude: string };
+
+/** One group of a batch of daily cost series: selected nodes matching every field given. */
+export type CostSeriesGroup = { job?: string; manual?: boolean; folder?: string; nodeKey?: string };
 
 /** One node's estimated query cost in one build, across every warehouse it used. */
 export type NodeBuildCost = {
@@ -394,6 +472,7 @@ export type NodeBuildCost = {
 	status: Exclude<RunCostStatus, 'none'>;
 	credits: number;
 	usd: number | null;
+	priceSource: PriceSource | null;
 	seconds: number;
 	queryCount: number;
 };

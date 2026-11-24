@@ -128,7 +128,7 @@ MODEL_CONFIG_PROJECT: dict[str, str] = {
         '[targets.dev]\nconnection = "local"\n'
         "schema = \"${coalesce(ENV:SQB_MISSING_SCHEMA, 'dev')}_${CTX:model.name}\"\n"
     ),
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         'MODEL (\n  materialized table,\n  description "Orders.",\n'
         "  tags [\"${if(eq(CTX:run.target, 'dev'), 'development', 'release')}\"],\n"
         "  columns (\n"
@@ -136,7 +136,7 @@ MODEL_CONFIG_PROJECT: dict[str, str] = {
         '    status (audits [accepted_values (values ["placed", "shipped"])]),\n'
         "  ),\n);\n\nSELECT 1 AS order_id, 'placed' AS status\n"
     ),
-    "models/customers.sql": (
+    "sql/models/customers.sql": (
         "MODEL (\n  materialized view,\n  columns (customer_id (type INTEGER)),\n);\n\n"
         "SELECT 1 AS customer_id\n"
     ),
@@ -154,12 +154,12 @@ LATER_VALIDATION_PATTERNS: tuple[re.Pattern[str], ...] = (
 """Validations the loop runs after parsing a header, which the YAML schema parsers never run."""
 _PARITY_PROJECT: str = 'name = "orders"\nadapter = "duckdb"\n'
 _PARITY_FILES: dict[str, str] = {
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         "MODEL (description 'Orders.', materialized incremental, incremental_strategy append);\n"
         "SELECT 1 AS order_id\n"
     ),
     **{
-        f"audits/generic/{name}.sql": 'AUDIT ();\nSELECT * FROM __ref("@model") WHERE FALSE\n'
+        f"sql/audits/generic/{name}.sql": 'AUDIT ();\nSELECT * FROM __ref("@model") WHERE FALSE\n'
         for name in ("a",)
     },
 }
@@ -506,10 +506,10 @@ def column_metadata_outcome(*, project_dir: Path, header_column: str) -> tuple[o
         "sqlbuild_project.toml": (
             'name = "orders"\nadapter = "duckdb"\n\n[vars]\ncolumn_type = "BIGINT"\n'
         ),
-        "macros/python/amounts.py": (
+        "sql/macros/python/amounts.py": (
             'def cents(column: str) -> str:\n    return f"{column} * 100"\n'
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             f"MODEL (description 'Orders.', columns ({header_column}));\nSELECT 1 AS amount\n"
         ),
     }
@@ -551,7 +551,7 @@ CONFIG_VALUE_PROJECT: dict[str, str] = {
         '[path_defaults."marts"]\nrow_diff_exclude_columns = ["loaded_at"]\ntags = ["mart"]\n\n'
         '[targets.dev]\nconnection = "local"\nschema = "${region}_${CTX:model.name}"\n'
     ),
-    "models/marts/orders.sql": 'MODEL (description "Orders.");\n\nSELECT 1 AS order_id\n',
+    "sql/models/marts/orders.sql": 'MODEL (description "Orders.");\n\nSELECT 1 AS order_id\n',
 }
 
 
@@ -653,7 +653,7 @@ def header_column_paths(*, project_dir: Path, headers: tuple[str, ...]) -> tuple
     files: dict[str, str] = {
         "sqlbuild_project.toml": CONFIG_VALUE_PROJECT["sqlbuild_project.toml"],
         **{
-            f"models/marts/orders_{index}.sql": f"MODEL ({header});\n\nSELECT 1 AS order_id\n"
+            f"sql/models/marts/orders_{index}.sql": f"MODEL ({header});\n\nSELECT 1 AS order_id\n"
             for index, header in enumerate(headers)
         },
     }

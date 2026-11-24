@@ -35,7 +35,7 @@ def test_given_physical_drift_when_diffing_contracts_then_reports_without_writin
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     database: Path = prepare_contract_project(tmp_path)
-    original_model: str = (tmp_path / "models" / "orders.sql").read_text(encoding="utf-8")
+    original_model: str = (tmp_path / "sql" / "models" / "orders.sql").read_text(encoding="utf-8")
 
     exit_code: int = main(
         [
@@ -57,7 +57,9 @@ def test_given_physical_drift_when_diffing_contracts_then_reports_without_writin
     assert "missing_declaration" in output
     assert "model:orders" in output
     assert "source:raw_orders" in output
-    assert (tmp_path / "models" / "orders.sql").read_text(encoding="utf-8") == original_model
+    assert (tmp_path / "sql" / "models" / "orders.sql").read_text(
+        encoding="utf-8"
+    ) == original_model
     assert database.is_file()
 
 
@@ -96,8 +98,8 @@ def test_given_missing_declarations_when_generating_additively_then_preserves_me
 
     assert exit_code == test_case.expected_exit_code
     assert "0 contract difference(s)" in capsys.readouterr().out
-    model_sql: str = (tmp_path / "models" / "orders.sql").read_text(encoding="utf-8")
-    source_yaml: str = (tmp_path / "sources" / "raw.yml").read_text(encoding="utf-8")
+    model_sql: str = (tmp_path / "sql" / "models" / "orders.sql").read_text(encoding="utf-8")
+    source_yaml: str = (tmp_path / "sql" / "sources" / "raw.yml").read_text(encoding="utf-8")
     assert "id (type INTEGER)" in model_sql
     assert "name (type VARCHAR)" in model_sql
     assert "-- keep model metadata" in model_sql
@@ -165,7 +167,7 @@ def test_given_parameterized_physical_type_when_generating_then_writes_valid_mod
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     database: Path = prepare_contract_project(tmp_path)
-    model_path: Path = tmp_path / "models" / "orders.sql"
+    model_path: Path = tmp_path / "sql" / "models" / "orders.sql"
     _ = model_path.write_text(
         "MODEL (description 'Test model orders.', materialized table);\n"
         "SELECT CAST(1 AS INTEGER) AS id, CAST(1 AS DECIMAL(10,2)) AS amount\n",
@@ -261,7 +263,7 @@ def test_given_multiple_sources_in_one_file_when_generating_then_all_edits_are_r
         ]
     )
 
-    source_yaml: str = (tmp_path / "sources" / "raw.yml").read_text(encoding="utf-8")
+    source_yaml: str = (tmp_path / "sql" / "sources" / "raw.yml").read_text(encoding="utf-8")
     assert exit_code == test_case.expected_exit_code
     assert "0 contract difference(s)" in capsys.readouterr().out
     assert "type: 'BIGINT'" in source_yaml
@@ -287,7 +289,7 @@ def test_given_conflicting_contract_when_overwriting_then_physical_shape_replace
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     _ = prepare_contract_project(tmp_path)
-    model_path: Path = tmp_path / "models" / "orders.sql"
+    model_path: Path = tmp_path / "sql" / "models" / "orders.sql"
     _ = model_path.write_text(
         """MODEL (description "Test model orders.",
   materialized table
@@ -449,7 +451,7 @@ def test_given_unavailable_inspection_target_credentials_when_generating_then_va
             f'database = "${{ENV:{missing_variable}}}"\n'
         ),
     )
-    model_path: Path = tmp_path / "models" / "orders.sql"
+    model_path: Path = tmp_path / "sql" / "models" / "orders.sql"
 
     exit_code: int = main(
         [
@@ -489,13 +491,13 @@ def test_given_shared_schema_when_one_binding_differs_then_write_fails_closed(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     _ = prepare_contract_project(tmp_path)
-    schema_path: Path = tmp_path / "schemas" / "order.sql"
-    schema_path.parent.mkdir()
+    schema_path: Path = tmp_path / "sql" / "schemas" / "order.sql"
+    schema_path.parent.mkdir(parents=True)
     _ = schema_path.write_text(
         "SCHEMA (name order, columns (id (type INTEGER)));\n",
         encoding="utf-8",
     )
-    model_path: Path = tmp_path / "models" / "orders.sql"
+    model_path: Path = tmp_path / "sql" / "models" / "orders.sql"
     _ = model_path.write_text(
         "MODEL (materialized table, model_schema order);\n"
         "SELECT CAST(1 AS INTEGER) AS id, CAST('a' AS VARCHAR) AS name\n",
@@ -541,7 +543,7 @@ def test_given_source_conflicts_when_overwriting_then_preserves_retained_metadat
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     _ = prepare_contract_project(tmp_path)
-    source_path: Path = tmp_path / "sources" / "raw.yml"
+    source_path: Path = tmp_path / "sql" / "sources" / "raw.yml"
     _ = source_path.write_text(
         """sources:
   - name: raw_orders
@@ -601,7 +603,7 @@ def test_given_cli_vars_when_writing_then_validation_recompile_uses_same_values(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     _ = prepare_contract_project(tmp_path)
-    model_path: Path = tmp_path / "models" / "orders.sql"
+    model_path: Path = tmp_path / "sql" / "models" / "orders.sql"
     _ = model_path.write_text(
         "MODEL (description 'Test model orders.', materialized table);\n"
         "SELECT CAST(@@identifier AS INTEGER) AS id, CAST('a' AS VARCHAR) AS name\n",
@@ -645,7 +647,7 @@ def test_given_unresolved_additive_type_conflict_when_writing_then_file_is_not_r
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     _ = prepare_contract_project(tmp_path)
-    model_path: Path = tmp_path / "models" / "orders.sql"
+    model_path: Path = tmp_path / "sql" / "models" / "orders.sql"
     _ = model_path.write_text(
         "MODEL (description 'Test model orders.', materialized table, columns (id (type BIGINT), name (type VARCHAR)));\n"
         "SELECT CAST(1 AS INTEGER) AS id, CAST('a' AS VARCHAR) AS name\n",
@@ -691,17 +693,19 @@ def test_given_relative_project_directory_when_diffing_contract_then_private_mac
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     project_dir: Path = tmp_path / "project"
-    project_dir.mkdir()
+    project_dir.mkdir(parents=True)
     _ = prepare_contract_project(project_dir)
-    root_model_path: Path = project_dir / "models" / "orders.sql"
+    root_model_path: Path = project_dir / "sql" / "models" / "orders.sql"
     root_model_path.unlink()
-    model_path: Path = project_dir / "models" / "orders" / "orders.sql"
-    model_path.parent.mkdir()
+    model_path: Path = project_dir / "sql" / "models" / "orders" / "orders.sql"
+    model_path.parent.mkdir(parents=True)
     _ = model_path.write_text(
         "MODEL (description 'Test model orders.', materialized table);\nSELECT @py.order_id() AS id, CAST('a' AS VARCHAR) AS name\n",
         encoding="utf-8",
     )
-    macro_path: Path = model_path.parent / "_sqlbuild" / "_macros" / "python" / "order_id.py"
+    macro_path: Path = (
+        model_path.parent / "_sqlbuild" / "_macros" / "python" / "order_id.py"
+    )
     macro_path.parent.mkdir(parents=True)
     _ = macro_path.write_text(
         'def order_id() -> str:\n    return "CAST(1 AS INTEGER)"\n', encoding="utf-8"
@@ -744,7 +748,7 @@ def test_given_indentless_source_columns_when_generating_then_preserves_metadata
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     _ = prepare_contract_project(tmp_path)
-    source_path: Path = tmp_path / "sources" / "raw.yml"
+    source_path: Path = tmp_path / "sql" / "sources" / "raw.yml"
     _ = source_path.write_text(
         """sources:
   - name: raw_orders

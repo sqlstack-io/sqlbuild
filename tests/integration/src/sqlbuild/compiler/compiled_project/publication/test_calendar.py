@@ -161,7 +161,7 @@ def test_given_a_served_calendar_when_time_passes_and_a_provider_fails_then_refr
                 "def excluded_calendar(window):\n    raise ValueError('excluded calendar must not evaluate')\n"
             ),
             **duckshop_orchestration("platform_orders"),
-            "providers/fulfillment.py": (
+            "python/providers/fulfillment.py": (
                 "import json, os\nfrom pathlib import Path\nfrom datetime import timedelta, timezone\n"
                 "from sqlbuild.provider.classes.provider import Provider\n"
                 "class Fulfillment(Provider):\n"
@@ -253,8 +253,8 @@ def test_given_a_served_calendar_when_time_passes_and_a_provider_fails_then_refr
             observations = [json.loads(line) for line in evaluations.read_text().splitlines()]
             assert [row["phase"] for row in observations] == ["setup", "evaluate", "teardown"] * 3
             data.write_text(json.dumps({"offsets": [1]}))
-            (project / "models/stg_orders.sql").write_text(
-                PUBLISHABLE_FILES["models/stg_orders.sql"].replace(
+            (project / "sql/models/stg_orders.sql").write_text(
+                PUBLISHABLE_FILES["sql/models/stg_orders.sql"].replace(
                     "CAST(5 AS INTEGER)", "CAST(19 AS INTEGER)"
                 )
             )

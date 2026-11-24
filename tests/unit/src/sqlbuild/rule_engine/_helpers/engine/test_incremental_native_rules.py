@@ -16,25 +16,25 @@ from tests.unit.src.sqlbuild.rule_engine._helpers.engine.helpers import (
 
 _ORDERS: IncrementalModelSpec = IncrementalModelSpec(
     name="commerce__mart__orders",
-    relative_path="models/commerce/mart/commerce__mart__orders.sql",
+    relative_path="sql/models/commerce/mart/commerce__mart__orders.sql",
     sql="WITH orders AS (SELECT * FROM source_orders) SELECT order_id FROM orders WHERE amount > 7",
     config_values={"materialized": "table"},
 )
 _CUSTOMERS: IncrementalModelSpec = IncrementalModelSpec(
     name="commerce__mart__customers",
-    relative_path="models/commerce/mart/commerce__mart__customers.sql",
+    relative_path="sql/models/commerce/mart/commerce__mart__customers.sql",
     sql="SELECT customer_id FROM warehouse.raw.customers",
 )
 _PRODUCTS: IncrementalModelSpec = IncrementalModelSpec(
     name="commerce__stg__products",
-    relative_path="models/commerce/staging/commerce__stg__products.sql",
+    relative_path="sql/models/commerce/staging/commerce__stg__products.sql",
     sql="SELECT * FROM warehouse.raw.products",
 )
 _EDITED_ORDERS: IncrementalModelSpec = replace(_ORDERS, sql=_ORDERS.sql.replace("> 7", "> 9"))
 _RENAMED_PRODUCTS: IncrementalModelSpec = replace(
     _PRODUCTS,
     name="commerce__stg__catalog_products",
-    relative_path="models/commerce/staging/commerce__stg__catalog_products.sql",
+    relative_path="sql/models/commerce/staging/commerce__stg__catalog_products.sql",
 )
 
 EDIT_SEQUENCE: tuple[IncrementalRulesStep, ...] = (
@@ -102,12 +102,12 @@ def test_given_edit_sequence_when_evaluating_incrementally_then_each_result_equa
     tmp_path: Path, test_case: IncrementalRulesModeTestCase
 ) -> None:
     cached_dir: Path = tmp_path / "cached"
-    cached_dir.mkdir()
+    cached_dir.mkdir(parents=True)
     observed: set[str] = set()
 
     for index, step in enumerate(EDIT_SEQUENCE):
         full_dir: Path = tmp_path / f"full_{index}"
-        full_dir.mkdir()
+        full_dir.mkdir(parents=True)
         incremental: RulesResult = evaluate_incremental_step(
             step=step,
             project_dir=cached_dir,

@@ -48,7 +48,7 @@ _EXPECTED_EVOLVED_ROWS: tuple[tuple[object, ...], ...] = (
         ),
         SqliteDecimalContractE2ETestCase(
             description="a numeric DECIMAL(10,2) warehouse column is enforced to contract text",
-            source_files={"sources/raw.yml": UNDECLARED_PAYMENT_SOURCES},
+            source_files={"sql/sources/raw.yml": UNDECLARED_PAYMENT_SOURCES},
             expected_payment_rows=_EXPECTED_PAYMENT_ROWS,
             expected_agreeing_rows=2,
             expected_evolved_rows=_EXPECTED_EVOLVED_ROWS,

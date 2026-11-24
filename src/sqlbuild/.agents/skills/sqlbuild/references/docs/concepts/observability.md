@@ -12,11 +12,11 @@ of parsing terminal output.
 | You want to | Use |
 |-------------|-----|
 | Find out what a past run did: what ran, its SQL, audit results, errors and output | [Recall](observability/recall.md) and [`sqb recall`](../cli/recall.md) |
-| Send events or output to your own systems, such as a message queue or a monitoring tool | [Typed sinks](observability/sinks.md) |
+| Send events or output to your own systems, such as a message queue or a monitoring tool | [Typed sinks](observability/event-sinks.md) |
 | Store lifecycle events and query run state from your own Python application | [Execution history](observability/execution-history.md) |
 | Read the result of the command you just ran | Its final `--json` output |
 
-Recall is on by default and covers investigation for people and agents. Sinks and execution history
+Recall is on by default and covers investigation for people and agents. Event sinks and execution history
 are for building on SQLBuild's events elsewhere. The `stdout.log`, `stderr.log` and
 `diagnostics.jsonl` files under `logs/<date>/` hold the same output as Recall; prefer
 `sqb recall output`, which also works with a shared store.
@@ -96,4 +96,4 @@ or failure. Sink delivery is bounded and best effort; destination failure does n
 warehouse work, and successful delivery does not prove the command succeeded.
 
 See [Recall](observability/recall.md) for the local history `sqb recall` queries, and
-[Typed Sinks](observability/sinks.md) to export lifecycle and command-output records.
+[Event sinks](observability/event-sinks.md) to export lifecycle and command-output records.

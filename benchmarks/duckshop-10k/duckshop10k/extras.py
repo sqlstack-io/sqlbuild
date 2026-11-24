@@ -163,15 +163,15 @@ def fx_source() -> str:
 
 
 def build_extras(project: Project, result: Intermediate) -> None:
-    project.write("functions/sql/udf__sku_family.sql", SKU_FAMILY)
-    project.write("functions/python/luhn_valid.py", LUHN_VALID)
-    project.write("python/audits/fact_quality.py", FACT_QUALITY)
-    project.write("sources/finance_reference.yml", fx_source())
+    project.write("sql/functions/sql/udf__sku_family.sql", SKU_FAMILY)
+    project.write("sql/functions/python/luhn_valid.py", LUHN_VALID)
+    project.write("python/nodes/audits/fact_quality.py", FACT_QUALITY)
+    project.write("sql/sources/finance_reference.yml", fx_source())
     charges = result.combined.get("payments__charges_enriched")
     if charges is not None:
         _card_checks(project, charges)
     if "fct_orders" in project.models:
-        project.write("functions/sql/table_fn__customer_orders.sql", CUSTOMER_ORDERS)
+        project.write("sql/functions/sql/table_fn__customer_orders.sql", CUSTOMER_ORDERS)
         _order_lookup(project)
     tickets = result.combined.get("support__tickets_enriched")
     if tickets is not None:
@@ -202,7 +202,7 @@ def _card_checks(project: Project, charges: Model) -> None:
     project.add(
         Model(
             name="int_payments__card_bin_checks",
-            folder="models/intermediate/payments",
+            folder="sql/models/intermediate/payments",
             layer="intermediate",
             description="One row per gateway charge with checks on the card number"
             " prefix it reported",
@@ -226,7 +226,7 @@ def _order_lookup(project: Project) -> None:
     project.add(
         Model(
             name="rpt_customer_order_lookup",
-            folder="models/marts/support",
+            folder="sql/models/marts/support",
             layer="marts",
             description=(
                 "Every order of the customer named by the lookup_customer_id variable, for "
@@ -278,7 +278,7 @@ def _open_ticket_age(project: Project, tickets: Model) -> None:
     project.add(
         Model(
             name="rpt_support__open_ticket_age",
-            folder="models/marts/support",
+            folder="sql/models/marts/support",
             layer="marts",
             description=(
                 "Tickets with no satisfaction response yet and their age in hours at query time. "
@@ -320,7 +320,7 @@ def _overdue_purchase_orders(project: Project, orders: Model) -> None:
     project.add(
         Model(
             name="rpt_operations__overdue_purchase_orders",
-            folder="models/marts/operations",
+            folder="sql/models/marts/operations",
             layer="marts",
             description=(
                 "Purchase orders past their expected arrival with no invoice yet, aged at query "
@@ -364,7 +364,7 @@ def _dim_date(project: Project) -> None:
     project.add(
         Model(
             name="dim_date",
-            folder="models/marts/core",
+            folder="sql/models/marts/core",
             layer="marts",
             description="One row per calendar day of the reporting history, from GENERATOR",
             config=["contract enforced"],

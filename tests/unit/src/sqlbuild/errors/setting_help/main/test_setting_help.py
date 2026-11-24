@@ -63,10 +63,10 @@ from tests.unit.src.sqlbuild.errors.setting_help.main._test_types import (
             "a snippet help shows every line to write",
             snippet_help(
                 purpose="to describe it",
-                target="add this to seeds/lookups.yml",
+                target="add this to sql/seeds/lookups.yml",
                 lines=("- name: product_types", "  description: Product type catalogue"),
             ),
-            "to describe it, add this to seeds/lookups.yml:\n"
+            "to describe it, add this to sql/seeds/lookups.yml:\n"
             "            - name: product_types\n"
             "              description: Product type catalogue",
         ),

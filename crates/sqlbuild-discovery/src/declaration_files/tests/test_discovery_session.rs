@@ -4,20 +4,20 @@ use crate::declaration_files::tests::test_types::SessionReadTestCase;
 
 const FILES: &[(&str, &str)] = &[
     (
-        "enums/status.sql",
+        "sql/enums/status.sql",
         "ENUM (name order_status, members [PLACED]);\n",
     ),
     (
-        "constants/limits.sql",
+        "sql/constants/limits.sql",
         "CONSTANT (name max_orders, value 10);\n",
     ),
     (
-        "macros/python/cents.py",
+        "sql/macros/python/cents.py",
         "def cents(value):\n    return value\n",
     ),
-    ("schemas/orders.sql", "SCHEMA (name orders_shape);\n"),
+    ("sql/schemas/orders.sql", "SCHEMA (name orders_shape);\n"),
     (
-        "audits/generic/positive.sql",
+        "sql/audits/generic/positive.sql",
         "AUDIT (name positive);\nSELECT 1\n",
     ),
 ];

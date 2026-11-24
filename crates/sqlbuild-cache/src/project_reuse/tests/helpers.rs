@@ -29,7 +29,7 @@ pub(crate) fn stored_inputs() -> StoredInputs {
         modules: vec![("/site/orders.py".to_owned(), 5, 10)],
         project_files: vec![
             StoredProjectFile {
-                stamp: stamp("models/orders.sql", "f", None),
+                stamp: stamp("sql/models/orders.sql", "f", None),
                 digest: Some("b3:model".to_owned()),
                 racy: true,
             },

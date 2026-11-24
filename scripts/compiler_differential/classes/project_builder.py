@@ -213,7 +213,9 @@ class ProjectBuilder:
                     ]
                 )
         self._features.add("path_defaults_wildcard")
-        lines.extend(extra_lines)
+        top_level: list[str] = [line for line in extra_lines if line.startswith("extra_paths")]
+        lines[0:0] = top_level
+        lines.extend(line for line in extra_lines if not line.startswith("extra_paths"))
         lines.extend(GENERATOR_SQL_RULE_IGNORES)
         self._files["sqlbuild_project.toml"] = "\n".join(lines) + "\n"
 
@@ -238,14 +240,14 @@ class ProjectBuilder:
                 f'    expression: "({rows})"\n'
                 f"    columns:\n{columns}"
             )
-        self._files["sources/raw.yml"] = "sources:\n" + "\n".join(entries) + "\n"
+        self._files["sql/sources/raw.yml"] = "sources:\n" + "\n".join(entries) + "\n"
 
     def _write_seeds(self) -> None:
         schemas: list[str] = []
         for index in range(self._random.randint(0, 2)):
             name: str = f"lookup_{index}"
             self._seeds.append(name)
-            self._files[f"seeds/{name}.csv"] = f'id,label\n1,"{self._label()}"\n2,plain\n'
+            self._files[f"sql/seeds/{name}.csv"] = f'id,label\n1,"{self._label()}"\n2,plain\n'
             schemas.append(
                 f"  - name: {name}\n"
                 f"    description: Generated lookup {index}.\n"
@@ -255,7 +257,7 @@ class ProjectBuilder:
             )
         if schemas:
             self._features.add("seeds")
-            self._files["seeds/seeds.yml"] = "seeds:\n" + "\n".join(schemas) + "\n"
+            self._files["sql/seeds/seeds.yml"] = "seeds:\n" + "\n".join(schemas) + "\n"
 
     def _plan_models(self, *, domains: list[str]) -> None:
         staging: list[ModelPlan] = []
@@ -487,9 +489,9 @@ class ProjectBuilder:
             return f"{folders.pop()}/_sqlbuild/_{role}"
         if len(domains) == 1:
             self._features.add("tree_scope")
-            return f"models/{domains.pop()}/_sqlbuild/{role}"
+            return f"sql/models/{domains.pop()}/_sqlbuild/{role}"
         self._features.add("project_scope")
-        return role
+        return f"sql/{role}"
 
     def _write_models(self) -> None:
         for model in self._models:
@@ -562,16 +564,20 @@ class ProjectBuilder:
         if not self._chance(GENERATOR_HALF):
             return
         self._features.add("python_nodes")
-        self._files["python/tasks/exports.py"] = (
-            "from sqlbuild.assets import AssetContext, asset\n\n\n"
-            "@asset\n"
-            "def collect_exports(ctx: AssetContext):\n"
-            '    """Collect generated exports."""\n'
-            '    return ctx.result(payload={"rows": 3})\n\n\n'
-            "@asset(depends_on=collect_exports)\n"
-            "def publish_exports(ctx: AssetContext):\n"
-            '    """Publish generated exports."""\n'
-            '    return ctx.result(metadata={"published": True})\n'
+        self._files["python/nodes/tasks/exports/assets.py"] = (
+            "from sqlbuild.assets import AssetContext, asset\n"
+            "from sqlbuild.factories import factory\n\n\n"
+            "@factory\n"
+            "def export_assets():\n"
+            "    @asset\n"
+            "    def collect_exports(ctx: AssetContext):\n"
+            '        """Collect generated exports."""\n'
+            '        return ctx.result(payload={"rows": 3})\n\n'
+            "    @asset(depends_on=collect_exports)\n"
+            "    def publish_exports(ctx: AssetContext):\n"
+            '        """Publish generated exports."""\n'
+            '        return ctx.result(metadata={"published": True})\n\n'
+            "    return [collect_exports, publish_exports]\n"
         )
 
     def _write_tests_and_scenarios(self) -> None:
@@ -664,7 +670,7 @@ class ProjectBuilder:
 
     def _duplicate_macro(self, model: ModelPlan) -> str:
         _ = model
-        self._files["macros/python/duplicate_adjust_0.py"] = (
+        self._files["sql/macros/python/duplicate_adjust_0.py"] = (
             "def adjust_0(expression: str) -> str:\n"
             '    """Duplicate a macro name."""\n'
             "    return expression\n"
@@ -680,7 +686,7 @@ class ProjectBuilder:
 
     def _over_broad_constant_column(self, model: ModelPlan) -> str:
         _ = model
-        self._files["constants/unused_threshold.sql"] = (
+        self._files["sql/constants/unused_threshold.sql"] = (
             "CONSTANT (name unused_threshold, value 3);\n"
         )
         return '@const("unused_threshold") AS narrow'

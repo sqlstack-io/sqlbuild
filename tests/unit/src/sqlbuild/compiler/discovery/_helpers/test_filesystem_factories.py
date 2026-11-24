@@ -15,6 +15,7 @@ from sqlbuild._native import (
 from tests.unit.src.sqlbuild.compiler.discovery._helpers._test_types import (
     DiscoverPythonNodeFactoriesTestCase,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 
 @pytest.mark.parametrize(
@@ -23,7 +24,7 @@ from tests.unit.src.sqlbuild.compiler.discovery._helpers._test_types import (
         DiscoverPythonNodeFactoriesTestCase(
             description="discovers mixed nodes returned by a factory",
             files={
-                "python/factories/generated.py": """
+                "python/nodes/factories/generated/factory.py": """
 from sqlbuild.assets import asset
 from sqlbuild.checks import check
 from sqlbuild.factories import factory
@@ -77,7 +78,7 @@ def regional_pipeline():
         DiscoverPythonNodeFactoriesTestCase(
             description="discovers tuple nodes returned by a factory",
             files={
-                "python/loaders/generated.py": """
+                "python/nodes/loaders/generated/loaders.py": """
 from sqlbuild.factories import factory
 from sqlbuild.loaders import loader
 
@@ -102,7 +103,7 @@ def generated_loaders():
         DiscoverPythonNodeFactoriesTestCase(
             description="discovers set node returned by a factory",
             files={
-                "python/checks/generated.py": """
+                "python/nodes/checks/generated/checks.py": """
 from sqlbuild.checks import check
 from sqlbuild.factories import factory
 
@@ -114,6 +115,7 @@ def generated_checks():
         return True
     return {generated_check}
 """,
+                "python/nodes/checks/generated/__init__.py": "from .checks import generated_checks\n",
             },
             expected_loader_names=(),
             expected_asset_names=(),
@@ -123,7 +125,7 @@ def generated_checks():
         DiscoverPythonNodeFactoriesTestCase(
             description="discovers single node returned by a factory in assets folder",
             files={
-                "python/assets/generated.py": """
+                "python/nodes/assets/generated/assets.py": """
 from sqlbuild.assets import asset
 from sqlbuild.factories import factory
 
@@ -144,7 +146,7 @@ def generated_asset():
         DiscoverPythonNodeFactoriesTestCase(
             description="discovers factory in loaders folder",
             files={
-                "python/loaders/generated.py": """
+                "python/nodes/loaders/generated/loaders.py": """
 from sqlbuild.factories import factory
 from sqlbuild.loaders import loader
 
@@ -165,7 +167,7 @@ def generated_loader():
         DiscoverPythonNodeFactoriesTestCase(
             description="discovers node kind from its decorator regardless of python subfolder",
             files={
-                "python/checks/generated.py": """
+                "python/nodes/checks/generated/asset.py": """
 from sqlbuild.assets import asset
 
 
@@ -173,6 +175,7 @@ from sqlbuild.assets import asset
 def export(ctx):
     return {}
 """,
+                "python/nodes/checks/generated/__init__.py": "from .asset import export\n",
             },
             expected_loader_names=(),
             expected_asset_names=("orders_export",),
@@ -182,28 +185,39 @@ def export(ctx):
         DiscoverPythonNodeFactoriesTestCase(
             description="discovers mixed-kind factory next to direct nodes using a shared helper",
             files={
-                "python/_helpers.py": """
+                "python/nodes/_helpers.py": """
 REGION = "emea"
 """,
-                "python/orders/pipeline.py": """
-from python._helpers import REGION
-from sqlbuild.checks import check
-from sqlbuild.factories import factory
-from sqlbuild.assets import asset
-
-
-@asset(name="prepare_orders")
-def prepare_orders(ctx):
-    return {"region": REGION}
-
-
-@factory
-def regional_checks():
-    @check(name=f"orders_{REGION}_exists", depends_on=prepare_orders)
-    def generated_check(ctx):
-        return True
-    return generated_check
-""",
+                "python/nodes/orders/pipeline/prepare_orders/asset.py": (
+                    "from python.nodes._helpers import REGION\n"
+                    "from sqlbuild.checks import check\n"
+                    "from sqlbuild.factories import factory\n"
+                    "from sqlbuild.assets import asset\n"
+                    "\n"
+                    "\n"
+                    '@asset(name="prepare_orders")\n'
+                    "def prepare_orders(ctx):\n"
+                    '    return {"region": REGION}\n'
+                ),
+                "python/nodes/orders/pipeline/regional_checks/checks.py": (
+                    "from python.nodes._helpers import REGION\n"
+                    "from sqlbuild.checks import check\n"
+                    "from sqlbuild.factories import factory\n"
+                    "from sqlbuild.assets import asset\n"
+                    "from python.nodes.orders.pipeline.prepare_orders.asset import prepare_orders\n"
+                    "\n"
+                    "\n"
+                    "@factory\n"
+                    "def regional_checks():\n"
+                    '    @check(name=f"orders_{REGION}_exists", depends_on=prepare_orders)\n'
+                    "    def generated_check(ctx):\n"
+                    "        return True\n"
+                    "    return generated_check\n"
+                ),
+                "python/nodes/orders/pipeline/__init__.py": (
+                    "from .prepare_orders.asset import prepare_orders\n"
+                    "from .regional_checks.checks import regional_checks\n"
+                ),
             },
             expected_loader_names=(),
             expected_asset_names=("prepare_orders",),
@@ -243,7 +257,9 @@ def test_given_factory_nodes_when_discovering_python_nodes_then_returns_generate
         DiscoverPythonNodeFactoriesTestCase(
             description="raises when factory returns invalid shape",
             files={
-                "python/tasks/generated.py": """
+                **node_module_files(
+                    "python/nodes/tasks/generated.py",
+                    """
 from sqlbuild.factories import factory
 
 
@@ -251,6 +267,7 @@ from sqlbuild.factories import factory
 def broken_factory():
     return "not a node"
 """,
+                ),
             },
             expected_loader_names=(),
             expected_asset_names=(),
@@ -260,7 +277,9 @@ def broken_factory():
         DiscoverPythonNodeFactoriesTestCase(
             description="raises when factory returns none",
             files={
-                "python/tasks/generated.py": """
+                **node_module_files(
+                    "python/nodes/tasks/generated.py",
+                    """
 from sqlbuild.factories import factory
 
 
@@ -268,6 +287,7 @@ from sqlbuild.factories import factory
 def broken_factory():
     return None
 """,
+                ),
             },
             expected_loader_names=(),
             expected_asset_names=(),
@@ -277,7 +297,9 @@ def broken_factory():
         DiscoverPythonNodeFactoriesTestCase(
             description="raises when factory returns dict",
             files={
-                "python/tasks/generated.py": """
+                **node_module_files(
+                    "python/nodes/tasks/generated.py",
+                    """
 from sqlbuild.factories import factory
 
 
@@ -285,6 +307,7 @@ from sqlbuild.factories import factory
 def broken_factory():
     return {"node": object()}
 """,
+                ),
             },
             expected_loader_names=(),
             expected_asset_names=(),
@@ -294,7 +317,9 @@ def broken_factory():
         DiscoverPythonNodeFactoriesTestCase(
             description="raises when factory returns bytes",
             files={
-                "python/tasks/generated.py": """
+                **node_module_files(
+                    "python/nodes/tasks/generated.py",
+                    """
 from sqlbuild.factories import factory
 
 
@@ -302,6 +327,7 @@ from sqlbuild.factories import factory
 def broken_factory():
     return b"not a node"
 """,
+                ),
             },
             expected_loader_names=(),
             expected_asset_names=(),
@@ -311,7 +337,9 @@ def broken_factory():
         DiscoverPythonNodeFactoriesTestCase(
             description="raises when factory returns object",
             files={
-                "python/tasks/generated.py": """
+                **node_module_files(
+                    "python/nodes/tasks/generated.py",
+                    """
 from sqlbuild.factories import factory
 
 
@@ -319,6 +347,7 @@ from sqlbuild.factories import factory
 def broken_factory():
     return object()
 """,
+                ),
             },
             expected_loader_names=(),
             expected_asset_names=(),
@@ -328,7 +357,9 @@ def broken_factory():
         DiscoverPythonNodeFactoriesTestCase(
             description="raises when factory returns class",
             files={
-                "python/tasks/generated.py": """
+                **node_module_files(
+                    "python/nodes/tasks/generated.py",
+                    """
 from sqlbuild.factories import factory
 
 
@@ -340,6 +371,7 @@ class NotANode:
 def broken_factory():
     return NotANode
 """,
+                ),
             },
             expected_loader_names=(),
             expected_asset_names=(),
@@ -349,7 +381,9 @@ def broken_factory():
         DiscoverPythonNodeFactoriesTestCase(
             description="raises when factory returns nested structures",
             files={
-                "python/tasks/generated.py": """
+                **node_module_files(
+                    "python/nodes/tasks/generated.py",
+                    """
 from sqlbuild.factories import factory
 from sqlbuild.assets import asset
 
@@ -363,6 +397,7 @@ def generated_task(ctx):
 def broken_factory():
     return [[generated_task]]
 """,
+                ),
             },
             expected_loader_names=(),
             expected_asset_names=(),
@@ -372,7 +407,9 @@ def broken_factory():
         DiscoverPythonNodeFactoriesTestCase(
             description="raises when factory returned item is not decorated",
             files={
-                "python/tasks/generated.py": """
+                **node_module_files(
+                    "python/nodes/tasks/generated.py",
+                    """
 from sqlbuild.factories import factory
 
 
@@ -384,6 +421,7 @@ def helper(ctx):
 def broken_factory():
     return [helper]
 """,
+                ),
             },
             expected_loader_names=(),
             expected_asset_names=(),
@@ -393,7 +431,9 @@ def broken_factory():
         DiscoverPythonNodeFactoriesTestCase(
             description="raises when factory requires arguments",
             files={
-                "python/tasks/generated.py": """
+                **node_module_files(
+                    "python/nodes/tasks/generated.py",
+                    """
 from sqlbuild.factories import factory
 
 
@@ -401,6 +441,7 @@ from sqlbuild.factories import factory
 def broken_factory(region):
     return []
 """,
+                ),
             },
             expected_loader_names=(),
             expected_asset_names=(),
@@ -410,7 +451,9 @@ def broken_factory(region):
         DiscoverPythonNodeFactoriesTestCase(
             description="raises when factory body fails",
             files={
-                "python/tasks/generated.py": """
+                **node_module_files(
+                    "python/nodes/tasks/generated.py",
+                    """
 from sqlbuild.factories import factory
 
 
@@ -418,6 +461,7 @@ from sqlbuild.factories import factory
 def broken_factory():
     raise RuntimeError("boom")
 """,
+                ),
             },
             expected_loader_names=(),
             expected_asset_names=(),

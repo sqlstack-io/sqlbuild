@@ -28,7 +28,7 @@ _PROJECT_FILES: dict[str, str] = {
         'database = "analytics"\nschema = "marts"\n\n'
         '[defaults]\ndatabase = "analytics"\nschema = "marts"\nmaterialized = "table"\n'
     ),
-    "sources/raw.yml": (
+    "sql/sources/raw.yml": (
         "sources:\n"
         "  - name: raw_listings\n    description: Partner listings in quoted camelCase.\n"
         "    database: analytics\n    schema: raw\n    table: listings\n"
@@ -36,12 +36,12 @@ _PROJECT_FILES: dict[str, str] = {
         "      - name: '\"listingId\"'\n        type: VARCHAR\n"
         "      - name: '\"unitPriceMinor\"'\n        type: NUMBER(38,0)\n"
     ),
-    "models/stg_listings.sql": (
+    "sql/models/stg_listings.sql": (
         "MODEL (description 'Listings renamed to snake case.');\n\n"
         'SELECT s."listingId" AS listing_id, s."unitPriceMinor" AS unit_price_minor\n'
         'FROM __source("raw_listings") AS s\n'
     ),
-    "models/listing_export.sql": (
+    "sql/models/listing_export.sql": (
         "MODEL (\n  description 'Listings in the partner feed format.',\n"
         '  columns ("listingId" (nullable false, audits [not_null]),),\n);\n\n'
         'WITH final AS (\n  SELECT l.listing_id AS "listingId"\n'
@@ -115,7 +115,7 @@ def test_given_enforced_contract_on_quoted_alias_when_building_then_runtime_cont
 ) -> None:
     files: dict[str, str] = {
         **_PROJECT_FILES,
-        "models/listing_export.sql": (
+        "sql/models/listing_export.sql": (
             "MODEL (\n  description 'Listings in the partner feed format.',\n"
             "  contract enforced,\n"
             f"  columns ({test_case.declared_name} (type VARCHAR),),\n);\n\n"

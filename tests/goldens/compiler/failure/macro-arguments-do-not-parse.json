@@ -8,12 +8,12 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Macro arguments of '@py.cents' in '<project>/models/staging/stg_orders.sql' could not be parsed: a value is missing here at line 5, column 66",
-     "path": "models/staging/stg_orders.sql",
+     "message": "Macro arguments of '@py.cents' in '<project>/sql/models/staging/stg_orders.sql' could not be parsed: a value is missing here at line 5, column 66",
+     "path": "sql/models/staging/stg_orders.sql",
      "line": 5,
      "column": 66,
      "location": {
-      "path": "models/staging/stg_orders.sql",
+      "path": "sql/models/staging/stg_orders.sql",
       "line": 5,
       "column": 66
      },

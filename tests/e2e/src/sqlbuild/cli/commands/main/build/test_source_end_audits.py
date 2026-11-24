@@ -17,12 +17,12 @@ _PROJECT_FILES: dict[str, str] = {
         'name = "source_end_audits"\nadapter = "duckdb"\n\n'
         '[connection]\ndatabase = "warehouse.duckdb"\n\n[defaults]\nmaterialized = "table"\n'
     ),
-    "sources/raw.yml": (
+    "sql/sources/raw.yml": (
         "sources:\n  - name: raw_refunds\n    description: Test source raw_refunds.\n"
         "    schema: main\n    table: raw_refunds\n    columns:\n"
         "      - name: refund_id\n        type: INTEGER\n        audits: [not_null]\n"
     ),
-    "models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS order_id\n",
+    "sql/models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS order_id\n",
 }
 
 

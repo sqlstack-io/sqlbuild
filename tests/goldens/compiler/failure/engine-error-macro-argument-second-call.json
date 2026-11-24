@@ -8,12 +8,12 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Macro arguments of '@py.cents' in '<project>/models/marts/customer_totals.sql' could not be parsed: a comma is missing between arguments at line 6, column 22",
-     "path": "models/marts/customer_totals.sql",
+     "message": "Macro arguments of '@py.cents' in '<project>/sql/models/marts/customer_totals.sql' could not be parsed: a comma is missing between arguments at line 6, column 22",
+     "path": "sql/models/marts/customer_totals.sql",
      "line": 6,
      "column": 22,
      "location": {
-      "path": "models/marts/customer_totals.sql",
+      "path": "sql/models/marts/customer_totals.sql",
       "line": 6,
       "column": 22
      },

@@ -95,21 +95,21 @@ SNAPSHOT_CAPTURE_FINGERPRINT: str = build_scenario_snapshot_input_fingerprint(
                         kind=ScenarioArtifactKind.SEED,
                         logical_name="country_codes",
                         source_target=SNAPSHOT_CAPTURE_PLAN.fixture_plans[2].destination,
-                        file_path=Path("seeds/country_codes.jsonl"),
+                        file_path=Path("sql/seeds/country_codes.jsonl"),
                         capture_sql="SELECT 'US' AS country_code",
                     ),
                     ScenarioSnapshotCaptureRelationPlan(
                         kind=ScenarioArtifactKind.SEED,
                         logical_name="currency_codes",
                         source_target=SNAPSHOT_CAPTURE_PLAN.seed_entries[0].destination,
-                        file_path=Path("seeds/currency_codes.jsonl"),
-                        capture_sql="seed_file:seeds/currency_codes.csv",
+                        file_path=Path("sql/seeds/currency_codes.jsonl"),
+                        capture_sql="seed_file:sql/seeds/currency_codes.csv",
                     ),
                     ScenarioSnapshotCaptureRelationPlan(
                         kind=ScenarioArtifactKind.SOURCE,
                         logical_name="raw__orders",
                         source_target=SNAPSHOT_CAPTURE_PLAN.fixture_plans[0].destination,
-                        file_path=Path("sources/raw__orders.jsonl"),
+                        file_path=Path("sql/sources/raw__orders.jsonl"),
                         capture_sql="SELECT 1 AS order_id",
                     ),
                 ),
@@ -135,21 +135,21 @@ SNAPSHOT_CAPTURE_FINGERPRINT: str = build_scenario_snapshot_input_fingerprint(
                     ScenarioSnapshotRelation(
                         kind=ScenarioArtifactKind.SEED,
                         logical_name="country_codes",
-                        file_path=Path("seeds/country_codes.jsonl"),
+                        file_path=Path("sql/seeds/country_codes.jsonl"),
                         row_count=0,
                         byte_count=0,
                     ),
                     ScenarioSnapshotRelation(
                         kind=ScenarioArtifactKind.SEED,
                         logical_name="currency_codes",
-                        file_path=Path("seeds/currency_codes.jsonl"),
+                        file_path=Path("sql/seeds/currency_codes.jsonl"),
                         row_count=0,
                         byte_count=0,
                     ),
                     ScenarioSnapshotRelation(
                         kind=ScenarioArtifactKind.SOURCE,
                         logical_name="raw__orders",
-                        file_path=Path("sources/raw__orders.jsonl"),
+                        file_path=Path("sql/sources/raw__orders.jsonl"),
                         row_count=0,
                         byte_count=0,
                     ),
@@ -183,7 +183,7 @@ def test_given_scenario_execution_plan_when_building_capture_plan_then_returns_s
     [
         ScenarioSnapshotJsonlRoundTripTestCase(
             description="jsonl rows round trip with file stats",
-            relative_file_path=Path("sources/raw__orders.jsonl"),
+            relative_file_path=Path("sql/sources/raw__orders.jsonl"),
             rows=(
                 {"order_id": 1, "amount": 10.5, "is_paid": True, "note": None},
                 {"order_id": 2, "amount": 20, "is_paid": False, "note": "refund"},
@@ -200,7 +200,7 @@ def test_given_scenario_execution_plan_when_building_capture_plan_then_returns_s
         ),
         ScenarioSnapshotJsonlRoundTripTestCase(
             description="jsonl rows serialize captured warehouse scalar objects",
-            relative_file_path=Path("sources/raw__orders.jsonl"),
+            relative_file_path=Path("sql/sources/raw__orders.jsonl"),
             rows=(
                 {
                     "amount": Decimal("10.50"),
@@ -269,7 +269,7 @@ def test_given_invalid_snapshot_jsonl_when_reading_then_raises_clear_error(
     tmp_path: Path,
     test_case: ScenarioSnapshotJsonlErrorTestCase,
 ) -> None:
-    file_path: Path = tmp_path / "sources" / "raw__orders.jsonl"
+    file_path: Path = tmp_path / "sql" / "sources" / "raw__orders.jsonl"
     file_path.parent.mkdir(parents=True, exist_ok=True)
     file_path.write_text(test_case.file_contents, encoding="utf-8")
 
@@ -286,7 +286,7 @@ def test_given_invalid_snapshot_jsonl_when_reading_then_raises_clear_error(
             description="manifest round trips through scenario json shape",
             manifest=build_snapshot_manifest(),
             expected_json_fragments=(
-                '"file": "sources/raw__orders.jsonl"',
+                '"file": "sql/sources/raw__orders.jsonl"',
                 '"bytes": 100',
                 '"warehouse_type": "NUMBER(10,2)"',
                 '"local_type": "DECIMAL(10,2)"',
@@ -392,19 +392,19 @@ def test_given_snapshot_manifest_state_when_classifying_then_returns_expected_st
                 ScenarioSnapshotInputSpec(
                     kind=ScenarioArtifactKind.SEED,
                     logical_name="country_codes",
-                    file_path=Path("seeds/country_codes.jsonl"),
+                    file_path=Path("sql/seeds/country_codes.jsonl"),
                     capture_sql="SELECT 'US' AS country_code",
                 ),
                 ScenarioSnapshotInputSpec(
                     kind=ScenarioArtifactKind.SEED,
                     logical_name="currency_codes",
-                    file_path=Path("seeds/currency_codes.jsonl"),
-                    capture_sql="seed_file:seeds/currency_codes.csv",
+                    file_path=Path("sql/seeds/currency_codes.jsonl"),
+                    capture_sql="seed_file:sql/seeds/currency_codes.csv",
                 ),
                 ScenarioSnapshotInputSpec(
                     kind=ScenarioArtifactKind.SOURCE,
                     logical_name="raw__orders",
-                    file_path=Path("sources/raw__orders.jsonl"),
+                    file_path=Path("sql/sources/raw__orders.jsonl"),
                     capture_sql="SELECT 1 AS order_id",
                 ),
             ),
@@ -465,7 +465,7 @@ def test_given_scenario_execution_plan_when_building_snapshot_specs_then_returns
             expected_manifest_path=Path(
                 "/repo/tests/_scenario_snapshots/order_refund/scenario.json"
             ),
-            expected_relation_path=Path("sources/raw__orders.jsonl"),
+            expected_relation_path=Path("sql/sources/raw__orders.jsonl"),
         ),
         ScenarioSnapshotPathTestCase(
             description="ref snapshot paths use refs directory",
@@ -489,7 +489,7 @@ def test_given_scenario_execution_plan_when_building_snapshot_specs_then_returns
             expected_manifest_path=Path(
                 "/repo/tests/_scenario_snapshots/order_refund/scenario.json"
             ),
-            expected_relation_path=Path("seeds/waffle_types.jsonl"),
+            expected_relation_path=Path("sql/seeds/waffle_types.jsonl"),
         ),
         ScenarioSnapshotPathTestCase(
             description="dbt ref snapshot paths use dbt_refs directory",
@@ -537,7 +537,7 @@ def test_given_scenario_and_relation_when_resolving_snapshot_paths_then_returns_
                 ScenarioSnapshotInputSpec(
                     kind=ScenarioArtifactKind.SOURCE,
                     logical_name="raw__orders",
-                    file_path=Path("sources/raw__orders.jsonl"),
+                    file_path=Path("sql/sources/raw__orders.jsonl"),
                     capture_sql="SELECT *\nFROM raw.orders",
                 ),
                 ScenarioSnapshotInputSpec(
@@ -557,7 +557,7 @@ def test_given_scenario_and_relation_when_resolving_snapshot_paths_then_returns_
                 ScenarioSnapshotInputSpec(
                     kind=ScenarioArtifactKind.SOURCE,
                     logical_name="raw__orders",
-                    file_path=Path("sources/raw__orders.jsonl"),
+                    file_path=Path("sql/sources/raw__orders.jsonl"),
                     capture_sql="SELECT * FROM raw.orders",
                 ),
             ),
@@ -565,7 +565,7 @@ def test_given_scenario_and_relation_when_resolving_snapshot_paths_then_returns_
                 ScenarioSnapshotInputSpec(
                     kind=ScenarioArtifactKind.SOURCE,
                     logical_name="raw__orders",
-                    file_path=Path("sources/raw__orders.jsonl"),
+                    file_path=Path("sql/sources/raw__orders.jsonl"),
                     capture_sql="SELECT id FROM raw.orders",
                 ),
                 ScenarioSnapshotInputSpec(
@@ -611,7 +611,7 @@ def test_given_snapshot_input_specs_when_fingerprinting_then_is_stable_and_input
                 ScenarioSnapshotInputSpec(
                     kind=ScenarioArtifactKind.SOURCE,
                     logical_name="raw__orders",
-                    file_path=Path("sources/raw__orders.jsonl"),
+                    file_path=Path("sql/sources/raw__orders.jsonl"),
                     capture_sql="SELECT * FROM raw.orders",
                 ),
             ),
@@ -628,7 +628,7 @@ def test_given_snapshot_input_specs_when_fingerprinting_then_is_stable_and_input
                 ScenarioSnapshotInputSpec(
                     kind=ScenarioArtifactKind.SOURCE,
                     logical_name="raw__orders",
-                    file_path=Path("sources/raw__orders.jsonl"),
+                    file_path=Path("sql/sources/raw__orders.jsonl"),
                     capture_sql="SELECT * FROM raw.orders",
                 ),
             ),

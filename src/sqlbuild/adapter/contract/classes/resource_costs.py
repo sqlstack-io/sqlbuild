@@ -21,6 +21,21 @@ class ResourceCostsMixin:
             render_framework_type=adapter.render_framework_type,
         )
 
+    def render_add_resource_costs_columns_sql(
+        self, *, database: str | None, schema: str
+    ) -> list[str]:
+        """Render one `ADD COLUMN IF NOT EXISTS` per column added after the first release."""
+
+        from sqlbuild._native import build_resource_costs_add_columns_sql
+
+        adapter: Any = cast(Any, self)
+        return build_resource_costs_add_columns_sql(
+            database=database,
+            schema=schema,
+            render_qualified_name=adapter.render_qualified_name,
+            render_framework_type=adapter.render_framework_type,
+        )
+
     def render_prune_resource_costs_history_sql(
         self, *, database: str | None, schema: str, retain_versions: int
     ) -> str:

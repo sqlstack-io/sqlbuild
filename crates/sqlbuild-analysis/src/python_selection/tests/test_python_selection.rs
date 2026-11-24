@@ -23,7 +23,7 @@ fn given_python_node_selectors_when_resolving_then_names_match_python() {
         },
         NodeSelectorTestCase {
             description: "explicit Python path",
-            select: &["path:python/tasks"],
+            select: &["path:python/nodes/tasks"],
             exclude: &[],
             expected_names: Ok(&["prepare_orders"]),
         },
@@ -54,7 +54,7 @@ fn given_python_node_selectors_when_resolving_then_names_match_python() {
             exclude: &[],
             expected_names: Err((
                 "S012",
-                "path selectors require an explicit root: use 'models/' or 'python/'",
+                "path selectors require an explicit root: use 'sql/models/' or 'python/nodes/'",
             )),
         },
         NodeSelectorTestCase {
@@ -261,8 +261,8 @@ fn given_relative_paths_when_indexing_then_folders_match_python_parent() {
     let test_cases = [
         InventoryTestCase {
             description: "nested file",
-            relative_path: "python/tasks/orders.py",
-            expected_folder: "python/tasks",
+            relative_path: "python/nodes/tasks/orders.py",
+            expected_folder: "python/nodes/tasks",
         },
         InventoryTestCase {
             description: "top-level file",
@@ -293,7 +293,7 @@ fn given_check_exclude_tokens_when_resolving_then_unmatched_tokens_are_skipped()
         NodeSelectorTestCase {
             description: "unknown name, tag and path are skipped",
             select: &[],
-            exclude: &["missing tag:missing path:python/none", "tag:exports"],
+            exclude: &["missing tag:missing path:python/nodes/none", "tag:exports"],
             expected_names: Ok(&["check_orders_export", "export_orders"]),
         },
         NodeSelectorTestCase {
@@ -302,7 +302,7 @@ fn given_check_exclude_tokens_when_resolving_then_unmatched_tokens_are_skipped()
             exclude: &["path:other"],
             expected_names: Err((
                 "S012",
-                "path selectors require an explicit root: use 'models/' or 'python/'",
+                "path selectors require an explicit root: use 'sql/models/' or 'python/nodes/'",
             )),
         },
     ];

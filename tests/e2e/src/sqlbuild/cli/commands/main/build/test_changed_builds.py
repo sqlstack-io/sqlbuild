@@ -147,7 +147,7 @@ def test_given_an_unqualified_name_matching_two_relations_when_building_with_cha
 ) -> None:
     project_dir: Path = prepare_changed_project(tmp_path=tmp_path, warehouse=test_case.warehouse)
     add_changed_overlay(project_dir, CHANGED_BUILDS_UNQUALIFIED_FIXTURE)
-    customers_model: Path = project_dir / "models/customers.sql"
+    customers_model: Path = project_dir / "sql/models/customers.sql"
     run_changed_build(project_dir, ("--select", "+customers"))
     run_changed_build(project_dir, ("--changed",))
     nothing_changed: frozenset[str] = run_changed_build(project_dir, ("--changed",))
@@ -251,7 +251,7 @@ def test_given_scheduled_jobs_when_building_with_changed_then_a_change_stops_at_
         project_dir / warehouse.warehouse_file, "INSERT INTO raw.orders VALUES (2, 1, 2)"
     )
     new_data: frozenset[str] = run_changed_build(project_dir, ("--changed",))
-    (project_dir / "models/stg_orders.sql").write_text(STG_ORDERS_REDEFINED, encoding="utf-8")
+    (project_dir / "sql/models/stg_orders.sql").write_text(STG_ORDERS_REDEFINED, encoding="utf-8")
     plan: subprocess.CompletedProcess[str] = run_sqb(
         command=("--no-color", "plan", "--changed"), project_dir=project_dir
     )
@@ -300,8 +300,8 @@ def test_given_two_jobs_each_holding_a_redefined_upstream_when_building_changed_
     project_dir: Path = prepare_changed_project(tmp_path=tmp_path, warehouse=warehouse)
     add_changed_overlay(project_dir, CHANGED_BUILDS_TWO_UP_FIXTURE)
     first: frozenset[str] = run_changed_build(project_dir, (CHANGED_ANY,))
-    (project_dir / "models/stg_orders.sql").write_text(STG_ORDERS_REDEFINED, encoding="utf-8")
-    (project_dir / "models/stg_customers.sql").write_text(
+    (project_dir / "sql/models/stg_orders.sql").write_text(STG_ORDERS_REDEFINED, encoding="utf-8")
+    (project_dir / "sql/models/stg_customers.sql").write_text(
         'MODEL (description "Staged customers.", materialized table);\n'
         'SELECT customer_id FROM __source("raw_customers") WHERE customer_id > 0\n',
         encoding="utf-8",

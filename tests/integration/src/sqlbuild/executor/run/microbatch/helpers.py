@@ -168,7 +168,7 @@ def build_microbatch_plan_entry(
     return ModelPlanEntry(
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="orders"),
         name="orders",
-        relative_path=Path("models/orders.sql"),
+        relative_path=Path("sql/models/orders.sql"),
         materialization_type=MaterializationType.INCREMENTAL,
         action=action,
         reason=reason,
@@ -207,7 +207,7 @@ def build_integer_reconciliation_plan_entry() -> ModelPlanEntry:
     return ModelPlanEntry(
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="orders"),
         name="orders",
-        relative_path=Path("models/orders.sql"),
+        relative_path=Path("sql/models/orders.sql"),
         materialization_type=MaterializationType.INCREMENTAL,
         action=PlanAction.INCREMENTAL_DELETE_INSERT,
         reason=PlanReason.NORMAL_INCREMENTAL,

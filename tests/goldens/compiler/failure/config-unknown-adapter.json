@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "C601",
-     "message": "unknown adapter 'warehouse9000'. Available built-in adapters: bigquery, clickhouse, databricks, duckdb, motherduck, postgres, snowflake, sqlite, sqlserver. Project-local adapters are discovered from adapters/**/*.py."
+     "message": "unknown adapter 'warehouse9000'. Available built-in adapters: bigquery, clickhouse, databricks, duckdb, motherduck, postgres, snowflake, sqlite, sqlserver. Project-local adapters are discovered from python/adapters/**/*.py."
     }
    ]
   }

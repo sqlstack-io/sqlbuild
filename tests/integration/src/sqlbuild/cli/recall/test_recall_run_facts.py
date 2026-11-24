@@ -74,6 +74,12 @@ def test_given_selectors_when_building_then_the_effective_selection_is_recorded(
     test_case: RecordedSelectionTestCase, tmp_path: Path
 ) -> None:
     project_dir: Path = write_project(tmp_path / "orders_shop")
+    project_file: Path = project_dir / "sqlbuild_project.toml"
+    # A selector file at the top level is outside the project layout unless the project lists it.
+    _ = project_file.write_text(
+        'extra_paths = ["nightly.txt"]\n' + project_file.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
     _ = (project_dir / "nightly.txt").write_text(test_case.selector_file, encoding="utf-8")
 
     built: subprocess.CompletedProcess[bytes] = run(project_dir, "build", *test_case.args)
@@ -148,7 +154,9 @@ def test_given_sigterm_when_a_build_is_stopped_then_it_is_recorded_cancelled_wit
     test_case: TerminatedCommandTestCase, tmp_path: Path
 ) -> None:
     project_dir: Path = write_slow_import_sink(write_project(tmp_path / "orders_shop"))
-    _ = (project_dir / "models" / "orders.sql").write_text(test_case.orders_model, encoding="utf-8")
+    _ = (project_dir / "sql" / "models" / "orders.sql").write_text(
+        test_case.orders_model, encoding="utf-8"
+    )
 
     terminated: subprocess.CompletedProcess[bytes] = terminated_build(
         project_dir,
@@ -227,7 +235,7 @@ def test_given_a_failed_statement_when_recalled_then_its_sql_is_readable(
     test_case: FailedStatementSqlTestCase, tmp_path: Path
 ) -> None:
     project_dir: Path = write_project(tmp_path / "orders_shop")
-    _ = (project_dir / "models" / "orders.sql").write_text(
+    _ = (project_dir / "sql" / "models" / "orders.sql").write_text(
         f'MODEL (\n  description "One row per order",\n  materialized table,\n);\n\n'
         f"{test_case.model_sql}\n",
         encoding="utf-8",
@@ -292,7 +300,7 @@ def test_given_a_failing_audit_when_recalled_then_its_evidence_follows_the_setti
     test_case: AuditEvidenceTestCase, tmp_path: Path
 ) -> None:
     project_dir: Path = write_project(tmp_path / "orders_shop", extra_toml=test_case.recall_toml)
-    _ = (project_dir / "models" / "customers.sql").write_text(
+    _ = (project_dir / "sql" / "models" / "customers.sql").write_text(
         CUSTOMERS_MODEL.replace("severity warn", f"severity {test_case.severity}"),
         encoding="utf-8",
     )
@@ -350,7 +358,7 @@ def test_given_cost_attribution_when_a_build_ends_then_the_invocation_records_ho
         toml.read_text(encoding="utf-8").replace('"duckdb"', '"duckdb_costed"', 1),
         encoding="utf-8",
     )
-    adapter: Path = project_dir / "adapters" / "warehouse" / "duckdb_costed.py"
+    adapter: Path = project_dir / "python" / "adapters" / "warehouse" / "duckdb_costed.py"
     adapter.parent.mkdir(parents=True)
     _ = adapter.write_text(COSTED_ADAPTER.format(collected=test_case.collected), encoding="utf-8")
 

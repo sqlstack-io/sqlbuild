@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from sqlbuild._native import EventExporterCommandScope, EventExporterDispatcher
+from sqlbuild.event_sinks import CommandOutputStream
 from sqlbuild.runtime.output_capture.models import (
     BoundCommandOutputSink,
     CommandOutputRecord,
 )
-from sqlbuild.sinks import CommandOutputStream
 
 
 def make_event_exporter_scope(*, records: list[CommandOutputRecord]) -> EventExporterCommandScope:

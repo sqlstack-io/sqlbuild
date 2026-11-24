@@ -57,7 +57,7 @@ def make_contract_project(
                 key=key,
                 deps=(),
                 name=model_name,
-                relative_path=Path(f"models/{model_name}.sql"),
+                relative_path=Path(f"sql/models/{model_name}.sql"),
                 query_sql="SELECT 1 AS id",
                 config=CompileModelConfig(
                     values=cast(
@@ -134,7 +134,7 @@ def make_promotion_project(
                 key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name=name),
                 deps=(),
                 name=name,
-                relative_path=Path(f"models/{name}.sql"),
+                relative_path=Path(f"sql/models/{name}.sql"),
                 query_sql="SELECT 1 AS id",
                 config=CompileModelConfig(values=values),
                 destination=CompiledRelationLocation(

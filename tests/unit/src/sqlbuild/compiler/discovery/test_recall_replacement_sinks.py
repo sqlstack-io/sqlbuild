@@ -24,7 +24,7 @@ LIFECYCLE_REPLACEMENT: str = (
     "    history.publish_lifecycle(event)\n\n"
 )
 OUTPUT_REPLACEMENT: str = (
-    "@command_output_sink\n"
+    "@command_output_event_sink\n"
     "def redact(record: CommandOutputRecord, writer: RecallWriter) -> None:\n"
     "    writer.publish_command_output(record)\n\n"
 )
@@ -32,7 +32,7 @@ ORDINARY_SINKS: str = (
     "@lifecycle_event_sink\n"
     "def audit_log(event: LifecycleEvent) -> None:\n"
     "    del event\n\n"
-    "@command_output_sink\n"
+    "@command_output_event_sink\n"
     "def output_log(record: CommandOutputRecord) -> None:\n"
     "    del record\n"
 )
@@ -43,15 +43,17 @@ ORDINARY_SINKS: str = (
     (
         RecallSinkDiscoveryTestCase(
             description="no replacement keeps Recall's default for both streams",
-            sink_files={"sinks/logs.py": RECALL_SINK_IMPORTS + ORDINARY_SINKS},
+            sink_files={"python/event_sinks/logs.py": RECALL_SINK_IMPORTS + ORDINARY_SINKS},
             expected_replacements=((), ()),
             expected_ordinary=(("audit_log",), ("output_log",)),
         ),
         RecallSinkDiscoveryTestCase(
             description="one replacement per stream, by writer type under any parameter name",
             sink_files={
-                "sinks/recall.py": RECALL_SINK_IMPORTS + LIFECYCLE_REPLACEMENT + OUTPUT_REPLACEMENT,
-                "sinks/logs.py": RECALL_SINK_IMPORTS + ORDINARY_SINKS,
+                "python/event_sinks/recall.py": RECALL_SINK_IMPORTS
+                + LIFECYCLE_REPLACEMENT
+                + OUTPUT_REPLACEMENT,
+                "python/event_sinks/logs.py": RECALL_SINK_IMPORTS + ORDINARY_SINKS,
             },
             expected_replacements=((("keep_runs", "history"),), (("redact", "writer"),)),
             expected_ordinary=(("audit_log",), ("output_log",)),
@@ -78,53 +80,53 @@ def test_given_sinks_taking_a_recall_writer_when_discovering_then_they_replace_r
         InvalidRecallSinkTestCase(
             description="two replacements for one stream are both named",
             project_files={
-                "sinks/first.py": RECALL_SINK_IMPORTS + OUTPUT_REPLACEMENT,
-                "sinks/second.py": RECALL_SINK_IMPORTS
+                "python/event_sinks/first.py": RECALL_SINK_IMPORTS + OUTPUT_REPLACEMENT,
+                "python/event_sinks/second.py": RECALL_SINK_IMPORTS
                 + OUTPUT_REPLACEMENT.replace("def redact", "def mask"),
             },
             expected_error=EventExporterDiscoveryError,
             expected_code="D015",
             expected_message=(
                 "Only one sink may replace Recall command-output history; found "
-                "sinks/first.py:redact, sinks/second.py:mask"
+                "python/event_sinks/first.py:redact, python/event_sinks/second.py:mask"
             ),
         ),
         InvalidRecallSinkTestCase(
             description="a sink with two writers",
             project_files={
-                "sinks/recall.py": RECALL_SINK_IMPORTS + "@lifecycle_event_sink\n"
+                "python/event_sinks/recall.py": RECALL_SINK_IMPORTS + "@lifecycle_event_sink\n"
                 "def both(event: LifecycleEvent, one: RecallWriter, two: RecallWriter) -> None:\n"
                 "    del event, one, two\n",
             },
             expected_error=EventExporterDiscoveryError,
             expected_code="D015",
-            expected_message="sinks/recall.py:both declares more than one RecallWriter parameter",
+            expected_message="python/event_sinks/recall.py:both declares more than one RecallWriter parameter",
         ),
         InvalidRecallSinkTestCase(
             description="a replacement with a provider parameter",
             project_files={
-                "providers/orders_api.py": "from sqlbuild.providers import Provider\n\n\n"
+                "python/providers/orders_api.py": "from sqlbuild.providers import Provider\n\n\n"
                 "class OrdersApi(Provider):\n    'Order service settings.'\n\n"
                 "    region: str = 'eu'\n",
-                "sinks/recall.py": RECALL_SINK_IMPORTS + "@command_output_sink\n"
+                "python/event_sinks/recall.py": RECALL_SINK_IMPORTS + "@command_output_event_sink\n"
                 "def redact(record: CommandOutputRecord, writer: RecallWriter, orders_api) -> None:\n"
                 "    del record, writer, orders_api\n",
             },
             expected_error=EventExporterDiscoveryError,
             expected_code="D015",
-            expected_message="sinks/recall.py:redact must not declare provider parameters",
+            expected_message="python/event_sinks/recall.py:redact must not declare provider parameters",
         ),
         InvalidRecallSinkTestCase(
             description="a provider named recall_writer",
             project_files={
-                "providers/recall_writer.py": "from sqlbuild.providers import Provider\n\n\n"
+                "python/providers/recall_writer.py": "from sqlbuild.providers import Provider\n\n\n"
                 "class RecallWriter(Provider):\n    'Shadows the writer name.'\n\n"
                 "    region: str = 'eu'\n",
-                "sinks/logs.py": RECALL_SINK_IMPORTS + ORDINARY_SINKS,
+                "python/event_sinks/logs.py": RECALL_SINK_IMPORTS + ORDINARY_SINKS,
             },
             expected_error=ProviderDiscoveryError,
             expected_code="D012",
-            expected_message="Provider name 'recall_writer' in providers/recall_writer.py is reserved",
+            expected_message="Provider name 'recall_writer' in python/providers/recall_writer.py is reserved",
         ),
     ),
     ids=lambda case: case.description,

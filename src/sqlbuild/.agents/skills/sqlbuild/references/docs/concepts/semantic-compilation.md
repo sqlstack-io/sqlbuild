@@ -21,7 +21,7 @@ misspelled functions, invalid grouping, and more. It works offline, from your pr
 ```text
 error[B002]: Unknown column 'qty' in stg_orders (as o)
   model: fact_orders
-  --> models/marts/fact_orders.sql:16:5
+  --> sql/models/marts/fact_orders.sql:16:5
      |
   16 |   o.qty,
      |     ^^^

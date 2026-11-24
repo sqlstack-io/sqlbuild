@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D013",
-     "message": "Unsupported entries in audits/: audits/at_least.sql; audit files must live in audits/generic/ or audits/singular/"
+     "message": "Unsupported entries in sql/audits/: sql/audits/at_least.sql; audit files must live in sql/audits/generic/ or sql/audits/singular/"
     }
    ]
   }

@@ -97,9 +97,9 @@ def test_given_dynamic_models_when_compiling_then_adapter_rules_apply(
         project_name="shop",
         repo_files={
             "sqlbuild_project.toml": _PROJECT_TOML[test_case.adapter],
-            "models/orders.sql": _ORDERS,
-            "models/clean_orders.sql": _CLEAN_ORDERS,
-            "models/daily_totals.sql": (
+            "sql/models/orders.sql": _ORDERS,
+            "sql/models/clean_orders.sql": _CLEAN_ORDERS,
+            "sql/models/daily_totals.sql": (
                 f"MODEL (description 'Daily totals.', {test_case.daily_totals_header});\n"
                 f"{_DAILY_TOTALS_QUERY}"
             ),

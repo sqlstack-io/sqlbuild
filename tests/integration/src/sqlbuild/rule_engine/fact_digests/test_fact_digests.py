@@ -13,10 +13,10 @@ from tests.integration.src.sqlbuild.rule_engine.fact_digests.helpers import (
     write_files,
 )
 
-_STG: str = "models/staging/stg_orders.sql"
-_TOTALS: str = "models/marts/order_totals.sql"
+_STG: str = "sql/models/staging/stg_orders.sql"
+_TOTALS: str = "sql/models/marts/order_totals.sql"
 _NEW_MODEL: dict[str, str] = {
-    "models/marts/order_counts.sql": "MODEL ();\n\nSELECT 1 AS order_count\n"
+    "sql/models/marts/order_counts.sql": "MODEL ();\n\nSELECT 1 AS order_count\n"
 }
 _TOTALS_WITH_COLUMN: dict[str, str] = {
     _TOTALS: 'MODEL ();\n\nSELECT o.order_id, 1 AS amount FROM __ref("stg_orders") AS o\n'
@@ -75,20 +75,24 @@ _TEST_EDITED: dict[str, str] = {
         FactDigestEditTestCase(
             "project sources",
             ("project.sources",),
-            {"sources/raw.yml": PROJECT_FILES["sources/raw.yml"].replace("Raw", "All")},
+            {"sql/sources/raw.yml": PROJECT_FILES["sql/sources/raw.yml"].replace("Raw", "All")},
         ),
         FactDigestEditTestCase(
             "project seeds",
             ("project.seeds",),
-            {"seeds/regions.yml": PROJECT_FILES["seeds/regions.yml"].replace("Regions", "Areas")},
+            {
+                "sql/seeds/regions.yml": PROJECT_FILES["sql/seeds/regions.yml"].replace(
+                    "Regions", "Areas"
+                )
+            },
         ),
         FactDigestEditTestCase(
             "project functions",
             ("project.functions",),
             {
-                "functions/sql/is_paid.sql": PROJECT_FILES["functions/sql/is_paid.sql"].replace(
-                    "'PAID'", "'OPEN'"
-                )
+                "sql/functions/sql/is_paid.sql": PROJECT_FILES[
+                    "sql/functions/sql/is_paid.sql"
+                ].replace("'PAID'", "'OPEN'")
             },
         ),
         FactDigestEditTestCase("project tests", ("project.tests",), _TEST_EDITED),
@@ -99,22 +103,24 @@ _TEST_EDITED: dict[str, str] = {
         FactDigestEditTestCase(
             "public enums",
             ("declarations.public_enums",),
-            {"enums/order_status.sql": "ENUM (name order_status, members [PAID, OPEN, VOID]);\n"},
+            {
+                "sql/enums/order_status.sql": "ENUM (name order_status, members [PAID, OPEN, VOID]);\n"
+            },
         ),
         FactDigestEditTestCase(
             "all enums",
             ("declarations.enums",),
-            {"enums/order_status.sql": "ENUM (name order_status, members [PAID]);\n"},
+            {"sql/enums/order_status.sql": "ENUM (name order_status, members [PAID]);\n"},
         ),
         FactDigestEditTestCase(
             "public constants",
             ("declarations.public_constants",),
-            {"constants/policy.sql": "CONSTANT (name minimum_amount, value 8);\n"},
+            {"sql/constants/policy.sql": "CONSTANT (name minimum_amount, value 8);\n"},
         ),
         FactDigestEditTestCase(
             "all constants",
             ("declarations.constants",),
-            {"constants/policy.sql": "CONSTANT (name minimum_amount, value 9);\n"},
+            {"sql/constants/policy.sql": "CONSTANT (name minimum_amount, value 9);\n"},
         ),
         FactDigestEditTestCase("model SQL", ("sql.for_model", _TOTALS), _TOTALS_WITH_COLUMN),
         FactDigestEditTestCase(
@@ -141,17 +147,19 @@ _TEST_EDITED: dict[str, str] = {
             _STG_ACCEPTED_STRINGS,
             base_files=_STG_ACCEPTED_INTEGERS,
         ),
-        FactDigestEditTestCase("tree children", ("tree.children", "models/marts"), _NEW_MODEL),
+        FactDigestEditTestCase("tree children", ("tree.children", "sql/models/marts"), _NEW_MODEL),
         FactDigestEditTestCase("tree descendants", ("tree.descendants", "models"), _NEW_MODEL),
-        FactDigestEditTestCase("tree glob", ("tree.glob", "models/**/*.sql"), _NEW_MODEL),
+        FactDigestEditTestCase("tree glob", ("tree.glob", "sql/models/**/*.sql"), _NEW_MODEL),
         FactDigestEditTestCase(
-            "resources under", ("tree.resources_under", "models/marts"), _NEW_MODEL
+            "resources under", ("tree.resources_under", "sql/models/marts"), _NEW_MODEL
         ),
         FactDigestEditTestCase(
             "read text", ("tree.read_text", "config/owners.yaml"), {"config/owners.yaml": "a: 2\n"}
         ),
         FactDigestEditTestCase(
-            "missing model appears", ("sql.for_model", "models/marts/order_counts.sql"), _NEW_MODEL
+            "missing model appears",
+            ("sql.for_model", "sql/models/marts/order_counts.sql"),
+            _NEW_MODEL,
         ),
     ),
     ids=lambda case: case.description,

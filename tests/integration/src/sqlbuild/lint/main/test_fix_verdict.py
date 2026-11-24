@@ -107,8 +107,8 @@ def test_given_baseline_and_fixed_compiles_when_comparing_then_failures_belong_t
 ) -> None:
     before_dir: Path = tmp_path / "before"
     after_dir: Path = tmp_path / "after"
-    before_dir.mkdir()
-    after_dir.mkdir()
+    before_dir.mkdir(parents=True)
+    after_dir.mkdir(parents=True)
     before: CompiledProjectView = compile_models(
         project_dir=before_dir, models=test_case.before_models
     )
@@ -119,7 +119,9 @@ def test_given_baseline_and_fixed_compiles_when_comparing_then_failures_belong_t
     verdict: FixVerdict = fix_verdict(
         before=compile_facts(project=before, project_dir=before_dir),
         after=compile_facts(project=after, project_dir=before_dir),
-        edited=frozenset((before_dir / "models" / name).resolve() for name in test_case.edited),
+        edited=frozenset(
+            (before_dir / "sql" / "models" / name).resolve() for name in test_case.edited
+        ),
     )
 
     assert {path.name: reason for path, reason in verdict.failing.items()} == dict(
@@ -150,8 +152,8 @@ def test_given_lineage_unavailable_on_both_sides_when_comparing_then_matching_co
 ) -> None:
     before_dir: Path = tmp_path / "before"
     after_dir: Path = tmp_path / "after"
-    before_dir.mkdir()
-    after_dir.mkdir()
+    before_dir.mkdir(parents=True)
+    after_dir.mkdir(parents=True)
     before: CompiledProjectView = without_lineage(
         compile_models(project_dir=before_dir, models=test_case.before_models)
     )
@@ -162,7 +164,9 @@ def test_given_lineage_unavailable_on_both_sides_when_comparing_then_matching_co
     verdict: FixVerdict = fix_verdict(
         before=compile_facts(project=before, project_dir=before_dir),
         after=compile_facts(project=after, project_dir=before_dir),
-        edited=frozenset((before_dir / "models" / name).resolve() for name in test_case.edited),
+        edited=frozenset(
+            (before_dir / "sql" / "models" / name).resolve() for name in test_case.edited
+        ),
     )
 
     assert {path.name: reason for path, reason in verdict.failing.items()} == dict(

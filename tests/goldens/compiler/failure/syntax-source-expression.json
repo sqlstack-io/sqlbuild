@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "SQL syntax error in source expression 'raw_orders' (<project>/sources/raw.yml): Parse error at line 1, column 38: Unexpected token: Comma",
+     "message": "SQL syntax error in source expression 'raw_orders' (<project>/sql/sources/raw.yml): Parse error at line 1, column 38: Unexpected token: Comma",
      "help": "if this SQL is valid for your warehouse, please report it so the parser can support it\n  = help: SQL analysis is on for this project; to turn it off for every model, set this in sqlbuild_project.toml:\n            [settings]\n            sql_analysis = false\n  = help: to skip SQL analysis for one run, use `--no-sql-analysis`"
     }
    ]

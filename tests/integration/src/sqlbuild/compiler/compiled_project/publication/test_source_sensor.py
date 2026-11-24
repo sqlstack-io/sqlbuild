@@ -29,6 +29,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     wait_for_generation,
     wait_for_run,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 
 @pytest.mark.parametrize(
@@ -43,7 +44,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
             expected_origin="sensor",
             files={
                 **duckshop_orchestration("source_orders"),
-                "sources/orders.yml": Path(
+                "sql/sources/orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
                 ).read_text(),
             },
@@ -58,13 +59,16 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
             expected_origin="sensor",
             files={
                 **duckshop_orchestration("stale_orders"),
-                "sources/orders.yml": Path(
+                "sql/sources/orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/managed_orders.yml"
                 ).read_text(),
-                "python/loaders/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/orders_loader.py"
-                ).read_text(),
-                "source_observations.json": Path(
+                **node_module_files(
+                    "python/nodes/loaders/orders.py",
+                    Path(
+                        "benchmarks/duckshop/edge_cases/orchestration/orders_loader.py"
+                    ).read_text(),
+                ),
+                ".source_observations.json": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/source_stale_journey.json"
                 ).read_text(),
             },
@@ -79,7 +83,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
             expected_origin="sensor",
             files={
                 **duckshop_orchestration("changed_source_orders"),
-                "sources/orders.yml": Path(
+                "sql/sources/orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
                 ).read_text(),
             },
@@ -94,7 +98,7 @@ def test_given_external_source_versions_when_a_location_resyncs_then_only_change
 ) -> None:
     data: dict[str, Any] = json.loads(
         test_case.files.get(
-            "source_observations.json",
+            ".source_observations.json",
             Path(
                 "benchmarks/duckshop/edge_cases/orchestration/source_data_sensor.json"
             ).read_text(),

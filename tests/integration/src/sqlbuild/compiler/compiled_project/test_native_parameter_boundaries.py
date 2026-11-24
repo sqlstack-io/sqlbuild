@@ -65,8 +65,8 @@ def test_given_adapter_parameter_when_attaching_native_test_then_actual_sql_uses
         project_dir=tmp_path,
         files={
             "sqlbuild_project.toml": f'name = "orders"\nadapter = "{test_case.adapter_name}"\n',
-            "models/raw_orders.sql": 'MODEL (description "Raw orders");\nSELECT 1 AS value\n',
-            "models/orders.sql": 'MODEL (description "Orders");\nSELECT value FROM __ref("raw_orders")\n',
+            "sql/models/raw_orders.sql": 'MODEL (description "Raw orders");\nSELECT 1 AS value\n',
+            "sql/models/orders.sql": 'MODEL (description "Orders");\nSELECT value FROM __ref("raw_orders")\n',
             "tests/unit/order_values.sql": (
                 f"TEST (parameters (value {test_case.declaration}), cases (single (value {test_case.literal})));\n"
                 'WITH __ref__raw_orders AS (SELECT @param("value") AS value), '
@@ -107,8 +107,8 @@ def test_given_quoted_hook_argument_when_attaching_then_inserted_marker_is_not_r
         project_dir=tmp_path,
         files={
             "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
-            "hooks/sql/notify.sql": "HOOK (description \"Record a label\");\nSELECT @'label'\n",
-            "models/orders.sql": (
+            "sql/hooks/sql/notify.sql": "HOOK (description \"Record a label\");\nSELECT @'label'\n",
+            "sql/models/orders.sql": (
                 f'MODEL (description "Orders", pre_hooks [sql("notify", label: {json.dumps(test_case.argument)})]);\nSELECT 1 AS order_id\n'
             ),
         },

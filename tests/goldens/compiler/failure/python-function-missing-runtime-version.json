@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Python function file functions/python/order_flag.py must declare runtime_version"
+     "message": "Python function file sql/functions/python/order_flag.py must declare runtime_version"
     }
    ]
   }

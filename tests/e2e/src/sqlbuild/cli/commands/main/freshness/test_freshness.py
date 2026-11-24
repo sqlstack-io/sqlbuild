@@ -360,7 +360,7 @@ def test_given_timestamp_freshness_beyond_tolerance_when_state_then_returns_nonz
         ),
     )
     persist_direct_source_freshness(project_dir=project_dir)
-    (project_dir / "sources" / "raw.yml").write_text(
+    (project_dir / "sql" / "sources" / "raw.yml").write_text(
         freshness_sources_yml(
             raw_orders_freshness=(
                 "    freshness:\n"
@@ -423,7 +423,7 @@ def test_given_timestamp_freshness_moves_backwards_when_state_then_returns_nonze
         ),
     )
     persist_direct_source_freshness(project_dir=project_dir)
-    (project_dir / "sources" / "raw.yml").write_text(
+    (project_dir / "sql" / "sources" / "raw.yml").write_text(
         freshness_sources_yml(
             raw_orders_freshness=(
                 "    freshness:\n"
@@ -554,7 +554,7 @@ def test_given_changed_source_freshness_when_running_state_fail_on_stale_then_re
 ) -> None:
     project_dir: Path = prepare_freshness_project(tmp_path=tmp_path, include_error_source=False)
     persist_direct_source_freshness(project_dir=project_dir)
-    (project_dir / "sources" / "raw.yml").write_text(
+    (project_dir / "sql" / "sources" / "raw.yml").write_text(
         freshness_sources_yml(
             raw_orders_query="SELECT 2 AS data_version",
             include_error_source=False,
@@ -631,7 +631,7 @@ def test_given_timestamp_freshness_within_tolerance_when_running_state_then_repo
         ),
     )
     persist_direct_source_freshness(project_dir=project_dir)
-    (project_dir / "sources" / "raw.yml").write_text(
+    (project_dir / "sql" / "sources" / "raw.yml").write_text(
         freshness_sources_yml(
             raw_orders_freshness=(
                 "    freshness:\n"

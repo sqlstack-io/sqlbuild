@@ -16,7 +16,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.rules.helpers import (
 )
 
 _PROJECT_TOML: str = 'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN038"]\n'
-_MODEL_PATH: str = "models/order_checks.sql"
+_MODEL_PATH: str = "sql/models/order_checks.sql"
 _CUSTOMERS: str = (
     "CROSS JOIN with `customers` in CTE `order_checks` creates an explicit cartesian product"
 )
@@ -62,12 +62,12 @@ _UNNAMED_SQL: str = (
     'SELECT o.order_id, u.n FROM __ref("orders") AS o CROSS JOIN UNNEST([1, 2]) AS u(n)\n'
 )
 _UPSTREAM_FILES: tuple[tuple[str, str], ...] = (
-    ("models/orders.sql", "MODEL (description 'Sample orders.');\nSELECT 1 AS order_id\n"),
+    ("sql/models/orders.sql", "MODEL (description 'Sample orders.');\nSELECT 1 AS order_id\n"),
     (
-        "models/customers.sql",
+        "sql/models/customers.sql",
         "MODEL (description 'Sample customers.');\nSELECT 1 AS customer_id\n",
     ),
-    ("models/regions.sql", "MODEL (description 'Sample regions.');\nSELECT 1 AS region_id\n"),
+    ("sql/models/regions.sql", "MODEL (description 'Sample regions.');\nSELECT 1 AS region_id\n"),
 )
 
 
@@ -101,7 +101,7 @@ _UPSTREAM_FILES: tuple[tuple[str, str], ...] = (
             expected_exit=1,
             expected_fragments=(
                 "stale rule exception suppresses no finding: SQLCLEAN038 at "
-                "models/order_checks.sql (relation shipments)",
+                "sql/models/order_checks.sql (relation shipments)",
             ),
         ),
         RuleExceptionConfigCase(
@@ -113,7 +113,7 @@ _UPSTREAM_FILES: tuple[tuple[str, str], ...] = (
             expected_fragments=(
                 "Inline Rule suppressions are not supported",
                 '[[rules.rule_exceptions]]\n            rule = "SQLCLEAN038"\n'
-                '            path = "models/order_checks.sql"\n'
+                '            path = "sql/models/order_checks.sql"\n'
                 '            relation = "customers"\n'
                 '            reason = "every order meets every customer"',
             ),
@@ -145,7 +145,7 @@ _UPSTREAM_FILES: tuple[tuple[str, str], ...] = (
             ),
             expected_fragments=(
                 '[[rules.rule_exceptions]]\n            rule = "SQLCLEAN038"\n'
-                '            path = "models/order_checks.sql"\n',
+                '            path = "sql/models/order_checks.sql"\n',
             ),
         ),
         RuleExceptionConfigCase(

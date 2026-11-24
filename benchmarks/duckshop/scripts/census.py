@@ -20,7 +20,7 @@ import statistics
 import sys
 
 PROJECT = pathlib.Path(__file__).resolve().parent.parent / "project"
-COMPILED = PROJECT / "target" / "compiled" / "models"
+COMPILED = PROJECT / "target" / "compiled" / "sql" / "models"
 EDGE_FOLDER = "edge_cases"
 AREAS = ("core", "edge", "all")
 

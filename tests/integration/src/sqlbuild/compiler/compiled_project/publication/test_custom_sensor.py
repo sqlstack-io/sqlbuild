@@ -45,7 +45,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.person
             expected_origin="sensor",
             files={
                 **duckshop_orchestration("custom_orders"),
-                "providers/fulfillment.py": (
+                "python/providers/fulfillment.py": (
                     "import json, os, time\nfrom pathlib import Path\n"
                     "from sqlbuild.orchestration import RunRequest, SkipReason\n"
                     "from sqlbuild.provider.classes.provider import Provider\n"

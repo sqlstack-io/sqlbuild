@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Unknown macro '@py.cents' in '<project>/models/staging/stg_orders.sql'. Available macros: none"
+     "message": "Unknown macro '@py.cents' in '<project>/sql/models/staging/stg_orders.sql'. Available macros: none"
     }
    ]
   }

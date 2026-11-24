@@ -1,20 +1,20 @@
 <script lang="ts">
-	import { copyText } from '$lib/browser/clipboard';
+	import { createCopyState } from '$lib/browser/copy-state.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import KeyRoundIcon from '@lucide/svelte/icons/key-round';
 
 	type Props = { label: string; secret: string; ondismiss: () => void };
 	let { label, secret, ondismiss }: Props = $props();
 
-	let copied = $state(false);
+	const copier = createCopyState();
+	const copied = $derived(copier.copied);
 	// Copying can fail, for example where the browser blocks it; the secret is then selected to copy by hand.
-	let failed = $state(false);
+	const failed = $derived(copier.failed);
 	let shown = $state<HTMLElement>();
 
-	async function copy() {
-		copied = await copyText(secret);
-		failed = !copied;
-		if (failed && shown) getSelection()?.selectAllChildren(shown);
+	async function copy(e: MouseEvent) {
+		const done = await copier.copy(secret, e.currentTarget as Element);
+		if (!done && shown) getSelection()?.selectAllChildren(shown);
 	}
 </script>
 

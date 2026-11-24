@@ -64,7 +64,7 @@ def test_given_materialization_switch_when_building_then_each_kind_replaces_the_
 ) -> None:
     write_orders_project(project_dir=tmp_path)
     warehouse: SimulatedSnowflakeWarehouse = orders_warehouse()
-    model: Path = tmp_path / "models" / "marts" / "orders_view.sql"
+    model: Path = tmp_path / "sql" / "models" / "marts" / "orders_view.sql"
     source: str = model.read_text(encoding="utf-8")
     table_types: list[tuple[str, ...]] = []
     builds: list[OfflineBuild] = []
@@ -184,7 +184,7 @@ def test_given_external_change_before_promotion_when_building_then_promotion_rea
         for _ in range(test_case.builds_before)
     )
     warehouse.external_changes.append((re.compile(test_case.before_statement), test_case.change))
-    model: Path = tmp_path / "models" / "marts" / "orders_table.sql"
+    model: Path = tmp_path / "sql" / "models" / "marts" / "orders_table.sql"
     _ = model.write_text(
         model.read_text(encoding="utf-8").replace("SELECT ", "SELECT 1 AS revision, ", 1),
         encoding="utf-8",

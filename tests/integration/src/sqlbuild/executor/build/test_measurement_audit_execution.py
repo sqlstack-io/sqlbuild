@@ -92,9 +92,9 @@ def test_given_measurement_outcomes_when_building_then_gates_and_persists_canoni
         project_dir=tmp_path,
         project_files={
             "sqlbuild_project.toml": 'name = "measurement_build"\nadapter = "duckdb"\n',
-            "models/orders.sql": model_sql,
-            "audits/generic/configured_rate.sql": audit_sql,
-            "audits/generic/empty_rate.sql": """
+            "sql/models/orders.sql": model_sql,
+            "sql/audits/generic/configured_rate.sql": audit_sql,
+            "sql/audits/generic/empty_rate.sql": """
             AUDIT (
               evaluation measurement,
               value measured_value,

@@ -209,14 +209,14 @@ fn given_a_located_gap_when_skipping_analysis_then_p026_names_the_model_its_site
             },
             site: GapSite {
                 label: None,
-                path: "models/orders.sql",
+                path: "sql/models/orders.sql",
                 position: GapPosition::File(TextPosition {
                     line: 5,
                     column: 18,
                 }),
             },
             expected_code: "P001",
-            expected_message: "SQL syntax error in model 'orders' (models/orders.sql): the \
+            expected_message: "SQL syntax error in model 'orders' (sql/models/orders.sql): the \
                                postgres parser cannot read syntax error at line 5, column 18: \
                                syntax error at or near \"FROM\"",
         },
@@ -234,7 +234,7 @@ fn given_a_located_gap_when_skipping_analysis_then_p026_names_the_model_its_site
             },
             site: GapSite {
                 label: Some("post_hooks[0] sql(\"record_refresh\")"),
-                path: "hooks/sql/record_refresh.sql",
+                path: "sql/hooks/sql/record_refresh.sql",
                 position: GapPosition::Statement(TextPosition {
                     line: 1,
                     column: 13,
@@ -242,7 +242,7 @@ fn given_a_located_gap_when_skipping_analysis_then_p026_names_the_model_its_site
             },
             expected_code: "P001",
             expected_message: "SQL syntax error in model 'customer_totals' post_hooks[0] \
-                               sql(\"record_refresh\") (hooks/sql/record_refresh.sql): the duckdb \
+                               sql(\"record_refresh\") (sql/hooks/sql/record_refresh.sql): the duckdb \
                                parser cannot read Syntax error at or near 'WHERE' at line 1, \
                                column 13 of its SQL",
         },
@@ -260,12 +260,12 @@ fn given_a_located_gap_when_skipping_analysis_then_p026_names_the_model_its_site
             },
             site: GapSite {
                 label: None,
-                path: "models/orders_pivot.sql",
+                path: "sql/models/orders_pivot.sql",
                 position: GapPosition::Analysed,
             },
             expected_code: "P026",
             expected_message: "SQL analysis skipped for model 'orders_pivot' \
-                               (models/orders_pivot.sql): the postgres parser cannot read PIVOT at \
+                               (sql/models/orders_pivot.sql): the postgres parser cannot read PIVOT at \
                                line 3, column 3 of the analysed SQL",
         },
     ];

@@ -56,7 +56,7 @@ sqb clone --from prod --to dev
 sqb clone --from prod
 
 # Clone only marts to dev
-sqb clone --from prod --to dev --select path:models/marts
+sqb clone --from prod --to dev --select path:sql/models/marts
 
 # Force physical copies
 sqb clone --from prod --to dev --hard-copy

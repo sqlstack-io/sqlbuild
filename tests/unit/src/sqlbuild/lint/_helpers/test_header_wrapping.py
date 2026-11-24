@@ -50,10 +50,10 @@ def test_given_long_header_audits_when_formatting_then_lists_wrap_idempotently(
     config: LintConfig = LintConfig(line_width=test_case.line_width)
 
     formatted, faults = format_native_headers(
-        contents=test_case.header + _BODY, file_path=Path("models/orders.sql"), config=config
+        contents=test_case.header + _BODY, file_path=Path("sql/models/orders.sql"), config=config
     )
     again, _ = format_native_headers(
-        contents=formatted, file_path=Path("models/orders.sql"), config=config
+        contents=formatted, file_path=Path("sql/models/orders.sql"), config=config
     )
 
     assert faults == ()

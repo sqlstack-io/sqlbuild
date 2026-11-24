@@ -119,15 +119,6 @@ fn given_unresolvable_dependencies_when_resolving_then_compile_fails_naming_the_
             expected_fragments: &["a job of another code location"],
         },
         FailureTestCase {
-            description: "a loader's set",
-            dependant: ("sync_events", "loader"),
-            groups: &[],
-            sets: &[("job", "single", None)],
-            expected_fragments: &[
-                "loader 'sync_events' depends on job 'single'; loaders cannot depend on a job or a tag",
-            ],
-        },
-        FailureTestCase {
             description: "a job node reading the dependant's output closes a cycle",
             dependant: ("report", "asset"),
             groups: &[],

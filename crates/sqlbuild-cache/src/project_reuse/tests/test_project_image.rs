@@ -206,7 +206,7 @@ fn given_project_file_when_computing_delta_changes_then_only_content_changes_cou
             racy: false,
             mtime_shift_ns: 1,
             current_digest: Some("b3:two"),
-            expected_changed: &["models/orders.sql"],
+            expected_changed: &["sql/models/orders.sql"],
         },
         ChangedFileTestCase {
             description: "racy equal stamp with new bytes is changed",
@@ -214,7 +214,7 @@ fn given_project_file_when_computing_delta_changes_then_only_content_changes_cou
             racy: true,
             mtime_shift_ns: 0,
             current_digest: Some("b3:two"),
-            expected_changed: &["models/orders.sql"],
+            expected_changed: &["sql/models/orders.sql"],
         },
         ChangedFileTestCase {
             description: "moved stamp without a stored digest is changed",
@@ -222,7 +222,7 @@ fn given_project_file_when_computing_delta_changes_then_only_content_changes_cou
             racy: false,
             mtime_shift_ns: 1,
             current_digest: Some("b3:one"),
-            expected_changed: &["models/orders.sql"],
+            expected_changed: &["sql/models/orders.sql"],
         },
         ChangedFileTestCase {
             description: "unreadable moved file is changed",
@@ -230,21 +230,21 @@ fn given_project_file_when_computing_delta_changes_then_only_content_changes_cou
             racy: false,
             mtime_shift_ns: 1,
             current_digest: None,
-            expected_changed: &["models/orders.sql"],
+            expected_changed: &["sql/models/orders.sql"],
         },
     ];
     for test_case in test_cases {
         let stored = vec![StoredProjectFile {
-            stamp: stamp("models/orders.sql", "f", None),
+            stamp: stamp("sql/models/orders.sql", "f", None),
             digest: test_case.stored_digest.map(str::to_owned),
             racy: test_case.racy,
         }];
-        let mut current = stamp("models/orders.sql", "f", None);
+        let mut current = stamp("sql/models/orders.sql", "f", None);
         current.mtime_ns += test_case.mtime_shift_ns;
-        let current = vec![current, stamp("models/customers.sql", "f", None)];
+        let current = vec![current, stamp("sql/models/customers.sql", "f", None)];
         let digests: HashMap<String, String> = test_case
             .current_digest
-            .map(|digest| HashMap::from([("models/orders.sql".to_owned(), digest.to_owned())]))
+            .map(|digest| HashMap::from([("sql/models/orders.sql".to_owned(), digest.to_owned())]))
             .unwrap_or_default();
         let unverified: HashSet<String> = unverified_paths(&stored, &current);
 
@@ -258,7 +258,7 @@ fn given_project_file_when_computing_delta_changes_then_only_content_changes_cou
         assert_eq!(
             (changes.added, changes.removed),
             (
-                vec!["models/customers.sql".to_owned()],
+                vec!["sql/models/customers.sql".to_owned()],
                 Vec::<String>::new()
             ),
             "{}",

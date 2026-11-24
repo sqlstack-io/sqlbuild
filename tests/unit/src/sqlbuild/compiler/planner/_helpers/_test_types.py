@@ -134,7 +134,7 @@ class SeedIdentityTestCase:
     seed_contents: str
     comparison_contents: str
     expected_same_identity: bool
-    seed_relative_path: Path = Path("seeds/orders.csv")
+    seed_relative_path: Path = Path("sql/seeds/orders.csv")
 
 
 @dataclass(frozen=True)

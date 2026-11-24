@@ -81,7 +81,7 @@ class OutputCaptureContext:
 
 
 @dataclass(frozen=True)
-class CommandOutputSinkDefinition:
+class CommandOutputEventSinkDefinition:
     """Immutable metadata attached to a command-output sink function."""
 
     name: str

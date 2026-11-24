@@ -35,7 +35,7 @@ pub struct ParsedCsvSettings<N> {
     pub keep_default_na: Option<N>,
 }
 
-/// One seed declaration of a `seeds/**/*.yml` file.
+/// One seed declaration of a `sql/seeds/**/*.yml` file.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ParsedSeedEntry<N> {
     pub name: N,

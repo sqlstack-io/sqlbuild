@@ -35,8 +35,8 @@ _DUCKDB_SOURCES: str = _SOURCES.replace(
     "    database: example_db\n    schema: raw\n    table: orders\n",
     "    expression: SELECT 'o1' AS order_id, NULL::BOOLEAN AS is_test_order\n",
 )
-_MODEL_PATH: str = "models/real_orders.sql"
-_AUDIT_PATH: str = "audits/generic/test_orders_are_flagged.sql"
+_MODEL_PATH: str = "sql/models/real_orders.sql"
+_AUDIT_PATH: str = "sql/audits/generic/test_orders_are_flagged.sql"
 _TEST_PATH: str = "tests/unit/test_real_orders.sql"
 _MODEL: str = (
     "MODEL (\n"
@@ -82,7 +82,7 @@ _SNOWFLAKE_HELP: str = (
             description="snowflake rejects truth-value tests in models, audits and SQL tests",
             repo_files={
                 "sqlbuild_project.toml": _SNOWFLAKE_PROJECT,
-                "sources/raw.yml": _SOURCES,
+                "sql/sources/raw.yml": _SOURCES,
                 _MODEL_PATH: _MODEL,
                 _AUDIT_PATH: _AUDIT,
                 _TEST_PATH: _SQL_TEST,
@@ -120,7 +120,7 @@ _SNOWFLAKE_HELP: str = (
             description="duckdb accepts truth-value tests",
             repo_files={
                 "sqlbuild_project.toml": _DUCKDB_PROJECT,
-                "sources/raw.yml": _DUCKDB_SOURCES,
+                "sql/sources/raw.yml": _DUCKDB_SOURCES,
                 _MODEL_PATH: _DUCKDB_MODEL,
                 _AUDIT_PATH: _AUDIT,
                 _TEST_PATH: _SQL_TEST,
@@ -162,7 +162,7 @@ def test_given_truth_value_test_when_compiling_then_dialect_support_is_enforced(
             description="duckdb builds, audits and tests truth-value tests",
             repo_files={
                 "sqlbuild_project.toml": _DUCKDB_PROJECT,
-                "sources/raw.yml": _DUCKDB_SOURCES,
+                "sql/sources/raw.yml": _DUCKDB_SOURCES,
                 _MODEL_PATH: _DUCKDB_MODEL,
                 _AUDIT_PATH: _AUDIT,
                 _TEST_PATH: _SQL_TEST,

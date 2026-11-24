@@ -19,8 +19,8 @@ from tests.unit.src.sqlbuild.compiler.planner._helpers.helpers import build_test
         BuildPathIndexTestCase(
             description="strips models prefix from relative paths",
             model_paths={
-                "stg_orders": "models/staging/stg_orders.sql",
-                "fact_orders": "models/marts/fact_orders.sql",
+                "stg_orders": "sql/models/staging/stg_orders.sql",
+                "fact_orders": "sql/models/marts/fact_orders.sql",
             },
             expected_folders={
                 "stg_orders": "staging",
@@ -30,7 +30,7 @@ from tests.unit.src.sqlbuild.compiler.planner._helpers.helpers import build_test
         BuildPathIndexTestCase(
             description="handles nested subdirectories",
             model_paths={
-                "deep_model": "models/staging/raw/deep_model.sql",
+                "deep_model": "sql/models/staging/raw/deep_model.sql",
             },
             expected_folders={
                 "deep_model": "staging/raw",
@@ -39,7 +39,7 @@ from tests.unit.src.sqlbuild.compiler.planner._helpers.helpers import build_test
         BuildPathIndexTestCase(
             description="handles models at top level models dir",
             model_paths={
-                "top_model": "models/top_model.sql",
+                "top_model": "sql/models/top_model.sql",
             },
             expected_folders={
                 "top_model": "",

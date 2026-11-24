@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "unknown environment variable '@@ENV:SQB_DIFFERENTIAL_UNSET' in '<project>/models/staging/stg_orders.sql'"
+     "message": "unknown environment variable '@@ENV:SQB_DIFFERENTIAL_UNSET' in '<project>/sql/models/staging/stg_orders.sql'"
     }
    ]
   }

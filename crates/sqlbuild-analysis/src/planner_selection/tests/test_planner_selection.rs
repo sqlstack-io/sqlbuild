@@ -170,12 +170,12 @@ fn given_model_selector_term_when_resolving_then_returns_model_names() {
         },
         ModelSelectorTestCase {
             description: "windows path is translated and matches nested folders",
-            term: "path:models\\staging",
-            expected_names: names(&["orders", "customers"], Some("path:models/staging")),
+            term: "path:sql\\models\\staging",
+            expected_names: names(&["orders", "customers"], Some("path:sql/models/staging")),
         },
         ModelSelectorTestCase {
             description: "path selects the folder's models",
-            term: "path:models/marts",
+            term: "path:sql/models/marts",
             expected_names: names(&["report"], None),
         },
         ModelSelectorTestCase {
@@ -253,12 +253,12 @@ fn given_order_selectors_when_splitting_unit_tests_then_tests_and_resources_sepa
         },
         UnitTestSplitTestCase {
             description: "selectors without unit tests pass through unchanged",
-            select: texts(&["orders", "customers,tag:daily", "models/marts"]),
+            select: texts(&["orders", "customers,tag:daily", "sql/models/marts"]),
             exclude: texts(&["raw_orders"]),
             accepts_unit_tests: true,
             expected_split: Ok(full_split(
                 (
-                    &["orders", "customers,tag:daily", "models/marts"],
+                    &["orders", "customers,tag:daily", "sql/models/marts"],
                     &["raw_orders"],
                 ),
                 (&[], &[]),

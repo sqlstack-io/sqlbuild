@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { copyText } from '$lib/browser/clipboard';
+	import { createCopyState } from '$lib/browser/copy-state.svelte';
 	import { noun, plural } from '$lib/format/plural';
 	import PageBody from '$lib/components/page-body.svelte';
 	import DataTable from '$lib/components/list/data-table.svelte';
@@ -319,11 +319,11 @@
 		});
 	}
 
-	let copied = $state(false);
-	async function copy() {
+	const copier = createCopyState();
+	const copied = $derived(copier.copied);
+	async function copy(e: MouseEvent) {
 		const command = job ? `sqb ${request.command.join(' ')}` : cmd.trim();
-		copied = await copyText(`${command} --target ${app.target?.name ?? ''}`);
-		setTimeout(() => (copied = false), 1500);
+		await copier.copy(`${command} --target ${app.target?.name ?? ''}`, e.currentTarget as Element);
 	}
 
 	// ---- run ----

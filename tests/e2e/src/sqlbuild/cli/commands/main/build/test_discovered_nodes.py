@@ -14,6 +14,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
 
 _PROJECT: str = (
+    'extra_paths = ["runs.txt"]\n'
     'name = "discovered"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
     '[connection]\ndatabase = "discovered.duckdb"\n\n[targets.dev]\nschema = "dev"\n'
 )
@@ -37,7 +38,7 @@ def plan() -> Discovered:
 @asset(for_each=plan, depends_on=model("orders"))
 def run_step(ctx: AssetContext, step: str) -> None:
     """Run one step."""
-    with (Path(__file__).parents[2] / "runs.txt").open("a") as runs:
+    with (Path(__file__).parents[4] / "runs.txt").open("a") as runs:
         runs.write(f"{ctx.discovered.item}:{step}:{ctx.discovered.tags['release']}\\n")
 '''
 
@@ -111,8 +112,8 @@ def test_given_a_for_each_asset_when_planning_or_building_outside_a_location_the
         project_name="discovered",
         repo_files={
             "sqlbuild_project.toml": _PROJECT,
-            "models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
-            "python/plan/nodes.py": _NODES,
+            "sql/models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
+            "python/nodes/plan/nodes/asset.py": _NODES,
         },
     )
     runs_file: Path = project_dir / "runs.txt"
@@ -149,8 +150,8 @@ def test_given_a_for_each_asset_when_compiling_then_the_dag_shows_the_placeholde
         project_name="discovered",
         repo_files={
             "sqlbuild_project.toml": _PROJECT,
-            "models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
-            "python/plan/nodes.py": _NODES,
+            "sql/models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
+            "python/nodes/plan/nodes/asset.py": _NODES,
         },
     )
     dag: Path = project_dir / "target" / "sqlbuild_dag.json"
@@ -197,8 +198,8 @@ def test_given_a_set_without_items_when_discovering_for_a_command_then_it_stops_
         project_name="discovered",
         repo_files={
             "sqlbuild_project.toml": _PROJECT,
-            "models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
-            "python/plan/nodes.py": nodes,
+            "sql/models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
+            "python/nodes/plan/nodes/asset.py": nodes,
         },
     )
     result: subprocess.CompletedProcess[str] = run_sqb(

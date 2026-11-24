@@ -569,6 +569,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/cost/selection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readCostSelection"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/cost/series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readCostSeries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/discovered": {
         parameters: {
             query?: never;
@@ -2201,6 +2233,34 @@ export interface components {
             /** @description Where signing out goes when a trusted proxy owns the sign-in; absent means no sign-out link. */
             logout_url?: string | null;
         };
+        /** @description One job's estimated query cost on one node: in the period, and in the period before it. */
+        CostFactRecord: {
+            /** Format: int64 */
+            bytes_scanned: number;
+            /** Format: double */
+            credits: number;
+            /** @description The node's folder as `costFolder` names it; empty at the top of `sql/models`. */
+            folder: string;
+            /** @description None for builds no server run started. */
+            job?: string | null;
+            /** @description `<kind>:<name>`, like catalog node keys. */
+            node_key: string;
+            /** Format: double */
+            previous_credits: number;
+            /** Format: double */
+            previous_usd?: number | null;
+            /** Format: int64 */
+            queries: number;
+            /**
+             * Format: int64
+             * @description Builds in the period, counted once each.
+             */
+            runs: number;
+            /** Format: double */
+            seconds: number;
+            /** Format: double */
+            usd?: number | null;
+        };
         /** @description Estimated query cost of one group, such as a job, a warehouse size or a node. */
         CostGroup: {
             /** Format: double */
@@ -2219,6 +2279,70 @@ export interface components {
              * @description None when any of the group's observations had no configured credit price.
              */
             usd?: number | null;
+        };
+        /** @description The price the dollars of a cost read use, and where it came from. */
+        CostPrice: {
+            /**
+             * @description `config` (the project's `[cost] usd_per_credit`), `rate_sheet`, `list_price` (an estimate,
+             *     also when only some rows are) or `mixed`.
+             */
+            source: string;
+            /** Format: double */
+            usd_per_credit: number;
+        };
+        /** @description A selection's estimated query cost over a period, job by node, with daily series. */
+        CostSelectionRecord: {
+            /** Format: int64 */
+            bytes_scanned: number;
+            /** Format: double */
+            credits: number;
+            /** @description The period's days, `YYYY-MM-DD` in UTC, oldest first; every series follows them. */
+            dates: string[];
+            /** Format: int32 */
+            days: number;
+            error?: null | components["schemas"]["SelectionProblem"];
+            facts: components["schemas"]["CostFactRecord"][];
+            folder_daily: components["schemas"]["CostSeriesRecord"][];
+            /**
+             * Format: int64
+             * @description Of those, builds whose cost is still pending or partial.
+             */
+            incomplete_runs: number;
+            job_daily: components["schemas"]["CostSeriesRecord"][];
+            /** Format: double */
+            previous_credits: number;
+            /** Format: double */
+            previous_usd?: number | null;
+            price?: null | components["schemas"]["CostPrice"];
+            /** Format: int64 */
+            queries: number;
+            /**
+             * Format: int64
+             * @description Builds in the period that spent cost on a selected node.
+             */
+            runs: number;
+            /** Format: double */
+            seconds: number;
+            /** Format: date-time */
+            since: string;
+            /**
+             * Format: uuid
+             * @description The publication the selection was evaluated against; None before the first one.
+             */
+            snapshot_id?: string | null;
+            /** Format: double */
+            usd?: number | null;
+        };
+        /** @description Daily series for a batch of groups, in their order. */
+        CostSeriesBatch: {
+            dates: string[];
+            series: number[][];
+        };
+        /** @description Credits per day of the period, oldest first, for one group. */
+        CostSeriesRecord: {
+            credits: number[];
+            /** @description The job, or top-level folder; None for builds no server run started. */
+            key?: string | null;
         };
         /** @description A target's estimated query cost over a window, from the latest observation of each run. */
         CostSummaryRecord: {
@@ -2239,6 +2363,11 @@ export interface components {
             since: string;
             /** Format: double */
             usd?: number | null;
+            /**
+             * @description Where the dollars' prices came from: `config`, `rate_sheet`, `list_price` (an estimate, also
+             *     when only some are) or `mixed`; None without dollars.
+             */
+            usd_per_credit_source?: string | null;
         };
         /** @description One stretch of the cursor, as raw bound texts. */
         CoverageBatch: {
@@ -2281,6 +2410,18 @@ export interface components {
             /** @enum {string} */
             status: "unavailable";
         };
+        /** @description The node one item of a discovered set became under one `for_each` asset. */
+        DiscoveredNodeReadback: {
+            /** @description The item's arguments; one that is not a string reads as its JSON text. */
+            args: {
+                [key: string]: string;
+            };
+            asset: string;
+            /** @description The node key, `asset:<asset>[<item>]`. */
+            key: string;
+            /** @description The item's ID, or `*` for the placeholder of a set that never succeeded. */
+            step: string;
+        };
         /** @description The discovered sets of a target's current snapshot; empty when it saved none. */
         DiscoveredReadback: {
             /** Format: int64 */
@@ -2293,6 +2434,8 @@ export interface components {
         };
         /** @description One discovered set of the current snapshot, as a deploy reads it back. */
         DiscoveredSetReadback: {
+            /** @description The `for_each` assets that read the set. */
+            assets: string[];
             /** Format: int64 */
             check_every_seconds?: number | null;
             digest?: string | null;
@@ -2304,9 +2447,13 @@ export interface components {
             /** Format: date-time */
             last_good_at?: string | null;
             name: string;
+            /** @description The node each served item became under each of `assets`, or each asset's placeholder. */
+            nodes: components["schemas"]["DiscoveredNodeReadback"][];
             status: components["schemas"]["DiscoveredSetStatus"];
-            /** @description The tags of the result the set serves: its newest, or its last good one after a failure. */
-            tags: Record<string, never>;
+            /** @description The tags of the result the set serves (its newest, or its last good one), each as text. */
+            tags: {
+                [key: string]: string;
+            };
         };
         /**
          * @description How a set's newest attempt went.
@@ -2893,6 +3040,8 @@ export interface components {
             status: string;
             /** Format: double */
             usd?: number | null;
+            /** @description Where the build's price per credit came from: `config`, `rate_sheet` or `list_price`. */
+            usd_per_credit_source?: string | null;
         };
         /** @enum {string} */
         NodeEventKind: "success" | "failed" | "recovered";
@@ -3141,6 +3290,11 @@ export interface components {
             dropped_bytes?: number;
             /** @description The node that printed the lines, keyed `<kind>:<name>`; `None` for lines printed outside a node. */
             node_key?: string | null;
+            /**
+             * Format: date-time
+             * @description When the worker read these lines from the command's output, to the millisecond.
+             */
+            read_at: string;
             stream: components["schemas"]["OutputStream"];
             text: string;
         };
@@ -4007,10 +4161,16 @@ export interface components {
             event_id: string;
             event_type: string;
             invocation_id: string;
-            /** @description A summary the scheduler writes for a group run's member events, such as a member retry; never error or SQL text. */
+            /** @description A summary of what an event names, such as a member retry or the command a worker started; never error or SQL text. */
             message?: string | null;
             occurred_at: string;
             outcome?: string | null;
+            /** @description For a phase of a worker's command, such as `compiled` or `planned`: what it counted, what it is about and its sub-steps. */
+            phase?: string | null;
+            /** Format: int64 */
+            phase_count?: number | null;
+            phase_detail?: string | null;
+            phase_name?: string | null;
             producer?: string | null;
             resource_attempt_id?: string | null;
             resource_id?: string | null;
@@ -5113,6 +5273,10 @@ export interface components {
             statements_observed: number;
             status: string;
             target_name?: string | null;
+            /** @description The price per credit `estimated_usd` used; None on rows recorded before prices were. */
+            usd_per_credit?: string | null;
+            /** @description `config`, `rate_sheet` or `list_price` (an estimate); None on rows recorded before prices were. */
+            usd_per_credit_source?: string | null;
             warehouse_name: string;
             warehouse_size: string;
             warehouse_type?: string | null;
@@ -6743,6 +6907,106 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CostSummaryRecord"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readCostSelection: {
+        parameters: {
+            query?: {
+                /** @description Builds that started in the last this many whole UTC days, today included; defaults to 7, capped at 90 */
+                days?: number;
+                /** @description Space-separated selectors, as `sqb build -s` takes them; empty selects every node */
+                select?: string;
+                /** @description Space-separated selectors, as `--exclude` takes them */
+                exclude?: string;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The selection's cost job by node, against the period before, with daily series by job and top-level folder */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostSelectionRecord"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readCostSeries: {
+        parameters: {
+            query: {
+                /** @description As `readCostSelection` */
+                days?: number;
+                /** @description As `readCostSelection` */
+                select?: string;
+                /** @description As `readCostSelection` */
+                exclude?: string;
+                /** @description A JSON array of at most 200 `CostSeriesGroup`s */
+                groups: string;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Each group's credits per day, in the groups' order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostSeriesBatch"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Session rejected */

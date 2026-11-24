@@ -6,7 +6,7 @@ use crate::freshness::constants::{STRING_STATE_VALUE_TYPE, TEXT_TIMESTAMP_STATE_
 /// The column the warehouse clock fills on insert.
 pub const OBSERVED_AT_COLUMN: &str = "observed_at";
 /// Columns in declaration order with their state value types; `observed_at` is last.
-pub const RESOURCE_COST_COLUMN_TYPES: [(&str, &str); 23] = [
+pub const RESOURCE_COST_COLUMN_TYPES: [(&str, &str); 25] = [
     ("observation_id", STRING_STATE_VALUE_TYPE),
     ("run_id", STRING_STATE_VALUE_TYPE),
     ("orchestration_run_id", STRING_STATE_VALUE_TYPE),
@@ -22,6 +22,8 @@ pub const RESOURCE_COST_COLUMN_TYPES: [(&str, &str); 23] = [
     ("bytes_scanned", INTEGER_STATE_VALUE_TYPE),
     ("estimated_credits", STRING_STATE_VALUE_TYPE),
     ("estimated_usd", STRING_STATE_VALUE_TYPE),
+    ("usd_per_credit", STRING_STATE_VALUE_TYPE),
+    ("usd_per_credit_source", STRING_STATE_VALUE_TYPE),
     ("status", STRING_STATE_VALUE_TYPE),
     ("statements_expected", INTEGER_STATE_VALUE_TYPE),
     ("statements_observed", INTEGER_STATE_VALUE_TYPE),
@@ -31,14 +33,18 @@ pub const RESOURCE_COST_COLUMN_TYPES: [(&str, &str); 23] = [
     ("run_completed_at", TEXT_TIMESTAMP_STATE_VALUE_TYPE),
     (OBSERVED_AT_COLUMN, TEXT_TIMESTAMP_STATE_VALUE_TYPE),
 ];
-/// Columns that may be NULL: server run, optional warehouse detail, unpriced USD and target.
-pub const NULLABLE_RESOURCE_COST_COLUMNS: [&str; 5] = [
+/// Columns that may be NULL: server run, optional warehouse detail, unpriced USD and its price, and target.
+pub const NULLABLE_RESOURCE_COST_COLUMNS: [&str; 7] = [
     "orchestration_run_id",
     "warehouse_type",
     "cluster_number",
     "estimated_usd",
+    "usd_per_credit",
+    "usd_per_credit_source",
     "target_name",
 ];
+/// Columns added after the table's first release; opening an older table adds them.
+pub const ADDED_RESOURCE_COST_COLUMNS: [&str; 2] = ["usd_per_credit", "usd_per_credit_source"];
 /// Resource type of a run's totals row; executor resource types never start with an underscore.
 pub const TOTAL_RESOURCE_TYPE: &str = "_total";
 /// Columns a refresh reads from each run's newest run row, in this order.

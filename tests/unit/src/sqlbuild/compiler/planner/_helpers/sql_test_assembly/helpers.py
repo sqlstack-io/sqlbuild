@@ -291,7 +291,7 @@ def build_test_and_project(
                     )
                 ),
                 name=model_name,
-                relative_path=Path(f"models/{model_name}.sql"),
+                relative_path=Path(f"sql/models/{model_name}.sql"),
                 query_sql=query_sql,
                 config=CompileModelConfig(),
                 destination=CompiledRelationLocation(
@@ -315,7 +315,7 @@ def build_test_and_project(
                 ),
                 deps=(),
                 name=function_name,
-                relative_path=Path(f"functions/sql/{function_name}.sql"),
+                relative_path=Path(f"sql/functions/sql/{function_name}.sql"),
                 arguments=(),
                 returns="BOOLEAN",
                 body_sql="SELECT TRUE",
@@ -342,7 +342,7 @@ def build_test_and_project(
                 ),
                 deps=(),
                 name=function_name,
-                relative_path=Path(f"functions/sql/{function_name}.sql"),
+                relative_path=Path(f"sql/functions/sql/{function_name}.sql"),
                 arguments=(),
                 returns="TABLE",
                 body_sql="SELECT 1 AS order_id",
@@ -416,7 +416,7 @@ def _expand_model_query_overrides(
     for model_name, query_sql in test_case.model_macro_source_queries.items():
         overrides[model_name] = expand_sql_macros(
             sql=query_sql,
-            file_path=Path(f"models/{model_name}.sql"),
+            file_path=Path(f"sql/models/{model_name}.sql"),
             loaded_macros=loaded_macros,
             macro_overrides=test_case.macro_mocks,
             macro_context=_MACRO_CONTEXT,
@@ -446,8 +446,8 @@ def _build_loaded_macros(macro_outputs: dict[str, str]) -> dict[str, LoadedMacro
     for name, output in macro_outputs.items():
         loaded_macros[name] = LoadedMacro(
             name=name,
-            file_path=Path("macros/python/test_macros.py"),
-            relative_path=Path("macros/python/test_macros.py"),
+            file_path=Path("sql/macros/python/test_macros.py"),
+            relative_path=Path("sql/macros/python/test_macros.py"),
             raw_source="",
             function=_macro_function(output),
         )
@@ -517,7 +517,7 @@ def build_cursor_model(*, cursor_type: str, cursor_grain: str | None) -> Compile
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="daily_orders"),
         deps=(),
         name="daily_orders",
-        relative_path=Path("models/daily_orders.sql"),
+        relative_path=Path("sql/models/daily_orders.sql"),
         query_sql=CURSOR_WINDOW_MODEL_SQL,
         config=CompileModelConfig(values=values),
         destination=CompiledRelationLocation(

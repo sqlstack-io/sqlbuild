@@ -2,10 +2,10 @@ use crate::cli_text::models::{
     DiagnosticText, DisplayLimit, LocationText, ModelPlanText, PlanTextReport,
 };
 
-/// A location in `models/a.sql`, whose text has a CRLF line, a non-ASCII name and a vertical tab.
+/// A location in `sql/models/a.sql`, whose text has a CRLF line, a non-ASCII name and a vertical tab.
 pub(super) fn location(line: i64, column: i64, end: (Option<i64>, Option<i64>)) -> LocationText {
     LocationText {
-        path: "models/a.sql".to_owned(),
+        path: "sql/models/a.sql".to_owned(),
         line,
         column,
         end_line: end.0,

@@ -40,11 +40,11 @@ def test_given_unrelated_project_types_when_completing_fixture_then_eager_work_i
         tmp_path,
         {
             "sqlbuild_project.toml": 'name = "fixture_scope"\nadapter = "duckdb"\n',
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 'MODEL (description "Order facts.");\n'
                 'SELECT order_id, status FROM __source("raw_orders")'
             ),
-            "sources/raw_orders.yml": (
+            "sql/sources/raw_orders.yml": (
                 "sources:\n  - name: raw_orders\n    description: Order input.\n"
                 "    expression: SELECT 1 AS order_id, 'open' AS status\n"
                 "    contract: enforced\n    columns:\n"

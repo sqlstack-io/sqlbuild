@@ -96,7 +96,7 @@ def test_given_retired_tracked_relation_past_retention_when_running_janitor_then
         },
     )
     for model_name in test_case.retired_model_ages_days:
-        (project_dir / "models" / f"{model_name}.sql").unlink()
+        (project_dir / "sql" / "models" / f"{model_name}.sql").unlink()
 
     janitor_result: subprocess.CompletedProcess[str] = run_sqb(
         command=test_case.janitor_command, project_dir=project_dir

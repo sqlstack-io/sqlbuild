@@ -32,13 +32,13 @@ _UDF_AFTER_MENTIONS: str = (
         NativeResourceDiagnosticTestCase(
             description="MODEL header after leading blank lines",
             files={
-                "models/order_totals.sql": "\n \t\n\n    MODEL (materialized table);\nSELECT 1 AS id\n"
+                "sql/models/order_totals.sql": "\n \t\n\n    MODEL (materialized table);\nSELECT 1 AS id\n"
             },
             expected_diagnostics=(
                 (
                     "P010",
                     "model 'order_totals' has no description",
-                    "models/order_totals.sql",
+                    "sql/models/order_totals.sql",
                     4,
                     5,
                     None,
@@ -48,13 +48,13 @@ _UDF_AFTER_MENTIONS: str = (
         NativeResourceDiagnosticTestCase(
             description="FUNCTION header after a leading blank line",
             files={
-                "functions/sql/is_large_order.sql": "\nFUNCTION (returns BOOLEAN);\n\nSELECT TRUE\n"
+                "sql/functions/sql/is_large_order.sql": "\nFUNCTION (returns BOOLEAN);\n\nSELECT TRUE\n"
             },
             expected_diagnostics=(
                 (
                     "P010",
                     "function 'is_large_order' has no description",
-                    "functions/sql/is_large_order.sql",
+                    "sql/functions/sql/is_large_order.sql",
                     2,
                     1,
                     None,
@@ -63,12 +63,12 @@ _UDF_AFTER_MENTIONS: str = (
         ),
         NativeResourceDiagnosticTestCase(
             description="HOOK header on the first line",
-            files={"hooks/sql/analyze_orders.sql": "HOOK ();\nSELECT 1\n"},
+            files={"sql/hooks/sql/analyze_orders.sql": "HOOK ();\nSELECT 1\n"},
             expected_diagnostics=(
                 (
                     "P010",
                     "hook 'analyze_orders' has no description",
-                    "hooks/sql/analyze_orders.sql",
+                    "sql/hooks/sql/analyze_orders.sql",
                     1,
                     1,
                     None,
@@ -77,12 +77,12 @@ _UDF_AFTER_MENTIONS: str = (
         ),
         NativeResourceDiagnosticTestCase(
             description="@udf decorator after docstring and comment mentions",
-            files={"functions/python/is_large_order.py": _UDF_AFTER_MENTIONS},
+            files={"sql/functions/python/is_large_order.py": _UDF_AFTER_MENTIONS},
             expected_diagnostics=(
                 (
                     "P010",
                     "function 'is_large_order' has no description",
-                    "functions/python/is_large_order.py",
+                    "sql/functions/python/is_large_order.py",
                     6,
                     1,
                     None,
@@ -92,9 +92,9 @@ _UDF_AFTER_MENTIONS: str = (
         NativeResourceDiagnosticTestCase(
             description="second seed entry of its YAML file",
             files={
-                "seeds/product_labels.csv": "product_type_id\n1\n",
-                "seeds/product_types.csv": "product_type_id\n1\n",
-                "seeds/product_types.yml": (
+                "sql/seeds/product_labels.csv": "product_type_id\n1\n",
+                "sql/seeds/product_types.csv": "product_type_id\n1\n",
+                "sql/seeds/product_types.yml": (
                     "seeds:\n  - name: product_labels\n    description: Labels\n    columns:\n"
                     "      - name: product_type_id\n        type: INTEGER\n"
                     "  - name: product_types\n    columns:\n"
@@ -105,7 +105,7 @@ _UDF_AFTER_MENTIONS: str = (
                 (
                     "P010",
                     "seed 'product_types' has no description",
-                    "seeds/product_types.yml",
+                    "sql/seeds/product_types.yml",
                     7,
                     1,
                     None,
@@ -116,7 +116,7 @@ _UDF_AFTER_MENTIONS: str = (
             description="cursor model reading only constants is located at its cursor entry",
             files=cursor_model_files(),
             expected_diagnostics=(
-                ("P011", _CURSOR_MESSAGE, "models/finance/daily_revenue.sql", 5, 3, 22),
+                ("P011", _CURSOR_MESSAGE, "sql/models/finance/daily_revenue.sql", 5, 3, 22),
             ),
         ),
         NativeResourceDiagnosticTestCase(
@@ -127,10 +127,10 @@ _UDF_AFTER_MENTIONS: str = (
         NativeResourceDiagnosticTestCase(
             description="audit factory only one model attaches",
             files={
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     'MODEL (description "Orders", audit_factories [quality]);\nSELECT 1 AS id\n'
                 ),
-                "python/factories/quality.py": (
+                "python/nodes/factories/quality.py": (
                     "from sqlbuild.audits import audit_factory\n\n\n"
                     "@audit_factory\ndef quality():\n    return []\n\n\n"
                     "@audit_factory\ndef unused_quality():\n    return []\n"
@@ -141,7 +141,7 @@ _UDF_AFTER_MENTIONS: str = (
                     "C216",
                     "Audit factory 'unused_quality' is not referenced by any model and will "
                     "not produce audits",
-                    "python/factories/quality.py",
+                    "python/nodes/factories/quality.py",
                     9,
                     1,
                     None,

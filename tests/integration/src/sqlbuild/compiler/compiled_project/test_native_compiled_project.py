@@ -131,7 +131,7 @@ def test_given_repeated_output_schemas_when_serializing_then_columns_share_immut
         files={
             "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
             **{
-                f"models/orders_{index}.sql": (
+                f"sql/models/orders_{index}.sql": (
                     'MODEL (description "Order identifiers");\n'
                     "SELECT CAST(1 AS INT) AS order_id, CAST(NULL AS INT) AS missing_id, "
                     "CAST('ready' AS VARCHAR) AS status"
@@ -261,7 +261,7 @@ def test_given_project_when_running_native_model_loop_then_inputs_match_recorded
         ModelLoopErrorTestCase(
             description="blank header description",
             model_sql="MODEL (description ' ');\nSELECT 1 AS order_id\n",
-            expected_message="models/orders.sql model 'description' must be a non-empty string",
+            expected_message="sql/models/orders.sql model 'description' must be a non-empty string",
             expected_code="P001",
         ),
         ModelLoopErrorTestCase(
@@ -301,7 +301,7 @@ def test_given_project_when_running_native_model_loop_then_inputs_match_recorded
             description="unknown audit factory",
             model_sql="MODEL (audit_factories [order_checks]);\nSELECT 1 AS order_id\n",
             expected_message=(
-                "model 'orders' in models/orders.sql references unknown audit factory "
+                "model 'orders' in sql/models/orders.sql references unknown audit factory "
                 "'order_checks'. Available audit factories: none discovered"
             ),
             expected_code="P001",
@@ -319,7 +319,7 @@ def test_given_project_when_running_native_model_loop_then_inputs_match_recorded
             description="dbt reference without a dbt manifest",
             model_sql='MODEL ();\nSELECT * FROM __dbt_ref("raw_orders")\n',
             expected_message=(
-                'Model file models/orders.sql uses __dbt_ref("raw_orders") but no dbt manifest '
+                'Model file sql/models/orders.sql uses __dbt_ref("raw_orders") but no dbt manifest '
                 "was found"
             ),
             expected_code="C214",
@@ -327,7 +327,7 @@ def test_given_project_when_running_native_model_loop_then_inputs_match_recorded
         ModelLoopErrorTestCase(
             description="unclosed reference call located in the model file",
             model_sql='MODEL ();\nSELECT *\nFROM __ref("stg_orders"\n',
-            expected_message="models/orders.sql:3:6: SQL reference contains an unclosed parenthesis",
+            expected_message="sql/models/orders.sql:3:6: SQL reference contains an unclosed parenthesis",
             expected_code="P001",
         ),
         ModelLoopErrorTestCase(
@@ -436,7 +436,7 @@ def test_given_project_when_running_native_model_loop_then_inputs_match_recorded
             model_sql='MODEL (post_hooks [sql("grant_read")]);\nSELECT 1 AS id\n',
             expected_message=(
                 "{model_path} post_hooks[0] sql(\"grant_read\") is missing argument 'role' for "
-                "SQL hook 'grant_read' in hooks/sql/grant_read.sql"
+                "SQL hook 'grant_read' in sql/hooks/sql/grant_read.sql"
             ),
             expected_code="P001",
             files=SQL_HOOK_FILES,
@@ -449,7 +449,7 @@ def test_given_project_when_running_native_model_loop_then_inputs_match_recorded
             ),
             expected_message=(
                 '{model_path} pre_hooks[0] sql("grant_read") passes unknown argument(s) to '
-                "SQL hook 'grant_read' in hooks/sql/grant_read.sql: mode, scope"
+                "SQL hook 'grant_read' in sql/hooks/sql/grant_read.sql: mode, scope"
             ),
             expected_code="P001",
             files=SQL_HOOK_FILES,
@@ -513,8 +513,8 @@ def test_given_invalid_model_when_running_native_model_loop_then_attachment_erro
         fixtures=(),
         files={
             "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
-            "enums/status.sql": "ENUM (name order_status, members [PLACED, SHIPPED]);\n",
-            "models/orders.sql": test_case.model_sql,
+            "sql/enums/status.sql": "ENUM (name order_status, members [PLACED, SHIPPED]);\n",
+            "sql/models/orders.sql": test_case.model_sql,
         }
         | test_case.files,
         project_dir=tmp_path / "project",
@@ -524,7 +524,7 @@ def test_given_invalid_model_when_running_native_model_loop_then_attachment_erro
         _ = build_inputs_with_native_loop(project_dir=project_dir)
 
     assert raised.value.message == test_case.expected_message.format(
-        model_path=project_dir / "models" / "orders.sql"
+        model_path=project_dir / "sql" / "models" / "orders.sql"
     )
     assert raised.value.code == test_case.expected_code
 
@@ -566,7 +566,7 @@ def test_given_unparseable_model_when_validating_immediately_then_syntax_error_i
         fixtures=(),
         files={
             "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
-            "models/orders.sql": test_case.model_sql,
+            "sql/models/orders.sql": test_case.model_sql,
         },
         project_dir=tmp_path / "project",
     )
@@ -575,7 +575,7 @@ def test_given_unparseable_model_when_validating_immediately_then_syntax_error_i
         _ = build_inputs_with_native_loop(project_dir=project_dir, defer_validation=False)
 
     assert raised.value.message == test_case.expected_message.format(
-        model_path=project_dir / "models" / "orders.sql"
+        model_path=project_dir / "sql" / "models" / "orders.sql"
     )
     assert raised.value.code == "P001"
     assert test_case.expected_help_fragment in (raised.value.help or "")
@@ -620,8 +620,8 @@ def test_given_ordinary_compile_when_compiling_then_no_python_project_is_constru
     [
         ModelPathScopeErrorTestCase(
             description="a folder holding the identity separator is read as an identity",
-            model_path="models/a:b/orders.sql",
-            expected_message="Unknown qualified identity kind: 'models/a'",
+            model_path="sql/models/a:b/orders.sql",
+            expected_message="Unknown qualified identity kind: 'sql/models/a'",
             expected_code="S002",
         ),
     ],
@@ -636,7 +636,7 @@ def test_given_model_path_scope_rejects_when_running_native_model_loop_then_scop
         fixtures=(),
         files={
             "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
-            "enums/status.sql": "ENUM (name order_status, members [PLACED, SHIPPED]);\n",
+            "sql/enums/status.sql": "ENUM (name order_status, members [PLACED, SHIPPED]);\n",
             test_case.model_path: "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
         },
         project_dir=tmp_path / "project",

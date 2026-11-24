@@ -46,7 +46,7 @@ _EVALUATING: str = "Evaluating configured rules..."
                         {
                             "code": "SQBRMODEL102",
                             "message": "SELECT * is allowed only inside dependency import CTEs",
-                            "path": "models/orders.sql",
+                            "path": "sql/models/orders.sql",
                             "line": 2,
                         }
                     ],
@@ -65,7 +65,7 @@ def test_given_a_rule_finding_when_a_location_loads_then_nothing_is_published_an
         project_dir=project,
         files={
             "sqlbuild_project.toml": _PROJECT + _SELECT_STAR_RULE,
-            "models/orders.sql": _MODEL + test_case.model_sql + "\n",
+            "sql/models/orders.sql": _MODEL + test_case.model_sql + "\n",
         },
     )
 
@@ -95,7 +95,7 @@ def test_given_a_published_snapshot_when_plans_are_previewed_then_rules_ran_only
         project_dir=project,
         files={
             "sqlbuild_project.toml": _PROJECT + _SELECT_STAR_RULE,
-            "models/orders.sql": _MODEL + test_case.model_sql + "\n",
+            "sql/models/orders.sql": _MODEL + test_case.model_sql + "\n",
         },
     )
     built: subprocess.CompletedProcess[str] = run_sqb(project, "build", "--target", "development")

@@ -6,7 +6,7 @@ use crate::python_rules::tests::test_types::{PythonRunFailureTestCase, PythonRun
 
 const PURE_FACTORY: &str = r#"from sqlbuild.assets import factory, asset
 
-from python.inventory.snapshots.constants import WAREHOUSE_SPECS
+from python.nodes.inventory.snapshots.constants import WAREHOUSE_SPECS
 
 
 @factory
@@ -70,7 +70,7 @@ const SENSOR: &str = r#"from orchestration.sensors.inventory._helpers import fee
 
 LATEST = feed.latest()
 "#;
-const FEED: &str = r#"from python.utils.network import ping
+const FEED: &str = r#"from python.nodes.utils.network import ping
 
 
 def latest():
@@ -82,7 +82,7 @@ def again():
 "#;
 const NETWORK: &str = r#"import socket
 
-from python.utils import network
+from python.nodes.utils import network
 
 
 def ping():
@@ -105,7 +105,7 @@ SHELL = SSHClient()
 "#;
 const DEFERRED: &str = r#"import subprocess
 
-from python.utils.shell import deferred_runner
+from python.nodes.utils.shell import deferred_runner
 
 HANDLERS = {"ls": lambda: subprocess.run(["ls"])}
 RUNNER = deferred_runner()
@@ -131,12 +131,12 @@ fn given_compile_time_python_when_evaluating_compile_time_purity_then_reports_ca
         PythonRunTestCase {
             description: "static specs, node bodies, main() and provider methods report nothing",
             files: &[
-                ("python/inventory/snapshots/node.py", PURE_FACTORY),
+                ("python/nodes/inventory/snapshots/asset.py", PURE_FACTORY),
                 (
-                    "python/inventory/snapshots/constants.py",
+                    "python/nodes/inventory/snapshots/constants.py",
                     "WAREHOUSE_SPECS = (\"north\", \"south\")\n",
                 ),
-                ("python/orders/export/main.py", RUNTIME_ONLY),
+                ("python/nodes/orders/export/main.py", RUNTIME_ONLY),
             ],
             config: json!({ "select": ["SQBRPYTHON022"] }),
             expected_faults: vec![],
@@ -144,16 +144,22 @@ fn given_compile_time_python_when_evaluating_compile_time_purity_then_reports_ca
         PythonRunTestCase {
             description: "module scope, factory bodies and the project functions they call are followed to each external call",
             files: &[
-                ("python/inventory/snapshots/node.py", QUERYING_FACTORY),
                 (
-                    "python/inventory/snapshots/_helpers/spec_loading.py",
+                    "python/nodes/inventory/snapshots/asset.py",
+                    QUERYING_FACTORY,
+                ),
+                (
+                    "python/nodes/inventory/snapshots/_helpers/spec_loading.py",
                     SPEC_LOADING,
                 ),
-                ("python/orders/storefront_import/constants.py", REGIONS),
+                (
+                    "python/nodes/orders/storefront_import/constants.py",
+                    REGIONS,
+                ),
                 ("orchestration/sensors/inventory/stock_feed.py", SENSOR),
                 ("orchestration/sensors/inventory/_helpers/feed.py", FEED),
-                ("python/utils/network.py", NETWORK),
-                ("providers/carrier_api/constants.py", CLIENTS),
+                ("python/nodes/utils/network.py", NETWORK),
+                ("python/providers/carrier_api/constants.py", CLIENTS),
             ],
             config: json!({ "select": ["SQBRPYTHON022"] }),
             expected_faults: vec![
@@ -163,60 +169,93 @@ fn given_compile_time_python_when_evaluating_compile_time_purity_then_reports_ca
                     3,
                     10,
                 ),
-                ("SQBRPYTHON022", "providers/carrier_api/constants.py", 6, 10),
-                ("SQBRPYTHON022", "providers/carrier_api/constants.py", 7, 11),
-                ("SQBRPYTHON022", "providers/carrier_api/constants.py", 8, 8),
-                ("SQBRPYTHON022", "providers/carrier_api/constants.py", 9, 9),
                 (
                     "SQBRPYTHON022",
-                    "python/inventory/snapshots/node.py",
+                    "python/nodes/inventory/snapshots/asset.py",
                     10,
                     13,
                 ),
                 (
                     "SQBRPYTHON022",
-                    "python/inventory/snapshots/node.py",
+                    "python/nodes/inventory/snapshots/asset.py",
                     11,
                     12,
                 ),
                 (
                     "SQBRPYTHON022",
-                    "python/orders/storefront_import/constants.py",
+                    "python/nodes/orders/storefront_import/constants.py",
                     3,
                     22,
+                ),
+                (
+                    "SQBRPYTHON022",
+                    "python/providers/carrier_api/constants.py",
+                    6,
+                    10,
+                ),
+                (
+                    "SQBRPYTHON022",
+                    "python/providers/carrier_api/constants.py",
+                    7,
+                    11,
+                ),
+                (
+                    "SQBRPYTHON022",
+                    "python/providers/carrier_api/constants.py",
+                    8,
+                    8,
+                ),
+                (
+                    "SQBRPYTHON022",
+                    "python/providers/carrier_api/constants.py",
+                    9,
+                    9,
                 ),
             ],
         },
         PythonRunTestCase {
             description: "lambda bodies and the __main__ block never run on import, but a lambda default and an else branch do",
             files: &[
-                ("python/orders/export/constants.py", DEFERRED),
-                ("python/utils/shell.py", SHELL),
+                ("python/nodes/orders/export/constants.py", DEFERRED),
+                ("python/nodes/utils/shell.py", SHELL),
             ],
             config: json!({ "select": ["SQBRPYTHON022"] }),
             expected_faults: vec![
-                ("SQBRPYTHON022", "python/orders/export/constants.py", 7, 24),
-                ("SQBRPYTHON022", "python/orders/export/constants.py", 12, 5),
+                (
+                    "SQBRPYTHON022",
+                    "python/nodes/orders/export/constants.py",
+                    7,
+                    24,
+                ),
+                (
+                    "SQBRPYTHON022",
+                    "python/nodes/orders/export/constants.py",
+                    12,
+                    5,
+                ),
             ],
         },
         PythonRunTestCase {
             description: "an approved loader boundary stops the walk at exactly that function",
             files: &[
-                ("python/inventory/snapshots/node.py", QUERYING_FACTORY),
                 (
-                    "python/inventory/snapshots/_helpers/spec_loading.py",
+                    "python/nodes/inventory/snapshots/asset.py",
+                    QUERYING_FACTORY,
+                ),
+                (
+                    "python/nodes/inventory/snapshots/_helpers/spec_loading.py",
                     SPEC_LOADING,
                 ),
             ],
             config: json!({
                 "select": ["SQBRPYTHON022"],
                 "rule_options": { "SQBRPYTHON022": { "approved_loader_boundaries": [
-                    "python.inventory.snapshots._helpers.spec_loading.load_specs",
+                    "python.nodes.inventory.snapshots._helpers.spec_loading.load_specs",
                 ] } },
             }),
             expected_faults: vec![(
                 "SQBRPYTHON022",
-                "python/inventory/snapshots/node.py",
+                "python/nodes/inventory/snapshots/asset.py",
                 10,
                 13,
             )],
@@ -224,16 +263,19 @@ fn given_compile_time_python_when_evaluating_compile_time_purity_then_reports_ca
         PythonRunTestCase {
             description: "an approved factory runs its body unchecked",
             files: &[
-                ("python/inventory/snapshots/node.py", QUERYING_FACTORY),
                 (
-                    "python/inventory/snapshots/_helpers/spec_loading.py",
+                    "python/nodes/inventory/snapshots/asset.py",
+                    QUERYING_FACTORY,
+                ),
+                (
+                    "python/nodes/inventory/snapshots/_helpers/spec_loading.py",
                     SPEC_LOADING,
                 ),
             ],
             config: json!({
                 "select": ["SQBRPYTHON022"],
                 "rule_options": { "SQBRPYTHON022": { "approved_loader_boundaries": [
-                    "python.inventory.snapshots.node.warehouse_snapshots",
+                    "python.nodes.inventory.snapshots.asset.warehouse_snapshots",
                 ] } },
             }),
             expected_faults: vec![],
@@ -256,19 +298,22 @@ fn given_a_boundary_naming_a_module_when_evaluating_compile_time_purity_then_the
     let test_cases = [PythonRunFailureTestCase {
         description: "a module is not a loader boundary",
         files: &[
-            ("python/inventory/snapshots/node.py", QUERYING_FACTORY),
             (
-                "python/inventory/snapshots/_helpers/spec_loading.py",
+                "python/nodes/inventory/snapshots/asset.py",
+                QUERYING_FACTORY,
+            ),
+            (
+                "python/nodes/inventory/snapshots/_helpers/spec_loading.py",
                 SPEC_LOADING,
             ),
         ],
         config: json!({
             "select": ["SQBRPYTHON022"],
             "rule_options": { "SQBRPYTHON022": { "approved_loader_boundaries": [
-                "python.inventory.snapshots._helpers.spec_loading",
+                "python.nodes.inventory.snapshots._helpers.spec_loading",
             ] } },
         }),
-        expected_error: "names the module python.inventory.snapshots._helpers.spec_loading",
+        expected_error: "names the module python.nodes.inventory.snapshots._helpers.spec_loading",
     }];
     for test_case in test_cases {
         let faults = python_rule_faults(test_case.files, test_case.config);

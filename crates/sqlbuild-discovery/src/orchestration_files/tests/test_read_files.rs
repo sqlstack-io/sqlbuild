@@ -15,7 +15,7 @@ const DEPENDENCY_GROUP: &str = "name = \"nightly_job_group\"\ndescription = \"d\
 
 const FULL_JOB: &str = r#"name = "orders_export_job"
 description = "Write the daily partner file."
-select = "python/orders/partner_export"
+select = "python/nodes/orders/partner_export"
 exclude = "tag:slow"
 targets = ["production"]
 owner = "Orders team"
@@ -42,7 +42,7 @@ fn given_job_files_when_reading_then_types_every_field_and_keeps_positions() {
             description: "a job using every key",
             text: FULL_JOB,
             expected_name: written("orders_export_job", 1, 8),
-            expected_select: written("python/orders/partner_export", 3, 10),
+            expected_select: written("python/nodes/orders/partner_export", 3, 10),
             expected_exclude: Some("tag:slow"),
             expected_overlap: Overlap::Skip,
             expected_pools: &[("supplier_api", 1), ("warehouse", 2)],

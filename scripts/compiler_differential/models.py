@@ -165,7 +165,7 @@ class ModelPlan:
     def folder(self) -> str:
         """Return the model's folder relative to the project root."""
 
-        return f"models/{self.domain}/{self.layer}"
+        return f"sql/models/{self.domain}/{self.layer}"
 
 
 @dataclass(frozen=True)

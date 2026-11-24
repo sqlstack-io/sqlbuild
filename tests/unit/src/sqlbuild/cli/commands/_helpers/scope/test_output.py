@@ -31,10 +31,10 @@ _RESET: str = "\033[0m"
             verbose=False,
             expected_fragments=(
                 "  Status: 1 match\n",
-                "  ├─ ● enum:mart_status  models/marts/_enums/mart_status.sql:1\n",
+                "  ├─ ● enum:mart_status  sql/models/marts/_enums/mart_status.sql:1\n",
                 "  … 1 global collapsed; run sqb scope model:orders "
-                "--as-path models/marts/orders.sql --globals all\n",
-                "  Lost (1)\n    └─ ● enum:order_status  models/staging/enums/order_status.sql:1\n",
+                "--as-path sql/models/marts/orders.sql --globals all\n",
+                "  Lost (1)\n    └─ ● enum:order_status  sql/models/staging/enums/order_status.sql:1\n",
                 "  Invalidated usages (1)\n    - enum:order_status\n",
                 "● used by this resource   ○ not used by this resource   --verbose for scope details\n",
                 "Completeness: complete\n",
@@ -54,8 +54,8 @@ _RESET: str = "\033[0m"
             expected_fragments=(
                 "  Status: 1 match\n",
                 "  ├─ ● enum:mart_status  [enum; exact-owner-private; expected_model through "
-                "model:expected_orders; role models/marts/_enums]  "
-                "models/marts/_enums/mart_status.sql:1:1\n",
+                "model:expected_orders; role sql/models/marts/_enums]  "
+                "sql/models/marts/_enums/mart_status.sql:1:1\n",
                 "Nearby unavailable (1 of 1)\n  (none)\n",
                 "  Private retained (0)\n    (none)\n",
                 "Diagnostics (0)\n  (none)\nCompleteness: complete\n",
@@ -73,7 +73,7 @@ def test_given_move_preview_when_rendering_then_detail_level_follows_verbose(
     exit_code: int = run_scope_command(
         request=ScopeCommandRequest(
             target="model:orders",
-            as_path="models/marts/orders.sql",
+            as_path="sql/models/marts/orders.sql",
             verbose=test_case.verbose,
         ),
         load_scope_index=lambda **_kwargs: report_scope_lookup().index,
@@ -97,7 +97,7 @@ def test_given_move_preview_when_rendering_then_detail_level_follows_verbose(
                 f"{_BOLD}Scope{_RESET}\n  {_DIM}Target:{_RESET} model:orders\n",
                 f"{_BOLD}Used{_RESET} {_DIM}(3){_RESET}\n",
                 f"  {_DIM}├─{_RESET} {_GREEN}●{_RESET} enum:mart_status  "
-                f"{_DIM}models/marts/_enums/mart_status.sql:1{_RESET}\n",
+                f"{_DIM}sql/models/marts/_enums/mart_status.sql:1{_RESET}\n",
                 f"{_BOLD}Available{_RESET} {_DIM}(2 of 3, 1 collapsed){_RESET}\n",
                 f"    {_DIM}├─{_RESET} {_DIM}○{_RESET} constant:warehouse_password",
                 f"    {_DIM}└─{_RESET} {_GREEN}●{_RESET} {_GREEN}enum:mart_status{_RESET}",
@@ -127,7 +127,7 @@ def test_given_colour_setting_when_rendering_move_preview_then_applies_colour_ro
 ) -> None:
     rendered: str = render_scope_result(
         result=orders_move_report(),
-        request=ScopeCommandRequest(target="model:orders", as_path="models/marts/orders.sql"),
+        request=ScopeCommandRequest(target="model:orders", as_path="sql/models/marts/orders.sql"),
         use_color=test_case.use_color,
     )
 
@@ -151,8 +151,8 @@ def test_given_browse_result_when_rendering_then_counts_and_follow_ups_are_exact
 
     assert exit_code == test_case.expected_exit_code
     assert "Scope folders" in stream.getvalue()
-    assert "constants/  1 declaration, 0 used, 0 children; constant 1" in stream.getvalue()
-    assert "macros/  1 declaration, 1 used, 1 child; macro 1" in stream.getvalue()
+    assert "sql/constants/  1 declaration, 0 used, 0 children; constant 1" in stream.getvalue()
+    assert "sql/macros/  1 declaration, 1 used, 1 child; macro 1" in stream.getvalue()
     assert "sqb scope model:orders --browse" in stream.getvalue()
     assert "sqb scope model:orders --list" in stream.getvalue()
 

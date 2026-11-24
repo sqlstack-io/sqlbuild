@@ -39,7 +39,7 @@ from tests.integration.src.sqlbuild.compiler.helpers import (
 
 _FAILURE_BASE_FILES: dict[str, str] = {
     "sqlbuild_project.toml": MACRO_BRIDGE_PROJECT_FILES["sqlbuild_project.toml"],
-    "macros/python/common.py": (
+    "sql/macros/python/common.py": (
         "def cents(column: str) -> str:\n"
         '    """Convert an amount to cents."""\n'
         '    return f"{column} * 100"\n\n\n'
@@ -50,7 +50,7 @@ _FAILURE_BASE_FILES: dict[str, str] = {
         '    """Return a value that is not SQL."""\n'
         "    return 1\n"
     ),
-    "models/a_first.sql": (
+    "sql/models/a_first.sql": (
         'MODEL (description "First");\n\nSELECT @py.cents("amount") AS amount_cents\n'
     ),
 }
@@ -120,7 +120,7 @@ def test_given_repeated_macro_calls_when_rendering_natively_then_each_call_class
             description="macro raises in a later model",
             files={
                 **_FAILURE_BASE_FILES,
-                "models/b_second.sql": (
+                "sql/models/b_second.sql": (
                     'MODEL (description "Second");\n\nSELECT @py.explode("amount") AS bogus\n'
                 ),
             },
@@ -130,7 +130,7 @@ def test_given_repeated_macro_calls_when_rendering_natively_then_each_call_class
             description="unknown macro after a successful call",
             files={
                 **_FAILURE_BASE_FILES,
-                "models/b_second.sql": (
+                "sql/models/b_second.sql": (
                     'MODEL (description "Second");\n\n'
                     'SELECT @py.cents("amount") AS a, @py.nope("amount") AS b\n'
                 ),
@@ -141,7 +141,7 @@ def test_given_repeated_macro_calls_when_rendering_natively_then_each_call_class
             description="macro returns a value that is not SQL",
             files={
                 **_FAILURE_BASE_FILES,
-                "models/b_second.sql": (
+                "sql/models/b_second.sql": (
                     'MODEL (description "Second");\n\nSELECT @py.number("amount") AS b\n'
                 ),
             },
@@ -151,7 +151,7 @@ def test_given_repeated_macro_calls_when_rendering_natively_then_each_call_class
             description="malformed call after a successful call",
             files={
                 **_FAILURE_BASE_FILES,
-                "models/b_second.sql": (
+                "sql/models/b_second.sql": (
                     'MODEL (description "Second");\n\n'
                     'SELECT @py.cents("amount") AS a, @py.cents x("amount") AS b\n'
                 ),

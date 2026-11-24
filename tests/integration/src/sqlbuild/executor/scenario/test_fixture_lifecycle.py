@@ -248,7 +248,7 @@ def test_given_scenario_plan_when_executing_models_then_builds_model_relations(
         hook_functions=(
             DiscoveredHookFunction(
                 file_path=Path(__file__),
-                relative_path=Path("hooks/python/scenario.py"),
+                relative_path=Path("sql/hooks/python/scenario.py"),
                 name="insert_scenario_hook_log",
                 function=insert_scenario_hook_log,
             ),

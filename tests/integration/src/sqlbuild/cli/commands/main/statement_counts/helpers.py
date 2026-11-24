@@ -159,22 +159,22 @@ ORDERS_FILES: dict[str, str] = {
         "[connection]\n"
         f'database = "{ORDERS_DATABASE}"\n'
     ),
-    "sources/raw.yml": (
+    "sql/sources/raw.yml": (
         "sources:\n"
         "  - name: raw_orders\n    description: Test source raw_orders.\n"
         "    schema: main\n"
         "    table: raw_orders\n"
     ),
-    "models/orders_table.sql": _MODEL_HEADER.format(
+    "sql/models/orders_table.sql": _MODEL_HEADER.format(
         name="orders_table",
         config=("  materialized table,\n  columns (order_id (audits [not_null])),\n"),
     )
     + _ORDERS_SELECT,
-    "models/orders_view.sql": _MODEL_HEADER.format(
+    "sql/models/orders_view.sql": _MODEL_HEADER.format(
         name="orders_view", config="  materialized view,\n"
     )
     + 'SELECT order_id, amount FROM __ref("orders_table")\n',
-    "models/orders_merge.sql": _MODEL_HEADER.format(
+    "sql/models/orders_merge.sql": _MODEL_HEADER.format(
         name="orders_merge",
         config=(
             "  materialized incremental,\n"
@@ -187,7 +187,7 @@ ORDERS_FILES: dict[str, str] = {
         ),
     )
     + _ORDERS_SELECT,
-    "models/orders_daily.sql": _MODEL_HEADER.format(
+    "sql/models/orders_daily.sql": _MODEL_HEADER.format(
         name="orders_daily",
         config=(
             "  materialized incremental,\n"
@@ -337,7 +337,7 @@ def scenario_relation_name(project_dir: Path, suffix: str) -> str:
 def revise_model(project_dir: Path, name: str) -> None:
     """Change one model's definition by adding a constant column."""
 
-    model: Path = project_dir / "models" / f"{name}.sql"
+    model: Path = project_dir / "sql" / "models" / f"{name}.sql"
     _ = model.write_text(
         model.read_text(encoding="utf-8").replace("SELECT ", "SELECT 1 AS revision, ", 1),
         encoding="utf-8",
@@ -347,7 +347,7 @@ def revise_model(project_dir: Path, name: str) -> None:
 def add_post_hook(project_dir: Path, name: str, sql: str) -> str:
     """Give one model an inline SQL post hook, returning its original definition."""
 
-    model: Path = project_dir / "models" / f"{name}.sql"
+    model: Path = project_dir / "sql" / "models" / f"{name}.sql"
     original: str = model.read_text(encoding="utf-8")
     _ = model.write_text(
         re.sub(
@@ -363,7 +363,7 @@ def add_post_hook(project_dir: Path, name: str, sql: str) -> str:
 def add_upstream_reads(project_dir: Path, name: str, upstream: tuple[str, ...]) -> None:
     """Make one model read ``upstream`` without changing its rows, so it builds after them."""
 
-    model: Path = project_dir / "models" / f"{name}.sql"
+    model: Path = project_dir / "sql" / "models" / f"{name}.sql"
     filters: str = " AND ".join(
         f'NOT EXISTS (SELECT 1 FROM __ref("{reference}") WHERE FALSE)' for reference in upstream
     )

@@ -30,7 +30,7 @@ pub(crate) fn source(name: &str, loader: Option<&str>, meta: DagValue) -> DagSou
     DagSourceInput {
         key: key("source", name),
         name: name.to_owned(),
-        path: "sources/raw.yml".to_owned(),
+        path: "sql/sources/raw.yml".to_owned(),
         entry: DagSourceEntryInput {
             name: name.to_owned(),
             database: None,
@@ -52,7 +52,7 @@ pub(crate) fn loader(
 ) -> DagLoaderInput {
     DagLoaderInput {
         name: name.to_owned(),
-        path: "python/loaders.py".to_owned(),
+        path: "python/nodes/loaders.py".to_owned(),
         destination: destination.map(str::to_owned),
         columns: Vec::new(),
         dependency_names: dependencies.iter().map(|name| (*name).to_owned()).collect(),
@@ -64,7 +64,7 @@ pub(crate) fn python_node(kind: &str, name: &str, sql_deps: Vec<ObjectKey>) -> D
     DagPythonNodeInput {
         kind: kind.to_owned(),
         name: name.to_owned(),
-        path: "python/nodes.py".to_owned(),
+        path: "python/nodes/nodes.py".to_owned(),
         description: None,
         tags: Vec::new(),
         group: None,

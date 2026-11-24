@@ -73,7 +73,7 @@ _DBT_MANIFEST_SCHEMA_VERSION: str = "https://schemas.getdbt.com/dbt/manifest/v12
 _MODEL_ORDERS: CompiledModelView = build_test_model(
     name="orders",
     query_sql="SELECT * FROM raw",
-    relative_path="models/staging/orders.sql",
+    relative_path="sql/models/staging/orders.sql",
     schema="staging",
     config_values={"materialized": "table"},
     description="Order records",
@@ -83,13 +83,13 @@ _MODEL_ORDERS: CompiledModelView = build_test_model(
 _MODEL_ORPHAN: CompiledModelView = build_test_model(
     name="orphan",
     query_sql="SELECT 1",
-    relative_path="models/orphan.sql",
+    relative_path="sql/models/orphan.sql",
     schema="public",
 )
 
 _MODEL_WITH_COLUMNS: CompiledModelView = build_test_model(
     name="typed_model",
-    relative_path="models/typed_model.sql",
+    relative_path="sql/models/typed_model.sql",
     description="Has columns",
     columns=(
         SchemaColumn(name="id", type="INTEGER", description="Primary key"),
@@ -99,13 +99,13 @@ _MODEL_WITH_COLUMNS: CompiledModelView = build_test_model(
 
 _MODEL_WITH_DEPS: CompiledModelView = build_test_model(
     name="joined",
-    relative_path="models/joined.sql",
+    relative_path="sql/models/joined.sql",
     deps=(model_key("orders"), source_key("raw_customers")),
 )
 
 _MODEL_WITH_ALIAS: CompiledModelView = build_test_model(
     name="orders_aliased",
-    relative_path="models/marts/orders_aliased.sql",
+    relative_path="sql/models/marts/orders_aliased.sql",
     database="analytics",
     schema="marts",
     alias="fact_orders",
@@ -384,7 +384,7 @@ def test_given_project_when_building_manifest_then_produces_correct_structure(
                         SqlHookEntry(
                             statement="SELECT 'reader'",
                             name="record_access",
-                            relative_path=Path("hooks/sql/record_access.sql"),
+                            relative_path=Path("sql/hooks/sql/record_access.sql"),
                             definition_sql="SELECT @'role'",
                             kwargs={"role": "reader"},
                             description="Record access",
@@ -416,7 +416,7 @@ def test_given_project_when_building_manifest_then_produces_correct_structure(
                                 "type": "sql",
                                 "statement": "SELECT 'reader'",
                                 "name": "record_access",
-                                "relative_path": "hooks/sql/record_access.sql",
+                                "relative_path": "sql/hooks/sql/record_access.sql",
                                 "definition_sql": "SELECT @'role'",
                                 "kwargs": {"role": "reader"},
                                 "description": "Record access",
@@ -598,19 +598,19 @@ def test_given_seed_when_building_manifest_then_produces_correct_node(
         FqnTestCase(
             description="builds fqn from nested relative path",
             project_name=_PROJECT,
-            relative_path="models/staging/orders.sql",
+            relative_path="sql/models/staging/orders.sql",
             expected_fqn=[_PROJECT, "models", "staging", "orders"],
         ),
         FqnTestCase(
             description="builds fqn from top-level relative path",
             project_name=_PROJECT,
-            relative_path="models/orders.sql",
+            relative_path="sql/models/orders.sql",
             expected_fqn=[_PROJECT, "models", "orders"],
         ),
         FqnTestCase(
             description="builds fqn from seed path",
             project_name=_PROJECT,
-            relative_path="seeds/codes.csv",
+            relative_path="sql/seeds/codes.csv",
             expected_fqn=[_PROJECT, "seeds", "codes"],
         ),
     ],
@@ -702,7 +702,7 @@ def test_given_deps_when_building_manifest_then_parent_map_correct(
             expected_name="my_macro",
             expected_resource_type="macro",
             expected_macro_sql="def my_macro(): return 'SELECT 1'",
-            expected_path="macros/python/helpers.py",
+            expected_path="sql/macros/python/helpers.py",
         ),
         ManifestMacroNodeTestCase(
             description="scoped macro exposes visibility metadata",
@@ -711,9 +711,9 @@ def test_given_deps_when_building_manifest_then_parent_map_correct(
             expected_name="my_macro",
             expected_resource_type="macro",
             expected_macro_sql="def my_macro(): return 'SELECT 1'",
-            expected_path="models/sales/macros/python/helpers.py",
+            expected_path="sql/models/sales/macros/python/helpers.py",
             expected_visibility="inherited",
-            expected_scope_path="models/sales",
+            expected_scope_path="sql/models/sales",
             expected_dependencies=("base_macro",),
         ),
     ],
@@ -745,7 +745,7 @@ def test_given_macro_when_building_manifest_then_macro_node_present(
     dependency_records: tuple[DeclarationRecord, ...] = tuple(
         DeclarationRecord(
             identity=identity,
-            path=f"macros/{identity.name}.py",
+            path=f"sql/macros/{identity.name}.py",
             line=1,
             column=1,
             scope=ScopeKind.GLOBAL,
@@ -759,7 +759,7 @@ def test_given_macro_when_building_manifest_then_macro_node_present(
         loaded_macros[dependency_name] = LoadedMacro(
             name=dependency_name,
             file_path=Path(f"/project/macros/{dependency_name}.py"),
-            relative_path=Path(f"macros/{dependency_name}.py"),
+            relative_path=Path(f"sql/macros/{dependency_name}.py"),
             raw_source=f"def {dependency_name}(): return 'SELECT 1'",
             function=lambda: "SELECT 1",
         )
@@ -955,7 +955,7 @@ def test_given_full_project_when_building_manifest_then_validates_against_dbt_sc
     model: CompiledModelView = build_test_model(
         name="orders",
         query_sql="SELECT id FROM raw",
-        relative_path="models/staging/orders.sql",
+        relative_path="sql/models/staging/orders.sql",
         schema="staging",
         config_values={"materialized": "table", "tags": ["core"]},
         description="Order records",
@@ -976,7 +976,7 @@ def test_given_full_project_when_building_manifest_then_validates_against_dbt_sc
         sql_hook_files=(
             DiscoveredSqlHookFile(
                 file_path=Path("/project/hooks/sql/record_access.sql"),
-                relative_path=Path("hooks/sql/record_access.sql"),
+                relative_path=Path("sql/hooks/sql/record_access.sql"),
                 contents="HOOK (description 'Test hook record_access.');\n\nSELECT @'role'\n",
                 header_values={"description": "Record access"},
                 sql_body="SELECT @'role'",
@@ -1024,7 +1024,7 @@ def test_given_full_project_when_building_manifest_then_validates_against_dbt_sc
     macro: LoadedMacro = LoadedMacro(
         name="my_macro",
         file_path=Path("/project/macros/python/helpers.py"),
-        relative_path=Path("macros/python/helpers.py"),
+        relative_path=Path("sql/macros/python/helpers.py"),
         raw_source="def my_macro(): return 'SELECT 1'",
         function=lambda: "SELECT 1",
     )
@@ -1049,7 +1049,7 @@ def test_given_full_project_when_building_manifest_then_validates_against_dbt_sc
     sql_hook_macro: dict[str, Any] = result["macros"][
         f"macro.{_PROJECT}__sqlbuild_hooks.record_access"
     ]
-    assert sql_hook_macro["original_file_path"] == "hooks/sql/record_access.sql"
+    assert sql_hook_macro["original_file_path"] == "sql/hooks/sql/record_access.sql"
     assert sql_hook_macro["meta"] == {
         "sqlbuild_resource_type": "sql_hook",
         "sqlbuild_hook_name": "record_access",

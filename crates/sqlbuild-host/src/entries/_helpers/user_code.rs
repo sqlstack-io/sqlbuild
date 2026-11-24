@@ -60,7 +60,7 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
         edge: HostEdge::UserCode,
     },
     HostEntry {
-        name: "load_sink_module",
+        name: "load_event_sink_module",
         kind: HostKind::Function,
         edge: HostEdge::UserCode,
     },

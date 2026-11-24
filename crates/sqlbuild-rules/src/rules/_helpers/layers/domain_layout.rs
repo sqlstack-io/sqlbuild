@@ -266,7 +266,14 @@ fn resolve_model_path(
     levels: &[Vec<&str>],
     domain_roots: &[Vec<&str>],
 ) -> ModelPathResolution {
-    let parts: Vec<&str> = model.relative_path.split('/').collect();
+    let Some(below_sql) = model
+        .relative_path
+        .strip_prefix(sqlbuild_core::constants::SQL_DIRECTORY)
+        .and_then(|rest| rest.strip_prefix('/'))
+    else {
+        return ModelPathResolution::Missing;
+    };
+    let parts: Vec<&str> = below_sql.split('/').collect();
     if parts.len() < MIN_MODEL_PATH_COMPONENTS || parts.first().copied() != Some("models") {
         return ModelPathResolution::Missing;
     }

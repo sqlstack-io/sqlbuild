@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Macro '@py.cents' in '<project>/models/staging/stg_orders.sql' failed: cannot convert amount"
+     "message": "Macro '@py.cents' in '<project>/sql/models/staging/stg_orders.sql' failed: cannot convert amount"
     }
    ]
   }

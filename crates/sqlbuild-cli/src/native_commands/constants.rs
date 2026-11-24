@@ -106,9 +106,7 @@ pub(crate) const RULES_LIST_ACTION: &str = "list";
 pub(crate) const RULES_SHOW_ACTION: &str = "show";
 
 /// Project directories holding Python the command would import.
-pub(crate) const EVENT_EXPORTERS_DIRECTORY: &str = "event_exporters";
-
-pub(crate) const SINKS_DIRECTORY: &str = "sinks";
+pub(crate) const EVENT_SINKS_DIRECTORY: &str = sqlbuild_core::constants::EVENT_SINKS_PATH;
 
 pub(crate) const CUSTOM_RULES_DIRECTORY: &str = "rules";
 
@@ -157,7 +155,7 @@ pub(crate) const PYTHON_INT_MAX_STR_DIGITS: usize = 4300;
 pub(crate) const DIGIT_SEPARATOR: char = '_';
 
 /// Where a loaded project configuration names its lifecycle sinks.
-pub(crate) const LIFECYCLE_SINK_PATH: [&str; 3] = ["sinks", "lifecycle", "named"];
+pub(crate) const LIFECYCLE_SINK_PATH: [&str; 3] = ["event_sinks", "lifecycle", "named"];
 
 /// CPython's default buffer size for a piped stdout.
 pub(crate) const PYTHON_STDOUT_BUFFER_SIZE: usize = 8192;
@@ -271,4 +269,8 @@ pub(crate) const REPUBLISH_POLL_SECONDS: u64 = 10;
 pub(crate) const REPUBLISH_TIMEOUT_SECONDS: u64 = 600;
 
 /// How `sqb dev` hands its location the resolved folder of run output, which the watch leaves out.
-pub(crate) const DEVELOPMENT_OUTPUT_FOLDER: &str = "SQLBUILD_DEVELOPMENT_OUTPUT_FOLDER";
+pub(crate) const DEVELOPMENT_OUTPUT_FOLDER: &str =
+    sqlbuild_core::constants::DEVELOPMENT_OUTPUT_FOLDER_ENV;
+/// How `sqb dev` hands its location the SQLite control store file, which the watch leaves out.
+pub(crate) const DEVELOPMENT_CONTROL_FILE: &str =
+    sqlbuild_core::constants::DEVELOPMENT_CONTROL_FILE_ENV;

@@ -194,8 +194,8 @@ def test_given_existing_artifacts_when_rules_fail_then_staged_changes_are_not_pu
     config_path: Path = tmp_path / "sqlbuild_project.toml"
     config: str = 'name = "orders"\nadapter = "duckdb"\n[rules]\nselect = ["SQLCLEAN021"]\n'
     config_path.write_text(config, encoding="utf-8")
-    models: Path = tmp_path / "models"
-    models.mkdir()
+    models: Path = tmp_path / "sql" / "models"
+    models.mkdir(parents=True)
     header: str = "MODEL (description 'Test model.', materialized table, contract enforced, columns (order_id (type INTEGER)));\n"
     for index in range(test_case.model_count):
         (models / f"orders_{index:03}.sql").write_text(
@@ -217,13 +217,13 @@ def test_given_existing_artifacts_when_rules_fail_then_staged_changes_are_not_pu
     modified_times: dict[Path, int] = {path: path.stat().st_mtime_ns for path in before}
     assert len(before) == test_case.model_count
     assert staging_directories(tmp_path / "target") == []
-    stale: Path = compiled / "models" / "obsolete.sql"
+    stale: Path = compiled / "sql" / "models" / "obsolete.sql"
     stale.write_text("SELECT 0\n", encoding="utf-8")
     (models / "orders_000.sql").write_text(
         header + "SELECT CAST(2 AS INTEGER) AS order_id\n", encoding="utf-8"
     )
     rules: Path = tmp_path / "rules"
-    rules.mkdir()
+    rules.mkdir(parents=True)
     (rules / "orders.py").write_text(
         "from sqlbuild.rules import Finding, Model, RuleContext, rule\n"
         '@rule(code="XSQBRARCH001", message="Model rejected", remediation="Update the model.")\n'
@@ -237,11 +237,13 @@ def test_given_existing_artifacts_when_rules_fail_then_staged_changes_are_not_pu
     assert main(arguments) == 1
     failed: dict[str, object] = json.loads(capsys.readouterr().out)
     assert failed["has_errors"] is True
-    changed: Path = compiled / "models" / "orders_000.sql"
+    changed: Path = compiled / "sql" / "models" / "orders_000.sql"
     assert {path: path.read_bytes() for path in before} == before
-    assert (tmp_path / "target" / "compiled-failed" / "models" / "orders_000.sql").read_bytes() == (
+    assert (
+        tmp_path / "target" / "compiled-failed" / "sql" / "models" / "orders_000.sql"
+    ).read_bytes() == (
         b"-- sqb: compile failed for this model; not buildable\n"
-        b"-- XSQBRARCH001 at models/orders_000.sql:1:1: Model rejected\n"
+        b"-- XSQBRARCH001 at sql/models/orders_000.sql:1:1: Model rejected\n"
         b"SELECT CAST(2 AS INTEGER) AS order_id\n"
     )
     assert stale.exists()
@@ -294,7 +296,9 @@ def test_given_leftover_staging_when_compiling_then_only_abandoned_staging_is_re
     assert exit_code == 0
     assert payload["has_errors"] is False
     assert tuple(remaining) == test_case.expected_remaining
-    assert len(list((target / "compiled" / "models").glob("*.sql"))) == test_case.model_count
+    assert (
+        len(list((target / "compiled" / "sql" / "models").glob("*.sql"))) == test_case.model_count
+    )
 
 
 @pytest.mark.skipif(
@@ -314,11 +318,11 @@ def test_given_compiled_dir_on_other_filesystem_when_compiling_then_artifacts_ar
     write_prepared_artifacts_project(project_dir=tmp_path, model_count=test_case.model_count)
     with TemporaryDirectory(dir=_SECOND_FILESYSTEM) as other_filesystem:
         compiled: Path = Path(other_filesystem) / "compiled"
-        compiled.mkdir()
-        (tmp_path / "target").mkdir()
+        compiled.mkdir(parents=True)
+        (tmp_path / "target").mkdir(parents=True)
         (tmp_path / "target" / "compiled").symlink_to(compiled, target_is_directory=True)
         exit_code: int = main(["--project-dir", str(tmp_path), "compile", "--no-cache", "--json"])
-        published: list[Path] = sorted((compiled / "models").glob("*.sql"))
+        published: list[Path] = sorted((compiled / "sql" / "models").glob("*.sql"))
         leftovers: list[str] = sorted(path.name for path in compiled.rglob(".*"))
         with duckdb.connect() as connection:
             last_value: object = connection.execute(

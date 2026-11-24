@@ -126,8 +126,8 @@ def test_given_prod_old_name_view_when_previewing_early_drop_as_prod_then_view_i
         command=("--no-color", "build", "--target", "prod"), project_dir=project_dir
     )
     assert origin_build.returncode == 0, origin_build.stdout + origin_build.stderr
-    (project_dir / "models" / "revenue.sql").unlink()
-    (project_dir / "models" / "daily_revenue.sql").write_text(
+    (project_dir / "sql" / "models" / "revenue.sql").unlink()
+    (project_dir / "sql" / "models" / "daily_revenue.sql").write_text(
         "MODEL (description 'Test model daily_revenue.',\n  migrate_from revenue,\n);\n\nSELECT 1 AS revenue_id\n",
         encoding="utf-8",
     )

@@ -44,7 +44,7 @@ def prepare_motherduck_build_project(*, tmp_path: Path) -> tuple[Path, str]:
                 project_name="motherduck_build_project",
                 schema_name=schema_name,
             ),
-            "models/fact_orders.sql": (
+            "sql/models/fact_orders.sql": (
                 "MODEL (description 'Test model fact_orders.', materialized table);\n\n"
                 "SELECT 1 AS order_id, 'classic' AS waffle_name UNION ALL "
                 "SELECT 2 AS order_id, 'liege' AS waffle_name"

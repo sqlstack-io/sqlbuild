@@ -48,10 +48,10 @@ def test_given_snowflake_star_when_compiling_lowercase_contract_then_folded_name
         project_name="shop",
         repo_files={
             "sqlbuild_project.toml": _PROJECT_TOML,
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 f"MODEL (description 'Test model orders.');\nSELECT {test_case.upstream_columns}\n"
             ),
-            "models/order_rows.sql": (
+            "sql/models/order_rows.sql": (
                 f"MODEL (description 'Test model order_rows.', {_CONTRACT});\n"
                 'SELECT o.* FROM __ref("orders") AS o\n'
             ),

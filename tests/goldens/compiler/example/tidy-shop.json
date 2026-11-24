@@ -22,7 +22,7 @@
   }
  ],
  "compiled": {
-  "models/daily_revenue.sql": [
+  "sql/models/daily_revenue.sql": [
    "SELECT CAST('2026-04-01' AS DATE) AS revenue_date, 2850 AS total_revenue_cents",
    ""
   ]
@@ -35,8 +35,8 @@
     "name": "daily_revenue",
     "resource_type": "model",
     "package_name": "waffle_shop",
-    "path": "models/daily_revenue.sql",
-    "original_file_path": "models/daily_revenue.sql",
+    "path": "sql/models/daily_revenue.sql",
+    "original_file_path": "sql/models/daily_revenue.sql",
     "unique_id": "model.waffle_shop.daily_revenue",
     "fqn": [
      "waffle_shop",

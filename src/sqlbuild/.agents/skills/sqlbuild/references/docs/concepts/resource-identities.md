@@ -12,7 +12,7 @@ file by hand creates a new resource with no history, so use [`sqb rename`](../cl
 keep it.
 
 ```text
-error[D016]: Invalid model identity 'DailyOrders' in models/DailyOrders.sql;
+error[D016]: Invalid model identity 'DailyOrders' in sql/models/DailyOrders.sql;
 use snake_case 'daily_orders'
 ```
 
@@ -21,7 +21,7 @@ lowercase letters, digits and underscores. Double underscores are fine, as in
 `commerce__mart_v_order`.
 
 A resource named after its file takes the file name without the extension:
-`models/daily_orders.sql` is the model `daily_orders`. Folders organise files but are not part of
+`sql/models/daily_orders.sql` is the model `daily_orders`. Folders organise files but are not part of
 the name.
 
 ## Renaming a resource

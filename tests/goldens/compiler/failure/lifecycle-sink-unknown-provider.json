@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D015",
-     "message": "Event exporter 'publish_events' in sinks/lifecycle.py requires unknown provider 'destination_client'"
+     "message": "Event exporter 'publish_events' in python/event_sinks/lifecycle.py requires unknown provider 'destination_client'"
     }
    ]
   }

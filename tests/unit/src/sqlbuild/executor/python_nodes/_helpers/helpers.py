@@ -496,7 +496,7 @@ def build_ingress_task_asset_graph() -> PythonNodeGraph:
                 ingress_task_function(),
                 DiscoveredAssetFunction(
                     file_path=Path("/project/assets/orders.py"),
-                    relative_path=Path("python/assets/orders.py"),
+                    relative_path=Path("python/nodes/assets/orders.py"),
                     name="publish_ingress_orders",
                     function=publish_ingress_orders,
                     depends_on=(prepare_ingress_orders,),
@@ -509,7 +509,7 @@ def build_ingress_task_asset_graph() -> PythonNodeGraph:
 def ingress_task_function() -> DiscoveredAssetFunction:
     return DiscoveredAssetFunction(
         file_path=Path("/project/tasks/orders.py"),
-        relative_path=Path("python/tasks/orders.py"),
+        relative_path=Path("python/nodes/tasks/orders.py"),
         name="prepare_ingress_orders",
         function=prepare_ingress_orders,
     )
@@ -518,7 +518,7 @@ def ingress_task_function() -> DiscoveredAssetFunction:
 def ingress_loader_function() -> DiscoveredLoaderFunction:
     return DiscoveredLoaderFunction(
         file_path=Path("/project/loaders/orders.py"),
-        relative_path=Path("python/loaders/orders.py"),
+        relative_path=Path("python/nodes/loaders/orders.py"),
         name="load_ingress_orders",
         function=load_ingress_orders,
         depends_on=(prepare_ingress_orders,),
@@ -568,14 +568,14 @@ def build_read_side_sql_task_asset_graph() -> PythonNodeGraph:
             asset_functions=(
                 DiscoveredAssetFunction(
                     file_path=Path("/project/tasks/orders.py"),
-                    relative_path=Path("python/tasks/orders.py"),
+                    relative_path=Path("python/nodes/tasks/orders.py"),
                     name="profile_stg_orders",
                     function=profile_stg_orders,
                     depends_on=(model("stg_orders"),),
                 ),
                 DiscoveredAssetFunction(
                     file_path=Path("/project/assets/orders.py"),
-                    relative_path=Path("python/assets/orders.py"),
+                    relative_path=Path("python/nodes/assets/orders.py"),
                     name="export_stg_profile",
                     function=export_stg_profile,
                     depends_on=(profile_stg_orders,),
@@ -617,7 +617,7 @@ def python_check_function_for_case(description: str) -> DiscoveredCheckFunction:
     }.get(description, passing_python_check)
     return DiscoveredCheckFunction(
         file_path=Path("/project/checks/orders.py"),
-        relative_path=Path("python/checks/orders.py"),
+        relative_path=Path("python/nodes/checks/orders.py"),
         name="check_upstream_task",
         function=function,
         depends_on=(check_upstream_task,),
@@ -633,7 +633,7 @@ def build_python_check_graph(*, check_function: DiscoveredCheckFunction) -> Pyth
             asset_functions=(
                 DiscoveredAssetFunction(
                     file_path=Path("/project/tasks/orders.py"),
-                    relative_path=Path("python/tasks/orders.py"),
+                    relative_path=Path("python/nodes/tasks/orders.py"),
                     name="upstream_task",
                     function=check_upstream_task,
                 ),

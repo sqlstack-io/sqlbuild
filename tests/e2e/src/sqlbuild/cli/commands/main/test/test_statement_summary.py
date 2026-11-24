@@ -20,7 +20,7 @@ _PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": (
         'name = "orders"\nadapter = "duckdb"\n\n[connection]\ndatabase = "orders.duckdb"\n'
     ),
-    "sources/raw_orders.yml": (
+    "sql/sources/raw_orders.yml": (
         "sources:\n"
         "  - name: raw_orders\n    description: Test source raw_orders.\n"
         "    schema: main\n    table: raw_orders\n"
@@ -28,7 +28,7 @@ _PROJECT_FILES: dict[str, str] = {
         "      - name: order_id\n        type: INTEGER\n"
         "      - name: amount\n        type: INTEGER\n"
     ),
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         "MODEL (description 'Test model orders.');\n\n"
         'SELECT order_id, amount * 2 AS doubled FROM __source("raw_orders")\n'
     ),

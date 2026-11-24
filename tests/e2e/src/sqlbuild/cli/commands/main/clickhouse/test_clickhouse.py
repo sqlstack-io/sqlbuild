@@ -261,7 +261,7 @@ def test_given_snapshot_project_when_building_on_clickhouse_then_scd2_history_is
             )
         ) == (test_case.expected_historical_check_rows)
 
-        (project_dir / "models" / "current_customers.sql").write_text(
+        (project_dir / "sql" / "models" / "current_customers.sql").write_text(
             build_current_customers_model_sql(plan="blocked", updated_at="2026-01-02 00:00:00"),
             encoding="utf-8",
         )
@@ -276,7 +276,7 @@ def test_given_snapshot_project_when_building_on_clickhouse_then_scd2_history_is
             test_case.expected_current_rows_after_initial_build
         )
 
-        (project_dir / "models" / "current_customers.sql").write_text(
+        (project_dir / "sql" / "models" / "current_customers.sql").write_text(
             build_current_customers_model_sql(plan="pro", updated_at="2026-01-02 00:00:00"),
             encoding="utf-8",
         )
@@ -346,7 +346,7 @@ def test_given_existing_snapshot_targets_when_building_on_clickhouse_then_change
             command=("--no-color", "build", "--concurrency", "4"), project_dir=project_dir
         )
         assert initial.returncode == 0, initial.stdout + initial.stderr
-        models: Path = project_dir / "models"
+        models: Path = project_dir / "sql" / "models"
         (models / "current_check_customers.sql").write_text(
             build_current_check_customers_model_sql(changed=True), encoding="utf-8"
         )

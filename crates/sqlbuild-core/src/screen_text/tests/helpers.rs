@@ -148,7 +148,7 @@ pub(super) fn semantic_group(total: usize) -> TreeGroup {
             entry(
                 "fct_revenue",
                 &[
-                    ("at", "models/finance/fct_revenue.sql:42:7", Tone::Muted),
+                    ("at", "sql/models/finance/fct_revenue.sql:42:7", Tone::Muted),
                     ("error", "unknown column net_amount_usd", Tone::Error),
                 ],
             ),
@@ -160,7 +160,7 @@ pub(super) fn semantic_group(total: usize) -> TreeGroup {
 
 /// Every row any renderer draws at `facts`, with whether it is live (cut) rather than lasting (wrapped).
 pub(super) fn every_row(facts: &ScreenFacts) -> Vec<(bool, String)> {
-    let long: &str = "Python nodes 287/412 \u{b7} models/marts/finance/fct_revenue_by_region.sql \
+    let long: &str = "Python nodes 287/412 \u{b7} sql/models/marts/finance/fct_revenue_by_region.sql \
                       \u{b7} a_very_long_identifier_without_any_spaces_in_it_at_all_whatsoever";
     let mut rows: Vec<(bool, String)> = Vec::new();
     for state in [

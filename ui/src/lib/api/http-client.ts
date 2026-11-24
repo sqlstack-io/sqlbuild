@@ -21,11 +21,12 @@ import { jobDetailOf, runWindowOf, toJob, toTick, toTrigger, toTriggerStateEvent
 import { timelineOf } from './http-timeline';
 import { RUN_WINDOW, groupRunNodes, parseRunCursor, planResultOf, queueEntriesOf, toAdhocCheck, runDetailOf, runRowPageOver, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements, toIgnoredAuditFailures, toRunCostRows, toCostSummary, toNodeBuildCosts } from './http-runs';
 import { toSelectionEvaluation, toSelectionVocabulary } from './http-selection';
+import { costSeriesGroups, toCostSelection } from './http-cost';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
-import type { AuthMode, Bootstrap, BuiltInRole, Capability, Location, NavCounts, PlatformEvent, RepublishResult, Scope, Snapshot, WarehouseSync } from './types';
+import type { AuthMode, Bootstrap, BuiltInRole, Capability, DiscoveredSet, Location, NavCounts, PlatformEvent, RepublishResult, Scope, Snapshot, WarehouseSync } from './types';
 import type { Account, AuditEntry, AuditQuery, ConnectionTest, IssuedToken, KeyRotation, LocationDetail, NewPasswordAccount, NewServiceAccount, ServiceAccount, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, ProviderConnection, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { Acknowledgement, CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, NodeStates, NodeStatusDelta, Overview, SnapshotChange, ColumnLineage, AttentionAcknowledgement, ConditionShape, AutomaticWithdrawal } from './types/build';
-import type { NodeOutputIndex, NodeOutputPage, NodeOutputSearch, RunNode, RunOutputFollow, AdhocRunCheck, AdhocRunRequest, BulkRunResult, SelectionEvaluation, SelectionRequest, SelectionVocabulary, PlanDiff, PlanPage, PlanPageSection, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, IgnoredAuditFailure, RunCostRow, CostSummary, NodeBuildCost, StatementSql } from './types/operate';
+import type { NodeOutputIndex, NodeOutputPage, NodeOutputSearch, RunNode, RunOutputFollow, AdhocRunCheck, AdhocRunRequest, BulkRunResult, SelectionEvaluation, SelectionRequest, SelectionVocabulary, PlanDiff, PlanPage, PlanPageSection, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, IgnoredAuditFailure, RunCostRow, CostSummary, CostSelection, CostSelectionQuery, CostSeriesGroup, NodeBuildCost, StatementSql } from './types/operate';
 import { newRequestId } from '$lib/browser/request-id';
 
 type Wire = components['schemas'];
@@ -49,6 +50,8 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'listRunIgnoredAudits',
 	'listRunCost',
 	'getCostSummary',
+	'readCostSelection',
+	'readCostSeries',
 	'listNodeCosts',
 	'getStatementSql',
 	'listRunOutput',
@@ -457,6 +460,22 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			if (!data) throw new ApiError(errorText(error, response), response.status);
 			return toCostSummary(data);
 		},
+		async readCostSelection(scope: Scope, query: CostSelectionQuery): Promise<CostSelection> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/cost/selection', { params: { path: { location_id: locationId, target }, query } });
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toCostSelection(data);
+		},
+		async readCostSeries(scope: Scope, query: CostSelectionQuery, groups: CostSeriesGroup[]): Promise<number[][]> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/cost/series', {
+				params: { path: { location_id: locationId, target }, query: { ...query, groups: costSeriesGroups(groups) } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return data.series;
+		},
 		async listNodeCosts(scope: Scope, nodeKey: string, days: number): Promise<NodeBuildCost[]> {
 			const { locationId, target } = parseLocationKey(scope.locationId);
 			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/cost', {
@@ -761,6 +780,27 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 		},
 		/** Asks the location to publish again, then long-polls until it has or the request expires. */
+		async readDiscovered(scope: Scope): Promise<DiscoveredSet[]> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/discovered', {
+				params: { path: { location_id: locationId, target } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (error) throw new ApiError(errorText(error, response), response.status);
+			return (data?.sets ?? []).map((s) => ({
+				name: s.name,
+				status: s.status,
+				items: s.items,
+				fetchedAt: s.fetched_at ?? null,
+				lastGoodAt: s.last_good_at ?? null,
+				digest: s.digest ?? null,
+				error: s.error ?? null,
+				checkEverySeconds: s.check_every_seconds ?? null,
+				tags: s.tags,
+				assets: s.assets,
+				nodes: s.nodes.map((n) => ({ key: n.key, asset: n.asset, step: n.step, args: n.args }))
+			}));
+		},
 		async republish(scope: Scope): Promise<RepublishResult> {
 			const { locationId, target } = parseLocationKey(scope.locationId);
 			const path = { location_id: locationId, target };

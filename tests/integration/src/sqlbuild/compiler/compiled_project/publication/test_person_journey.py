@@ -193,7 +193,7 @@ def test_given_an_initialized_installation_when_people_run_and_reload_then_permi
             tmp_path / "location.stdout",
         ) as location:
             _ = wait_for_generation(worker.api, "development", 2, location, log)
-            model: Path = worker.project / "models/orders.sql"
+            model: Path = worker.project / "sql/models/orders.sql"
             original: str = model.read_text()
             _ = model.write_text(original.replace("23", "37"))
             edited: dict[str, Any] = wait_for_generation(

@@ -172,6 +172,10 @@ def _run_build_pipeline(
         connection_count=effective_concurrency,
         callbacks=inputs.callbacks,
     )
+    _ = _publish_execution_start(
+        concurrency=effective_concurrency,
+        connections=len(preparation.worker_connections) + 1,
+    )
     timing_tracker: BuildPhaseTimingTracker | None = BuildPhaseTimingTracker.current()
     execution_error: BaseException | None = None
     execution_start: float = time.monotonic()
@@ -211,4 +215,19 @@ def _run_build_pipeline(
             adapter=adapter,
             connections=cleanup_connections,
             active_error=execution_error,
+        )
+
+
+def _publish_execution_start(*, concurrency: int, connections: int) -> None:
+    dispatcher: EventDispatcher | None = current_event_dispatcher()
+    if dispatcher is not None:
+        dispatcher.publish_lifecycle(
+            create_lifecycle_event(
+                event_type="invocation_phase",
+                payload={
+                    "phase": "started_execution",
+                    "count": concurrency,
+                    "detail": f"{connections} connections",
+                },
+            )
         )

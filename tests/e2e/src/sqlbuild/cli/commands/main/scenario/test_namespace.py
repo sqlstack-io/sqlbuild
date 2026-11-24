@@ -172,7 +172,7 @@ def test_given_namespaced_leftovers_when_running_janitor_then_all_namespaces_are
     test_case: ScenarioNamespaceE2ETestCase, tmp_path: Path
 ) -> None:
     project: Path = prepare_namespace_project(tmp_path)
-    source: Path = project / "sources/raw.yml"
+    source: Path = project / "sql/sources/raw.yml"
     source.write_text(source.read_text().replace("schema: main", "schema: raw"))
     config: Path = project / "sqlbuild_project.toml"
     config.write_text(config.read_text() + "\n[janitor]\nenabled = true\nretention_days = 0\n")

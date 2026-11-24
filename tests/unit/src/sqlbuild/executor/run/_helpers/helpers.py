@@ -57,7 +57,7 @@ def build_result_model_plan_entry() -> ModelPlanEntry:
             name="orders",
         ),
         name="orders",
-        relative_path=Path("models/orders.sql"),
+        relative_path=Path("sql/models/orders.sql"),
         materialization_type=MaterializationType.TABLE,
         action=PlanAction.CREATE_TABLE,
         reason=PlanReason.FIRST_RUN,
@@ -110,7 +110,7 @@ def build_snapshot_execution_plan_entry(
             name="customer_snapshot",
         ),
         name="customer_snapshot",
-        relative_path=Path("models/customer_snapshot.sql"),
+        relative_path=Path("sql/models/customer_snapshot.sql"),
         materialization_type=MaterializationType.SNAPSHOT,
         action=PlanAction.SNAPSHOT,
         reason=PlanReason.FIRST_RUN,
@@ -346,7 +346,7 @@ def run_python_hook_with_relations(
         hook_functions=(
             DiscoveredHookFunction(
                 file_path=Path(__file__),
-                relative_path=Path("hooks/python/lookups.py"),
+                relative_path=Path("sql/hooks/python/lookups.py"),
                 name="refresh_lookup",
                 function=function,
                 reads=reads,

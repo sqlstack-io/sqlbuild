@@ -106,7 +106,7 @@ def audit_input(*, definition: str, template: str, rendered: str) -> dict[str, o
     """Return one captured generic audit attached to column `amount` of model `orders`."""
 
     return {
-        "audit_file": {"relative_path": {"__path__": f"audits/generic/{definition}.sql"}},
+        "audit_file": {"relative_path": {"__path__": f"sql/audits/generic/{definition}.sql"}},
         "audit_block": {"sql_body": template},
         "sql_body": rendered,
         "attached_target_kind": {"__enum__": f"{_AUDIT_TARGET}.MODEL"},

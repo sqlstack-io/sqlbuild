@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D006",
-     "message": "<project>/sources/raw.yml source has unknown keys: freshnes; allowed keys: audits, columns, contract, cursor_column, database, description, expression, final, freshness, load_batch_size, managed, meta, name, schema, table, type_enforcement, unique_key, write_strategy",
+     "message": "<project>/sql/sources/raw.yml source has unknown keys: freshnes; allowed keys: audits, columns, contract, cursor_column, database, description, expression, final, freshness, load_batch_size, managed, meta, name, schema, table, type_enforcement, unique_key, write_strategy",
      "help": "did you mean 'freshness'?"
     }
    ]

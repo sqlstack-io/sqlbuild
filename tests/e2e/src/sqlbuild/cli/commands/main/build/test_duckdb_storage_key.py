@@ -44,7 +44,7 @@ def test_given_storage_key_in_connection_when_building_then_warehouse_keeps_defa
                 'name = "storage_key"\nadapter = "duckdb"\n\n'
                 f'[connection]\ndatabase = "warehouse.duckdb"\n{test_case.connection_key} = "latest"\n'
             ),
-            "models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS order_id\n",
+            "sql/models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS order_id\n",
         },
     )
 

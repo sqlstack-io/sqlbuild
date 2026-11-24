@@ -21,7 +21,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
 )
 
 _DATABASE: str = "warehouse.duckdb"
-_MODELS: str = "models/sales"
+_MODELS: str = "sql/models/sales"
 _PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": (
         'name = "sql_hook_reads"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
@@ -29,11 +29,11 @@ _PROJECT_FILES: dict[str, str] = {
         '[targets.dev]\nschema = "dev"\nloader_schema = "raw_dev"\ndefer_sources_to = "prod"\n\n'
         '[targets.prod]\nschema = "prod"\nloader_schema = "raw_prod"\n'
     ),
-    "sources/raw.yml": (
+    "sql/sources/raw.yml": (
         "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n    managed: true\n    write_strategy: table\n"
         "    columns:\n      - name: order_id\n        type: INTEGER\n"
     ),
-    "python/loaders/raw.py": (
+    "python/nodes/loaders/raw/loader.py": (
         "from sqlbuild.loaders import loader\n\n\n"
         "@loader\ndef raw_orders(ctx):\n    '''Test loader raw_orders.'''\n    return [{'order_id': 9}]\n"
     ),

@@ -118,11 +118,12 @@ async fn record_segment(
     let before: StoredNodeLines = rows.into_iter().next().unwrap_or_default();
     let node_line: i64 = before.node_lines + 1;
     let (mut transaction, _) = query(transaction,
-        "INSERT INTO sqb_run_output_segments (run_id, chunk, node_key, stream, run_line, node_line, line_count, text_offset, text_bytes) \
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+        "INSERT INTO sqb_run_output_segments (run_id, chunk, node_key, stream, run_line, node_line, line_count, text_offset, text_bytes, read_at) \
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
         vec![Parameter::Id(run_id), Parameter::Integer(chunk), node.clone(), Parameter::Text(stream.into()),
             Parameter::Integer(run_line), Parameter::Integer(node_line), Parameter::Integer(segment.line_count),
-            Parameter::Integer(segment.text_offset), Parameter::Integer(segment.text_bytes)]).await?;
+            Parameter::Integer(segment.text_offset), Parameter::Integer(segment.text_bytes),
+            Parameter::Time(segment.read_at)]).await?;
     let room: usize =
         MARKED_LINES.saturating_sub(usize::try_from(before.stream_marks).unwrap_or(MARKED_LINES));
     let marks = &segment.marks[..segment.marks.len().min(room)];

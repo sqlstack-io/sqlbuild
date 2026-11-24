@@ -705,3 +705,24 @@ pub(crate) fn republish_failed(_: uuid::Uuid) -> crate::platform::models::Locati
         error: "orders does not parse".into(),
     }
 }
+
+/// A selection cost read per store: every fact `(job, node, folder, credits, previous)` and the series batch totals.
+pub(crate) struct CostSelectionTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_all: Vec<(
+        serde_json::Value,
+        serde_json::Value,
+        serde_json::Value,
+        f64,
+        f64,
+    )>,
+    pub(crate) expected_series: Vec<f64>,
+}
+
+/// A node's published path and the cost folder it falls in.
+pub(crate) struct CostFolderTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) path: Option<&'static str>,
+    pub(crate) expected_folder: &'static str,
+}

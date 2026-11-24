@@ -221,7 +221,7 @@ def capped_dependency_warehouse_files(*, project_dir: Path) -> dict[str, str]:
             'name = "capped_dependency"\nadapter = "duckdb"\n\n'
             f"[connection]\ndatabase = {json.dumps(str(database_path))}\n"
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n  - name: raw_events\n    description: Test source raw_events.\n"
             "    schema: main\n    table: raw_events\n"
         ),
@@ -237,13 +237,13 @@ def compile_capped_microbatch_intermediary_project(
         project_dir=project_dir,
         project_files={
             **capped_dependency_warehouse_files(project_dir=project_dir),
-            "models/capped_events.sql": capped_dependency_producer_sql(
+            "sql/models/capped_events.sql": capped_dependency_producer_sql(
                 action=MicrobatchLimitAction.CAP_FROM_END
             ),
-            "models/intermediate_events.sql": capped_microbatch_intermediary_sql(
+            "sql/models/intermediate_events.sql": capped_microbatch_intermediary_sql(
                 input_role=input_role
             ),
-            "models/downstream_events.sql": capped_dependency_consumer_sql(
+            "sql/models/downstream_events.sql": capped_dependency_consumer_sql(
                 watermark_mode="all", input_name="intermediate_events"
             ),
         },
@@ -267,12 +267,12 @@ def compile_capped_dependency_project(
 
     project_files: dict[str, str] = {
         **capped_dependency_warehouse_files(project_dir=project_dir),
-        "models/capped_events.sql": capped_dependency_producer_sql(action=action),
-        "models/downstream_events.sql": consumer_sql,
+        "sql/models/capped_events.sql": capped_dependency_producer_sql(action=action),
+        "sql/models/downstream_events.sql": consumer_sql,
     }
     upstream_name: str = "capped_events"
     for intermediary_name in intermediary_names:
-        project_files[f"models/{intermediary_name}.sql"] = dependency_view_sql(
+        project_files[f"sql/models/{intermediary_name}.sql"] = dependency_view_sql(
             upstream_name=upstream_name
         )
         upstream_name = intermediary_name

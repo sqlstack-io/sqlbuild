@@ -1,4 +1,4 @@
-from python.tasks.scoring import score_orders
+from python.nodes.tasks.scoring.asset import score_orders
 
 from sqlbuild.assets import asset
 

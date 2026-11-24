@@ -16,7 +16,7 @@ Online: https://sqlbuild.com/docs/concepts/functions/
 - Python function options
 - Adapter support
 
-Functions are SQL or Python definitions under `functions/` that SQLBuild compiles and deploys to the warehouse alongside your models. They participate in the DAG: if a function definition changes, SQLBuild redeploys it, and every model that calls it directly treats the change as a change to its own query.
+Functions are SQL or Python definitions under `sql/functions/` that SQLBuild compiles and deploys to the warehouse alongside your models. They participate in the DAG: if a function definition changes, SQLBuild redeploys it, and every model that calls it directly treats the change as a change to its own query.
 
 ## Scalar UDFs
 
@@ -24,10 +24,10 @@ Scalar UDFs return a single value per row. They can be written in SQL or Python.
 
 ### SQL UDFs
 
-Place SQL function files under `functions/sql/`. Each file has a `FUNCTION()` header declaring arguments and return type, followed by a SQL expression body. The header accepts `description`, `arguments`, `returns`, `database`, `schema`, and `tags`; any other key fails compilation with `D002`, naming the key and its file and line. `description` is required: a function without one fails compilation with `P010` (see [Descriptions](models/configuration.md#descriptions)):
+Place SQL function files under `sql/functions/sql/`. Each file has a `FUNCTION()` header declaring arguments and return type, followed by a SQL expression body. The header accepts `description`, `arguments`, `returns`, `database`, `schema`, and `tags`; any other key fails compilation with `D002`, naming the key and its file and line. `description` is required: a function without one fails compilation with `P010` (see [Descriptions](models/configuration.md#descriptions)):
 
 ```sql
--- functions/sql/udf__is_completed_order.sql
+-- sql/functions/sql/udf__is_completed_order.sql
 FUNCTION (
   description "Whether an order status counts as completed",
   arguments (order_status STRING),
@@ -39,10 +39,10 @@ order_status = 'completed'
 
 ### Python UDFs
 
-Place Python function files under `functions/python/`. Each file has exactly one function decorated with `@udf(...)`:
+Place Python function files under `sql/functions/python/`. Each file has exactly one function decorated with `@udf(...)`:
 
 ```python
-# functions/python/is_completed_order_py.py
+# sql/functions/python/is_completed_order_py.py
 from sqlbuild.functions import udf
 
 @udf(
@@ -74,14 +74,14 @@ The function name is the file stem (filename without extension). `__udf()` resol
 
 ## Table functions
 
-Table functions return multiple rows and columns. Write them in SQL under `functions/sql/` with a `returns table(...)` declaration, or in Python under `functions/python/` with `@table_fn(...)`.
+Table functions return multiple rows and columns. Write them in SQL under `sql/functions/sql/` with a `returns table(...)` declaration, or in Python under `sql/functions/python/` with `@table_fn(...)`.
 
 ### SQL table functions
 
 A SQL table function's body is a query:
 
 ```sql
--- functions/sql/table_fn__customer_orders.sql
+-- sql/functions/sql/table_fn__customer_orders.sql
 FUNCTION (
   description "Customer orders",
   arguments (p_customer_id INTEGER),
@@ -108,10 +108,10 @@ WHERE customer_id = p_customer_id
 
 ### Python table functions
 
-A Python table function receives one whole partition of its input rows as a data frame and returns a data frame of rows. Use it for per-group numerics that SQL expresses badly, such as smoothing a series or fitting a curve per customer. Place it under `functions/python/`, with exactly one function decorated with `@table_fn(...)`:
+A Python table function receives one whole partition of its input rows as a data frame and returns a data frame of rows. Use it for per-group numerics that SQL expresses badly, such as smoothing a series or fitting a curve per customer. Place it under `sql/functions/python/`, with exactly one function decorated with `@table_fn(...)`:
 
 ```python
-# functions/python/smooth_payments.py
+# sql/functions/python/smooth_payments.py
 import polars as pl
 from sqlbuild.functions import table_fn
 
@@ -195,7 +195,7 @@ SQL functions can reference the same resources as models:
 
 These references are resolved at compile time and create DAG edges. If a referenced model changes, the function is redeployed.
 
-A SQL function uses macros, constants, and enums available from its file under `functions/sql/`.
+A SQL function uses macros, constants, and enums available from its file under `sql/functions/sql/`.
 See [How Visibility Works](declaration-scopes/visibility.md) to limit declarations to one
 function folder or to that folder and its children.
 
@@ -208,7 +208,7 @@ A model that calls a changed function directly plans as `Function changed`, with
 ## Project layout
 
 ```
-functions/
+sql/functions/
   sql/
     udf__is_completed_order.sql        # scalar SQL UDF
     table_fn__customer_orders.sql     # table function (returns table)

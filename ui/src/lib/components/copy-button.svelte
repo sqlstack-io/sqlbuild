@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { copyText } from '$lib/browser/clipboard';
+	import { createCopyState } from '$lib/browser/copy-state.svelte';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import CopyIcon from '@lucide/svelte/icons/copy';
 
@@ -7,15 +7,13 @@
 	// `showValue` names the value in the tooltip and label; turn it off for long values such as SQL.
 	let { value, label = 'Copy', text, showValue = true }: { value: string; label?: string; text?: string; showValue?: boolean } = $props();
 
-	let copied = $state(false);
-	let timer: ReturnType<typeof setTimeout> | undefined;
+	const copier = createCopyState();
+	const copied = $derived(copier.copied);
 
 	async function copy(e: MouseEvent) {
 		e.stopPropagation();
 		e.preventDefault();
-		copied = await copyText(value);
-		clearTimeout(timer);
-		timer = setTimeout(() => (copied = false), 1200);
+		await copier.copy(value, e.currentTarget as Element);
 	}
 </script>
 

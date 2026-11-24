@@ -22,7 +22,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
 _PROJECT_TOML: str = (
     'name = "orders"\nadapter = "duckdb"\n[connection]\ndatabase = "orders.duckdb"\n'
 )
-_MODEL_PATH: str = "models/order_totals.sql"
+_MODEL_PATH: str = "sql/models/order_totals.sql"
 _SNAPSHOT_PROJECT_TOML: str = (
     'name = "customers"\nadapter = "duckdb"\n[connection]\ndatabase = "customers.duckdb"\n'
     '[snapshots]\ncurrent_state_full_refresh = "allow"\n'
@@ -117,7 +117,7 @@ def test_given_view_model_when_switched_and_fully_refreshed_then_each_refresh_re
         project_name="customers_project",
         repo_files={
             "sqlbuild_project.toml": _SNAPSHOT_PROJECT_TOML,
-            "sources/raw.yml": _RAW_CUSTOMERS_YML,
+            "sql/sources/raw.yml": _RAW_CUSTOMERS_YML,
         },
     )
     import duckdb
@@ -128,7 +128,7 @@ def test_given_view_model_when_switched_and_fully_refreshed_then_each_refresh_re
         "SELECT 1 AS customer_id, 'basic' AS plan, TIMESTAMP '2024-01-01' AS updated_at"
     )
     connection.close()
-    model_path: Path = project_dir / "models/customer_snapshot.sql"
+    model_path: Path = project_dir / "sql/models/customer_snapshot.sql"
     model_path.parent.mkdir(parents=True, exist_ok=True)
     _ = model_path.write_text(
         "MODEL (description 'Customer snapshot.', materialized view);\n\n" + _CUSTOMER_SNAPSHOT_SQL,

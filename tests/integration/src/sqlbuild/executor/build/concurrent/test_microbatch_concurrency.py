@@ -114,7 +114,7 @@ def test_given_three_batch_ceiling_when_incremental_runs_then_batches_overlap(
             """
         ).strip()
         + "\n",
-        "sources/raw.yml": dedent(
+        "sql/sources/raw.yml": dedent(
             """
             sources:
               - name: raw_events
@@ -124,7 +124,7 @@ def test_given_three_batch_ceiling_when_incremental_runs_then_batches_overlap(
             """
         ).strip()
         + "\n",
-        "models/orders.sql": dedent(
+        "sql/models/orders.sql": dedent(
             """
             MODEL (description "Test model orders.",
               materialized incremental,
@@ -149,7 +149,7 @@ def test_given_three_batch_ceiling_when_incremental_runs_then_batches_overlap(
             """
         ).strip()
         + "\n",
-        "models/shipments.sql": dedent(
+        "sql/models/shipments.sql": dedent(
             """
             MODEL (description "Test model shipments.",
               materialized incremental,

@@ -15,7 +15,7 @@ def test_given_tagged_model_in_edge_folder_when_evaluating_then_passes() -> None
         test_case=RuleCase(
             description="edge model declares the edge_case tag",
             source=_TAGGED,
-            path="models/intermediate/edge_cases/int_edge_orders.sql",
+            path="sql/models/intermediate/edge_cases/int_edge_orders.sql",
             expected_finding_count=0,
         ),
     )
@@ -29,7 +29,7 @@ def test_given_untagged_model_in_edge_folder_when_evaluating_then_reports_it() -
         test_case=RuleCase(
             description="edge model without the edge_case tag",
             source=_OTHER_TAG,
-            path="models/staging/edge_cases/stg_edge_orders.sql",
+            path="sql/models/staging/edge_cases/stg_edge_orders.sql",
             expected_finding_count=1,
         ),
     )
@@ -44,7 +44,7 @@ def test_given_tagged_model_outside_edge_folder_when_evaluating_then_reports_it(
         test_case=RuleCase(
             description="core model declares the edge_case tag",
             source=_TAGGED,
-            path="models/marts/orders/fct_orders.sql",
+            path="sql/models/marts/orders/fct_orders.sql",
             expected_finding_count=1,
         ),
     )
@@ -58,7 +58,7 @@ def test_given_untagged_model_outside_edge_folder_when_evaluating_then_passes() 
         test_case=RuleCase(
             description="core model without the tag",
             source=_UNTAGGED,
-            path="models/marts/orders/fct_orders.sql",
+            path="sql/models/marts/orders/fct_orders.sql",
             expected_finding_count=0,
         ),
     )
@@ -76,7 +76,7 @@ def test_given_tags_text_in_description_when_evaluating_then_reads_only_header_t
                 "  columns (\n    order_id (type VARCHAR),\n  ),\n"
                 "  tags [orders],\n);\nSELECT 1 AS order_id\n"
             ),
-            path="models/staging/edge_cases/stg_edge_orders.sql",
+            path="sql/models/staging/edge_cases/stg_edge_orders.sql",
             expected_finding_count=1,
         ),
     )

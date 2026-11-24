@@ -54,6 +54,9 @@ use sqlbuild_orchestration::snapshots::models::SnapshotRecord;
 use sqlbuild_orchestration::worker::errors::WorkerError;
 use sqlbuild_orchestration::worker::main::connect_worker::connect_worker;
 use sqlbuild_orchestration::worker::main::start_worker::start_worker;
+use sqlbuild_python_base::invocation_phases::constants::MATCHED_PHASE;
+use sqlbuild_python_base::invocation_phases::main::phase_since::phase_since;
+use sqlbuild_python_base::native_host::main::publish_invocation_phase::publish_invocation_phase;
 use sqlbuild_python_base::native_host::types::ReadResult;
 use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_state::runs::constants::FIRST_ATTEMPT;
@@ -1181,7 +1184,8 @@ impl NativeOrchestrationWorker {
             Uuid::parse_str(&run_id).map_err(|error| PyValueError::new_err(error.to_string()))?,
             Uuid::parse_str(&claim_id).map_err(|error| PyValueError::new_err(error.to_string()))?,
         );
-        py.detach(|| {
+        let started: Instant = Instant::now();
+        let worker: NativeOrchestrationWorker = py.detach(|| {
             let runtime = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()
@@ -1204,7 +1208,9 @@ impl NativeOrchestrationWorker {
                     Err(PyRuntimeError::new_err(error.to_string()))
                 }
             }
-        })
+        })?;
+        publish_invocation_phase(py, &phase_since(MATCHED_PHASE, started))?;
+        Ok(worker)
     }
 }
 

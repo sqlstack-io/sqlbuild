@@ -5,10 +5,11 @@ use sqlbuild_core::event_export::constants::DEFAULT_EVENT_EXPORT_INVOCATION_TIME
 use crate::dispatch::constants::SHUTDOWN_TIMEOUT_SETTING;
 use crate::dispatch::models::{ExportSummary, ExporterLoss};
 
-/// One warning line when lifecycle events were dropped or failed, else `None`.
+/// One warning line when lifecycle events were dropped or failed or a sink provider's teardown raised, else `None`.
 #[must_use]
 pub fn event_export_warning(summary: &ExportSummary, command_succeeded: bool) -> Option<String> {
-    if summary.dropped == 0 && summary.failed == 0 {
+    let lost: bool = summary.dropped > 0 || summary.failed > 0;
+    if !lost && summary.teardown_failures.is_empty() {
         return None;
     }
     let affected: Vec<&ExporterLoss> = summary
@@ -32,11 +33,22 @@ pub fn event_export_warning(summary: &ExportSummary, command_succeeded: bool) ->
     } else {
         "Warning: lifecycle event export was incomplete"
     };
-    Some(format!(
-        "{prefix}: {} of {} {unit} dropped, {} failed ({sink_label} {names}). \
-         Check sink health: a sink call slower than {DEFAULT_EVENT_EXPORT_INVOCATION_TIMEOUT_SECONDS}s \
-         drops that sink's events until it returns; events still queued at exit need a longer \
-         {SHUTDOWN_TIMEOUT_SETTING}.",
-        summary.dropped, summary.accepted, summary.failed
-    ))
+    let mut parts: Vec<String> = Vec::new();
+    if lost {
+        parts.push(format!(
+            "{} of {} {unit} dropped, {} failed ({sink_label} {names}). \
+             Check sink health: a sink call slower than {DEFAULT_EVENT_EXPORT_INVOCATION_TIMEOUT_SECONDS}s \
+             drops that sink's events until it returns; events still queued at exit need a longer \
+             {SHUTDOWN_TIMEOUT_SETTING}.",
+            summary.dropped, summary.accepted, summary.failed
+        ));
+    }
+    if !summary.teardown_failures.is_empty() {
+        parts.push(format!(
+            "sink provider teardown failed ({}); events the provider still held may not have \
+             been delivered.",
+            summary.teardown_failures.join(", ")
+        ));
+    }
+    Some(format!("{prefix}: {}", parts.join(" ")))
 }

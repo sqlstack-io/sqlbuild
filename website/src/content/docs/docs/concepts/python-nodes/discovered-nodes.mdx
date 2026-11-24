@@ -6,7 +6,7 @@ description: "Run a Python asset once per item an external system lists, with @d
 A discover function asks an external system which items exist, and an asset with `for_each` runs once per item. The location calls the function when it publishes and saves its result in the snapshot, so every run executes exactly the nodes it published.
 
 ```python
-# python/fulfilment/nodes.py
+# python/nodes/fulfilment/nodes.py
 from sqlbuild.assets import AssetContext, asset
 from sqlbuild.discovery import Discovered, Item, discover
 from sqlbuild.refs import model
@@ -37,7 +37,7 @@ With steps `pick`, `pack` and `ship`, where each waits on the one before, the gr
 
 ## Declaring a discovered set
 
-- **`@discover`** marks a project function under `python/` that returns `Discovered`. Providers are injected by parameter name, as for any Python node. Pass `name=` to name the set something other than the function, and `check_every=` to have the location check it for changes (see [When discovery runs](#when-discovery-runs)).
+- **`@discover`** marks a project function under `python/nodes/` that returns `Discovered`. Providers are injected by parameter name, as for any Python node. Pass `name=` to name the set something other than the function, and `check_every=` to have the location check it for changes (see [When discovery runs](#when-discovery-runs)).
 - **`Discovered`** is the only return form: `items`, plus optional set-wide `tags` and `max_parallel`.
 - **`Item`** has an `id`, a `depends_on` and `args`.
   - `id` is unique in the set, at most 200 characters, and uses only letters, digits and `_ . : -`.
@@ -114,7 +114,7 @@ Only a location, including `sqb dev`, calls discover functions. Every other comp
 
 - **A set fails on its own.** It keeps its last good items, the location's health shows **Discovery failed** with the set and its error, and everything else publishes normally. A location that restarts reads the last good items from the server's current snapshot.
 - **Last good items that name a model, source, seed or job the project no longer has** aren't kept. That covers a publish that reuses a set after the model it names was renamed or removed: the set fails with an error naming the item and the missing node, and compiles as its placeholder until it's discovered again.
-- **An item that depends on a `tag()` no node carries** still fails the whole publish, not only its set: tags are known only once the project compiles. The location keeps its current snapshot and reports the error.
+- **An item that depends on a `tag()` no node carries** fails only its own set, with an error naming the item and the tag. Tags are known only once the project compiles, so the location compiles once more with that set's last good items, and everything else publishes. When those items name the missing tag too, the set compiles as its placeholder.
 - **A set that never succeeded** compiles as its **placeholder node**, `<asset>[*]`. Its `job()` and `tag()` dependants stay valid. A run that reaches it fails that node with `never discovered: <error>`, and its downstream nodes are skipped.
 
 ## Outside a location

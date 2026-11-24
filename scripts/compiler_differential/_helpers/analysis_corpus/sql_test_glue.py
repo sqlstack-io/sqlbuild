@@ -4,7 +4,7 @@ from scripts.compiler_differential._helpers.corpus.case_builder import failure_c
 from scripts.compiler_differential.models import FailureCase
 
 _TEST_PATH: str = "tests/unit/test_customer_totals.sql"
-_WINDOWED_PATH: str = "models/marts/windowed_orders.sql"
+_WINDOWED_PATH: str = "sql/models/marts/windowed_orders.sql"
 _WINDOWED_MODEL: str = (
     "MODEL (\n  description 'Orders in the cursor window',\n  materialized incremental,\n"
     "  incremental_strategy delete_insert,\n  cursor order_id,\n  cursor_type integer,\n"

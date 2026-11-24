@@ -1,7 +1,7 @@
 import type { components } from '$control/schema.d.ts';
 import { isActiveRun, isUnfinishedNode, UNFINISHED_NODE_STATUSES } from '$lib/status';
 import type { Capability, Principal } from './types';
-import type { AdhocRunCheck, LaunchVerb, NodeCounts, NodeKind, PlanChanged, PlanDocument, PlanPage, PlanPageSection, PlanResult, PlanWarning, QueueEntry, QueueWait, Run, RunDetail, RunListQuery, RunNode, RunNodeStatus, RunRow, RunRowPage, RunRowQuery, RunTabCounts, RunEvent, RunEventCheck, RunEventLevel, RunOutputLine, RunStatement, IgnoredAuditFailure, RunCostRow, CostGroup, CostSummary, NodeBuildCost } from './types/operate';
+import type { AdhocRunCheck, LaunchVerb, NodeCounts, NodeKind, PlanChanged, PlanDocument, PlanPage, PlanPageSection, PlanResult, PlanWarning, QueueEntry, QueueWait, Run, RunDetail, RunListQuery, RunNode, RunNodeStatus, RunRow, RunRowPage, RunRowQuery, RunTabCounts, RunEvent, RunEventCheck, RunEventLevel, RunOutputLine, RunStatement, IgnoredAuditFailure, RunCostRow, CostGroup, CostSummary, PriceSource, NodeBuildCost } from './types/operate';
 import { RECALL_EVENT_TYPES, SCHEDULER_FACTS } from './types/operate';
 
 type Wire = components['schemas'];
@@ -468,7 +468,8 @@ export function toRunEvent(wire: Wire['RunEventRecord'], runId: string): RunEven
 		statementId: wire.statement_id ?? null,
 		attempt: null,
 		message,
-		check: type === 'audit_completed' ? checkOf(wire) : null
+		check: type === 'audit_completed' ? checkOf(wire) : null,
+		phase: wire.phase ? { phase: wire.phase, durationMs: wire.duration_ms ?? null, count: wire.phase_count ?? null, name: wire.phase_name ?? null, detail: wire.phase_detail ?? null } : null
 	};
 }
 
@@ -563,6 +564,14 @@ export function toRunOutput(wire: Wire['RunOutput']): RunOutputLine[] {
 
 const COST_STATUSES: RunCostRow['status'][] = ['complete', 'partial', 'pending', 'collection_failed', 'unavailable'];
 
+const PRICE_SOURCES: readonly PriceSource[] = ['config', 'rate_sheet', 'list_price', 'mixed'];
+
+/** A price's source; dollars recorded before sources were came from the project's price. */
+export const priceSource = (source: string | null | undefined, priced: boolean): PriceSource | null => {
+	const known = PRICE_SOURCES.find((s) => s === source);
+	return known ?? (priced ? 'config' : null);
+};
+
 const costStatus = (status: string): RunCostRow['status'] => COST_STATUSES.find((s) => s === status) ?? 'unavailable';
 
 const toCostGroup = (g: Wire['CostGroup']): CostGroup => ({ key: g.key ?? null, credits: g.credits, usd: g.usd ?? null, seconds: g.seconds, runs: g.runs });
@@ -572,6 +581,7 @@ export function toCostSummary(wire: Wire['CostSummaryRecord']): CostSummary {
 		since: wire.since,
 		credits: wire.credits,
 		usd: wire.usd ?? null,
+		priceSource: priceSource(wire.usd_per_credit_source, wire.usd != null),
 		runs: wire.runs,
 		incompleteRuns: wire.incomplete_runs,
 		byJob: wire.by_job.map(toCostGroup),
@@ -588,6 +598,7 @@ export function toNodeBuildCosts(wire: Wire['NodeCostRecord'][]): NodeBuildCost[
 		status: costStatus(c.status),
 		credits: c.credits,
 		usd: c.usd ?? null,
+		priceSource: priceSource(c.usd_per_credit_source, c.usd != null),
 		seconds: c.seconds,
 		queryCount: c.query_count
 	}));
@@ -608,6 +619,7 @@ export function toRunCostRows(wire: Wire['WarehouseResourceCostRecord'][]): RunC
 		bytesScanned: r.bytes_scanned,
 		credits: Number(r.estimated_credits),
 		usd: r.estimated_usd == null ? null : Number(r.estimated_usd),
+		priceSource: priceSource(r.usd_per_credit_source, r.estimated_usd != null),
 		status: costStatus(r.status),
 		statementsExpected: r.statements_expected,
 		statementsObserved: r.statements_observed

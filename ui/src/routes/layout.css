@@ -5,6 +5,7 @@
 @import "@fontsource-variable/space-grotesk";
 @import "@fontsource/ibm-plex-mono/400.css";
 @import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
 
 @custom-variant dark (&:is(.dark *));
 @plugin '@tailwindcss/typography';
@@ -305,6 +306,21 @@
 /* A list whose rows open nothing. */
 .sb-list.static tbody tr {
 	cursor: default;
+}
+/* A row that opens in place: a click anywhere on it toggles it, its chevron brightens on hover,
+   and a name that drills in underlines. */
+.sb-list tbody tr.expandable {
+	cursor: pointer;
+}
+.sb-list tbody tr.expandable:hover {
+	background: var(--sb-hover);
+}
+.sb-list tbody tr.expandable:hover .chevron,
+.sb-list tbody tr.expandable:hover .chev {
+	color: var(--foreground);
+}
+.sb-list tbody tr.expandable:hover .row-name:not(.plain) {
+	text-decoration: underline;
 }
 /* A short list inside a page section, such as a plan's nodes: tighter rows. */
 .sb-list.compact tbody td {

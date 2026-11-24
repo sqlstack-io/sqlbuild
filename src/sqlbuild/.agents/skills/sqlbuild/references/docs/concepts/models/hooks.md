@@ -23,31 +23,32 @@ SQL and Python hooks live in language-specific directories:
 
 ```text
 my_project/
-  models/
-    marts/
-      orders.sql
-  hooks/
-    sql/
-      permissions/
-        grant_access.sql
-      record_access.sql
-    python/
-      notifications.py
+  sql/
+    models/
+      marts/
+        orders.sql
+    hooks/
+      sql/
+        permissions/
+          grant_access.sql
+        record_access.sql
+      python/
+        notifications.py
 ```
 
-Directories below `hooks/sql/` and `hooks/python/` are organizational. They do not namespace resource names: `hooks/sql/permissions/grant_access.sql` is still invoked as `sql("grant_access")`.
+Directories below `sql/hooks/sql/` and `sql/hooks/python/` are organizational. They do not namespace resource names: `sql/hooks/sql/permissions/grant_access.sql` is still invoked as `sql("grant_access")`.
 
 Named hooks follow the same scope rules as macros. A hook used only by models under one folder lives
 under that folder's `_sqlbuild/`:
 
 | Location | Who can call it |
 |----------|-----------------|
-| `hooks/sql/`, `hooks/python/` | Models anywhere in the project |
+| `sql/hooks/sql/`, `sql/hooks/python/` | Models anywhere in the project |
 | `<folder>/_sqlbuild/hooks/sql/`, `<folder>/_sqlbuild/hooks/python/` | Models in `<folder>` and below |
 | `<folder>/_sqlbuild/_hooks/sql/`, `<folder>/_sqlbuild/_hooks/python/` | Models directly in `<folder>` only |
 
 ```text
-models/
+sql/models/
   marts/
     _sqlbuild/
       _hooks/
@@ -57,7 +58,7 @@ models/
 ```
 
 A hook must live under the nearest folder containing every model that calls it; a top-level hook
-called only under `models/marts/` fails with `S024` and names the destination. Calling a hook that
+called only under `sql/models/marts/` fails with `S024` and names the destination. Calling a hook that
 is not visible from the model's folder fails with `S006`. `inline_sql(...)` hooks are part of their
 model and are unaffected. See
 [Where to Put Declarations](../declaration-scopes/placement.md).
@@ -78,8 +79,8 @@ Hook lists use three explicit entry types:
 | Entry | Definition | Use |
 |-------|------------|-----|
 | [`inline_sql("...")`](hooks/sql.md#inline-sql-hooks) | SQL written directly in the model header | Short, model-specific SQL |
-| [`sql("name", args...)`](hooks/sql.md) | A reusable resource in a `hooks/sql/` role | Shared, parameterized SQL |
-| [`python("name", args...)`](hooks/python.md) | A decorated function in a `hooks/python/` role | Control flow, providers, queries, or skips |
+| [`sql("name", args...)`](hooks/sql.md) | A reusable resource in a `sql/hooks/sql/` role | Shared, parameterized SQL |
+| [`python("name", args...)`](hooks/python.md) | A decorated function in a `sql/hooks/python/` role | Control flow, providers, queries, or skips |
 
 Bare SQL strings are not hook entries. The singular `pre_hook` and `post_hook` fields are also invalid; use `pre_hooks` and `post_hooks` with one of the three typed forms above. `sql("...")` always means a named SQL hook and never falls back to inline SQL.
 

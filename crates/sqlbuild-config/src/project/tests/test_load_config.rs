@@ -22,7 +22,7 @@ fn given_project_files_when_loading_then_rejections_match_python_loader() {
         ProjectFailureTestCase {
             description: "a valid project and local file load",
             project: "name = 'orders'\nadapter = 'duckdb'\n[settings]\nconcurrency = 4\n\
-                      [targets.dev]\nschema = 'analytics'\n[sinks.lifecycle]\nshutdown_timeout = '10m'\n",
+                      [targets.dev]\nschema = 'analytics'\n[event_sinks.lifecycle]\nshutdown_timeout = '10m'\n",
             local: "target = 'dev'\n[settings]\nmax_concurrency = 2\n",
             expected_failure: None,
         },
@@ -190,11 +190,11 @@ fn given_project_files_when_loading_then_rejections_match_python_loader() {
         },
         ProjectFailureTestCase {
             description: "a shutdown timeout over ten minutes is rejected",
-            project: "name = 'orders'\nadapter = 'duckdb'\n[sinks.lifecycle]\nshutdown_timeout = '601s'\n",
+            project: "name = 'orders'\nadapter = 'duckdb'\n[event_sinks.lifecycle]\nshutdown_timeout = '601s'\n",
             local: "",
             expected_failure: failure_at(
                 ConfigFile::Project,
-                "sinks.lifecycle.shutdown_timeout must be a fixed duration from '0s' to '10m' such as '30s'",
+                "event_sinks.lifecycle.shutdown_timeout must be a fixed duration from '0s' to '10m' such as '30s'",
                 None,
             ),
         },
@@ -236,7 +236,7 @@ fn given_project_files_when_loading_then_rejections_match_python_loader() {
                 ConfigFile::Project,
                 "path_defaults defines both ' staging ' and another key that normalize to \
                  'staging'. Use only the canonical model-relative form without a leading \
-                 'models/' prefix.",
+                 'sql/models/' prefix.",
                 None,
             ),
         },

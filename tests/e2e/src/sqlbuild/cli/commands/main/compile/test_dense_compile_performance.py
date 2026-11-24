@@ -154,7 +154,7 @@ def test_given_dense_project_when_compiling_cold_then_preserves_rules_semantics_
     # Each model misses in model rules and SQL lint, the custom rule once, and the Python rules
     # once per project Python file: the custom rule module and every Python macro.
     python_files: int = len(list(project_dir.glob("rules/*.py"))) + len(
-        list(project_dir.glob("models/**/macros/python/**/*.py"))
+        list(project_dir.glob("sql/models/**/macros/python/**/*.py"))
     )
     assert timings["rule_cache_misses"] == 2 * test_case.model_count + 1 + python_files
     assert timings["built_in_rules_ms"] > 0

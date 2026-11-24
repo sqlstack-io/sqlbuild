@@ -65,8 +65,8 @@ def test_given_parameterised_test_and_sql_rules_when_compiling_then_the_test_is_
         project_name="shop",
         repo_files={
             "sqlbuild_project.toml": _PROJECT_TOML.format(rules=test_case.selected_rules),
-            "models/orders.sql": _ORDERS_MODEL,
-            "models/stg_orders.sql": _STAGED_ORDERS_MODEL,
+            "sql/models/orders.sql": _ORDERS_MODEL,
+            "sql/models/stg_orders.sql": _STAGED_ORDERS_MODEL,
             "tests/unit/test_stg_orders_status.sql": _STATUS_TEST,
         },
     )

@@ -137,7 +137,7 @@ def test_given_explicit_cursor_overrides_without_snapshot_when_planning_then_use
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="orders"),
         deps=(),
         name="orders",
-        relative_path=Path("models/orders.sql"),
+        relative_path=Path("sql/models/orders.sql"),
         query_sql="SELECT 1",
         references=(),
         config=CompileModelConfig(
@@ -212,7 +212,7 @@ def test_given_runtime_owned_missing_snapshot_when_overrides_complete_then_all_r
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="orders"),
         deps=(),
         name="orders",
-        relative_path=Path("models/orders.sql"),
+        relative_path=Path("sql/models/orders.sql"),
         query_sql="SELECT 1",
         references=(),
         config=CompileModelConfig(
@@ -316,7 +316,7 @@ def test_given_planner_owned_model_backed_input_when_grain_is_coarser_then_range
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="hourly_context"),
         deps=(),
         name="hourly_context",
-        relative_path=Path("models/hourly_context.sql"),
+        relative_path=Path("sql/models/hourly_context.sql"),
         query_sql="SELECT 1",
         references=(),
         config=CompileModelConfig(
@@ -392,7 +392,7 @@ def test_given_snapshot_cursor_grain_when_planning_then_dml_bound_matches_query_
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="orders"),
         deps=(),
         name="orders",
-        relative_path=Path("models/orders.sql"),
+        relative_path=Path("sql/models/orders.sql"),
         query_sql="SELECT 1",
         references=(),
         config=CompileModelConfig(

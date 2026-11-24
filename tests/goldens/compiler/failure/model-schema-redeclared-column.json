@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Schema 'order_row' in schemas/orders.sql redeclares inherited column 'ID' from schemas/orders.sql:1; column overrides are not supported"
+     "message": "Schema 'order_row' in sql/schemas/orders.sql redeclares inherited column 'ID' from sql/schemas/orders.sql:1; column overrides are not supported"
     }
    ]
   }

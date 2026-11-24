@@ -263,9 +263,9 @@ def test_given_source_in_managed_schema_when_running_direct_janitor_then_blocks_
                 """
             ).strip()
             + "\n",
-            "models/orders.sql": "MODEL (description 'Test model orders.');\n\nSELECT 1 AS order_id\n",
-            "models/safe_orders.sql": "MODEL (description 'Test model safe_orders.', schema safe,);\n\nSELECT 1 AS order_id\n",
-            "sources/raw.yml": dedent(
+            "sql/models/orders.sql": "MODEL (description 'Test model orders.');\n\nSELECT 1 AS order_id\n",
+            "sql/models/safe_orders.sql": "MODEL (description 'Test model safe_orders.', schema safe,);\n\nSELECT 1 AS order_id\n",
+            "sql/sources/raw.yml": dedent(
                 """
                 sources:
                   - name: raw_events

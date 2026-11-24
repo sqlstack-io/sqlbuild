@@ -43,7 +43,7 @@ test('a selection is typed, picked, widened, copied, narrowed and built', async 
 
 	const count = page.locator('.sb-count');
 	await expect(count).toHaveText(/^\d+ nodes?$/);
-	await expect(page.locator('.sb-msg')).toContainText('Reads as: nodes tagged finance and everything upstream of them');
+	await expect(page.locator('.sb-msg')).toHaveCount(0);
 	await expect.poll(() => new URL(page.url()).searchParams.get('select')).toBe('+tag:finance');
 
 	await page.getByRole('button', { name: /Copy as/ }).click();
@@ -55,7 +55,6 @@ test('a selection is typed, picked, widened, copied, narrowed and built', async 
 	await field(page, 'Except').pressSequentially('tag:revenue');
 	await page.keyboard.press('Enter');
 	await expect(chips(page, 1)).toHaveText([/tag:revenue/]);
-	await expect(page.locator('.sb-msg')).toContainText('minus nodes tagged revenue');
 	await expect(count).toHaveText(/^\d+ nodes?$/);
 	await expect.poll(() => new URL(page.url()).searchParams.get('exclude')).toBe('tag:revenue');
 	await page.getByRole('button', { name: /Copy as/ }).click();

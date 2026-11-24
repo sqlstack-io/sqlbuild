@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P018",
-     "message": "CTE \"live\" from macro live_orders() clashes with a CTE already defined in model:stg_orders\n  model: stg_orders\n  --> models/staging/stg_orders.sql:7:1\n  --> models/staging/_sqlbuild/_macros/sql/live_orders.sql:6:6",
+     "message": "CTE \"live\" from macro live_orders() clashes with a CTE already defined in model:stg_orders\n  model: stg_orders\n  --> sql/models/staging/stg_orders.sql:7:1\n  --> sql/models/staging/_sqlbuild/_macros/sql/live_orders.sql:6:6",
      "help": "pass __cte := <name> to give the CTEs one call inserts their own names, as in @sql.live_orders(..., __cte := first_orders), or rename one of the CTEs"
     }
    ]

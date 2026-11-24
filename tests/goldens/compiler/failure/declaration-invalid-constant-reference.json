@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Invalid constant reference in '<project>/models/staging/stg_orders.sql'"
+     "message": "Invalid constant reference in '<project>/sql/models/staging/stg_orders.sql'"
     }
    ]
   }

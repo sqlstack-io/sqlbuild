@@ -11,11 +11,11 @@
      "message": "Audit factory 'order_quality' is not referenced by any model and will not produce audits",
      "resource_type": "audit",
      "resource_name": "order_quality",
-     "path": "python/audits/quality.py",
+     "path": "python/nodes/audits/quality.py",
      "line": 4,
      "column": 1,
      "location": {
-      "path": "python/audits/quality.py",
+      "path": "python/nodes/audits/quality.py",
       "line": 4,
       "column": 1
      }
@@ -24,12 +24,12 @@
      "phase": "compile",
      "severity": "error",
      "code": "S024",
-     "message": "Declaration 'constant:minimum_amount' is currently project at 'constants' (constants/limits.sql); required exact-owner-private at 'models/staging'. Consumers: model:stg_orders. Move it to 'models/staging/_sqlbuild/_constants/'",
-     "path": "constants/limits.sql",
+     "message": "Declaration 'constant:minimum_amount' is currently project at 'sql/constants' (sql/constants/limits.sql); required exact-owner-private at 'sql/models/staging'. Consumers: model:stg_orders. Move it to 'sql/models/staging/_sqlbuild/_constants/'",
+     "path": "sql/constants/limits.sql",
      "line": 1,
      "column": 1,
      "location": {
-      "path": "constants/limits.sql",
+      "path": "sql/constants/limits.sql",
       "line": 1,
       "column": 1
      }
@@ -38,13 +38,13 @@
   }
  ],
  "compiled": {
-  "models/marts/customer_totals.sql": [
+  "sql/models/marts/customer_totals.sql": [
    "SELECT customer_id, SUM(amount) AS total_amount",
    "FROM __ref(\"stg_orders\")",
    "GROUP BY customer_id",
    ""
   ],
-  "models/staging/stg_orders.sql": [
+  "sql/models/staging/stg_orders.sql": [
    "SELECT order_id, customer_id, amount, status",
    "FROM __source(\"raw_orders\")",
    "WHERE amount > 1",
@@ -59,8 +59,8 @@
     "name": "customer_totals",
     "resource_type": "model",
     "package_name": "failure_corpus",
-    "path": "models/marts/customer_totals.sql",
-    "original_file_path": "models/marts/customer_totals.sql",
+    "path": "sql/models/marts/customer_totals.sql",
+    "original_file_path": "sql/models/marts/customer_totals.sql",
     "unique_id": "model.failure_corpus.customer_totals",
     "fqn": [
      "failure_corpus",
@@ -128,8 +128,8 @@
     "name": "stg_orders",
     "resource_type": "model",
     "package_name": "failure_corpus",
-    "path": "models/staging/stg_orders.sql",
-    "original_file_path": "models/staging/stg_orders.sql",
+    "path": "sql/models/staging/stg_orders.sql",
+    "original_file_path": "sql/models/staging/stg_orders.sql",
     "unique_id": "model.failure_corpus.stg_orders",
     "fqn": [
      "failure_corpus",
@@ -199,8 +199,8 @@
     "name": "raw_orders",
     "resource_type": "source",
     "package_name": "failure_corpus",
-    "path": "sources/raw.yml",
-    "original_file_path": "sources/raw.yml",
+    "path": "sql/sources/raw.yml",
+    "original_file_path": "sql/sources/raw.yml",
     "unique_id": "source.failure_corpus.raw_orders",
     "fqn": [
      "failure_corpus",

@@ -52,7 +52,7 @@ def test_given_python_identity_when_writing_fingerprint_then_uses_fingerprint_st
         identity=PythonNodeIdentity(
             node_type="asset",
             node_name="build_orders",
-            source_path="python/tasks/orders.py",
+            source_path="python/nodes/tasks/orders.py",
             source_hash="source-hash",
             definition_hash="definition-hash",
             version_hash="version-hash",

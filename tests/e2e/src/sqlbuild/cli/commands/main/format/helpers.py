@@ -21,14 +21,14 @@ def write_format_performance_project(
 ) -> None:
     """Write a deterministic contract-heavy project with unique SQL test fixtures."""
 
-    project_dir.mkdir()
+    project_dir.mkdir(parents=True)
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "format_guard"\nadapter = "duckdb"\n[defaults]\ncontract = "enforced"\n',
         encoding="utf-8",
     )
-    models_dir: Path = project_dir / "models"
+    models_dir: Path = project_dir / "sql" / "models"
     tests_dir: Path = project_dir / "tests" / "unit" / "orders"
-    models_dir.mkdir()
+    models_dir.mkdir(parents=True)
     tests_dir.mkdir(parents=True)
     for model_index in range(model_count):
         models_dir.joinpath(f"orders_{model_index:05d}.sql").write_text(
@@ -145,7 +145,7 @@ def write_mixed_format_project(*, project_dir: Path, model_count: int) -> None:
     """Unformatted models plus files that fault, use CRLF line endings or carry a directive."""
 
     write_model_format_project(project_dir=project_dir, model_count=model_count)
-    models_dir: Path = project_dir / "models"
+    models_dir: Path = project_dir / "sql" / "models"
     path: Path
     for path in sorted(models_dir.glob("*.sql")):
         _ = path.write_text(
@@ -177,7 +177,7 @@ def model_tree(*, project_dir: Path) -> dict[str, bytes]:
 
     return {
         str(path.relative_to(project_dir)): path.read_bytes()
-        for path in sorted((project_dir / "models").rglob("*.sql"))
+        for path in sorted((project_dir / "sql" / "models").rglob("*.sql"))
     }
 
 

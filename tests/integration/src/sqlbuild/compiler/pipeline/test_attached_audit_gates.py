@@ -17,7 +17,7 @@ from tests.integration.src.sqlbuild.compiler.pipeline.helpers import (
 )
 
 _ORDER_CHECK: dict[str, str] = {
-    "audits/generic/order_check.sql": (
+    "sql/audits/generic/order_check.sql": (
         'AUDIT ();\nSELECT o.* FROM @relation o LEFT JOIN __ref("valid_codes") v USING (code)\n'
     ),
 }
@@ -25,8 +25,8 @@ _PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": (
         'name = "gate_demo"\nadapter = "duckdb"\n\n[connection]\ndatabase = ":memory:"\n'
     ),
-    "models/valid_codes.sql": "MODEL (description 'Test model valid_codes.', materialized table);\nSELECT 'A' AS code\n",
-    "audits/singular/reconcile.sql": (
+    "sql/models/valid_codes.sql": "MODEL (description 'Test model valid_codes.', materialized table);\nSELECT 'A' AS code\n",
+    "sql/audits/singular/reconcile.sql": (
         'AUDIT ();\nSELECT o.* FROM __ref("orders") o JOIN __ref("valid_codes") v USING (code)\n'
     ),
 }
@@ -59,7 +59,7 @@ def test_given_gate_edge_when_planning_singular_audit_then_attachment_uses_linea
         tmp_path,
         _PROJECT_FILES
         | test_case.generic_audit_files
-        | {"models/orders.sql": f"{test_case.orders_header}\nSELECT 'A' AS code\n"},
+        | {"sql/models/orders.sql": f"{test_case.orders_header}\nSELECT 'A' AS code\n"},
     )
 
     result: CompilePipelineResult = run_compile_pipeline_for_project(

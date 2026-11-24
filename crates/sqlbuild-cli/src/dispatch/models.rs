@@ -162,4 +162,6 @@ pub struct ExportSummary {
     pub dropped: u64,
     pub failed: u64,
     pub per_exporter: Vec<ExporterLoss>,
+    /// Each sink provider whose teardown raised, with its error type.
+    pub teardown_failures: Vec<String>,
 }

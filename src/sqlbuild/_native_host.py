@@ -164,9 +164,9 @@ _TARGETS: dict[str, tuple[str, str]] = {
         "sqlbuild.compiler.discovery._helpers.filesystem.project_modules",
         "load_python_node_module",
     ),
-    "load_sink_module": (
+    "load_event_sink_module": (
         "sqlbuild.compiler.discovery._helpers.filesystem.project_modules",
-        "load_sink_module",
+        "load_event_sink_module",
     ),
     "load_orchestration_module": (
         "sqlbuild.compiler.discovery._helpers.filesystem.project_modules",
@@ -637,6 +637,10 @@ _TARGETS: dict[str, tuple[str, str]] = {
     "current_execution_identity": (
         "sqlbuild.runtime.observability.main.current_execution_identity",
         "current_execution_identity",
+    ),
+    "current_event_dispatcher": (
+        "sqlbuild.runtime.observability.main.current_event_dispatcher",
+        "current_event_dispatcher",
     ),
     "diagnostic_log_to_json": (
         "sqlbuild.runtime.observability.main.diagnostic_log_to_json",

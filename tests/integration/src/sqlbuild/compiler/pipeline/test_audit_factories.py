@@ -34,11 +34,11 @@ def test_given_generated_and_direct_attachments_when_compiled_then_audit_inputs_
         tmp_path,
         {
             "sqlbuild_project.toml": 'name = "audit_factory"\nadapter = "duckdb"\n',
-            "audits/generic/expression_is_true.sql": """
+            "sql/audits/generic/expression_is_true.sql": """
 AUDIT ();
 SELECT * FROM __ref("@model") WHERE NOT (@expression)
 """,
-            "python/factories/quality.py": """
+            "python/nodes/factories/quality.py": """
 from sqlbuild.compiler.compile.types import AuditInput
 from sqlbuild.audits import AuditCase, AuditSeverity, audit_factory
 
@@ -49,7 +49,7 @@ def order_quality():
         AuditCase(name="bounded_amount", definition="expression_is_true", arguments={"expression": "amount < 1000"}, severity=AuditSeverity.WARN),
     ]
 """,
-            "models/orders.sql": """
+            "sql/models/orders.sql": """
 MODEL (description "Test model orders.", audit_factories [order_quality]);
 SELECT 10 AS amount
 """,
@@ -60,7 +60,7 @@ SELECT 10 AS amount
     write_repo_files(
         tmp_path,
         {
-            "models/orders.sql": """
+            "sql/models/orders.sql": """
 MODEL (description "Test model orders.",
   audits [
     expression_is_true (name "positive_amount", expression "amount > 0", severity error),

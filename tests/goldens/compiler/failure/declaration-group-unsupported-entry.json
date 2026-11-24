@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D013",
-     "message": "Declaration group models/marts/_sqlbuild/ contains unsupported entries: models/marts/_sqlbuild/notes.txt"
+     "message": "Declaration group sql/models/marts/_sqlbuild/ contains unsupported entries: sql/models/marts/_sqlbuild/notes.txt"
     }
    ]
   }

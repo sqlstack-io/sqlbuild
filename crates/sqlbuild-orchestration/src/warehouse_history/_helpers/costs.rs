@@ -8,6 +8,9 @@ use uuid::Uuid;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
+use crate::warehouse_history::constants::{
+    CONFIG_PRICE_SOURCE, LIST_PRICE_SOURCE, MIXED_PRICE_SOURCE,
+};
 use crate::warehouse_history::models::{CostGroup, NodeCostRecord};
 use crate::warehouse_metadata::models::WarehouseResourceCostRecord;
 
@@ -68,6 +71,24 @@ pub(crate) async fn latest_costs_in(
     Ok((transaction, costs))
 }
 
+/// Where a row's price came from; a priced row recorded before prices were is the project's.
+pub(crate) fn price_source(record: &WarehouseResourceCostRecord) -> Option<&str> {
+    record
+        .usd_per_credit_source
+        .as_deref()
+        .or(record.estimated_usd.as_ref().map(|_| CONFIG_PRICE_SOURCE))
+}
+
+/// Several prices' one source: theirs if they agree, else `list_price` if any is one, else `mixed`.
+pub(crate) fn combined_source(sources: &BTreeSet<String>) -> Option<String> {
+    match sources.len() {
+        0 => None,
+        1 => sources.first().cloned(),
+        _ if sources.contains(LIST_PRICE_SOURCE) => Some(LIST_PRICE_SOURCE.to_owned()),
+        _ => Some(MIXED_PRICE_SOURCE.to_owned()),
+    }
+}
+
 /// A decimal text as a number; an unreadable value counts as zero.
 pub(crate) fn amount(text: &str) -> f64 {
     text.trim().parse().unwrap_or(0.0)
@@ -82,15 +103,24 @@ pub(crate) struct Accumulator {
     unpriced: bool,
     seconds: f64,
     runs: BTreeSet<String>,
+    sources: BTreeSet<String>,
 }
 
 impl Accumulator {
+    /// Where the group's prices came from, as one source; none when any of it is unpriced.
+    pub(crate) fn source(&self) -> Option<String> {
+        combined_source(&self.sources).filter(|_| !self.unpriced)
+    }
+
     pub(crate) fn add(&mut self, cost: &LatestCost) {
         let record = &cost.record;
         self.credits += amount(&record.estimated_credits);
         match record.estimated_usd.as_deref() {
             Some(usd) => self.usd += amount(usd),
             None => self.unpriced = true,
+        }
+        if let Some(source) = price_source(record) {
+            self.sources.insert(source.to_owned());
         }
         self.seconds += amount(&record.attributed_seconds);
         self.runs.insert(record.run_id.clone());
@@ -106,6 +136,9 @@ impl Accumulator {
         }
     }
 }
+
+/// Accumulated cost by group key.
+pub(crate) type CostGroups = BTreeMap<Option<String>, Accumulator>;
 
 /// Groups as records, most expensive first.
 pub(crate) fn ranked(groups: BTreeMap<Option<String>, Accumulator>) -> Vec<CostGroup> {
@@ -136,9 +169,13 @@ pub(crate) fn node_builds(costs: &[LatestCost], limit: u32) -> Vec<NodeCostRecor
                 status: String::new(),
                 credits: 0.0,
                 usd: Some(0.0),
+                usd_per_credit_source: None,
                 seconds: 0.0,
                 query_count: 0,
             });
+        if let Some(source) = price_source(record) {
+            build.usd_per_credit_source = Some(source.to_owned());
+        }
         build.credits += amount(&record.estimated_credits);
         build.usd = build
             .usd

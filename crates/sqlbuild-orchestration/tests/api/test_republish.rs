@@ -17,8 +17,8 @@ use crate::platform::main::work::{
     request_republish::request_republish,
 };
 use crate::platform::models::{
-    LocationWork, LocationWorkOutcome, LocationWorkRequest, LocationWorkResult, LocationWorkScope,
-    PersonWorkRequest, RepublishState,
+    DiscoveredNodeReadback, LocationWork, LocationWorkOutcome, LocationWorkRequest,
+    LocationWorkResult, LocationWorkScope, PersonWorkRequest, RepublishState,
 };
 use crate::runs::tests::helpers::snapshot;
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
@@ -195,7 +195,12 @@ fn given_a_republish_when_requested_claimed_and_completed_then_it_is_authorized_
             input.documents.insert(
                 "discovered".into(),
                 json!({"orders_plan": {"status": "ok", "digest": "d-2",
-                    "result": {"items": [{"id": "load", "depends_on": [], "args": {}}], "tags": {"release": "0.58.0"}}}}),
+                    "result": {"items": [{"id": "load", "depends_on": [], "args": {"region": "eu", "attempt": 2}}],
+                        "tags": {"release": "0.58.0", "max_parallel": 4}}}}),
+            );
+            input.documents.insert(
+                "discovered_assets".into(),
+                json!({"orders_plan": ["load_orders"]}),
             );
             let published = publish_snapshot(store, &input).await.expect("republish");
             let outcome = (test_case.outcome)(published.snapshot_id);
@@ -233,16 +238,37 @@ fn given_a_republish_when_requested_claimed_and_completed_then_it_is_authorized_
             .await
             .expect("a viewer reads the sets back")
             .expect("published");
-            let expected_tags: BTreeMap<String, serde_json::Value> =
-                [("release".to_owned(), json!("0.58.0"))].into();
+            let expected_tags: BTreeMap<String, String> = [
+                ("max_parallel".to_owned(), "4".to_owned()),
+                ("release".to_owned(), "0.58.0".to_owned()),
+            ]
+            .into();
+            let expected_nodes = vec![DiscoveredNodeReadback {
+                key: "asset:load_orders[load]".into(),
+                asset: "load_orders".into(),
+                step: "load".into(),
+                args: [
+                    ("attempt".to_owned(), "2".to_owned()),
+                    ("region".to_owned(), "eu".to_owned()),
+                ]
+                .into(),
+            }];
             assert_eq!(
                 (
                     readback.generation,
                     readback.sets[0].items,
-                    &readback.sets[0].tags
+                    &readback.sets[0].tags,
+                    &readback.sets[0].assets,
+                    &readback.sets[0].nodes
                 ),
-                (2, 1, &expected_tags),
-                "{}: the readback shows the new tags",
+                (
+                    2,
+                    1,
+                    &expected_tags,
+                    &vec!["load_orders".to_owned()],
+                    &expected_nodes
+                ),
+                "{}: the readback shows the new tags, and the node each item became, with its args",
                 test_case.description
             );
             let (transaction, audit) = query(

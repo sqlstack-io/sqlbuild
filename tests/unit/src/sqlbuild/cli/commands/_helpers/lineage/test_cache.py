@@ -22,14 +22,14 @@ from tests.unit.src.sqlbuild.cli.commands._helpers.lineage.helpers import (
 
 _LAYOUT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\nschema = "${ENV:ORDERS_SCHEMA}"\n',
-    "models/a/b.sql": "SELECT 1 AS order_id\n",
-    "models/a-c.sql": "SELECT '${ENV:  ORDERS_REGION}' AS region\n",
-    "models/a.sql": "SELECT 2 AS order_id\n",
-    "models/Z.SQL": "SELECT 3 AS order_id\n",
-    "models/é.sql": "SELECT 'café' AS label\n",
-    "seeds/customers.csv": "customer_id\n1\n",
-    "sources/raw.YML": "sources: []\n",
-    "macros/python/helpers.py": "def total():\n    return 1\n",
+    "sql/models/a/b.sql": "SELECT 1 AS order_id\n",
+    "sql/models/a-c.sql": "SELECT '${ENV:  ORDERS_REGION}' AS region\n",
+    "sql/models/a.sql": "SELECT 2 AS order_id\n",
+    "sql/models/Z.SQL": "SELECT 3 AS order_id\n",
+    "sql/models/é.sql": "SELECT 'café' AS label\n",
+    "sql/seeds/customers.csv": "customer_id\n1\n",
+    "sql/sources/raw.YML": "sources: []\n",
+    "sql/macros/python/helpers.py": "def total():\n    return 1\n",
     ".hidden/notes.yaml": "a: 1\n",
     ".gitignore": "target/\n",
     "nested/.sqlbuildignore": "*.tmp\n",
@@ -38,30 +38,30 @@ _LAYOUT_FILES: dict[str, str] = {
     "noext": "ENV:\n",
     "target/ignored.sql": "ENV:\n",
     ".venv/ignored.py": "ENV:\n",
-    "models/__pycache__/ignored.py": "ENV:\n",
+    "sql/models/__pycache__/ignored.py": "ENV:\n",
     "nested/target/kept.sql": "SELECT 4 AS order_id\n",
 }
 _LAYOUT_LINKS: dict[str, str] = {
-    "models/linked.sql": "models/a.sql",
+    "sql/models/linked.sql": "sql/models/a.sql",
     "linked_dir": "models",
-    "models/broken.sql": "models/missing.sql",
+    "sql/models/broken.sql": "sql/models/missing.sql",
 }
 _LAYOUT_UNLINKED_HASHED_FILES: tuple[str, ...] = (
     ".gitignore",
     ".hidden/notes.yaml",
-    "macros/python/helpers.py",
-    "models/Z.SQL",
-    "models/a/b.sql",
-    "models/a-c.sql",
-    "models/a.sql",
-    "models/é.sql",
+    "sql/macros/python/helpers.py",
+    "sql/models/Z.SQL",
+    "sql/models/a/b.sql",
+    "sql/models/a-c.sql",
+    "sql/models/a.sql",
+    "sql/models/é.sql",
     "nested/.sqlbuildignore",
     "nested/target/kept.sql",
-    "seeds/customers.csv",
-    "sources/raw.YML",
+    "sql/seeds/customers.csv",
+    "sql/sources/raw.YML",
     "sqlbuild_project.toml",
 )
-_LAYOUT_HASHED_FILES: tuple[str, ...] = (*_LAYOUT_UNLINKED_HASHED_FILES, "models/linked.sql")
+_LAYOUT_HASHED_FILES: tuple[str, ...] = (*_LAYOUT_UNLINKED_HASHED_FILES, "sql/models/linked.sql")
 _LAYOUT_ENVIRONMENT_NAMES: tuple[str, ...] = ("ORDERS_REGION", "ORDERS_SCHEMA")
 
 
@@ -120,7 +120,7 @@ def test_given_referenced_environment_change_when_fingerprinting_then_invalidate
         ),
         LineageFingerprintAvailabilityTestCase(
             description="SQL output context preserves structural cache availability",
-            relative_path="models/orders.sql",
+            relative_path="sql/models/orders.sql",
             config=(
                 "MODEL (description 'Test model orders.', materialized view);\n\n"
                 "SELECT '${CTX:run_id}' AS invocation_id, 1 AS order_id\n"
@@ -158,21 +158,21 @@ def test_given_dynamic_invocation_context_when_fingerprinting_then_disables_cach
         ),
         FingerprintedFilesTestCase(
             description="chmod permissions follow the platform directory semantics",
-            files={**_LAYOUT_FILES, "models/locked/hidden.sql": "SELECT 5 AS order_id\n"},
+            files={**_LAYOUT_FILES, "sql/models/locked/hidden.sql": "SELECT 5 AS order_id\n"},
             links={},
-            unreadable_directories=("models/locked",),
+            unreadable_directories=("sql/models/locked",),
             environment={"ORDERS_SCHEMA": "orders_dev"},
             cli_vars={},
             expected_hashed_files=_LAYOUT_UNLINKED_HASHED_FILES
-            + (("models/locked/hidden.sql",) if sys.platform == "win32" else ()),
+            + (("sql/models/locked/hidden.sql",) if sys.platform == "win32" else ()),
             expected_environment_names=_LAYOUT_ENVIRONMENT_NAMES,
         ),
         FingerprintedFilesTestCase(
             description="undecodable names that are never hashed",
             files={
                 **_LAYOUT_FILES,
-                "models/notes_\udcff.md": "ENV:\n",
-                "models/\udcfe_dir/readme.txt": "ENV:\n",
+                "sql/models/notes_\udcff.md": "ENV:\n",
+                "sql/models/\udcfe_dir/readme.txt": "ENV:\n",
             },
             links={},
             unreadable_directories=(),
@@ -230,32 +230,35 @@ def test_given_authored_files_when_fingerprinting_then_hashes_exactly_the_expect
     (
         UncacheableFingerprintTestCase(
             description="an environment marker without a name",
-            files={**_LAYOUT_FILES, "models/bad.sql": "SELECT 'ENV: ' AS broken\n"},
+            files={**_LAYOUT_FILES, "sql/models/bad.sql": "SELECT 'ENV: ' AS broken\n"},
             expected_fingerprint=None,
         ),
         UncacheableFingerprintTestCase(
             description="an environment name followed by a non-ASCII byte",
-            files={"models/bad.sql": "SELECT '${ENV:ORDERSÉ}' AS broken\n"},
+            files={"sql/models/bad.sql": "SELECT '${ENV:ORDERSÉ}' AS broken\n"},
             expected_fingerprint=None,
         ),
         UncacheableFingerprintTestCase(
             description="overlapping markers inside one matched name",
-            files={"models/bad.sql": "SELECT 'ENV: ENV:X' AS broken\n"},
+            files={"sql/models/bad.sql": "SELECT 'ENV: ENV:X' AS broken\n"},
             expected_fingerprint=None,
         ),
         UncacheableFingerprintTestCase(
             description="dynamic context in Python source",
-            files={"macros/python/run.py": "RUN = 'CTX:run_id'\n", "models/a.sql": "SELECT 1\n"},
+            files={
+                "sql/macros/python/run.py": "RUN = 'CTX:run_id'\n",
+                "sql/models/a.sql": "SELECT 1\n",
+            },
             expected_fingerprint=None,
         ),
         UncacheableFingerprintTestCase(
             description="an undecodable hashed file name",
-            files={**_LAYOUT_FILES, "models/orders_\udcff.sql": "SELECT 6 AS order_id\n"},
+            files={**_LAYOUT_FILES, "sql/models/orders_\udcff.sql": "SELECT 6 AS order_id\n"},
             expected_fingerprint=None,
         ),
         UncacheableFingerprintTestCase(
             description="a hashed file below an undecodable directory",
-            files={**_LAYOUT_FILES, "models/\udcfe_dir/orders.sql": "SELECT 7 AS order_id\n"},
+            files={**_LAYOUT_FILES, "sql/models/\udcfe_dir/orders.sql": "SELECT 7 AS order_id\n"},
             expected_fingerprint=None,
         ),
     ),
@@ -279,7 +282,7 @@ def test_given_unhashable_inputs_when_fingerprinting_then_the_cache_is_disabled(
     (
         InterruptedListingFingerprintTestCase(
             description="a hashed directory whose listing fails mid-way",
-            files={"sqlbuild_project.toml": 'name = "orders"\n', "models/a.sql": "SELECT 1\n"},
+            files={"sqlbuild_project.toml": 'name = "orders"\n', "sql/models/a.sql": "SELECT 1\n"},
             interrupted_directory="models",
             expected_uncacheable_before=(3, 13),
         ),

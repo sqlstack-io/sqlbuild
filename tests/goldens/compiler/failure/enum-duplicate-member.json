@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D013",
-     "message": "<project>/models/staging/_sqlbuild/_enums/order_status.sql enum 'order_status' has duplicate member 'PLACED'"
+     "message": "<project>/sql/models/staging/_sqlbuild/_enums/order_status.sql enum 'order_status' has duplicate member 'PLACED'"
     }
    ]
   }

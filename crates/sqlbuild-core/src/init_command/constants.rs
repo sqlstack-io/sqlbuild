@@ -2,22 +2,22 @@
 
 /// Each resource directory, in creation order.
 pub const SCAFFOLD_DIRECTORIES: [&str; 16] = [
-    "models/staging",
-    "models/marts",
-    "schemas",
-    "sources",
-    "seeds",
-    "python",
-    "hooks/sql",
-    "hooks/python",
+    "sql/models/staging",
+    "sql/models/marts",
+    "sql/schemas",
+    "sql/sources",
+    "sql/seeds",
+    "python/nodes",
+    "sql/hooks/sql",
+    "sql/hooks/python",
     "tests/unit",
     "tests/scenarios",
-    "functions/sql",
-    "functions/python",
-    "macros/sql",
-    "macros/python",
-    "audits/generic",
-    "audits/singular",
+    "sql/functions/sql",
+    "sql/functions/python",
+    "sql/macros/sql",
+    "sql/macros/python",
+    "sql/audits/generic",
+    "sql/audits/singular",
 ];
 
 /// The placeholder file kept in otherwise empty directories.
@@ -25,12 +25,12 @@ pub const GITKEEP_FILE: &str = ".gitkeep";
 
 /// The numbered next steps before the compile and build commands.
 pub const NEXT_STEPS: [&str; 6] = [
-    "  1. Add sources to sources/",
-    "  2. Add seeds to seeds/",
-    "  3. Add Python loaders, assets, checks, and factories to python/",
-    "  4. Add SQL hooks to hooks/sql/, Python hooks to hooks/python/, functions to functions/, or macros to macros/sql/ or macros/python/",
-    "  5. Add models to models/staging/ and models/marts/",
-    "  6. Add tests to tests/unit/ or tests/scenarios/, reusable audits to audits/generic/, or standalone audits to audits/singular/",
+    "  1. Add sources to sql/sources/",
+    "  2. Add seeds to sql/seeds/",
+    "  3. Add Python loaders, assets, checks, and factories to python/nodes/",
+    "  4. Add SQL hooks to sql/hooks/sql/, Python hooks to sql/hooks/python/, functions to sql/functions/, or macros to sql/macros/sql/ or sql/macros/python/",
+    "  5. Add models to sql/models/staging/ and sql/models/marts/",
+    "  6. Add tests to tests/unit/ or tests/scenarios/, reusable audits to sql/audits/generic/, or standalone audits to sql/audits/singular/",
 ];
 
 /// The git ignore file `sqb init` and the playground add the env file to.

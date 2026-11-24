@@ -15,6 +15,7 @@ pub mod contracts;
 pub mod diagnostics;
 pub mod event_exporting;
 pub mod frontier;
+pub mod invocation_phases;
 pub mod native_host;
 pub mod native_threads;
 pub mod orchestration_reads;

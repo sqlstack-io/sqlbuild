@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D015",
-     "message": "Event exporter 'ignore_events' in sinks/lifecycle.py parameters must not have defaults"
+     "message": "Event exporter 'ignore_events' in python/event_sinks/lifecycle.py parameters must not have defaults"
     }
    ]
   }

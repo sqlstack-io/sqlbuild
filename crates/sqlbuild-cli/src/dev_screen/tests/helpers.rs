@@ -156,7 +156,7 @@ pub(super) fn secrets_reported(
                 .into_iter()
                 .map(|(provider, variables)| UnsetProviderSecrets {
                     provider: provider.to_owned(),
-                    path: format!("providers/{provider}.py"),
+                    path: format!("python/providers/{provider}.py"),
                     settings: variables
                         .into_iter()
                         .zip(9..)
@@ -181,12 +181,12 @@ pub(super) fn failed_compile() -> Vec<ScreenMessage> {
     messages.push(ScreenMessage::Child(DevEvent::Failed {
         generation: 1,
         message:
-            "[D001] models/marts/fct_orders.sql:42:7: column net_amount_usd does not exist in \
+            "[D001] sql/models/marts/fct_orders.sql:42:7: column net_amount_usd does not exist in \
                   stg_payments; the column was renamed to amount_usd_net when the payments source \
                   moved to the v2 export, and fct_orders still selects the old name"
                 .to_owned(),
         position: Some(SourcePosition {
-            path: "models/marts/fct_orders.sql".to_owned(),
+            path: "sql/models/marts/fct_orders.sql".to_owned(),
             line: 42,
             column: 7,
         }),

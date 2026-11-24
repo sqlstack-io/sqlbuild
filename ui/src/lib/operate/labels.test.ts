@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeWait, onFailureText, overlapPlain, overlapWhileRunning, poolText, runConcurrencyText, triggerKindLabel, waitTechnical } from './labels';
+import { describeWait, onFailureText, overlapPlain, poolText, runConcurrencyHelp, triggerKindLabel, waitTechnical } from './labels';
 import type { QueueWait } from '$lib/api';
 
 const text = (w: QueueWait) => describeWait(w).map((p) => p.text).join('');
@@ -49,14 +49,13 @@ describe('concurrency in plain words', () => {
 		expect(`${clamped.text} (${clamped.detail})`).toBe('Takes the whole warehouse_heavy pool on this server (capped at 1; the project asks for 3)');
 	});
 
-	it("states a run's concurrency as the limit it applies, for a job and for a group's members", () => {
-		expect(runConcurrencyText(4, 'job')).toBe("Inside a run: at most 4 of this job's nodes at once");
-		expect(runConcurrencyText(1, 'job')).toBe("Inside a run: at most 1 of this job's nodes at once");
-		expect(runConcurrencyText(6, 'group')).toBe('Members without their own limit: at most 6 nodes at once');
+	it("explains a run's node limit for a job and for a group's members", () => {
+		expect(runConcurrencyHelp('job')).toBe("At most this many of the job's nodes run together in one run.");
+		expect(runConcurrencyHelp('group')).toBe('Members without their own limit run at most this many nodes together.');
 	});
 
-	it('says what a job triggered while it runs does', () => {
-		expect(overlapWhileRunning).toEqual({ queue: 'waits', skip: 'is skipped' });
+	it('names what a job triggered while it runs does', () => {
+		expect(overlapPlain).toEqual({ queue: 'Queue', skip: 'Skip' });
 	});
 });
 

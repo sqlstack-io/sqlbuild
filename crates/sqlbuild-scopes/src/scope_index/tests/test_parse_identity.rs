@@ -39,8 +39,8 @@ fn given_qualified_value_when_parsing_then_python_identity_or_failure_is_returne
         },
         ParseIdentityTestCase {
             description: "a path folder is an unknown kind",
-            value: "models/a:b/orders.sql",
-            expected_identity: Err(IdentityFailure::UnknownKind("models/a".to_owned())),
+            value: "sql/models/a:b/orders.sql",
+            expected_identity: Err(IdentityFailure::UnknownKind("sql/models/a".to_owned())),
         },
         ParseIdentityTestCase {
             description: "an empty name",

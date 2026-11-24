@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D013",
-     "message": "Declaration root models/marts/_enums/_constants/ is nested inside another declaration tree"
+     "message": "Declaration root sql/models/marts/_enums/_constants/ is nested inside another declaration tree"
     }
    ]
   }

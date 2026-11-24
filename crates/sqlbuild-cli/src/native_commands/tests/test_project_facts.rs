@@ -5,7 +5,7 @@ use crate::native_commands::tests::helpers::write_tree;
 use crate::native_commands::tests::test_types::{ProjectFactsTestCase, ProjectNameTestCase};
 
 const PROJECT: &str = "name = \"shop\"\nadapter = \"duckdb\"\n";
-const NAMED_SINK_PROJECT: &str = "name = \"shop\"\nadapter = \"duckdb\"\n\n[sinks.lifecycle.named.audit]\nmin_severity = \"error\"\n";
+const NAMED_SINK_PROJECT: &str = "name = \"shop\"\nadapter = \"duckdb\"\n\n[event_sinks.lifecycle.named.audit]\nmin_severity = \"error\"\n";
 
 #[test]
 fn given_project_files_when_checking_runtime_extensions_then_python_owned_ones_need_python() {

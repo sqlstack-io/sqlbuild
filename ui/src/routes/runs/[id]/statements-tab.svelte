@@ -89,7 +89,7 @@
 
 <DataTable class="compact statements" embedded columns={statementColumns} rows={statements} key={(st) => st.id} empty={total ? 'No queries match the filter.' : 'No queries yet.'}>
 	{#snippet row(st)}
-				<tr class="row" class:open={open.has(st.id)} class:focused={st.id === focusId} data-sid={st.id} onclick={() => toggle(st)}>
+				<tr class="row expandable" class:open={open.has(st.id)} class:focused={st.id === focusId} data-sid={st.id} onclick={() => toggle(st)}>
 					<td class="caret-col"><DisclosureButton open={open.has(st.id)}><span class="sr-only">{open.has(st.id) ? 'Hide' : 'Show'} statement {st.sequence}</span></DisclosureButton></td>
 					<td class="num faint">{st.sequence}</td>
 					<td class="faint nowrap" title={formatStamp(st.startedAt)}>{clockTime(st.startedAt)}</td>

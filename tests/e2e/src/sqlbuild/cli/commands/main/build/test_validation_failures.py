@@ -34,7 +34,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 ).strip()
                 + "\n",
                 "seed_raw_data.sql": "",
-                "models/orders.sql": dedent(
+                "sql/models/orders.sql": dedent(
                     """
                 MODEL (description "Test model orders.",
                   materialized table,
@@ -85,7 +85,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                 sources:
                   - name: raw_orders
@@ -95,7 +95,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 """
                 ).strip()
                 + "\n",
-                "models/staging/stg_orders.sql": dedent(
+                "sql/models/staging/stg_orders.sql": dedent(
                     """
                 MODEL (description "Test model stg_orders.", materialized view);
 
@@ -106,7 +106,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 """
                 ).strip()
                 + "\n",
-                "models/marts/fact_orders.sql": dedent(
+                "sql/models/marts/fact_orders.sql": dedent(
                     """
                 MODEL (description "Test model fact_orders.", materialized table);
 
@@ -114,7 +114,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 """
                 ).strip()
                 + "\n",
-                "models/marts/customer_status_snapshot.sql": dedent(
+                "sql/models/marts/customer_status_snapshot.sql": dedent(
                     """
                 MODEL (description "Test model customer_status_snapshot.",
                   materialized incremental,
@@ -154,7 +154,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 ).strip()
                 + "\n",
                 "seed_raw_data.sql": "",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                 sources:
                   - name: raw_orders
@@ -163,7 +163,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 """
                 ).strip()
                 + "\n",
-                "models/orders.sql": dedent(
+                "sql/models/orders.sql": dedent(
                     """
                 MODEL (description "Test model orders.", materialized table);
 

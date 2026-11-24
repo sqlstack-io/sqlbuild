@@ -12,7 +12,7 @@ use crate::python_rules::_helpers::units::project::{
 use crate::python_rules::constants::{
     CHECK_KIND, CONTEXT_PARAMETER, DESCRIPTION_KEYWORD, FACTORY_SHAPE_CODE, LOADER_DECORATOR,
     MAIN_NAME, NAME_KEYWORD, NODE_DELEGATES_TO_MAIN_CODE, NODE_DESCRIPTION_CODE,
-    NODE_SIGNATURE_CODE, SPEC_MODULES, UNIT_CHECKS_FILE, UNIT_NODE_FILE,
+    NODE_SIGNATURE_CODE, SPEC_MODULES, UNIT_CHECKS_FILE, UNIT_DECLARATION_FILES,
 };
 use crate::python_rules::models::{UnitFile, UnitProject};
 
@@ -23,15 +23,16 @@ struct UnitNames {
     specs: BTreeSet<String>,
 }
 
-/// Declaration faults of every node, check and factory in a unit's node.py and checks.py.
+/// Declaration faults of every node, check and factory in a unit's declaration file and checks.py.
 pub(crate) fn declaration_faults(project: &UnitProject<'_>) -> Vec<Fault> {
     let mut faults: Vec<Fault> = Vec::new();
     for file in &project.files {
-        let (Some(unit), Some(UNIT_NODE_FILE | UNIT_CHECKS_FILE)) =
-            (file.unit.as_deref(), unit_file_name(file))
-        else {
+        let (Some(unit), Some(name)) = (file.unit.as_deref(), unit_file_name(file)) else {
             continue;
         };
+        if name != UNIT_CHECKS_FILE && !UNIT_DECLARATION_FILES.contains(&name) {
+            continue;
+        }
         let names = UnitNames {
             main: unit_imports(file, project, unit, &[MAIN_NAME])
                 .into_iter()

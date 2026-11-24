@@ -28,10 +28,10 @@ _ORDERS_TEST: str = (
 _NOT_NULL_AUDIT: str = "AUDIT ();\nSELECT 1 FROM @relation WHERE @column IS NULL\n"
 _BROKEN_MODEL: str = 'MODEL (description "Broken");\nSELECT @py.unknown()\n'
 _UNEXPANDABLE_FILES: dict[str, str] = {
-    "models/customers.sql": _CUSTOMERS_MODEL,
-    "models/orders.sql": _ORDERS_MODEL,
-    "models/aa_broken.sql": _BROKEN_MODEL,
-    "models/zz_broken.sql": _BROKEN_MODEL,
+    "sql/models/customers.sql": _CUSTOMERS_MODEL,
+    "sql/models/orders.sql": _ORDERS_MODEL,
+    "sql/models/aa_broken.sql": _BROKEN_MODEL,
+    "sql/models/zz_broken.sql": _BROKEN_MODEL,
 }
 
 
@@ -41,10 +41,10 @@ _UNEXPANDABLE_FILES: dict[str, str] = {
         BatchedPreparationTestCase(
             description="models, tests, and generic audits",
             files={
-                "models/customers.sql": _CUSTOMERS_MODEL,
-                "models/orders.sql": _ORDERS_MODEL,
+                "sql/models/customers.sql": _CUSTOMERS_MODEL,
+                "sql/models/orders.sql": _ORDERS_MODEL,
                 "tests/unit/test_orders.sql": _ORDERS_TEST,
-                "audits/generic/not_null.sql": _NOT_NULL_AUDIT,
+                "sql/audits/generic/not_null.sql": _NOT_NULL_AUDIT,
             },
             expected_codes=("SQLCLEAN001",),
         )
@@ -69,7 +69,7 @@ def test_given_project_when_linting_then_bodies_of_every_kind_are_prepared_in_on
     [
         UnexpandableFailureTestCase(
             description="first unexpandable file in path order is raised",
-            expected_error_file="models/aa_broken.sql",
+            expected_error_file="sql/models/aa_broken.sql",
         )
     ],
     ids=lambda case: case.description,
@@ -90,7 +90,7 @@ def test_given_unexpandable_files_when_linting_then_first_in_file_order_is_raise
     [
         UnexpandableSkipTestCase(
             description="skipped unexpandable files are reported and the rest is linted",
-            expected_unexpandable=("models/aa_broken.sql", "models/zz_broken.sql"),
+            expected_unexpandable=("sql/models/aa_broken.sql", "sql/models/zz_broken.sql"),
             expected_codes=("SQLCLEAN001",),
         )
     ],

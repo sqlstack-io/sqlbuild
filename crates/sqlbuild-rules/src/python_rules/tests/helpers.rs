@@ -59,7 +59,7 @@ pub(super) fn core_rule_faults(source: &str, fensu_code: &str) -> Vec<(String, u
 /// The speculation keys of a request selecting `select`, before and after its one Python module changes from `original` to `edited`.
 pub(super) fn source_keys(select: &[&str], original: &str, edited: &str) -> (String, String) {
     let directory = tempfile::tempdir().expect("temporary project");
-    let module = directory.path().join("python/orders/main.py");
+    let module = directory.path().join("python/nodes/orders/main.py");
     std::fs::create_dir_all(module.parent().expect("parent")).expect("folders");
     std::fs::write(&module, original).expect("module");
     let before: String = request_key(directory.path(), select);
@@ -169,14 +169,14 @@ pub(super) fn scaling_project(
     functions: usize,
 ) -> Vec<(String, String)> {
     let helper = (
-        "python/utils/text/join.py".to_owned(),
+        "python/nodes/utils/text/join.py".to_owned(),
         "\"\"\"Join text.\"\"\"\n\n\ndef joined(value: str) -> str:\n    \"\"\"Return the value.\"\"\"\n    return value\n".to_owned(),
     );
     let modules = (0..units).map(|unit| {
         (
-            format!("python/domain_{}/unit_{unit}/main.py", unit % 50),
+            format!("python/nodes/domain_{}/unit_{unit}/main.py", unit % 50),
             format!(
-                "\"\"\"Unit {unit}.\"\"\"\n\nfrom python.utils.text.join import joined\n\n\ndef run_{unit}(value: str) -> str:\n    \"\"\"Run unit {unit}.\"\"\"\n    return joined(value)\n"
+                "\"\"\"Unit {unit}.\"\"\"\n\nfrom python.nodes.utils.text.join import joined\n\n\ndef run_{unit}(value: str) -> str:\n    \"\"\"Run unit {unit}.\"\"\"\n    return joined(value)\n"
             ),
         )
     });
@@ -186,7 +186,7 @@ pub(super) fn scaling_project(
                 format!("def alert_{function}(ctx, reason):\n    print(ctx, reason)\n\n\n")
             })
             .collect();
-        (format!("hooks/python/alert_{file}.py"), body)
+        (format!("sql/hooks/python/alert_{file}.py"), body)
     });
     std::iter::once(helper)
         .chain(modules)
@@ -202,7 +202,7 @@ pub(super) fn unit_scaling_project(units: usize, undescribed: usize) -> Vec<(Str
         unit_files(
             unit,
             &format!(
-                "from {}.node import node_{previous}\n",
+                "from {}.asset import node_{previous}\n",
                 unit_module(previous)
             ),
             &format!("depends_on=[node_{previous}], description=\"Unit {unit}.\""),
@@ -210,7 +210,7 @@ pub(super) fn unit_scaling_project(units: usize, undescribed: usize) -> Vec<(Str
     });
     let bare = (units..units + undescribed).flat_map(|unit| unit_files(unit, "", ""));
     let utils = (
-        "python/utils/text/join.py".to_owned(),
+        "python/nodes/utils/text/join.py".to_owned(),
         "def joined(value: str) -> str:\n    return value\n".to_owned(),
     );
     head.into_iter()
@@ -221,7 +221,7 @@ pub(super) fn unit_scaling_project(units: usize, undescribed: usize) -> Vec<(Str
 }
 
 fn unit_module(unit: usize) -> String {
-    format!("python.area{}.unit_{unit}", unit % 50)
+    format!("python.nodes.area{}.unit_{unit}", unit % 50)
 }
 
 /// The node, main and checks files of `unit`, its node importing `upstream` and declared with `arguments`.
@@ -230,19 +230,19 @@ fn unit_files(unit: usize, upstream: &str, arguments: &str) -> [(String, String)
     let dir = module.replace('.', "/");
     [
         (
-            format!("{dir}/node.py"),
+            format!("{dir}/asset.py"),
             format!(
                 "{upstream}from {module}.main import main\n\n\n@asset({arguments})\ndef node_{unit}(ctx: AssetContext) -> None:\n    return main(ctx=ctx)\n"
             ),
         ),
         (
             format!("{dir}/main.py"),
-            "from sqlbuild import PythonNodeResult\n\nfrom python.utils.text.join import joined\n\n\ndef main(ctx: AssetContext) -> PythonNodeResult:\n    return ctx.result(joined(\"\"))\n".to_owned(),
+            "from sqlbuild import PythonNodeResult\n\nfrom python.nodes.utils.text.join import joined\n\n\ndef main(ctx: AssetContext) -> PythonNodeResult:\n    return ctx.result(joined(\"\"))\n".to_owned(),
         ),
         (
             format!("{dir}/checks.py"),
             format!(
-                "from {module}.node import node_{unit}\n\n\n@check(depends_on=[node_{unit}], description=\"Ran.\")\ndef ran_{unit}(ctx: CheckContext) -> bool:\n    return ctx.ok()\n"
+                "from {module}.asset import node_{unit}\n\n\n@check(depends_on=[node_{unit}], description=\"Ran.\")\ndef ran_{unit}(ctx: CheckContext) -> bool:\n    return ctx.ok()\n"
             ),
         ),
     ]
@@ -258,15 +258,15 @@ pub(super) fn purity_chain_project(
     for chain in 0..chains {
         for step in 1..depth {
             files.push((
-                format!("python/utils/chain_{chain}/step_{previous}.py", previous = step - 1),
+                format!("python/nodes/utils/chain_{chain}/step_{previous}.py", previous = step - 1),
                 format!(
-                    "from python.utils.chain_{chain} import step_{step}\n\n\ndef run():\n    return step_{step}.run()\n"
+                    "from python.nodes.utils.chain_{chain} import step_{step}\n\n\ndef run():\n    return step_{step}.run()\n"
                 ),
             ));
         }
         files.push((
             format!(
-                "python/utils/chain_{chain}/step_{last}.py",
+                "python/nodes/utils/chain_{chain}/step_{last}.py",
                 last = depth - 1
             ),
             "import requests\n\n\ndef run():\n    return requests.get(\"https://example.com\")\n"
@@ -275,9 +275,9 @@ pub(super) fn purity_chain_project(
     }
     for root in 0..roots {
         files.push((
-            format!("python/orders/export_{root}/constants.py"),
+            format!("python/nodes/orders/export_{root}/constants.py"),
             format!(
-                "from python.utils.chain_{chain} import step_0\n\nREGIONS = step_0.run()\n",
+                "from python.nodes.utils.chain_{chain} import step_0\n\nREGIONS = step_0.run()\n",
                 chain = root % chains
             ),
         ));

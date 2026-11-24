@@ -44,23 +44,23 @@ if TYPE_CHECKING:
             description="expands ordered typed model and macro test cases before macros",
             repo_files=base_repo_files()
             | {
-                "models/orders.sql": "MODEL (description 'Test model orders.');\n\nSELECT 'open' AS status\n",
-                "models/customers.sql": "MODEL (description 'Test model customers.');\n\nSELECT 1 AS customer_id\n",
-                "sources/raw.yml": "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n    expression: SELECT 1 AS order_id\n",
-                "seeds/schema.yml": (
+                "sql/models/orders.sql": "MODEL (description 'Test model orders.');\n\nSELECT 'open' AS status\n",
+                "sql/models/customers.sql": "MODEL (description 'Test model customers.');\n\nSELECT 1 AS customer_id\n",
+                "sql/sources/raw.yml": "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n    expression: SELECT 1 AS order_id\n",
+                "sql/seeds/schema.yml": (
                     "seeds:\n  - name: country_codes\n    description: Test seed country_codes.\n    columns:\n"
                     "      - name: code\n        type: VARCHAR\n"
                 ),
-                "seeds/country_codes.csv": "code\nGB\n",
-                "models/_constants/offset.sql": "CONSTANT (name offset, value 2);\n",
-                "models/_enums/state.sql": "ENUM (name state, members [OPEN, CLOSED]);\n",
-                "functions/sql/add_one.sql": """
+                "sql/seeds/country_codes.csv": "code\nGB\n",
+                "sql/models/_constants/offset.sql": "CONSTANT (name offset, value 2);\n",
+                "sql/models/_enums/state.sql": "ENUM (name state, members [OPEN, CLOSED]);\n",
+                "sql/functions/sql/add_one.sql": """
 FUNCTION (description "Test function add_one.", arguments (value INTEGER), returns INTEGER);
 
 value + 1
 """.strip()
                 + "\n",
-                "functions/sql/by_customer.sql": """
+                "sql/functions/sql/by_customer.sql": """
 FUNCTION (description "Test function by_customer.",
   arguments (customer_id INTEGER),
   returns table (customer_id INTEGER)

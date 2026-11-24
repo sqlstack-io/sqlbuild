@@ -36,7 +36,7 @@ def test_given_repository_when_auditing_raw_statements_then_only_approved_bounda
             description="nested raw attributes and aliases are violations",
             source_files=(
                 (
-                    "adapters/example.py",
+                    "python/adapters/example.py",
                     "class Bad:\n"
                     "    def nested(self, connection):\n"
                     "        connection.raw_connection.execute('SELECT 1')\n"
@@ -49,9 +49,9 @@ def test_given_repository_when_auditing_raw_statements_then_only_approved_bounda
                 ),
             ),
             expected_violations=(
-                "adapters/example.py:3",
-                "adapters/example.py:6",
-                "adapters/example.py:9",
+                "python/adapters/example.py:3",
+                "python/adapters/example.py:6",
+                "python/adapters/example.py:9",
             ),
         ),
         RawStatementAuditFixtureCase(
@@ -74,7 +74,7 @@ def test_given_repository_when_auditing_raw_statements_then_only_approved_bounda
                     "        return self.raw_cursor.executemany(sql, rows)\n",
                 ),
                 (
-                    "adapters/bigquery/classes/bigquery_connection.py",
+                    "python/adapters/bigquery/classes/bigquery_connection.py",
                     "class _BigQueryConnection:\n"
                     "    def query_job(self, sql):\n"
                     "        return self.client.query(sql)\n",

@@ -47,8 +47,8 @@ def test_given_invalid_python_macro_arguments_when_compiling_then_error_names_th
         project_name="order_totals",
         repo_files={
             "sqlbuild_project.toml": build_offline_snowflake_project_toml(),
-            "models/_macros/python/order_total.py": _ORDER_MACRO,
-            "models/order_totals.sql": (
+            "sql/models/_macros/python/order_total.py": _ORDER_MACRO,
+            "sql/models/order_totals.sql": (
                 f'MODEL (description "Order totals.");\nSELECT {test_case.call_sql} AS total\n'
             ),
         },

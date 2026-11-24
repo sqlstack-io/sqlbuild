@@ -56,7 +56,7 @@ CREATE TABLE sqb_snapshot_sources (
 );
 CREATE TABLE sqb_snapshot_documents (
     snapshot_id {uuid} NOT NULL REFERENCES sqb_snapshots(snapshot_id),
-    kind TEXT NOT NULL CHECK (kind IN ('jobs', 'groups', 'triggers', 'roles', 'lineage', 'columns', 'providers', 'connection', 'discovered')),
+    kind TEXT NOT NULL CHECK (kind IN ('jobs', 'groups', 'triggers', 'roles', 'lineage', 'columns', 'providers', 'connection', 'discovered', 'discovered_assets')),
     document_hash TEXT NOT NULL REFERENCES sqb_documents(document_hash),
     PRIMARY KEY (snapshot_id, kind)
 );
@@ -231,6 +231,7 @@ CREATE TABLE sqb_run_output_segments (
     line_count BIGINT NOT NULL,
     text_offset BIGINT NOT NULL,
     text_bytes BIGINT NOT NULL,
+    read_at {time},
     PRIMARY KEY (run_id, run_line),
     FOREIGN KEY (run_id, chunk) REFERENCES sqb_run_output_chunks(run_id, chunk)
 );

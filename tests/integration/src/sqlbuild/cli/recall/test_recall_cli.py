@@ -211,14 +211,14 @@ def test_given_project_sinks_when_reading_recall_then_no_sink_runs_and_no_comput
     project_dir: Path = write_project(tmp_path / "orders_shop")
     _ = write_sinks(project_dir, {"output_log": OUTPUT_LOG_SINK})
     assert run(project_dir, "build").returncode == 0
-    (project_dir / "output.log").unlink()
+    (project_dir / ".output.log").unlink()
     logs_before: set[Path] = set((project_dir / "logs").glob("*/*"))
 
     read: subprocess.CompletedProcess[bytes] = run(project_dir, *test_case.args)
 
     assert read.returncode == 0, read.stderr.decode(errors="replace")
     assert read.stdout
-    assert (project_dir / "output.log").exists() is test_case.expected_sink_log
+    assert (project_dir / ".output.log").exists() is test_case.expected_sink_log
     assert set((project_dir / "logs").glob("*/*")) == logs_before
 
 

@@ -219,7 +219,7 @@ def test_given_partial_bounded_replay_and_later_upstream_progress_when_retried_t
         batch_concurrency=3,
         replay_policy="bounded-4h",
     )
-    (project_dir / "models" / "orders.sql").write_text(f2_sql, encoding="utf-8")
+    (project_dir / "sql" / "models" / "orders.sql").write_text(f2_sql, encoding="utf-8")
     partial: subprocess.CompletedProcess[str] = run_sqb(
         command=("--no-color", "build"), project_dir=project_dir
     )
@@ -312,7 +312,7 @@ def test_given_all_failed_f2_and_f3_when_code_returns_to_f2_then_old_requirement
         batch_concurrency=3,
         replay_policy="bounded-2h",
     )
-    model_path: Path = project_dir / "models" / "orders.sql"
+    model_path: Path = project_dir / "sql" / "models" / "orders.sql"
     model_path.write_text(f2_sql, encoding="utf-8")
     failed_f2: subprocess.CompletedProcess[str] = run_sqb(
         command=("--no-color", "build"), project_dir=project_dir
@@ -378,7 +378,7 @@ def test_given_pending_replay_when_model_is_only_reformatted_then_replay_still_c
         batch_concurrency=3,
         replay_policy="bounded-4h",
     )
-    model_path: Path = project_dir / "models" / "orders.sql"
+    model_path: Path = project_dir / "sql" / "models" / "orders.sql"
     model_path.write_text(f2_sql, encoding="utf-8")
     partial: subprocess.CompletedProcess[str] = run_sqb(
         command=("--no-color", "build"), project_dir=project_dir

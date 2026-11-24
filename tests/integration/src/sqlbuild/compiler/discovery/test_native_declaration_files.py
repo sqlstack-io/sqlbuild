@@ -56,38 +56,38 @@ _FUNCTION: bytes = (
     b"SELECT amount * 2\n"
 )
 _EVERY_KIND: tuple[tuple[str, bytes], ...] = (
-    ("models/marts/orders.sql", _MODEL),
-    ("macros/python/money.py", _MACRO),
-    ("macros/python/__init__.py", b""),
-    ("models/marts/_macros/python/local.py", _MACRO),
-    ("enums/status.sql", _ENUMS),
-    ("models/marts/_enums/tier.sql", b"ENUM (name tier, members [GOLD]);\n"),
-    ("models/marts/_sqlbuild/constants/limits.sql", _CONSTANTS),
-    ("constants/global.sql", b"CONSTANT (name ratio, value 1.5);\n"),
-    ("models/marts/_sqlbuild/_audits/generic/is_true.sql", _AUDIT),
-    ("models/marts/_sqlbuild/audits/singular/orders_ok.sql", _AUDIT),
-    ("models/marts/_sqlbuild/_schemas/order_shape.sql", _SCHEMA),
-    ("models/marts/_sqlbuild/hooks/sql/record_marts_refresh.sql", _HOOK),
-    ("audits/generic/is_true.sql", _AUDIT),
-    ("audits/generic/nested/measured.sql", _MEASUREMENTS),
-    ("audits/singular/orders_ok.sql", _AUDIT),
-    ("schemas/order_shape.sql", _SCHEMA),
-    ("hooks/sql/record_refresh.sql", _HOOK),
-    ("hooks/sql/_private.sql", b"not a hook"),
-    ("functions/sql/double_amount.sql", _FUNCTION),
-    ("functions/sql/finance/net_amount.sql", _FUNCTION),
-    ("functions/sql/_macros/python/helpers.py", _MACRO),
-    ("seeds/channels.csv", b"id\n1\n"),
+    ("sql/models/marts/orders.sql", _MODEL),
+    ("sql/macros/python/money.py", _MACRO),
+    ("sql/macros/python/__init__.py", b""),
+    ("sql/models/marts/_macros/python/local.py", _MACRO),
+    ("sql/enums/status.sql", _ENUMS),
+    ("sql/models/marts/_enums/tier.sql", b"ENUM (name tier, members [GOLD]);\n"),
+    ("sql/models/marts/_sqlbuild/constants/limits.sql", _CONSTANTS),
+    ("sql/constants/global.sql", b"CONSTANT (name ratio, value 1.5);\n"),
+    ("sql/models/marts/_sqlbuild/_audits/generic/is_true.sql", _AUDIT),
+    ("sql/models/marts/_sqlbuild/audits/singular/orders_ok.sql", _AUDIT),
+    ("sql/models/marts/_sqlbuild/_schemas/order_shape.sql", _SCHEMA),
+    ("sql/models/marts/_sqlbuild/hooks/sql/record_marts_refresh.sql", _HOOK),
+    ("sql/audits/generic/is_true.sql", _AUDIT),
+    ("sql/audits/generic/nested/measured.sql", _MEASUREMENTS),
+    ("sql/audits/singular/orders_ok.sql", _AUDIT),
+    ("sql/schemas/order_shape.sql", _SCHEMA),
+    ("sql/hooks/sql/record_refresh.sql", _HOOK),
+    ("sql/hooks/sql/_private.sql", b"not a hook"),
+    ("sql/functions/sql/double_amount.sql", _FUNCTION),
+    ("sql/functions/sql/finance/net_amount.sql", _FUNCTION),
+    ("sql/functions/sql/_macros/python/helpers.py", _MACRO),
+    ("sql/seeds/channels.csv", b"id\n1\n"),
     (
-        "seeds/seeds.yml",
+        "sql/seeds/seeds.yml",
         b"seeds:\n  - name: channels\n    description: Sales channels.\n"
         b"    columns:\n      - name: id\n        type: INTEGER\n"
         b"  - name: stores\n    description: Stores.\n"
         b"    columns:\n      - name: id\n        type: INTEGER\n",
     ),
-    ("seeds/regional/stores.csv", b"id\n2\n"),
-    ("seeds/readme.md", b"seeds"),
-    ("seeds/archive.csv/notes.txt", b"a directory named like a seed"),
+    ("sql/seeds/regional/stores.csv", b"id\n2\n"),
+    ("sql/seeds/readme.md", b"seeds"),
+    ("sql/seeds/archive.csv/notes.txt", b"a directory named like a seed"),
 )
 
 
@@ -97,7 +97,7 @@ _EVERY_KIND: tuple[tuple[str, bytes], ...] = (
         GeneratedDeclarationFileTestCase(
             description="generated enum files",
             kind="enum",
-            relative_path="enums/generated.sql",
+            relative_path="sql/enums/generated.sql",
             case_count=150,
             expected_minimum_parsed=20,
             expected_minimum_failed=60,
@@ -106,7 +106,7 @@ _EVERY_KIND: tuple[tuple[str, bytes], ...] = (
         GeneratedDeclarationFileTestCase(
             description="generated constant files",
             kind="constant",
-            relative_path="models/marts/_constants/generated.sql",
+            relative_path="sql/models/marts/_constants/generated.sql",
             case_count=150,
             expected_minimum_parsed=60,
             expected_minimum_failed=30,
@@ -115,7 +115,7 @@ _EVERY_KIND: tuple[tuple[str, bytes], ...] = (
         GeneratedDeclarationFileTestCase(
             description="generated reusable schema files",
             kind="model_schema",
-            relative_path="schemas/generated.sql",
+            relative_path="sql/schemas/generated.sql",
             case_count=150,
             expected_minimum_parsed=50,
             expected_minimum_failed=30,
@@ -124,7 +124,7 @@ _EVERY_KIND: tuple[tuple[str, bytes], ...] = (
         GeneratedDeclarationFileTestCase(
             description="generated audit files",
             kind="audit",
-            relative_path="models/marts/_sqlbuild/audits/generic/generated.sql",
+            relative_path="sql/models/marts/_sqlbuild/audits/generic/generated.sql",
             case_count=150,
             expected_minimum_parsed=30,
             expected_minimum_failed=60,
@@ -133,7 +133,7 @@ _EVERY_KIND: tuple[tuple[str, bytes], ...] = (
         GeneratedDeclarationFileTestCase(
             description="generated SQL hook files",
             kind="sql_hook",
-            relative_path="hooks/sql/generated.sql",
+            relative_path="sql/hooks/sql/generated.sql",
             case_count=150,
             expected_minimum_parsed=40,
             expected_minimum_failed=40,
@@ -142,7 +142,7 @@ _EVERY_KIND: tuple[tuple[str, bytes], ...] = (
         GeneratedDeclarationFileTestCase(
             description="generated SQL function files",
             kind="sql_function",
-            relative_path="functions/sql/generated.sql",
+            relative_path="sql/functions/sql/generated.sql",
             case_count=150,
             expected_minimum_parsed=50,
             expected_minimum_failed=30,
@@ -173,8 +173,8 @@ def test_given_generated_declaration_files_when_discovering_then_native_parses_o
         DeclarationFilesParityTestCase(
             description="the first failing enum file in path order is reported",
             files=(
-                ("enums/a_status.sql", b"ENUM (name a_status, members [placed]);\n"),
-                ("enums/b_status.sql", b"ENUM (name b_status);\n"),
+                ("sql/enums/a_status.sql", b"ENUM (name a_status, members [placed]);\n"),
+                ("sql/enums/b_status.sql", b"ENUM (name b_status);\n"),
             ),
             expected_failure_type="DeclarationParseError",
             expected_message_fragment="member identifiers must be uppercase: 'placed'",
@@ -183,7 +183,7 @@ def test_given_generated_declaration_files_when_discovering_then_native_parses_o
             description="an earlier constant's value fails before a later constant's name",
             files=(
                 (
-                    "constants/limits.sql",
+                    "sql/constants/limits.sql",
                     b"CONSTANT (name launch, value 'soon', type DATE);\n"
                     b"CONSTANT (name Bad, value 1);\n",
                 ),
@@ -195,7 +195,7 @@ def test_given_generated_declaration_files_when_discovering_then_native_parses_o
             description="an earlier schema's columns fail before a later schema's keys",
             files=(
                 (
-                    "schemas/shapes.sql",
+                    "sql/schemas/shapes.sql",
                     b"SCHEMA (name first_shape, columns (id (nullable maybe)));\n"
                     b"SCHEMA (name second_shape, extra 1, columns (id (type INT)));\n",
                 ),
@@ -205,34 +205,34 @@ def test_given_generated_declaration_files_when_discovering_then_native_parses_o
         ),
         DeclarationFilesParityTestCase(
             description="a non-canonical declaration name fails with the identity help",
-            files=(("enums/status.sql", b"ENUM (name OrderStatus, members [PLACED]);\n"),),
+            files=(("sql/enums/status.sql", b"ENUM (name OrderStatus, members [PLACED]);\n"),),
             expected_failure_type="ResourceIdentityError",
             expected_message_fragment="use snake_case 'order_status'",
         ),
         DeclarationFilesParityTestCase(
             description="a nested declaration root fails before any file is parsed",
             files=(
-                ("models/marts/_enums/macros/python/money.py", _MACRO),
-                ("enums/status.sql", b"broken"),
+                ("sql/models/marts/_enums/macros/python/money.py", _MACRO),
+                ("sql/enums/status.sql", b"broken"),
             ),
             expected_failure_type="DeclarationParseError",
             expected_message_fragment="is nested inside another declaration tree",
         ),
         DeclarationFilesParityTestCase(
             description="an unreadable audit file fails with Python's decode error",
-            files=(("audits/generic/is_true.sql", b"AUDIT ();\nSELECT '\xff'\n"),),
+            files=(("sql/audits/generic/is_true.sql", b"AUDIT ();\nSELECT '\xff'\n"),),
             expected_failure_type="UnicodeDecodeError",
             expected_message_fragment="invalid start byte",
         ),
         DeclarationFilesParityTestCase(
             description="an unreadable macro file fails with Python's decode error",
-            files=(("macros/python/money.py", b"# \xc3"),),
+            files=(("sql/macros/python/money.py", b"# \xc3"),),
             expected_failure_type="UnicodeDecodeError",
             expected_message_fragment="unexpected end of data",
         ),
         DeclarationFilesParityTestCase(
             description="a hook with an unsupported key fails with the key suggestion",
-            files=(("hooks/sql/refresh.sql", b'HOOK (descripton "Refresh");\nSELECT 1\n'),),
+            files=(("sql/hooks/sql/refresh.sql", b'HOOK (descripton "Refresh");\nSELECT 1\n'),),
             expected_failure_type="SqlHookParseError",
             expected_message_fragment="has unsupported keys: descripton",
         ),
@@ -240,7 +240,7 @@ def test_given_generated_declaration_files_when_discovering_then_native_parses_o
             description="a measurement audit without MEASURE fails",
             files=(
                 (
-                    "audits/generic/measured.sql",
+                    "sql/audits/generic/measured.sql",
                     b"AUDIT (evaluation measurement, value total);\nSELECT 1\n",
                 ),
             ),
@@ -249,7 +249,7 @@ def test_given_generated_declaration_files_when_discovering_then_native_parses_o
         ),
         DeclarationFilesParityTestCase(
             description="a SQL function without a body fails",
-            files=(("functions/sql/empty.sql", b"FUNCTION (returns INT);\n  \n"),),
+            files=(("sql/functions/sql/empty.sql", b"FUNCTION (returns INT);\n  \n"),),
             expected_failure_type="ModelSqlParseError",
             expected_message_fragment="must contain SQL after FUNCTION(...)",
         ),
@@ -272,7 +272,7 @@ def test_given_declaration_files_when_discovering_then_inputs_or_failures_are_ex
         DeepDeclarationHeaderTestCase(
             description="a constant value nested 1k levels",
             kind="constant",
-            relative_path="constants/limits.sql",
+            relative_path="sql/constants/limits.sql",
             prefix="CONSTANT (name cap, value 3);\nCONSTANT (\n  name regions,\n  value ",
             suffix=",\n);\n",
             depth=1_000,
@@ -282,7 +282,7 @@ def test_given_declaration_files_when_discovering_then_inputs_or_failures_are_ex
         DeepDeclarationHeaderTestCase(
             description="a hook description nested 20k levels",
             kind="sql_hook",
-            relative_path="hooks/sql/refresh.sql",
+            relative_path="sql/hooks/sql/refresh.sql",
             prefix="HOOK (\n  description ",
             suffix=",\n);\n\nSELECT 1\n",
             depth=20_000,
@@ -292,7 +292,7 @@ def test_given_declaration_files_when_discovering_then_inputs_or_failures_are_ex
         DeepDeclarationHeaderTestCase(
             description="a function return type nested 100k levels",
             kind="sql_function",
-            relative_path="functions/sql/doubled.sql",
+            relative_path="sql/functions/sql/doubled.sql",
             prefix='FUNCTION (\n  description "Doubles",\n  returns ',
             suffix=",\n);\nSELECT 2\n",
             depth=100_000,
@@ -302,7 +302,7 @@ def test_given_declaration_files_when_discovering_then_inputs_or_failures_are_ex
         DeepDeclarationHeaderTestCase(
             description="a later audit block's value nested 100k levels",
             kind="audit",
-            relative_path="audits/generic/is_true.sql",
+            relative_path="sql/audits/generic/is_true.sql",
             prefix="AUDIT (name first);\nSELECT 1\nAUDIT (\n  name second,\n  value ",
             suffix=",\n);\nSELECT 2\n",
             depth=100_000,
@@ -338,12 +338,12 @@ def test_given_deeply_nested_declaration_header_when_discovering_then_its_line_i
             description="broken files of every kind become the same faults",
             files=(
                 *_EVERY_KIND,
-                ("enums/broken.sql", b"ENUM (name broken);\n"),
-                ("constants/broken.sql", b"CONSTANT (name Broken, value 1);\n"),
-                ("schemas/broken.sql", b"SCHEMA (name broken_shape);\n"),
-                ("audits/generic/broken.sql", b"SELECT 1\n"),
-                ("hooks/sql/broken.sql", b"HOOK ();\n"),
-                ("functions/sql/broken.sql", b"SELECT 1\n"),
+                ("sql/enums/broken.sql", b"ENUM (name broken);\n"),
+                ("sql/constants/broken.sql", b"CONSTANT (name Broken, value 1);\n"),
+                ("sql/schemas/broken.sql", b"SCHEMA (name broken_shape);\n"),
+                ("sql/audits/generic/broken.sql", b"SELECT 1\n"),
+                ("sql/hooks/sql/broken.sql", b"HOOK ();\n"),
+                ("sql/functions/sql/broken.sql", b"SELECT 1\n"),
             ),
             expected_resource_faults=3,
             expected_declaration_faults=3,

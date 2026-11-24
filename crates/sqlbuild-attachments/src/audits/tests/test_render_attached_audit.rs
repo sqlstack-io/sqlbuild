@@ -37,7 +37,7 @@ fn given_attached_audits_when_rendering_then_python_rendering_is_returned() {
                 None,
             ),
             expected_rendering: failed(
-                "models/schema.yml audit 'accepted_values' must not override \
+                "sql/models/schema.yml audit 'accepted_values' must not override \
                  implicit column from attached context",
             ),
         },
@@ -76,14 +76,14 @@ fn given_attached_audits_when_rendering_then_python_rendering_is_returned() {
                 None,
             ),
             expected_rendering: failed(
-                "models/schema.yml audit 'accepted_values' must not override \
+                "sql/models/schema.yml audit 'accepted_values' must not override \
                  implicit column from attached context",
             ),
         },
         AttachedAuditTestCase {
             description: "an argument the audit SQL never reads names itself for removal",
             attachment: AuditAttachment {
-                definition_path: Some("audits/generic/accepted_values.sql".to_owned()),
+                definition_path: Some("sql/audits/generic/accepted_values.sql".to_owned()),
                 ..attachment(
                     vec![
                         values.clone(),
@@ -97,8 +97,8 @@ fn given_attached_audits_when_rendering_then_python_rendering_is_returned() {
                 )
             },
             expected_rendering: failed(
-                "models/schema.yml audit 'accepted_values' passes argument 'where_condition', \
-                 which the audit's SQL in audits/generic/accepted_values.sql never uses; remove \
+                "sql/models/schema.yml audit 'accepted_values' passes argument 'where_condition', \
+                 which the audit's SQL in sql/audits/generic/accepted_values.sql never uses; remove \
                  'where_condition' from the attachment",
             ),
         },
@@ -117,7 +117,7 @@ fn given_attached_audits_when_rendering_then_python_rendering_is_returned() {
                 )
             },
             expected_rendering: failed(
-                "models/schema.yml audit 'relationships' argument 'to' is customers, not a \
+                "sql/models/schema.yml audit 'relationships' argument 'to' is customers, not a \
                  relation reference; write to __ref(\"customers\") (or __source or __seed) so \
                  the audit reads the built relation and runs after it",
             ),
@@ -148,14 +148,14 @@ fn given_attached_audits_when_rendering_then_python_rendering_is_returned() {
             description: "a missing argument is Python's error before the policies",
             attachment: attachment(Vec::new(), Some("fatal"), None),
             expected_rendering: failed(
-                "models/schema.yml is missing argument 'values' for generic audit \
+                "sql/models/schema.yml is missing argument 'values' for generic audit \
                  'accepted_values'",
             ),
         },
         AttachedAuditTestCase {
             description: "a seed audit reading @model is told to read @relation",
             attachment: AuditAttachment {
-                owner_label: "seeds/waffle_types.yml".to_owned(),
+                owner_label: "sql/seeds/waffle_types.yml".to_owned(),
                 sql_body: "SELECT * FROM __ref(\"@model\") WHERE NOT (price_cents >= 0)".to_owned(),
                 implicit_arguments: vec![
                     ("seed".to_owned(), "waffle_types".to_owned()),
@@ -164,7 +164,7 @@ fn given_attached_audits_when_rendering_then_python_rendering_is_returned() {
                 ..attachment(Vec::new(), None, None)
             },
             expected_rendering: failed(
-                "seeds/waffle_types.yml is missing argument 'model' for generic audit \
+                "sql/seeds/waffle_types.yml is missing argument 'model' for generic audit \
                  'accepted_values'; a seed audit receives 'seed' and 'relation', not 'model', \
                  so read the attached relation with @relation",
             ),
@@ -180,7 +180,7 @@ fn given_attached_audits_when_rendering_then_python_rendering_is_returned() {
                 None,
             ),
             expected_rendering: failed(
-                "models/schema.yml generic audit 'accepted_values' argument \
+                "sql/models/schema.yml generic audit 'accepted_values' argument \
                  'values' uses an unsupported value",
             ),
         },
@@ -189,7 +189,7 @@ fn given_attached_audits_when_rendering_then_python_rendering_is_returned() {
             attachment: attachment(vec![values.clone()], Some("fatal"), Some("delta")),
             expected_rendering: rendered(
                 "SELECT * FROM t WHERE status NOT IN (1)",
-                Err("models/schema.yml audit \
+                Err("sql/models/schema.yml audit \
                  'accepted_values': unknown severity 'fatal'; valid values: warn, error"),
             ),
         },

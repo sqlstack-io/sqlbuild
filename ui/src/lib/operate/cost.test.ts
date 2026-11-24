@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { CatalogNode, RunCostRow } from '$lib/api';
-import { costByFolder, costSummary, formatQueryCost, runCostOf } from './cost';
+import type { RunCostRow } from '$lib/api';
+import { combinedSource, costSummary, costTitle, formatQueryCost, runCostOf } from './cost';
 
 const row = (overrides: Partial<RunCostRow>): RunCostRow => ({
+	priceSource: overrides.usd === null ? null : 'config',
 	nodeKey: `${overrides.resourceType ?? 'model'}:${overrides.resourceName ?? 'orders'}`,
 	buildRunId: 'b1',
 	resourceType: 'model',
@@ -77,25 +78,20 @@ describe('what the cost figure says', () => {
 	});
 });
 
-describe('cost by folder', () => {
-	const node = (key: string, path: string, group: string | null = null) => ({ key, kind: 'model', path, group }) as unknown as CatalogNode;
-	const nodes = [node('model:stg_orders', 'models/staging/orders/stg_orders.sql'), node('model:stg_items', 'models/staging/stg_items.sql'), node('model:fct_revenue', 'models/finance/fct_revenue.sql', 'marts/finance')];
-
-	it('sums nodes under their outermost folder, honours declared groups and keeps removed nodes', () => {
-		const folders = costByFolder(
-			[
-				{ key: 'model:fct_revenue', credits: 0.5, usd: 1.5, seconds: 900, runs: 2 },
-				{ key: 'model:stg_orders', credits: 0.3, usd: 0.9, seconds: 540, runs: 3 },
-				{ key: 'model:stg_items', credits: 0.4, usd: null, seconds: 720, runs: 3 },
-				{ key: 'model:dropped', credits: 0.05, usd: 0.15, seconds: 90, runs: 1 }
-			],
-			nodes
-		);
-		expect(folders.map((f) => [f.key, f.nodes, f.usd])).toEqual([
-			['staging', 2, null],
-			['marts', 1, 1.5],
-			['other', 1, 0.15]
-		]);
-		expect(folders[0].credits).toBeCloseTo(0.7);
+describe('prices and their sources', () => {
+	it('marks dollars at a list price as an estimate, and names the source in the tooltip', () => {
+		expect(formatQueryCost({ credits: 1, usd: 3.9, priceSource: 'list_price' })).toBe('$3.90 est.');
+		expect(formatQueryCost({ credits: 1, usd: 2.73, priceSource: 'rate_sheet' })).toBe('$2.73');
+		expect(costTitle({ credits: 2, usd: 7.8, priceSource: 'list_price' })).toBe("2.000 credits × $3.90 per credit (Snowflake's list price for the account's region (an estimate))");
+		expect(costTitle({ credits: 2, usd: null, priceSource: null })).toBeUndefined();
+	});
+	it('reads several sources as one: theirs, the list price when any is one, else mixed', () => {
+		expect(combinedSource(['config', 'config', null])).toBe('config');
+		expect(combinedSource(['config', 'list_price'])).toBe('list_price');
+		expect(combinedSource(['config', 'rate_sheet'])).toBe('mixed');
+		expect(combinedSource([null])).toBeNull();
+	});
+	it("gives a run's breakdown its rows' source", () => {
+		expect(runCostOf([row({ resourceType: '_total', resourceName: 'b1', nodeKey: null, priceSource: 'list_price' }), row({ priceSource: 'list_price' })]).priceSource).toBe('list_price');
 	});
 });

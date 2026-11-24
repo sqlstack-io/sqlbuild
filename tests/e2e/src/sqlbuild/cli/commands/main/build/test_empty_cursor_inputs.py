@@ -102,8 +102,8 @@ _REVENUE_ROWS_SQL: str = (
 )
 _LOADED_REVENUE_ROWS: tuple[tuple[object, ...], ...] = (("2026-04-01", 1200), ("2026-04-02", 1650))
 _EMPTIED_MODELS: dict[str, str] = {
-    "models/daily_revenue.sql": _DAILY_REVENUE_SQL,
-    "models/revenue_summary.sql": _REVENUE_SUMMARY_SQL,
+    "sql/models/daily_revenue.sql": _DAILY_REVENUE_SQL,
+    "sql/models/revenue_summary.sql": _REVENUE_SUMMARY_SQL,
 }
 _ALIASED_REPLAY_SQL: str = dedent(
     """
@@ -170,21 +170,21 @@ _STAGED_REVENUE_SQL: str = dedent(
     """
 ).lstrip()
 _SAME_RUN_MODELS: dict[str, str] = {
-    "models/stg_payments.sql": dedent(
+    "sql/models/stg_payments.sql": dedent(
         """
         MODEL (description "Payments staged for reporting", materialized view);
 
         SELECT payment_id, paid_at, amount_cents FROM __source("raw_payments")
         """
     ).lstrip(),
-    "models/stg_refunds.sql": dedent(
+    "sql/models/stg_refunds.sql": dedent(
         """
         MODEL (description "Refunds staged for reporting", materialized view);
 
         SELECT refund_id, refunded_at, amount_cents FROM __source("raw_refunds")
         """
     ).lstrip(),
-    "models/daily_revenue.sql": dedent(
+    "sql/models/daily_revenue.sql": dedent(
         """
         MODEL (
           description "Daily revenue net of refunds, from staged inputs",
@@ -208,7 +208,7 @@ _EMPTY_REFUNDS_SQL: str = (
     "DELETE FROM main.raw_refunds; "
     "INSERT INTO main.raw_payments VALUES (2, '2026-04-02 10:00:00', 1650)"
 )
-_NO_INPUTS_MODELS: dict[str, str] = {"models/finance/daily_revenue.sql": _NO_INPUTS_SQL}
+_NO_INPUTS_MODELS: dict[str, str] = {"sql/models/finance/daily_revenue.sql": _NO_INPUTS_SQL}
 
 
 @pytest.mark.parametrize(
@@ -236,7 +236,7 @@ def test_given_empty_source_when_building_first_then_creates_empty_table_and_nex
     tmp_path: Path,
 ) -> None:
     project_dir: Path = prepare_empty_cursor_inputs_project(
-        tmp_path=tmp_path, models={"models/daily_revenue.sql": test_case.model_sql}
+        tmp_path=tmp_path, models={"sql/models/daily_revenue.sql": test_case.model_sql}
     )
 
     first: subprocess.CompletedProcess[str] = run_empty_cursor_command(
@@ -369,7 +369,7 @@ def test_given_emptied_source_when_planning_json_then_reports_no_input_rows(
     tmp_path: Path,
 ) -> None:
     project_dir: Path = prepare_empty_cursor_inputs_project(
-        tmp_path=tmp_path, models={"models/daily_revenue.sql": _DAILY_REVENUE_SQL}
+        tmp_path=tmp_path, models={"sql/models/daily_revenue.sql": _DAILY_REVENUE_SQL}
     )
     load_empty_cursor_payments(project_dir=project_dir)
     build_empty_cursor_project(project_dir=project_dir)
@@ -399,7 +399,7 @@ def test_given_emptied_source_when_planning_json_then_reports_no_input_rows(
             expected_output_fragments=(
                 "error[P011]: incremental model 'daily_revenue' reads no inputs, so builds "
                 "after the first cannot work out their cursor window",
-                "--> models/finance/daily_revenue.sql:5:3",
+                "--> sql/models/finance/daily_revenue.sql:5:3",
                 "cursor revenue_date,",
                 "^^^^^^^^^^^^^^^^^^^",
                 "help: read the data through __ref(), __source() or __seed() so its cursor can "
@@ -468,7 +468,7 @@ def test_given_cursor_model_without_inputs_when_compiling_json_then_locates_curs
     assert test_case.expected_json_location is not None
     line, column, end_column = test_case.expected_json_location
     assert diagnostic["location"] == {
-        "path": "models/finance/daily_revenue.sql",
+        "path": "sql/models/finance/daily_revenue.sql",
         "line": line,
         "column": column,
         "end_line": line,
@@ -495,7 +495,7 @@ def test_given_failing_incremental_build_when_building_then_delta_relation_is_ke
     tmp_path: Path,
 ) -> None:
     project_dir: Path = prepare_empty_cursor_inputs_project(
-        tmp_path=tmp_path, models={"models/daily_revenue.sql": _DAILY_REVENUE_SQL}
+        tmp_path=tmp_path, models={"sql/models/daily_revenue.sql": _DAILY_REVENUE_SQL}
     )
     load_empty_cursor_payments(project_dir=project_dir)
     build_empty_cursor_project(project_dir=project_dir)
@@ -742,14 +742,14 @@ def test_given_empty_input_built_in_same_run_when_building_then_labels_it_by_pro
     project_dir: Path = prepare_empty_cursor_inputs_project(
         tmp_path=tmp_path,
         models={
-            "models/stg_payments.sql": _STG_PAYMENTS_SQL,
-            "models/daily_revenue.sql": _STAGED_REVENUE_SQL,
+            "sql/models/stg_payments.sql": _STG_PAYMENTS_SQL,
+            "sql/models/daily_revenue.sql": _STAGED_REVENUE_SQL,
         },
     )
     load_empty_cursor_payments(project_dir=project_dir)
     build_empty_cursor_project(project_dir=project_dir)
     execute_empty_cursor_sql(project_dir=project_dir, sql="DELETE FROM main.raw_payments")
-    (project_dir / "models" / "stg_payments.sql").write_text(
+    (project_dir / "sql" / "models" / "stg_payments.sql").write_text(
         test_case.changed_upstream_sql, encoding="utf-8"
     )
 

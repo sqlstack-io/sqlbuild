@@ -84,6 +84,8 @@ pub struct OutputSegment {
     pub node_key: Option<String>,
     pub stream: OutputStream,
     pub text: String,
+    /// When the worker read these lines from the command's output, to the millisecond.
+    pub read_at: chrono::DateTime<chrono::Utc>,
     /// Bytes the worker dropped just before these lines because it could not send them fast enough.
     #[serde(default)]
     pub dropped_bytes: u64,
@@ -302,6 +304,7 @@ pub(crate) struct PreparedSegment {
     pub(crate) line_count: i64,
     pub(crate) text_offset: i64,
     pub(crate) text_bytes: i64,
+    pub(crate) read_at: chrono::DateTime<chrono::Utc>,
     /// Each marked line's offset within the segment, level and text.
     pub(crate) marks: Vec<(i64, OutputLevel, String)>,
 }
@@ -317,7 +320,7 @@ pub(crate) struct StoredSegment {
     pub(crate) text_bytes: i64,
     pub(crate) object_key: String,
     pub(crate) chunk_text_bytes: i64,
-    pub(crate) received_at: chrono::DateTime<chrono::Utc>,
+    pub(crate) read_at: chrono::DateTime<chrono::Utc>,
 }
 
 /// A node's line count and its marks so far in one stream, before a segment adds to them.

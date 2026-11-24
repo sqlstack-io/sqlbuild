@@ -126,7 +126,7 @@ def build_test_and_project(
                 ),
                 deps=dependencies,
                 name=model_name,
-                relative_path=Path(f"models/{model_name}.sql"),
+                relative_path=Path(f"sql/models/{model_name}.sql"),
                 query_sql=query_sql,
                 config=CompileModelConfig(),
                 destination=CompiledRelationLocation(

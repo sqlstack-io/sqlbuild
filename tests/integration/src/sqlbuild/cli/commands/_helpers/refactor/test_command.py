@@ -18,19 +18,19 @@ _PROJECT_FILES: dict[str, str] = {
         '[connection]\ndatabase = "orders.duckdb"\n\n'
         '[targets.dev]\nschema = "analytics"\n'
     ),
-    "seeds/orders.csv": "order_id,amount\n1,25\n2,40\n",
-    "seeds/orders.yml": (
+    "sql/seeds/orders.csv": "order_id,amount\n1,25\n2,40\n",
+    "sql/seeds/orders.yml": (
         "seeds:\n"
         "  - name: orders\n    description: Test seed orders.\n"
         "    columns:\n"
         "      - name: order_id\n        type: INTEGER\n"
         "      - name: amount\n        type: INTEGER\n"
     ),
-    "models/staging/stg_orders.sql": (
+    "sql/models/staging/stg_orders.sql": (
         "MODEL (description 'Test model.',\n  materialized view,\n);\n\n"
         'SELECT\n  order_id,\n  amount\nFROM __seed("orders")\n'
     ),
-    "models/marts/fact_orders.sql": (
+    "sql/models/marts/fact_orders.sql": (
         "MODEL (description 'Test model.',\n  materialized table,\n);\n\n"
         'SELECT\n  order_id,\n  amount\nFROM __ref("stg_orders")\n'
     ),
@@ -45,7 +45,7 @@ _PROJECT_FILES: dict[str, str] = {
             command=CliCommand.MV,
             target="model:fact_orders",
             new_name=None,
-            destination="models/finance/fact_orders.sql",
+            destination="sql/models/finance/fact_orders.sql",
             expected_lines=(
                 "Planned edits to 1 file.",
                 "Writing 1 file...",
@@ -121,7 +121,7 @@ def test_given_refactor_when_running_then_progress_messages_agree_in_number(
             target="stg_orders.amount",
             new_name="revenue",
             destination=None,
-            expected_path="models/marts/fact_orders.sql",
+            expected_path="sql/models/marts/fact_orders.sql",
             expected_fragment="revenue AS amount",
             expected_missing_paths=(),
         ),
@@ -130,10 +130,10 @@ def test_given_refactor_when_running_then_progress_messages_agree_in_number(
             command=CliCommand.MV,
             target="fact_orders",
             new_name=None,
-            destination="models/finance/",
-            expected_path="models/finance/fact_orders.sql",
+            destination="sql/models/finance/",
+            expected_path="sql/models/finance/fact_orders.sql",
             expected_fragment='FROM __ref("stg_orders")',
-            expected_missing_paths=("models/marts/fact_orders.sql",),
+            expected_missing_paths=("sql/models/marts/fact_orders.sql",),
         ),
     ],
     ids=lambda case: case.description,

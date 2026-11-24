@@ -91,7 +91,7 @@ def test_given_successful_callable_when_result_persistence_fails_then_resource_o
     )
     node: DiscoveredAssetFunction = DiscoveredAssetFunction(
         file_path=Path("/project/tasks/orders.py"),
-        relative_path=Path("python/tasks/orders.py"),
+        relative_path=Path("python/nodes/tasks/orders.py"),
         name="persist_orders",
         function=lambda: "ok",
     )
@@ -144,7 +144,7 @@ def test_given_successful_callable_when_owned_finalizer_fails_then_resource_only
     dispatcher.subscribe_lifecycle(subscriber=events.append, accepts_opaque=False)
     node: DiscoveredAssetFunction = DiscoveredAssetFunction(
         file_path=Path("/project/tasks/orders.py"),
-        relative_path=Path("python/tasks/orders.py"),
+        relative_path=Path("python/nodes/tasks/orders.py"),
         name="finalize_orders",
         function=lambda: "ok",
     )
@@ -197,13 +197,13 @@ def test_given_task_asset_chain_when_executing_python_nodes_then_records_results
     nodes: tuple[DiscoveredAssetFunction | DiscoveredAssetFunction, ...] = (
         DiscoveredAssetFunction(
             file_path=Path("/project/tasks/orders.py"),
-            relative_path=Path("python/tasks/orders.py"),
+            relative_path=Path("python/nodes/tasks/orders.py"),
             name="fetch_orders",
             function=fetch_orders,
         ),
         DiscoveredAssetFunction(
             file_path=Path("/project/assets/orders.py"),
-            relative_path=Path("python/assets/orders.py"),
+            relative_path=Path("python/nodes/assets/orders.py"),
             name="export_orders",
             function=export_orders,
             depends_on=(fetch_orders,),
@@ -259,13 +259,13 @@ def test_given_provider_parameters_when_executing_python_nodes_then_providers_ar
     nodes: tuple[DiscoveredAssetFunction | DiscoveredAssetFunction, ...] = (
         DiscoveredAssetFunction(
             file_path=Path("/project/tasks/provider.py"),
-            relative_path=Path("python/tasks/provider.py"),
+            relative_path=Path("python/nodes/tasks/provider.py"),
             name="provider_task",
             function=provider_task,
         ),
         DiscoveredAssetFunction(
             file_path=Path("/project/assets/provider.py"),
-            relative_path=Path("python/assets/provider.py"),
+            relative_path=Path("python/nodes/assets/provider.py"),
             name="provider_asset",
             function=provider_asset,
         ),
@@ -317,13 +317,13 @@ def test_given_provider_container_when_executing_python_nodes_then_context_expos
     nodes: tuple[DiscoveredAssetFunction | DiscoveredAssetFunction, ...] = (
         DiscoveredAssetFunction(
             file_path=Path("/project/tasks/provider.py"),
-            relative_path=Path("python/tasks/provider.py"),
+            relative_path=Path("python/nodes/tasks/provider.py"),
             name="context_provider_task",
             function=context_provider_task,
         ),
         DiscoveredAssetFunction(
             file_path=Path("/project/assets/provider.py"),
-            relative_path=Path("python/assets/provider.py"),
+            relative_path=Path("python/nodes/assets/provider.py"),
             name="context_provider_asset",
             function=context_provider_asset,
         ),
@@ -377,13 +377,13 @@ def test_given_missing_provider_container_when_executing_python_nodes_then_failu
     nodes: tuple[DiscoveredAssetFunction | DiscoveredAssetFunction, ...] = (
         DiscoveredAssetFunction(
             file_path=Path("/project/tasks/provider.py"),
-            relative_path=Path("python/tasks/provider.py"),
+            relative_path=Path("python/nodes/tasks/provider.py"),
             name="provider_task",
             function=provider_task,
         ),
         DiscoveredAssetFunction(
             file_path=Path("/project/assets/provider.py"),
-            relative_path=Path("python/assets/provider.py"),
+            relative_path=Path("python/nodes/assets/provider.py"),
             name="provider_asset",
             function=provider_asset,
         ),
@@ -435,7 +435,7 @@ def test_given_missing_context_provider_when_executing_python_node_then_failure_
         nodes=(
             DiscoveredAssetFunction(
                 file_path=Path("/project/tasks/provider.py"),
-                relative_path=Path("python/tasks/provider.py"),
+                relative_path=Path("python/nodes/tasks/provider.py"),
                 name="missing_context_provider_task",
                 function=missing_context_provider_task,
             ),
@@ -483,13 +483,13 @@ def test_given_ready_python_node_when_executing_then_uses_existing_run_state(
     run_state: PythonNodeRunState = PythonNodeRunState()
     task_node: DiscoveredAssetFunction = DiscoveredAssetFunction(
         file_path=Path("/project/tasks/orders.py"),
-        relative_path=Path("python/tasks/orders.py"),
+        relative_path=Path("python/nodes/tasks/orders.py"),
         name="fetch_orders",
         function=fetch_orders,
     )
     asset_node: DiscoveredAssetFunction = DiscoveredAssetFunction(
         file_path=Path("/project/assets/orders.py"),
-        relative_path=Path("python/assets/orders.py"),
+        relative_path=Path("python/nodes/assets/orders.py"),
         name="export_orders",
         function=export_orders,
         depends_on=(fetch_orders,),
@@ -574,7 +574,7 @@ def test_given_cursor_overrides_when_executing_python_nodes_then_context_receive
     nodes: tuple[DiscoveredAssetFunction | DiscoveredAssetFunction, ...] = (
         DiscoveredAssetFunction(
             file_path=Path("/project/tasks/orders.py"),
-            relative_path=Path("python/tasks/orders.py"),
+            relative_path=Path("python/nodes/tasks/orders.py"),
             name="cursor_window",
             function=cursor_window,
         ),
@@ -626,13 +626,13 @@ def test_given_hard_skipped_upstream_when_executing_python_nodes_then_skips_down
     nodes: tuple[DiscoveredAssetFunction | DiscoveredAssetFunction, ...] = (
         DiscoveredAssetFunction(
             file_path=Path("/project/tasks/orders.py"),
-            relative_path=Path("python/tasks/orders.py"),
+            relative_path=Path("python/nodes/tasks/orders.py"),
             name="skip_empty_orders",
             function=hard_skip_empty_orders,
         ),
         DiscoveredAssetFunction(
             file_path=Path("/project/assets/orders.py"),
-            relative_path=Path("python/assets/orders.py"),
+            relative_path=Path("python/nodes/assets/orders.py"),
             name="export_after_skip",
             function=export_after_skip,
             depends_on=(hard_skip_empty_orders,),
@@ -718,26 +718,26 @@ def test_given_mixed_python_skips_when_executing_nodes_then_fan_in_matches_mode(
     nodes: tuple[DiscoveredAssetFunction | DiscoveredAssetFunction, ...] = (
         DiscoveredAssetFunction(
             file_path=Path("/project/tasks/orders.py"),
-            relative_path=Path("python/tasks/orders.py"),
+            relative_path=Path("python/nodes/tasks/orders.py"),
             name="skip_empty_orders",
             function=skip_function,
         ),
         DiscoveredAssetFunction(
             file_path=Path("/project/tasks/sibling.py"),
-            relative_path=Path("python/tasks/sibling.py"),
+            relative_path=Path("python/nodes/tasks/sibling.py"),
             name="successful_sibling",
             function=successful_sibling,
         ),
         DiscoveredAssetFunction(
             file_path=Path("/project/assets/intermediate.py"),
-            relative_path=Path("python/assets/intermediate.py"),
+            relative_path=Path("python/nodes/assets/intermediate.py"),
             name="export_after_skip",
             function=export_after_skip,
             depends_on=(skip_function,),
         ),
         DiscoveredAssetFunction(
             file_path=Path("/project/assets/final.py"),
-            relative_path=Path("python/assets/final.py"),
+            relative_path=Path("python/nodes/assets/final.py"),
             name="export_after_mixed_skip",
             function=export_after_mixed_skip,
             depends_on=(export_after_skip, successful_sibling),
@@ -786,13 +786,13 @@ def test_given_failed_upstream_when_executing_python_nodes_then_blocks_downstrea
     nodes: tuple[DiscoveredAssetFunction | DiscoveredAssetFunction, ...] = (
         DiscoveredAssetFunction(
             file_path=Path("/project/tasks/orders.py"),
-            relative_path=Path("python/tasks/orders.py"),
+            relative_path=Path("python/nodes/tasks/orders.py"),
             name="fail_orders",
             function=fail_orders,
         ),
         DiscoveredAssetFunction(
             file_path=Path("/project/assets/orders.py"),
-            relative_path=Path("python/assets/orders.py"),
+            relative_path=Path("python/nodes/assets/orders.py"),
             name="export_after_failure",
             function=export_after_failure,
             depends_on=(fail_orders,),
@@ -848,7 +848,7 @@ def test_given_retry_policy_when_transient_failures_then_retries_and_succeeds(
     nodes: tuple[DiscoveredAssetFunction | DiscoveredAssetFunction, ...] = (
         DiscoveredAssetFunction(
             file_path=Path("/project/tasks/orders.py"),
-            relative_path=Path("python/tasks/orders.py"),
+            relative_path=Path("python/nodes/tasks/orders.py"),
             name="flaky_task",
             function=flaky_task,
             retry=RetryPolicy(
@@ -973,7 +973,7 @@ def test_given_retry_policy_when_attempts_exhausted_then_records_final_exception
     nodes: tuple[DiscoveredAssetFunction | DiscoveredAssetFunction, ...] = (
         DiscoveredAssetFunction(
             file_path=Path("/project/tasks/orders.py"),
-            relative_path=Path("python/tasks/orders.py"),
+            relative_path=Path("python/nodes/tasks/orders.py"),
             name="flaky_task",
             function=flaky_task,
             retry=RetryPolicy(
@@ -1032,7 +1032,7 @@ def test_given_retry_policy_when_exception_is_not_selected_then_does_not_retry(
     nodes: tuple[DiscoveredAssetFunction | DiscoveredAssetFunction, ...] = (
         DiscoveredAssetFunction(
             file_path=Path("/project/tasks/orders.py"),
-            relative_path=Path("python/tasks/orders.py"),
+            relative_path=Path("python/nodes/tasks/orders.py"),
             name="flaky_task",
             function=flaky_task,
             retry=RetryPolicy(max_attempts=3, retry_on=TimeoutError, jitter=False),
@@ -1086,7 +1086,7 @@ def test_given_retry_policy_when_backoff_exceeds_cap_then_sleep_is_capped(
     nodes: tuple[DiscoveredAssetFunction | DiscoveredAssetFunction, ...] = (
         DiscoveredAssetFunction(
             file_path=Path("/project/tasks/orders.py"),
-            relative_path=Path("python/tasks/orders.py"),
+            relative_path=Path("python/nodes/tasks/orders.py"),
             name="flaky_task",
             function=flaky_task,
             retry=RetryPolicy(

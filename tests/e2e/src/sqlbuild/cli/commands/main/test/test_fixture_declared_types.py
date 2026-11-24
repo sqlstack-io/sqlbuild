@@ -17,13 +17,13 @@ _PROJECT_FILES: dict[str, str] = {
         'name = "fixture_types"\nadapter = "duckdb"\n\n'
         '[connection]\ndatabase = "fixture_types.duckdb"\n'
     ),
-    "sources/raw_orders.yml": (
+    "sql/sources/raw_orders.yml": (
         "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
         "    schema: main\n    table: raw_orders\n    columns:\n"
         "      - name: order_id\n        type: INTEGER\n"
         "      - name: ordered_on\n        type: DATE\n"
     ),
-    "models/order_years.sql": (
+    "sql/models/order_years.sql": (
         "MODEL (description 'Test model order_years.');\n"
         'SELECT o.order_id, YEAR(o.ordered_on) AS order_year FROM __source("raw_orders") AS o\n'
     ),

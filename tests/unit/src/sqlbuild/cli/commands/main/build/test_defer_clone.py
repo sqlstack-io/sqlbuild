@@ -136,7 +136,7 @@ def test_given_disabled_model_in_defer_clone_scope_when_counting_then_only_enabl
             key=keys_by_name[name],
             deps=(),
             name=name,
-            relative_path=Path(f"models/{name}.sql"),
+            relative_path=Path(f"sql/models/{name}.sql"),
             query_sql="SELECT 1 AS id",
             config=CompileModelConfig(values={"enabled": enabled}),
             destination=CompiledRelationLocation(

@@ -11,8 +11,10 @@
 
 	import type { FolderBoxData } from './folder-graph';
 	import { clickGuard } from './click-guard';
+	import type { DiscoveredBox } from './job-graph';
+	import { discoveredStatusLabel, discoveredStatusTone } from '$lib/platform/labels';
 
-	type JobBoxData = { jobKey: string; nodeCount: number; drawnElsewhere: number; collapsed: boolean; ontoggle?: (jobKey: string) => void; lastRun?: RunRef | null };
+	type JobBoxData = { jobKey: string; nodeCount: number; drawnElsewhere: number; collapsed: boolean; ontoggle?: (jobKey: string) => void; lastRun?: RunRef | null; discovered?: DiscoveredBox };
 
 	// A job group's member box, or an open lineage folder, whose header closes it.
 	let { data }: NodeProps = $props();
@@ -23,7 +25,7 @@
 	const close = (e: MouseEvent) => guard.still(e) && folder?.ontoggle?.(folder.folder);
 </script>
 
-<div class="box" class:collapsed={!folder && d.collapsed}>
+<div class="box" class:collapsed={!folder && d.collapsed} class:discovered={!folder && !!d.discovered && !d.collapsed}>
 	<Handle type="target" position={Position.Left} class="box-handle" />
 	{#if folder}
 		<!-- Zoomed out, the header's target grows upward so it stays at least its height on screen. -->
@@ -35,6 +37,22 @@
 			<ChevronDownIcon size={14} class="chevron" />
 			<span class="name" title={folder.folder}>{folder.label}</span>
 			<span class="faint">· {plural(folder.nodeCount, folder.noun ?? 'node')}{#if folder.stale} · <span class="stale">{folder.stale} stale</span>{/if}{#if folder.failed} · <span class="failed">{folder.failed} failed</span>{/if}</span>
+		</button>
+	{:else if d.discovered}
+		{@const set = d.discovered}
+		<!-- A discovered set's header; the whole header collapses or expands the set. -->
+		<!-- raw-button: the header of a discovered set's frame on the canvas; it must not start a drag -->
+		<button
+			class="head set-head nodrag"
+			aria-expanded={!d.collapsed}
+			aria-label="{d.collapsed ? 'Expand' : 'Collapse'} discovered set {set.set}"
+			title="{d.collapsed ? 'Expand' : 'Collapse'} discovered set {set.set} (asset {d.jobKey})"
+			onclick={() => d.ontoggle?.(d.jobKey)}
+		>
+			{#if d.collapsed}<ChevronRightIcon size={14} class="chevron" />{:else}<ChevronDownIcon size={14} class="chevron" />{/if}
+			<span class="name">{set.set}</span>
+			<span class="faint">· discovered set · {plural(d.nodeCount, 'step')}{#if set.release} · release <span class="mono-faint" title={set.releaseFull ?? undefined}>{set.release}</span>{/if}</span>
+			<span class="last" title="{discoveredStatusLabel[set.status]}{set.error ? ` (${set.error})` : ''}"><i style:background={discoveredStatusTone[set.status]}></i>{discoveredStatusLabel[set.status]}</span>
 		</button>
 	{:else}
 	<div class="head">
@@ -65,6 +83,25 @@
 		border: 1px solid var(--border-strong);
 		border-radius: 3px;
 		background: color-mix(in srgb, var(--card) 45%, transparent);
+	}
+	/* An open discovered set's title sits on its frame, at a size that reads at any zoom. */
+	.discovered {
+		border-style: dashed;
+		border-color: color-mix(in srgb, var(--primary) 45%, var(--border-strong));
+		background: color-mix(in srgb, var(--primary) 4%, transparent);
+	}
+	.discovered .head {
+		position: absolute;
+		bottom: 100%;
+		left: -1px;
+		width: max-content;
+		max-width: calc(100% / var(--sb-unzoom, 1));
+		border: 1px solid color-mix(in srgb, var(--primary) 45%, var(--border-strong));
+		border-bottom: 0;
+		border-radius: 3px 3px 0 0;
+		background: var(--card);
+		transform: scale(var(--sb-unzoom, 1));
+		transform-origin: bottom left;
 	}
 	.collapsed .head {
 		border-bottom: 0;
@@ -126,6 +163,31 @@
 	}
 	.failed {
 		color: var(--sb-error);
+	}
+	.set-head {
+		width: 100%;
+		gap: 6px;
+		padding-left: 8px;
+		cursor: pointer;
+		text-align: left;
+	}
+	.set-head:hover {
+		background: var(--sb-hover);
+	}
+	.set-head:focus-visible {
+		outline: 2px solid var(--primary);
+		outline-offset: -2px;
+	}
+	.set-head :global(.chevron) {
+		flex: 0 0 auto;
+		color: var(--muted-foreground);
+	}
+	.set-head .name:hover {
+		color: inherit;
+	}
+	.mono-faint {
+		font-family: var(--font-mono);
+		font-size: 11.5px;
 	}
 	.name:hover,
 	.last:hover {

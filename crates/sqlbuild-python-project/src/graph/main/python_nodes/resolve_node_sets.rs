@@ -6,7 +6,7 @@ use crate::graph::_helpers::python_nodes::python_node_graph::explicit_python_nod
 use crate::graph::_helpers::python_nodes::python_selection::{
     allows_round_trips, project_sources, selection_graph,
 };
-use crate::graph::_helpers::python_nodes::set_dependencies::dependants;
+use crate::graph::_helpers::python_nodes::set_dependencies::{dependants, record_set_tag_failures};
 use crate::graph::models::NativeProjectGraph;
 use crate::job_settings::main::declared_jobs::declared_jobs;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
@@ -39,6 +39,7 @@ pub fn resolve_node_sets(
         } else {
             declared_jobs(&project_dir)?
         };
+        record_set_tag_failures(discovered, (native.get().graph(), &python), &found)?;
         let allow_warehouse_round_trips: bool = allows_round_trips(project)?;
         Some(compiler_guard(|| {
             Ok(resolve_node_set_dependencies(

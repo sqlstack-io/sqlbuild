@@ -55,7 +55,7 @@ def test_given_seed_watermark_when_seed_changes_then_incremental_consumes_new_hi
                 """
             ).strip()
             + "\n",
-            "seeds/schema.yml": (
+            "sql/seeds/schema.yml": (
                 "seeds:\n"
                 "  - name: order_events\n    description: Test seed order_events.\n"
                 "    columns:\n"
@@ -64,8 +64,8 @@ def test_given_seed_watermark_when_seed_changes_then_incremental_consumes_new_hi
                 "      - name: amount\n"
                 "        type: INTEGER\n"
             ),
-            "seeds/order_events.csv": test_case.initial_seed,
-            "models/order_events_incremental.sql": dedent(
+            "sql/seeds/order_events.csv": test_case.initial_seed,
+            "sql/models/order_events_incremental.sql": dedent(
                 """
                 MODEL (description "Test model order_events_incremental.",
                   materialized incremental,
@@ -101,7 +101,7 @@ def test_given_seed_watermark_when_seed_changes_then_incremental_consumes_new_hi
     assert plan_result.returncode == 0, plan_result.stdout + plan_result.stderr
     assert test_case.expected_plan_bounds in plan_result.stdout, plan_result.stdout
 
-    (project_dir / "seeds" / "order_events.csv").write_text(
+    (project_dir / "sql" / "seeds" / "order_events.csv").write_text(
         test_case.changed_seed, encoding="utf-8"
     )
     changed_result: subprocess.CompletedProcess[str] = run_sqb(

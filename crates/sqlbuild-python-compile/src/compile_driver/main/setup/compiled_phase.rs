@@ -1,5 +1,6 @@
 //! `compile_project_phase` with resolved arguments.
 
+use crate::compile_driver::_helpers::setup::compiled::publish_compiled;
 use crate::compile_driver::_helpers::setup::pipeline::reject_compile_errors;
 use crate::compile_driver::_helpers::setup::pipeline_entries::compile_analysis_selection;
 use crate::compile_driver::main::setup::build_compiled_project::build_compiled_project;
@@ -85,6 +86,7 @@ pub fn compiled_phase<'py>(
     }
     let project: Bound<'py, PyAny> = compiled?;
     reject_compile_errors(&project, &options, on_progress)?;
+    publish_compiled(&project, compile_seconds)?;
     progress(
         on_progress,
         &format!("Compiled project. ({compile_seconds:.2}s)"),

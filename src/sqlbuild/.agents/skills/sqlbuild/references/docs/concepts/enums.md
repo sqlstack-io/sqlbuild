@@ -11,21 +11,22 @@ reference during compilation, then renders the selected value as a safe SQL lite
 
 ## Create an enum
 
-Put project-wide enums under the top-level `enums/` directory. Files are discovered recursively, so
+Put project-wide enums under the top-level `sql/enums/` directory. Files are discovered recursively, so
 subdirectories can organize a large enum library without changing where the enums are available.
 
 ```text
 my_project/
-├── enums/
-│   ├── fulfillment/
-│   │   └── fulfillment_method.sql
-│   └── order_status.sql
-├── models/
+├── sql/
+│   ├── enums/
+│   │   ├── fulfillment/
+│   │   │   └── fulfillment_method.sql
+│   │   └── order_status.sql
+│   └── models/
 └── sqlbuild_project.toml
 ```
 
 ```sql
--- enums/fulfillment/fulfillment_method.sql
+-- sql/enums/fulfillment/fulfillment_method.sql
 ENUM (
   name fulfillment_method,
   members [DELIVERY, PICKUP, SHIPPING],

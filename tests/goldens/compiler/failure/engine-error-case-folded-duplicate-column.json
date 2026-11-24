@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "models/marts/customer_totals.sql model has duplicate column 'größe' (column names are case-insensitive)"
+     "message": "sql/models/marts/customer_totals.sql model has duplicate column 'größe' (column names are case-insensitive)"
     }
    ]
   }

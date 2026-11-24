@@ -50,9 +50,9 @@ pub(super) fn models() -> Vec<SelectableModel> {
         folder: folder.to_owned(),
     };
     vec![
-        model("orders", &["daily"], "models/staging"),
-        model("customers", &[], "models/staging/sub"),
-        model("report", &["daily"], "models/marts"),
+        model("orders", &["daily"], "sql/models/staging"),
+        model("customers", &[], "sql/models/staging/sub"),
+        model("report", &["daily"], "sql/models/marts"),
     ]
 }
 

@@ -22,14 +22,14 @@ from tests.unit.src.sqlbuild.compiler.discovery._helpers._test_types import (
         DiscoverLoaderFunctionsTestCase(
             description="discovers decorated source loaders from the python directory",
             files={
-                "python/loaders/github.py": """
+                "python/nodes/loaders/github/loader.py": """
 from sqlbuild.loaders import loader
 
 @loader
 def github_events(ctx):
     return []
 """,
-                "python/loaders/stripe.py": """
+                "python/nodes/loaders/stripe/loader.py": """
 from sqlbuild.loaders import loader
 
 @loader(destination="raw.customers")
@@ -49,7 +49,7 @@ def stripe_customers(ctx):
         DiscoverLoaderFunctionsTestCase(
             description="discovers intermediate loader write and schema metadata",
             files={
-                "python/loaders/events.py": """
+                "python/nodes/loaders/events/loader.py": """
 from sqlbuild.loaders import loader
 
 @loader(
@@ -66,6 +66,7 @@ from sqlbuild.loaders import loader
 def events(ctx):
     return []
 """,
+                "python/nodes/loaders/events/__init__.py": "from .loader import events\n",
             },
             expected_names=("events",),
             expected_targets=("staging.events",),
@@ -79,17 +80,27 @@ def events(ctx):
         DiscoverLoaderFunctionsTestCase(
             description="discovers loader dependencies from decorator metadata",
             files={
-                "python/loaders/events.py": """
-from sqlbuild.loaders import loader
-
-@loader
-def fetch_events(ctx):
-    return []
-
-@loader(depends_on=[fetch_events])
-def enriched_events(ctx):
-    return []
-""",
+                "python/nodes/loaders/events/fetch_events/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "\n"
+                    "\n"
+                    "@loader\n"
+                    "def fetch_events(ctx):\n"
+                    "    return []\n"
+                ),
+                "python/nodes/loaders/events/enriched_events/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "from python.nodes.loaders.events.fetch_events.loader import fetch_events\n"
+                    "\n"
+                    "\n"
+                    "@loader(depends_on=[fetch_events])\n"
+                    "def enriched_events(ctx):\n"
+                    "    return []\n"
+                ),
+                "python/nodes/loaders/events/__init__.py": (
+                    "from .fetch_events.loader import fetch_events\n"
+                    "from .enriched_events.loader import enriched_events\n"
+                ),
             },
             expected_names=("enriched_events", "fetch_events"),
             expected_targets=(None, None),
@@ -103,17 +114,27 @@ def enriched_events(ctx):
         DiscoverLoaderFunctionsTestCase(
             description="discovers explicit loader names and dependencies",
             files={
-                "python/loaders/events.py": """
-from sqlbuild.loaders import loader
-
-@loader(name="fetch_events")
-def make_fetch(ctx):
-    return []
-
-@loader(name="enriched_events", depends_on=[make_fetch])
-def make_enriched(ctx):
-    return []
-""",
+                "python/nodes/loaders/events/make_fetch/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "\n"
+                    "\n"
+                    '@loader(name="fetch_events")\n'
+                    "def make_fetch(ctx):\n"
+                    "    return []\n"
+                ),
+                "python/nodes/loaders/events/make_enriched/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "from python.nodes.loaders.events.make_fetch.loader import make_fetch\n"
+                    "\n"
+                    "\n"
+                    '@loader(name="enriched_events", depends_on=[make_fetch])\n'
+                    "def make_enriched(ctx):\n"
+                    "    return []\n"
+                ),
+                "python/nodes/loaders/events/__init__.py": (
+                    "from .make_fetch.loader import make_fetch\n"
+                    "from .make_enriched.loader import make_enriched\n"
+                ),
             },
             expected_names=("enriched_events", "fetch_events"),
             expected_targets=(None, None),
@@ -139,15 +160,16 @@ def make_enriched(ctx):
         DiscoverLoaderFunctionsTestCase(
             description="ignores undecorated functions and init files",
             files={
-                "python/loaders/__init__.py": "",
-                "python/loaders/helpers.py": "def helper(): return None\n",
-                "python/loaders/orders.py": """
+                "python/nodes/loaders/__init__.py": "",
+                "python/nodes/loaders/helpers.py": "def helper(): return None\n",
+                "python/nodes/loaders/orders/loader.py": """
 from sqlbuild.loaders import loader
 
 @loader
 def orders(ctx):
     return []
 """,
+                "python/nodes/loaders/orders/__init__.py": "from .loader import orders\n",
             },
             expected_names=("orders",),
             expected_targets=(None,),
@@ -202,7 +224,7 @@ def test_given_project_dir_when_discovering_loaders_then_returns_expected(
     [
         DiscoverLoaderFunctionsTestCase(
             description="raises clear error when loader file import fails",
-            files={"python/loaders/broken.py": "import missing_loader_dependency\n"},
+            files={"python/nodes/loaders/broken.py": "import missing_loader_dependency\n"},
             expected_names=(),
             expected_targets=(),
             expected_dependency_counts=(),
@@ -211,7 +233,7 @@ def test_given_project_dir_when_discovering_loaders_then_returns_expected(
             expected_unique_keys=(),
             expected_column_names=(),
             expected_contracts=(),
-            expected_error_fragment="Failed to import Python node file python/loaders/broken.py",
+            expected_error_fragment="Failed to import Python node file python/nodes/loaders/broken.py",
         )
     ],
     ids=lambda case: case.description,
@@ -237,23 +259,37 @@ def test_given_loader_import_error_when_discovering_loaders_then_raises_clear_er
         DiscoverLoaderFunctionsTestCase(
             description="loader descriptions come from the decorator or the docstring",
             files={
-                "python/loaders/orders.py": '''
-from sqlbuild.loaders import loader
-
-@loader
-def raw_orders(ctx):
-    """Orders from the storefront export."""
-    return []
-
-@loader(description="Refunds from the payments export")
-def raw_refunds(ctx):
-    """Ignored because the decorator wins."""
-    return []
-
-@loader
-def raw_returns(ctx):
-    return []
-''',
+                "python/nodes/loaders/orders/raw_orders/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "\n"
+                    "\n"
+                    "@loader\n"
+                    "def raw_orders(ctx):\n"
+                    '    """Orders from the storefront export."""\n'
+                    "    return []\n"
+                ),
+                "python/nodes/loaders/orders/raw_refunds/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "\n"
+                    "\n"
+                    '@loader(description="Refunds from the payments export")\n'
+                    "def raw_refunds(ctx):\n"
+                    '    """Ignored because the decorator wins."""\n'
+                    "    return []\n"
+                ),
+                "python/nodes/loaders/orders/raw_returns/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "\n"
+                    "\n"
+                    "@loader\n"
+                    "def raw_returns(ctx):\n"
+                    "    return []\n"
+                ),
+                "python/nodes/loaders/orders/__init__.py": (
+                    "from .raw_orders.loader import raw_orders\n"
+                    "from .raw_refunds.loader import raw_refunds\n"
+                    "from .raw_returns.loader import raw_returns\n"
+                ),
             },
             expected_names=("raw_orders", "raw_refunds", "raw_returns"),
             expected_descriptions=(

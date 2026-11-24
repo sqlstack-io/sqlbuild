@@ -11,20 +11,20 @@
      "message": "model:customer_totals depends on model:stg_orders through macro staged_orders()",
      "resource_type": "model",
      "resource_name": "customer_totals",
-     "path": "models/marts/_sqlbuild/_macros/python/orders.py",
+     "path": "sql/models/marts/_sqlbuild/_macros/python/orders.py",
      "help": "write the reference in the model, or pass it in: @py.staged_orders(__ref(\"stg_orders\"))\n  = help: the current value is [references] enforce_explicit = true (from sqlbuild_project.toml or its default); while migrating a project, to allow macro-generated references, set this in sqlbuild_project.toml:\n            [references]\n            enforce_explicit = false"
     }
    ]
   }
  ],
  "compiled": {
-  "models/marts/customer_totals.sql": [
+  "sql/models/marts/customer_totals.sql": [
    "SELECT customer_id, SUM(amount) AS total_amount",
    "FROM __ref(\"stg_orders\")",
    "GROUP BY customer_id",
    ""
   ],
-  "models/staging/stg_orders.sql": [
+  "sql/models/staging/stg_orders.sql": [
    "SELECT order_id, customer_id, amount, status",
    "FROM __source(\"raw_orders\")",
    ""
@@ -38,8 +38,8 @@
     "name": "customer_totals",
     "resource_type": "model",
     "package_name": "failure_corpus",
-    "path": "models/marts/customer_totals.sql",
-    "original_file_path": "models/marts/customer_totals.sql",
+    "path": "sql/models/marts/customer_totals.sql",
+    "original_file_path": "sql/models/marts/customer_totals.sql",
     "unique_id": "model.failure_corpus.customer_totals",
     "fqn": [
      "failure_corpus",
@@ -107,8 +107,8 @@
     "name": "stg_orders",
     "resource_type": "model",
     "package_name": "failure_corpus",
-    "path": "models/staging/stg_orders.sql",
-    "original_file_path": "models/staging/stg_orders.sql",
+    "path": "sql/models/staging/stg_orders.sql",
+    "original_file_path": "sql/models/staging/stg_orders.sql",
     "unique_id": "model.failure_corpus.stg_orders",
     "fqn": [
      "failure_corpus",
@@ -178,8 +178,8 @@
     "name": "raw_orders",
     "resource_type": "source",
     "package_name": "failure_corpus",
-    "path": "sources/raw.yml",
-    "original_file_path": "sources/raw.yml",
+    "path": "sql/sources/raw.yml",
+    "original_file_path": "sql/sources/raw.yml",
     "unique_id": "source.failure_corpus.raw_orders",
     "fqn": [
      "failure_corpus",
@@ -246,8 +246,8 @@
     "name": "staged_orders",
     "resource_type": "macro",
     "package_name": "failure_corpus",
-    "path": "models/marts/_sqlbuild/_macros/python/orders.py",
-    "original_file_path": "models/marts/_sqlbuild/_macros/python/orders.py",
+    "path": "sql/models/marts/_sqlbuild/_macros/python/orders.py",
+    "original_file_path": "sql/models/marts/_sqlbuild/_macros/python/orders.py",
     "unique_id": "macro.failure_corpus.staged_orders",
     "macro_sql": "def staged_orders() -> str:\n    \"\"\"Return the staged orders relation.\"\"\"\n    return '__ref(\"stg_orders\")'\n",
     "depends_on": {
@@ -256,7 +256,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "local",
-     "sqlbuild_scope_path": "models/marts"
+     "sqlbuild_scope_path": "sql/models/marts"
     },
     "docs": {
      "show": true,

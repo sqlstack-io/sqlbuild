@@ -25,19 +25,19 @@ _PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": (
         'name = "partner_feed"\nadapter = "duckdb"\n\n[connection]\ndatabase = "partner_feed.duckdb"\n'
     ),
-    "sources/raw.yml": (
+    "sql/sources/raw.yml": (
         "sources:\n"
         "  - name: raw_listings\n    description: Partner listings in quoted camelCase.\n"
         "    schema: main\n    table: raw_listings\n    columns:\n"
         "      - name: '\"listingId\"'\n        type: VARCHAR\n"
         "      - name: '\"unitPriceMinor\"'\n        type: BIGINT\n"
     ),
-    "models/stg_listings.sql": (
+    "sql/models/stg_listings.sql": (
         "MODEL (description 'Listings renamed to snake case.', materialized table);\n\n"
         'SELECT s."listingId" AS listing_id, s."unitPriceMinor" AS unit_price_minor\n'
         'FROM __source("raw_listings") AS s\n'
     ),
-    "models/listing_export.sql": (
+    "sql/models/listing_export.sql": (
         "MODEL (\n  description 'Listings in the partner feed format.',\n  materialized table,\n"
         "  columns (\n"
         '    "listingId" (type VARCHAR, nullable false, audits [not_null, unique]),\n'
@@ -136,7 +136,7 @@ def test_given_enforced_contract_on_quoted_alias_when_building_then_contract_and
         project_name="partner_feed",
         repo_files={
             **_PROJECT_FILES,
-            "models/listing_export.sql": (
+            "sql/models/listing_export.sql": (
                 "MODEL (\n  description 'Listings in the partner feed format.',\n"
                 "  materialized table,\n  contract enforced,\n"
                 f"  columns ({test_case.declared_name} (type VARCHAR),),\n);\n\n"
@@ -188,20 +188,20 @@ def test_given_quoted_configured_columns_when_building_twice_then_snapshot_and_b
         project_name="partner_feed",
         repo_files={
             "sqlbuild_project.toml": _PROJECT_FILES["sqlbuild_project.toml"],
-            "sources/raw.yml": (
+            "sql/sources/raw.yml": (
                 "sources:\n"
                 "  - name: raw_listings\n    description: Partner listings.\n"
                 "    schema: main\n    table: raw_listings\n"
                 "  - name: raw_listing_events\n    description: Partner listing events.\n"
                 "    schema: main\n    table: raw_listing_events\n"
             ),
-            "models/listing_history.sql": (
+            "sql/models/listing_history.sql": (
                 "MODEL (\n  description 'Listing price history.',\n  materialized snapshot,\n"
                 f"  unique_key [{test_case.unique_key}],\n  snapshot_strategy timestamp,\n"
                 "  updated_at '\"updatedAt\"',\n);\n\n"
                 'SELECT "listingId", "unitPriceMinor", "updatedAt" FROM __source("raw_listings")\n'
             ),
-            "models/listing_activity.sql": (
+            "sql/models/listing_activity.sql": (
                 "MODEL (\n  description 'Listing events by hour.',\n  materialized incremental,\n"
                 "  incremental_strategy delete_insert,\n  incremental_mode microbatch,\n"
                 "  microbatch_strategy watermark,\n  cursor_watermark_mode all,\n"

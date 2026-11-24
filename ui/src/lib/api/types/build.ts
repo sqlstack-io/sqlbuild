@@ -81,6 +81,27 @@ export type CatalogNode = {
 	checks: CheckCounts | null;
 };
 
+// ---- discovered sets ----
+
+/** One discovered set of the current snapshot, as `readDiscovered` reads it back, with the nodes its items became. */
+export type DiscoveredSet = {
+	name: string;
+	status: 'ok' | 'failed' | 'never';
+	items: number;
+	fetchedAt: Iso | null;
+	lastGoodAt: Iso | null;
+	digest: string | null;
+	/** Why the newest fetch failed, secrets masked. */
+	error: string | null;
+	checkEverySeconds: number | null;
+	/** The tags of the result the set serves, such as `release` and `plan_digest`. */
+	tags: Record<string, string>;
+	/** The `for_each` assets reading the set. */
+	assets: string[];
+	/** Each item's node, with the item's arguments. */
+	nodes: { key: string; asset: string; step: string; args: Record<string, string> }[];
+};
+
 // ---- node states ----
 
 /** A node's build state, the part of a catalog node that changes between publications. */
@@ -416,8 +437,6 @@ export type OverviewMetrics = {
 	checks: CheckCounts;
 	/** Distinct stale nodes, and how many are changed or behind (a node can be both); null when the server reports no project-wide build state, and `sources` null when source freshness is not checked. */
 	stale: { nodes: number; changed: number; behind: number; sources: number | null } | null;
-	/** Null when the adapter has no cost data. */
-	cost: { last24h: number; baseline: number; baselineDays: number; unit: CostUnit } | null;
 };
 
 /** Build status per group: current, stale (changed or behind) and failed. */

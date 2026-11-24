@@ -7,6 +7,7 @@ pub mod interrupted;
 pub mod log_debug_message;
 pub mod log_warning_message;
 pub mod module_installed;
+pub mod publish_invocation_phase;
 pub mod python_executable;
 pub mod redirect_stdout_to_stderr;
 pub mod run_interruptible;

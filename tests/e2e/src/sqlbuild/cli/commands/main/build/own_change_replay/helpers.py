@@ -75,7 +75,7 @@ _DOWNSTREAM_MERGE_SQL: str = (
     'SELECT\n  id,\n  event_date\nFROM __ref("upstream_v")\n'
     "WHERE\n  event_date >= __cursor_start()::DATE\n"
 )
-_ADJUST_FUNCTION_PATH: str = "functions/sql/udf__adjust_amount.sql"
+_ADJUST_FUNCTION_PATH: str = "sql/functions/sql/udf__adjust_amount.sql"
 
 
 def _upstream_view_sql(*, upstream: str) -> str:
@@ -90,11 +90,11 @@ def build_event_project(*, tmp_path: Path, extra_files: dict[str, str]) -> Path:
 
     files: dict[str, str] = {
         "sqlbuild_project.toml": _PROJECT_TOML,
-        "seeds/seeds.yml": _EVENTS_SEED_YML,
-        "seeds/events.csv": _EVENTS_CSV,
-        "models/upstream.sql": _UPSTREAM_SQL,
-        "models/upstream_v.sql": _upstream_view_sql(upstream="upstream"),
-        "models/downstream_mb.sql": _DOWNSTREAM_MB_SQL,
+        "sql/seeds/seeds.yml": _EVENTS_SEED_YML,
+        "sql/seeds/events.csv": _EVENTS_CSV,
+        "sql/models/upstream.sql": _UPSTREAM_SQL,
+        "sql/models/upstream_v.sql": _upstream_view_sql(upstream="upstream"),
+        "sql/models/downstream_mb.sql": _DOWNSTREAM_MB_SQL,
         **extra_files,
     }
     project_dir: Path = prepare_inline_project(
@@ -107,7 +107,7 @@ def build_event_project(*, tmp_path: Path, extra_files: dict[str, str]) -> Path:
 def merge_downstream_files(*, extra_config: str) -> dict[str, str]:
     """Return a merge model whose SQL reads its interval through cursor intrinsics."""
 
-    return {"models/downstream.sql": _DOWNSTREAM_MERGE_SQL.format(extra_config=extra_config)}
+    return {"sql/models/downstream.sql": _DOWNSTREAM_MERGE_SQL.format(extra_config=extra_config)}
 
 
 def mark_first_day(*, project_dir: Path, relations: tuple[str, ...]) -> None:
@@ -124,7 +124,7 @@ def mark_first_day(*, project_dir: Path, relations: tuple[str, ...]) -> None:
 def insert_table_between_upstream_and_view(*, project_dir: Path) -> None:
     """Add a new table between the upstream table and its view."""
 
-    (project_dir / "models/upstream_new.sql").write_text(
+    (project_dir / "sql/models/upstream_new.sql").write_text(
         "MODEL (description 'Test model upstream_new.',\n  materialized table,\n);\n\n"
         'SELECT\n  id,\n  event_date\nFROM __ref("upstream")\n',
         encoding="utf-8",
@@ -135,8 +135,8 @@ def insert_table_between_upstream_and_view(*, project_dir: Path) -> None:
 def rename_upstream_with_migrate_from(*, project_dir: Path, extra_sql: str) -> None:
     """Rename the upstream table by hand, declaring migrate_from, optionally changing its SQL."""
 
-    (project_dir / "models/upstream.sql").unlink()
-    (project_dir / "models/upstream_renamed.sql").write_text(
+    (project_dir / "sql/models/upstream.sql").unlink()
+    (project_dir / "sql/models/upstream_renamed.sql").write_text(
         _UPSTREAM_SQL.replace(
             "  materialized table,\n", "  materialized table,\n  migrate_from upstream,\n"
         )
@@ -154,12 +154,12 @@ def rename_upstream_with_cli(*, project_dir: Path, extra_sql: str) -> None:
         project_dir=project_dir,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    renamed_path: Path = project_dir / "models/upstream_renamed.sql"
+    renamed_path: Path = project_dir / "sql/models/upstream_renamed.sql"
     renamed_path.write_text(renamed_path.read_text(encoding="utf-8") + extra_sql, encoding="utf-8")
 
 
 def _write_upstream_view(*, project_dir: Path, upstream: str) -> None:
-    (project_dir / "models/upstream_v.sql").write_text(
+    (project_dir / "sql/models/upstream_v.sql").write_text(
         _upstream_view_sql(upstream=upstream), encoding="utf-8"
     )
 
@@ -169,7 +169,7 @@ def build_function_project(*, tmp_path: Path, caller_config: str) -> Path:
 
     files: dict[str, str] = {
         "sqlbuild_project.toml": _PROJECT_TOML,
-        "seeds/seeds.yml": (
+        "sql/seeds/seeds.yml": (
             "seeds:\n"
             "- name: orders\n  description: Test seed orders.\n"
             "  columns:\n"
@@ -180,14 +180,14 @@ def build_function_project(*, tmp_path: Path, caller_config: str) -> Path:
             "  - name: amount\n"
             "    type: INTEGER\n"
         ),
-        "seeds/orders.csv": (
+        "sql/seeds/orders.csv": (
             "id,ordered_at,amount\n1,2026-09-01,10\n2,2026-09-02,20\n3,2026-09-03,30\n"
         ),
         _ADJUST_FUNCTION_PATH: (
             "FUNCTION (description 'Test function.',"
             "\n  arguments (amount INTEGER),\n  returns INTEGER,\n);\n\namount + 1\n"
         ),
-        "models/order_amounts.sql": (
+        "sql/models/order_amounts.sql": (
             "MODEL (description 'Test model order_amounts.',\n"
             "  materialized incremental,\n"
             "  incremental_strategy merge,\n"
@@ -202,7 +202,7 @@ def build_function_project(*, tmp_path: Path, caller_config: str) -> Path:
             '  __udf("udf__adjust_amount")(amount) AS adjusted_amount\n'
             'FROM __seed("orders")\n'
         ),
-        "models/order_totals.sql": (
+        "sql/models/order_totals.sql": (
             "MODEL (description 'Test model order_totals.',\n"
             "  materialized incremental,\n"
             "  incremental_strategy merge,\n"
@@ -233,7 +233,7 @@ def direct_reference_merge_files() -> dict[str, str]:
     """Return a protected full-replay merge model that reads the upstream table directly."""
 
     return {
-        "models/down_merge.sql": (
+        "sql/models/down_merge.sql": (
             "MODEL (description 'Test model down_merge.',\n"
             "  materialized incremental,\n"
             "  incremental_strategy merge,\n"
@@ -253,7 +253,7 @@ def direct_reference_merge_files() -> dict[str, str]:
 def edit_direct_reference_merge(*, project_dir: Path) -> None:
     """Make a real query edit to the direct-reference merge model."""
 
-    path: Path = project_dir / "models/down_merge.sql"
+    path: Path = project_dir / "sql/models/down_merge.sql"
     path.write_text(
         path.read_text(encoding="utf-8").replace(
             "  event_date\nFROM", "  event_date,\n  id * 2 AS doubled_id\nFROM"
@@ -270,11 +270,11 @@ def build_star_project(*, tmp_path: Path, downstream_config: str) -> Path:
         project_name="star_projection",
         repo_files={
             "sqlbuild_project.toml": _PROJECT_TOML,
-            "models/up.sql": (
+            "sql/models/up.sql": (
                 "MODEL (description 'Test model up.',\n  materialized table,\n);\n\n"
                 "SELECT 1 AS id, DATE '2026-09-01' AS event_date\n"
             ),
-            "models/down.sql": (
+            "sql/models/down.sql": (
                 "MODEL (description 'Test model down.',\n"
                 "  materialized incremental,\n"
                 "  incremental_strategy append,\n"
@@ -292,7 +292,7 @@ def build_star_project(*, tmp_path: Path, downstream_config: str) -> Path:
 def add_upstream_column(*, project_dir: Path) -> None:
     """Add a column to the star project's upstream table."""
 
-    path: Path = project_dir / "models/up.sql"
+    path: Path = project_dir / "sql/models/up.sql"
     path.write_text(
         path.read_text(encoding="utf-8").replace(
             "AS event_date", "AS event_date, 'web' AS channel"
@@ -309,7 +309,7 @@ ENFORCED_CONTRACT_CONFIG: str = (
 def declare_downstream_column_type(*, project_dir: Path) -> None:
     """Change the declared type of the star downstream's id column in its own contract."""
 
-    path: Path = project_dir / "models/down.sql"
+    path: Path = project_dir / "sql/models/down.sql"
     path.write_text(
         path.read_text(encoding="utf-8").replace("id (type INTEGER)", "id (type BIGINT)"),
         encoding="utf-8",
@@ -319,7 +319,7 @@ def declare_downstream_column_type(*, project_dir: Path) -> None:
 def remove_downstream_declared_column(*, project_dir: Path) -> None:
     """Remove event_date from the star downstream's own contract and select list."""
 
-    path: Path = project_dir / "models/down.sql"
+    path: Path = project_dir / "sql/models/down.sql"
     path.write_text(
         path.read_text(encoding="utf-8")
         .replace("    event_date (type DATE),\n", "")
@@ -332,11 +332,11 @@ def udf_reference_merge_files() -> dict[str, str]:
     """Return a protected full-replay merge model that reads the upstream through a UDF."""
 
     return {
-        "functions/sql/udf__plus_one.sql": (
+        "sql/functions/sql/udf__plus_one.sql": (
             "FUNCTION (description 'Test function udf__plus_one.',"
             "\n  arguments (value INTEGER),\n  returns INTEGER,\n);\n\nvalue + 1\n"
         ),
-        "models/down_merge.sql": (
+        "sql/models/down_merge.sql": (
             "MODEL (description 'Test model down_merge.',\n"
             "  materialized incremental,\n"
             "  incremental_strategy merge,\n"
@@ -360,7 +360,7 @@ def incremental_upstream_files() -> dict[str, str]:
     """Return an incremental upstream so a rename moves its data instead of renaming it."""
 
     return {
-        "models/upstream.sql": (
+        "sql/models/upstream.sql": (
             "MODEL (description 'Test model upstream.',\n"
             "  materialized incremental,\n"
             "  incremental_strategy merge,\n"
@@ -388,7 +388,7 @@ def build_selected(*, project_dir: Path, selector: str) -> None:
 def remove_migrate_from(*, project_dir: Path) -> None:
     """Drop the migrate_from declaration from the renamed upstream model."""
 
-    path: Path = project_dir / "models/upstream_renamed.sql"
+    path: Path = project_dir / "sql/models/upstream_renamed.sql"
     path.write_text(
         path.read_text(encoding="utf-8").replace("  migrate_from upstream,\n", ""),
         encoding="utf-8",
@@ -398,7 +398,7 @@ def remove_migrate_from(*, project_dir: Path) -> None:
 def drop_upstream_column(*, project_dir: Path) -> None:
     """Drop the event_date column from the star project's upstream table."""
 
-    (project_dir / "models/up.sql").write_text(
+    (project_dir / "sql/models/up.sql").write_text(
         "MODEL (description 'Test model up.',\n  materialized table,\n);\n\nSELECT 1 AS id\n",
         encoding="utf-8",
     )

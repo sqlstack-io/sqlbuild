@@ -51,11 +51,11 @@ impl NamedKind {
 
 /// `GLOBAL_NAMED_DECLARATION_ROOTS`, in Python's dict order.
 const GLOBAL_NAMED_ROOTS: [(&str, NamedKind); 5] = [
-    ("audits/generic", NamedKind::Audit),
-    ("audits/singular", NamedKind::SingularAudit),
-    ("schemas", NamedKind::Schema),
-    ("hooks/sql", NamedKind::SqlHook),
-    ("hooks/python", NamedKind::PythonHook),
+    ("sql/audits/generic", NamedKind::Audit),
+    ("sql/audits/singular", NamedKind::SingularAudit),
+    ("sql/schemas", NamedKind::Schema),
+    ("sql/hooks/sql", NamedKind::SqlHook),
+    ("sql/hooks/python", NamedKind::PythonHook),
 ];
 
 /// `GROUPED_NAMED_DECLARATION_ROLES`, in Python's dict order.
@@ -71,8 +71,8 @@ const GROUPED_NAMED_ROLES: [(&str, NamedKind, &str); 9] = [
     ("_hooks/python", NamedKind::PythonHook, "local"),
 ];
 
-const FUNCTIONS_ROOT: &str = "functions/sql";
-const SEEDS_ROOT: &str = "seeds";
+const FUNCTIONS_ROOT: &str = "sql/functions/sql";
+const SEEDS_ROOT: &str = sqlbuild_core::constants::SEEDS_PATH;
 const SEED_FILE_SUFFIX: &str = ".csv";
 
 /// The macro, enum or constant files of `kind`, from the whole layout or `kind`'s alone.

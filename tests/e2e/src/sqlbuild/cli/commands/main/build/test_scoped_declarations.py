@@ -37,24 +37,24 @@ _SCOPED_PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": (
         'name = "scoped_shop"\nadapter = "duckdb"\n\n[connection]\ndatabase = "scoped_shop.duckdb"\n'
     ),
-    "models/marts/daily/orders.sql": _MART_MODEL,
-    "models/marts/weekly/orders_weekly.sql": _MART_MODEL,
-    "models/marts/_sqlbuild/schemas/order_shape.sql": (
+    "sql/models/marts/daily/orders.sql": _MART_MODEL,
+    "sql/models/marts/weekly/orders_weekly.sql": _MART_MODEL,
+    "sql/models/marts/_sqlbuild/schemas/order_shape.sql": (
         "SCHEMA (description 'Test schema.', name order_shape, columns (order_id (type INTEGER, nullable false)));\n"
     ),
-    "models/marts/_sqlbuild/audits/generic/order_check.sql": (
+    "sql/models/marts/_sqlbuild/audits/generic/order_check.sql": (
         'AUDIT ();\n\nSELECT order_id FROM __ref("@model") WHERE order_id IS NULL\n'
     ),
-    "models/marts/_sqlbuild/audits/singular/orders_match_weekly.sql": (
+    "sql/models/marts/_sqlbuild/audits/singular/orders_match_weekly.sql": (
         'AUDIT (name "orders_match_weekly", severity error);\n\n'
         'SELECT d.order_id FROM __ref("orders") d\n'
         'LEFT JOIN __ref("orders_weekly") w USING (order_id)\n'
         "WHERE w.order_id IS NULL\n"
     ),
-    "models/marts/_sqlbuild/hooks/sql/record_start.sql": (
+    "sql/models/marts/_sqlbuild/hooks/sql/record_start.sql": (
         "HOOK (description 'Test hook record_start.');\n\nINSERT INTO main.hook_log VALUES ('sql')\n"
     ),
-    "models/marts/_sqlbuild/hooks/python/lifecycle.py": (
+    "sql/models/marts/_sqlbuild/hooks/python/lifecycle.py": (
         "from sqlbuild.hooks import hook\n\n\n"
         "@hook\n"
         "def record_finish(ctx):\n"
@@ -128,12 +128,12 @@ def test_given_scoped_declarations_when_building_then_schema_hooks_and_audits_ap
     [
         ScopedDeclarationScopeE2ETestCase(
             description="scope report lists scoped schema, hooks, and generic audit as used",
-            target="models/marts/daily/orders.sql",
+            target="sql/models/marts/daily/orders.sql",
             expected_fragments=(
-                "audit:order_check  models/marts/_sqlbuild/audits/generic/order_check.sql",
-                "python_hook:record_finish  models/marts/_sqlbuild/hooks/python/lifecycle.py",
-                "schema:order_shape  models/marts/_sqlbuild/schemas/order_shape.sql",
-                "sql_hook:record_start  models/marts/_sqlbuild/hooks/sql/record_start.sql",
+                "audit:order_check  sql/models/marts/_sqlbuild/audits/generic/order_check.sql",
+                "python_hook:record_finish  sql/models/marts/_sqlbuild/hooks/python/lifecycle.py",
+                "schema:order_shape  sql/models/marts/_sqlbuild/schemas/order_shape.sql",
+                "sql_hook:record_start  sql/models/marts/_sqlbuild/hooks/sql/record_start.sql",
             ),
         )
     ],
@@ -189,9 +189,9 @@ def test_given_seed_audit_when_building_then_it_runs_after_load_and_gates_depend
                 'name = "seed_audit_shop"\nadapter = "duckdb"\n\n'
                 '[connection]\ndatabase = "seed_audit_shop.duckdb"\n'
             ),
-            "seeds/order_codes.yml": _SEED_YAML,
-            "seeds/order_codes.csv": test_case.seed_csv,
-            "models/coded_orders.sql": (
+            "sql/seeds/order_codes.yml": _SEED_YAML,
+            "sql/seeds/order_codes.csv": test_case.seed_csv,
+            "sql/models/coded_orders.sql": (
                 'MODEL (description "Test model coded_orders.", materialized table);\n\nSELECT order_id, label FROM __seed("order_codes")\n'
             ),
         },

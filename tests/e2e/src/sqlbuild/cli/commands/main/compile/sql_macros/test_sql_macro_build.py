@@ -32,38 +32,38 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.sql_macros.helpers import 
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import query_duckdb, run_sqb
 
 _UNION_COLUMNS: dict[str, str] = {
-    "macros/sql/order_columns.sql": (
+    "sql/macros/sql/order_columns.sql": (
         'MACRO (description "Order columns in a fixed order", arguments (src RELATION '
         "(order_id BIGINT, status VARCHAR)));\n\nSELECT @src.order_id, @src.status\n"
     )
 }
 _HAS_TAG: dict[str, str] = {
-    "macros/sql/has_tag.sql": (
+    "sql/macros/sql/has_tag.sql": (
         'MACRO (description "Whether the tags hold a tag", arguments (tags VARCHAR[], '
         "tag VARCHAR CONST), returns BOOLEAN);\n\nlist_contains(@tags, @tag)\n"
     )
 }
 _STATUS_LABEL: dict[str, str] = {
-    "macros/sql/status_label.sql": (
+    "sql/macros/sql/status_label.sql": (
         'MACRO (description "Status label", arguments (status VARCHAR CONST), returns VARCHAR);'
         "\n\n'status: ' || @status\n"
     )
 }
 _FIRST_ORDERS: dict[str, str] = {
-    "macros/sql/first_orders.sql": (
+    "sql/macros/sql/first_orders.sql": (
         'MACRO (description "First orders", arguments (src RELATION (order_id BIGINT), '
         "n BIGINT CONST));\n\nWITH firsts AS (SELECT s.order_id FROM @src AS s "
         "ORDER BY s.order_id LIMIT @n)\n"
     )
 }
 _IS_STATUS: dict[str, str] = {
-    "macros/sql/is_status.sql": (
+    "sql/macros/sql/is_status.sql": (
         'MACRO (description "Whether the status column matches", arguments (status VARCHAR), '
         "returns BOOLEAN);\n\nstatus = @status\n"
     )
 }
 _SCOPED_DOUBLED: dict[str, str] = {
-    "models/marts/_sqlbuild/_macros/sql/doubled.sql": (
+    "sql/models/marts/_sqlbuild/_macros/sql/doubled.sql": (
         'MACRO (description "Doubled", arguments (v BIGINT), returns BIGINT);\n\n@v * 2\n'
     )
 }
@@ -87,42 +87,42 @@ _CTE_LIST_SPELLINGS: tuple[tuple[str, str], ...] = (
     ),
 )
 _REFUNDS: dict[str, str] = {
-    "seeds/raw_refunds.csv": "refund_id,status\n1,250\n",
-    "seeds/raw_refunds.yml": (
+    "sql/seeds/raw_refunds.csv": "refund_id,status\n1,250\n",
+    "sql/seeds/raw_refunds.yml": (
         "seeds:\n  - name: raw_refunds\n    description: Raw refunds.\n    columns:\n"
         "      - name: refund_id\n        type: BIGINT\n"
         "      - name: status\n        type: BIGINT\n"
     ),
-    "models/staging/stg_refunds.sql": (
+    "sql/models/staging/stg_refunds.sql": (
         'MODEL (description "Staged refunds");\n\nSELECT * FROM __seed("raw_refunds")\n'
     ),
 }
 _PLUS_ONE_HOUR: dict[str, str] = {
-    "macros/sql/plus_one_hour.sql": (
+    "sql/macros/sql/plus_one_hour.sql": (
         'MACRO (description "One hour later", arguments (ts TIMESTAMP), returns TIMESTAMP);'
         "\n\n@ts + INTERVAL 1 HOUR\n"
     )
 }
 _BODY_SCOPED: dict[str, str] = {
-    "models/marts/_sqlbuild/_constants/fee_divisor.sql": "CONSTANT (name fee_divisor, value 100);\n",
-    "models/marts/_sqlbuild/macros/sql/fee_dollars.sql": (
+    "sql/models/marts/_sqlbuild/_constants/fee_divisor.sql": "CONSTANT (name fee_divisor, value 100);\n",
+    "sql/models/marts/_sqlbuild/macros/sql/fee_dollars.sql": (
         'MACRO (description "Fee in dollars", arguments (cents BIGINT), returns DOUBLE);'
         '\n\n@cents / @const("fee_divisor")\n'
     ),
-    "models/marts/daily/orders.sql": (
+    "sql/models/marts/daily/orders.sql": (
         'MODEL (description "Orders");\n\nSELECT DISTINCT order_id, @sql.fee_dollars(fee_cents) '
         'AS fee FROM __ref("stg_orders") WHERE order_id = 2\n'
     ),
 }
 _NESTED_LOCAL: dict[str, str] = {
-    "models/marts/_sqlbuild/macros/sql/doubled_fee.sql": (
+    "sql/models/marts/_sqlbuild/macros/sql/doubled_fee.sql": (
         'MACRO (description "Fee doubled", arguments (cents BIGINT), returns BIGINT);'
         "\n\n@sql.doubled_inner(@cents)\n"
     ),
-    "models/marts/_sqlbuild/_macros/sql/doubled_inner.sql": (
+    "sql/models/marts/_sqlbuild/_macros/sql/doubled_inner.sql": (
         'MACRO (description "Doubled", arguments (v BIGINT), returns BIGINT);\n\n@v * 2\n'
     ),
-    "models/marts/daily/orders.sql": (
+    "sql/models/marts/daily/orders.sql": (
         'MODEL (description "Orders");\n\nSELECT DISTINCT order_id, @sql.doubled_fee(fee_cents) '
         'AS fee FROM __ref("stg_orders") WHERE order_id = 2\n'
     ),
@@ -454,13 +454,13 @@ def test_given_any_spelling_of_list_calls_when_building_then_the_model_holds_the
             },
             command=("rules", "run", "SQBRMODEL102"),
             expected_returncode=1,
-            expected_fragments=("models/marts/orders.sql", "[SQBRMODEL102]"),
+            expected_fragments=("sql/models/marts/orders.sql", "[SQBRMODEL102]"),
         ),
         SqlMacroCommandTestCase(
             description="scope_names_the_invalid_sql_macro_file_and_keeps_the_valid_ones",
             files={
                 **CENTS_TO_DOLLARS,
-                "macros/sql/zz_invalid.sql": (
+                "sql/macros/sql/zz_invalid.sql": (
                     'MACRO (description "Invalid", returns BIGINT);\n\nWITH a AS (SELECT 1)\n'
                 ),
                 **orders_model(
@@ -471,7 +471,7 @@ def test_given_any_spelling_of_list_calls_when_building_then_the_model_holds_the
             expected_returncode=1,
             expected_fragments=(
                 "Resource: macro:cents_to_dollars",
-                "ERROR S021 macros/sql/zz_invalid.sql: CTE-list macro zz_invalid() cannot declare returns",
+                "ERROR S021 sql/macros/sql/zz_invalid.sql: CTE-list macro zz_invalid() cannot declare returns",
             ),
         ),
     ],
@@ -504,7 +504,7 @@ def test_given_a_project_with_macros_when_running_a_command_then_its_output_refl
                     'FROM __ref("stg_orders")\nWHERE order_id = 2\n'
                 ),
             },
-            edited_path="macros/sql/cents_to_dollars.sql",
+            edited_path="sql/macros/sql/cents_to_dollars.sql",
             replaced_text=("/ 100", "/ 10"),
             query="SELECT fee FROM orders",
             expected_rows=[(5.0,)],
@@ -513,13 +513,13 @@ def test_given_a_project_with_macros_when_running_a_command_then_its_output_refl
             description="sql_macro_called_only_from_a_hook",
             files={
                 **CENTS_TO_DOLLARS,
-                "models/marts/orders.sql": (
+                "sql/models/marts/orders.sql": (
                     'MODEL (description "Orders", post_hooks [inline_sql("CREATE OR REPLACE TABLE '
                     'hook_fee AS SELECT @sql.cents_to_dollars(50) AS fee")]);\n\n'
                     'SELECT DISTINCT order_id FROM __ref("stg_orders")\n'
                 ),
             },
-            edited_path="macros/sql/cents_to_dollars.sql",
+            edited_path="sql/macros/sql/cents_to_dollars.sql",
             replaced_text=("/ 100", "/ 10"),
             query="SELECT fee FROM hook_fee",
             expected_rows=[(5.0,)],
@@ -551,7 +551,7 @@ def test_given_an_edited_sql_macro_when_rebuilding_then_its_callers_use_the_new_
         SqlMacroFormatTestCase(
             description="cte_list_macro_and_its_call",
             files={
-                "macros/sql/pair.sql": (
+                "sql/macros/sql/pair.sql": (
                     'MACRO (description "Pair", arguments (src RELATION (order_id BIGINT)));\n\n'
                     "with a as (select * from @src), b as (select order_id from a)\n"
                 ),
@@ -560,7 +560,7 @@ def test_given_an_edited_sql_macro_when_rebuilding_then_its_callers_use_the_new_
                     "final AS (SELECT order_id FROM b)\nSELECT * FROM final\n"
                 ),
             },
-            formatted_path="macros/sql/pair.sql",
+            formatted_path="sql/macros/sql/pair.sql",
             expected_ending=(
                 "WITH a AS (\n  SELECT *\n  FROM @src\n),\n\nb AS (\n  SELECT order_id\n"
                 "  FROM a\n)\n"
@@ -569,7 +569,7 @@ def test_given_an_edited_sql_macro_when_rebuilding_then_its_callers_use_the_new_
         SqlMacroFormatTestCase(
             description="expression_macro_body_and_one_line_header",
             files={
-                "macros/sql/net.sql": (
+                "sql/macros/sql/net.sql": (
                     'MACRO (description "Net",   arguments (gross BIGINT,refund BIGINT), '
                     "returns DOUBLE);\n\nround(cast((@gross - coalesce(@refund, 0)) as double) "
                     "/ 100, 2)\n"
@@ -578,7 +578,7 @@ def test_given_an_edited_sql_macro_when_rebuilding_then_its_callers_use_the_new_
                     'SELECT DISTINCT order_id, @sql.net(amount_cents, fee_cents) AS net FROM __ref("stg_orders")\n'
                 ),
             },
-            formatted_path="macros/sql/net.sql",
+            formatted_path="sql/macros/sql/net.sql",
             expected_start=(
                 'MACRO (description "Net", arguments (gross BIGINT, refund BIGINT), '
                 "returns DOUBLE);\n\n"
@@ -588,13 +588,13 @@ def test_given_an_edited_sql_macro_when_rebuilding_then_its_callers_use_the_new_
         SqlMacroFormatTestCase(
             description="column_list_macro_body_and_multi_line_header",
             files={
-                "macros/sql/stamps.sql": (
+                "sql/macros/sql/stamps.sql": (
                     'MACRO (description "Stamps",\n   arguments (src RELATION (created_at TIMESTAMP, '
                     "updated_at TIMESTAMP)));\n\nselect @src.created_at,@src.updated_at\n"
                 ),
                 **orders_model('SELECT o.order_id, @sql.stamps(o) FROM __ref("stg_orders") AS o\n'),
             },
-            formatted_path="macros/sql/stamps.sql",
+            formatted_path="sql/macros/sql/stamps.sql",
             expected_start=(
                 'MACRO (\n  description "Stamps",\n  arguments (src RELATION (created_at TIMESTAMP, '
                 "updated_at TIMESTAMP)),\n);\n\n"

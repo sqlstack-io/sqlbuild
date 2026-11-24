@@ -69,9 +69,9 @@ def test_given_macro_mock_with_alias_when_testing_then_the_mock_value_is_used(
         project_name="shop",
         repo_files={
             "sqlbuild_project.toml": _PROJECT_TOML,
-            "macros/sql/region_filter.sql": _REGION_MACRO,
-            "models/orders.sql": _ORDERS_MODEL,
-            "models/regional_orders.sql": _REGIONAL_ORDERS_MODEL,
+            "sql/macros/sql/region_filter.sql": _REGION_MACRO,
+            "sql/models/orders.sql": _ORDERS_MODEL,
+            "sql/models/regional_orders.sql": _REGIONAL_ORDERS_MODEL,
             "tests/unit/test_regional_orders.sql": _TEST.format(mock_select=test_case.mock_select),
         },
     )

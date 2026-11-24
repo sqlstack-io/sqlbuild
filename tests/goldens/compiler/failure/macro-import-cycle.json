@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Macro import cycle in 'macros/python/first.py': macros.python.first -> macros.python.second -> macros.python.first"
+     "message": "Macro import cycle in 'sql/macros/python/first.py': sql.macros.python.first -> sql.macros.python.second -> sql.macros.python.first"
     }
    ]
   }

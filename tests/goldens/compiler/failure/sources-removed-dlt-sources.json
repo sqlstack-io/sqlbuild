@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D006",
-     "message": "<project>/sources/loaded.yml declares dlt_sources, a dlt integration, which SQLBuild no longer supports; declare each source under `sources:` with `managed: true` and load it with a Python `@loader` named after the source instead"
+     "message": "<project>/sql/sources/loaded.yml declares dlt_sources, a dlt integration, which SQLBuild no longer supports; declare each source under `sources:` with `managed: true` and load it with a Python `@loader` named after the source instead"
     }
    ]
   }

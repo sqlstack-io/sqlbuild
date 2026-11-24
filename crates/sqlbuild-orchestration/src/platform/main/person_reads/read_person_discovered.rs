@@ -4,7 +4,9 @@ use uuid::Uuid;
 
 use crate::authorization::main::decisions::begin_authorized::begin_authorized;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
-use crate::discovered_sets::constants::DISCOVERED_DOCUMENT;
+use std::collections::BTreeMap;
+
+use crate::discovered_sets::constants::{DISCOVERED_ASSETS_DOCUMENT, DISCOVERED_DOCUMENT};
 use crate::discovered_sets::main::discovered_readback::discovered_readback;
 use crate::discovered_sets::types::DiscoveredSets;
 use crate::platform::models::DiscoveredReadback;
@@ -36,7 +38,7 @@ pub async fn read_person_discovered(
     let (transaction, documents) = read_snapshot_documents(
         transaction,
         snapshot.snapshot_id,
-        Some(&[DISCOVERED_DOCUMENT]),
+        Some(&[DISCOVERED_DOCUMENT, DISCOVERED_ASSETS_DOCUMENT]),
     )
     .await?;
     commit(transaction).await?;
@@ -48,10 +50,18 @@ pub async fn read_person_discovered(
         })?,
         None => DiscoveredSets::new(),
     };
+    let assets: BTreeMap<String, Vec<String>> = match documents.get(DISCOVERED_ASSETS_DOCUMENT) {
+        Some(document) => serde_json::from_value(document.clone()).map_err(|error| {
+            ControlError::Invalid(format!(
+                "the snapshot's discovered set assets are unreadable: {error}"
+            ))
+        })?,
+        None => BTreeMap::new(),
+    };
     Ok(Some(DiscoveredReadback {
         snapshot_id: snapshot.snapshot_id,
         generation: snapshot.generation,
         published_at: snapshot.published_at,
-        sets: discovered_readback(&sets),
+        sets: discovered_readback(&sets, &assets),
     }))
 }

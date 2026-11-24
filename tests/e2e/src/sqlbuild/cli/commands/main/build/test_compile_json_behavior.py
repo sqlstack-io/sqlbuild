@@ -162,7 +162,7 @@ def test_given_waffle_shop_when_running_compile_json_then_it_reports_offline_que
                     "type": "sql",
                     "statement": "SELECT 1",
                     "name": "select_value",
-                    "relative_path": "hooks/sql/select_value.sql",
+                    "relative_path": "sql/hooks/sql/select_value.sql",
                     "definition_sql": "SELECT @value",
                     "kwargs": {"value": 1},
                     "description": "Test hook select_value.",
@@ -190,14 +190,14 @@ def test_given_model_with_hooks_when_running_compile_json_then_it_reports_hook_m
                 "[connection]\n"
                 'database = "compile_json_hooks_project.duckdb"\n'
             ),
-            "hooks/python/notify.py": (
+            "sql/hooks/python/notify.py": (
                 "from sqlbuild.hooks import hook\n\n"
                 "@hook\n"
                 "def notify(ctx, message):\n"
                 "    '''Test hook notify.'''\n    ctx.log.info(message)\n"
             ),
-            "hooks/sql/select_value.sql": "HOOK (description 'Test hook select_value.');\n\nSELECT @value\n",
-            "models/orders.sql": (
+            "sql/hooks/sql/select_value.sql": "HOOK (description 'Test hook select_value.');\n\nSELECT @value\n",
+            "sql/models/orders.sql": (
                 "MODEL (description 'Test model orders.',\n"
                 "  materialized table,\n"
                 '  pre_hooks [sql("select_value", value: 1), '
@@ -233,11 +233,11 @@ def test_given_model_with_hooks_when_running_compile_json_then_it_reports_hook_m
     assert hooks_by_name["select_value"] == {
         "type": "sql",
         "name": "select_value",
-        "relative_path": "hooks/sql/select_value.sql",
+        "relative_path": "sql/hooks/sql/select_value.sql",
         "description": "Test hook select_value.",
         "sql": "SELECT @value",
     }
-    assert hooks_by_name["notify"]["relative_path"] == "hooks/python/notify.py"
+    assert hooks_by_name["notify"]["relative_path"] == "sql/hooks/python/notify.py"
     assert hooks_by_name["notify"]["definition_hash"]
     assert hooks_by_name["notify"]["version_hash"]
 
@@ -249,7 +249,7 @@ def test_given_model_with_hooks_when_running_compile_json_then_it_reports_hook_m
             description="unknown materialization stops compile",
             repo_files={
                 "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
-                "models/orders.sql": "MODEL (description 'Test model orders.', materialized tablex);\n\nSELECT 1 AS order_id\n",
+                "sql/models/orders.sql": "MODEL (description 'Test model orders.', materialized tablex);\n\nSELECT 1 AS order_id\n",
             },
             expected_code="P001",
             expected_message_fragment="unknown materialization 'tablex'",
@@ -259,7 +259,7 @@ def test_given_model_with_hooks_when_running_compile_json_then_it_reports_hook_m
             description="unknown on_schema_change stops compile with help",
             repo_files={
                 "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     "MODEL (description 'Test model orders.',\n  materialized incremental,\n  incremental_strategy append,\n"
                     "  on_schema_change append_columns,\n);\n\nSELECT 1 AS order_id\n"
                 ),

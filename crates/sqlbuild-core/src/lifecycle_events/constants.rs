@@ -687,7 +687,7 @@ pub(crate) const LIFECYCLE_EVENT_CATALOG_V1: [EventDefinition; 20] = [
 ];
 
 /// The schema version 2 catalogue in declaration order.
-pub(crate) const LIFECYCLE_EVENT_CATALOG_V2: [EventDefinition; 23] = [
+pub(crate) const LIFECYCLE_EVENT_CATALOG_V2: [EventDefinition; 24] = [
     EventDefinition {
         event_type: "invocation_started",
         required_correlations: &[],
@@ -717,6 +717,13 @@ pub(crate) const LIFECYCLE_EVENT_CATALOG_V2: [EventDefinition; 23] = [
             "signal_number",
         ],
         terminal: true,
+    },
+    EventDefinition {
+        event_type: "invocation_phase",
+        required_correlations: &[],
+        required_payload: &["phase"],
+        allowed_payload: &["count", "detail", "duration_ms", "name", "phase"],
+        terminal: false,
     },
     EventDefinition {
         event_type: "run_started",

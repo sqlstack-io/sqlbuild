@@ -24,14 +24,14 @@ _MODEL: bytes = b"MODEL ();\nSELECT 1 AS id"
 _TEST: bytes = b'TEST (name "keeps_orders");\nSELECT 1\n'
 _SOURCE: bytes = b"sources:\n  - name: raw_orders\n"
 _FILES: tuple[tuple[str, bytes], ...] = (
-    ("models/orders.sql", _MODEL),
-    (os.fsdecode(b"models/caf\xe9.sql"), _MODEL),
-    (os.fsdecode(b"models/notes\xe9.txt"), b"x"),
+    ("sql/models/orders.sql", _MODEL),
+    (os.fsdecode(b"sql/models/caf\xe9.sql"), _MODEL),
+    (os.fsdecode(b"sql/models/notes\xe9.txt"), b"x"),
     ("tests/unit/orders.sql", _TEST),
     (os.fsdecode(b"tests/unit/old\xe9/orders.sql"), _TEST),
-    ("sources/raw.yml", _SOURCE),
+    ("sql/sources/raw.yml", _SOURCE),
 )
-_BAD_SOURCE: tuple[str, bytes] = (os.fsdecode(b"sources/caf\xe9.yml"), _SOURCE)
+_BAD_SOURCE: tuple[str, bytes] = (os.fsdecode(b"sql/sources/caf\xe9.yml"), _SOURCE)
 _RENAME: str = " is not valid UTF-8; rename it so SQLBuild can read it"
 _ORDER_STATUS: bytes = b"ENUM (name order_status, members [PLACED]);\n"
 _TIER: bytes = b"ENUM (name tier, members [GOLD]);\n"
@@ -49,8 +49,8 @@ _READERS: dict[str, Callable[..., tuple[object, ...]]] = {
             description="scope discovery faults each unreadable path and keeps the rest",
             reader="scope",
             files=(*_FILES, _BAD_SOURCE),
-            expected_models=("models/orders.sql",),
-            expected_sources=("sources/raw.yml",),
+            expected_models=("sql/models/orders.sql",),
+            expected_sources=("sql/sources/raw.yml",),
             expected_faults=(
                 (_FILES[1][0], f"Project path ./models/caf\\xe9.sql{_RENAME}"),
                 (_BAD_SOURCE[0], f"Project path ./sources/caf\\xe9.yml{_RENAME}"),
@@ -61,15 +61,15 @@ _READERS: dict[str, Callable[..., tuple[object, ...]]] = {
             description="a valid name is not blamed for a raw sibling with the same lossy name",
             reader="scope",
             files=(
-                ("models/orders.sql", _MODEL),
-                ("models/st\ufffd.sql", b"MODEL ();\nSELECT 2 AS id"),
-                (os.fsdecode(b"models/st\xe8.sql"), b"garbage"),
+                ("sql/models/orders.sql", _MODEL),
+                ("sql/models/st\ufffd.sql", b"MODEL ();\nSELECT 2 AS id"),
+                (os.fsdecode(b"sql/models/st\xe8.sql"), b"garbage"),
             ),
-            expected_models=("models/orders.sql", "models/st\ufffd.sql"),
+            expected_models=("sql/models/orders.sql", "sql/models/st\ufffd.sql"),
             expected_sources=(),
             expected_faults=(
                 (
-                    os.fsdecode(b"models/st\xe8.sql"),
+                    os.fsdecode(b"sql/models/st\xe8.sql"),
                     f"Project path ./models/st\\xe8.sql{_RENAME}",
                 ),
             ),
@@ -78,15 +78,15 @@ _READERS: dict[str, Callable[..., tuple[object, ...]]] = {
             description="model descriptions skip an unreadable model path",
             reader="descriptions",
             files=(*_FILES, _BAD_SOURCE),
-            expected_models=("models/orders.sql",),
+            expected_models=("sql/models/orders.sql",),
             expected_sources=(),
         ),
         UndecodablePathToleranceTestCase(
             description="selected contracts never read an unselected model path",
             reader="selected contracts",
             files=_FILES,
-            expected_models=("models/orders.sql",),
-            expected_sources=("sources/raw.yml",),
+            expected_models=("sql/models/orders.sql",),
+            expected_sources=("sql/sources/raw.yml",),
         ),
     ],
     ids=lambda case: case.description,
@@ -110,21 +110,21 @@ def test_given_undecodable_paths_when_discovering_tolerantly_then_each_read_path
     [
         UndecodableDeclarationNameTestCase(
             description="an enum file whose name is not UTF-8",
-            relative_path=b"enums/st\xe9.sql",
+            relative_path=b"sql/enums/st\xe9.sql",
             contents=_ORDER_STATUS,
-            expected_path="enums/st\\xe9.sql",
+            expected_path="sql/enums/st\\xe9.sql",
         ),
         UndecodableDeclarationNameTestCase(
             description="a scoped enum directory whose name is not UTF-8",
-            relative_path=b"models/a\xe8/_enums/y.sql",
+            relative_path=b"sql/models/a\xe8/_enums/y.sql",
             contents=_TIER,
-            expected_path="models/a\\xe8/_enums/y.sql",
+            expected_path="sql/models/a\\xe8/_enums/y.sql",
         ),
         UndecodableDeclarationNameTestCase(
             description="a SQL hook whose name is not UTF-8",
-            relative_path=b"hooks/sql/refresh_\xff.sql",
+            relative_path=b"sql/hooks/sql/refresh_\xff.sql",
             contents=b"HOOK ();\nSELECT 1\n",
-            expected_path="hooks/sql/refresh_\\xff.sql",
+            expected_path="sql/hooks/sql/refresh_\\xff.sql",
         ),
     ],
     ids=lambda case: case.description,
@@ -135,7 +135,7 @@ def test_given_declaration_file_named_with_invalid_utf8_when_discovering_then_d0
     write_project(
         project_dir=tmp_path,
         files=(
-            ("models/orders.sql", _MODEL),
+            ("sql/models/orders.sql", _MODEL),
             (os.fsdecode(test_case.relative_path), test_case.contents),
         ),
     )

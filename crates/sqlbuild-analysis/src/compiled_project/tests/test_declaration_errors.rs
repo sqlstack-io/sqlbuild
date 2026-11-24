@@ -13,7 +13,7 @@ fn given_declaration_error_when_wording_then_attachment_message_is_returned() {
                 name: "_status".to_owned(),
                 visible: vec!["region".to_owned(), "channel".to_owned()],
             },
-            expected_message: "Unknown enum '_status' in this model in 'models/orders.sql'. \
+            expected_message: "Unknown enum '_status' in this model in 'sql/models/orders.sql'. \
                                Visible enums: channel, region",
         },
         DeclarationErrorTestCase {
@@ -23,7 +23,7 @@ fn given_declaration_error_when_wording_then_attachment_message_is_returned() {
                 name: "cap".to_owned(),
                 visible: Vec::new(),
             },
-            expected_message: "Unknown constant 'cap' in 'models/orders.sql'. Visible constants: none",
+            expected_message: "Unknown constant 'cap' in 'sql/models/orders.sql'. Visible constants: none",
         },
         DeclarationErrorTestCase {
             description: "inaccessible resource-owned constant",
@@ -31,23 +31,23 @@ fn given_declaration_error_when_wording_then_attachment_message_is_returned() {
                 kind: "constant".to_owned(),
                 name: "cap".to_owned(),
                 record: InaccessibleDeclaration {
-                    path: "models/marts/_constants/limits.sql".to_owned(),
+                    path: "sql/models/marts/_constants/limits.sql".to_owned(),
                     line: 1,
                     column: 11,
                     scope: "directory".to_owned(),
-                    owner: "models/marts".to_owned(),
+                    owner: "sql/models/marts".to_owned(),
                     owner_identity: Some(("model".to_owned(), "orders_daily".to_owned())),
                 },
             },
-            expected_message: "Constant 'cap' is known but inaccessible in 'models/orders.sql'. \
-                               It is defined at models/marts/_constants/limits.sql:1:11 with \
-                               directory scope owned by 'models/marts' (model 'orders_daily'); \
-                               consumer path: 'models/orders.sql'",
+            expected_message: "Constant 'cap' is known but inaccessible in 'sql/models/orders.sql'. \
+                               It is defined at sql/models/marts/_constants/limits.sql:1:11 with \
+                               directory scope owned by 'sql/models/marts' (model 'orders_daily'); \
+                               consumer path: 'sql/models/orders.sql'",
         },
         DeclarationErrorTestCase {
             description: "invalid enum reference stop",
             error: DeclarationError::ScanStop(2),
-            expected_message: "Invalid enum reference in 'models/orders.sql'",
+            expected_message: "Invalid enum reference in 'sql/models/orders.sql'",
         },
         DeclarationErrorTestCase {
             description: "unclosed quote stop",
@@ -58,7 +58,7 @@ fn given_declaration_error_when_wording_then_attachment_message_is_returned() {
 
     for test_case in test_cases {
         assert_eq!(
-            declaration_error_message(&test_case.error, "models/orders.sql"),
+            declaration_error_message(&test_case.error, "sql/models/orders.sql"),
             test_case.expected_message,
             "{}",
             test_case.description

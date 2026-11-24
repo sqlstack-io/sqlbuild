@@ -78,20 +78,15 @@ describe('a pill name too long to fit', () => {
 		]);
 	});
 
-	it('loses its middle, keeping both ends, so siblings still read differently', () => {
+	it('loses its end, keeping its start, never its middle', () => {
 		const tails = compactTails(names);
 		const shown = names.map((n) => pillText(tails.get(n)!, 12, 100, measure));
-		// Thirteen characters fit: four from the start, an ellipsis, eight from the end.
-		expect(shown[0]).toBe('orde…e__alpha');
-		expect(shown[7]).toBe('regi…_country');
+		// Thirteen characters fit: twelve from the start and an ellipsis.
+		expect(shown[0]).toBe('order_type__…');
+		expect(shown[7]).toBe('region_usabi…');
 		expect(shown[3]).toBe('delta');
-		for (const [i, s] of shown.entries()) {
-			const [head, end = ''] = s.split('…');
-			expect(tails.get(names[i])!.startsWith(head) && tails.get(names[i])!.endsWith(end)).toBe(true);
-		}
-		// Names that differ only at their start keep it.
-		expect(['stg_customers_daily', 'dim_customers_daily'].map((n) => pillText(n, 12, 80, measure))).toEqual(['stg…s_daily', 'dim…s_daily']);
-		expect(new Set(shown).size).toBe(names.length);
+		for (const [i, s] of shown.entries()) expect(tails.get(names[i])!.startsWith(s.replace(/…$/, ''))).toBe(true);
 		for (const s of shown) expect(measure(s, 12)).toBeLessThanOrEqual(100);
 	});
+
 });

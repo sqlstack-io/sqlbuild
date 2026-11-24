@@ -55,8 +55,8 @@ def test_given_serial_microbatch_when_building_then_state_table_is_not_used(
                 database_name="serial.duckdb",
                 settings_toml=test_case.settings_toml,
             ),
-            "sources/raw.yml": raw_events_source_yml(),
-            "models/orders.sql": timestamp_microbatch_model_sql(
+            "sql/sources/raw.yml": raw_events_source_yml(),
+            "sql/models/orders.sql": timestamp_microbatch_model_sql(
                 value_expression="payload",
                 batch_concurrency=1,
                 replay_policy="forward",
@@ -130,8 +130,8 @@ def test_given_integer_cursor_maximum_when_building_then_half_open_batches_inclu
                 database_name="integer_maximum.duckdb",
                 settings_toml=("\n[settings]\nconcurrency = 3\nmicrobatch_concurrency = true\n"),
             ),
-            "sources/raw.yml": raw_events_source_yml(),
-            "models/orders.sql": (
+            "sql/sources/raw.yml": raw_events_source_yml(),
+            "sql/models/orders.sql": (
                 "MODEL (description 'Test model orders.',\n"
                 "  materialized incremental,\n"
                 "  incremental_strategy delete_insert,\n"
@@ -213,8 +213,8 @@ def test_given_concurrent_ceiling_when_first_run_and_full_refresh_then_target_bo
                 database_name="bootstrap.duckdb",
                 settings_toml=("\n[settings]\nconcurrency = 3\nmicrobatch_concurrency = true\n"),
             ),
-            "sources/raw.yml": raw_events_source_yml(),
-            "models/orders.sql": timestamp_microbatch_model_sql(
+            "sql/sources/raw.yml": raw_events_source_yml(),
+            "sql/models/orders.sql": timestamp_microbatch_model_sql(
                 value_expression="payload",
                 batch_concurrency=3,
                 replay_policy="forward",
@@ -299,8 +299,8 @@ def test_given_recreated_target_when_building_then_old_completion_generation_is_
                 database_name="recreated.duckdb",
                 settings_toml="\n[settings]\nmicrobatch_concurrency = true\n",
             ),
-            "sources/raw.yml": raw_events_source_yml(),
-            "models/orders.sql": timestamp_microbatch_model_sql(
+            "sql/sources/raw.yml": raw_events_source_yml(),
+            "sql/models/orders.sql": timestamp_microbatch_model_sql(
                 value_expression="payload",
                 batch_concurrency=2,
                 replay_policy="forward",

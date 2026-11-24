@@ -35,7 +35,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.sensor
                 "success",
                 [(7,)],
                 files={
-                    "models/orders.sql": (
+                    "sql/models/orders.sql": (
                         "MODEL (description 'Orders.', materialized table, columns (\n"
                         "  amount (type INTEGER, audits [accepted_values (values [1], severity error)]),\n"
                         "  code (type VARCHAR, audits [accepted_values (values ['a'], severity warn)])));\n"
@@ -67,11 +67,11 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.sensor
                 "partial",
                 [(0,)],
                 files={
-                    "models/raw_orders.sql": (
+                    "sql/models/raw_orders.sql": (
                         "MODEL (description 'Raw orders.', materialized table);\n"
                         "SELECT 1 AS order_id, 10 AS amount\n"
                     ),
-                    "models/stg_orders.sql": (
+                    "sql/models/stg_orders.sql": (
                         "MODEL (description 'Staged orders.', materialized table);\n"
                         'SELECT order_id, amount * 2 AS amount FROM __ref("raw_orders")\n'
                     ),

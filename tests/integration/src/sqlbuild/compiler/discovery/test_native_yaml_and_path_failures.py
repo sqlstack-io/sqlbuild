@@ -27,7 +27,7 @@ _HELP: bool = True
             description="block, flow, quoted, folded and literal values with anchors and merges",
             files=(
                 (
-                    "sources/raw.yml",
+                    "sql/sources/raw.yml",
                     b"---\n# raw\n" + _SOURCE_HEAD + b"    description: >\n      Raw\n"
                     b"      orders.\n    meta: &m {owner: 'data', tags: [a, \"b\"]}\n"
                     b"  - name: raw_items\n    description: |\n      Items.\n"
@@ -37,19 +37,21 @@ _HELP: bool = True
         ),
         AuthoredFileFailureTestCase(
             description="invalid YAML names the file and position",
-            files=(("sources/raw.yml", _SOURCE_HEAD + b"    description: [unclosed\n"),),
+            files=(("sql/sources/raw.yml", _SOURCE_HEAD + b"    description: [unclosed\n"),),
             expected_error="SourceParseError",
             expected_message=(
-                "{project}/sources/raw.yml contains invalid YAML at line 4, column 1: while "
+                "{project}/sql/sources/raw.yml contains invalid YAML at line 4, column 1: while "
                 "parsing a flow sequence, expected ',' or ']'"
             ),
         ),
         AuthoredFileFailureTestCase(
             description="a binary value is unsupported at its node",
-            files=(("sources/raw.yml", _SOURCE_HEAD + b"    meta:\n      blob: !!binary aGk=\n"),),
+            files=(
+                ("sql/sources/raw.yml", _SOURCE_HEAD + b"    meta:\n      blob: !!binary aGk=\n"),
+            ),
             expected_error="SourceParseError",
             expected_message=(
-                "{project}/sources/raw.yml uses YAML that SQLBuild does not support at line 4, "
+                "{project}/sql/sources/raw.yml uses YAML that SQLBuild does not support at line 4, "
                 "column 22: values tagged !!binary"
             ),
             expected_help=_HELP,
@@ -58,51 +60,51 @@ _HELP: bool = True
             description="a tab inside a quoted value and a directive load",
             files=(
                 (
-                    "sources/raw.yml",
+                    "sql/sources/raw.yml",
                     b"%YAML 1.2\n---\n" + _SOURCE_HEAD + b'    description: "Raw\torders"\n',
                 ),
             ),
         ),
         AuthoredFileFailureTestCase(
             description="a recursive alias is unsupported at the alias",
-            files=(("sources/raw.yml", b"sources: []\nmeta: &a [*a]\n"),),
+            files=(("sql/sources/raw.yml", b"sources: []\nmeta: &a [*a]\n"),),
             expected_error="SourceParseError",
             expected_message=(
-                "{project}/sources/raw.yml uses YAML that SQLBuild does not support at line 2, "
+                "{project}/sql/sources/raw.yml uses YAML that SQLBuild does not support at line 2, "
                 "column 11: recursive aliases"
             ),
             expected_help=_HELP,
         ),
         AuthoredFileFailureTestCase(
             description="an invalid schema file fails as a schema file",
-            files=(("models/marts/schema.yml", b"models: [\n"),),
+            files=(("sql/models/marts/schema.yml", b"models: [\n"),),
             expected_error="SchemaParseError",
             expected_message=(
-                "{project}/models/marts/schema.yml contains invalid YAML at line 2, column 1: "
+                "{project}/sql/models/marts/schema.yml contains invalid YAML at line 2, column 1: "
                 "while parsing a node, did not find expected node content"
             ),
         ),
         AuthoredFileFailureTestCase(
             description="names discovery never reads may be any bytes",
             files=(
-                ("models/orders.sql", _MODEL),
-                (os.fsdecode(b"models/notes\xe9.txt"), b"x"),
-                (os.fsdecode(b"models/old\xe9/readme.md"), b"x"),
-                (os.fsdecode(b"macros/x\xe9.txt"), b"x"),
+                ("sql/models/orders.sql", _MODEL),
+                (os.fsdecode(b"sql/models/notes\xe9.txt"), b"x"),
+                (os.fsdecode(b"sql/models/old\xe9/readme.md"), b"x"),
+                (os.fsdecode(b"sql/macros/x\xe9.txt"), b"x"),
                 (os.fsdecode(b"tests/unit/x\xe9.txt"), b"x"),
                 (os.fsdecode(b"tests/scenarios/x\xe9.md"), b"x"),
-                (os.fsdecode(b"sources/x\xe9.txt"), b"x"),
-                (os.fsdecode(b"seeds/x\xe9.txt"), b"x"),
+                (os.fsdecode(b"sql/sources/x\xe9.txt"), b"x"),
+                (os.fsdecode(b"sql/seeds/x\xe9.txt"), b"x"),
                 (os.fsdecode(b"data\xe9.csv"), b"x"),
                 (os.fsdecode(b"target/x\xe9"), b"x"),
             ),
         ),
         AuthoredFileFailureTestCase(
             description="a model below a directory that is not UTF-8 is shown lossily",
-            files=((os.fsdecode(b"models/old\xe9/orders.sql"), _MODEL),),
+            files=((os.fsdecode(b"sql/models/old\xe9/orders.sql"), _MODEL),),
             expected_error="ProjectPathError",
             expected_message=(
-                "Project path {project}/models/old\\xe9/orders.sql is not valid UTF-8; rename it "
+                "Project path {project}/sql/models/old\\xe9/orders.sql is not valid UTF-8; rename it "
                 "so SQLBuild can read it"
             ),
         ),
@@ -117,19 +119,19 @@ _HELP: bool = True
         ),
         AuthoredFileFailureTestCase(
             description="a source path that is not UTF-8 is shown lossily",
-            files=((os.fsdecode(b"sources/caf\xe9.yml"), _SOURCE_HEAD),),
+            files=((os.fsdecode(b"sql/sources/caf\xe9.yml"), _SOURCE_HEAD),),
             expected_error="ProjectPathError",
             expected_message=(
-                "Project path {project}/sources/caf\\xe9.yml is not valid UTF-8; rename it so "
+                "Project path {project}/sql/sources/caf\\xe9.yml is not valid UTF-8; rename it so "
                 "SQLBuild can read it"
             ),
         ),
         AuthoredFileFailureTestCase(
             description="a model path that is not UTF-8 is shown lossily",
-            files=((os.fsdecode(b"models/caf\xe9.sql"), b"MODEL ();\nSELECT 1 AS id"),),
+            files=((os.fsdecode(b"sql/models/caf\xe9.sql"), b"MODEL ();\nSELECT 1 AS id"),),
             expected_error="ProjectPathError",
             expected_message=(
-                "Project path {project}/models/caf\\xe9.sql is not valid UTF-8; rename it so "
+                "Project path {project}/sql/models/caf\\xe9.sql is not valid UTF-8; rename it so "
                 "SQLBuild can read it"
             ),
         ),

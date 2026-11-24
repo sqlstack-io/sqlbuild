@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Constant 'order_cap' is known but inaccessible in '<project>/models/staging/stg_orders.sql'. It is defined at models/marts/_constants/limits.sql:1:1 with local scope owned by 'models/marts'; consumer path: '<project>/models/staging/stg_orders.sql'"
+     "message": "Constant 'order_cap' is known but inaccessible in '<project>/sql/models/staging/stg_orders.sql'. It is defined at sql/models/marts/_constants/limits.sql:1:1 with local scope owned by 'sql/models/marts'; consumer path: '<project>/sql/models/staging/stg_orders.sql'"
     }
    ]
   }

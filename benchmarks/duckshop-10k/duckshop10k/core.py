@@ -82,7 +82,7 @@ class Declaration:
     """A reusable declaration whose folder is decided by where it is used."""
 
     name: str
-    role: str  # macros/sql, macros/python, constants, enums, audits/generic, schemas
+    role: str  # sql/macros/sql, sql/macros/python, constants, enums, sql/audits/generic, schemas
     content: str
     file_name: str = ""
 
@@ -90,7 +90,7 @@ class Declaration:
     def filename(self) -> str:
         if self.file_name:
             return self.file_name
-        suffix = ".py" if self.role == "macros/python" else ".sql"
+        suffix = ".py" if self.role == "sql/macros/python" else ".sql"
         return f"{self.name}{suffix}"
 
 
@@ -116,11 +116,11 @@ def declaration_uses(text: str) -> set[tuple[str, str]]:
 
 
 _KIND_OF_ROLE = {
-    "macros/sql": "macro",
-    "macros/python": "macro",
+    "sql/macros/sql": "macro",
+    "sql/macros/python": "macro",
     "constants": "constant",
     "enums": "enum",
-    "audits/generic": "audit",
+    "sql/audits/generic": "audit",
     "schemas": "schema",
 }
 
@@ -185,7 +185,7 @@ class Project:
     def _consumers(self, files: dict[str, str]) -> dict[tuple[str, str], set[str]]:
         direct: dict[tuple[str, str], set[str]] = {}
         for path, text in files.items():
-            if not path.endswith(".sql") or not path.startswith(("models/", "tests/")):
+            if not path.endswith(".sql") or not path.startswith(("sql/models/", "tests/")):
                 continue
             folder = str(PurePosixPath(path).parent)
             uses = declaration_uses(text)
@@ -196,7 +196,7 @@ class Project:
                     continue
                 direct.setdefault(use, set()).add(folder)
         for path, text in files.items():
-            if path.startswith(("sources/", "seeds/")):
+            if path.startswith(("sql/sources/", "sql/seeds/")):
                 for use in declaration_uses(text):
                     direct.setdefault(use, set()).add(path.split("/")[0])
         # A declaration used inside another declaration is used wherever that one is.

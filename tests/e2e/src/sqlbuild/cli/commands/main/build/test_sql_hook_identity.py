@@ -14,7 +14,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
 
-_HOOK_PATH: str = "hooks/sql/record_order_access.sql"
+_HOOK_PATH: str = "sql/hooks/sql/record_order_access.sql"
 _HOOK_CONTENTS: str = (
     dedent(
         """
@@ -42,7 +42,7 @@ _HOOK_CONTENTS: str = (
         SqlHookIdentityBuildE2ETestCase(
             description="hook file move keeps the model unchanged",
             removed_hook_path=_HOOK_PATH,
-            added_hook_path="hooks/sql/audit/record_order_access.sql",
+            added_hook_path="sql/hooks/sql/audit/record_order_access.sql",
             added_hook_contents=_HOOK_CONTENTS,
             expected_reason="no_change",
         ),
@@ -75,7 +75,7 @@ def test_given_built_model_with_sql_hook_when_editing_hook_then_plans_expected_r
             ).strip()
             + "\n",
             _HOOK_PATH: _HOOK_CONTENTS,
-            "models/orders.sql": dedent(
+            "sql/models/orders.sql": dedent(
                 """
                 MODEL (description "Test model orders.",
                   materialized table,

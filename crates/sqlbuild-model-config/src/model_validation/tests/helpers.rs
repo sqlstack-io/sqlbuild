@@ -29,7 +29,7 @@ pub(super) fn validation_outcome(
         .collect();
     let facts = ModelValidationFacts {
         model_name: "orders_daily",
-        relative_path: "models/marts/orders_daily.sql",
+        relative_path: "sql/models/marts/orders_daily.sql",
         references: &references,
         declared_columns: None,
         query_sql,

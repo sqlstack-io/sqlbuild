@@ -38,7 +38,7 @@ def test_given_large_invalid_models_when_compiling_then_bounds_diagnostic_work(
     test_case: DiagnosticPerformanceCase, tmp_path: Path
 ) -> None:
     write_diagnostic_project(project_dir=tmp_path, depth=test_case.depth, width=test_case.width)
-    for path in (tmp_path / "models").glob("large_orders_*.sql"):
+    for path in (tmp_path / "sql" / "models").glob("large_orders_*.sql"):
         assert len(path.read_text().splitlines()) >= 3000
     elapsed, payload = measure_diagnostic_compile(
         project_dir=tmp_path, timeout=test_case.expected_timeout_seconds

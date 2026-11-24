@@ -52,6 +52,10 @@ import type {
 	RunCostRow,
 	CostSummary,
 	NodeBuildCost,
+	CostSelection,
+	CostSelectionQuery,
+	CostSeriesGroup,
+	SelectionProblem,
 	RunTabCounts,
 	Scope,
 	SnapshotNode,
@@ -91,6 +95,7 @@ import {
 	type TriggerDef
 } from './operate';
 import { SCHEDULER } from './principals';
+import { costFolder, costPeriod, costSelectionOf, costSeriesOf, type CostRowIn } from './cost-rows';
 import { ancestors, evaluateMockSelection, isWritable, mockVocabulary, resolveSelection, SNAPSHOT_NODES, snapshotNode, sortTopologically, edgesWithin, writeSetOf } from './operate-graph';
 import {
 	commandOf,
@@ -416,12 +421,44 @@ export class MockOperate {
 			since: new Date(since).toISOString(),
 			credits: total.credits,
 			usd: total.runs.size ? total.usd : null,
+			priceSource: total.runs.size && total.usd !== null ? 'config' : null,
 			runs: total.runs.size,
 			incompleteRuns,
 			byJob: ranked(byJob),
 			byWarehouseSize: ranked(bySize),
 			byNode: ranked(byNode)
 		});
+	}
+
+	/** The cost rows of the selected nodes over twice `days`, for the cost reads of a selection. */
+	#selectionRows(scope: Scope, query: CostSelectionQuery): { rows: CostRowIn[]; error: SelectionProblem | null } {
+		const now = Date.now();
+		const { previous } = costPeriod(query.days, now);
+		const evaluated = query.select.trim() || query.exclude.trim() ? evaluateMockSelection(query.select, query.exclude) : null;
+		if (evaluated?.error) return { rows: [], error: evaluated.error };
+		const chosen = evaluated && new Set(evaluated.keys);
+		const rows: CostRowIn[] = [];
+		for (const rec of this.#records) {
+			const at = rec.run.startedAt ? Date.parse(rec.run.startedAt) : NaN;
+			if (!(at >= previous)) continue;
+			const costs = this.#costRows(scope, rec, now);
+			const pending = costs.some((r) => r.resourceType === '_total' && (r.status === 'pending' || r.status === 'partial'));
+			for (const r of costs) {
+				if (r.resourceType === '_total' || !r.nodeKey || (chosen && !chosen.has(r.nodeKey))) continue;
+				rows.push({ runId: r.buildRunId, job: rec.run.jobKey, nodeKey: r.nodeKey, folder: costFolder(snapshotNode(r.nodeKey)?.path), startedAt: at, pending, credits: r.credits, usd: r.usd, seconds: r.seconds, queries: r.queryCount, bytes: r.bytesScanned });
+			}
+		}
+		return { rows, error: null };
+	}
+
+	readCostSelection(scope: Scope, query: CostSelectionQuery): Promise<CostSelection> {
+		const { rows, error } = this.#selectionRows(scope, query);
+		return this.#ctx.reply(costSelectionOf(rows, query.days, Date.now(), error));
+	}
+
+	readCostSeries(scope: Scope, query: CostSelectionQuery, groups: CostSeriesGroup[]): Promise<number[][]> {
+		if (groups.length > 200) throw new ApiError('at most 200 groups per request', 400);
+		return this.#ctx.reply(costSeriesOf(this.#selectionRows(scope, query).rows, query.days, Date.now(), groups));
 	}
 
 	/** One node's cost in each build of the window, newest first. */
@@ -442,6 +479,7 @@ export class MockOperate {
 				status: run.status,
 				credits: mine.reduce((t, r) => t + r.credits, 0),
 				usd: mine.some((r) => r.usd === null) ? null : mine.reduce((t, r) => t + (r.usd ?? 0), 0),
+				priceSource: mine.some((r) => r.usd === null) ? null : 'config',
 				seconds: mine.reduce((t, r) => t + r.seconds, 0),
 				queryCount: mine.reduce((t, r) => t + r.queryCount, 0)
 			});
@@ -474,6 +512,7 @@ export class MockOperate {
 			bytesScanned: queryCount * 52_428_800,
 			credits,
 			usd: priced ? credits * 3 : null,
+			priceSource: priced ? 'config' : null,
 			status,
 			statementsExpected: statements.length,
 			statementsObserved: status === 'pending' ? 0 : statements.length

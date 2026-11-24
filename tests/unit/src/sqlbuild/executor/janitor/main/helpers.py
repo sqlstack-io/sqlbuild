@@ -581,7 +581,7 @@ def build_project(
                 key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="orders"),
                 deps=(),
                 name="orders",
-                relative_path=Path("models/orders.sql"),
+                relative_path=Path("sql/models/orders.sql"),
                 query_sql="select 1",
                 config=CompileModelConfig(values={"migrate_from": migrate_from}),
                 destination=CompiledRelationLocation(

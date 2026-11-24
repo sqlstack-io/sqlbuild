@@ -37,7 +37,7 @@ def test_given_unchanged_builtin_inputs_when_evaluating_twice_then_second_run_hi
 ) -> None:
     project: CompiledProjectView = build_project(
         name="commerce__mart__orders",
-        relative_path="models/mart/commerce__mart__orders.sql",
+        relative_path="sql/models/mart/commerce__mart__orders.sql",
         sql="SELECT * FROM orders",
         config_values={},
     )
@@ -72,7 +72,7 @@ def test_given_authored_sql_changes_when_compiled_sql_is_same_then_cache_is_inva
     compiled_sql: str = "WITH final AS (SELECT 1 AS id) SELECT id FROM final WHERE id > 7"
     project: CompiledProjectView = build_project(
         name="commerce__mart__orders",
-        relative_path="models/mart/commerce__mart__orders.sql",
+        relative_path="sql/models/mart/commerce__mart__orders.sql",
         sql=compiled_sql,
         config_values={},
     )
@@ -109,7 +109,7 @@ def test_given_exact_exception_when_fault_exists_then_suppresses_fault(
     tmp_path: Path,
     test_case: PolicyBehaviorTestCase,
 ) -> None:
-    relative_path = "models/mart/commerce__mart__orders.sql"
+    relative_path = "sql/models/mart/commerce__mart__orders.sql"
     target: Path = tmp_path / relative_path
     target.parent.mkdir(parents=True)
     target.write_text("SELECT * FROM orders\n", encoding="utf-8")
@@ -149,7 +149,7 @@ def test_given_stale_exact_exception_when_evaluating_then_raises_error(
     tmp_path: Path,
     test_case: PolicyBehaviorTestCase,
 ) -> None:
-    relative_path = "models/mart/commerce__mart__orders.sql"
+    relative_path = "sql/models/mart/commerce__mart__orders.sql"
     target: Path = tmp_path / relative_path
     target.parent.mkdir(parents=True)
     target.write_text("WITH final AS (SELECT 1 AS id) SELECT id FROM final\n", encoding="utf-8")
@@ -184,7 +184,7 @@ def test_given_scoped_ignore_when_fault_exists_then_suppresses_fault(
     tmp_path: Path,
     test_case: PolicyBehaviorTestCase,
 ) -> None:
-    relative_path = "models/legacy/commerce__mart__orders.sql"
+    relative_path = "sql/models/legacy/commerce__mart__orders.sql"
     project: CompiledProjectView = build_project(
         name="commerce__mart__orders",
         relative_path=relative_path,
@@ -196,7 +196,7 @@ def test_given_scoped_ignore_when_fault_exists_then_suppresses_fault(
         rule_ignores=(
             RuleIgnore(
                 rules=("SQBRCONTRACT",),
-                paths=("models/legacy/**",),
+                paths=("sql/models/legacy/**",),
                 reason="Legacy migration boundary",
             ),
         ),

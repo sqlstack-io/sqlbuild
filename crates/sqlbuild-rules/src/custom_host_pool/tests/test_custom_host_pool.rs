@@ -107,24 +107,24 @@ fn given_planned_invocations_when_partitioning_then_split_is_deterministic() {
             plan: plan(&[
                 ("XSQBRT101", None),
                 ("XSQBRT102", None),
-                ("XSQBRT103", Some(&["models/b.sql"])),
+                ("XSQBRT103", Some(&["sql/models/b.sql"])),
             ]),
             invocations: invocations(&[
                 ("XSQBRT102", ""),
-                ("XSQBRT101", "models/a.sql"),
-                ("XSQBRT101", "models/b.sql"),
-                ("XSQBRT103", "models/b.sql"),
-                ("XSQBRT101", "models/c.sql"),
+                ("XSQBRT101", "sql/models/a.sql"),
+                ("XSQBRT101", "sql/models/b.sql"),
+                ("XSQBRT103", "sql/models/b.sql"),
+                ("XSQBRT101", "sql/models/c.sql"),
             ]),
             hosts: 2,
             expected_plans: vec![
                 plan(&[
-                    ("XSQBRT101", Some(&["models/b.sql"])),
+                    ("XSQBRT101", Some(&["sql/models/b.sql"])),
                     ("XSQBRT102", Some(&[""])),
-                    ("XSQBRT103", Some(&["models/b.sql"])),
+                    ("XSQBRT103", Some(&["sql/models/b.sql"])),
                 ]),
                 plan(&[
-                    ("XSQBRT101", Some(&["models/a.sql", "models/c.sql"])),
+                    ("XSQBRT101", Some(&["sql/models/a.sql", "sql/models/c.sql"])),
                     ("XSQBRT102", Some(&[])),
                     ("XSQBRT103", Some(&[])),
                 ]),
@@ -133,7 +133,7 @@ fn given_planned_invocations_when_partitioning_then_split_is_deterministic() {
         HostPlanTestCase {
             description: "one subject keeps the original plan",
             plan: plan(&[("XSQBRT101", None)]),
-            invocations: invocations(&[("XSQBRT101", "models/a.sql")]),
+            invocations: invocations(&[("XSQBRT101", "sql/models/a.sql")]),
             hosts: 4,
             expected_plans: vec![plan(&[("XSQBRT101", None)])],
         },
@@ -206,7 +206,7 @@ fn given_host_response_when_decoding_then_slice_or_rules_error_is_returned() {
                 "readsets": [[["project.models"]]],
                 "evaluations": [
                     {"code": "R1", "subject": null, "findings": [{"message": "m"}], "reads": 0},
-                    {"code": "R2", "subject": "models/a.sql", "findings": [], "reads": 0},
+                    {"code": "R2", "subject": "sql/models/a.sql", "findings": [], "reads": 0},
                 ],
                 "untracked": {"R2": [["tree.paths"]]},
                 "uncacheable": ["R3"],
@@ -221,7 +221,7 @@ fn given_host_response_when_decoding_then_slice_or_rules_error_is_returned() {
                         findings: vec![json!({"message": "m"})],
                         ..evaluation("R1", "", Some(&[&["project.models"]]))
                     },
-                    evaluation("R2", "models/a.sql", None),
+                    evaluation("R2", "sql/models/a.sql", None),
                 ],
                 untracked_reads: BTreeMap::from([(
                     "R2".to_owned(),

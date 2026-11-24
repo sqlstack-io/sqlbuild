@@ -207,7 +207,7 @@ This is distinct from `@@name` (project variables) and `@sql.name()` or `@py.nam
 
 ## Named SQL hook parameters
 
-Reusable hooks under `hooks/sql/` use `@name` for raw SQL substitution and `@'name'` for escaped SQL-literal substitution. These parameters are supplied by `sql("name", args...)` and resolved before the rest of the hook SQL is compiled. See [SQL hooks](/docs/concepts/models/hooks/sql#sql-hook-arguments) for value rendering and validation rules.
+Reusable hooks under `sql/hooks/sql/` use `@name` for raw SQL substitution and `@'name'` for escaped SQL-literal substitution. These parameters are supplied by `sql("name", args...)` and resolved before the rest of the hook SQL is compiled. See [SQL hooks](/docs/concepts/models/hooks/sql#sql-hook-arguments) for value rendering and validation rules.
 
 ## Compilation order
 

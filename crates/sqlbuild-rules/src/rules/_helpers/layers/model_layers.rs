@@ -173,7 +173,7 @@ fn canonical_folder_for_layer(layer: &str) -> &'static str {
 fn canonical_folder_in_path(relative_path: &str) -> Option<&'static str> {
     let parts: Vec<&str> = relative_path.split('/').collect();
     let parent = &parts[..parts.len().saturating_sub(1)];
-    for (index, component) in parent.iter().enumerate().skip(1) {
+    for (index, component) in parent.iter().enumerate().skip(2) {
         if *component == STAGING_LAYER_DIRECTORY {
             return Some(STAGING_LAYER_DIRECTORY);
         }

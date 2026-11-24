@@ -19,7 +19,7 @@ pub(super) fn browse_result(complete: bool) -> ScopeResult {
     ScopeResult::Browse(BrowseResult {
         folder: "models".to_owned(),
         folders: vec![ScopeFolder {
-            path: "models/my marts".to_owned(),
+            path: "sql/models/my marts".to_owned(),
             name: "my marts".to_owned(),
             descendant_count: 1,
             child_count: 0,

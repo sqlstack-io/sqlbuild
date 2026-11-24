@@ -21,6 +21,7 @@ import type {
 	BuiltInRole,
 	Capability,
 	CurrentUser,
+	DiscoveredSet,
 	Job,
 	JobDetail,
 	JobLaunchOptions,
@@ -43,6 +44,9 @@ import type {
 	IgnoredAuditFailure,
 	CostSummary,
 	NodeBuildCost,
+	CostSelection,
+	CostSelectionQuery,
+	CostSeriesGroup,
 	NodeState,
 	NodeStates,
 	RepublishResult, Scope,
@@ -60,6 +64,7 @@ import { MockOperate } from './operate-store';
 import type { PlatformApi } from '../platform-client';
 import { MockPlatformApi } from './platform';
 import { MockBuild } from './build';
+import { discoveredSets } from './discovered';
 
 export type MockOptions = {
 	role?: BuiltInRole;
@@ -192,6 +197,10 @@ export class MockApiClient implements ApiClient {
 		this.#location(args[0]);
 		return this.#build.overview(args[0]);
 	}
+	readDiscovered(_scope: Scope): Promise<DiscoveredSet[]> {
+		return this.#reply(discoveredSets(this.#createdAt));
+	}
+
 	listCatalogNodes(...args: Parameters<ApiClient['listCatalogNodes']>) {
 		this.#location(args[0]);
 		return this.#build.listCatalogNodes(...args);
@@ -296,6 +305,16 @@ export class MockApiClient implements ApiClient {
 	async getCostSummary(scope: Scope, days: number): Promise<CostSummary> {
 		this.#location(scope);
 		return this.#operate.getCostSummary(scope, days);
+	}
+
+	async readCostSelection(scope: Scope, query: CostSelectionQuery): Promise<CostSelection> {
+		this.#location(scope);
+		return this.#operate.readCostSelection(scope, query);
+	}
+
+	async readCostSeries(scope: Scope, query: CostSelectionQuery, groups: CostSeriesGroup[]): Promise<number[][]> {
+		this.#location(scope);
+		return this.#operate.readCostSeries(scope, query, groups);
 	}
 
 	async listNodeCosts(scope: Scope, nodeKey: string, days: number): Promise<NodeBuildCost[]> {

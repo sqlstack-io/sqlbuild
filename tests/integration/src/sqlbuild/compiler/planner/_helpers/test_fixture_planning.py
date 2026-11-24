@@ -74,10 +74,10 @@ def test_given_partial_fixture_when_compiling_and_planning_then_completes_requir
                 "[connection]\n"
                 'database = ":memory:"\n'
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 f'MODEL (description "Test model orders.");\n\n{test_case.query_sql}\n'
             ),
-            "sources/raw_orders.yml": (
+            "sql/sources/raw_orders.yml": (
                 "sources:\n"
                 "  - name: raw_orders\n    description: Test source raw_orders.\n"
                 "    expression: SELECT 1 AS order_id, 'open' AS status\n"
@@ -143,7 +143,7 @@ def test_given_upper_case_reads_through_star_import_when_planning_then_fills_eac
         tmp_path,
         {
             "sqlbuild_project.toml": f'name = "fixture_fill_demo"\n{test_case.project_toml}',
-            "sources/raw.yml": (
+            "sql/sources/raw.yml": (
                 "sources:\n"
                 "  - name: raw__orders\n    description: Raw order records\n"
                 "    database: example_db\n"
@@ -154,7 +154,7 @@ def test_given_upper_case_reads_through_star_import_when_planning_then_fills_eac
                 "      - name: customer_id\n        type: VARCHAR\n"
                 "      - name: status\n        type: VARCHAR\n"
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 'MODEL (description "Orders with their status.", database example_db, '
                 "schema analytics);\n\n"
                 'WITH raw__orders AS (SELECT * FROM __source("raw__orders")),\n'
@@ -217,11 +217,11 @@ def test_given_untyped_null_fixture_when_planning_then_applies_authoritative_typ
                 "[connection]\n"
                 'database = ":memory:"\n'
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Test model orders.');\n\nSELECT TRY_CAST(status AS DOUBLE) AS parsed_status "
                 'FROM __source("raw_orders")\n'
             ),
-            "sources/raw_orders.yml": (
+            "sql/sources/raw_orders.yml": (
                 "sources:\n"
                 "  - name: raw_orders\n    description: Test source raw_orders.\n"
                 "    expression: SELECT '1.5' AS status\n"
@@ -287,8 +287,8 @@ def test_given_source_contract_when_completing_fixture_then_respects_authoritati
         tmp_path,
         {
             "sqlbuild_project.toml": 'name = "fixture_schema_demo"\nadapter = "duckdb"\n[connection]\ndatabase = ":memory:"\n',
-            "models/orders.sql": 'MODEL (description "Order facts."); SELECT order_id FROM __source("raw_orders")',
-            "sources/raw_orders.yml": (
+            "sql/models/orders.sql": 'MODEL (description "Order facts."); SELECT order_id FROM __source("raw_orders")',
+            "sql/sources/raw_orders.yml": (
                 "sources:\n  - name: raw_orders\n    description: Raw order facts.\n"
                 "    expression: SELECT 1 AS order_id\n"
                 f"{test_case.contract}"

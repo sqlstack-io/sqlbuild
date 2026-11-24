@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "models/staging/stg_orders.sql model column 'order_id' has unknown metadata keys: format"
+     "message": "sql/models/staging/stg_orders.sql model column 'order_id' has unknown metadata keys: format"
     }
    ]
   }
