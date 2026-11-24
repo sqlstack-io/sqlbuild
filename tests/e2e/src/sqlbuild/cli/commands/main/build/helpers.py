@@ -1387,8 +1387,7 @@ def prepare_changed_project(*, tmp_path: Path, warehouse: ChangedWarehouse) -> P
 
     files: dict[str, str] = {
         path.relative_to(CHANGED_BUILDS_FIXTURE).as_posix(): path.read_text(encoding="utf-8")
-        for path in sorted(CHANGED_BUILDS_FIXTURE.rglob("*"))
-        if path.is_file()
+        for path in sorted(CHANGED_BUILDS_FIXTURE.glob("sql/*/*"))
     }
     project_dir: Path = prepare_inline_project(
         tmp_path=tmp_path,

@@ -53,7 +53,7 @@ test('a job that ignores audit failures says so in its settings', async ({ page 
 	await page.goto('/jobs/core_build?mock');
 	await expect(page.getByTestId('job-ignores-audit-failures')).toHaveText("Audit failures don't stop runs", { timeout: 20_000 });
 	await page.goto('/jobs/marts_only?mock');
-	await expect(page.locator('ul.concurrency')).toBeVisible({ timeout: 20_000 });
+	await expect(page.locator('.concurrency')).toBeVisible({ timeout: 20_000 });
 	await expect(page.getByTestId('job-ignores-audit-failures')).toHaveCount(0);
 });
 
