@@ -39,6 +39,7 @@ use sqlbuild_python_project::planner_identity::main::execution_cycle::execution_
 use sqlbuild_python_project::planner_selection::main::reject_unit_test_selectors::reject_unit_test_selectors;
 use sqlbuild_python_project::planner_selection::main::select_project_graph::select_project_graph;
 use sqlbuild_python_project::project_snapshot::main::job_group_cycles::job_group_cycles;
+use sqlbuild_python_project::project_snapshot::main::orchestration_selectors::orchestration_selectors;
 use sqlbuild_rules::lint_text::main::counts_toward_exit::counts_toward_exit;
 use std::time::Instant;
 
@@ -232,10 +233,16 @@ fn analyzed<'py>(
         early_lint_wait_ms = early_lint.borrow().stop(py)?.into_pyobject(py)?.into_any();
     } else {
         let compiled: &Bound<'py, CompiledProjectGraph> = graph.cast()?;
+        let native = compiled.get().native(py);
+        orchestration_selectors(
+            &options.project_dir,
+            (&project, &discovered),
+            native.get().graph(),
+        )?;
         job_group_cycles(
             &options.project_dir,
             (&project, &discovered),
-            compiled.get().native(py).get().graph(),
+            native.get().graph(),
         )?;
     }
     let (lineage, lineage_ms): (Bound<'py, PyAny>, u64) = driver.lineage(&graph, &dialect)?;

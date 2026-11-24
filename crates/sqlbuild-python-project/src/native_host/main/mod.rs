@@ -5,5 +5,6 @@ pub mod register_runs_state;
 pub mod report_synced_catalog;
 pub mod run_recorder;
 pub mod sensor_declaration;
+pub(crate) mod sensor_selection;
 pub mod target_location;
 pub mod write_stderr_line;
