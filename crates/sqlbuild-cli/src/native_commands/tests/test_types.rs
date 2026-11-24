@@ -486,3 +486,9 @@ pub(crate) struct HealthExitTestCase {
     pub(crate) state: sqlbuild_orchestration::platform::models::LocationState,
     pub(crate) expected_code: i32,
 }
+
+pub(super) struct CrashedCheckTestCase {
+    pub(super) description: &'static str,
+    pub(super) script: &'static str,
+    pub(super) expected_rediscovers: u64,
+}
