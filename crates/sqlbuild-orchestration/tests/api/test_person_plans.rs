@@ -7,12 +7,15 @@ use sqlbuild_core::plan_display::main::detach_model_diffs::detach_model_diffs;
 use uuid::Uuid;
 
 use crate::api::tests::plans_helpers::{ask, person, plan_request, register_instance, run_rows};
-use crate::api::tests::test_types::{PlanDiffTestCase, PlanTestCase, PlanTimingsReadTestCase};
+use crate::api::tests::test_types::{
+    PlanDiffTestCase, PlanLoadFailureTestCase, PlanTestCase, PlanTimingsReadTestCase,
+};
 use crate::api::tests::work_helpers::execute;
 use crate::authorization::main::people::bootstrap_user::bootstrap_user;
 use crate::credentials::models::{AuditContext, BuiltinRole};
 use crate::credentials::tests::location_helpers::create_location;
 use crate::platform::_helpers::maintenance::retention::retain;
+use crate::platform::main::health::report_location_health::report_location_health;
 use crate::platform::main::person_reads::read_person_plan::read_person_plan;
 use crate::platform::main::person_reads::read_person_plan_diff::read_person_plan_diff;
 use crate::platform::main::person_reads::read_person_plan_rows::read_person_plan_rows;
@@ -21,8 +24,9 @@ use crate::platform::main::work::claim_location_work::claim_location_work;
 use crate::platform::main::work::complete_location_work::complete_location_work;
 use crate::platform::main::work::request_location_work::request_location_work;
 use crate::platform::models::{
-    LocationWork, LocationWorkOutcome, LocationWorkRequest, LocationWorkResult, PlanModelDiff,
-    PlanRequest, PlanRowSection, PlanRowsQuery, PlanTimingStep, PlanTimings,
+    LocationHealth, LocationHealthReport, LocationWork, LocationWorkOutcome, LocationWorkRequest,
+    LocationWorkResult, PlanModelDiff, PlanRequest, PlanRowSection, PlanRowsQuery, PlanTimingStep,
+    PlanTimings,
 };
 use crate::runs::tests::helpers::snapshot;
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
@@ -804,6 +808,139 @@ fn given_a_plan_with_timings_when_its_summary_is_read_then_timings_of_another_sh
                 "{}",
                 test_case.description
             );
+        });
+    }
+}
+
+#[test]
+fn given_a_location_whose_load_fails_when_planning_then_waiting_and_new_plans_fail_with_its_error()
+{
+    let test_cases = [
+        PlanLoadFailureTestCase {
+            description: "SQLite, the load error reported",
+            backend: Backend::Sqlite,
+            load_error: Some("job loaders_job: path selectors require an explicit root"),
+            expected_message: "the location can't load the current code, so it can't plan: job loaders_job: path selectors require an explicit root",
+        },
+        PlanLoadFailureTestCase {
+            description: "PostgreSQL, from a location that reports no error",
+            backend: Backend::Postgres,
+            load_error: None,
+            expected_message: "the location can't load the current code, so it can't plan: the location's output has the error",
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let context = AuditContext {
+                actor: "control-store-owner".into(),
+                granting_role: "control-store-owner".into(),
+                request_id: Uuid::now_v7(),
+                ip_address: None,
+            };
+            let admin = bootstrap_user(store, &context, "orders-admin")
+                .await
+                .expect("bootstrap");
+            let location = create_location(store, "orders", "test-owner")
+                .await
+                .expect("location");
+            publish_snapshot(store, &snapshot(location))
+                .await
+                .expect("publish");
+            let viewer = person(
+                store,
+                (&context, admin),
+                ("orders-viewer", location),
+                &[BuiltinRole::Viewer],
+            )
+            .await;
+            let poll = register_instance(store, location).await;
+            let waiting = plan_request(&["build", "customers"]);
+            assert_eq!(
+                ask(store, (&context, viewer), location, &waiting)
+                    .await
+                    .ok(),
+                Some(true),
+                "{}: a plan waits while the location loads",
+                test_case.description
+            );
+            let reported = |health: LocationHealth| LocationHealthReport {
+                event_id: Uuid::now_v7(),
+                session_id: poll.session_id,
+                target: "development".into(),
+                health,
+            };
+            report_location_health(
+                store,
+                location,
+                &reported(LocationHealth::CompileFailed {
+                    generation: 2,
+                    rules: None,
+                    error: test_case.load_error.map(str::to_owned),
+                }),
+            )
+            .await
+            .expect("failed load");
+            let answered = read_person_plan(
+                store,
+                (&context, viewer),
+                (location, "development", waiting.request_id),
+            )
+            .await
+            .expect("read plan")
+            .and_then(|record| record.result_json);
+            let Some(LocationWorkOutcome::Plan { document, .. }) =
+                answered.map(|result| result.outcome)
+            else {
+                panic!("{}: the waiting plan failed", test_case.description);
+            };
+            assert_eq!(
+                document["error"]["message"], test_case.expected_message,
+                "{}: the waiting plan carries the load error",
+                test_case.description
+            );
+            let refused = ask(
+                store,
+                (&context, viewer),
+                location,
+                &plan_request(&["build", "orders"]),
+            )
+            .await;
+            assert!(
+                matches!(&refused, Err(ControlError::Invalid(message)) if message == test_case.expected_message),
+                "{}: a new plan fails at once, got {refused:?}",
+                test_case.description
+            );
+            report_location_health(
+                store,
+                location,
+                &reported(LocationHealth::Connection {
+                    generation: 1,
+                    healthy: true,
+                    trigger: None,
+                    elapsed_millis: None,
+                }),
+            )
+            .await
+            .expect("publication");
+            assert_eq!(
+                ask(
+                    store,
+                    (&context, viewer),
+                    location,
+                    &plan_request(&["build", "orders"])
+                )
+                .await
+                .ok(),
+                Some(true),
+                "{}: once a load publishes, plans are accepted again",
+                test_case.description
+            );
+            close_test_store(fixture).await;
         });
     }
 }

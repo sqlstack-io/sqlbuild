@@ -59,7 +59,7 @@ use crate::native_commands::constants::{
 use crate::native_commands::constants::{
     DEVELOPMENT_CONTROL_FILE, DEVELOPMENT_OUTPUT_FOLDER, PLAN_NOT_PRODUCED,
 };
-use crate::native_commands::constants::{OPENING_STORE, STORE_READY};
+use crate::native_commands::constants::{MAX_LOAD_ERROR_CHARS, OPENING_STORE, STORE_READY};
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_admin::run_admin;
 use crate::native_commands::main::_run_control::run_control;
@@ -1870,11 +1870,20 @@ pub(crate) async fn finish_compile(
         ..
     } = match load {
         Ok(published) => published,
-        Err((rules, _)) => {
+        Err((rules, error)) => {
             watch.retry_at = Some(Instant::now() + Duration::from_secs(30));
+            let error: String = redact_error_text(&error)
+                .chars()
+                .take(MAX_LOAD_ERROR_CHARS)
+                .collect();
+            let failed = LocationHealth::CompileFailed {
+                generation,
+                rules,
+                error: Some(error),
+            };
             tokio::select! {
                 result = &mut stopped => { result?; return Ok(None); },
-                () = report_location_health(options, session.0, session.1, LocationHealth::CompileFailed { generation, rules }) => {},
+                () = report_location_health(options, session.0, session.1, failed) => {},
             }
             drop(write_output(&[(
                 Stream::Stderr,

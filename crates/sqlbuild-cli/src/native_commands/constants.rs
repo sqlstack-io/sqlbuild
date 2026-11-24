@@ -277,3 +277,6 @@ pub(crate) const DEVELOPMENT_CONTROL_FILE: &str =
 
 /// `sqb location health` while the newest location instance has not finished its first load.
 pub(crate) const STARTING_EXIT_CODE: i32 = 3;
+
+/// The most characters of a failed load's error a location reports; the server refuses more.
+pub(crate) const MAX_LOAD_ERROR_CHARS: usize = 4000;

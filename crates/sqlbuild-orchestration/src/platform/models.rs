@@ -47,6 +47,9 @@ pub enum LocationHealth {
         /// The configured rules' findings when they failed the load; absent for other failures and from older locations.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         rules: Option<LocationRuleFailure>,
+        /// Why the load failed, redacted and bounded; absent from older locations.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
     },
     Connection {
         generation: i64,

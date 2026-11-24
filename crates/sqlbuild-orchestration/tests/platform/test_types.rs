@@ -70,6 +70,8 @@ pub(crate) struct CompileFailureTestCase {
     pub(crate) finding_count: u64,
     pub(crate) listed: usize,
     pub(crate) message_chars: usize,
+    /// The load error's length.
+    pub(crate) error_chars: usize,
     pub(crate) expected_accepted: bool,
 }
 

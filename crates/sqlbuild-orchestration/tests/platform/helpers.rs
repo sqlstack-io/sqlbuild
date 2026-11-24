@@ -286,6 +286,7 @@ pub(crate) fn health_history(
                 ReportedHealth::Failed(generation) => LocationHealth::CompileFailed {
                     generation,
                     rules: None,
+                    error: Some(format!("generation {generation} failed to load")),
                 },
                 ReportedHealth::Secrets => LocationHealth::ProviderSecrets {
                     generation: 1,
