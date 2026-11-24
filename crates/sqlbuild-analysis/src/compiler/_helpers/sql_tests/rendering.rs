@@ -14,7 +14,8 @@ use crate::compiler::_helpers::sql_tests::cte_slices::{
 use crate::compiler::_helpers::sql_tests::cte_sql::{cte_definition_sql, leading_with_prefix_end};
 use crate::compiler::_helpers::sql_tests::helper_names::HELPER_PREFIX;
 use crate::compiler::_helpers::sql_tests::planning::REF_PREFIX;
-use crate::compiler::models::{PlacedComparisonSql, SqlTestAssertionStep, SqlTestChainStep};
+use crate::compiler::models::{SqlTestAssertionStep, SqlTestChainStep};
+use crate::compiler::types::PlacedComparisonSql;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 
