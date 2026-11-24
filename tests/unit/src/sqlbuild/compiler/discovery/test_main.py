@@ -687,6 +687,12 @@ def test_given_supported_project_python_when_discovering_inputs_then_paths_are_a
             repo_files=base_repo_files() | {"definitions.py": "VALUE = 1\n"},
             expected_error_fragment="'definitions.py' is not part of a SQLBuild project",
         ),
+        DiscoverProjectInputsErrorTestCase(
+            description="raises when Python lives in removed event_exporters root",
+            repo_files=base_repo_files()
+            | {"event_exporters/publish.py": "def publish(event):\n    del event\n"},
+            expected_error_fragment="'event_exporters/' is not part of a SQLBuild project",
+        ),
     ),
     ids=lambda case: case.description,
 )

@@ -240,7 +240,7 @@ DIAGNOSTIC_CONSTRUCTION_OWNER_PATHS: frozenset[str] = frozenset(
 
 EVENT_EXPORTER_RUNTIME_PREFIX: str = "src/sqlbuild/runtime/event_exporting/"
 EVENT_EXPORTER_PUBLIC_PATH: str = "src/sqlbuild/event_sinks.py"
-EVENT_EXPORTER_DIRECTORY_NAME: str = "sinks"
+EVENT_EXPORTER_DIRECTORY_PARTS: tuple[str, ...] = ("python", "event_sinks")
 EVENT_EXPORTER_MODULE_PARTS: tuple[str, ...] = ("sqlbuild", "runtime", "event_exporting")
 CORE_EVENT_EXPORTER_CLASS_NAMES: frozenset[str] = frozenset(
     {
@@ -282,7 +282,7 @@ OBSERVABILITY_FACTORY_MODULES: tuple[tuple[str, ...], ...] = (
 OBSERVABILITY_DEFINITION_MODULES: tuple[tuple[str, ...], ...] = (
     ("sqlbuild", "runtime", "observability", "models"),
 )
-PUBLIC_EVENT_EXPORTER_MODULE_PARTS: tuple[str, ...] = ("sqlbuild", "sinks")
+PUBLIC_EVENT_EXPORTER_MODULE_PARTS: tuple[str, ...] = ("sqlbuild", "event_sinks")
 NATIVE_BINDINGS_ROOTS: tuple[str, ...] = (
     "crates/sqlbuild-python/src/",
     "crates/sqlbuild-python-base/src/",

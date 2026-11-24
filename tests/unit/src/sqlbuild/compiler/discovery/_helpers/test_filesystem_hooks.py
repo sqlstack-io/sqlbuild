@@ -163,7 +163,7 @@ def imported_hook(ctx):
                 + "\n",
                 "sql/hooks/python/uses_import.py": """
 from sqlbuild.hooks import hook
-from hooks.python.shared import imported_hook
+from sql.hooks.python.shared import imported_hook
 
 
 @hook

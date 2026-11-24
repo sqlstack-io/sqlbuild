@@ -61,7 +61,7 @@ from tests.unit.scripts.compiler_differential._helpers.comparing._test_types imp
             description="escaped_pointer_token",
             left={"sql/models/orders.sql": {"a~b": 1}},
             right={"sql/models/orders.sql": {"a~b": 2}},
-            expected_location="/models~1orders.sql/a~0b",
+            expected_location="/sql~1models~1orders.sql/a~0b",
         ),
     ],
     ids=lambda case: case.description,

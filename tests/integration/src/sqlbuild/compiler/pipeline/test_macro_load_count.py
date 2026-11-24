@@ -22,7 +22,8 @@ _PROJECT_TOML: str = 'name = "demo"\nadapter = "duckdb"\n\n[connection]\ndatabas
 _COUNTING_MACRO_MODULE: str = (
     "from pathlib import Path\n"
     "\n"
-    "_LOG_PATH = Path(__file__).resolve().parents[3] / 'macro_import_log.txt'\n"
+    "_PROJECT = Path(__file__).resolve().parents[4]\n"
+    "_LOG_PATH = _PROJECT.parent / f'{_PROJECT.name}_macro_import_log.txt'\n"
     "with _LOG_PATH.open('a', encoding='utf-8') as handle:\n"
     "    handle.write('import\\n')\n"
     "\n"
@@ -67,7 +68,9 @@ def test_given_side_effect_macro_when_compiling_manifest_then_imports_macros_onc
         adapter_type="duckdb",
     )
 
-    import_log: str = (tmp_path / "macro_import_log.txt").read_text(encoding="utf-8")
+    import_log: str = (tmp_path.parent / f"{tmp_path.name}_macro_import_log.txt").read_text(
+        encoding="utf-8"
+    )
     assert import_log.count("import") == test_case.expected_macro_import_count
 
 

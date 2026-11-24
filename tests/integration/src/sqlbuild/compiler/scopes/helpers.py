@@ -138,7 +138,7 @@ _FOLDERS: tuple[str, ...] = (
     "sql/models/other/archive",
 )
 _PLACEMENTS: tuple[str, ...] = (
-    "{kind}s/f{index}",
+    "sql/{kind}s/f{index}",
     "{folder}/{kind}s/f{index}",
     "{folder}/_sqlbuild/{kind}s/f{index}",
     "{folder}/_{kind}s/f{index}",

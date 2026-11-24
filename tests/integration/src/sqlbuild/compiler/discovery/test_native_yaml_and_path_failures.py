@@ -95,7 +95,7 @@ _HELP: bool = True
                 (os.fsdecode(b"tests/scenarios/x\xe9.md"), b"x"),
                 (os.fsdecode(b"sql/sources/x\xe9.txt"), b"x"),
                 (os.fsdecode(b"sql/seeds/x\xe9.txt"), b"x"),
-                (os.fsdecode(b"data\xe9.csv"), b"x"),
+                (os.fsdecode(b"tests/data\xe9.csv"), b"x"),
                 (os.fsdecode(b"target/x\xe9"), b"x"),
             ),
         ),

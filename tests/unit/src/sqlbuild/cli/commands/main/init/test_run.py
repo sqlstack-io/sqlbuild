@@ -20,9 +20,9 @@ from tests.unit.src.sqlbuild.presentation.helpers import use_color_terminal, use
             expected_directories=(
                 "sql/models/staging",
                 "sql/models/marts",
-                "schemas",
-                "sources",
-                "seeds",
+                "sql/schemas",
+                "sql/sources",
+                "sql/seeds",
                 "python",
                 "sql/hooks/sql",
                 "sql/hooks/python",

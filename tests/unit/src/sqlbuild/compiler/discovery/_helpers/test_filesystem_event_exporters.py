@@ -300,22 +300,3 @@ alias = publish
     )
 
     assert tuple(exporter.name for exporter in exporters) == (test_case.expected_name,)
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    (EventExporterDiscoveryTestCase("legacy exporter directory", "replaced by sinks"),),
-    ids=lambda case: case.description,
-)
-def test_given_legacy_exporter_directory_when_discovering_then_reports_migration(
-    test_case: EventExporterDiscoveryTestCase,
-    tmp_path: Path,
-    write_repo_files: Callable[[Path, dict[str, str]], None],
-) -> None:
-    write_repo_files(
-        tmp_path,
-        {"event_exporters/publish.py": "def publish(event):\n    del event\n"},
-    )
-
-    with pytest.raises(EventExporterDiscoveryError, match=test_case.expected_name):
-        discover_event_exporter_functions(project_dir=tmp_path)

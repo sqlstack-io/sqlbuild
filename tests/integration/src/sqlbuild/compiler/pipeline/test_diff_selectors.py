@@ -58,7 +58,7 @@ _PROJECT_FILES: dict[str, str] = {
         ),
         DiffSelectorIntegrationTestCase(
             description="Windows-style path selector returns models under folder",
-            select=("path:models\\staging",),
+            select=("path:sql\\models\\staging",),
             exclude=(),
             expected_model_names=frozenset(("stg_orders", "stg_customers")),
         ),

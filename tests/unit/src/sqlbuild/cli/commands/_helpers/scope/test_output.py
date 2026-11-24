@@ -151,8 +151,8 @@ def test_given_browse_result_when_rendering_then_counts_and_follow_ups_are_exact
 
     assert exit_code == test_case.expected_exit_code
     assert "Scope folders" in stream.getvalue()
-    assert "sql/constants/  1 declaration, 0 used, 0 children; constant 1" in stream.getvalue()
-    assert "sql/macros/  1 declaration, 1 used, 1 child; macro 1" in stream.getvalue()
+    assert "constants/  1 declaration, 0 used, 0 children; constant 1" in stream.getvalue()
+    assert "macros/  1 declaration, 1 used, 1 child; macro 1" in stream.getvalue()
     assert "sqb scope model:orders --browse" in stream.getvalue()
     assert "sqb scope model:orders --list" in stream.getvalue()
 

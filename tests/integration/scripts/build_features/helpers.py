@@ -39,6 +39,7 @@ def write_workspace(root: Path, test_case: BuildFeaturesTestCase) -> None:
     _write(
         root / "crates" / "sqlbuild-cli" / "Cargo.toml",
         '[package]\nname = "sqlbuild-cli"\nversion = "0.1.0"\nedition = "2021"\n\n'
+        "[features]\nui = []\n\n"
         '[dependencies]\nshared = { path = "../shared" }\nderive = { path = "../derive" }\n',
     )
     _write(root / "crates" / "sqlbuild-cli" / "src" / "lib.rs", "")
