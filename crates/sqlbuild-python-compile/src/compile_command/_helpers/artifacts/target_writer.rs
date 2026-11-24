@@ -62,7 +62,7 @@ use sqlbuild_python_project::sql_test_glue::models::SqlTestPlanOptions;
 const COMPILED_DIR: &str = "compiled";
 const MODELS_DIR: &str = sqlbuild_core::constants::MODELS_PATH;
 const FUNCTIONS_DIR: &str = sqlbuild_core::constants::FUNCTIONS_PATH;
-const AUDITS_DIR: &str = "audits";
+const AUDITS_DIR: &str = sqlbuild_core::constants::AUDITS_PATH;
 const GENERIC_DIR: &str = "generic";
 const SINGULAR_DIR: &str = "singular";
 const TESTS_DIR: &str = "tests";

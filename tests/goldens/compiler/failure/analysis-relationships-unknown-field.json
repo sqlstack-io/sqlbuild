@@ -61,7 +61,7 @@
   }
  ],
  "compiled": {
-  "audits/generic/customer_totals/relationships__customer_id.sql": [
+  "sql/audits/generic/customer_totals/relationships__customer_id.sql": [
    "SELECT customer_id",
    "FROM __ref(\"customer_totals\")",
    "WHERE customer_id IS NOT NULL",

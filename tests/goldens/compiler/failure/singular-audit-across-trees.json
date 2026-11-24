@@ -24,7 +24,7 @@
   }
  ],
  "compiled": {
-  "audits/singular/totals_have_orders.sql": [
+  "sql/audits/singular/totals_have_orders.sql": [
    "SELECT t.customer_id",
    "FROM __ref(\"customer_totals\") t",
    "LEFT JOIN __source(\"raw_orders\") o ON t.customer_id = o.customer_id",

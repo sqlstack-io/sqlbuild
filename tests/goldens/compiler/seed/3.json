@@ -17,26 +17,26 @@
   }
  ],
  "compiled": {
-  "audits/generic/audited_event_totals/amount_floor.sql": [
+  "sql/audits/generic/audited_event_totals/amount_floor.sql": [
    "SELECT *",
    "FROM __ref(\"audited_event_totals\")",
    "WHERE amount < -23",
    ""
   ],
-  "audits/generic/audited_events/accepted_values__id.sql": [
+  "sql/audits/generic/audited_events/accepted_values__id.sql": [
    "SELECT id",
    "FROM __source(\"audited_events\")",
    "WHERE id IS NOT NULL",
    "  AND id NOT IN (1, 2)",
    ""
   ],
-  "audits/generic/audited_events/not_null__id.sql": [
+  "sql/audits/generic/audited_events/not_null__id.sql": [
    "SELECT id",
    "FROM __source(\"audited_events\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/audited_events/unique__id.sql": [
+  "sql/audits/generic/audited_events/unique__id.sql": [
    "SELECT id, COUNT(*) AS duplicate_count",
    "FROM __source(\"audited_events\")",
    "WHERE id IS NOT NULL",
@@ -44,32 +44,32 @@
    "HAVING COUNT(*) > 1",
    ""
   ],
-  "audits/generic/billing_summary_1/not_null__id.sql": [
+  "sql/audits/generic/billing_summary_1/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"billing_summary_1\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/channel_codes/not_null__id.sql": [
+  "sql/audits/generic/channel_codes/not_null__id.sql": [
    "SELECT id",
    "FROM __seed(\"channel_codes\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/checked_stg_billing_1/accepted_values__status.sql": [
+  "sql/audits/generic/checked_stg_billing_1/accepted_values__status.sql": [
    "SELECT status",
    "FROM __ref(\"checked_stg_billing_1\")",
    "WHERE status IS NOT NULL",
    "  AND status NOT IN ('placed', 'expédié', '取消', 'returned ✓')",
    ""
   ],
-  "audits/generic/checked_stg_billing_1/expression_is_true.sql": [
+  "sql/audits/generic/checked_stg_billing_1/expression_is_true.sql": [
    "SELECT *",
    "FROM __ref(\"checked_stg_billing_1\")",
    "WHERE NOT (amount >= -1000)",
    ""
   ],
-  "audits/generic/checked_stg_billing_1/relationships__id.sql": [
+  "sql/audits/generic/checked_stg_billing_1/relationships__id.sql": [
    "SELECT id",
    "FROM __ref(\"checked_stg_billing_1\")",
    "WHERE id IS NOT NULL",
@@ -80,33 +80,33 @@
    "  )",
    ""
   ],
-  "audits/generic/configured_events/accepted_values__id.sql": [
+  "sql/audits/generic/configured_events/accepted_values__id.sql": [
    "SELECT id",
    "FROM __source(\"configured_events\")",
    "WHERE id IS NOT NULL",
    "  AND id NOT IN ('1')",
    ""
   ],
-  "audits/generic/configured_stg_billing_1/accepted_values__status.sql": [
+  "sql/audits/generic/configured_stg_billing_1/accepted_values__status.sql": [
    "SELECT status",
    "FROM __ref(\"configured_stg_billing_1\")",
    "WHERE status IS NOT NULL",
    "  AND status NOT IN ('placed', 'shipped')",
    ""
   ],
-  "audits/generic/configured_stg_billing_1/configured_amount_floor.sql": [
+  "sql/audits/generic/configured_stg_billing_1/configured_amount_floor.sql": [
    "SELECT *",
    "FROM __ref(\"configured_stg_billing_1\")",
    "WHERE amount < -25",
    ""
   ],
-  "audits/generic/configured_stg_billing_1/configured_id_present__id.sql": [
+  "sql/audits/generic/configured_stg_billing_1/configured_id_present__id.sql": [
    "SELECT id",
    "FROM __ref(\"configured_stg_billing_1\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/configured_stg_billing_1/unique__id.sql": [
+  "sql/audits/generic/configured_stg_billing_1/unique__id.sql": [
    "SELECT id, COUNT(*) AS duplicate_count",
    "FROM __ref(\"configured_stg_billing_1\")",
    "WHERE id IS NOT NULL",
@@ -114,7 +114,7 @@
    "HAVING COUNT(*) > 1",
    ""
   ],
-  "audits/generic/stg_billing_0/not_null__id.sql": [
+  "sql/audits/generic/stg_billing_0/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"stg_billing_0\")",
    "WHERE id IS NULL",

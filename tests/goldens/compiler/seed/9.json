@@ -17,39 +17,39 @@
   }
  ],
  "compiled": {
-  "audits/generic/billing_summary_0/not_null__id.sql": [
+  "sql/audits/generic/billing_summary_0/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"billing_summary_0\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/configured_events/accepted_values__id.sql": [
+  "sql/audits/generic/configured_events/accepted_values__id.sql": [
    "SELECT id",
    "FROM __source(\"configured_events\")",
    "WHERE id IS NOT NULL",
    "  AND id NOT IN ('1')",
    ""
   ],
-  "audits/generic/configured_stg_support_1/accepted_values__status.sql": [
+  "sql/audits/generic/configured_stg_support_1/accepted_values__status.sql": [
    "SELECT status",
    "FROM __ref(\"configured_stg_support_1\")",
    "WHERE status IS NOT NULL",
    "  AND status NOT IN ('placed', 'shipped')",
    ""
   ],
-  "audits/generic/configured_stg_support_1/configured_amount_floor.sql": [
+  "sql/audits/generic/configured_stg_support_1/configured_amount_floor.sql": [
    "SELECT *",
    "FROM __ref(\"configured_stg_support_1\")",
    "WHERE amount < -37",
    ""
   ],
-  "audits/generic/configured_stg_support_1/configured_id_present__id.sql": [
+  "sql/audits/generic/configured_stg_support_1/configured_id_present__id.sql": [
    "SELECT id",
    "FROM __ref(\"configured_stg_support_1\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/configured_stg_support_1/unique__id.sql": [
+  "sql/audits/generic/configured_stg_support_1/unique__id.sql": [
    "SELECT id, COUNT(*) AS duplicate_count",
    "FROM __ref(\"configured_stg_support_1\")",
    "WHERE id IS NOT NULL",
@@ -57,32 +57,32 @@
    "HAVING COUNT(*) > 1",
    ""
   ],
-  "audits/generic/guarded_stg_billing_0/amount_at_least__amount.sql": [
+  "sql/audits/generic/guarded_stg_billing_0/amount_at_least__amount.sql": [
    "SELECT *",
    "FROM __ref(\"guarded_stg_billing_0\")",
    "WHERE amount < 0",
    ""
   ],
-  "audits/generic/labelled_stg_support_1/tidy_status__status.sql": [
+  "sql/audits/generic/labelled_stg_support_1/tidy_status__status.sql": [
    "SELECT *",
    "FROM __ref(\"labelled_stg_support_1\")",
    "WHERE status <> LOWER(TRIM(status))",
    ""
   ],
-  "audits/generic/stated_stg_support_0/accepted_values__status.sql": [
+  "sql/audits/generic/stated_stg_support_0/accepted_values__status.sql": [
    "SELECT status",
    "FROM __ref(\"stated_stg_support_0\")",
    "WHERE status IS NOT NULL",
    "  AND status NOT IN ('placed', 'expédié', '取消', 'returned ✓')",
    ""
   ],
-  "audits/generic/stg_billing_0/not_null__id.sql": [
+  "sql/audits/generic/stg_billing_0/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"stg_billing_0\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/singular/labelled_channels_match.sql": [
+  "sql/audits/singular/labelled_channels_match.sql": [
    "SELECT l.id",
    "FROM __ref(\"labelled_stg_support_1\") l",
    "JOIN __ref(\"channel_labels\") c ON l.id = c.id",

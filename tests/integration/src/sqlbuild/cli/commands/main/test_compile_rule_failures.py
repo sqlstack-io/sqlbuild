@@ -430,7 +430,7 @@ def test_given_resources_edited_while_rules_fail_when_the_fix_passes_then_compil
         "tests/order_totals/order_totals_case.sql",
     ]
     assert changed_artifacts(after_test_edit, after_model_edit) == [
-        "audits/singular/positive_totals.sql",
+        "sql/audits/singular/positive_totals.sql",
         "sql/models/order_totals.sql",
         "tests/order_totals/order_totals_case.sql",
     ]

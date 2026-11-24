@@ -42,7 +42,7 @@
   }
  ],
  "compiled": {
-  "audits/generic/customer_totals/expression_is_true.sql": [
+  "sql/audits/generic/customer_totals/expression_is_true.sql": [
    "SELECT *",
    "FROM __ref(\"customer_totals\")",
    "WHERE NOT (discount >= 0)",

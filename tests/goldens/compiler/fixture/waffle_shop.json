@@ -22,13 +22,13 @@
   }
  ],
  "compiled": {
-  "audits/generic/customer_status_snapshot/not_null__customer_id.sql": [
+  "sql/audits/generic/customer_status_snapshot/not_null__customer_id.sql": [
    "SELECT customer_id",
    "FROM __ref(\"customer_status_snapshot\")",
    "WHERE customer_id IS NULL",
    ""
   ],
-  "audits/generic/customer_status_snapshot/unique__customer_id.sql": [
+  "sql/audits/generic/customer_status_snapshot/unique__customer_id.sql": [
    "SELECT customer_id, COUNT(*) AS duplicate_count",
    "FROM __ref(\"customer_status_snapshot\")",
    "WHERE customer_id IS NOT NULL",
@@ -36,43 +36,43 @@
    "HAVING COUNT(*) > 1",
    ""
   ],
-  "audits/generic/daily_activity_rollup/daily_orders_placed_is_non_negative.sql": [
+  "sql/audits/generic/daily_activity_rollup/daily_orders_placed_is_non_negative.sql": [
    "SELECT *",
    "FROM __ref(\"daily_activity_rollup\")",
    "WHERE NOT (orders_placed >= 0)",
    ""
   ],
-  "audits/generic/daily_activity_rollup/not_null__activity_day.sql": [
+  "sql/audits/generic/daily_activity_rollup/not_null__activity_day.sql": [
    "SELECT activity_day",
    "FROM __ref(\"daily_activity_rollup\")",
    "WHERE activity_day IS NULL",
    ""
   ],
-  "audits/generic/daily_order_partitioned/not_null__order_date.sql": [
+  "sql/audits/generic/daily_order_partitioned/not_null__order_date.sql": [
    "SELECT order_date",
    "FROM __ref(\"daily_order_partitioned\")",
    "WHERE order_date IS NULL",
    ""
   ],
-  "audits/generic/daily_order_partitioned/waffles_ordered_is_positive.sql": [
+  "sql/audits/generic/daily_order_partitioned/waffles_ordered_is_positive.sql": [
    "SELECT *",
    "FROM __ref(\"daily_order_partitioned\")",
    "WHERE NOT (waffles_ordered > 0)",
    ""
   ],
-  "audits/generic/daily_revenue/revenue_is_non_negative.sql": [
+  "sql/audits/generic/daily_revenue/revenue_is_non_negative.sql": [
    "SELECT *",
    "FROM __ref(\"daily_revenue\")",
    "WHERE NOT (total_revenue_cents >= 0)",
    ""
   ],
-  "audits/generic/dim_customers/not_null__customer_id.sql": [
+  "sql/audits/generic/dim_customers/not_null__customer_id.sql": [
    "SELECT customer_id",
    "FROM __ref(\"dim_customers\")",
    "WHERE customer_id IS NULL",
    ""
   ],
-  "audits/generic/dim_customers/unique__customer_id.sql": [
+  "sql/audits/generic/dim_customers/unique__customer_id.sql": [
    "SELECT customer_id, COUNT(*) AS duplicate_count",
    "FROM __ref(\"dim_customers\")",
    "WHERE customer_id IS NOT NULL",
@@ -80,43 +80,43 @@
    "HAVING COUNT(*) > 1",
    ""
   ],
-  "audits/generic/fact_orders/not_null__order_id.sql": [
+  "sql/audits/generic/fact_orders/not_null__order_id.sql": [
    "SELECT order_id",
    "FROM __ref(\"fact_orders\")",
    "WHERE order_id IS NULL",
    ""
   ],
-  "audits/generic/hourly_activity_with_daily_context/day_orders_cover_hourly_orders.sql": [
+  "sql/audits/generic/hourly_activity_with_daily_context/day_orders_cover_hourly_orders.sql": [
    "SELECT *",
    "FROM __ref(\"hourly_activity_with_daily_context\")",
    "WHERE NOT (day_orders_placed >= orders_placed)",
    ""
   ],
-  "audits/generic/hourly_activity_with_daily_context/not_null__activity_hour.sql": [
+  "sql/audits/generic/hourly_activity_with_daily_context/not_null__activity_hour.sql": [
    "SELECT activity_hour",
    "FROM __ref(\"hourly_activity_with_daily_context\")",
    "WHERE activity_hour IS NULL",
    ""
   ],
-  "audits/generic/hourly_order_activity/not_null__activity_hour.sql": [
+  "sql/audits/generic/hourly_order_activity/not_null__activity_hour.sql": [
    "SELECT activity_hour",
    "FROM __ref(\"hourly_order_activity\")",
    "WHERE activity_hour IS NULL",
    ""
   ],
-  "audits/generic/hourly_order_activity/orders_placed_is_non_negative.sql": [
+  "sql/audits/generic/hourly_order_activity/orders_placed_is_non_negative.sql": [
    "SELECT *",
    "FROM __ref(\"hourly_order_activity\")",
    "WHERE NOT (orders_placed >= 0)",
    ""
   ],
-  "audits/generic/order_status_index/not_null__order_id.sql": [
+  "sql/audits/generic/order_status_index/not_null__order_id.sql": [
    "SELECT order_id",
    "FROM __ref(\"order_status_index\")",
    "WHERE order_id IS NULL",
    ""
   ],
-  "audits/generic/order_status_index/unique__order_id.sql": [
+  "sql/audits/generic/order_status_index/unique__order_id.sql": [
    "SELECT order_id, COUNT(*) AS duplicate_count",
    "FROM __ref(\"order_status_index\")",
    "WHERE order_id IS NOT NULL",
@@ -124,19 +124,19 @@
    "HAVING COUNT(*) > 1",
    ""
   ],
-  "audits/generic/stg_customers/not_null__customer_id.sql": [
+  "sql/audits/generic/stg_customers/not_null__customer_id.sql": [
    "SELECT customer_id",
    "FROM __ref(\"stg_customers\")",
    "WHERE customer_id IS NULL",
    ""
   ],
-  "audits/generic/stg_customers/not_null__email.sql": [
+  "sql/audits/generic/stg_customers/not_null__email.sql": [
    "SELECT email",
    "FROM __ref(\"stg_customers\")",
    "WHERE email IS NULL",
    ""
   ],
-  "audits/generic/stg_customers/unique__customer_id.sql": [
+  "sql/audits/generic/stg_customers/unique__customer_id.sql": [
    "SELECT customer_id, COUNT(*) AS duplicate_count",
    "FROM __ref(\"stg_customers\")",
    "WHERE customer_id IS NOT NULL",
@@ -144,26 +144,26 @@
    "HAVING COUNT(*) > 1",
    ""
   ],
-  "audits/generic/stg_orders/accepted_values__status.sql": [
+  "sql/audits/generic/stg_orders/accepted_values__status.sql": [
    "SELECT status",
    "FROM __ref(\"stg_orders\")",
    "WHERE status IS NOT NULL",
    "  AND status NOT IN ('placed', 'preparing', 'ready', 'completed', 'cancelled')",
    ""
   ],
-  "audits/generic/stg_orders/not_null__customer_id.sql": [
+  "sql/audits/generic/stg_orders/not_null__customer_id.sql": [
    "SELECT customer_id",
    "FROM __ref(\"stg_orders\")",
    "WHERE customer_id IS NULL",
    ""
   ],
-  "audits/generic/stg_orders/not_null__order_id.sql": [
+  "sql/audits/generic/stg_orders/not_null__order_id.sql": [
    "SELECT order_id",
    "FROM __ref(\"stg_orders\")",
    "WHERE order_id IS NULL",
    ""
   ],
-  "audits/generic/stg_orders/relationships__waffle_type_id.sql": [
+  "sql/audits/generic/stg_orders/relationships__waffle_type_id.sql": [
    "SELECT waffle_type_id",
    "FROM __ref(\"stg_orders\")",
    "WHERE waffle_type_id IS NOT NULL",
@@ -174,7 +174,7 @@
    "  )",
    ""
   ],
-  "audits/generic/stg_orders/unique__order_id.sql": [
+  "sql/audits/generic/stg_orders/unique__order_id.sql": [
    "SELECT order_id, COUNT(*) AS duplicate_count",
    "FROM __ref(\"stg_orders\")",
    "WHERE order_id IS NOT NULL",
@@ -182,19 +182,19 @@
    "HAVING COUNT(*) > 1",
    ""
   ],
-  "audits/generic/stg_payments/not_null__order_id.sql": [
+  "sql/audits/generic/stg_payments/not_null__order_id.sql": [
    "SELECT order_id",
    "FROM __ref(\"stg_payments\")",
    "WHERE order_id IS NULL",
    ""
   ],
-  "audits/generic/stg_payments/not_null__payment_id.sql": [
+  "sql/audits/generic/stg_payments/not_null__payment_id.sql": [
    "SELECT payment_id",
    "FROM __ref(\"stg_payments\")",
    "WHERE payment_id IS NULL",
    ""
   ],
-  "audits/generic/stg_payments/relationships__order_id.sql": [
+  "sql/audits/generic/stg_payments/relationships__order_id.sql": [
    "SELECT order_id",
    "FROM __ref(\"stg_payments\")",
    "WHERE order_id IS NOT NULL",
@@ -205,7 +205,7 @@
    "  )",
    ""
   ],
-  "audits/generic/stg_payments/unique__payment_id.sql": [
+  "sql/audits/generic/stg_payments/unique__payment_id.sql": [
    "SELECT payment_id, COUNT(*) AS duplicate_count",
    "FROM __ref(\"stg_payments\")",
    "WHERE payment_id IS NOT NULL",

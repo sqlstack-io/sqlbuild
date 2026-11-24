@@ -68,7 +68,7 @@ SQL_TEST_MODEL_CHAINS: str = "sql_test_model_chain_names_by_key"
                     "REGISTER PYTHON FUNCTION analytics.is_completed_order_py"
                     "(VARCHAR) RETURNS BOOLEAN\n"
                 ),
-                "compiled/audits/generic/orders/not_null__order_id.sql": (
+                "compiled/sql/audits/generic/orders/not_null__order_id.sql": (
                     "SELECT order_id FROM analytics.orders WHERE order_id IS NULL\n"
                 ),
             },
