@@ -47,6 +47,15 @@ _WITH_QUERY: str = "WITH base AS (SELECT 1 AS id)\nSELECT id FROM base\n"
                 + "-- Benchmark edit 0.\n-- Benchmark edit 1.\nSELECT 1 AS id\n"
             },
         ),
+        OneModelEditTestCase(
+            description="a base checkout's project from before the sql/ layout keeps models/",
+            model_files={"models/orders.sql": _HEADER + "SELECT 1 AS id\n"},
+            revisions=1,
+            expected_paths=("models/orders.sql",),
+            expected_files={
+                "models/orders.sql": _HEADER + "-- Benchmark edit 0.\nSELECT 1 AS id\n"
+            },
+        ),
     ),
     ids=lambda case: case.description,
 )

@@ -43,7 +43,7 @@ def read_model_files(*, project_dir: Path) -> dict[str, str]:
 
     return {
         path.relative_to(project_dir).as_posix(): path.read_text(encoding="utf-8")
-        for path in sorted((project_dir / "sql" / "models").rglob("*.sql"))
+        for path in sorted(project_dir.rglob("*.sql"))
     }
 
 

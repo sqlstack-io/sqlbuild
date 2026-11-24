@@ -7,7 +7,7 @@ from pathlib import Path
 from scripts.compile_performance_ratio.constants import (
     EDIT_COMMENT,
     MODEL_FILE_PATTERN,
-    MODELS_DIRECTORY,
+    MODELS_DIRECTORIES,
     STATEMENT_START,
 )
 from scripts.compile_performance_ratio.exceptions import BenchmarkEditError
@@ -17,7 +17,11 @@ def apply_one_model_edit(*, project_dir: Path, revision: int) -> Path:
     """Comment the middle model's query with the revision so each revision is a new edit."""
 
     models: list[Path] = sorted(
-        (project_dir / MODELS_DIRECTORY).rglob(MODEL_FILE_PATTERN),
+        (
+            path
+            for directory in MODELS_DIRECTORIES
+            for path in (project_dir / directory).rglob(MODEL_FILE_PATTERN)
+        ),
         key=lambda path: path.relative_to(project_dir).as_posix(),
     )
     if not models:

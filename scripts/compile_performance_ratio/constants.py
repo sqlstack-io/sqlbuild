@@ -26,7 +26,9 @@ ANALYSED_MODEL_COUNTERS: tuple[str, ...] = (
     ANALYSIS_CACHE_MISSES,
     ANALYSIS_CACHE_BYPASSES,
 )
-MODELS_DIRECTORY: str = "sql/models"
+# Where each side's generator writes models: this layout's sql/models/, or models/ in a base
+# checkout from before it. Only one of them exists in a project.
+MODELS_DIRECTORIES: tuple[str, ...] = ("sql/models", "models")
 MODEL_FILE_PATTERN: str = "*.sql"
 EDIT_COMMENT: str = "-- Benchmark edit {revision}.\n"
 STATEMENT_START: re.Pattern[str] = re.compile(r"^(WITH|SELECT)\b", re.MULTILINE)
