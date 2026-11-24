@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import atexit
+import json
 import logging
 import queue
 import sys
@@ -37,6 +38,12 @@ from sqlbuild.adapter.relations.main.relation_metadata_cache_scope import (
     relation_metadata_cache_scope,
 )
 from sqlbuild.diagnostics.main.log_debug_event import log_debug_event
+from sqlbuild.executor.local._helpers.session import session_time_zone
+from sqlbuild.executor.local.constants import (
+    RUN_ON_LOCAL,
+    RUN_ON_WAREHOUSE,
+    STATEMENT_CONSTRUCT,
+)
 from sqlbuild.executor.pipeline._helpers.connections import (
     close_connections,
     open_worker_connections,
@@ -60,10 +67,14 @@ from sqlbuild.executor.scenario.main._capture_steps import (
     execute_scenario_snapshot_capture_run,
 )
 from sqlbuild.executor.scenario.main._cleanup_interrupted import cleanup_interrupted_scenarios
-from sqlbuild.executor.scenario.main._local import execute_local_scenario_load_only_run
+from sqlbuild.executor.scenario.main._local import (
+    execute_local_scenario_load_only_run,
+    local_scenario_refusals,
+)
 from sqlbuild.executor.scenario.main._run import execute_scenario_run
 from sqlbuild.executor.scenario.main._snapshots import classify_scenario_snapshot_state
 from sqlbuild.executor.scenario.models import (
+    LocalConversion,
     ScenarioCaptureSettings,
     ScenarioLocalReplaySource,
     ScenarioRunOptions,
@@ -287,7 +298,6 @@ def run_scenario_local_test_pipeline(
     scenarios: tuple[CompiledSqlScenario, ...],
     adapter: BaseAdapter,
     project_name: str,
-    strict: bool,
     replay_source: ScenarioLocalReplaySource,
     on_scenario_start: Callable[[CompiledSqlScenario], None] | None = None,
     on_scenario_complete: Callable[
@@ -301,17 +311,18 @@ def run_scenario_local_test_pipeline(
         settings=pipeline_result.project.settings, adapter=adapter
     )
     running: RunningScenarios = RunningScenarios(adapter=adapter)
+    conversion: LocalConversion = local_conversion(pipeline_result)
 
     def execute(scenario_plan: ScenarioExecutionPlan) -> ScenarioRunResult:
         return execute_local_scenario_load_only_run(
             project_dir=project_dir,
             scenario_plan=scenario_plan,
             adapter=adapter,
-            strict=strict,
             promotion_mode=promotion_mode,
             capture_adapter=replay_source.capture_adapter,
             capture_dialect=replay_source.capture_dialect,
             running=running,
+            conversion=conversion,
         )
 
     def failed(*, scenario_name: str, exc: Exception) -> ScenarioRunResult:
@@ -340,6 +351,82 @@ def run_scenario_local_test_pipeline(
                 cancel_statements=partial(running.interrupt, close_uncancellable=False)
             )
         ),
+    )
+
+
+def decide_scenario_run_on(
+    *,
+    project_dir: Path,
+    pipeline_result: CompilePipelineResult,
+    scenarios: tuple[CompiledSqlScenario, ...],
+    adapter: BaseAdapter,
+    project_name: str,
+    replay_source: ScenarioLocalReplaySource,
+    run_on: str,
+) -> str:
+    """Each scenario's decision as JSON: local with a fresh snapshot whose SQL converts."""
+
+    conversion: LocalConversion = local_conversion(pipeline_result)
+    decisions: list[dict[str, object]] = []
+    scenario: CompiledSqlScenario
+    for scenario in scenarios:
+        refusals: tuple[dict[str, object], ...] = ()
+        if run_on != RUN_ON_WAREHOUSE:
+            try:
+                refusals = local_scenario_refusals(
+                    project_dir=project_dir,
+                    scenario_plan=build_scenario_plan(
+                        scenario=scenario,
+                        pipeline_result=pipeline_result,
+                        dialect=Dialect(adapter),
+                        project_name=project_name,
+                        source_lexical_syntax=replay_source.lexical_syntax,
+                    ),
+                    capture_adapter=replay_source.capture_adapter,
+                    capture_dialect=replay_source.capture_dialect,
+                    conversion=conversion,
+                )
+            except Exception as error:
+                refusals = (
+                    {
+                        "category": "plan",
+                        "construct": f"scenario:{scenario.name}",
+                        "reason": error_message(error),
+                    },
+                )
+        decisions.append(
+            {
+                "name": scenario.name,
+                "run_on": RUN_ON_LOCAL
+                if run_on != RUN_ON_WAREHOUSE and not refusals
+                else RUN_ON_WAREHOUSE,
+                "refusals": [
+                    {
+                        **refusal,
+                        "construct": refusal.get("construct") or STATEMENT_CONSTRUCT,
+                    }
+                    for refusal in refusals
+                ],
+            }
+        )
+    return json.dumps({"decisions": decisions}, default=str)
+
+
+def local_conversion(pipeline_result: CompilePipelineResult) -> LocalConversion:
+    """The declared column types of every fully typed model, and the target's session time zone."""
+
+    columns: dict[str, tuple[tuple[str, str], ...]] = {}
+    for model in pipeline_result.project.models:
+        schema_entry: Any = model.schema_entry
+        if schema_entry is None or not schema_entry.columns:
+            continue
+        typed: tuple[tuple[str, str], ...] = tuple(
+            (column.name, column.type) for column in schema_entry.columns if column.type
+        )
+        if len(typed) == len(schema_entry.columns):
+            columns[model.name] = typed
+    return LocalConversion(
+        model_columns=columns, time_zone=session_time_zone(pipeline_result.project)
     )
 
 

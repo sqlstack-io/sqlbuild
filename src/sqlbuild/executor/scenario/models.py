@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -137,6 +138,14 @@ class ScenarioLocalReplaySource:
     lexical_syntax: SqlLexicalSyntax
     capture_adapter: str | None = None
     capture_dialect: str | None = None
+
+
+@dataclass(frozen=True)
+class LocalConversion:
+    """What SQLQuack's conversion of local scenario SQL reads: model column types and time zone."""
+
+    model_columns: Mapping[str, tuple[tuple[str, str], ...]] = field(default_factory=dict)
+    time_zone: str | None = None
 
 
 @dataclass(frozen=True)

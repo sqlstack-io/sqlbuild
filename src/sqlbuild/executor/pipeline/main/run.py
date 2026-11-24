@@ -31,6 +31,9 @@ from sqlbuild.executor.pipeline._helpers.connections import (
 )
 from sqlbuild.executor.pipeline._helpers.graph_width import runnable_graph_width
 from sqlbuild.executor.pipeline._helpers.scenario import (
+    decide_scenario_run_on as decide_scenario_run_on,
+)
+from sqlbuild.executor.pipeline._helpers.scenario import (
     run_scenario_capture_pipeline as run_scenario_capture_pipeline,
 )
 from sqlbuild.executor.pipeline._helpers.scenario import (

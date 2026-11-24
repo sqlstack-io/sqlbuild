@@ -612,9 +612,6 @@ pub(crate) fn command_facts(args: &Bound<'_, PyAny>) -> PyResult<CommandFacts> {
         format_diff: flag("format_diff")?,
         format_fix: flag("format_fix")?,
         format_fixtures_only: flag("format_fixtures_only")?,
-        scenario_local: flag("scenario_local")?,
-        scenario_retain: flag("scenario_retain")?,
-        scenario_snapshot_sync: flag("scenario_sync_snapshots")? || flag("scenario_refresh")?,
         raw_query_diff,
         ignores_failures_of_no_audits: attr("ignore_audit_failures")?.is_truthy()?
             && !flag("run_audits")?,

@@ -102,9 +102,6 @@ pub struct CommandFacts {
     pub format_diff: bool,
     pub format_fix: bool,
     pub format_fixtures_only: bool,
-    pub scenario_local: bool,
-    pub scenario_retain: bool,
-    pub scenario_snapshot_sync: bool,
     /// Whether `diff` compares raw queries rather than project models.
     pub raw_query_diff: bool,
     /// Whether `--ignore-audit-failures` is combined with `--no-audits`, which leaves nothing to ignore.

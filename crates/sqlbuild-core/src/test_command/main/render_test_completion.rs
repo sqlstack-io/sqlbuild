@@ -3,6 +3,7 @@
 use crate::cli_text::main::format_coded_error::format_coded_error;
 use crate::cli_text::main::format_summary_footer::format_summary_footer;
 use crate::cli_text::models::{CliStyle, SummaryCount};
+use crate::run_on::main::run_on_split::run_on_split;
 use crate::test_command::constants::{DEFAULT_ERROR, ERROR_LABEL, ERROR_LABEL_WIDTH, TIMEOUT_CODE};
 use crate::test_command::models::TestFailure;
 use crate::text::main::python_splitlines::python_splitlines;
@@ -44,11 +45,13 @@ fn failure_lines(failure: &TestFailure, style: CliStyle) -> Vec<String> {
     lines
 }
 
-/// A blank line, PASS, FAIL and TOTAL counts, then the failures when any, and a newline.
+/// A blank line, PASS, FAIL and TOTAL counts with the local and warehouse split when given, then
+/// the failures when any, and a newline.
 #[must_use]
 pub fn render_test_completion(
     (passed, total): (usize, usize),
     failures: &[TestFailure],
+    split: Option<(usize, usize)>,
     style: CliStyle,
 ) -> String {
     let timed_out: usize = failures
@@ -63,7 +66,8 @@ pub fn render_test_completion(
         counts.push(count("TIMEOUT", timed_out));
     }
     counts.push(count("TOTAL", total));
-    let summary: String = format_summary_footer(style, &counts, None);
+    let split: Option<String> = split.map(|(local, warehouse)| run_on_split(local, warehouse));
+    let summary: String = format_summary_footer(style, &counts, split.as_deref());
     let mut rendered: String = format!("\n{summary}");
     if !failures.is_empty() {
         let mut lines: Vec<String> = vec![style.error_strong("Failures:"), String::new()];

@@ -2,7 +2,7 @@
 
 use crate::progress::models::{StatementSummary, StatementTiming};
 
-/// `Statements: 12 (SELECT 8, CREATE 2, DROP 2); compile 1.5s, execution 0.8s`; nothing without statements.
+/// `Statements: 12 on the warehouse (SELECT 8, CREATE 2, DROP 2); compile 1.5s, execution 0.8s`; nothing without statements.
 #[must_use]
 pub fn format_statement_summary(
     summary: &StatementSummary,
@@ -41,5 +41,5 @@ pub fn format_statement_summary(
         StatementTiming::NotReported(adapter) => format!("compile time not reported by {adapter}"),
         StatementTiming::Failed(reason) => format!("compile time unavailable ({reason})"),
     };
-    Some(format!("Statements: {total} ({kinds}); {time}"))
+    Some(format!("Statements: {total} on the warehouse ({kinds}); {time}"))
 }

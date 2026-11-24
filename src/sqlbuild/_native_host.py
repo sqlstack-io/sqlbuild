@@ -473,6 +473,19 @@ _TARGETS: dict[str, tuple[str, str]] = {
     ),
     "run_seed_pipeline": ("sqlbuild.executor.pipeline.main.run", "run_seed_pipeline"),
     "run_test_pipeline": ("sqlbuild.executor.pipeline.main.run", "run_test_pipeline"),
+    "decide_sql_test_run_on": (
+        "sqlbuild.executor.local.main.decide_sql_test_run_on",
+        "decide_sql_test_run_on",
+    ),
+    "local_test_adapter": (
+        "sqlbuild.executor.local.main.local_test_adapter",
+        "local_test_adapter",
+    ),
+    "unplaced_sql_test_result": (
+        "sqlbuild.executor.local.main.unplaced_sql_test_result",
+        "unplaced_sql_test_result",
+    ),
+    "decide_scenario_run_on": ("sqlbuild.executor.pipeline.main.run", "decide_scenario_run_on"),
     "select_scenario_snapshot_capture_candidates": (
         "sqlbuild.executor.pipeline.main.run",
         "select_scenario_snapshot_capture_candidates",

@@ -50,6 +50,7 @@ pub mod process_environment;
 pub mod progress;
 pub mod query_command;
 pub mod redaction;
+pub mod run_on;
 pub mod scenario_command;
 pub mod screen_text;
 pub mod seed_command;

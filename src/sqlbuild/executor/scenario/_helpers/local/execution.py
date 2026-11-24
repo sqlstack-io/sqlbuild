@@ -27,6 +27,12 @@ from sqlbuild.adapter.contract.types import TablePromotionMode
 from sqlbuild.compiler.compile.types import FunctionLanguage
 from sqlbuild.executor.build.models import FunctionExecutionResult
 from sqlbuild.executor.functions.main._execute import execute_function
+from sqlbuild.executor.local.constants import (
+    SNAPSHOT_INVALID_CATEGORY,
+    SNAPSHOT_MISSING_CATEGORY,
+    SNAPSHOT_STALE_CATEGORY,
+    UTC_TIME_ZONE,
+)
 from sqlbuild.executor.run.models import ModelExecutionResult
 from sqlbuild.executor.scenario._helpers.execution.model_execution import execute_scenario_models
 from sqlbuild.executor.scenario._helpers.lifecycle.expectations import (
@@ -39,8 +45,9 @@ from sqlbuild.executor.scenario._helpers.local.snapshots import (
     local_snapshot_table_name,
 )
 from sqlbuild.executor.scenario._helpers.local.sql import (
+    LocalSqlRefusedError,
+    convert_sql_for_local_duckdb,
     replace_local_relations,
-    transpile_sql_for_local_duckdb,
 )
 from sqlbuild.executor.scenario._helpers.snapshots.core import (
     build_scenario_snapshot_input_fingerprint,
@@ -61,12 +68,15 @@ from sqlbuild.executor.scenario.constants import (
     SCENARIO_LOCAL_SNAPSHOT_STALE,
 )
 from sqlbuild.executor.scenario.models import (
+    LocalConversion,
     ScenarioAssertionExpectationExecutionResult,
     ScenarioExpectedExpectationExecutionResult,
     ScenarioFailureDetails,
     ScenarioLocalSnapshotLoadedRelation,
     ScenarioLocalSnapshotLoadResult,
     ScenarioRunResult,
+    ScenarioSnapshotManifest,
+    ScenarioSnapshotRelation,
     ScenarioSnapshotStateResult,
 )
 from sqlbuild.executor.scenario.types import ScenarioLocalRunStatus, ScenarioSnapshotState
@@ -76,6 +86,7 @@ from sqlbuild.runtime.observability.classes.resource_attempt_lifecycle import (
 )
 
 _LOCAL_STEP_FAILED_MESSAGE: str = "local scenario step failed"
+_UTC_SESSION_SQL: str = f"SET TimeZone = '{UTC_TIME_ZONE}'"
 
 
 def execute_local_scenario_load_only_run(
@@ -83,13 +94,15 @@ def execute_local_scenario_load_only_run(
     project_dir: Path,
     scenario_plan: ScenarioExecutionPlan,
     adapter: BaseAdapter,
-    strict: bool,
     promotion_mode: TablePromotionMode,
     capture_adapter: str | None = None,
     capture_dialect: str | None = None,
     running: RunningScenarios | None = None,
+    conversion: LocalConversion | None = None,
 ) -> ScenarioRunResult:
     """Run one scenario locally against a run-scoped DuckDB database."""
+
+    resolved_conversion: LocalConversion = conversion or LocalConversion()
 
     snapshot_state: ScenarioSnapshotStateResult = classify_scenario_snapshot_state(
         project_dir=project_dir,
@@ -100,7 +113,7 @@ def execute_local_scenario_load_only_run(
     if snapshot_state.state == ScenarioSnapshotState.MISSING:
         return _local_snapshot_unavailable_result(
             scenario_name=scenario_plan.name,
-            status=ScenarioLocalRunStatus.ERROR if strict else ScenarioLocalRunStatus.SKIP,
+            status=ScenarioLocalRunStatus.ERROR,
             code=SCENARIO_LOCAL_SNAPSHOT_MISSING,
             message=(
                 f"Scenario '{scenario_plan.name}' is missing local snapshot manifest "
@@ -111,7 +124,7 @@ def execute_local_scenario_load_only_run(
     if snapshot_state.state == ScenarioSnapshotState.STALE:
         return _local_snapshot_unavailable_result(
             scenario_name=scenario_plan.name,
-            status=ScenarioLocalRunStatus.ERROR if strict else ScenarioLocalRunStatus.SKIP,
+            status=ScenarioLocalRunStatus.ERROR,
             code=SCENARIO_LOCAL_SNAPSHOT_STALE,
             message=(
                 f"Scenario '{scenario_plan.name}' local snapshot "
@@ -156,11 +169,17 @@ def execute_local_scenario_load_only_run(
             current_input_fingerprint=input_fingerprint,
             connection=connection,
         )
+        macros: list[str] = []
         local_plan: ScenarioExecutionPlan = _build_local_execution_plan(
             scenario_plan=scenario_plan,
             load_result=load_result,
             source_dialect=load_result.manifest.capture_dialect,
+            conversion=resolved_conversion,
+            macros=macros,
         )
+        _ = adapter.execute(connection=connection, sql=_UTC_SESSION_SQL)
+        for macro in macros:
+            _ = adapter.execute(connection=connection, sql=macro)
         result: ScenarioRunResult = _execute_local_plan(
             scenario_plan=local_plan,
             adapter=adapter,
@@ -189,11 +208,113 @@ def execute_local_scenario_load_only_run(
     return result
 
 
+def local_scenario_refusals(
+    *,
+    project_dir: Path,
+    scenario_plan: ScenarioExecutionPlan,
+    capture_adapter: str | None,
+    capture_dialect: str | None,
+    conversion: LocalConversion,
+) -> tuple[dict[str, object], ...]:
+    """Why a scenario cannot replay locally: its snapshot or SQLQuack's refusals, or nothing."""
+
+    snapshot_state: ScenarioSnapshotStateResult = classify_scenario_snapshot_state(
+        project_dir=project_dir,
+        scenario_plan=scenario_plan,
+        capture_adapter=capture_adapter,
+        capture_dialect=capture_dialect,
+    )
+    category: str | None = {
+        ScenarioSnapshotState.MISSING: SNAPSHOT_MISSING_CATEGORY,
+        ScenarioSnapshotState.STALE: SNAPSHOT_STALE_CATEGORY,
+        ScenarioSnapshotState.INVALID: SNAPSHOT_INVALID_CATEGORY,
+    }.get(snapshot_state.state)
+    manifest: ScenarioSnapshotManifest | None = snapshot_state.manifest
+    if category is not None or manifest is None:
+        return (
+            {
+                "category": category or SNAPSHOT_MISSING_CATEGORY,
+                "construct": f"scenario:{scenario_plan.name}",
+                "reason": snapshot_state.error_message
+                or f"{snapshot_state.manifest_path.as_posix()} is not a fresh snapshot",
+                "path": snapshot_state.manifest_path.relative_to(project_dir).as_posix()
+                if snapshot_state.manifest_path.is_relative_to(project_dir)
+                else snapshot_state.manifest_path.as_posix(),
+            },
+        )
+    load_result: ScenarioLocalSnapshotLoadResult = ScenarioLocalSnapshotLoadResult(
+        scenario_name=scenario_plan.name,
+        manifest=manifest,
+        relations=tuple(
+            ScenarioLocalSnapshotLoadedRelation(
+                kind=relation.kind,
+                logical_name=relation.logical_name,
+                file_path=relation.file_path,
+                table_name=local_snapshot_table_name(
+                    kind=relation.kind, logical_name=relation.logical_name
+                ),
+                row_count=0,
+            )
+            for relation in manifest.relations
+        ),
+    )
+    try:
+        _ = _build_local_execution_plan(
+            scenario_plan=scenario_plan,
+            load_result=load_result,
+            source_dialect=manifest.capture_dialect,
+            conversion=conversion,
+            macros=[],
+        )
+    except LocalSqlRefusedError as refused:
+        return tuple(dict(refusal) for refusal in refused.refusals)
+    return ()
+
+
+def _local_schema(
+    *,
+    load_result: ScenarioLocalSnapshotLoadResult,
+    scenario_plan: ScenarioExecutionPlan,
+    conversion: LocalConversion,
+) -> dict[str, object]:
+    """The loaded snapshot tables and the scenario's model tables, as SQLQuack's schema."""
+
+    relations: dict[str, list[list[str]]] = {}
+    captured: dict[tuple[ScenarioArtifactKind, str], ScenarioSnapshotRelation] = {
+        (relation.kind, relation.logical_name): relation
+        for relation in load_result.manifest.relations
+    }
+    loaded: ScenarioLocalSnapshotLoadedRelation
+    for loaded in load_result.relations:
+        relation: ScenarioSnapshotRelation | None = captured.get((loaded.kind, loaded.logical_name))
+        if relation is None:
+            continue
+        columns: list[list[str]] = [
+            [column.name.upper(), column.warehouse_type] for column in relation.columns
+        ]
+        relations[loaded.table_name.upper()] = columns
+        relations[loaded.table_name] = columns
+    model_name: str
+    for model_name in scenario_plan.graph_plan.model_names:
+        declared: tuple[tuple[str, str], ...] | None = conversion.model_columns.get(model_name)
+        if not declared:
+            continue
+        table: str = local_snapshot_table_name(
+            kind=ScenarioArtifactKind.MODEL, logical_name=model_name
+        )
+        columns = [[name.upper(), column_type] for name, column_type in declared]
+        relations[table.upper()] = columns
+        relations[table] = columns
+    return {"relations": relations}
+
+
 def _build_local_execution_plan(
     *,
     scenario_plan: ScenarioExecutionPlan,
     load_result: ScenarioLocalSnapshotLoadResult,
     source_dialect: str | None,
+    conversion: LocalConversion,
+    macros: list[str],
 ) -> ScenarioExecutionPlan:
     relation_replacements: dict[str, str] = _build_relation_replacements(
         scenario_plan=scenario_plan,
@@ -203,6 +324,19 @@ def _build_local_execution_plan(
         scenario_plan=scenario_plan,
         load_result=load_result,
     )
+    schema: dict[str, object] = _local_schema(
+        load_result=load_result, scenario_plan=scenario_plan, conversion=conversion
+    )
+
+    def convert(*, sql: str, resource_kind: str, resource_name: str) -> str:
+        return convert_sql_for_local_duckdb(
+            sql=sql,
+            source_dialect=source_dialect,
+            schema=schema,
+            time_zone=conversion.time_zone,
+            resource=(scenario_plan.name, resource_kind, resource_name),
+            macros=macros,
+        )
 
     function_entries: list[FunctionPlanEntry] = []
     function_entry: FunctionPlanEntry
@@ -212,10 +346,8 @@ def _build_local_execution_plan(
             relation_replacements=relation_replacements,
         )
         if function_entry.language == FunctionLanguage.SQL:
-            function_sql = transpile_sql_for_local_duckdb(
+            function_sql = convert(
                 sql=function_sql,
-                source_dialect=source_dialect,
-                scenario_name=scenario_plan.name,
                 resource_kind=str(function_entry.key.resource_type),
                 resource_name=function_entry.name,
             )
@@ -228,13 +360,7 @@ def _build_local_execution_plan(
             sql=entry.resolved_sql,
             relation_replacements=relation_replacements,
         )
-        local_sql = transpile_sql_for_local_duckdb(
-            sql=local_sql,
-            source_dialect=source_dialect,
-            scenario_name=scenario_plan.name,
-            resource_kind="model",
-            resource_name=entry.name,
-        )
+        local_sql = convert(sql=local_sql, resource_kind="model", resource_name=entry.name)
         model_entries.append(
             replace(
                 entry,
@@ -253,10 +379,8 @@ def _build_local_execution_plan(
             sql=expected_expectation.expected_sql,
             relation_replacements=relation_replacements,
         )
-        expected_sql = transpile_sql_for_local_duckdb(
+        expected_sql = convert(
             sql=expected_sql,
-            source_dialect=source_dialect,
-            scenario_name=scenario_plan.name,
             resource_kind="expected comparison",
             resource_name=expected_expectation.model_name,
         )
@@ -275,10 +399,8 @@ def _build_local_execution_plan(
             sql=assertion_expectation.sql,
             relation_replacements=relation_replacements,
         )
-        assertion_sql = transpile_sql_for_local_duckdb(
+        assertion_sql = convert(
             sql=assertion_sql,
-            source_dialect=source_dialect,
-            scenario_name=scenario_plan.name,
             resource_kind="assertion",
             resource_name=assertion_expectation.name,
         )

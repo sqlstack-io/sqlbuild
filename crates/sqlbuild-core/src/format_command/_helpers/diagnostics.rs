@@ -62,7 +62,7 @@ fn source_excerpt(finding: &LintFinding, source_line: &str, style: CliStyle) -> 
     ]
 }
 
-fn help_lines(remediation: &str, style: CliStyle) -> Vec<String> {
+pub(crate) fn help_lines(remediation: &str, style: CliStyle) -> Vec<String> {
     let wrapped: Vec<String> = text_wrap(
         remediation,
         REPORT_LINE_WIDTH,

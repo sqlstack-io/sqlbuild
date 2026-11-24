@@ -4481,6 +4481,12 @@ def render_sql_test_comparison_sql(
     output_step_index: int | None = None,
     actual_relations: Mapping[int, str] | None = None,
 ) -> list[str]: ...
+def render_sql_test_comparison_segments(
+    test_entry: SqlTestPlanEntry,
+    *,
+    set_difference_operator: str = "EXCEPT",
+    sql_analysis_dialect: str | None = None,
+) -> tuple[str, list[tuple[int, int, str]]]: ...
 def render_sql_test_difference_sample_sql(
     *,
     test_entry: SqlTestPlanEntry,
