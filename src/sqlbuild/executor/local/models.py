@@ -22,6 +22,7 @@ class LocalRefusal:
     column: int | None = None
     width: int = 1
     snippet: str | None = None
+    snippet_column: int | None = None
     expanded_from: str | None = None
 
     @property

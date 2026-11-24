@@ -481,9 +481,9 @@ _TARGETS: dict[str, tuple[str, str]] = {
         "sqlbuild.executor.local.main.local_test_adapter",
         "local_test_adapter",
     ),
-    "unplaced_sql_test_result": (
-        "sqlbuild.executor.local.main.unplaced_sql_test_result",
-        "unplaced_sql_test_result",
+    "report_unplaced_sql_tests": (
+        "sqlbuild.executor.local.main.report_unplaced_sql_tests",
+        "report_unplaced_sql_tests",
     ),
     "decide_scenario_run_on": ("sqlbuild.executor.pipeline.main.run", "decide_scenario_run_on"),
     "select_scenario_snapshot_capture_candidates": (

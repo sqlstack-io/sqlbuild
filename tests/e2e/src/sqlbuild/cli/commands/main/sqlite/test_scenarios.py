@@ -37,7 +37,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
         ),
         SqliteScenarioE2ETestCase(
             description="snapshots captured from SQLite replay locally in DuckDB",
-            command=("scenario", "test", "--local", "--sync-snapshots"),
+            command=("scenario", "test", "--run-on", "local", "--sync-snapshots"),
             expected_outcomes=SCENARIO_OUTCOMES,
             expected_tables=("_sqlbuild_relations", "_sqlbuild_schemas"),
         ),

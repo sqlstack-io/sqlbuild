@@ -103,7 +103,7 @@ def test_given_snowflake_backslash_escapes_when_compiling_and_replaying_locally_
         command=("--no-color", "compile"), project_dir=project_dir
     )
     replayed: subprocess.CompletedProcess[str] = run_sqb(
-        command=("--no-color", "scenario", "test", "--local", "--strict", test_case.scenario_name),
+        command=("--no-color", "scenario", "test", "--run-on", "local", test_case.scenario_name),
         project_dir=project_dir,
     )
 

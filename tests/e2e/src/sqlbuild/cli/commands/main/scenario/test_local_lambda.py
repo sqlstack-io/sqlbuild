@@ -41,7 +41,7 @@ def test_given_snowflake_arrow_lambda_when_replaying_locally_then_the_scenario_p
     )
 
     replayed: subprocess.CompletedProcess[str] = run_sqb(
-        command=("--no-color", "scenario", "test", "--local", "--strict", test_case.scenario_name),
+        command=("--no-color", "scenario", "test", "--run-on", "local", test_case.scenario_name),
         project_dir=project_dir,
     )
 

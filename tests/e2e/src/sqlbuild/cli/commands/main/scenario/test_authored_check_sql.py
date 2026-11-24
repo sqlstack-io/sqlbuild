@@ -200,7 +200,7 @@ def test_given_project_dialect_scenario_sql_when_replaying_locally_then_resolves
     )
 
     result: subprocess.CompletedProcess[str] = run_sqb(
-        command=("--no-color", "scenario", "test", test_case.scenario_name, "--local"),
+        command=("--no-color", "scenario", "test", test_case.scenario_name, "--run-on", "local"),
         project_dir=project_dir,
     )
 

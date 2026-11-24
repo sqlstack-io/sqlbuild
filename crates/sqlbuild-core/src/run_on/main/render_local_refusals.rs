@@ -75,13 +75,14 @@ fn refusal_block(refusal: &LocalRefusal, names: &[String], style: CliStyle) -> S
         .unwrap_or_else(|| refusal.title());
     let mut lines: Vec<String> = match (&refusal.path, refusal.line, refusal.column) {
         (Some(path), Some(line), Some(column)) => {
+            let caret: i64 = refusal.snippet_column.unwrap_or(column);
             let finding: LintFinding = LintFinding {
                 file: path.clone(),
                 display_path: path.clone(),
                 line,
-                column,
+                column: caret,
                 end_line: Some(line),
-                end_column: Some(column + refusal.width.max(1)),
+                end_column: Some(caret + refusal.width.max(1)),
                 code: refusal.code.clone().unwrap_or_default(),
                 message,
                 fault: true,
@@ -93,6 +94,9 @@ fn refusal_block(refusal: &LocalRefusal, names: &[String], style: CliStyle) -> S
                 .lines()
                 .map(str::to_owned)
                 .collect();
+            if caret != column && located.len() > 1 {
+                located[1] = style.muted(&format!(" --> {path}:{line}:{column}"));
+            }
             let label: &str = refusal.label.as_deref().unwrap_or(&refusal.reason);
             if refusal.snippet.is_some() && !label.is_empty() && located.len() > CARET_LINE {
                 located[CARET_LINE] = format!("{} {label}", located[CARET_LINE]);

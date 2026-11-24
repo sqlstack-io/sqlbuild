@@ -59,6 +59,8 @@ pub struct LocalRefusal {
     pub column: Option<i64>,
     pub width: i64,
     pub snippet: Option<String>,
+    /// Where the caret goes in `snippet` when it is generated SQL rather than the file's line.
+    pub snippet_column: Option<i64>,
     pub expanded_from: Option<String>,
 }
 

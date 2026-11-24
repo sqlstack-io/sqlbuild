@@ -682,7 +682,14 @@ def test_given_snowflake_scenario_capture_when_replaying_locally_then_transpilab
         )
 
         replay_result: subprocess.CompletedProcess[str] = run_sqb(
-            command=("--no-color", "scenario", "test", test_case.scenario_name, "--local"),
+            command=(
+                "--no-color",
+                "scenario",
+                "test",
+                test_case.scenario_name,
+                "--run-on",
+                "local",
+            ),
             project_dir=project_dir,
         )
 
@@ -783,7 +790,15 @@ def test_given_snowflake_dbt_scenario_capture_when_replaying_locally_then_transp
         )
 
         replay_result: subprocess.CompletedProcess[str] = run_sqb(
-            command=("--no-color", "dbt", "scenario", "test", test_case.scenario_name, "--local"),
+            command=(
+                "--no-color",
+                "dbt",
+                "scenario",
+                "test",
+                test_case.scenario_name,
+                "--run-on",
+                "local",
+            ),
             project_dir=sqlbuild_project_dir,
         )
 

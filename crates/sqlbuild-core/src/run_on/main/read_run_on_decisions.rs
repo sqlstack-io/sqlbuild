@@ -31,6 +31,7 @@ fn refusal(value: &Value) -> LocalRefusal {
         column: number(value, "column"),
         width: number(value, "width").unwrap_or(1),
         snippet: text(value, "snippet"),
+        snippet_column: number(value, "snippet_column"),
         expanded_from: text(value, "expanded_from"),
     }
 }

@@ -747,8 +747,7 @@ def test_given_diff_command_arguments_when_running_with_dependencies_then_it_dis
                 "tests/scenarios/nested",
                 "--exclude",
                 "tests/scenarios/slow",
-                "--local",
-                "--strict",
+                "--run-on", "local",
                 "--sync-snapshots",
                 "--force",
                 "--max-snapshot-rows",
@@ -1062,7 +1061,7 @@ def test_given_load_flags_when_running_then_dispatches_expected_arguments(
     [
         MainTestCase(
             description="rejects local scenario retain flag",
-            argv=["scenario", "test", "order_totals_pass", "--local", "--retain"],
+            argv=["scenario", "test", "order_totals_pass", "--run-on", "local", "--retain"],
             expected_exit_code=1,
         )
     ],

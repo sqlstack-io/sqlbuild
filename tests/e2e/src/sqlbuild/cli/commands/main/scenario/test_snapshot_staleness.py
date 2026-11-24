@@ -62,7 +62,7 @@ def test_given_captured_snapshot_when_fixture_sql_changes_then_local_replay_repo
     )
 
     replayed: subprocess.CompletedProcess[str] = run_sqb(
-        command=("--no-color", "scenario", "test", "--local", "--strict", test_case.scenario_name),
+        command=("--no-color", "scenario", "test", "--run-on", "local", test_case.scenario_name),
         project_dir=project_dir,
     )
 

@@ -135,7 +135,7 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
         description="captured snapshot keeps local DuckDB by default",
         scenario_name="order_totals_pass",
         capture_command=("--no-color", "scenario", "capture", "order_totals_pass"),
-        command=("--no-color", "scenario", "test", "order_totals_pass", "--local"),
+        command=("--no-color", "scenario", "test", "order_totals_pass", "--run-on", "local"),
         expected_exit_code=0,
         expected_stdout_fragments=(
             "order_totals_pass",
@@ -152,7 +152,7 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
         description="malformed local JSONL errors and retains local DuckDB",
         scenario_name="order_totals_pass",
         capture_command=("--no-color", "scenario", "capture", "order_totals_pass"),
-        command=("--no-color", "scenario", "test", "order_totals_pass", "--local"),
+        command=("--no-color", "scenario", "test", "order_totals_pass", "--run-on", "local"),
         expected_exit_code=1,
         expected_stdout_fragments=(
             "order_totals_pass",
@@ -170,7 +170,7 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
         description="expected mismatch is local FAIL",
         scenario_name="order_totals_fail",
         capture_command=("--no-color", "scenario", "capture", "order_totals_fail"),
-        command=("--no-color", "scenario", "test", "order_totals_fail", "--local"),
+        command=("--no-color", "scenario", "test", "order_totals_fail", "--run-on", "local"),
         expected_exit_code=1,
         expected_stdout_fragments=(
             "order_totals_fail",
@@ -189,7 +189,7 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
         description="local model execution error is ERROR",
         scenario_name="local_model_error",
         capture_command=("--no-color", "scenario", "capture", "local_model_error"),
-        command=("--no-color", "scenario", "test", "local_model_error", "--local"),
+        command=("--no-color", "scenario", "test", "local_model_error", "--run-on", "local"),
         expected_exit_code=1,
         expected_stdout_fragments=(
             "local_model_error",
@@ -226,7 +226,7 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
         description="local SQL function scenario passes",
         scenario_name="local_sql_function_pass",
         capture_command=("--no-color", "scenario", "capture", "local_sql_function_pass"),
-        command=("--no-color", "scenario", "test", "local_sql_function_pass", "--local"),
+        command=("--no-color", "scenario", "test", "local_sql_function_pass", "--run-on", "local"),
         expected_exit_code=0,
         expected_stdout_fragments=(
             "local_sql_function_pass",
@@ -270,7 +270,14 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
         description="local SQL function setup error is ERROR",
         scenario_name="local_sql_function_setup_error",
         capture_command=("--no-color", "scenario", "capture", "local_sql_function_setup_error"),
-        command=("--no-color", "scenario", "test", "local_sql_function_setup_error", "--local"),
+        command=(
+            "--no-color",
+            "scenario",
+            "test",
+            "local_sql_function_setup_error",
+            "--run-on",
+            "local",
+        ),
         expected_exit_code=1,
         expected_stdout_fragments=(
             "local_sql_function_setup_error",
@@ -324,7 +331,8 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
             "scenario",
             "test",
             "local_sql_function_transpile_error",
-            "--local",
+            "--run-on",
+            "local",
         ),
         expected_exit_code=1,
         expected_stdout_fragments=(
@@ -369,7 +377,14 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
         description="local SQL function runtime error is ERROR",
         scenario_name="local_sql_function_runtime_error",
         capture_command=("--no-color", "scenario", "capture", "local_sql_function_runtime_error"),
-        command=("--no-color", "scenario", "test", "local_sql_function_runtime_error", "--local"),
+        command=(
+            "--no-color",
+            "scenario",
+            "test",
+            "local_sql_function_runtime_error",
+            "--run-on",
+            "local",
+        ),
         expected_exit_code=1,
         expected_stdout_fragments=(
             "local_sql_function_runtime_error",
@@ -413,7 +428,14 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
         description="local Python function scenario passes",
         scenario_name="local_python_function_pass",
         capture_command=("--no-color", "scenario", "capture", "local_python_function_pass"),
-        command=("--no-color", "scenario", "test", "local_python_function_pass", "--local"),
+        command=(
+            "--no-color",
+            "scenario",
+            "test",
+            "local_python_function_pass",
+            "--run-on",
+            "local",
+        ),
         expected_exit_code=0,
         expected_stdout_fragments=(
             "local_python_function_pass",
@@ -464,7 +486,14 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
         description="local Python function setup error is ERROR",
         scenario_name="local_python_function_error",
         capture_command=("--no-color", "scenario", "capture", "local_python_function_error"),
-        command=("--no-color", "scenario", "test", "local_python_function_error", "--local"),
+        command=(
+            "--no-color",
+            "scenario",
+            "test",
+            "local_python_function_error",
+            "--run-on",
+            "local",
+        ),
         expected_exit_code=1,
         expected_stdout_fragments=(
             "local_python_function_error",
@@ -525,7 +554,8 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
             "scenario",
             "test",
             "local_python_function_runtime_error",
-            "--local",
+            "--run-on",
+            "local",
         ),
         expected_exit_code=1,
         expected_stdout_fragments=(
@@ -773,7 +803,7 @@ def test_given_scenario_project_with_python_hooks_when_running_cli_then_hooks_ex
     (
         ScenarioLocalCliE2ETestCase(
             description="missing snapshot skips by default",
-            command=("--no-color", "scenario", "test", "order_totals_pass", "--local"),
+            command=("--no-color", "scenario", "test", "order_totals_pass", "--run-on", "local"),
             expected_exit_code=0,
             expected_stdout_fragments=(
                 "order_totals_pass",
@@ -789,8 +819,8 @@ def test_given_scenario_project_with_python_hooks_when_running_cli_then_hooks_ex
                 "scenario",
                 "test",
                 "order_totals_pass",
-                "--local",
-                "--strict",
+                "--run-on",
+                "local",
             ),
             expected_exit_code=1,
             expected_stdout_fragments=(
@@ -831,7 +861,7 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
             description="captured snapshot keeps local DuckDB by default",
             scenario_name="order_totals_pass",
             capture_command=("--no-color", "scenario", "capture", "order_totals_pass"),
-            command=("--no-color", "scenario", "test", "order_totals_pass", "--local"),
+            command=("--no-color", "scenario", "test", "order_totals_pass", "--run-on", "local"),
             expected_exit_code=0,
             expected_stdout_fragments=(
                 "order_totals_pass",
@@ -852,7 +882,7 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
             description="malformed local JSONL errors and retains local DuckDB",
             scenario_name="order_totals_pass",
             capture_command=("--no-color", "scenario", "capture", "order_totals_pass"),
-            command=("--no-color", "scenario", "test", "order_totals_pass", "--local"),
+            command=("--no-color", "scenario", "test", "order_totals_pass", "--run-on", "local"),
             expected_exit_code=1,
             expected_stdout_fragments=(
                 "order_totals_pass",
@@ -872,7 +902,7 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
             description="expected mismatch is local FAIL",
             scenario_name="order_totals_fail",
             capture_command=("--no-color", "scenario", "capture", "order_totals_fail"),
-            command=("--no-color", "scenario", "test", "order_totals_fail", "--local"),
+            command=("--no-color", "scenario", "test", "order_totals_fail", "--run-on", "local"),
             expected_exit_code=1,
             expected_stdout_fragments=(
                 "order_totals_fail",
@@ -895,7 +925,7 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
             description="local model execution error is ERROR",
             scenario_name="local_model_error",
             capture_command=("--no-color", "scenario", "capture", "local_model_error"),
-            command=("--no-color", "scenario", "test", "local_model_error", "--local"),
+            command=("--no-color", "scenario", "test", "local_model_error", "--run-on", "local"),
             expected_exit_code=1,
             expected_stdout_fragments=(
                 "local_model_error",
@@ -934,7 +964,14 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
             description="local SQL function scenario passes",
             scenario_name="local_sql_function_pass",
             capture_command=("--no-color", "scenario", "capture", "local_sql_function_pass"),
-            command=("--no-color", "scenario", "test", "local_sql_function_pass", "--local"),
+            command=(
+                "--no-color",
+                "scenario",
+                "test",
+                "local_sql_function_pass",
+                "--run-on",
+                "local",
+            ),
             expected_exit_code=0,
             expected_stdout_fragments=(
                 "local_sql_function_pass",
@@ -978,7 +1015,14 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
             description="local SQL function setup error is ERROR",
             scenario_name="local_sql_function_setup_error",
             capture_command=("--no-color", "scenario", "capture", "local_sql_function_setup_error"),
-            command=("--no-color", "scenario", "test", "local_sql_function_setup_error", "--local"),
+            command=(
+                "--no-color",
+                "scenario",
+                "test",
+                "local_sql_function_setup_error",
+                "--run-on",
+                "local",
+            ),
             expected_exit_code=1,
             expected_stdout_fragments=(
                 "local_sql_function_setup_error",
@@ -1032,7 +1076,8 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
                 "scenario",
                 "test",
                 "local_sql_function_transpile_error",
-                "--local",
+                "--run-on",
+                "local",
             ),
             expected_exit_code=1,
             expected_stdout_fragments=(
@@ -1087,7 +1132,8 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
                 "scenario",
                 "test",
                 "local_sql_function_runtime_error",
-                "--local",
+                "--run-on",
+                "local",
             ),
             expected_exit_code=1,
             expected_stdout_fragments=(
@@ -1132,7 +1178,14 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
             description="local Python function scenario passes",
             scenario_name="local_python_function_pass",
             capture_command=("--no-color", "scenario", "capture", "local_python_function_pass"),
-            command=("--no-color", "scenario", "test", "local_python_function_pass", "--local"),
+            command=(
+                "--no-color",
+                "scenario",
+                "test",
+                "local_python_function_pass",
+                "--run-on",
+                "local",
+            ),
             expected_exit_code=0,
             expected_stdout_fragments=(
                 "local_python_function_pass",
@@ -1183,7 +1236,14 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
             description="local Python function setup error is ERROR",
             scenario_name="local_python_function_error",
             capture_command=("--no-color", "scenario", "capture", "local_python_function_error"),
-            command=("--no-color", "scenario", "test", "local_python_function_error", "--local"),
+            command=(
+                "--no-color",
+                "scenario",
+                "test",
+                "local_python_function_error",
+                "--run-on",
+                "local",
+            ),
             expected_exit_code=1,
             expected_stdout_fragments=(
                 "local_python_function_error",
@@ -1244,7 +1304,8 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
                 "scenario",
                 "test",
                 "local_python_function_runtime_error",
-                "--local",
+                "--run-on",
+                "local",
             ),
             expected_exit_code=1,
             expected_stdout_fragments=(
@@ -1349,7 +1410,7 @@ def test_given_captured_snapshot_when_running_local_scenario_then_manages_local_
         ScenarioLocalCommittedSnapshotE2ETestCase(
             description="replays committed local snapshot without capture",
             scenario_name="order_totals_pass",
-            command=("--no-color", "scenario", "test", "order_totals_pass", "--local"),
+            command=("--no-color", "scenario", "test", "order_totals_pass", "--run-on", "local"),
             expected_exit_code=0,
             expected_stdout_fragments=(
                 "order_totals_pass",
@@ -1416,7 +1477,8 @@ def test_given_committed_snapshot_when_running_local_scenario_then_replays_witho
                 "scenario",
                 "test",
                 "order_totals_pass",
-                "--local",
+                "--run-on",
+                "local",
                 "--sync-snapshots",
             ),
             expected_exit_code=0,
@@ -1439,7 +1501,8 @@ def test_given_committed_snapshot_when_running_local_scenario_then_replays_witho
                 "scenario",
                 "test",
                 "order_totals_pass",
-                "--local",
+                "--run-on",
+                "local",
                 "--sync-snapshots",
             ),
             expected_exit_code=1,
@@ -1462,7 +1525,8 @@ def test_given_committed_snapshot_when_running_local_scenario_then_replays_witho
                 "scenario",
                 "test",
                 "order_totals_pass",
-                "--local",
+                "--run-on",
+                "local",
                 "--refresh",
             ),
             expected_exit_code=0,
@@ -1487,7 +1551,8 @@ def test_given_committed_snapshot_when_running_local_scenario_then_replays_witho
                 "scenario",
                 "test",
                 "order_totals_pass",
-                "--local",
+                "--run-on",
+                "local",
                 "--sync-snapshots",
             ),
             expected_exit_code=0,
@@ -1735,7 +1800,8 @@ def test_given_unknown_scenario_selector_when_running_scenario_test_then_fails_c
                 "scenario",
                 "test",
                 "order_totals_pass",
-                "--local",
+                "--run-on",
+                "local",
             ),
             expected_exit_code=1,
             expected_stderr_fragments=(
@@ -1755,7 +1821,8 @@ def test_given_unknown_scenario_selector_when_running_scenario_test_then_fails_c
                 "scenario",
                 "test",
                 "order_totals_pass",
-                "--local",
+                "--run-on",
+                "local",
                 "--sync-snapshots",
             ),
             expected_exit_code=1,
@@ -1997,7 +2064,7 @@ def test_given_scenario_project_when_running_scenario_test_then_writes_runtime_a
             description="writes local fixture artifact",
             scenario_name="order_totals_pass",
             capture_command=("--no-color", "scenario", "capture", "order_totals_pass"),
-            command=("--no-color", "scenario", "test", "order_totals_pass", "--local"),
+            command=("--no-color", "scenario", "test", "order_totals_pass", "--run-on", "local"),
             expected_exit_code=0,
             artifact_relative_path=Path(
                 "target/run/scenarios/order_totals_pass/local/fixtures/source__raw_orders.sql"
@@ -2012,7 +2079,7 @@ def test_given_scenario_project_when_running_scenario_test_then_writes_runtime_a
             description="writes local model artifact",
             scenario_name="order_totals_pass",
             capture_command=("--no-color", "scenario", "capture", "order_totals_pass"),
-            command=("--no-color", "scenario", "test", "order_totals_pass", "--local"),
+            command=("--no-color", "scenario", "test", "order_totals_pass", "--run-on", "local"),
             expected_exit_code=0,
             artifact_relative_path=Path(
                 "target/run/scenarios/order_totals_pass/local/sql/models/order_totals.sql"
@@ -2026,7 +2093,7 @@ def test_given_scenario_project_when_running_scenario_test_then_writes_runtime_a
             description="writes local expected comparison artifact",
             scenario_name="order_totals_pass",
             capture_command=("--no-color", "scenario", "capture", "order_totals_pass"),
-            command=("--no-color", "scenario", "test", "order_totals_pass", "--local"),
+            command=("--no-color", "scenario", "test", "order_totals_pass", "--run-on", "local"),
             expected_exit_code=0,
             artifact_relative_path=Path(
                 "target/run/scenarios/order_totals_pass/local/expectations/expected__order_totals.sql"
@@ -2041,7 +2108,14 @@ def test_given_scenario_project_when_running_scenario_test_then_writes_runtime_a
             description="writes local SQL function artifact",
             scenario_name="local_sql_function_pass",
             capture_command=("--no-color", "scenario", "capture", "local_sql_function_pass"),
-            command=("--no-color", "scenario", "test", "local_sql_function_pass", "--local"),
+            command=(
+                "--no-color",
+                "scenario",
+                "test",
+                "local_sql_function_pass",
+                "--run-on",
+                "local",
+            ),
             expected_exit_code=0,
             artifact_relative_path=Path(
                 "target/run/scenarios/local_sql_function_pass/local/sql/functions/sql/is_large_order.sql"

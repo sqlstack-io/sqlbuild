@@ -668,8 +668,16 @@ fn run_tests<'py>(
     let mut local_statements: StatementSummary = StatementSummary::default();
     let executed: PyResult<Vec<Bound<'py, PyAny>>> = (|| {
         let mut results: Vec<Bound<'py, PyAny>> = Vec::new();
-        for (entry, code, message) in &unplaced {
-            results.push(unplaced_result(&relay, entry, (code, message))?);
+        for (code, message) in [
+            (CANNOT_RUN_LOCALLY_CODE, CANNOT_RUN_LOCALLY_MESSAGE),
+            (NEEDS_WAREHOUSE_CODE, NEEDS_WAREHOUSE_MESSAGE),
+        ] {
+            let entries: Vec<Bound<'py, PyAny>> = unplaced
+                .iter()
+                .filter(|(_, unplaced_code, _)| *unplaced_code == code)
+                .map(|(entry, _, _)| entry.clone())
+                .collect();
+            results.extend(report_unplaced(&relay, pipeline, &entries, (code, message))?);
         }
         let callbacks = |reporting_connection: bool| -> PyResult<Bound<'py, PyAny>> {
             let mut hooks: Vec<(&str, Bound<'py, PyAny>)> = vec![
@@ -751,13 +759,12 @@ fn run_tests<'py>(
                             &host_entry(py, ExecutorHost::WarehouseConnectionError)?,
                         ) =>
                 {
-                    for entry in &warehouse {
-                        results.push(unplaced_result(
-                            &relay,
-                            entry,
-                            (NEEDS_WAREHOUSE_CODE, NEEDS_WAREHOUSE_MESSAGE),
-                        )?);
-                    }
+                    results.extend(report_unplaced(
+                        &relay,
+                        pipeline,
+                        &warehouse,
+                        (NEEDS_WAREHOUSE_CODE, NEEDS_WAREHOUSE_MESSAGE),
+                    )?);
                 }
                 Err(error) => return Err(error),
             }
@@ -784,24 +791,30 @@ fn run_tests<'py>(
     Ok((results, local_statements))
 }
 
-/// An error row for a test that does not run, reported as the run reports every other test.
-fn unplaced_result<'py>(
+/// Error rows for tests that do not run, reported as the run reports every other test.
+fn report_unplaced<'py>(
     relay: &Bound<'py, TestCallbackRelay>,
-    entry: &Bound<'py, PyAny>,
+    pipeline: &Bound<'py, PyAny>,
+    entries: &[Bound<'py, PyAny>],
     (code, message): (&str, &str),
-) -> PyResult<Bound<'py, PyAny>> {
+) -> PyResult<Vec<Bound<'py, PyAny>>> {
     let py: Python<'py> = relay.py();
-    relay.call_method1("on_test_start", (entry,))?;
-    let result: Bound<'py, PyAny> = call_with(
-        &host_entry(py, ExecutorHost::UnplacedSqlTestResult)?,
+    if entries.is_empty() {
+        return Ok(Vec::new());
+    }
+    call_with(
+        &host_entry(py, ExecutorHost::ReportUnplacedSqlTests)?,
         &[
-            ("test_entry", entry.clone()),
+            ("test_entries", PyTuple::new(py, entries)?.into_any()),
             ("code", text(py, code)),
             ("message", text(py, message)),
+            ("run_id", pipeline.getattr("project")?.getattr("run_id")?),
+            ("on_test_start", relay.getattr("on_test_start")?),
+            ("on_test_complete", relay.getattr("on_test_complete")?),
         ],
-    )?;
-    relay.call_method1("on_test_complete", (&result,))?;
-    Ok(result)
+    )?
+    .try_iter()?
+    .collect()
 }
 
 /// The statements the installed projector has counted so far.

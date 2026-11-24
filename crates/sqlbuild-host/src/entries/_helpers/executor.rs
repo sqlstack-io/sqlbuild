@@ -385,7 +385,7 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
         edge: HostEdge::Executor,
     },
     HostEntry {
-        name: "unplaced_sql_test_result",
+        name: "report_unplaced_sql_tests",
         kind: HostKind::Function,
         edge: HostEdge::Executor,
     },

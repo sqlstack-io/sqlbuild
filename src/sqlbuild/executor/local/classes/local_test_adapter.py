@@ -17,6 +17,9 @@ from sqlbuild.executor.local.constants import (
 )
 
 _UTC_SESSION_SQL: str = f"SET TimeZone = '{UTC_TIME_ZONE}'"
+# DuckDB invalidates a database after an internal or fatal error; every later statement fails.
+_INVALIDATED_MARKER: str = "database has been invalidated"
+_FATAL_ERRORS: frozenset[str] = frozenset({"FatalException", "InternalException"})
 
 
 class LocalTestAdapter(DuckDbAdapter):
@@ -55,6 +58,24 @@ class LocalTestAdapter(DuckDbAdapter):
         return connection
 
     def execute(self, *, connection: Any, sql: str) -> Any:
+        try:
+            return self._converted_execute(connection=connection, sql=sql)
+        except Exception as error:
+            if _INVALIDATED_MARKER in str(error) or type(error).__name__ in _FATAL_ERRORS:
+                self._reopen(connection)
+            raise
+
+    def _reopen(self, connection: Any) -> None:
+        """Replace a run-scoped database DuckDB invalidated, so later tests get a working one."""
+
+        import duckdb
+
+        object.__setattr__(connection, "raw_connection", duckdb.connect(database=":memory:"))
+        with self._macros_lock:
+            self._macros.pop(id(connection), None)
+        _ = super().execute(connection=connection, sql=_UTC_SESSION_SQL)
+
+    def _converted_execute(self, *, connection: Any, sql: str) -> Any:
         if self._dialect != CONVERTED_DIALECT or sql == _UTC_SESSION_SQL:
             return super().execute(connection=connection, sql=sql)
         conversion: Any = converted(

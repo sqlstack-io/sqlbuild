@@ -10,7 +10,7 @@ from typing import Any
 
 from sqlbuild._native import SqlTestPlanEntry, render_sql_test_comparison_segments
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
-from sqlbuild.executor.local._helpers.conversion import converted
+from sqlbuild.executor.local._helpers.conversion import convert_all, converted
 from sqlbuild.executor.local._helpers.positions import Segment, TestSources, placed_refusal
 from sqlbuild.executor.local._helpers.schema import project_schema
 from sqlbuild.executor.local._helpers.session import session_time_zone
@@ -39,6 +39,16 @@ def decide_sql_test_run_on(
     dialect: str | None = adapter.sql_analysis_dialect()
     schema: dict[str, Any] | None = None
     time_zone: str | None = session_time_zone(project)
+    rendered: dict[str, tuple[str, list[tuple[int, int, str]]]] = {}
+    if run_on != RUN_ON_WAREHOUSE and dialect == CONVERTED_DIALECT:
+        schema = project_schema(project)
+        for entry in test_entries:
+            rendered[entry.name] = render_sql_test_comparison_segments(
+                entry,
+                set_difference_operator=adapter.render_set_difference_operator(),
+                sql_analysis_dialect=dialect,
+            )
+        convert_all(sqls=[sql for sql, _ in rendered.values()], schema=schema, time_zone=time_zone)
     for entry in test_entries:
         if run_on == RUN_ON_WAREHOUSE:
             decisions.append(RunOnDecision(name=entry.name, run_on=RUN_ON_WAREHOUSE))
@@ -59,14 +69,12 @@ def decide_sql_test_run_on(
                 )
             )
         else:
-            if schema is None:
-                schema = project_schema(project)
             decisions.append(
                 _converted_decision(
                     entry=entry,
-                    adapter=adapter,
+                    rendered=rendered[entry.name],
                     project=project,
-                    schema=schema,
+                    schema=schema or {},
                     time_zone=time_zone,
                     location=(project_dir, compiled_paths.get(entry.name, "")),
                 )
@@ -91,18 +99,14 @@ def decide_sql_test_run_on(
 def _converted_decision(
     *,
     entry: SqlTestPlanEntry,
-    adapter: BaseAdapter,
+    rendered: tuple[str, list[tuple[int, int, str]]],
     project: Any,
     schema: dict[str, Any],
     time_zone: str | None,
     location: tuple[Path, str],
 ) -> RunOnDecision:
     project_dir, compiled_path = location
-    sql, segments = render_sql_test_comparison_segments(
-        entry,
-        set_difference_operator=adapter.render_set_difference_operator(),
-        sql_analysis_dialect=adapter.sql_analysis_dialect(),
-    )
+    sql, segments = rendered
     test_path: str | None = None
     test_text: str | None = None
     if entry.source_path is not None:
