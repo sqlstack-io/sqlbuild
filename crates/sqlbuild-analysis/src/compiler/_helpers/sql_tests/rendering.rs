@@ -14,7 +14,7 @@ use crate::compiler::_helpers::sql_tests::cte_slices::{
 use crate::compiler::_helpers::sql_tests::cte_sql::{cte_definition_sql, leading_with_prefix_end};
 use crate::compiler::_helpers::sql_tests::helper_names::HELPER_PREFIX;
 use crate::compiler::_helpers::sql_tests::planning::REF_PREFIX;
-use crate::compiler::models::{SqlTestAssertionStep, SqlTestChainStep};
+use crate::compiler::models::{PlacedComparisonSql, SqlTestAssertionStep, SqlTestChainStep};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 
@@ -653,9 +653,7 @@ pub(crate) fn rendered_chain_steps(
 }
 
 /// One planned test's comparison SQL and each CTE body's start, end and origin in it.
-pub(crate) fn render_placed_request(
-    request_json: &str,
-) -> Result<(String, Vec<(usize, usize, String)>), String> {
+pub(crate) fn render_placed_request(request_json: &str) -> Result<PlacedComparisonSql, String> {
     let request: RenderRequest =
         serde_json::from_str(request_json).map_err(|error| error.to_string())?;
     let placed: PlacedComparison = render_placed_comparison(&request)?;

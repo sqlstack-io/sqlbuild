@@ -11,6 +11,7 @@ use sqlbuild_analysis::compiler::main::scenario_expected_comparison_sql::scenari
 use sqlbuild_analysis::compiler::main::sql_test_difference_sampling::render_difference_sample_json;
 use sqlbuild_analysis::compiler::main::sql_test_placed_rendering::render_placed_comparison;
 use sqlbuild_analysis::compiler::main::sql_test_rendering::render_json;
+use sqlbuild_analysis::compiler::models::PlacedComparisonSql;
 
 use sqlbuild_python_base::boundary::main::value_error::value_error;
 use sqlbuild_python_base::boundary::models::Request;
@@ -168,7 +169,7 @@ pub(crate) fn render_sql_test_comparison_segments(
     py: Python<'_>,
     test_entry: Bound<'_, PyAny>,
     options: Option<&Bound<'_, PyDict>>,
-) -> PyResult<(String, Vec<(usize, usize, String)>)> {
+) -> PyResult<PlacedComparisonSql> {
     let settings: RenderSettings = RenderSettings::read(options)?;
     let request: String = serde_json::to_string(&comparison_request(
         &test_entry,

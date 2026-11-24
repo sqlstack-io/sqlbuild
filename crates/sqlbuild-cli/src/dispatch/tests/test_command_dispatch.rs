@@ -3,7 +3,7 @@ use crate::dispatch::constants::{
     SCENARIO_CAPTURE_ROUTE,
 };
 use crate::dispatch::main::command_dispatch::command_dispatch;
-use crate::dispatch::models::{CommandFacts, Dispatch, DispatchFailure};
+use crate::dispatch::models::{CommandFacts, Dispatch};
 use crate::dispatch::tests::helpers::{facts, failure, runs};
 use crate::dispatch::tests::test_types::CommandDispatchTestCase;
 

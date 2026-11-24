@@ -427,3 +427,6 @@ pub struct ScenarioHelperScope {
     pub(crate) graph: crate::compiler::_helpers::sql_tests::helper_scope::ScopeGraph,
     pub(crate) patterns: crate::compiler::_helpers::sql_tests::planning::SqlTestPatterns,
 }
+
+/// A rendered comparison's SQL and each CTE body's start, end and origin in it.
+pub type PlacedComparisonSql = (String, Vec<(usize, usize, String)>);
