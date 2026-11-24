@@ -208,12 +208,16 @@ class ComposeStack:
             (project / "sql/models/orders.sql").write_text(
                 "MODEL (description 'Example orders.', materialized table);\n" + sql + "\n"
             )
-            # Only source enters this build context; credentials stay in the parent process.
-            (project / "Dockerfile").write_text(
+            # Only source enters this build context; credentials stay in the parent process, and
+            # the Dockerfile stays beside the project, which may hold only project files.
+            dockerfile: Path = self.directory / f"{version}.Dockerfile"
+            dockerfile.write_text(
                 f"FROM {base}\nENV SQLBUILD_GIT_REVISION={version}\n"
                 "COPY --chown=10001:10001 . /project/\n"
             )
-            self.docker("build", "--tag", f"{self.name}:{version}", str(project))
+            self.docker(
+                "build", "--file", str(dockerfile), "--tag", f"{self.name}:{version}", str(project)
+            )
             images.append(
                 self.docker(
                     "image", "inspect", "--format", "{{.Id}}", f"{self.name}:{version}"
