@@ -99,3 +99,6 @@ pub(crate) const DBT_NO_MATCH_WARNING: &str = "No dbt or SQLBuild resources matc
 pub(crate) const DBT_RESOURCE_FALLBACK_TYPE: &str = "resource";
 /// An inline error wraps to at most this many lines before it is truncated.
 pub(crate) const MAX_INLINE_ERROR_LINES: usize = 2;
+
+/// How a full build's unbounded cursor range ends in plan text.
+pub(crate) const UNBOUNDED_RANGE: &str = "(unbounded)";

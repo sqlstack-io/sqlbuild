@@ -43,6 +43,9 @@ const SKIP_ACTION: &str = "skip";
 const QUERY_CHANGED: &str = "query_changed";
 const CONFIG_CHANGED: &str = "config_changed";
 const MICROBATCH_MODE: &str = "microbatch";
+const CREATE_TABLE_ACTION: &str = "create_table";
+/// An unbounded end of a full build's cursor range.
+const UNBOUNDED_RANGE_END: &str = "(unbounded)";
 const CHANGED_IDENTITY: &str = "changed";
 pub(crate) const PLAN_OPTIONS: (&[&str], &[&str]) = (
     &["plan"],
@@ -94,6 +97,19 @@ fn cursor_range(entry: &Bound<'_, PyAny>, bounds: &Bound<'_, PyAny>) -> PyResult
     Ok(format!("{start} \u{2192} {end}"))
 }
 
+/// A non-microbatch full build's range: its `cursor_start` floor, or unbounded, to unbounded; `None` for other builds.
+fn full_build_range(entry: &Bound<'_, PyAny>, runtime_owned: bool) -> PyResult<Option<String>> {
+    if runtime_owned
+        || native_field(entry, "incremental_mode")?.eq(MICROBATCH_MODE)?
+        || !native_field(&native_field(entry, "action")?, "value")?.eq(CREATE_TABLE_ACTION)?
+    {
+        return Ok(None);
+    }
+    let start: String = optional_text(&native_field(entry, "cursor_start")?)?
+        .unwrap_or_else(|| UNBOUNDED_RANGE_END.to_owned());
+    Ok(Some(format!("{start} \u{2192} {UNBOUNDED_RANGE_END}")))
+}
+
 fn cursor_text(entry: &Bound<'_, PyAny>, details: CursorDetails<'_>) -> PyResult<CursorPlanText> {
     let empty_inputs_window: Option<String> = if details.empty_inputs.is_truthy()? {
         Some(if details.waiting_on_empty_inputs {
@@ -104,11 +120,10 @@ fn cursor_text(entry: &Bound<'_, PyAny>, details: CursorDetails<'_>) -> PyResult
     } else {
         None
     };
-    let range: Option<String> = details
-        .resolved_bounds
-        .as_ref()
-        .map(|bounds| cursor_range(entry, bounds))
-        .transpose()?;
+    let range: Option<String> = match &details.resolved_bounds {
+        Some(bounds) => Some(cursor_range(entry, bounds)?),
+        None => full_build_range(entry, details.runtime_owned)?,
+    };
     Ok(CursorPlanText {
         column: optional_text(&native_field(entry, "cursor_column")?)?.unwrap_or_default(),
         cursor_type: optional_text(&native_field(entry, "cursor_type")?)?,

@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime
 
 from sqlbuild._native import CursorBounds, CursorOverrides, ModelCursorSnapshot, SourceEntry
+from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.models import ColumnInfo
 
 
@@ -64,6 +66,16 @@ class CursorIntrinsicResolutionTestCase:
     cursor_snapshots: dict[str, ModelCursorSnapshot]
     expected_sql: str | None = None
     expected_error_fragment: str | None = None
+
+
+@dataclass(frozen=True)
+class FullBuildIntrinsicTestCase:
+    description: str
+    adapter: Callable[[], BaseAdapter]
+    model_config: dict[str, object]
+    full_refresh: bool
+    full_rebuild_cause: str | None
+    expected_sql: str
 
 
 @dataclass(frozen=True)

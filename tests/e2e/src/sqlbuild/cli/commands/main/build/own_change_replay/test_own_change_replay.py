@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import subprocess
 from datetime import date
 from pathlib import Path
@@ -11,6 +10,7 @@ from typing import Any
 import pytest
 
 from tests.e2e.src.sqlbuild.cli.commands.main.build.own_change_replay._test_types import (
+    FullRefreshIntrinsicTestCase,
     FunctionCallerReplayTestCase,
     OwnChangePlanBuildTestCase,
     RefusedPlanTestCase,
@@ -33,10 +33,12 @@ from tests.e2e.src.sqlbuild.cli.commands.main.build.own_change_replay.helpers im
     merge_downstream_files,
     plan,
     plan_models,
+    relation_rows,
     relation_types,
     rename_upstream_with_cli,
     rename_upstream_with_migrate_from,
 )
+from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import run_sqb
 
 _REPLAYED_TAIL: list[tuple[Any, ...]] = [
     (2, date(2026, 9, 2)),
@@ -341,35 +343,35 @@ def test_given_full_refresh_false_caller_when_function_forces_full_rebuild_then_
 @pytest.mark.parametrize(
     "test_case",
     [
-        RefusedPlanTestCase(
-            description="explicit full refresh of a cursor-intrinsic merge names the FULL cause",
-            expected_fragments=(
-                "error[S204]",
-                "Model 'downstream' was given a FULL backfill (--full-refresh)",
-                "non-microbatch full rebuild has no cursor interval",
-                "--start-cursor-ts",
-            ),
+        FullRefreshIntrinsicTestCase(
+            description="explicit full refresh of a cursor-intrinsic merge spans every value",
+            expected_plan_fragments=("(unbounded)",),
         )
     ],
     ids=lambda case: case.description,
 )
-def test_given_full_refresh_flag_on_cursor_intrinsic_merge_when_planning_then_names_full_cause(
-    test_case: RefusedPlanTestCase, tmp_path: Path
+def test_given_full_refresh_flag_on_cursor_intrinsic_merge_when_building_then_rebuilds_every_row(
+    test_case: FullRefreshIntrinsicTestCase, tmp_path: Path
 ) -> None:
     project_dir: Path = build_event_project(
         tmp_path=tmp_path, extra_files=merge_downstream_files(extra_config="")
     )
+    before: list[tuple[Any, ...]] = relation_rows(project_dir=project_dir, relation="downstream")
 
-    assert_plan_fails(
+    planned: subprocess.CompletedProcess[str] = plan(
+        project_dir=project_dir, args=("--full-refresh", "--select", "downstream")
+    )
+    rebuilt: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "build", "--full-refresh", "--select", "downstream"),
         project_dir=project_dir,
-        args=("--full-refresh", "--select", "downstream"),
-        expected=test_case.expected_fragments,
     )
-    refused: subprocess.CompletedProcess[str] = plan(
-        project_dir=project_dir, args=("--json", "--full-refresh", "--select", "downstream")
+
+    assert planned.returncode == 0, planned.stdout + planned.stderr
+    assert all(fragment in planned.stdout for fragment in test_case.expected_plan_fragments), (
+        planned.stdout
     )
-    assert refused.returncode != 0, refused.stdout + refused.stderr
-    assert json.loads(refused.stdout)["error"]["code"] == "S204", refused.stdout + refused.stderr
+    assert rebuilt.returncode == 0, rebuilt.stdout + rebuilt.stderr
+    assert relation_rows(project_dir=project_dir, relation="downstream") == before
 
 
 @pytest.mark.parametrize(

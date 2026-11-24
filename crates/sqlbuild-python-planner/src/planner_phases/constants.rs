@@ -28,8 +28,8 @@ pub(crate) const DOWNGRADE_HISTORY_DAYS: i64 = 90;
 
 pub(crate) const FULL_REFRESH_DISABLED_REBUILD_CODE: &str = "S203";
 
-/// A FULL backfill of a non-microbatch model whose SQL reads the cursor intrinsics.
-pub(crate) const FULL_BACKFILL_WITHOUT_INTERVAL_CODE: &str = "S204";
+/// Marks an unbounded end of a full build's cursor intrinsics in compiled SQL.
+pub(crate) const UNBOUNDED_CURSOR_MARK: &str = "/* (unbounded) */";
 
 pub(crate) const MISSING_UPSTREAM_CODE: &str = "S301";
 

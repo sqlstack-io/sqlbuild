@@ -135,3 +135,5 @@ OTHER_REPLICAS_NOTICE: str = "usage read from this server only; other replicas n
 EXACT_ROW_COUNT_ENGINES: frozenset[str] = frozenset(
     {"MergeTree", "ReplicatedMergeTree", "SharedMergeTree"}
 )
+LOWEST_TIMESTAMP_CURSOR: str = "1900-01-01 00:00:00"
+HIGHEST_TIMESTAMP_CURSOR: str = "2299-12-31 23:59:59.999999"

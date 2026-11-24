@@ -42,6 +42,12 @@ class RefusedPlanTestCase:
 
 
 @dataclass(frozen=True)
+class FullRefreshIntrinsicTestCase:
+    description: str
+    expected_plan_fragments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class UpstreamContractFailureTestCase:
     description: str
     expected_fragments: tuple[str, ...]

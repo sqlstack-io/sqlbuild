@@ -12,7 +12,7 @@ use crate::cli_text::constants::{
     FIRST_RUN_REASON, FORWARD_BACKFILL, FULL_BACKFILL, FULL_REFRESH_REASON, INFO_SEVERITY_VALUE,
     NO_CHANGE_REASON, NORMAL_INCREMENTAL_REASON, QUERY_CHANGED_REASON, REASON_GROUPS,
     SCHEMA_CHANGED_REASON, SKIP_ACTION, SOURCE_FRESHNESS_UNKNOWN_WARNING_TITLE,
-    STALE_INPUT_WARNING_TITLE,
+    STALE_INPUT_WARNING_TITLE, UNBOUNDED_RANGE,
 };
 use crate::cli_text::models::{
     CliStyle, CursorPlanText, DisplayLimit, FunctionPlanText, ModelPlanText, PlanTextReport,
@@ -715,6 +715,19 @@ pub(crate) fn full_refresh_count_lines(active: &[&ModelPlanText]) -> Vec<String>
     )];
     for (label, count) in counts {
         lines.push(format!("  {count:>3} {label}"));
+    }
+    let unbounded: usize = active
+        .iter()
+        .filter(|model| {
+            model
+                .cursor
+                .as_ref()
+                .and_then(|cursor| cursor.range.as_deref())
+                .is_some_and(|range| range.ends_with(UNBOUNDED_RANGE))
+        })
+        .count();
+    if unbounded > 0 {
+        lines.push(format!("  {unbounded:>3} cursor range {UNBOUNDED_RANGE}"));
     }
     lines
 }
