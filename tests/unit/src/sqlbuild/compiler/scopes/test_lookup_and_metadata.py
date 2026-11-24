@@ -85,7 +85,7 @@ def test_given_unsorted_index_when_building_lookup_then_records_and_edges_are_ca
 def test_given_non_ascii_keys_when_building_lookup_then_mappings_follow_python_repr_order(
     test_case: UnicodeKeyOrderCase,
 ) -> None:
-    root: OwnershipRoot = OwnershipRoot("models", resource_kind=ResourceKind.MODEL)
+    root: OwnershipRoot = OwnershipRoot("sql/models", resource_kind=ResourceKind.MODEL)
     resources: tuple[ResourceRecord, ...] = tuple(
         ResourceRecord(
             identity=ResourceIdentity(kind=ResourceKind.MODEL, name=name),
@@ -214,7 +214,7 @@ def test_given_declaration_path_when_projecting_then_role_container_is_canonical
         line=1,
         column=1,
         scope=ScopeKind.INHERITED,
-        ownership_root=OwnershipRoot("models", resource_kind=ResourceKind.MODEL),
+        ownership_root=OwnershipRoot("sql/models", resource_kind=ResourceKind.MODEL),
         owning_path=test_case.owning_path,
     )
 

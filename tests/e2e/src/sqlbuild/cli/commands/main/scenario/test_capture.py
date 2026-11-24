@@ -358,7 +358,6 @@ def test_given_capture_safety_options_when_running_capture_then_enforces_limits(
         / "tests"
         / "_scenario_snapshots"
         / "order_totals_pass"
-        / "sql"
         / "sources"
         / "raw_orders.jsonl"
     )

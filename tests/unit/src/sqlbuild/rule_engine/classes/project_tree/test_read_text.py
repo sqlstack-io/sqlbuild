@@ -19,7 +19,7 @@ from tests.unit.src.sqlbuild.rule_engine.classes.project_tree.helpers import (
     (
         ReadTextTestCase("regular file", "sql/models/orders.sql", expected_text=ORDERS_SQL),
         ReadTextTestCase("nested file", "rules/inputs/limits.yaml", expected_text=LIMITS_YAML),
-        ReadTextTestCase("dot prefix", "./models/orders.sql", expected_text=ORDERS_SQL),
+        ReadTextTestCase("dot prefix", "./sql/models/orders.sql", expected_text=ORDERS_SQL),
         ReadTextTestCase("symlinked file", "sql/models/orders_alias.sql", expected_text=ORDERS_SQL),
         ReadTextTestCase("symlinked folder", "linked_models/orders.sql", expected_text=ORDERS_SQL),
     ),

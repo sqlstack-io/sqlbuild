@@ -34,10 +34,11 @@ _DISABLED: str = _PROJECT + "\n[references]\nenforce_explicit = false\n"
 _OLD_NAMES_OFF: str = _PROJECT + "\n[migrations]\nold_name_views = false\n"
 _HOOK_PATH: str = "sql/models/marts/_sqlbuild/_hooks/python/lookups.py"
 _SQL_HOOK_PATH: str = "sql/models/marts/_sqlbuild/_hooks/sql/record_rows.sql"
-_TASK_PATH: str = "python/nodes/tasks/export.py"
-_CHECK_PATH: str = "python/nodes/checks/orders.py"
-_ASSET_PATH: str = "python/nodes/assets/snapshot.py"
-_LOADER_PATH: str = "python/nodes/loaders/raw.py"
+_TASK_PATH: str = "python/nodes/tasks/export/asset.py"
+_CHECK_PATH: str = "python/nodes/checks/orders/checks.py"
+_ASSET_PATH: str = "python/nodes/assets/snapshot/asset.py"
+_REGIONS_LOADER_PATH: str = "python/nodes/loaders/raw_regions/loader.py"
+_CUSTOMERS_LOADER_PATH: str = "python/nodes/loaders/raw_customers/loader.py"
 _HOOKED: str = 'MODEL (description "Orders.", post_hooks [python("refresh_lookup")]);'
 _NAMED_SQL_HOOK: str = 'MODEL (description "Orders.", post_hooks [sql("record_rows")]);'
 
@@ -78,14 +79,22 @@ def _asset(body: str) -> str:
     )
 
 
-def _loaders(*, depends_on: str, body: str) -> str:
-    return (
-        "from sqlbuild.loaders import loader\n\n\n"
-        "@loader\ndef raw_regions(ctx):\n    '''Test loader raw_regions.'''\n"
-        "    return [{'id': 1}]\n\n\n"
-        f"@loader(depends_on=[{depends_on}])\ndef raw_customers(ctx):\n{body}"
-        "    return [{'id': 1}]\n"
-    )
+def _loaders(*, depends_on: str, body: str) -> dict[str, str]:
+    """Loaders raw_regions and raw_customers in their unit folders; raw_customers keeps its lines."""
+
+    return {
+        _REGIONS_LOADER_PATH: (
+            "from sqlbuild.loaders import loader\n\n\n"
+            "@loader\ndef raw_regions(ctx):\n    '''Test loader raw_regions.'''\n"
+            "    return [{'id': 1}]\n"
+        ),
+        _CUSTOMERS_LOADER_PATH: (
+            "from sqlbuild.loaders import loader\n\n"
+            "from python.nodes.loaders.raw_regions.loader import raw_regions\n\n\n\n\n\n\n"
+            f"@loader(depends_on=[{depends_on}])\ndef raw_customers(ctx):\n{body}"
+            "    return [{'id': 1}]\n"
+        ),
+    }
 
 
 _MODELS: dict[str, str] = {
@@ -130,7 +139,7 @@ EXPLICIT_REFERENCE_PROJECTS: tuple[tuple[str, dict[str, str], str], ...] = (
             **_MODELS,
             **_MANAGED,
             _HOOK_PATH: _hook(),
-            _LOADER_PATH: _loaders(depends_on="", body=""),
+            **_loaders(depends_on="", body=""),
             _TASK_PATH: _task(
                 '    ctx.query("SELECT * FROM raw_customers JOIN customers ON true")\n'
                 '    ctx.execute_sql(sql="DELETE FROM main.orders")\n'
@@ -185,7 +194,7 @@ EXPLICIT_REFERENCE_PROJECTS: tuple[tuple[str, dict[str, str], str], ...] = (
             **_MANAGED,
             **_SEED,
             _HOOK_PATH: _hook(),
-            _LOADER_PATH: _loaders(
+            **_loaders(
                 depends_on="raw_regions",
                 body=(
                     '    ctx.query("SELECT * FROM raw_customers JOIN raw_regions ON true")\n'
@@ -201,7 +210,7 @@ EXPLICIT_REFERENCE_PROJECTS: tuple[tuple[str, dict[str, str], str], ...] = (
             **_MODELS,
             **_MANAGED,
             _HOOK_PATH: _hook(),
-            _LOADER_PATH: _loaders(
+            **_loaders(
                 depends_on="",
                 body='    ctx.query("SELECT * FROM raw_regions")\n',
             ),

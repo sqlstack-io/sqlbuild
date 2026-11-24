@@ -448,7 +448,9 @@ def test_given_broken_declaration_category_when_loading_then_other_categories_re
             },
             expected_names=frozenset({"valid"}),
             unexpected_names=frozenset({"dotted", "nested"}),
-            expected_diagnostic_fragments=("Macro module path collision for 'macros.python.a.b'",),
+            expected_diagnostic_fragments=(
+                "Macro module path collision for 'sql.macros.python.a.b'",
+            ),
         ),
     ),
     ids=lambda case: case.description,

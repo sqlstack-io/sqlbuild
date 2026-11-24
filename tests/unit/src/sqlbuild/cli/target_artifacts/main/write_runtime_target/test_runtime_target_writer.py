@@ -22,15 +22,15 @@ from tests.unit.src.sqlbuild.cli.target_artifacts.main.write_runtime_target._tes
         TargetWriterTestCase(
             description="writes runtime SQL from executed statements",
             expected_files={
-                "run/models/staging/orders.sql": (
+                "run/sql/models/staging/orders.sql": (
                     "DROP TABLE IF EXISTS analytics.orders__staging;\n\n"
                     "CREATE OR REPLACE TABLE analytics.orders__staging AS SELECT 1 AS order_id;\n"
                 ),
-                "run/functions/sql/is_completed_order.sql": (
+                "run/sql/functions/sql/is_completed_order.sql": (
                     "CREATE OR REPLACE FUNCTION analytics.is_completed_order"
                     "(order_status VARCHAR) RETURNS BOOLEAN;\n"
                 ),
-                "run/functions/python/is_completed_order_py.sql": (
+                "run/sql/functions/python/is_completed_order_py.sql": (
                     "REGISTER PYTHON FUNCTION analytics.is_completed_order_py"
                     "(VARCHAR) RETURNS BOOLEAN;\n"
                 ),
@@ -39,19 +39,19 @@ from tests.unit.src.sqlbuild.cli.target_artifacts.main.write_runtime_target._tes
         TargetWriterTestCase(
             description="preserves existing runtime files outside current result scope",
             initial_files={
-                "run/models/marts/fact_orders.sql": "SELECT 1;\n",
+                "run/sql/models/marts/fact_orders.sql": "SELECT 1;\n",
             },
             expected_files={
-                "run/models/marts/fact_orders.sql": "SELECT 1;\n",
-                "run/models/staging/orders.sql": (
+                "run/sql/models/marts/fact_orders.sql": "SELECT 1;\n",
+                "run/sql/models/staging/orders.sql": (
                     "DROP TABLE IF EXISTS analytics.orders__staging;\n\n"
                     "CREATE OR REPLACE TABLE analytics.orders__staging AS SELECT 1 AS order_id;\n"
                 ),
-                "run/functions/sql/is_completed_order.sql": (
+                "run/sql/functions/sql/is_completed_order.sql": (
                     "CREATE OR REPLACE FUNCTION analytics.is_completed_order"
                     "(order_status VARCHAR) RETURNS BOOLEAN;\n"
                 ),
-                "run/functions/python/is_completed_order_py.sql": (
+                "run/sql/functions/python/is_completed_order_py.sql": (
                     "REGISTER PYTHON FUNCTION analytics.is_completed_order_py"
                     "(VARCHAR) RETURNS BOOLEAN;\n"
                 ),

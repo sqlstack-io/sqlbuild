@@ -236,12 +236,12 @@ def test_given_inaccessible_scoped_macro_import_when_loading_then_rejects_before
                 ),
                 "sql/macros/python/shared.py": "def shared_macro() -> str:\n    return 'shared'\n",
             },
-            expected_error_fragment="imports project package 'macros.python' instead of a macro module",
+            expected_error_fragment="imports project package 'sql.macros.python' instead of a macro module",
         ),
         LoadProjectMacrosErrorTestCase(
             description="rejects an import of a package containing project macros",
             macro_files={
-                "sql/macros/python/a_consumer.py": "import macros\n",
+                "sql/macros/python/a_consumer.py": "import sql.macros\n",
                 "sql/macros/python/shared.py": "def shared_macro() -> str:\n    return 'shared'\n",
             },
             expected_error_fragment="module imports are not supported",
@@ -256,7 +256,7 @@ def test_given_inaccessible_scoped_macro_import_when_loading_then_rejects_before
                     "def consumer() -> str:\n    return missing()\n"
                 )
             },
-            expected_error_fragment="imports project package 'macros.python.missing'",
+            expected_error_fragment="imports project package 'sql.macros.python.missing'",
         ),
         LoadProjectMacrosErrorTestCase(
             description="rejects project macro import cycle before execution",
@@ -359,7 +359,7 @@ def test_given_inaccessible_scoped_macro_import_when_loading_then_rejects_before
                 "sql/macros/python/a.b.py": "def dotted() -> str:\n    return 'dotted'\n",
                 "sql/macros/python/a/b.py": "def nested() -> str:\n    return 'nested'\n",
             },
-            expected_error_fragment="Macro module path collision for 'macros.python.a.b'",
+            expected_error_fragment="Macro module path collision for 'sql.macros.python.a.b'",
         ),
         LoadProjectMacrosErrorTestCase(
             description="rejects public module owned constants",

@@ -356,7 +356,7 @@ def assert_scenario_snapshot(
 
     snapshot_root: Path = project_dir / "tests" / "_scenario_snapshots" / scenario_name
     manifest_path: Path = snapshot_root / "scenario.json"
-    jsonl_path: Path = snapshot_root / "sql" / "sources" / "raw_orders.jsonl"
+    jsonl_path: Path = snapshot_root / "sources" / "raw_orders.jsonl"
     assert manifest_path.exists()
     assert jsonl_path.exists()
 
@@ -365,7 +365,7 @@ def assert_scenario_snapshot(
     assert manifest_data["scenario_name"] == scenario_name
     assert manifest_data["format"] == "jsonl"
     assert manifest_data["total_rows"] == expected_row_count
-    assert manifest_data["relations"][0]["file"] == "sql/sources/raw_orders.jsonl"
+    assert manifest_data["relations"][0]["file"] == "sources/raw_orders.jsonl"
     assert manifest_data["relations"][0]["row_count"] == expected_row_count
     columns: object = manifest_data["relations"][0]["columns"]
     assert isinstance(columns, list)
@@ -398,7 +398,6 @@ def maybe_corrupt_scenario_snapshot_jsonl(
             / "tests"
             / "_scenario_snapshots"
             / scenario_name
-            / "sql"
             / "sources"
             / "raw_orders.jsonl"
         )
@@ -437,7 +436,7 @@ def write_committed_order_totals_pass_snapshot(*, project_dir: Path) -> None:
     """Write a small snapshot fixture without running scenario capture."""
 
     snapshot_root: Path = project_dir / "tests" / "_scenario_snapshots" / "order_totals_pass"
-    sources_root: Path = snapshot_root / "sql" / "sources"
+    sources_root: Path = snapshot_root / "sources"
     sources_root.mkdir(parents=True)
     (snapshot_root / "scenario.json").write_text(
         json.dumps(
@@ -464,7 +463,7 @@ def write_committed_order_totals_pass_snapshot(*, project_dir: Path) -> None:
                                 "warehouse_type": "INTEGER",
                             },
                         ],
-                        "file": "sql/sources/raw_orders.jsonl",
+                        "file": "sources/raw_orders.jsonl",
                         "kind": "source",
                         "logical_name": "raw_orders",
                         "row_count": 2,
@@ -1238,9 +1237,9 @@ def write_snowflake_variant_snapshot(
     """Write the snapshot a Snowflake capture stores: the VARIANT as Snowflake's JSON text."""
 
     snapshot_root: Path = project_dir / "tests" / "_scenario_snapshots" / scenario_name
-    (snapshot_root / "sql" / "sources").mkdir(parents=True)
+    (snapshot_root / "sources").mkdir(parents=True)
     row: str = json.dumps({"ORDER_ID": 1, "PAYLOAD": payload_text, "STATUS": "a"}) + "\n"
-    (snapshot_root / "sql" / "sources" / "raw_orders.jsonl").write_text(row, encoding="utf-8")
+    (snapshot_root / "sources" / "raw_orders.jsonl").write_text(row, encoding="utf-8")
     manifest: dict[str, object] = {
         "capture_adapter": "snowflake",
         "capture_dialect": "snowflake",
@@ -1270,7 +1269,7 @@ def write_snowflake_variant_snapshot(
                         ("payload", "VARIANT", "VARIANT"),
                     )
                 ],
-                "file": "sql/sources/raw_orders.jsonl",
+                "file": "sources/raw_orders.jsonl",
                 "kind": "source",
                 "logical_name": "raw_orders",
                 "row_count": 1,
@@ -1322,9 +1321,9 @@ def write_snowflake_order_ids_snapshot(*, project_dir: Path, scenario_name: str)
     """Write the snapshot a Snowflake capture stores for a one-column order source."""
 
     snapshot_root: Path = project_dir / "tests" / "_scenario_snapshots" / scenario_name
-    (snapshot_root / "sql" / "sources").mkdir(parents=True)
+    (snapshot_root / "sources").mkdir(parents=True)
     row: str = json.dumps({"ORDER_ID": 1}) + "\n"
-    (snapshot_root / "sql" / "sources" / "raw_orders.jsonl").write_text(row, encoding="utf-8")
+    (snapshot_root / "sources" / "raw_orders.jsonl").write_text(row, encoding="utf-8")
     manifest: dict[str, object] = {
         "capture_adapter": "snowflake",
         "capture_dialect": "snowflake",
@@ -1353,7 +1352,7 @@ def write_snowflake_order_ids_snapshot(*, project_dir: Path, scenario_name: str)
                         "warehouse_type": "NUMBER(1,0)",
                     }
                 ],
-                "file": "sql/sources/raw_orders.jsonl",
+                "file": "sources/raw_orders.jsonl",
                 "kind": "source",
                 "logical_name": "raw_orders",
                 "row_count": 1,

@@ -41,7 +41,7 @@ from tests.unit.src.sqlbuild.compiler.scopes.helpers import report_scope_lookup
     (
         ScopeReportTargetCase("qualified", "model:orders", "model:orders", ()),
         ScopeReportTargetCase("exact_path", "sql/models/staging/orders.sql", "model:orders", ()),
-        ScopeReportTargetCase("windows_path", r"models\staging\orders.sql", "model:orders", ()),
+        ScopeReportTargetCase("windows_path", r"sql\models\staging\orders.sql", "model:orders", ()),
         ScopeReportTargetCase(
             "bare", "orders", None, (ScopeDiagnosticCode.UNQUALIFIED_TARGET.value,)
         ),
@@ -80,7 +80,7 @@ def test_given_resource_when_querying_then_sections_and_scope_chain_are_separate
     assert [item.identity for item in report.relationship_scope] == ["enum:mart_status"]
     assert [item.path for item in report.scope_chain] == [
         "sql/models/staging",
-        "models",
+        "sql/models",
         "global",
     ]
     assert [item.identity for item in report.nearby_unavailable] == ["enum:other_status"]
@@ -94,7 +94,7 @@ def test_given_prospective_paths_when_querying_then_visibility_is_pure_and_parti
     test_case: ExpectedBooleanCase,
 ) -> None:
     file_report: ScopeReport = query_scope_report(
-        lookup=report_scope_lookup(), at=r"models\staging\new.sql"
+        lookup=report_scope_lookup(), at=r"sql\models\staging\new.sql"
     )
     directory_report: ScopeReport = query_scope_report(
         lookup=report_scope_lookup(), at="sql/models/staging", directory=True
@@ -123,7 +123,7 @@ def test_given_empty_authored_root_when_querying_prospective_path_then_root_fact
 ) -> None:
     lookup: ScopeLookup = build_scope_lookup(
         index=ScopeIndex(
-            ownership_roots=(OwnershipRoot("models", resource_kind=ResourceKind.MODEL),)
+            ownership_roots=(OwnershipRoot("sql/models", resource_kind=ResourceKind.MODEL),)
         )
     )
 
@@ -227,7 +227,7 @@ def test_given_folder_tree_when_browsing_and_listing_then_counts_are_exact(
         filters=ScopeReportFilters(page_size=10_001),
     )
 
-    assert [item.path for item in root.folders] == ["global", "models"]
+    assert [item.path for item in root.folders] == ["global", "sql"]
     assert constants.folders[0].descendant_count == 10_000
     assert listed.section.total == 10_000
     assert len(listed.declarations) == 10_000
@@ -283,7 +283,7 @@ def test_given_declaration_when_explaining_then_metadata_is_typed_and_value_safe
         "render_as": None,
         "role": "constants",
         "visibility_label": "project",
-        "role_root": "constants",
+        "role_root": "sql/constants",
         "bucket_path": None,
     }
     assert test_case.expected_result

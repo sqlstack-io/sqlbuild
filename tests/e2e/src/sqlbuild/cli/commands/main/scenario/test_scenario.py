@@ -1936,7 +1936,7 @@ def test_given_waffle_shop_fixture_when_running_with_retain_then_keeps_scenario_
             command=("--no-color", "scenario", "test", "order_totals_pass"),
             expected_exit_code=0,
             artifact_relative_path=Path(
-                "target/run/scenarios/order_totals_pass/models/order_totals.sql"
+                "target/run/scenarios/order_totals_pass/sql/models/order_totals.sql"
             ),
             expected_artifact_fragments=(
                 "CREATE",
@@ -2004,7 +2004,7 @@ def test_given_scenario_project_when_running_scenario_test_then_writes_runtime_a
             ),
             expected_artifact_fragments=(
                 "loaded from",
-                "sql/sources/raw_orders.jsonl",
+                "sources/raw_orders.jsonl",
                 'CREATE TABLE "__sqb_local__source__raw_orders"',
             ),
         ),
@@ -2015,7 +2015,7 @@ def test_given_scenario_project_when_running_scenario_test_then_writes_runtime_a
             command=("--no-color", "scenario", "test", "order_totals_pass", "--local"),
             expected_exit_code=0,
             artifact_relative_path=Path(
-                "target/run/scenarios/order_totals_pass/local/models/order_totals.sql"
+                "target/run/scenarios/order_totals_pass/local/sql/models/order_totals.sql"
             ),
             expected_artifact_fragments=(
                 "SUM(amount) AS total_amount",
@@ -2044,7 +2044,7 @@ def test_given_scenario_project_when_running_scenario_test_then_writes_runtime_a
             command=("--no-color", "scenario", "test", "local_sql_function_pass", "--local"),
             expected_exit_code=0,
             artifact_relative_path=Path(
-                "target/run/scenarios/local_sql_function_pass/local/functions/sql/is_large_order.sql"
+                "target/run/scenarios/local_sql_function_pass/local/sql/functions/sql/is_large_order.sql"
             ),
             expected_artifact_fragments=(
                 "CREATE OR REPLACE MACRO",

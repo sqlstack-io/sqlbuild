@@ -15,7 +15,8 @@ from sqlbuild.compiler.compile.types import ExternalSqlReferenceResolver
 def base_repo_files() -> dict[str, str]:
     return {
         "sqlbuild_project.toml": (
-            'name = "demo"\nadapter = "duckdb"\n\n[settings]\ndefault_audit_severity = "warn"\n'
+            'name = "demo"\nadapter = "duckdb"\nextra_paths = ["dbt"]\n\n'
+            '[settings]\ndefault_audit_severity = "warn"\n'
         ),
     }
 

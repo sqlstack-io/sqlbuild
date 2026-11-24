@@ -83,7 +83,7 @@ def test_given_lifecycle_shutdown_timeout_when_discovering_then_exposes_drain_se
         InvalidEventExporterConfigTestCase(
             "unknown lifecycle sink",
             '[event_sinks.lifecycle.named.missing]\nmin_severity = "info"\n',
-            "unknown sink",
+            "unknown event sink",
         ),
         InvalidEventExporterConfigTestCase(
             "unknown kind", '[event_sinks.lifecycle]\nevent_kinds = ["kafka"]\n', "unknown kind"
@@ -131,7 +131,12 @@ def test_given_lifecycle_shutdown_timeout_when_discovering_then_exposes_drain_se
         InvalidEventExporterConfigTestCase(
             "legacy exporter config",
             '[event_exporters]\nmin_severity = "info"\n',
-            "replaced by event_sinks.lifecycle",
+            "event_exporters was replaced by event_sinks.lifecycle",
+        ),
+        InvalidEventExporterConfigTestCase(
+            "sinks config from before the rename",
+            '[sinks.lifecycle]\nmin_severity = "info"\n',
+            "sinks was renamed event_sinks",
         ),
     ),
     ids=lambda case: case.description,

@@ -18,7 +18,7 @@ from tests.unit.src.sqlbuild.compiler.scopes._test_types import PathNormalizatio
         ),
         PathNormalizationCase(
             description="windows_separators",
-            path=r"models\staging\orders\stg_orders.sql",
+            path=r"sql\models\staging\orders\stg_orders.sql",
             expected_path="sql/models/staging/orders/stg_orders.sql",
         ),
         PathNormalizationCase(
@@ -40,7 +40,7 @@ def test_given_posix_or_windows_path_when_normalizing_then_returns_canonical_pos
     [
         PathNormalizationCase("absolute", "/models/orders.sql", "project-relative"),
         PathNormalizationCase("windows_drive", "C:\\models\\orders.sql", "project-relative"),
-        PathNormalizationCase("escaping", "sql/models/../../orders.sql", "escapes the project"),
+        PathNormalizationCase("escaping", "sql/models/../../../orders.sql", "escapes the project"),
     ],
     ids=lambda case: case.description,
 )

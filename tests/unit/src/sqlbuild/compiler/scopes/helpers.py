@@ -54,7 +54,7 @@ def unused_declaration_index(*, enforce_placement: bool) -> ScopeIndex:
                     line=1,
                     column=1,
                     scope=ScopeKind.GLOBAL,
-                    ownership_root=OwnershipRoot("constants"),
+                    ownership_root=OwnershipRoot("sql/constants"),
                 ),
             ),
             completeness=ScopeCompleteness(runtime_usage=True, placement=False),
@@ -166,7 +166,7 @@ def declaration_record(
         1,
         1,
         scope,
-        OwnershipRoot("models", resource_kind=ResourceKind.MODEL),
+        OwnershipRoot("sql/models", resource_kind=ResourceKind.MODEL),
         owning_path=owner_path,
     )
 
@@ -176,7 +176,7 @@ def scope_index() -> ScopeIndex:
 
     model: ResourceIdentity = ResourceIdentity(kind=ResourceKind.MODEL, name="stg_orders")
     model_root: OwnershipRoot = OwnershipRoot(
-        path="models",
+        path="sql/models",
         kind=OwnershipRootKind.RESOURCE,
         resource_kind=ResourceKind.MODEL,
     )
@@ -186,7 +186,7 @@ def scope_index() -> ScopeIndex:
         2,
         1,
         ScopeKind.GLOBAL,
-        OwnershipRoot("enums", OwnershipRootKind.GLOBAL),
+        OwnershipRoot("sql/enums", OwnershipRootKind.GLOBAL),
         enum=EnumMetadata(
             (
                 EnumMemberMetadata("OPEN"),
@@ -201,7 +201,7 @@ def scope_index() -> ScopeIndex:
         8,
         3,
         ScopeKind.INHERITED,
-        OwnershipRoot("models", resource_kind=ResourceKind.MODEL),
+        OwnershipRoot("sql/models", resource_kind=ResourceKind.MODEL),
         owning_path="sql/models/staging",
         constant=ConstantMetadata("integer", render_as="value_list"),
     )
@@ -211,7 +211,7 @@ def scope_index() -> ScopeIndex:
         1,
         1,
         ScopeKind.GLOBAL,
-        OwnershipRoot("macros", OwnershipRootKind.GLOBAL),
+        OwnershipRoot("sql/macros", OwnershipRootKind.GLOBAL),
         macro=MacroMetadata(("status",), (enum.identity,)),
     )
     return ScopeIndex(
@@ -225,8 +225,8 @@ def scope_index() -> ScopeIndex:
 def report_scope_lookup(*, extra_globals: int = 0) -> ScopeLookup:
     """Return representative complete facts for scope report tests."""
 
-    model_root: OwnershipRoot = OwnershipRoot("models", resource_kind=ResourceKind.MODEL)
-    global_root: OwnershipRoot = OwnershipRoot("constants", OwnershipRootKind.GLOBAL)
+    model_root: OwnershipRoot = OwnershipRoot("sql/models", resource_kind=ResourceKind.MODEL)
+    global_root: OwnershipRoot = OwnershipRoot("sql/constants", OwnershipRootKind.GLOBAL)
     orders: ResourceIdentity = ResourceIdentity(ResourceKind.MODEL, "orders")
     expected: ResourceIdentity = ResourceIdentity(ResourceKind.MODEL, "expected_orders")
     resources: tuple[ResourceRecord, ...] = (
@@ -288,7 +288,7 @@ def report_scope_lookup(*, extra_globals: int = 0) -> ScopeLookup:
         1,
         1,
         ScopeKind.GLOBAL,
-        OwnershipRoot("macros", OwnershipRootKind.GLOBAL),
+        OwnershipRoot("sql/macros", OwnershipRootKind.GLOBAL),
         macro=MacroMetadata(("value",), (inherited.identity,), "secret-source-digest"),
     )
     generated: tuple[DeclarationRecord, ...] = tuple(
@@ -309,7 +309,7 @@ def report_scope_lookup(*, extra_globals: int = 0) -> ScopeLookup:
             OwnershipRoot("tests/unit", resource_kind=ResourceKind.TEST),
             OwnershipRoot("tests/scenarios", resource_kind=ResourceKind.SCENARIO),
             OwnershipRoot("sql/functions/sql", resource_kind=ResourceKind.FUNCTION),
-            OwnershipRoot("sources", resource_kind=ResourceKind.SOURCE),
+            OwnershipRoot("sql/sources", resource_kind=ResourceKind.SOURCE),
         ),
         resources=resources,
         declarations=(
@@ -333,7 +333,7 @@ def report_scope_lookup(*, extra_globals: int = 0) -> ScopeLookup:
     return build_scope_lookup(index=index)
 
 
-_RELOCATION_ROOT: OwnershipRoot = OwnershipRoot("models", resource_kind=ResourceKind.MODEL)
+_RELOCATION_ROOT: OwnershipRoot = OwnershipRoot("sql/models", resource_kind=ResourceKind.MODEL)
 _CENTS_MACRO: DeclarationIdentity = DeclarationIdentity(DeclarationKind.MACRO, "to_cents")
 _ORDER_SHAPE: DeclarationIdentity = DeclarationIdentity(DeclarationKind.SCHEMA, "order_shape")
 

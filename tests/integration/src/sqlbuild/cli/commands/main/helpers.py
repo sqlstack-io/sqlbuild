@@ -1799,7 +1799,7 @@ def write_job_warehouse_project(*, project_dir: Path) -> None:
             "sql/models/orders_daily.sql": _job_warehouse_model(' FROM __ref("orders")'),
             "sql/models/refunds.sql": _job_warehouse_model(' FROM __ref("orders_daily")'),
             "sql/models/summary.sql": _job_warehouse_model(' FROM __ref("refunds")'),
-            "python/nodes/assets.py": (
+            "python/nodes/refresh_marker/asset.py": (
                 "from sqlbuild.assets import asset\n\n\n@asset\ndef refresh_marker(ctx):\n"
                 '    """Refresh."""\n    ctx.execute_sql("SELECT \'task marker\'")\n'
             ),
