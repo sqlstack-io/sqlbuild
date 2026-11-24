@@ -11,10 +11,17 @@ export type CardStale = 'changed' | 'compiled' | 'upstream' | 'behind';
 
 export function cardStatus(node: CatalogNode): CardStatus {
 	if (node.kind === 'source') return 'src';
-	if (node.lastOutcome === 'failed') return 'fail';
-	if (node.lastOutcome === 'warn') return 'warn';
-	if (node.lastOutcome === 'success' || node.lastOutcome === 'skipped') return node.lastBuild ? 'ok' : 'none';
-	return node.lastBuild ? 'ok' : 'none';
+	// The server's status: changed and behind are built, and show as a stale badge.
+	switch (node.status) {
+		case 'failed':
+			return 'fail';
+		case 'current':
+		case 'changed':
+		case 'behind':
+			return 'ok';
+		default:
+			return 'none';
+	}
 }
 
 /** The stale reason to show on a card: own changes first, then upstream changes, then behind. */
@@ -24,6 +31,18 @@ export function cardStale(reasons: StaleReason[]): CardStale | undefined {
 	if (reasons.some((r) => r.reason === 'changed_upstream')) return 'upstream';
 	if (reasons.some((r) => r.reason === 'behind')) return 'behind';
 	return undefined;
+}
+
+/** A card's stale badge, which follows the server's status; the reasons only say which kind of change. */
+function staleBadge(node: CatalogNode): CardStale | undefined {
+	const reasons = node.stale ?? [];
+	if (node.status === 'changed') {
+		const shown = cardStale(reasons);
+		return shown === 'compiled' ? 'compiled' : 'changed';
+	}
+	if (node.status === 'behind') return 'behind';
+	// A current node can still have an upstream whose definition changed: shown, but not as its status.
+	return node.status === 'current' && cardStale(reasons) === 'upstream' ? 'upstream' : undefined;
 }
 
 export function checksBadge(node: CatalogNode): { checks?: string; checksColor?: string } {
@@ -43,10 +62,10 @@ export function cardData(node: CatalogNode): Record<string, unknown> {
 		nodeKind: node.kind,
 		status: node.liveStatus ?? cardStatus(node),
 		// A node the active run is building, or has just built, shows that, not whether it was stale.
-		stale: node.liveStatus ? undefined : cardStale(node.stale ?? []),
+		stale: node.liveStatus ? undefined : staleBadge(node),
 		live: !!node.liveStatus,
 		icon: nodeIconKey(node),
-		lastBuiltAt: node.kind === 'source' ? (node.sourceFreshness?.loadedAt ?? undefined) : node.lastBuild?.builtAt,
+		lastBuiltAt: node.kind === 'source' ? (node.sourceFreshness?.loadedAt ?? undefined) : (node.statusAt ?? undefined),
 		description: node.description || undefined,
 		tags: node.tags,
 		columnCount: node.columnCount || undefined,
@@ -91,8 +110,8 @@ export function groupCard(group: string, members: CatalogNode[]): GroupCard {
 	return {
 		group,
 		count: members.length,
-		ok: built.filter((n) => cardStatus(n) === 'ok' && !n.stale?.length).length,
-		stale: built.filter((n) => !!n.stale?.length).length,
-		failed: built.filter((n) => n.lastOutcome === 'failed').length
+		ok: built.filter((n) => n.status === 'current').length,
+		stale: built.filter((n) => n.status === 'changed' || n.status === 'behind').length,
+		failed: built.filter((n) => n.status === 'failed').length
 	};
 }

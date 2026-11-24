@@ -1,3 +1,4 @@
+import { withServerStatus } from '$lib/build-area/status-fixtures';
 import { describe, expect, it } from 'vitest';
 import type { Node } from '@xyflow/svelte';
 import type { CatalogNode } from '$lib/api';
@@ -5,7 +6,7 @@ import { MAX_DRAWN, folderGraph, folderTree, layoutFolderGraph, tooManyToDraw, w
 
 function node(key: string, path: string, upstream: string[] = [], extra: Partial<CatalogNode> = {}): CatalogNode {
 	const kind = key.startsWith('source:') ? 'source' : key.startsWith('seed:') ? 'seed' : 'table';
-	return { key, kind, path, upstream, group: null, tags: [], stale: [], lastOutcome: null, lastBuild: { builtAt: '2026-11-07T06:00:00Z' }, ...extra } as CatalogNode;
+	return withServerStatus({ key, kind, path, upstream, group: null, tags: [], stale: [], lastOutcome: null, lastBuild: { builtAt: '2026-11-07T06:00:00Z' }, ...extra } as CatalogNode);
 }
 
 const nodes = [

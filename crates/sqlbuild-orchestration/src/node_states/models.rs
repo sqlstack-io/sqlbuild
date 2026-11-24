@@ -15,13 +15,38 @@ use crate::warehouse_metadata::models::{
     CatalogNodeBuild, CatalogNodeChecks, CatalogNodeOutcome, CatalogNodeRecord,
 };
 
-/// The state fields of a `CatalogNodeRecord`, with the same meaning.
+/// The state fields of a `CatalogNodeRecord`, with the same meaning, and the status every page shows.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct NodeState {
     pub last_build: Option<CatalogNodeBuild>,
     pub last_outcome: Option<CatalogNodeOutcome>,
     pub definition_changed: bool,
     pub checks: CatalogNodeChecks,
+    /// The node's one build status, which pages show as it is.
+    #[serde(default)]
+    pub status: NodeBuildStatus,
+    /// When the status was reached: the last build, or the last run for a node without a table.
+    #[serde(default)]
+    pub status_at: Option<DateTime<Utc>>,
+}
+
+/// Where a node stands: built and current, or why not.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum NodeBuildStatus {
+    /// Built, or run successfully for a node without a table, and up to date.
+    Current,
+    /// Its definition changed since its last build.
+    Changed,
+    /// An upstream node has newer data than its last build.
+    Behind,
+    /// Its last attempt failed.
+    Failed,
+    /// Never built, or never run for a node without a table.
+    #[default]
+    NotBuilt,
+    /// A source, which SQLBuild reads but never builds.
+    Source,
 }
 
 /// Every current node's state at one version; `snapshot_id` is null before the first publication.

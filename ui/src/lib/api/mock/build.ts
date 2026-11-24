@@ -413,6 +413,7 @@ export class MockBuild {
 	#catalogNode(state: NodeState, checks: Check[]): CatalogNode & Pick<CatalogNodeDetail, 'stale' | 'checks'> {
 		const { sn, lastBuild, lastOutcome, stale } = state;
 		const spec = NODE_SPECS[sn.key];
+		const { status, statusAt } = mockStatus(state);
 		return {
 			key: sn.key,
 			kind: sn.kind,
@@ -429,7 +430,9 @@ export class MockBuild {
 			lastOutcome,
 			stale: structuredClone(stale),
 			sourceFreshness: this.#freshness[sn.key] ?? null,
-			checks: countChecks(checks.filter((c) => c.node === sn.key))
+			checks: countChecks(checks.filter((c) => c.node === sn.key)),
+			status,
+			statusAt
 		};
 	}
 
@@ -693,4 +696,18 @@ function synthRunId(seed: string, i: number): string {
 
 function invocationIdLike(seed: string): string {
 	return synthRunId(seed, 0);
+}
+
+/** Python nodes keep no table: the fake server, as the real one, takes their status from their last run. */
+const WITHOUT_TABLE: ReadonlySet<string> = new Set(['asset', 'loader']);
+
+/** The fake server's status of a node, by the real server's rule: failed, then not built, changed, behind or current. */
+function mockStatus({ sn, lastBuild, lastOutcome, entries, stale }: NodeState): Pick<CatalogNode, 'status' | 'statusAt'> {
+	const ranAt = entries[0]?.startedAt ?? null;
+	if (sn.kind === 'source') return { status: 'source', statusAt: null };
+	if (lastOutcome === 'failed') return { status: 'failed', statusAt: ranAt ?? lastBuild?.builtAt ?? null };
+	if (WITHOUT_TABLE.has(sn.kind) && !lastBuild) return lastOutcome ? { status: 'current', statusAt: ranAt } : { status: 'not_built', statusAt: null };
+	if (!lastBuild) return { status: 'not_built', statusAt: null };
+	const status = stale.some((r) => r.reason === 'changed') ? 'changed' : stale.some((r) => r.reason === 'behind') ? 'behind' : 'current';
+	return { status, statusAt: lastBuild.builtAt };
 }

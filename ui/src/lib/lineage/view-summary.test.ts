@@ -1,3 +1,4 @@
+import { withServerStatus } from '$lib/build-area/status-fixtures';
 import { describe, expect, it } from 'vitest';
 import type { CatalogNode, StaleReason } from '$lib/api';
 import { shownNodes } from './folder-selection';
@@ -5,7 +6,7 @@ import { viewSummary } from './view-summary';
 
 function node(key: string, kind: CatalogNode['kind'], path: string, stale: StaleReason['reason'][] = [], lastOutcome: CatalogNode['lastOutcome'] = null): CatalogNode {
 	const reasons = stale.map((reason) => ({ reason, upstream: [], detail: '', since: '' }) as unknown as StaleReason);
-	return { key, kind, path, upstream: [], group: null, tags: [], stale: reasons, lastOutcome, lastBuild: null } as unknown as CatalogNode;
+	return withServerStatus({ key, kind, path, upstream: [], group: null, tags: [], stale: reasons, lastOutcome, lastBuild: null } as unknown as CatalogNode);
 }
 
 const nodes = [
@@ -26,8 +27,9 @@ describe('view summary', () => {
 				{ kind: 'table', count: 2 },
 				{ kind: 'incremental', count: 1 }
 			],
+			// One status each: an upstream definition change leaves the view current.
 			changed: 1,
-			behind: 2,
+			behind: 1,
 			failed: 1
 		});
 	});

@@ -1,10 +1,11 @@
+import { withServerStatus } from '$lib/build-area/status-fixtures';
 import { describe, expect, it } from 'vitest';
 import type { CatalogNode, StaleReason } from '$lib/api';
 import { folderPaths, folderTree, visibleTreeRows, type TreeRow } from './folder-tree';
 
 const behind = [{ reason: 'behind', upstream: [], detail: '', since: '2026-11-18T00:00:00Z' }] as StaleReason[];
 const node = (key: string, path: string, extra: Partial<CatalogNode> = {}): CatalogNode =>
-	({ key, kind: 'table', path, group: null, upstream: [], stale: [], lastOutcome: 'success', lastBuild: { builtAt: '2026-11-18T00:00:00Z' }, ...extra }) as CatalogNode;
+	withServerStatus({ key, kind: 'table', path, group: null, upstream: [], stale: [], lastOutcome: 'success', lastBuild: { builtAt: '2026-11-18T00:00:00Z' }, ...extra } as CatalogNode);
 
 const nodes = [
 	node('card_events', 'sql/models/payments/providers/card/card_events.sql', { stale: behind }),

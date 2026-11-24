@@ -3018,6 +3018,11 @@ export interface components {
             name: string;
             role: components["schemas"]["BuiltinRole"];
         };
+        /**
+         * @description Where a node stands: built and current, or why not.
+         * @enum {string}
+         */
+        NodeBuildStatus: "current" | "changed" | "behind" | "failed" | "not_built" | "source";
         /** @description One build's estimated query cost of one node, across every warehouse it used. */
         NodeCostRecord: {
             /** Format: double */
@@ -3096,12 +3101,19 @@ export interface components {
             /** Format: uuid */
             snapshot_id: string;
         };
-        /** @description The state fields of a `CatalogNodeRecord`, with the same meaning. */
+        /** @description The state fields of a `CatalogNodeRecord`, with the same meaning, and the status every page shows. */
         NodeState: {
             checks: components["schemas"]["CatalogNodeChecks"];
             definition_changed: boolean;
             last_build?: null | components["schemas"]["CatalogNodeBuild"];
             last_outcome?: null | components["schemas"]["CatalogNodeOutcome"];
+            /** @description The node's one build status, which pages show as it is. */
+            status?: components["schemas"]["NodeBuildStatus"];
+            /**
+             * Format: date-time
+             * @description When the status was reached: the last build, or the last run for a node without a table.
+             */
+            status_at?: string | null;
         };
         /** @description Every current node's state at one version; `snapshot_id` is null before the first publication. */
         NodeStatesRecord: {

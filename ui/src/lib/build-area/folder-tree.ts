@@ -6,6 +6,7 @@ import { shortName } from '$lib/build-area/labels';
 import { folderOf } from '$lib/lineage/catalog-graph';
 import { canSelectByPath, dirOfFolder } from '$lib/project-layout';
 import { inexactDirs } from '$lib/selection/folders';
+import { countStatus } from './node-status';
 import { needsAttention } from './overview-panels';
 import { sortFolders } from './overview-panels';
 
@@ -44,11 +45,6 @@ export function folderTree(nodes: readonly CatalogNode[]): FolderNode[] {
 		// Whether the folder is the node's directory, as the layout places it; not for a declared group.
 		const onDisk = dirOfFolder(folder) === dir;
 		const parts = folder.split('/');
-		const stale = n.stale ?? [];
-		const isChanged = stale.some((s) => s.reason !== 'behind');
-		const isBehind = stale.some((s) => s.reason === 'behind');
-		const isFailed = n.lastOutcome === 'failed';
-		const isCurrent = !stale.length && !isFailed && !!n.lastBuild;
 		let parent: FolderNode | null = null;
 		for (let i = 0; i < parts.length; i++) {
 			const path = parts.slice(0, i + 1).join('/');
@@ -59,11 +55,7 @@ export function folderTree(nodes: readonly CatalogNode[]): FolderNode[] {
 				(parent ? parent.children : top).push(f);
 			}
 			f.onDisk &&= onDisk;
-			f.total += 1;
-			f.current += Number(isCurrent);
-			f.changed += Number(isChanged);
-			f.behind += Number(isBehind);
-			f.failed += Number(isFailed);
+			countStatus(f, n);
 			f.keys.push(shortName(n.key));
 			if (i === parts.length - 1) f.members.push(n);
 			parent = f;
@@ -95,7 +87,7 @@ export type TreeRow =
 	| { kind: 'node'; node: CatalogNode; depth: number }
 	| { kind: 'more'; folder: FolderNode; hidden: number };
 
-const nodeNeedsAttention = (n: CatalogNode) => n.lastOutcome === 'failed' || !!n.stale?.length;
+const nodeNeedsAttention = (n: CatalogNode) => n.status === 'failed' || n.status === 'changed' || n.status === 'behind';
 
 /**
  * The rows on screen: folders sorted within each level, an expanded folder's subfolders under it and,

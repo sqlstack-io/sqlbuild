@@ -22,7 +22,7 @@
 	import { useChecks } from '$lib/state/checks.svelte';
 	import { untrack } from 'svelte';
 	import { formatAgo } from '$lib/format/time';
-	import { nodeOutcomeLabel, nodeOutcomeTone } from '$lib/status';
+	import { statusLabel } from '$lib/build-area/node-status';
 	import { kindLine, kindTabLabel, kindTabOf, nodeIcon, nodeIconKey, shortName, sqlVersions } from '$lib/build-area/labels';
 	import { cardData } from '$lib/lineage/catalog-graph';
 	import OverviewTab from './overview-tab.svelte';
@@ -127,10 +127,9 @@
 			{#if n}
 				{#if n.kind === 'source'}
 					<StatusLabel tone="var(--sb-text-faint)" label="External source" muted />
-				{:else if n.lastOutcome}
-					<StatusLabel tone={nodeOutcomeTone[n.lastOutcome]} label="Last build {nodeOutcomeLabel[n.lastOutcome].toLowerCase()}" />
-				{:else if !n.lastBuild}
-					<StatusLabel tone="var(--sb-text-faint)" label="Not built" muted />
+				{:else if statusLabel(n)}
+					{@const s = statusLabel(n)!}
+					<StatusLabel tone={s.tone} label={s.label} muted={n.status === 'not_built'} />
 				{/if}
 				<StaleBadges reasons={n.stale} />
 			{/if}
@@ -142,7 +141,7 @@
 			<div class="meta-row">
 				<span>{kindLine(n)}</span>{#if n.group}<span>{n.group}</span>{/if}
 				{#if n.kind === 'source'}<span>{n.sourceFreshness?.loadedAt ? `Loaded ${formatAgo(n.sourceFreshness.loadedAt, app.now)}` : 'No freshness data'}</span>
-				{:else}<span>{n.lastBuild ? `Last built ${formatAgo(n.lastBuild.builtAt, app.now)}` : 'Never built'}</span>{/if}
+				{:else}<span>{n.statusAt ? `Last built ${formatAgo(n.statusAt, app.now)}` : 'Never built'}</span>{/if}
 			</div>
 		{/if}
 		<div class="mt-2.5"><PageTabs flush value={tab} tabs={tabs.map(([value, label]) => ({ value, label }))} onselect={setTab} /></div>
