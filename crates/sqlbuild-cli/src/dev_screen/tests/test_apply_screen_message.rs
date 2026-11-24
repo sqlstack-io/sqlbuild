@@ -56,7 +56,7 @@ fn given_a_session_when_drawn_then_the_viewport_matches_the_snapshot() {
                 "\u{2713} Started UI server       0.1s   http://127.0.0.1:8640",
                 "\u{2713} Started scheduler       0.1s   triggers start paused",
                 "\u{2717} Discovering project     0.2s   1 error",
-                "\u{2717} error  sql/models/marts/fct_orders.sql                                       D001",
+                "\u{2717} error  sql/models/marts/fct_orders.sql                                   D001",
                 "  at     sql/models/marts/fct_orders.sql:42:7",
                 "  why    column net_amount_usd does not exist in stg_payments; the column was",
                 "         renamed to amount_usd_net when the payments source moved to the v2",

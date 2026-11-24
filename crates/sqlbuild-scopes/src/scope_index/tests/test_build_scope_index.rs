@@ -199,7 +199,7 @@ fn given_paths_python_rejects_when_building_then_the_stage_defers() {
                 "sql/models/_macros/a.py",
                 1,
                 "local",
-                Some("sql/models/../.."),
+                Some("sql/models/../../.."),
             )],
             expected_deferral: true,
         },

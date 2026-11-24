@@ -9,7 +9,7 @@ fn given_slash_separated_paths_when_printed_then_they_match_python_as_posix() {
             description: "empty and current components are dropped",
             path: "sql/models//./orders.sql",
             expected_text: "sql/models/orders.sql",
-            expected_parent: "models",
+            expected_parent: "sql/models",
         },
         PosixPathTestCase {
             description: "an empty path prints as the current folder",

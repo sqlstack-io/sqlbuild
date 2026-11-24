@@ -107,7 +107,7 @@ fn given_moved_modules_when_rewriting_imports_then_each_import_follows_or_is_ref
             description: "imports of modules that stay are left alone",
             sources: &[(
                 "python/nodes/checks/amounts.py",
-                "import os\nfrom models.staging._sqlbuild._macros.rates import RATE\n",
+                "import os\nfrom sql.models.staging._sqlbuild._macros.rates import RATE\n",
             )],
             moves: CENTS_MOVE,
             expected_sources: &[],
@@ -117,13 +117,13 @@ fn given_moved_modules_when_rewriting_imports_then_each_import_follows_or_is_ref
             description: "an import without an alias is refused",
             sources: &[(
                 "python/nodes/checks/amounts.py",
-                "import os\nimport models.staging._sqlbuild._macros.cents\n",
+                "import os\nimport sql.models.staging._sqlbuild._macros.cents\n",
             )],
             moves: CENTS_MOVE,
             expected_sources: &[],
             expected_refusals: &[(
                 "python/nodes/checks/amounts.py:2:8",
-                "imports models.staging._sqlbuild._macros.cents without an alias",
+                "imports sql.models.staging._sqlbuild._macros.cents without an alias",
             )],
         },
         ImportRewriteTestCase {
@@ -131,13 +131,13 @@ fn given_moved_modules_when_rewriting_imports_then_each_import_follows_or_is_ref
             sources: &[(
                 "python/nodes/checks/amounts.py",
                 "import importlib\n\nCENTS = importlib.import_module(\
-                 \"models.staging._sqlbuild._macros.cents\")\n",
+                 \"sql.models.staging._sqlbuild._macros.cents\")\n",
             )],
             moves: CENTS_MOVE,
             expected_sources: &[],
             expected_refusals: &[(
                 "python/nodes/checks/amounts.py:3:9",
-                "imports models.staging._sqlbuild._macros.cents dynamically by name",
+                "imports sql.models.staging._sqlbuild._macros.cents dynamically by name",
             )],
         },
         ImportRewriteTestCase {
@@ -150,7 +150,7 @@ fn given_moved_modules_when_rewriting_imports_then_each_import_follows_or_is_ref
             expected_sources: &[],
             expected_refusals: &[(
                 "python/nodes/checks/amounts.py:1:1",
-                "star-imports the package of models.staging._sqlbuild._macros.cents",
+                "star-imports the package of sql.models.staging._sqlbuild._macros.cents",
             )],
         },
         ImportRewriteTestCase {
@@ -188,7 +188,7 @@ fn given_moved_modules_when_rewriting_imports_then_each_import_follows_or_is_ref
                 ),
                 (
                     "python/nodes/checks/amounts.py",
-                    "import os\nfrom models.staging._sqlbuild._macros import cents\n",
+                    "import os\nfrom sql.models.staging._sqlbuild._macros import cents\n",
                 ),
             ],
             moves: CENTS_MOVE,
@@ -212,8 +212,8 @@ fn given_moved_modules_when_rewriting_imports_then_each_import_follows_or_is_ref
             expected_sources: &[],
             expected_refusals: &[(
                 "python/nodes/checks/amounts.py:1:1",
-                "imports the moved module models.staging._sqlbuild._macros.cents by its name, \
-                 which becomes models.finance._sqlbuild._macros.money",
+                "imports the moved module sql.models.staging._sqlbuild._macros.cents by its name, \
+                 which becomes sql.models.finance._sqlbuild._macros.money",
             )],
         },
     ];

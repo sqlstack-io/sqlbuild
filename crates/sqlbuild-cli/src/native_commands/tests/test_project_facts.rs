@@ -23,15 +23,9 @@ fn given_project_files_when_checking_runtime_extensions_then_python_owned_ones_n
             expected_native: true,
         },
         ProjectFactsTestCase {
-            description: "a sinks directory is imported",
-            directories: &["sinks"],
+            description: "an event sinks directory is imported",
+            directories: &["python/event_sinks"],
             files: &[("sqlbuild_project.toml", PROJECT)],
-            expected_native: false,
-        },
-        ProjectFactsTestCase {
-            description: "the replaced event exporters directory is rejected in Python",
-            directories: &["event_exporters"],
-            files: &[],
             expected_native: false,
         },
         ProjectFactsTestCase {

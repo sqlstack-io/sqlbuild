@@ -19,9 +19,9 @@ use crate::scope_index::tests::test_types::{
 };
 
 const GLOBAL_ROOT_FALLBACKS: [(DeclarationKind, &str); 3] = [
-    (DeclarationKind::Macro, "macros"),
-    (DeclarationKind::Enum, "enums"),
-    (DeclarationKind::Constant, "constants"),
+    (DeclarationKind::Macro, "sql/macros"),
+    (DeclarationKind::Enum, "sql/enums"),
+    (DeclarationKind::Constant, "sql/constants"),
 ];
 const ROOTS: [(&str, ResourceRoot); 1] = [("seed", ResourceRoot::Seed)];
 
@@ -207,11 +207,11 @@ fn declaration_input(row: &DeclarationRow) -> DeclarationInput {
         path: path.to_owned(),
         line,
         scope,
-        ownership_root: (scope != ScopeKind::Global).then(|| "models".to_owned()),
+        ownership_root: (scope != ScopeKind::Global).then(|| "sql/models".to_owned()),
         root_fallback: GLOBAL_ROOT_FALLBACKS
             .iter()
             .find(|(fallback_kind, _root)| *fallback_kind == kind)
-            .map_or("macros", |(_kind, root)| *root)
+            .map_or("sql/macros", |(_kind, root)| *root)
             .to_owned(),
         owning_path: owning_path.map(str::to_owned),
         dependencies: Vec::new(),
@@ -246,7 +246,7 @@ fn consumer_table() -> VisibilityTable {
         global: vec![0, 4],
         local: HashMap::from([("sql/models/marts".to_owned(), vec![2])]),
         inherited: HashMap::from([
-            ("models".to_owned(), vec![3]),
+            ("sql/models".to_owned(), vec![3]),
             ("sql/models/staging".to_owned(), vec![5]),
         ]),
     }

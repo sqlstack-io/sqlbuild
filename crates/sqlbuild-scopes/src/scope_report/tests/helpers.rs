@@ -11,7 +11,7 @@ use crate::scope_report::models::{
 /// One model under `sql/models/sales`, a global macro, an inherited constant and a local enum.
 pub(super) fn orders_facts() -> (ReportRecords, ReportLookup, ReportValues) {
     let models: OwnershipRoot = OwnershipRoot {
-        path: "models".to_owned(),
+        path: "sql/models".to_owned(),
         kind: OwnershipRootKind::Resource,
         resource_kind: Some(ResourceKind::Model),
     };
@@ -56,7 +56,7 @@ pub(super) fn orders_facts() -> (ReportRecords, ReportLookup, ReportValues) {
             "sql/models/constants/c.sql",
             ScopeKind::Inherited,
             &models,
-            Some("models"),
+            Some("sql/models"),
         ),
         declaration(
             DeclarationKind::Enum,

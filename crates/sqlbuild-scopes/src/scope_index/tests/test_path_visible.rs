@@ -15,7 +15,7 @@ fn given_declared_scope_when_checking_authored_path_then_python_visibility_is_re
         PathVisibleTestCase {
             description: "inherited reaches a descendant folder",
             scope: ScopeKind::Inherited,
-            owning_path: Some("models"),
+            owning_path: Some("sql/models"),
             path: "sql/models/marts/orders.sql",
             expected_visible: true,
         },
@@ -29,7 +29,7 @@ fn given_declared_scope_when_checking_authored_path_then_python_visibility_is_re
         PathVisibleTestCase {
             description: "local only reaches its own folder",
             scope: ScopeKind::Local,
-            owning_path: Some("models"),
+            owning_path: Some("sql/models"),
             path: "sql/models/marts/orders.sql",
             expected_visible: false,
         },

@@ -15,7 +15,7 @@ fn given_words_and_pair_file_when_reading_pairs_then_every_pair_is_read_in_order
                 "sql/models/crm/",
             ],
             file: Some(
-                "# moves\n\nrefunds\tmodels/finance/\n  totals   sql/models/marts/t.sql  \n",
+                "# moves\n\nrefunds\tsql/models/finance/\n  totals   sql/models/marts/t.sql  \n",
             ),
             expected_pairs: Ok(&[
                 ("orders", "sql/models/finance/"),

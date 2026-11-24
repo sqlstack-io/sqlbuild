@@ -84,11 +84,11 @@ fn given_project_module_when_reading_project_closure_then_lists_imported_project
             files: vec![
                 (
                     "sql/macros/money.py",
-                    "import os\nfrom macros._rates import RATE\n\ndef cents(x):\n    return x\n",
+                    "import os\nfrom sql.macros._rates import RATE\n\ndef cents(x):\n    return x\n",
                 ),
                 (
                     "sql/macros/_rates.py",
-                    "from python import shared\nRATE = 100\n",
+                    "from python.nodes import shared\nRATE = 100\n",
                 ),
                 ("python/__init__.py", ""),
                 ("python/nodes/shared.py", "VALUE = 1\n"),
@@ -96,9 +96,9 @@ fn given_project_module_when_reading_project_closure_then_lists_imported_project
             ],
             source: "sql/macros/money.py",
             expected_closure: vec![
-                "sql/macros/_rates.py",
                 "python/__init__.py",
                 "python/nodes/shared.py",
+                "sql/macros/_rates.py",
             ],
         },
         ProjectClosureTestCase {

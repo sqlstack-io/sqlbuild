@@ -58,7 +58,8 @@ fn given_a_failed_node_when_people_read_its_error_then_only_evidence_on_that_nod
                 .nodes
                 .get_mut("orders")
                 .expect("orders node")
-                .definition = json!({"materialization": "table", "path": "models\\orders.sql"});
+                .definition =
+                json!({"materialization": "table", "path": "sql\\models\\orders.sql"});
             let published = publish_snapshot(store, &input).await.expect("publish");
             queue(
                 store,

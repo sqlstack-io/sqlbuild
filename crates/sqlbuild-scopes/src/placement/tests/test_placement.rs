@@ -70,13 +70,13 @@ fn given_placement_when_choosing_directory_then_role_folders_match_python() {
             kind: DeclarationKind::Macro,
             scope: ScopeKind::Global,
             path: Some("sql/models/sales"),
-            expected_directory: "macros",
+            expected_directory: "sql/macros",
         },
         DeclarationDirectoryTestCase {
             description: "a local audit below an authored root",
             kind: DeclarationKind::Audit,
             scope: ScopeKind::Local,
-            path: Some("models"),
+            path: Some("sql/models"),
             expected_directory: "sql/models/_audits/generic",
         },
         DeclarationDirectoryTestCase {
@@ -91,7 +91,7 @@ fn given_placement_when_choosing_directory_then_role_folders_match_python() {
             kind: DeclarationKind::Enum,
             scope: ScopeKind::Inherited,
             path: None,
-            expected_directory: "enums",
+            expected_directory: "sql/enums",
         },
     ];
     for test_case in test_cases {
