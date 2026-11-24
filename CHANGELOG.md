@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.260.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.259.0...v0.260.0) (2026-11-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* sql/ and python/ project layout, the Cost page and Snowflake prices, SQLQuack 0.23.0 ([#1620](https://github.com/sqlstack-io/sqlbuild/issues/1620))
+* projects must move to the new layout.
+
+### Features
+
+* **cost:** price Snowflake cost from usd_per_credit, else the rate sheet, else the list price, recorded per run with its source ([9ca9327](https://github.com/sqlstack-io/sqlbuild/commit/9ca9327c261b4137aa8801e09724e8579f7de9ad))
+* **layout:** D018 rejects entries outside the layout; extra_paths lists anything kept on purpose ([9ca9327](https://github.com/sqlstack-io/sqlbuild/commit/9ca9327c261b4137aa8801e09724e8579f7de9ad))
+* **layout:** sql/ holds models, seeds, sources, schemas, macros, functions, enums, constants, audits and hooks; python/ holds nodes/, providers/, event_sinks/, materializations/ and adapters/ ([9ca9327](https://github.com/sqlstack-io/sqlbuild/commit/9ca9327c261b4137aa8801e09724e8579f7de9ad))
+* **python-nodes:** D011 requires each node in the file named for its kind ([9ca9327](https://github.com/sqlstack-io/sqlbuild/commit/9ca9327c261b4137aa8801e09724e8579f7de9ad))
+* **python:** loaders depend on a job or a tag like assets ([9ca9327](https://github.com/sqlstack-io/sqlbuild/commit/9ca9327c261b4137aa8801e09724e8579f7de9ad))
+* **runs:** a worker's preparation shows as phase events with durations ([9ca9327](https://github.com/sqlstack-io/sqlbuild/commit/9ca9327c261b4137aa8801e09724e8579f7de9ad))
+* **runs:** each output line keeps the time the worker read it ([9ca9327](https://github.com/sqlstack-io/sqlbuild/commit/9ca9327c261b4137aa8801e09724e8579f7de9ad))
+* sql/ and python/ project layout, the Cost page and Snowflake prices, SQLQuack 0.23.0 ([#1620](https://github.com/sqlstack-io/sqlbuild/issues/1620)) ([9ca9327](https://github.com/sqlstack-io/sqlbuild/commit/9ca9327c261b4137aa8801e09724e8579f7de9ad))
+* **ui:** a 7-day cost card on the Overview, and idle jobs folded in Activity ([9ca9327](https://github.com/sqlstack-io/sqlbuild/commit/9ca9327c261b4137aa8801e09724e8579f7de9ad))
+* **ui:** frame a job's discovered sets and name discovered nodes by their step ([9ca9327](https://github.com/sqlstack-io/sqlbuild/commit/9ca9327c261b4137aa8801e09724e8579f7de9ad))
+* **ui:** graph cards drawn in stages, without the kind word, in IBM Plex Mono ([9ca9327](https://github.com/sqlstack-io/sqlbuild/commit/9ca9327c261b4137aa8801e09724e8579f7de9ad))
+* **ui:** the Cost page, a selection's query cost by job and folder down to each model ([9ca9327](https://github.com/sqlstack-io/sqlbuild/commit/9ca9327c261b4137aa8801e09724e8579f7de9ad))
+
+
+### Bug Fixes
+
+* **discovery:** an item depending on an unknown tag fails only its own set ([9ca9327](https://github.com/sqlstack-io/sqlbuild/commit/9ca9327c261b4137aa8801e09724e8579f7de9ad))
+* **event-sinks:** a provider teardown that raises shows in the export warning ([9ca9327](https://github.com/sqlstack-io/sqlbuild/commit/9ca9327c261b4137aa8801e09724e8579f7de9ad))
+* **snowflake:** a missing schema's listing reads as empty, not as a failed query ([9ca9327](https://github.com/sqlstack-io/sqlbuild/commit/9ca9327c261b4137aa8801e09724e8579f7de9ad))
+* **ui:** connections one row per target, one job row height, job concurrency as facts, and copy over plain HTTP ([9ca9327](https://github.com/sqlstack-io/sqlbuild/commit/9ca9327c261b4137aa8801e09724e8579f7de9ad))
+* **ui:** one-row selection bar without "Reads as", and expandable rows with a hover state ([9ca9327](https://github.com/sqlstack-io/sqlbuild/commit/9ca9327c261b4137aa8801e09724e8579f7de9ad))
+* **ui:** run-level events named plainly: Worker ready, no "run run" ([9ca9327](https://github.com/sqlstack-io/sqlbuild/commit/9ca9327c261b4137aa8801e09724e8579f7de9ad))
+
+
+### Build System
+
+* release wheels use 16 codegen units ([9ca9327](https://github.com/sqlstack-io/sqlbuild/commit/9ca9327c261b4137aa8801e09724e8579f7de9ad))
+
 ## [0.259.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.258.0...v0.259.0) (2026-11-23)
 
 
