@@ -53,7 +53,7 @@ const MAX_RERUN_MODELS: usize = 500;
 const MAX_RERUN_PERCENT: usize = 5;
 /// How many times a changed relation shape may pull its dependents into the delta.
 const MAX_ROUNDS: usize = 4;
-const MODELS_ROOT: &str = "models/";
+const MODELS_ROOT: &str = "sql/models/";
 /// How a rules diagnostic's report JSON names its phase; rules run over the whole project.
 const RULE_PHASE: &str = "\"phase\": \"rule\"";
 /// What every error for a reference to an undiscovered source says.
