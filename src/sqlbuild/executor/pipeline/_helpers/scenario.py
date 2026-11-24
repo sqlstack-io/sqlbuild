@@ -426,7 +426,12 @@ def local_conversion(pipeline_result: CompilePipelineResult) -> LocalConversion:
         if len(typed) == len(schema_entry.columns):
             columns[model.name] = typed
     return LocalConversion(
-        model_columns=columns, time_zone=session_time_zone(pipeline_result.project)
+        model_columns=columns,
+        time_zone=session_time_zone(pipeline_result.project),
+        model_files={
+            model.name: (Path(model.relative_path).as_posix(), model.authored_sql)
+            for model in pipeline_result.project.models
+        },
     )
 
 

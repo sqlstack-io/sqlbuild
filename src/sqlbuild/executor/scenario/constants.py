@@ -228,7 +228,8 @@ JSONL_BLANK_LINE: str = ""
 LOCAL_SCENARIO_DIALECT: str = "duckdb"
 
 LOCAL_CAPTURE_ADAPTER: str = "duckdb"
-VARIANT_FROM_JSON_PLACEHOLDER: str = "CAST(CAST(? AS JSON) AS VARIANT)"
+# Converted SQL reads a captured VARIANT as the JSON text Snowflake writes.
+JSON_FROM_TEXT_PLACEHOLDER: str = "CAST(? AS JSON)"
 CANONICAL_JSON_FUNCTION: str = "sqb_canonical_json"
 SEMI_STRUCTURED_COMPARISON_TEMPLATE: str = (
     CANONICAL_JSON_FUNCTION + "(CAST({column} AS JSON)) AS {column}"

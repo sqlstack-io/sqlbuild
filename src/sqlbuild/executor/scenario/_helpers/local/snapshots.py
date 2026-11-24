@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -16,7 +17,9 @@ from sqlbuild.executor.scenario._helpers.snapshots.core import (
     scenario_snapshot_root,
 )
 from sqlbuild.executor.scenario.constants import (
+    JSON_FROM_TEXT_PLACEHOLDER,
     LOCAL_CAPTURE_ADAPTER,
+    LOCAL_TYPE_JSON,
     LOCAL_TYPE_VARIANT,
     SCENARIO_LOCAL_JSONL_INVALID,
     SCENARIO_LOCAL_LOAD_FAILED,
@@ -24,7 +27,6 @@ from sqlbuild.executor.scenario.constants import (
     SCENARIO_LOCAL_SNAPSHOT_MISSING,
     SCENARIO_LOCAL_SNAPSHOT_STALE,
     SCENARIO_LOCAL_TYPE_INVALID,
-    VARIANT_FROM_JSON_PLACEHOLDER,
 )
 from sqlbuild.executor.scenario.models import (
     ScenarioLocalSnapshotLoadedRelation,
@@ -228,7 +230,16 @@ def _load_snapshot_relation(
         logical_name=relation.logical_name,
     )
     connection.execute(f"DROP TABLE IF EXISTS {_quote_identifier(table_name)}")
-    connection.execute(_build_create_table_sql(table_name=table_name, columns=relation.columns))
+    native_values: bool = capture_adapter == LOCAL_CAPTURE_ADAPTER
+    connection.execute(
+        _build_create_table_sql(
+            table_name=table_name,
+            columns=tuple(
+                _storage_column(column=column, native_values=native_values)
+                for column in relation.columns
+            ),
+        )
+    )
 
     try:
         rows: tuple[dict[str, object], ...] = read_scenario_snapshot_jsonl(file_path=file_path)
@@ -248,7 +259,7 @@ def _load_snapshot_relation(
         relation=relation,
         table_name=table_name,
         rows=rows,
-        native_values=capture_adapter == LOCAL_CAPTURE_ADAPTER,
+        native_values=native_values,
     )
     return ScenarioLocalSnapshotLoadedRelation(
         kind=relation.kind,
@@ -355,6 +366,16 @@ def _build_create_table_sql(*, table_name: str, columns: tuple[ScenarioSnapshotC
     return f"CREATE TABLE {_quote_identifier(table_name)} ({column_defs})"
 
 
+def _storage_column(
+    *, column: ScenarioSnapshotColumn, native_values: bool
+) -> ScenarioSnapshotColumn:
+    """The column as stored locally: SQLQuack reads a captured VARIANT as DuckDB JSON text."""
+
+    if native_values or column.local_type.strip().upper() != LOCAL_TYPE_VARIANT:
+        return column
+    return replace(column, local_type=LOCAL_TYPE_JSON)
+
+
 def _variant_json_text(*, value: object) -> str | None:
     """Another adapter's VARIANT value as JSON text; a string that parses is already JSON text."""
 
@@ -374,7 +395,7 @@ def _build_insert_sql(
 ) -> str:
     columns: str = ", ".join(_quote_identifier(column_name) for column_name in column_names)
     placeholders: str = ", ".join(
-        VARIANT_FROM_JSON_PLACEHOLDER if variant else "?" for variant in variant_columns
+        JSON_FROM_TEXT_PLACEHOLDER if variant else "?" for variant in variant_columns
     )
     return f"INSERT INTO {_quote_identifier(table_name)} ({columns}) VALUES ({placeholders})"
 

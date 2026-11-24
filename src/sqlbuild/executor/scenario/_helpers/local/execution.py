@@ -293,7 +293,6 @@ def _local_schema(
             [column.name.upper(), column.warehouse_type] for column in relation.columns
         ]
         relations[loaded.table_name.upper()] = columns
-        relations[loaded.table_name] = columns
     model_name: str
     for model_name in scenario_plan.graph_plan.model_names:
         declared: tuple[tuple[str, str], ...] | None = conversion.model_columns.get(model_name)
@@ -304,7 +303,6 @@ def _local_schema(
         )
         columns = [[name.upper(), column_type] for name, column_type in declared]
         relations[table.upper()] = columns
-        relations[table] = columns
     return {"relations": relations}
 
 
@@ -336,6 +334,7 @@ def _build_local_execution_plan(
             time_zone=conversion.time_zone,
             resource=(scenario_plan.name, resource_kind, resource_name),
             macros=macros,
+            file=conversion.model_files.get(resource_name) if resource_kind == "model" else None,
         )
 
     function_entries: list[FunctionPlanEntry] = []

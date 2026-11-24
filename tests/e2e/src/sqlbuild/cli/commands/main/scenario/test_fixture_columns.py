@@ -47,7 +47,8 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             description="CONNECT BY pseudo-columns are not mock columns",
             repo_files=build_connect_by_scenario_project_files(),
             command=("--no-color", "scenario", "test", "--run-on", "local"),
-            expected_exit_code=0,
+            # Fixture checks pass; local runs are strict, so the missing snapshot is an error.
+            expected_exit_code=1,
             expected_stdout_fragments=("missing local snapshot manifest",),
         ),
     ),

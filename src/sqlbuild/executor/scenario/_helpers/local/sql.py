@@ -7,6 +7,7 @@ from typing import Any
 
 from sqlbuild.errors.contracts.exceptions import ExecutorInputError
 from sqlbuild.executor.local._helpers.conversion import converted
+from sqlbuild.executor.local._helpers.positions import file_placed_refusal
 from sqlbuild.executor.local.constants import CONVERTED_DIALECT, LOCAL_DIALECT
 from sqlbuild.executor.scenario.constants import SCENARIO_LOCAL_SQL_TRANSPILE_FAILED
 
@@ -31,8 +32,12 @@ def convert_sql_for_local_duckdb(
     time_zone: str | None,
     resource: tuple[str, str, str],
     macros: list[str],
+    file: tuple[str, str] | None = None,
 ) -> str:
-    """DuckDB SQL for `sql`; SQLQuack converts Snowflake SQL and DuckDB SQL runs as authored."""
+    """DuckDB SQL for `sql`; SQLQuack converts Snowflake SQL and DuckDB SQL runs as authored.
+
+    `file` is the path and text of the file that holds `sql`, where refusals are placed.
+    """
 
     scenario_name, resource_kind, resource_name = resource
     if source_dialect == LOCAL_DIALECT:
@@ -59,7 +64,10 @@ def convert_sql_for_local_duckdb(
         raise LocalSqlRefusedError(
             f"SQLQuack refused the SQL of scenario '{scenario_name}', {resource_kind} "
             f"'{resource_name}':\n{conversion.rendered.rstrip()}",
-            refusals=tuple(conversion.report["refusals"]),
+            refusals=tuple(
+                file_placed_refusal(refusal=refusal, sql=sql, file=file)
+                for refusal in conversion.report["refusals"]
+            ),
         )
     for macro in conversion.macros:
         if macro not in macros:

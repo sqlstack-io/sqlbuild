@@ -212,6 +212,8 @@ const R_LOCAL_TARGET_CONFIG: RecordSpec = RecordSpec {
             FieldDefault::NativeCall(RecordId::TargetWarehousesConfig),
         ),
         FieldSpec::new("concurrency", FieldDefault::None),
+        FieldSpec::new("test_run_on", FieldDefault::None),
+        FieldSpec::new("scenario_run_on", FieldDefault::None),
         FieldSpec::new("catalog_connection", FieldDefault::None),
         FieldSpec::new("ignore_audit_failures", FieldDefault::None),
         FieldSpec::new("plan_from", FieldDefault::None),

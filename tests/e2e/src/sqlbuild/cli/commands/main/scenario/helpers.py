@@ -1302,7 +1302,7 @@ def build_snowflake_lambda_scenario_project_files() -> dict[str, str]:
         "sql/models/order_quantities.sql": (
             'MODEL (description "Quantities above each order id.");\n'
             "SELECT order_id,\n"
-            "  FILTER(ARRAY_CONSTRUCT(1, 2, 3), x -> x > order_id) AS big_quantities\n"
+            "  FILTER(ARRAY_CONSTRUCT(1, 2, 3), x -> x::NUMBER > order_id) AS big_quantities\n"
             'FROM __source("raw_orders")\n'
         ),
         "tests/scenarios/order_quantities__lambda.sql": (

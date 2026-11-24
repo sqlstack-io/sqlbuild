@@ -12,6 +12,8 @@ CONVERTED_DIALECT: str = "snowflake"
 
 # SQLBuild's own reasons, in SQLQuack's `<category>: <construct>` label form.
 DIALECT_REASON_CATEGORY: str = "dialect"
+FUNCTION_REASON_CATEGORY: str = "project function"
+RELATION_REASON_CATEGORY: str = "warehouse relation"
 NO_CONNECTION_REASON: str = "no connection: warehouse"
 SNAPSHOT_MISSING_CATEGORY: str = "snapshot missing"
 SNAPSHOT_STALE_CATEGORY: str = "snapshot stale"

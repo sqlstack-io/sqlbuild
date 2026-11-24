@@ -41,7 +41,7 @@ _ARCHIVE: str = "sql/models/order_archive.sql"
 _ARCHIVE_SQL: str = (
     "MODEL (description 'Archived orders.');\n\nSELECT order_id FROM __ref(\"stg_orders\")\n"
 )
-_TEST_COMMAND: tuple[str, ...] = ("--no-color", "test", "--since", "main")
+_TEST_COMMAND: tuple[str, ...] = ("--no-color", "test", "--run-on", "warehouse", "--since", "main")
 _BASE_REF_CONFIG: str = _FILES["sqlbuild_project.toml"] + '\n[git]\nbase_ref = "main"\n'
 _INDIRECT: dict[str, str] = build_since_indirect_files()
 _PROJECT_CONFIG: str = "sqlbuild_project.toml"

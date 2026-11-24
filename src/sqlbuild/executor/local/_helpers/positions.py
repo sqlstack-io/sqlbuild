@@ -92,6 +92,38 @@ def placed_refusal(*, refusal: Mapping[str, Any], sources: TestSources) -> Local
     )
 
 
+def file_placed_refusal(
+    *, refusal: Mapping[str, Any], sql: str, file: tuple[str, str] | None
+) -> dict[str, Any]:
+    """A refusal of converted `sql` placed in `file` (path, text) where its text appears there."""
+
+    placed: dict[str, Any] = dict(refusal)
+    help_text: str | None = refusal.get("help")
+    if help_text is not None:
+        placed["help"] = help_text.replace(SQLQUACK_SOURCES_HELP, SQLBUILD_SOURCES_HELP)
+    span: Mapping[str, int] | None = refusal.get("span")
+    if span is None or file is None:
+        return placed
+    start: int = int(span["start"])
+    end: int = max(int(span["end"]), start + 1)
+    refused: str = sql[start:end].split("\n", 1)[0]
+    line, column = _line_column(sql, start)
+    path, text = file
+    place: _Place | None = _token_place(
+        path=path, text=text, token=refused, near=line
+    ) or _similar_line_place(path=path, text=text, line_text=_line_text(sql, line), column=column)
+    if place is None:
+        return placed
+    placed.update(
+        path=place.path,
+        line=place.line,
+        column=place.column,
+        width=max(1, len(refused)),
+        snippet=place.snippet,
+    )
+    return placed
+
+
 def _place(*, start: int, refused: str, sources: TestSources) -> _Place:
     segment: Segment | None = next(
         (item for item in sources.segments if item.start <= start < item.end), None

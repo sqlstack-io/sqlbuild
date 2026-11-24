@@ -26,7 +26,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             description="a captured VARIANT fixture replays locally in strict mode",
             repo_files=build_local_variant_scenario_project_files(),
             scenario_name="orders__keep_payload",
-            expected_stdout_fragment="PASS=1  FAIL=0  ERROR=0  SKIP=0  TOTAL=1",
+            expected_stdout_fragment="PASS=1  FAIL=0  TOTAL=1",
         ),
         LocalVariantScenarioTestCase(
             description="an expected VARIANT object compares equal to the replayed fixture",
@@ -35,7 +35,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
                 expected='\'{"qty": 2, "tags": ["a"]}\'::JSON::VARIANT AS payload',
             ),
             scenario_name="orders__keep_payload",
-            expected_stdout_fragment="PASS=1  FAIL=0  ERROR=0  SKIP=0  TOTAL=1",
+            expected_stdout_fragment="PASS=1  FAIL=0  TOTAL=1",
         ),
         LocalVariantScenarioTestCase(
             description="a cast-built VARIANT object compares equal to the replayed fixture",
@@ -45,7 +45,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
                 expected="{'note': 'x', 'qty': 2}::VARIANT AS payload",
             ),
             scenario_name="orders__keep_payload",
-            expected_stdout_fragment="PASS=1  FAIL=0  ERROR=0  SKIP=0  TOTAL=1",
+            expected_stdout_fragment="PASS=1  FAIL=0  TOTAL=1",
         ),
         LocalVariantScenarioTestCase(
             description="a cast-built VARIANT scalar compares equal to the replayed fixture",
@@ -53,7 +53,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
                 fixture="2::VARIANT", output="o.payload", expected="2::VARIANT AS payload"
             ),
             scenario_name="orders__keep_payload",
-            expected_stdout_fragment="PASS=1  FAIL=0  ERROR=0  SKIP=0  TOTAL=1",
+            expected_stdout_fragment="PASS=1  FAIL=0  TOTAL=1",
         ),
         LocalVariantScenarioTestCase(
             description="a quoted VARIANT output column compares by its JSON value",
@@ -63,7 +63,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
                 expected='\'{"note": "x", "qty": 2}\'::JSON::VARIANT AS "Payload"',
             ),
             scenario_name="orders__keep_payload",
-            expected_stdout_fragment="PASS=1  FAIL=0  ERROR=0  SKIP=0  TOTAL=1",
+            expected_stdout_fragment="PASS=1  FAIL=0  TOTAL=1",
         ),
         LocalVariantScenarioTestCase(
             description="a different cast-built VARIANT value still fails the comparison",
@@ -116,14 +116,14 @@ def test_given_captured_variant_fixture_when_replaying_locally_then_the_scenario
             captured_payload_text='{\n  "note": "x",\n  "qty": 2\n}',
             expected_payload_json='{"qty": 2, "note": "x"}',
             expected_returncode=0,
-            expected_stdout_fragment="PASS=1  FAIL=0  ERROR=0  SKIP=0  TOTAL=1",
+            expected_stdout_fragment="PASS=1  FAIL=0  TOTAL=1",
         ),
         CapturedVariantTextScenarioTestCase(
             description="nested objects in another key order equal the expected value",
             captured_payload_text='{\n  "a": [\n    1,\n    {\n      "d": 2,\n      "c": 3\n    }\n  ],\n  "b": null\n}',
             expected_payload_json='{"b": null, "a": [1, {"c": 3, "d": 2}]}',
             expected_returncode=0,
-            expected_stdout_fragment="PASS=1  FAIL=0  ERROR=0  SKIP=0  TOTAL=1",
+            expected_stdout_fragment="PASS=1  FAIL=0  TOTAL=1",
         ),
         CapturedVariantTextScenarioTestCase(
             description="a different value still fails the comparison",

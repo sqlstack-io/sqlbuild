@@ -10,6 +10,7 @@ Online: https://sqlbuild.com/docs/cli/test/
 
 - Usage
 - Flags
+- Local and warehouse runs
 - Statement summary
 - Python tests
 - Run only affected tests
@@ -37,6 +38,8 @@ Positional `SELECTOR` arguments work like `--select`, and both forms can be comb
 | `--exclude` | Exclude tests by name, or the tests targeting specific models |
 | `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `query` [warehouse group](../concepts/adapters/snowflake.md#command-group-warehouses) and the connection warehouse |
 | `--test-timeout <duration>` | Time limit for each test in this run, such as `30s` or `2m`, or `disabled`; overrides `TEST(timeout ...)`, the target and `[settings] test_timeout` |
+| `--run-on auto\|local\|warehouse` | Where unit tests run; overrides the target's and `[settings]` `test_run_on`. See [Local and warehouse runs](#local-and-warehouse-runs) |
+| `--verbose` | Print every refusal that keeps a test off DuckDB in full, instead of the census |
 | `--since <ref>` | Run only the tests affected by changes since the merge base of `<ref>` and `HEAD` (see [Run only affected tests](#run-only-affected-tests)); `@base` reads `[git] base_ref` |
 | `--explain` | With `--since`, print why each selected test was selected |
 | `--sql` | Run only SQL tests |
@@ -65,13 +68,56 @@ counted under `TIMEOUT=` and excluded from `FAIL=` in the summary line
 output, `summary.fail_count` still includes timed-out tests, and `summary.timeout_count` reports how
 many of them timed out. A timeout still fails the run: `sqb test` exits non-zero.
 
+## Local and warehouse runs
+
+Each SQL test runs locally in DuckDB or on the warehouse, decided per test at compile time; see
+[Running tests locally](../concepts/testing-reference.md#running-tests-locally). Each row names
+where its test ran, and the summary splits the total:
+
+```
+fact_orders
+    test      test_fact_orders                    PASS  warehouse  1 real model  0.84s
+PASS=4  FAIL=0  TOTAL=4  (3 local, 1 warehouse)
+Statements: 5 on the warehouse (CREATE 2, DROP 2, WITH 1); compile 0.4s, execution 0.1s
+```
+
+A test that does not run is an `ERROR` row with a short reason: `can't run locally` (`T007`, with
+`--run-on local`) or `needs the warehouse (no connection)` (`T008`, in `auto`).
+
+After the summary:
+
+- With `--run-on local`, `Can't run locally (N tests)` lists SQLQuack's diagnostics: code,
+  message, the model or test file position, the source line with a caret and label, notes and
+  help, and `= tests:` with every test the refusal blocks. A refusal in a model's SQL points at
+  the model file; one in a fixture or expected rows at the test file; one inside a macro expansion
+  at the call site, with the generated SQL as the source line; one in SQL SQLBuild generates at the
+  compiled test under `target/run/tests/`.
+- In `auto`, `On the warehouse (N tests)` counts the tests each refusal sends to the warehouse,
+  most tests first:
+
+```
+On the warehouse (4 tests)
+  a known difference that isn't allowed: fn:HASH  3 tests
+  missing rule: node:method_call                  1 test
+```
+
+`--verbose` and `--inspect` print the full diagnostics instead.
+
+With `--json`, each check has `run_on` (`local` or `warehouse`) and `run_on_reason` (the first
+refusal's `<category>: <construct>`, or `null`), `summary` has `local_count` and
+`warehouse_count`, and the document has `refusals`: each refusal once per construct and place,
+with SQLQuack's `code`, `category`, `construct`, `reason`, `message`, `label`, `notes` and
+`help`, its `path`, `line` and `column`, its `title` (`<category>: <construct>`), and `tests`,
+the tests it blocks.
+
 ## Statement summary
 
 After the pass/fail summary, `sqb test` and `sqb scenario test` print how many warehouse statements
-the SQL tests or scenarios sent, by leading keyword, and how long the warehouse spent compiling and executing them:
+the SQL tests or scenarios sent, by leading keyword, and how long the warehouse spent compiling and executing them.
+Statements of tests and scenarios that ran locally are not counted:
 
 ```
-Statements: 12 (SELECT 7, CREATE 2, DROP 2, ALTER 1); compile 1.5s, execution 0.3s
+Statements: 12 on the warehouse (SELECT 7, CREATE 2, DROP 2, ALTER 1); compile 1.5s, execution 0.3s
 ```
 
 With `--json`, the document gains a `statements` section with `total`, `by_kind` and

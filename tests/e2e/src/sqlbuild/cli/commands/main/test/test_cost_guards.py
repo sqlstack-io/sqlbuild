@@ -164,7 +164,7 @@ def test_given_unit_test_when_comparing_stored_output_then_results_and_samples_a
     )
 
     result: subprocess.CompletedProcess[str] = run_sqb(
-        command=("--no-color", "--debug", "test"), project_dir=project_dir
+        command=("--no-color", "--debug", "test", "--run-on", "warehouse"), project_dir=project_dir
     )
     output: str = result.stdout + result.stderr
 

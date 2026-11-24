@@ -23,7 +23,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
         CapturedLambdaScenarioTestCase(
             description="a Snowflake FILTER with an arrow lambda replays locally",
             scenario_name="order_quantities__lambda",
-            expected_stdout_fragment="PASS=1  FAIL=0  ERROR=0  SKIP=0  TOTAL=1",
+            expected_stdout_fragment="PASS=1  FAIL=0  TOTAL=1",
         ),
     ],
     ids=lambda case: case.description,

@@ -90,7 +90,7 @@ class ScenarioLocalRuntimeArtifactTestCase:
 
 @dataclass(frozen=True)
 class ScenarioLocalCliE2ETestCase:
-    """Test case for sqb scenario test --local verification."""
+    """Test case for sqb scenario test --run-on local verification."""
 
     description: str
     command: tuple[str, ...]

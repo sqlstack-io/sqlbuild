@@ -187,7 +187,7 @@ def test_given_invalid_local_snapshot_when_loading_then_raises_coded_error(
         ScenarioLocalVariantLoadTestCase(
             description="driver JSON text of an object loads as that object",
             value='{\n  "qty": 2\n}',
-            expected_variant_type="OBJECT(qty)",
+            expected_variant_type="OBJECT",
             expected_matches_parsed_json=True,
         ),
         ScenarioLocalVariantLoadTestCase(
@@ -205,7 +205,7 @@ def test_given_invalid_local_snapshot_when_loading_then_raises_coded_error(
     ],
     ids=lambda case: case.description,
 )
-def test_given_snowflake_variant_text_when_loading_into_duckdb_then_it_loads_as_parsed_json(
+def test_given_snowflake_variant_text_when_loading_into_duckdb_then_it_loads_as_json_text(
     tmp_path: Path,
     test_case: ScenarioLocalVariantLoadTestCase,
 ) -> None:
@@ -225,8 +225,8 @@ def test_given_snowflake_variant_text_when_loading_into_duckdb_then_it_loads_as_
         connection=connection,
     )
     loaded: tuple[object, ...] | None = connection.execute(
-        "SELECT variant_typeof(payload), "
-        "payload IN (SELECT CAST(CAST('{\"qty\": 2}' AS JSON) AS VARIANT)) "
+        "SELECT json_type(payload), "
+        "COALESCE(CAST(json_extract(payload, '$.qty') AS INTEGER) = 2, false) "
         f'FROM "{result.relations[0].table_name}"'
     ).fetchone()
 

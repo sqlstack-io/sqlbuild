@@ -2,7 +2,7 @@
 
 # sqb scenario
 
-> Run end-to-end scenario tests against the warehouse or locally with DuckDB.
+> Run end-to-end scenario tests locally with DuckDB or against the warehouse.
 
 Online: https://sqlbuild.com/docs/cli/scenario/
 
@@ -16,7 +16,7 @@ Run end-to-end scenario tests. Scenarios materialize fixture inputs as physical 
 
 ## sqb scenario test
 
-Run scenario tests against the warehouse.
+Run scenario tests locally in DuckDB from captured snapshots, or against the warehouse.
 
 ```bash
 sqb scenario test [flags]
@@ -30,12 +30,12 @@ sqb scenario test [flags]
 | `--exclude` | Exclude scenarios from the selection |
 | `--retain` | Keep scenario-owned warehouse artifacts for inspection |
 | `--scenario-namespace NAMESPACE` | Isolate warehouse artifacts for this run; overrides environment and config |
-| `--local` | Run locally against DuckDB using captured JSONL snapshots |
-| `--strict` | Treat missing/stale local snapshots as errors instead of skips |
+| `--run-on auto\|local\|warehouse` | Where scenarios run; overrides the target's and `[settings]` `scenario_run_on` (see [Where scenarios run](#where-scenarios-run)) |
+| `--verbose` | Print every reason that keeps a scenario off DuckDB in full, instead of the census |
 | `--concurrency N` | Run up to `N` scenarios at once (default: the project `concurrency` setting) |
-| `--scenario-timeout <duration>` | Time limit for each scenario in this warehouse run, such as `10m`, or `disabled`; overrides `SCENARIO(timeout ...)`, the target and `[settings] scenario_timeout`. Not applied with `--local` |
-| `--sync-snapshots` | Capture missing/stale snapshots before local run (requires `--local`) |
-| `--refresh` | Recapture all selected snapshots before local run (requires `--local`) |
+| `--scenario-timeout <duration>` | Time limit for each scenario run on the warehouse, such as `10m`, or `disabled`; overrides `SCENARIO(timeout ...)`, the target and `[settings] scenario_timeout`. Not applied to local runs |
+| `--sync-snapshots` | Capture missing or stale snapshots before the run, so those scenarios can run locally; not with `--run-on warehouse` |
+| `--refresh` | Recapture all selected snapshots before the run; not with `--run-on warehouse` |
 | `--force` | Bypass snapshot capture safety limits |
 | `--max-snapshot-rows` | Override per-relation row limit for capture |
 | `--max-snapshot-total-rows` | Override total row limit for capture |
@@ -99,44 +99,59 @@ sqb scenario test --select daily_revenue_minimal --retain
 sqb scenario test --select revenue
 ```
 
-### Local examples
+### Where scenarios run
+
+| `--run-on` | Where each scenario runs |
+|------|-------------|
+| `auto` (default) | Locally when its snapshot is fresh and SQLQuack converts all its SQL; otherwise on the warehouse |
+| `local` | Locally. A missing or stale snapshot, or SQL SQLQuack refuses, is an `ERROR`; nothing goes to the warehouse |
+| `warehouse` | On the warehouse |
+
+The setting comes from, in order: `--run-on`, the default target's `scenario_run_on`,
+`[settings] scenario_run_on` in `sqlbuild_local.toml`, then in `sqlbuild_project.toml`, then
+`auto`. `--retain` keeps warehouse artifacts only, so it is rejected with `--run-on local`.
 
 ```bash
 # Run locally (requires prior capture)
-sqb scenario test --local
+sqb scenario test --run-on local
 
-# Run locally, capture missing/stale snapshots first
-sqb scenario test --local --sync-snapshots
+# Capture missing/stale snapshots first, then run locally
+sqb scenario test --run-on local --sync-snapshots
 
-# Run locally, recapture everything first
-sqb scenario test --local --refresh
-
-# Fail on missing/stale snapshots instead of skipping
-sqb scenario test --local --strict
+# Recapture everything first
+sqb scenario test --run-on local --refresh
 ```
 
 ### Output
 
-Remote scenarios report per-scenario PASS/FAIL with nested check rows:
+Scenarios report per-scenario PASS/FAIL, where each ran, and nested check rows:
 
 ```
-daily_revenue_minimal                                            PASS  0.84s
+daily_revenue_minimal                                            PASS  warehouse  0.84s
     expect    expected daily_revenue                             PASS
     expect    assertion no_negative_revenue                      PASS
 
-PASS=1  FAIL=0  TOTAL=1  (0.91s)
-Statements: 9 (CREATE 3, SELECT 3, DROP 2, ALTER 1); compile time not reported by duckdb
+PASS=1  FAIL=0  TOTAL=1  (0 local, 1 warehouse, 0.91s)
+Statements: 9 on the warehouse (CREATE 3, SELECT 3, DROP 2, ALTER 1); compile time not reported by duckdb
 ```
 
 Each scenario row shows its wall time and the summary shows the total. `--json` reports the same
 values as `scenarios[].duration_ms` and `summary.duration_ms`. The `Statements:` line and the JSON
 `statements` section are described in [Statement summary](test.md#statement-summary).
 
-Local scenarios add ERROR and SKIP statuses:
+A scenario that cannot run, such as one without a fresh snapshot under `--run-on local`, is
+`ERROR`, and the summary adds an `ERROR=` count:
 
 ```
-PASS=2  FAIL=0  ERROR=0  SKIP=1  TOTAL=3  (1.20s)
+PASS=2  FAIL=0  ERROR=1  TOTAL=3  (3 local, 0 warehouse, 1.20s)
 ```
+
+After the summary, `--run-on local` lists why scenarios could not run locally (`Can't run locally`),
+and `auto` counts what sent scenarios to the warehouse (`On the warehouse`), as
+[`sqb test`](test.md#local-and-warehouse-runs) does. A snapshot reason reads
+`snapshot stale: scenario:<name>` or `snapshot missing: scenario:<name>`. With `--json`, each
+scenario has `run_on` and `run_on_reason`, `summary` has `local_count` and `warehouse_count`, and
+the document has `refusals`, as for `sqb test`.
 
 Failed scenarios suggest rerunning with `--retain` for inspection. Local runs always keep the DuckDB file at `target/run/scenarios/<scenario_name>/local.duckdb`.
 

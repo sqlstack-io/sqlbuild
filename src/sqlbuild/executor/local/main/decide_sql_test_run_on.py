@@ -10,6 +10,7 @@ from typing import Any
 
 from sqlbuild._native import SqlTestPlanEntry, render_sql_test_comparison_segments
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
+from sqlbuild.executor.local._helpers.binding import EmptyDuckDb
 from sqlbuild.executor.local._helpers.conversion import convert_all, converted
 from sqlbuild.executor.local._helpers.positions import Segment, TestSources, placed_refusal
 from sqlbuild.executor.local._helpers.schema import project_schema
@@ -17,7 +18,9 @@ from sqlbuild.executor.local._helpers.session import session_time_zone
 from sqlbuild.executor.local.constants import (
     CONVERTED_DIALECT,
     DIALECT_REASON_CATEGORY,
+    FUNCTION_REASON_CATEGORY,
     LOCAL_DIALECT,
+    RELATION_REASON_CATEGORY,
     RUN_ON_LOCAL,
     RUN_ON_WAREHOUSE,
 )
@@ -39,21 +42,63 @@ def decide_sql_test_run_on(
     dialect: str | None = adapter.sql_analysis_dialect()
     schema: dict[str, Any] | None = None
     time_zone: str | None = session_time_zone(project)
+    functions: dict[str, Any] = {
+        function.name: function for function in getattr(project, "functions", ())
+    }
+
+    def warehouse_functions(entry: SqlTestPlanEntry) -> list[str]:
+        """Functions the test calls whose temporary copy cannot be made in an empty DuckDB."""
+
+        return [
+            key.name
+            for key in entry.function_deps
+            if dialect != LOCAL_DIALECT
+            or key.name not in functions
+            or functions[key.name].references
+        ]
+
     rendered: dict[str, tuple[str, list[tuple[int, int, str]]]] = {}
     if run_on != RUN_ON_WAREHOUSE and dialect == CONVERTED_DIALECT:
         schema = project_schema(project)
-        for entry in test_entries:
+        for entry in (entry for entry in test_entries if not warehouse_functions(entry)):
             rendered[entry.name] = render_sql_test_comparison_segments(
                 entry,
                 set_difference_operator=adapter.render_set_difference_operator(),
                 sql_analysis_dialect=dialect,
             )
         convert_all(sqls=[sql for sql, _ in rendered.values()], schema=schema, time_zone=time_zone)
+    empty: EmptyDuckDb = EmptyDuckDb()
     for entry in test_entries:
+        blocking: list[str] = warehouse_functions(entry)
         if run_on == RUN_ON_WAREHOUSE:
             decisions.append(RunOnDecision(name=entry.name, run_on=RUN_ON_WAREHOUSE))
+        elif blocking:
+            decisions.append(
+                RunOnDecision(
+                    name=entry.name,
+                    run_on=RUN_ON_WAREHOUSE,
+                    refusals=tuple(
+                        LocalRefusal(
+                            category=FUNCTION_REASON_CATEGORY,
+                            construct=name,
+                            reason=(
+                                f"the test calls project function {name}, whose temporary copy "
+                                "needs the warehouse"
+                            ),
+                        )
+                        for name in blocking
+                    ),
+                )
+            )
         elif dialect == LOCAL_DIALECT:
-            decisions.append(RunOnDecision(name=entry.name, run_on=RUN_ON_LOCAL))
+            sql: str = render_sql_test_comparison_segments(
+                entry,
+                set_difference_operator=adapter.render_set_difference_operator(),
+                sql_analysis_dialect=dialect,
+            )[0]
+            decisions.append(
+                _bound_decision(name=entry.name, missing=empty.missing_relation(sql=sql, macros=()))
+            )
         elif dialect != CONVERTED_DIALECT:
             decisions.append(
                 RunOnDecision(
@@ -77,8 +122,10 @@ def decide_sql_test_run_on(
                     schema=schema or {},
                     time_zone=time_zone,
                     location=(project_dir, compiled_paths.get(entry.name, "")),
+                    empty=empty,
                 )
             )
+    empty.close()
     return json.dumps(
         {
             "decisions": [
@@ -104,6 +151,7 @@ def _converted_decision(
     schema: dict[str, Any],
     time_zone: str | None,
     location: tuple[Path, str],
+    empty: EmptyDuckDb,
 ) -> RunOnDecision:
     project_dir, compiled_path = location
     sql, segments = rendered
@@ -119,7 +167,10 @@ def _converted_decision(
             test_text = None
     conversion: Any = converted(sql=sql, schema=schema, time_zone=time_zone, path=compiled_path)
     if conversion.converted:
-        return RunOnDecision(name=entry.name, run_on=RUN_ON_LOCAL)
+        return _bound_decision(
+            name=entry.name,
+            missing=empty.missing_relation(sql=conversion.sql, macros=conversion.macros),
+        )
     sources: TestSources = TestSources(
         sql=sql,
         segments=tuple(
@@ -139,6 +190,24 @@ def _converted_decision(
         refusals=tuple(
             placed_refusal(refusal=refusal, sources=sources)
             for refusal in conversion.report["refusals"]
+        ),
+    )
+
+
+def _bound_decision(*, name: str, missing: str | None) -> RunOnDecision:
+    """Local, unless the test reads a relation only the warehouse has."""
+
+    if missing is None:
+        return RunOnDecision(name=name, run_on=RUN_ON_LOCAL)
+    return RunOnDecision(
+        name=name,
+        run_on=RUN_ON_WAREHOUSE,
+        refusals=(
+            LocalRefusal(
+                category=RELATION_REASON_CATEGORY,
+                construct=missing,
+                reason=f"the test reads {missing}, which only the warehouse has",
+            ),
         ),
     )
 

@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
 
 from sqlbuild._native import (
     CompiledFunction,

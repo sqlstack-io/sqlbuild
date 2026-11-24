@@ -215,7 +215,7 @@ fixtures still isolate every scenario.
 On Ctrl-C, SQLBuild prints one notice, cancels scenarios that have not started, cancels the
 statements running scenarios have in flight, drops their relations (unless `--retain`), and only
 then exits. A second Ctrl-C skips that cleanup and exits immediately; the next run of the same
-scenarios drops whatever they left behind. `--local` replay and `sqb scenario capture` run one
+scenarios drops whatever they left behind. Local replay and `sqb scenario capture` run one
 scenario at a time.
 
 ### Parallel CI runs
@@ -326,15 +326,20 @@ When a limit is exceeded, capture fails with a clear error and suggests narrowin
 Run scenarios locally against DuckDB:
 
 ```bash
-sqb scenario test --local
+sqb scenario test --run-on local
 ```
 
-This:
+By default (`auto`), a scenario replays locally when its snapshot is fresh and SQLQuack converts
+all of its SQL, and runs on the warehouse otherwise. With `--run-on local`, every scenario replays
+locally, and one that cannot is an `ERROR`. Set the default with `[settings] scenario_run_on` or
+a target's `scenario_run_on`; see [`sqb scenario test`](../cli/scenario.md#where-scenarios-run).
 
-1. Checks snapshot freshness via the input fingerprint (missing/stale snapshots are skipped by default)
+Local replay:
+
+1. Checks snapshot freshness via the input fingerprint; a missing or stale snapshot keeps the scenario off DuckDB
 2. Creates a temporary DuckDB database at `target/run/scenarios/<scenario_name>/local.duckdb`
 3. Loads JSONL snapshots into typed DuckDB tables using column metadata from `scenario.json`
-4. Transpiles model and check SQL from the project adapter dialect to DuckDB; SQL captured from a DuckDB project runs as authored
+4. Converts function, model and check SQL from Snowflake to DuckDB with [SQLQuack](https://github.com/sqlstack-io/sqlquack), in a UTC session, reading the snapshot columns' captured types and models' declared column types; SQL captured from a DuckDB project runs as authored, and other adapters' scenarios run on the warehouse
 5. Builds functions, models, and runs expected/assertion checks in DuckDB
 6. Keeps the local DuckDB file for inspection (it lives under `target/`, so it's always retained)
 
@@ -344,21 +349,13 @@ Instead of running capture and test separately, sync snapshots in one command:
 
 ```bash
 # Capture missing/stale snapshots, then run locally
-sqb scenario test --local --sync-snapshots
+sqb scenario test --sync-snapshots
 
 # Recapture all snapshots, then run locally
-sqb scenario test --local --refresh
+sqb scenario test --refresh
 ```
 
 With `--sync-snapshots`, fresh snapshots are reused. With `--refresh`, all selected snapshots are recaptured even if fresh.
-
-### Strict mode
-
-By default, missing or stale snapshots are skipped with a warning. Use `--strict` to treat them as errors:
-
-```bash
-sqb scenario test --local --strict
-```
 
 ### Local type overrides
 
@@ -397,5 +394,5 @@ See the [CLI reference](../cli/scenario.md) for full command documentation.
   order, whitespace and number spelling do not matter, so a Snowflake capture's pretty-printed
   JSON equals an expected `PARSE_JSON(...)`. Values of non-JSON types with the same JSON text also
   compare equal, for example `DATE '2024-01-01'::VARIANT` and `'2024-01-01'::VARIANT`.
-- Local replay transpiles SQL from the project adapter dialect to DuckDB. Adapter-specific SQL that cannot be translated will produce a clear error with the failing resource name and reason.
-- Outside local replay, scenario fixture, expected and assertion SQL runs as authored: SQLBuild replaces `__ref`, `__source`, `__seed` and `__dbt_ref` calls with relation names and may wrap a partial fixture to add its missing columns, but never regenerates the query. Calls inside comments and quoted text are left unchanged. Quoted text and comments follow the project adapter's rules, including with `--local`: backslash escapes on Snowflake, BigQuery and Databricks, `E'...'` strings on DuckDB and Postgres, nested block comments on DuckDB, Postgres, Databricks and SQL Server, `#` line comments on BigQuery, and `//` line comments on Snowflake. A call naming a relation the scenario does not provide, or SQL with an unclosed string or comment, fails planning with `S511` naming the scenario file.
+- Local replay runs only SQL SQLQuack converts. A model read by another model needs fully typed declared columns, or SQLQuack refuses the reading SQL (`unresolved name`) and the scenario runs on the warehouse.
+- Outside local replay, scenario fixture, expected and assertion SQL runs as authored: SQLBuild replaces `__ref`, `__source`, `__seed` and `__dbt_ref` calls with relation names and may wrap a partial fixture to add its missing columns, but never regenerates the query. Calls inside comments and quoted text are left unchanged. Quoted text and comments follow the project adapter's rules, including in local replay: backslash escapes on Snowflake, BigQuery and Databricks, `E'...'` strings on DuckDB and Postgres, nested block comments on DuckDB, Postgres, Databricks and SQL Server, `#` line comments on BigQuery, and `//` line comments on Snowflake. A call naming a relation the scenario does not provide, or SQL with an unclosed string or comment, fails planning with `S511` naming the scenario file.

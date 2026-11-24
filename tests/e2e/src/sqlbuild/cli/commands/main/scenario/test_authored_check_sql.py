@@ -162,7 +162,7 @@ def test_given_unclosed_scenario_string_when_testing_then_fails_without_running(
                 '  SELECT * FROM __ref("order_totals")\n'
                 "  WHERE total_amount <> 15 AND 'D\\'Arcy' IS NULL"
             ),
-            expected_stdout_fragment="PASS=1  FAIL=0  ERROR=0  SKIP=0  TOTAL=1",
+            expected_stdout_fragment="PASS=1  FAIL=0  TOTAL=1",
         ),
     ],
     ids=lambda case: case.description,
@@ -174,6 +174,17 @@ def test_given_project_dialect_scenario_sql_when_replaying_locally_then_resolves
     del repo_files["tests/scenarios/order_totals_pass.sql"]
     del repo_files["tests/scenarios/order_totals_fail.sql"]
     del repo_files["tests/scenarios/nested/orders_assert_pass.sql"]
+    # SQLQuack converts a model only when the models it reads declare their column types.
+    repo_files["sql/models/orders.sql"] = (
+        "MODEL (\n  description 'Test model orders.',\n  materialized table,\n"
+        "  columns (order_id (type NUMBER(38,0)), amount (type NUMBER(38,0))),\n);\n\n"
+        'SELECT id AS order_id, amount FROM __source("raw_orders")\n'
+    )
+    repo_files["sql/models/order_totals.sql"] = (
+        "MODEL (\n  description 'Test model order_totals.',\n  materialized table,\n"
+        "  columns (total_amount (type NUMBER(38,0))),\n);\n\n"
+        'SELECT SUM(amount) AS total_amount FROM __ref("orders")\n'
+    )
     repo_files[f"tests/scenarios/{test_case.scenario_name}.sql"] = (
         "SCENARIO (description 'Test scenario orders_assert_pass.');\n\n"
         "WITH\n"

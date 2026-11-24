@@ -146,6 +146,8 @@ class LocalConversion:
 
     model_columns: Mapping[str, tuple[tuple[str, str], ...]] = field(default_factory=dict)
     time_zone: str | None = None
+    # Each model's file, relative to the project, and its authored SQL, to place refusals in.
+    model_files: Mapping[str, tuple[str, str]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

@@ -39,7 +39,7 @@ _SCENARIO_PATH: str = "tests/scenarios/orders__from_helper.sql"
             edited_from="__expected__stg_orders AS (SELECT 1 AS order_id)",
             edited_to="__expected__stg_orders AS (SELECT 1 AS order_id\n)",
             expected_exit_code=0,
-            expected_stdout_fragment="PASS=1  FAIL=0  ERROR=0  SKIP=0  TOTAL=1",
+            expected_stdout_fragment="PASS=1  FAIL=0  TOTAL=1",
         ),
     ],
     ids=lambda case: case.description,

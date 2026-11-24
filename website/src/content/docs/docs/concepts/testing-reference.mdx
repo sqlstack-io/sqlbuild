@@ -428,8 +428,9 @@ credentials.
 | `local` | Locally. A test SQLQuack refuses is an `ERROR` (`T007`, `can't run locally`); it is never skipped or sent to the warehouse |
 | `warehouse` | On the warehouse, as every test ran before |
 
-The setting comes from, in order: `--run-on`, the selected target's `test_run_on`,
-`[settings] test_run_on` in `sqlbuild_local.toml`, then in `sqlbuild_project.toml`, then `auto`.
+The setting comes from, in order: `--run-on`, the selected target's `test_run_on` (a target in
+`sqlbuild_local.toml` replaces the project file's), `[settings] test_run_on` in
+`sqlbuild_local.toml`, then in `sqlbuild_project.toml`, then `auto`.
 
 ```toml
 [settings]
@@ -445,7 +446,12 @@ How SQLBuild decides, at compile time, before anything runs:
   chain, its fixtures, expected rows and assertions. SQLQuack converts only constructs whose rules
   were verified against recorded Snowflake results, and refuses anything else. SQLBuild gives
   SQLQuack the declared columns of the project's sources, seeds and models.
-- **DuckDB projects.** The SQL is already DuckDB SQL, so every test can run locally.
+- **DuckDB projects.** The SQL is already DuckDB SQL, so tests run locally as written.
+- **Project functions.** A local run makes temporary copies of the functions a test calls. A
+  function whose body reads a table or view, or any function in a project that isn't DuckDB, needs
+  the warehouse (reason `project function: <name>`).
+- **Unmocked relations.** A test whose SQL still reads a relation the local database doesn't have
+  needs the warehouse (reason `warehouse relation: <name>`).
 - **Other adapters.** SQLQuack converts Snowflake SQL only, so tests run on the warehouse (reason
   `dialect: <adapter>`).
 - **Time zone.** Local runs use a UTC session. When the target's connection sets another
