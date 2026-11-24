@@ -80,7 +80,7 @@ def _asset(body: str) -> str:
 
 
 def _loaders(*, depends_on: str, body: str) -> dict[str, str]:
-    """Loaders raw_regions and raw_customers in their unit folders; raw_customers keeps its lines."""
+    """Loaders raw_regions and raw_customers, each in its unit folder, at their old line numbers."""
 
     return {
         _REGIONS_LOADER_PATH: (
