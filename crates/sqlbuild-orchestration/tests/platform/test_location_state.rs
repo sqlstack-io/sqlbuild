@@ -101,3 +101,50 @@ fn given_a_location_restart_when_reading_health_then_the_newest_instance_decides
         );
     }
 }
+
+#[test]
+fn given_loads_of_one_generation_when_reading_health_then_the_latest_to_arrive_decides() {
+    let test_cases = [
+        LocationStateTestCase {
+            description: "failed attempts at a generation, then its publication: healthy",
+            reported: vec![
+                reported(Instance::Restarted, 20, ReportedHealth::Failed(12)),
+                reported(Instance::Restarted, 15, ReportedHealth::Failed(12)),
+                RESTARTED_CHECKED_IN,
+                reported(Instance::Restarted, 4, ReportedHealth::Published(12)),
+            ],
+            later_reports: 0,
+            expected_state: LocationState::Healthy,
+        },
+        LocationStateTestCase {
+            description: "a generation's publication, then a failed reload at it: falling back",
+            reported: vec![
+                reported(Instance::Restarted, 20, ReportedHealth::Published(12)),
+                RESTARTED_CHECKED_IN,
+                reported(Instance::Restarted, 4, ReportedHealth::Failed(12)),
+            ],
+            later_reports: 0,
+            expected_state: LocationState::FallingBack,
+        },
+        LocationStateTestCase {
+            description: "a previous instance's failures at the generation the next one published, with its start no longer kept",
+            reported: vec![
+                reported(Instance::Previous, 600, ReportedHealth::Failed(12)),
+                reported(Instance::Previous, 300, ReportedHealth::Failed(12)),
+                reported(Instance::LongRunning, 5, ReportedHealth::CheckIn),
+                reported(Instance::LongRunning, 4, ReportedHealth::Published(12)),
+            ],
+            later_reports: 0,
+            expected_state: LocationState::Healthy,
+        },
+    ];
+    for test_case in test_cases {
+        let (observations, now) = health_history(&test_case.reported, test_case.later_reports);
+        assert_eq!(
+            LocationState::of(&observations, ("production", now)),
+            test_case.expected_state,
+            "{}",
+            test_case.description
+        );
+    }
+}

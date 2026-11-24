@@ -18,19 +18,21 @@ export function healthOf(observations: Wire['LocationHealthObservation'][], now:
 	const reported = observations.filter((o) => o.report.health.kind !== 'pool_capped');
 	const live = new Set(reported.filter((o) => now - Date.parse(o.received_at) <= LIVE_WINDOW_MS).map((o) => o.report.session_id));
 	const lastSeenAt = reported.reduce<string | null>((latest, o) => (!latest || o.received_at > latest ? o.received_at : latest), null);
-	const failed = latestOf(observations, 'compile_failed');
-	const connection = latestOf(observations, 'connection');
+	// The newest load report by arrival decides (observations come newest first): a failed load, or the
+	// connection check after a publication. Failed loads keep the generation they tried, so generations can't order them.
+	const load = observations.find((o) => o.report.health.kind === 'compile_failed' || o.report.health.kind === 'connection');
+	const connection = load?.report.health.kind === 'connection' ? load.report.health : null;
 	const secrets = latestOf(observations, 'provider_secrets');
 	const discovery = latestOf(observations, 'discovery');
 	const health: LocationHealth = !live.size
 		? 'broken'
-		: failed && (!connection || failed.report.health.generation >= connection.report.health.generation)
+		: load?.report.health.kind === 'compile_failed'
 			? 'falling_back'
 			: secrets && secrets.report.health.missing > 0
 				? 'missing_secrets'
 				: discovery && discovery.report.health.sets.some((set) => set.status === 'failed')
 					? 'discovery_failed'
-					: connection && !connection.report.health.healthy
+					: connection && !connection.healthy
 					? 'degraded'
 					: 'healthy';
 	return { health, liveInstances: live.size, lastSeenAt };

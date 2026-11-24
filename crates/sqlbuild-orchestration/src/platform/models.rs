@@ -237,24 +237,22 @@ impl LocationState {
                     .collect(),
                 CurrentInstance::Unknown => own,
             };
-        let mut failed: Option<(DateTime<Utc>, i64)> = None;
-        let mut connection: Option<(DateTime<Utc>, i64, bool)> = None;
+        // The newest load report by arrival decides: a failed load, or the connection check after a
+        // publication. Failed loads keep the generation they tried, so generations can't order them.
+        // On equal times the earlier observation wins, as reads list them newest first.
+        let mut load: Option<(DateTime<Utc>, LoadReport)> = None;
         let mut secrets: Option<(DateTime<Utc>, u64)> = None;
         let mut discovery: Option<(DateTime<Utc>, bool)> = None;
         for observation in own {
             let seen = observation.received_at;
             match observation.report.health {
-                LocationHealth::CompileFailed { generation, .. }
-                    if failed.is_none_or(|(at, _)| seen > at) =>
-                {
-                    failed = Some((seen, generation));
+                LocationHealth::CompileFailed { .. } if load.is_none_or(|(at, _)| seen > at) => {
+                    load = Some((seen, LoadReport::Failed));
                 }
-                LocationHealth::Connection {
-                    generation,
-                    healthy,
-                    ..
-                } if connection.is_none_or(|(at, _, _)| seen > at) => {
-                    connection = Some((seen, generation, healthy));
+                LocationHealth::Connection { healthy, .. }
+                    if load.is_none_or(|(at, _)| seen > at) =>
+                {
+                    load = Some((seen, LoadReport::Published { connected: healthy }));
                 }
                 LocationHealth::ProviderSecrets { missing, .. }
                     if secrets.is_none_or(|(at, _)| seen > at) =>
@@ -272,17 +270,21 @@ impl LocationState {
                 _ => {}
             }
         }
-        match (failed, connection, secrets) {
-            (Some((_, failed)), Some((_, connected, _)), _) if failed >= connected => {
-                Self::FallingBack
-            }
-            (Some(_), None, _) => Self::FallingBack,
-            (_, _, Some((_, missing))) if missing > 0 => Self::MissingSecrets,
+        match (load.map(|(_, report)| report), secrets) {
+            (Some(LoadReport::Failed), _) => Self::FallingBack,
+            (_, Some((_, missing))) if missing > 0 => Self::MissingSecrets,
             _ if discovery.is_some_and(|(_, failing)| failing) => Self::DiscoveryFailed,
-            (_, Some((_, _, false)), _) => Self::Degraded,
+            (Some(LoadReport::Published { connected: false }), _) => Self::Degraded,
             _ => Self::Healthy,
         }
     }
+}
+
+/// How the newest load a location reported ended.
+#[derive(Clone, Copy)]
+enum LoadReport {
+    Failed,
+    Published { connected: bool },
 }
 
 /// Only named location operations cross this boundary, never arbitrary SQL or Python.

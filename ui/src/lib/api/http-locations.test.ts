@@ -31,6 +31,13 @@ describe('location health', () => {
 		expect(healthOf(observations, now)).toMatchObject({ health: 'healthy', liveInstances: 2, lastSeenAt: at(10) });
 	});
 
+	it('takes the newest load report by arrival, whatever its generation', () => {
+		const failedAt = (secondsAgo: number) => seen(secondsAgo, { kind: 'compile_failed', generation: 12 });
+		const published = (secondsAgo: number) => seen(secondsAgo, { kind: 'connection', generation: 12, healthy: true });
+		expect(healthOf([seen(1, { kind: 'heartbeat' }), published(4), failedAt(20), failedAt(30)], now).health).toBe('healthy');
+		expect(healthOf([seen(1, { kind: 'heartbeat' }), failedAt(4), published(20)], now).health).toBe('falling_back');
+	});
+
 	it('falls back after a failed load until a newer generation connects', () => {
 		const failed = seen(20, { kind: 'compile_failed', generation: 3 });
 		expect(healthOf([seen(5, { kind: 'heartbeat' }), failed, seen(40, { kind: 'connection', generation: 2, healthy: true })], now).health).toBe('falling_back');
