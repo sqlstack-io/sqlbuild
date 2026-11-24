@@ -14,7 +14,7 @@ use crate::argv::models::Stream;
 use crate::native_commands::_helpers::command::paths::location_files;
 use crate::native_commands::_helpers::command::terminal::write_output;
 use crate::native_commands::_helpers::location::changed_build::{
-    changed_build_nodes, changed_build_settings,
+    changed_build_nodes, changed_build_settings, model_errors,
 };
 use crate::native_commands::_helpers::location::plan_reuse::keep_plan;
 use crate::native_commands::main::_location_plan::plan_location;
@@ -98,12 +98,16 @@ pub(super) async fn report_changed_build(
         }
     };
     let counts = format!("{} changed, {} downstream", changed.len(), downstream.len());
+    let failing: Option<String> = model_errors(&document);
+    if let Some(reason) = &failing {
+        report(&format!("Planned what changed with errors: {reason}\n"));
+    }
     let request = ChangedBuildReport {
         session_id,
         generation,
         changed,
         downstream,
-        failing: None,
+        failing: failing.map(|reason| reason.chars().take(MAX_FAILING_REASON_CHARS).collect()),
     };
     Ok(Some(
         match client.report_changed_build(&options.target, &request).await {

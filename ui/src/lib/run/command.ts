@@ -109,12 +109,12 @@ export const CHANGED_PLAN_HREF = planHref([], 'build', { flags: { '--changed': t
 
 /**
  * The counts the "Build N changed" button shows: the location's plan of `CHANGED_PLAN_HREF` when it
- * names a change, else the nodes whose definitions changed, with the downstream count unknown, and
- * why that plan is failing, if it is.
+ * names a change (a plan with models it couldn't plan still names the rest), else the nodes whose
+ * definitions changed, with the downstream count unknown, and why that plan is failing, if it is.
  */
 export function changedBuildCounts(definitionChanged: number, build: ChangedBuild | null): { changed: number; downstream: number | null; failing: string | null } {
 	const failing = build?.failing ?? null;
-	return build?.changed.length && !failing ? { changed: build.changed.length, downstream: build.downstream.length, failing } : { changed: definitionChanged, downstream: null, failing };
+	return build?.changed.length ? { changed: build.changed.length, downstream: build.downstream.length, failing } : { changed: definitionChanged, downstream: null, failing };
 }
 
 /** The "Build N changed" button's main label, its lighter bracketed part (null without one), and its tooltip. */

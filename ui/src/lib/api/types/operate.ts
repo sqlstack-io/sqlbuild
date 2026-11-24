@@ -825,6 +825,8 @@ export type PlanModel = {
 	old_name?: PlanOldName | null;
 	/** A paged row's diff counts in place of its diff text, which `planDiff` reads on demand. */
 	diff_stats?: { query?: PlanDiffStats; config?: PlanDiffStats };
+	/** Why the model couldn't be planned, on a row whose action is `error`; a build of it is refused. */
+	error?: { code: string | null; message: string; help: string | null };
 };
 
 /** A diff's changed lines; `whitespace_only` when they read the same with all whitespace taken out (a case change is a change). */
@@ -902,6 +904,8 @@ type PlanFields = {
 	functions: { name: string; language: string; reason?: string }[];
 	python_nodes: { name: string; kind: string; phase: string; identity_status: string }[];
 	warnings: PlanWarning[];
+	/** Whether any finding is an error, such as a model that couldn't be planned; a build of the plan is refused. */
+	has_errors?: boolean;
 	migrations: PlanMigration[];
 	column_migrations: PlanColumnMigration[];
 	table_type_conversions: PlanTableTypeConversion[];
@@ -944,6 +948,7 @@ export type PlanCantRun = {
 
 /** Every plan section a server summary counts and pages, in plan order. */
 export type PlanPageSection =
+	| 'planning_error'
 	| 'full_refresh'
 	| 'query_changed'
 	| 'function_changed'

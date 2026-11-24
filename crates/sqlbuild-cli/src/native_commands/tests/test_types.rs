@@ -492,3 +492,9 @@ pub(super) struct CrashedCheckTestCase {
     pub(super) script: &'static str,
     pub(super) expected_rediscovers: u64,
 }
+
+pub(super) struct ModelErrorsTestCase {
+    pub(super) description: &'static str,
+    pub(super) document: serde_json::Value,
+    pub(super) expected_reason: Option<&'static str>,
+}

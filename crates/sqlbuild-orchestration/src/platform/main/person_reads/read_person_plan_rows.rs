@@ -51,6 +51,7 @@ pub async fn read_person_plan_rows(
 /// The plan display's section for the API's.
 fn page_section(section: PlanRowSection) -> PlanPageSection {
     match section {
+        PlanRowSection::PlanningError => PlanPageSection::PlanningError,
         PlanRowSection::FullRefresh => PlanPageSection::FullRefresh,
         PlanRowSection::QueryChanged => PlanPageSection::QueryChanged,
         PlanRowSection::FunctionChanged => PlanPageSection::FunctionChanged,

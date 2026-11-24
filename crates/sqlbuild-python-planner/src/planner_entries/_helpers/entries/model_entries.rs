@@ -1,6 +1,7 @@
 //! Per-model plan entries from resolved change results and warehouse snapshot facts.
 
 use crate::planner_changes::main::replaces_incremental_relation::replaces_incremental_relation;
+use crate::planner_entries::_helpers::entries::planning_error::planning_error;
 use crate::planner_entries::_helpers::entries::values::{
     MICROBATCH_CONCURRENCY_MESSAGE, error_of, native, none, planner_type, replaced, string,
 };
@@ -473,24 +474,33 @@ pub(crate) fn plan_entries<'py>(
             continue;
         };
         let resolved = models.get_item(name)?;
-        let overrides = model_cursor_overrides(
-            &model,
-            &cursor_overrides,
-            (start_override.clone(), end_override.clone()),
-        )?;
-        let effective_full_refresh =
-            resolve_model_full_refresh(&model, full_refresh.applies(name))?;
-        let (mut entry, entry_warnings) = plan_model_from_change(&ModelPlanRequest {
-            model: model.clone(),
-            snapshot: snapshot.clone(),
-            context: &reads,
-            sql_analysis_enabled,
-            full_refresh: effective_full_refresh,
-            overrides,
-            change_result: native_field(&resolved, "change")?,
-            protect_full_refresh: !freshness_blocked.contains(name)?
-                && !external_blocked.contains(name)?,
-        })?;
+        let planned = (|| {
+            let overrides = model_cursor_overrides(
+                &model,
+                &cursor_overrides,
+                (start_override.clone(), end_override.clone()),
+            )?;
+            plan_model_from_change(&ModelPlanRequest {
+                model: model.clone(),
+                snapshot: snapshot.clone(),
+                context: &reads,
+                sql_analysis_enabled,
+                full_refresh: resolve_model_full_refresh(&model, full_refresh.applies(name))?,
+                overrides,
+                change_result: native_field(&resolved, "change")?,
+                protect_full_refresh: !freshness_blocked.contains(name)?
+                    && !external_blocked.contains(name)?,
+            })
+        })();
+        let (mut entry, entry_warnings) = match planned {
+            Ok(planned) => planned,
+            Err(error) => {
+                let (entry, warning) = planning_error(&model, error)?;
+                entries.push(entry);
+                warnings.push(warning);
+                continue;
+            }
+        };
         let entry_name = native_field(&entry, "name")?;
         if freshness_blocked.contains(&entry_name)? {
             entry = replaced(

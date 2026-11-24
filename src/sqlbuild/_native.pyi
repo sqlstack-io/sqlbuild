@@ -1065,12 +1065,14 @@ class PlanWarning(NativeRecord):
     severity: WarningSeverity
     message: str
     code: str | None
+    help: str | None
     def __init__(
         self,
         model_name: str | None,
         severity: WarningSeverity,
         message: str,
         code: str | None = ...,
+        help: str | None = ...,
     ) -> None: ...
     def __replace__(self, **changes: Any) -> PlanWarning: ...
 
@@ -14181,6 +14183,7 @@ class ModelPlanEntry(NativeRecord):
     refresh_on_build: bool
     dynamic_readers: tuple[str, ...]
     dynamic_paused: bool
+    planning_error: PlanWarning | None
     def __init__(
         self,
         key: CompiledObjectKey,
@@ -14277,6 +14280,7 @@ class ModelPlanEntry(NativeRecord):
         refresh_on_build: bool = ...,
         dynamic_readers: tuple[str, ...] = ...,
         dynamic_paused: bool = ...,
+        planning_error: PlanWarning | None = ...,
     ) -> None: ...
 
 class CloneSourcePlanEntry(NativeRecord):

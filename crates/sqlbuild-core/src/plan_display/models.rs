@@ -36,6 +36,8 @@ pub struct TimestampGrainFacts {
 /// A plan section a summary counts and the rows endpoint pages, in the order the plan reads.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PlanPageSection {
+    /// Models that couldn't be planned, with their errors.
+    PlanningError,
     /// Built models the plan rebuilds in full.
     FullRefresh,
     QueryChanged,

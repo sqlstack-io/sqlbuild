@@ -71,7 +71,7 @@ pub struct ChangedBuild {
     pub changed: Vec<String>,
     /// Nodes that run only because an upstream they read runs.
     pub downstream: Vec<String>,
-    /// Why the location's plan failed, with both lists empty; absent when it planned.
+    /// Why the location's plan failed or which models it couldn't plan, with the nodes it did plan; absent when every model planned.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub failing: Option<String>,
 }
@@ -93,7 +93,7 @@ pub struct ChangedBuildReport {
     pub generation: i64,
     pub changed: Vec<String>,
     pub downstream: Vec<String>,
-    /// Why the plan failed, sent with empty lists.
+    /// Why the plan failed (empty lists) or which models it couldn't plan (the lists of the rest).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub failing: Option<String>,
 }

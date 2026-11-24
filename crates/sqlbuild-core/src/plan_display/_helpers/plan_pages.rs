@@ -13,7 +13,8 @@ use crate::plan_display::constants::{
 use crate::plan_display::models::PlanPageSection;
 
 /// Every section, in the order the plan reads, with its name in the API.
-pub(crate) const SECTIONS: [(PlanPageSection, &str); 25] = [
+pub(crate) const SECTIONS: [(PlanPageSection, &str); 26] = [
+    (PlanPageSection::PlanningError, "planning_error"),
     (PlanPageSection::FullRefresh, "full_refresh"),
     (PlanPageSection::QueryChanged, "query_changed"),
     (PlanPageSection::FunctionChanged, "function_changed"),
@@ -45,7 +46,8 @@ pub(crate) const SECTIONS: [(PlanPageSection, &str); 25] = [
 ];
 
 /// A model's section by its plan reason; reasons without their own section build as routine models.
-const MODEL_REASONS: [(&str, PlanPageSection); 7] = [
+const MODEL_REASONS: [(&str, PlanPageSection); 8] = [
+    ("planning_error", PlanPageSection::PlanningError),
     ("full_refresh", PlanPageSection::FullRefresh),
     ("query_changed", PlanPageSection::QueryChanged),
     ("function_changed", PlanPageSection::FunctionChanged),
@@ -156,7 +158,8 @@ impl<'document> PlanRows<'document> {
     fn models(&self, section: PlanPageSection) -> Vec<&'document Value> {
         self.kept("models", |model| {
             text(model, "action") != SKIP_ACTION
-                && self.runs_node(&node_key("model", model))
+                && (section == PlanPageSection::PlanningError
+                    || self.runs_node(&node_key("model", model)))
                 && model_section(model) == section
         })
     }

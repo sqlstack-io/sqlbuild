@@ -128,7 +128,7 @@ export type NodeBuildStatus = 'current' | 'changed' | 'behind' | 'failed' | 'not
 /**
  * What `sqb build --changed` with default options runs, as the location planned it from the synced copy
  * after its last publication or sync: nodes changed themselves, and nodes downstream of them, as keys.
- * `failing` is why that plan failed, with both lists empty; a failed plan is never shown as a count.
+ * `failing` is why that plan failed (both lists empty) or which models it couldn't plan (the lists name the rest).
  */
 export type ChangedBuild = { generation: number; changed: string[]; downstream: string[]; failing: string | null };
 

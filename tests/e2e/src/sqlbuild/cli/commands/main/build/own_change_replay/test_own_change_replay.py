@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 from datetime import date
 from pathlib import Path
@@ -13,6 +14,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.build.own_change_replay._test_type
     FullRefreshIntrinsicTestCase,
     FunctionCallerReplayTestCase,
     OwnChangePlanBuildTestCase,
+    PlanningErrorRowTestCase,
     RefusedPlanTestCase,
     RenamePlanBuildTestCase,
 )
@@ -338,6 +340,59 @@ def test_given_full_refresh_false_caller_when_function_forces_full_rebuild_then_
     )
 
     assert_plan_fails(project_dir=project_dir, args=(), expected=test_case.expected_fragments)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PlanningErrorRowTestCase(
+            description="a model that can't be planned is an error row and the rest still plans",
+            expected_code="S203",
+            expected_error_model="order_amounts",
+            expected_planned_model="order_totals",
+            expected_text_fragments=(
+                "Planning failed",
+                "error[S203]: model 'order_amounts' sets full_refresh false",
+                "Plan failed with errors",
+            ),
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_one_model_that_cannot_be_planned_when_planning_then_it_is_an_error_row_and_builds_refuse(
+    test_case: PlanningErrorRowTestCase, tmp_path: Path
+) -> None:
+    project_dir: Path = build_function_project(
+        tmp_path=tmp_path, caller_config="  replay_on_change full,\n  full_refresh false,\n"
+    )
+    totals_before: list[tuple[Any, ...]] = relation_rows(
+        project_dir=project_dir, relation=test_case.expected_planned_model
+    )
+
+    planned_json: subprocess.CompletedProcess[str] = plan(project_dir=project_dir, args=("--json",))
+    planned_text: subprocess.CompletedProcess[str] = plan(project_dir=project_dir)
+    built: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "build"), project_dir=project_dir
+    )
+
+    document: dict[str, Any] = json.loads(planned_json.stdout)
+    models: dict[str, dict[str, Any]] = {model["name"]: model for model in document["models"]}
+    assert planned_json.returncode == 1, planned_json.stdout + planned_json.stderr
+    assert document["has_errors"] is True
+    assert models[test_case.expected_error_model]["action"] == "error"
+    assert models[test_case.expected_error_model]["error"]["code"] == test_case.expected_code
+    assert models[test_case.expected_planned_model]["action"] != "error"
+    assert "error" not in models[test_case.expected_planned_model]
+    assert planned_text.returncode == 1
+    assert all(fragment in planned_text.stdout for fragment in test_case.expected_text_fragments), (
+        planned_text.stdout
+    )
+    assert built.returncode != 0, built.stdout + built.stderr
+    assert f"error[{test_case.expected_code}]" in built.stdout + built.stderr
+    assert (
+        relation_rows(project_dir=project_dir, relation=test_case.expected_planned_model)
+        == totals_before
+    )
 
 
 @pytest.mark.parametrize(

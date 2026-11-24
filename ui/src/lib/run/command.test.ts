@@ -116,6 +116,12 @@ describe('changed build counts', () => {
 		expect(changedBuildCounts(4, null)).toEqual({ changed: 4, downstream: null, failing: null });
 	});
 
+	it('keeps the planned count of a plan with models it couldn\'t plan, with them as the tooltip', () => {
+		const counts = changedBuildCounts(4, { generation: 3, changed: ['model:totals'], downstream: [], failing: "Can't plan 1 model: orders: full_refresh false" });
+		expect(counts).toEqual({ changed: 1, downstream: 0, failing: "Can't plan 1 model: orders: full_refresh false" });
+		expect(changedBuildLabel(counts.changed, counts.downstream, 'bar', counts.failing).tooltip).toBe("Plan failing: Can't plan 1 model: orders: full_refresh false");
+	});
+
 	it('shows no planned count while the location\'s plan is failing, and gives the reason as the tooltip', () => {
 		const counts = changedBuildCounts(4, { generation: 3, changed: [], downstream: [], failing: 'Model orders cannot plan a full rebuild' });
 		expect(counts).toEqual({ changed: 4, downstream: null, failing: 'Model orders cannot plan a full rebuild' });

@@ -8,17 +8,33 @@ use crate::build_command::_helpers::storage::{retention_step, snapshot_steps, ta
 use crate::build_command::errors::BuildCommandError;
 use crate::build_command::main::model_limit_error::model_limit_error;
 use crate::build_command::models::{
-    ModelLimit, PlanSafetyFacts, PlanSafetyGates, PolicyStep, SnapshotPolicies,
+    ModelErrorFact, ModelLimit, PlanSafetyFacts, PlanSafetyGates, PolicyStep, SnapshotPolicies,
 };
 
-/// Migration, old-name, model-limit, snapshot, table-type and retention gates; a refusal ends the list.
+/// A selected model that couldn't be planned refuses the build with its own error; several are joined under the first one's code.
+fn model_error_refusal(errors: &[ModelErrorFact]) -> Option<BuildCommandError> {
+    let first: &ModelErrorFact = errors.first()?;
+    let message: String = errors
+        .iter()
+        .map(|error| error.message.as_str())
+        .collect::<Vec<&str>>()
+        .join("; ");
+    Some(BuildCommandError::new(
+        first.code.as_deref(),
+        message,
+        first.help.as_deref(),
+    ))
+}
+
+/// Model-error, migration, old-name, model-limit, snapshot, table-type and retention gates; a refusal ends the list.
 pub fn plan_safety_steps(
     facts: &PlanSafetyFacts,
     gates: &PlanSafetyGates,
     (limit, snapshot_policies): (&ModelLimit, &SnapshotPolicies),
 ) -> Result<Vec<PolicyStep>, BuildCommandError> {
     let mut steps: Vec<PolicyStep> = Vec::new();
-    let refusal: Option<BuildCommandError> = model_migration_refusal(&facts.model_migrations)
+    let refusal: Option<BuildCommandError> = model_error_refusal(&facts.model_errors)
+        .or_else(|| model_migration_refusal(&facts.model_migrations))
         .or_else(|| column_migration_refusal(&facts.column_migrations));
     if let Some(error) = refusal {
         steps.push(PolicyStep::Refuse(error));

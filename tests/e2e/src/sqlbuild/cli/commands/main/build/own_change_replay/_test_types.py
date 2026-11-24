@@ -48,6 +48,15 @@ class FullRefreshIntrinsicTestCase:
 
 
 @dataclass(frozen=True)
+class PlanningErrorRowTestCase:
+    description: str
+    expected_code: str
+    expected_error_model: str
+    expected_planned_model: str
+    expected_text_fragments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class UpstreamContractFailureTestCase:
     description: str
     expected_fragments: tuple[str, ...]

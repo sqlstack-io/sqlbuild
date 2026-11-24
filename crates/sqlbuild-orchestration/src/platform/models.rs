@@ -942,6 +942,8 @@ pub struct LocationRuleFinding {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum PlanRowSection {
+    /// Models that couldn't be planned, with their errors.
+    PlanningError,
     /// Built models the plan rebuilds in full.
     FullRefresh,
     QueryChanged,

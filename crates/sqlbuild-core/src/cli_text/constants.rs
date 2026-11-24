@@ -51,7 +51,8 @@ pub(crate) const STALE_INPUT_WARNING_TITLE: &str = "Stale inputs detected";
 pub(crate) const SOURCE_FRESHNESS_UNKNOWN_WARNING_TITLE: &str = "source freshness unknown";
 pub(crate) const DIFF_HEADER_MARKER: &str = "# ";
 pub(crate) const EFFECTIVE_BATCH_SIZE_TOKEN: &str = "effective";
-pub(crate) const REASON_GROUPS: [(&str, &str); 7] = [
+pub(crate) const REASON_GROUPS: [(&str, &str); 8] = [
+    ("planning_error", "Planning failed"),
     ("full_refresh", "Full refresh"),
     ("query_changed", "Query changed"),
     ("function_changed", "Function changed"),
@@ -61,6 +62,8 @@ pub(crate) const REASON_GROUPS: [(&str, &str); 7] = [
     ("renamed", "Renamed"),
 ];
 pub(crate) const SKIP_ACTION: &str = "skip";
+/// The row action of a model that can't be planned.
+pub(crate) const ERROR_ACTION: &str = "error";
 pub(crate) const CREATE_VIEW_ACTION: &str = "create_view";
 pub(crate) const CUSTOM_ACTION: &str = "custom";
 pub(crate) const CREATE_DYNAMIC_ACTION: &str = "create_dynamic";

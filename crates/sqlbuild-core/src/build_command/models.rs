@@ -36,6 +36,14 @@ pub struct PlanWarningFact {
     pub message: String,
 }
 
+/// A selected model that couldn't be planned, with its error.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ModelErrorFact {
+    pub code: Option<String>,
+    pub message: String,
+    pub help: Option<String>,
+}
+
 /// A snapshot model planned for a full refresh.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct SnapshotRefreshFact {
@@ -65,6 +73,7 @@ pub struct PlanSafetyFacts {
     pub model_migrations: Vec<ModelMigrationFact>,
     pub column_migrations: Vec<ColumnMigrationFact>,
     pub error_warnings: Vec<PlanWarningFact>,
+    pub model_errors: Vec<ModelErrorFact>,
     pub executable_model_count: usize,
     pub snapshot_refreshes: Vec<SnapshotRefreshFact>,
     pub table_type_downgrades: Vec<TableTypeFact>,
