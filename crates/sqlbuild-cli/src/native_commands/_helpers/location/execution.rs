@@ -439,8 +439,6 @@ pub(crate) async fn compile_generation(
         dev_event_line(&DevEvent::Published {
             generation,
             snapshot_id: record.snapshot_id.to_string(),
-            record: serde_json::to_value(&record)
-                .map_err(|error| ControlError::Invalid(error.to_string()))?,
         })
     } else {
         let mut output: String = serde_json::to_string(&record)

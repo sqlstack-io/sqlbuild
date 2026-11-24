@@ -125,7 +125,7 @@ def test_given_development_when_reloaded_and_restarted_then_local_scope_and_paus
     }
     _ = environment.pop("SQLBUILD_PLATFORM_WEBHOOK_URL", None)
     log: Path = tmp_path / "development.log"
-    output: Path = tmp_path / "publications.jsonl"
+    output: Path = tmp_path / "development.stdout"
     with location_process(arguments, log, output, env=environment) as process:
         url, identity = wait_for_development_ready(process, log)
         api: SnapshotApi = SnapshotApi(url, identity, "local-development")
@@ -229,8 +229,10 @@ def test_given_development_when_reloaded_and_restarted_then_local_scope_and_paus
         assert connection.execute("SELECT count(*) FROM sqb_development_locations").fetchone() == (
             1,
         )
-    for line in output.read_text().splitlines():
-        assert json.loads(line)["location_id"] == identity
+    # sqb dev's output is its screen: no raw JSON line, such as a publication record, on stdout or in
+    # the plain lines.
+    lines: list[str] = output.read_text().splitlines() + log.read_text().splitlines()
+    assert not any(line.lstrip().startswith(("{", "[")) for line in lines), output.read_text()
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Unix signal and process ownership contract")
@@ -264,7 +266,7 @@ def test_given_development_start_when_location_is_ready_then_project_python_is_d
     )
     executable: str = str(Path(sys.executable).with_name("sqb"))
     log: Path = tmp_path / "development.log"
-    output: Path = tmp_path / "publications.jsonl"
+    output: Path = tmp_path / "development.stdout"
     arguments: list[str] = [executable, "dev", "--project-dir", str(project), "--port", "0"]
     environment: dict[str, str] = dict(os.environ)
     _ = environment.pop("SQLBUILD_PLATFORM_WEBHOOK_URL", None)
@@ -312,7 +314,7 @@ def test_given_plain_development_when_a_warehouse_read_fails_then_a_warning_line
     environment: dict[str, str] = dict(os.environ)
     _ = environment.pop("SQLBUILD_PLATFORM_WEBHOOK_URL", None)
     with location_process(
-        arguments, log, tmp_path / "publications.jsonl", env=environment
+        arguments, log, tmp_path / "development.stdout", env=environment
     ) as process:
         url, identity = wait_for_development_ready(process, log)
         api: SnapshotApi = SnapshotApi(url, identity, "local-development")
@@ -377,7 +379,7 @@ def test_given_a_missing_secret_when_it_is_added_to_the_env_file_then_the_next_r
         "SQLBUILD_CONTROL_DATABASE_URL": str(project / ".sqlbuild/control.sqlite3")
     }
     log: Path = tmp_path / "development.log"
-    output: Path = tmp_path / "publications.jsonl"
+    output: Path = tmp_path / "development.stdout"
     arguments: list[str] = [executable, "dev", "--project-dir", str(project), "--port", "0"]
     with location_process(arguments, log, output, env=environment) as process:
         url, identity = wait_for_development_ready(process, log)
@@ -447,7 +449,7 @@ def test_given_an_unparsable_env_file_when_a_run_starts_then_its_reason_names_th
         "SQLBUILD_CONTROL_DATABASE_URL": str(project / ".sqlbuild/control.sqlite3")
     }
     log: Path = tmp_path / "development.log"
-    output: Path = tmp_path / "publications.jsonl"
+    output: Path = tmp_path / "development.stdout"
     arguments: list[str] = [executable, "dev", "--project-dir", str(project), "--port", "0"]
     with location_process(arguments, log, output, env=environment) as process:
         url, identity = wait_for_development_ready(process, log)
@@ -497,7 +499,7 @@ def test_given_an_opened_development_server_when_started_then_it_publishes_takes
     executable: str = str(Path(sys.executable).with_name("sqb"))
     arguments: list[str] = [executable, "dev", "--project-dir", str(project), "--port", "0"]
     log: Path = tmp_path / "development.log"
-    output: Path = tmp_path / "publications.jsonl"
+    output: Path = tmp_path / "development.stdout"
     with location_process(arguments + list(test_case.arguments), log, output) as process:
         url, identity = wait_for_development_ready(process, log)
         api: SnapshotApi = SnapshotApi(url, identity, "local-development")

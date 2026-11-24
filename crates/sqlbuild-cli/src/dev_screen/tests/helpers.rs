@@ -98,7 +98,6 @@ pub(super) fn connecting() -> Vec<ScreenMessage> {
         ScreenMessage::Child(DevEvent::Published {
             generation: 1,
             snapshot_id: "b429729b5c1e".to_owned(),
-            record: serde_json::Value::Null,
         }),
         ScreenMessage::Triggers("41 paused".to_owned()),
         ScreenMessage::Started {
