@@ -319,7 +319,7 @@
 .sb-list tbody tr.expandable:hover .chev {
 	color: var(--foreground);
 }
-.sb-list tbody tr.expandable:hover .row-name {
+.sb-list tbody tr.expandable:hover .row-name:not(.plain) {
 	text-decoration: underline;
 }
 /* A short list inside a page section, such as a plan's nodes: tighter rows. */
