@@ -215,7 +215,7 @@ def write_declarations(out: pathlib.Path) -> None:
             folders.pop() / "_sqlbuild" / "_enums" if len(folders) == 1 else out / "sql" / "enums"
         )
         keep[folder / f"{name}.sql"] = types(enums[name].read_text())
-    for gone in ("tests", "macros", "rules", "constants", "enums"):
+    for gone in ("tests", "rules", "sql/macros", "sql/constants", "sql/enums"):
         shutil.rmtree(out / gone, ignore_errors=True)
     for folder in ("_macros", "macros", "constants", "_constants", "enums", "_enums"):
         for path in list(out.glob(f"sql/models/**/_sqlbuild/{folder}")):
