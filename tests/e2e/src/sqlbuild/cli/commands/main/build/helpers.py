@@ -31,6 +31,21 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
 from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import duckshop_orchestration
 from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
+RAW_DATA_SCRIPT: str = "seed_raw_data.sql"
+
+
+def take_raw_data_sql(project_dir: Path) -> str:
+    """Remove the fixture's raw data script from the project and return its SQL.
+
+    The script loads source rows before the first build; it is not part of the project, so it
+    leaves the project before SQLBuild reads it.
+    """
+
+    script: Path = project_dir / RAW_DATA_SCRIPT
+    sql: str = script.read_text(encoding="utf-8")
+    script.unlink()
+    return sql
+
 
 def run_replay_command(
     *, command: tuple[str, ...], project_dir: Path
@@ -1371,8 +1386,9 @@ def prepare_changed_project(*, tmp_path: Path, warehouse: ChangedWarehouse) -> P
     """The DuckShop changed-builds edge case on `warehouse`, with its raw tables loaded."""
 
     files: dict[str, str] = {
-        str(path.relative_to(CHANGED_BUILDS_FIXTURE)): path.read_text(encoding="utf-8")
-        for path in sorted(CHANGED_BUILDS_FIXTURE.glob("*/*"))
+        path.relative_to(CHANGED_BUILDS_FIXTURE).as_posix(): path.read_text(encoding="utf-8")
+        for path in sorted(CHANGED_BUILDS_FIXTURE.rglob("*"))
+        if path.is_file()
     }
     project_dir: Path = prepare_inline_project(
         tmp_path=tmp_path,

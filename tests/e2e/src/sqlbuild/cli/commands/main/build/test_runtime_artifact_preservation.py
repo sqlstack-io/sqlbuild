@@ -23,7 +23,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
         RuntimeArtifactPreservationBuildE2ETestCase(
             description="full build then selected rerun preserves existing runtime artifacts",
             initial_command=("--no-color", "build"),
-            rerun_command=("--no-color", "build", "--select", "/models/marts"),
+            rerun_command=("--no-color", "build", "--select", "/sql/models/marts"),
             expected_runtime_paths=(
                 "target/run/sql/models/staging/stg_orders.sql",
                 "target/run/sql/models/intermediate/customer_status_snapshot.sql",

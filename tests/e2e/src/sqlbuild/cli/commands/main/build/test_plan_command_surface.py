@@ -37,7 +37,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_waffle_sh
                 "--no-color",
                 "plan",
                 "--select",
-                "/models/marts",
+                "/sql/models/marts",
                 "--exclude",
                 "hourly_order_activity",
             ),

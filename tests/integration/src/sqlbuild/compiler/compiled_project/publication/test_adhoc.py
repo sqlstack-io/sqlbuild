@@ -222,8 +222,8 @@ CUSTOMERS_TEST: str = (
 # landing mid-run would.
 REWRITE_CHECKOUT: str = (
     "import json, pathlib\n"
-    "root = pathlib.Path(__file__).resolve().parent.parent\n"
-    "flag = root / 'rewrite.json'\n"
+    "root = pathlib.Path(__file__).resolve().parents[2]\n"
+    "flag = root.parent / f'{root.name}_rewrite.json'\n"
     "if flag.exists():\n"
     "    for name, text in json.loads(flag.read_text()).items():\n"
     "        (root / name).write_text(text)\n"
@@ -368,7 +368,9 @@ def test_given_an_ad_hoc_verb_when_the_checkout_changes_after_verification_then_
 
         for command in test_case.prerequisites:
             assert launch(command)[2]["status"] == "success", (command, worker.log.read_text())
-        _ = (worker.project / "rewrite.json").write_text(json.dumps(test_case.rewrites))
+        _ = (worker.project.parent / f"{worker.project.name}_rewrite.json").write_text(
+            json.dumps(test_case.rewrites)
+        )
         check, run_id, completed = launch(test_case.command)
         assert completed["status"] == test_case.expected_status, worker.log.read_text()
         assert check["selection"] == test_case.expected_selection

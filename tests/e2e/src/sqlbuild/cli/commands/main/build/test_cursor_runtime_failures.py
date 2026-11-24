@@ -11,6 +11,7 @@ import pytest
 from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
     CliFailureBuildE2ETestCase,
 )
+from tests.e2e.src.sqlbuild.cli.commands.main.build.helpers import take_raw_data_sql
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     prepare_inline_project,
     run_sqb,
@@ -133,12 +134,12 @@ def test_given_cursor_runtime_failure_projects_when_running_build_then_cli_fails
         project_name="cursor_runtime_project",
         repo_files=test_case.repo_files,
     )
-    seed_file: Path = project_dir / "seed_raw_data.sql"
+    raw_data_sql: str = take_raw_data_sql(project_dir)
     import duckdb
 
     db_path: Path = project_dir / "cursor_runtime.duckdb"
     connection: duckdb.DuckDBPyConnection = duckdb.connect(str(db_path))
-    connection.execute(seed_file.read_text(encoding="utf-8"))
+    connection.execute(raw_data_sql)
     connection.close()
 
     pre_command: tuple[str, ...]

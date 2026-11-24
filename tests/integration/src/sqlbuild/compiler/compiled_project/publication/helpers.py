@@ -1744,8 +1744,9 @@ def sqlite_rows(path: Path, sql: str) -> list[tuple[Any, ...]]:
 def changed_job_files(project_toml: str) -> dict[str, str]:
     """The DuckShop changed-builds edge case with one scheduled `changed` job."""
     return {
-        str(path.relative_to(CHANGED_FIXTURE)): path.read_text()
-        for path in sorted(CHANGED_FIXTURE.glob("*/*"))
+        path.relative_to(CHANGED_FIXTURE).as_posix(): path.read_text()
+        for path in sorted(CHANGED_FIXTURE.rglob("*"))
+        if path.is_file()
     } | {
         "orchestration/jobs/changed_orders_job.toml": CHANGED_JOB,
         "sqlbuild_project.toml": project_toml,

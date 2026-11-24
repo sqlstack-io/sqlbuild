@@ -101,8 +101,8 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
             "--target",
             test_case.target,
         ]
-        log: Path = project / "location.log"
-        publications: Path = project / "publications.jsonl"
+        log: Path = tmp_path / "location.log"
+        publications: Path = tmp_path / "publications.jsonl"
         with location_process(arguments, log, publications, env=environment) as process:
             first: dict[str, Any] = wait_for_generation(api, test_case.target, 1, process, log)
             first_interpreter: int = int(compiler_pid.read_text())
