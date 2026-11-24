@@ -5,9 +5,7 @@ use sqlbuild_config::effective::main::effective_ignore_audit_failures::effective
 use sqlbuild_config::effective::models::AuditFailureLayers;
 
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_front::compile_attachment::main::build_effective_settings::build_effective_settings;
-use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
-use sqlbuild_python_front::contracts::main::resolve_target_name::resolve_target_name;
+use sqlbuild_python_front::command_runtime::main::target_and_settings_value::target_and_settings_value;
 
 const IGNORE_AUDIT_FAILURES: &str = "ignore_audit_failures";
 
@@ -17,23 +15,10 @@ pub(crate) fn resolve_ignore_audit_failures(
     discovered: &Bound<'_, PyAny>,
     selected_target: &Bound<'_, PyAny>,
 ) -> PyResult<bool> {
-    let py = request.py();
-    let project_config: Bound<'_, PyAny> = native_field(discovered, "project_config")?;
-    let local_config: Bound<'_, PyAny> = native_field(discovered, "local_config")?;
-    let target: Option<bool> =
-        match resolve_target_name(py, &project_config, &local_config, selected_target)? {
-            Some(name) => native_field(
-                &resolve_target_config(py, &project_config, &local_config, name.as_any())?,
-                IGNORE_AUDIT_FAILURES,
-            )?
-            .extract()?,
-            None => None,
-        };
-    let settings: bool = native_field(
-        &build_effective_settings(&project_config, &local_config)?,
-        IGNORE_AUDIT_FAILURES,
-    )?
-    .extract()?;
+    let (target, settings) =
+        target_and_settings_value(discovered, selected_target, IGNORE_AUDIT_FAILURES)?;
+    let target: Option<bool> = target.map(|value| value.extract()).transpose()?.flatten();
+    let settings: bool = settings.extract()?;
     Ok(effective_ignore_audit_failures(&AuditFailureLayers {
         requested: native_field(request, IGNORE_AUDIT_FAILURES)?.extract()?,
         target,

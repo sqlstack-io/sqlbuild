@@ -9,6 +9,7 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::definition_changes::models::{ExecutedItem, SelectedItem};
 use sqlbuild_core::cli_text::main::format_summary_footer::format_summary_footer;
 use sqlbuild_core::cli_text::models::{CliStyle, SummaryCount};
+use sqlbuild_core::progress::main::statement_summary_delta::statement_summary_delta;
 use sqlbuild_core::progress::models::StatementSummary;
 use sqlbuild_core::run_on::main::read_run_on_decisions::read_run_on_decisions;
 use sqlbuild_core::run_on::main::render_local_refusals::render_local_refusals;
@@ -624,7 +625,7 @@ pub(crate) fn run_scenario_test_command(
             (&pipeline, &named(&scenarios, &local_names)?),
             &section,
         )?);
-        local_statements = statement_delta(&before, &statement_summary(py)?);
+        local_statements = statement_summary_delta(&before, &statement_summary(py)?);
     }
     let reporting: TestRun<'_> = if warehouse_names.is_empty() || !run.local {
         if !run.local {
@@ -674,24 +675,6 @@ pub(crate) fn run_scenario_test_command(
         },
     )?;
     Ok(if succeeded { 0 } else { 1 })
-}
-
-/// The statements counted between `before` and `after`.
-fn statement_delta(before: &StatementSummary, after: &StatementSummary) -> StatementSummary {
-    let mut delta: StatementSummary = StatementSummary::default();
-    for (kind, count) in &after.by_kind {
-        let earlier: u64 = before.by_kind.get(kind).copied().unwrap_or(0);
-        if *count > earlier {
-            delta.by_kind.insert(kind.clone(), count - earlier);
-        }
-    }
-    delta.query_ids = after
-        .query_ids
-        .iter()
-        .filter(|query_id| !before.query_ids.contains(query_id))
-        .cloned()
-        .collect();
-    delta
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {

@@ -1392,6 +1392,10 @@ path = "src/sqlbuild/adapters/sqlserver/classes/sqlserver_adapter.py"
 reason = "The SQL Server adapter intentionally keeps overrideable backend behavior on one class."
 
 [[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-compile/src/analysis/main/register_sql_test_comparisons.rs", "crates/sqlbuild-python-compile/src/rules/main/checking/register_project_tree_queries.rs", "crates/sqlbuild-python-compile/src/rules/main/custom/register_custom_rule_evidence.rs", "crates/sqlbuild-python-front/src/contracts/main/register_effective_config.rs", "crates/sqlbuild-python-front/src/discovery/main/failures/register_guidance.rs", "crates/sqlbuild-python-front/src/model_config/main/config/register_config_values.rs", "crates/sqlbuild-python-front/src/state_rows/main/migrations/register_migration_io.rs", "crates/sqlbuild-python-output/src/cost_telemetry/main/register_snowflake.rs", "crates/sqlbuild-python-planner/src/plan_output/main/register_display.rs", "crates/sqlbuild-python-planner/src/planner_resolution/main/references/register_refs.rs", "crates/sqlbuild-python-project/src/fingerprints/main/register_storage_io.rs"]
+reason = "Each registers its own module's Python functions; only the add-function calls are alike."
+
+[[dupes.allowlist]]
 paths = ["crates/sqlbuild-orchestration/src/declarations/main/published_job.rs", "crates/sqlbuild-orchestration/src/scheduler/main/active_job_run.rs"]
 reason = "Each reads one row by location, target and job key: the published job, decoded with its snapshot named when it no longer decodes, and the run a skip overlap yields to. Only the keyed one-row query shape is alike."
 

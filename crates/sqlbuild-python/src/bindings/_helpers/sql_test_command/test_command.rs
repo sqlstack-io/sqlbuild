@@ -13,6 +13,7 @@ use pyo3::types::{PyBool, PyDict, PyDictMethods, PyInt, PyString, PyTuple};
 use pyo3::{pyclass, pyfunction, pymethods, wrap_pyfunction};
 use sqlbuild_analysis::definition_changes::models::{ExecutedItem, SelectedItem};
 use sqlbuild_core::cli_text::models::CliStyle;
+use sqlbuild_core::progress::main::statement_summary_delta::statement_summary_delta;
 use sqlbuild_core::progress::models::StatementSummary;
 use sqlbuild_core::run_on::main::read_run_on_decisions::read_run_on_decisions;
 use sqlbuild_core::run_on::main::render_local_refusals::render_local_refusals;
@@ -754,7 +755,7 @@ fn run_tests<'py>(
             let memory: Bound<'py, PyDict> = PyDict::new(py);
             memory.set_item("database", ":memory:")?;
             results.extend(run(&local, (adapter, memory.into_any()), false)?);
-            local_statements = statement_delta(&before, &statement_summary(py)?);
+            local_statements = statement_summary_delta(&before, &statement_summary(py)?);
         }
         if !warehouse.is_empty() {
             match run(
@@ -837,24 +838,6 @@ fn statement_summary(py: Python<'_>) -> PyResult<StatementSummary> {
         Some(projector) => projector.get().statement_summary(),
         None => Ok(StatementSummary::default()),
     }
-}
-
-/// The statements counted between `before` and `after`.
-fn statement_delta(before: &StatementSummary, after: &StatementSummary) -> StatementSummary {
-    let mut delta: StatementSummary = StatementSummary::default();
-    for (kind, count) in &after.by_kind {
-        let earlier: u64 = before.by_kind.get(kind).copied().unwrap_or(0);
-        if *count > earlier {
-            delta.by_kind.insert(kind.clone(), count - earlier);
-        }
-    }
-    delta.query_ids = after
-        .query_ids
-        .iter()
-        .filter(|query_id| !before.query_ids.contains(query_id))
-        .cloned()
-        .collect();
-    delta
 }
 
 /// The executor's `RunItemTimeouts` for a resolved run limit.
