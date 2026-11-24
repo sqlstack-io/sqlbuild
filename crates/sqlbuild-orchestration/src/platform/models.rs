@@ -4,6 +4,7 @@ use crate::api::models::ControlClient;
 use crate::credentials::models::AuditRetention;
 use crate::declarations::models::TriggerDefinition;
 use crate::discovered_sets::models::DiscoveredSetStatus;
+use crate::platform::_helpers::health::current_instance::{CurrentInstance, current_instance};
 use crate::runs::models::{RunKind, RunLogRetention, RunNodeFailure, RunOutcome};
 use crate::sensors::models::{SensorEvaluationRequest, SensorFunctionOutcome};
 use crate::snapshots::models::{SnapshotRecord, SnapshotRetention};
@@ -193,6 +194,8 @@ pub struct LocationHealthObservation {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LocationState {
+    /// The newest instance has not finished its first load; it reports nothing yet, and earlier instances don't count.
+    Starting,
     Healthy,
     /// The warehouse connection check after the last load failed.
     Degraded,
@@ -207,7 +210,7 @@ pub enum LocationState {
 }
 
 impl LocationState {
-    /// `target`'s state at `now` from observations that may cover several targets: down without a recent check-in, then a failed load, then missing provider secrets, then a failed discover function, then a failed connection.
+    /// `target`'s state at `now` from observations that may cover several targets: down without a recent check-in, then starting until the newest instance's first load finishes, then from that instance's own reports a failed load, missing provider secrets, a failed discover function, then a failed connection.
     #[must_use]
     pub fn of(
         observations: &[LocationHealthObservation],
@@ -225,6 +228,15 @@ impl LocationState {
         }) {
             return Self::Broken;
         }
+        let own: Vec<&LocationHealthObservation> =
+            match current_instance((&own, observations.len()), (silence, now)) {
+                CurrentInstance::Starting => return Self::Starting,
+                CurrentInstance::Loaded(session) => own
+                    .into_iter()
+                    .filter(|observation| observation.report.session_id == session)
+                    .collect(),
+                CurrentInstance::Unknown => own,
+            };
         let mut failed: Option<(DateTime<Utc>, i64)> = None;
         let mut connection: Option<(DateTime<Utc>, i64, bool)> = None;
         let mut secrets: Option<(DateTime<Utc>, u64)> = None;

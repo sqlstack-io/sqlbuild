@@ -44,6 +44,7 @@ sqb location health --server https://control.example.com --location-id "$LOCATIO
 
 | `state` | Meaning | Exit code |
 | --- | --- | --- |
+| `starting` | The newest instance checked in but hasn't finished its first load | `3` |
 | `healthy` | An instance checked in within 90 seconds and its last load published | `0` |
 | `degraded` | The warehouse connection check after the last load failed | `0` |
 | `missing_secrets` | A provider [secret](../concepts/python-nodes/providers.md#secrets) is unset in the location's environment, and the target's [`allow_missing_secrets`](../concepts/project-configuration.md#allowed-missing-secrets) doesn't list the provider, so runs that use it fail | `1` |
@@ -53,6 +54,13 @@ sqb location health --server https://control.example.com --location-id "$LOCATIO
 
 The command exits `2` when it cannot read the state: the server is unreachable, or the token is
 missing, expired or for another location. It needs the location's token, not a person's sign-in.
+
+The state is the newest instance's: the one that started last among those that checked in within
+90 seconds. Until its first load finishes it is `starting`, whatever an earlier instance loaded, so a
+deploy that restarts the location and polls `sqb location health` until it exits `0` waits for the
+new code. Once that load finishes, the state comes from it: `falling_back` if it failed, otherwise
+`healthy` or one of the states above. For an instance that started more than 7 days ago, whose
+first reports are no longer kept, the state comes from the location's newest reports of any instance.
 
 A Compose health check for the location service:
 

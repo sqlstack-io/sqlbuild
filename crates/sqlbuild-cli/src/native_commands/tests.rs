@@ -12,6 +12,8 @@ mod helpers;
 mod init;
 #[path = "tests/test_location_discovery.rs"]
 mod location_discovery;
+#[path = "tests/test_location_health.rs"]
+mod location_health;
 #[path = "tests/test_location_metadata.rs"]
 mod location_metadata;
 #[path = "tests/test_location_plan.rs"]

@@ -274,3 +274,6 @@ pub(crate) const DEVELOPMENT_OUTPUT_FOLDER: &str =
 /// How `sqb dev` hands its location the SQLite control store file, which the watch leaves out.
 pub(crate) const DEVELOPMENT_CONTROL_FILE: &str =
     sqlbuild_core::constants::DEVELOPMENT_CONTROL_FILE_ENV;
+
+/// `sqb location health` while the newest location instance has not finished its first load.
+pub(crate) const STARTING_EXIT_CODE: i32 = 3;

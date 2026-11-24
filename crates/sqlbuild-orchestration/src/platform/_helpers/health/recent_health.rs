@@ -2,7 +2,7 @@
 
 use uuid::Uuid;
 
-use crate::platform::constants::LOCATION_RETENTION_DAYS;
+use crate::platform::constants::{LOCATION_RETENTION_DAYS, RECENT_HEALTH_LIMIT};
 use crate::platform::models::LocationHealthObservation;
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
@@ -82,6 +82,6 @@ pub(crate) async fn recent_health(
             .collect::<Result<Vec<LocationHealthObservation>, _>>()?,
     );
     observations.sort_by_key(|observation| std::cmp::Reverse(observation.received_at));
-    observations.truncate(100);
+    observations.truncate(RECENT_HEALTH_LIMIT);
     Ok((transaction, observations))
 }

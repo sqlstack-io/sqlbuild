@@ -480,3 +480,9 @@ pub(super) struct CheckGraceTestCase {
     pub(super) expected_within: std::time::Duration,
     pub(super) expected_compiler: bool,
 }
+
+pub(crate) struct HealthExitTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) state: sqlbuild_orchestration::platform::models::LocationState,
+    pub(crate) expected_code: i32,
+}

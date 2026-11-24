@@ -6,6 +6,8 @@ mod helpers;
 mod test_compile_failure;
 #[path = "test_installation.rs"]
 mod test_installation;
+#[path = "test_location_state.rs"]
+mod test_location_state;
 #[path = "test_problems.rs"]
 mod test_problems;
 #[path = "test_provider_secrets.rs"]

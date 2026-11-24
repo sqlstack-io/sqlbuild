@@ -6,6 +6,8 @@ use chrono::Utc;
 use serde_json::json;
 use sqlbuild_orchestration::platform::main::work::connect_location_work::connect_location_work;
 use sqlbuild_orchestration::platform::models::LocationState;
+
+use crate::native_commands::_helpers::location::health::health_exit_code;
 use uuid::Uuid;
 
 use crate::argv::models::{Namespace, Stream};
@@ -69,7 +71,7 @@ pub(crate) fn run_location_invocation(namespace: &Namespace, script: Option<&Pat
     })
 }
 
-/// `sqb location health`: 0 when healthy, degraded or failing discovery, 1 when down or falling back, 2 when unanswered.
+/// `sqb location health`: 0 when healthy, degraded or failing discovery, 1 when down or falling back, 2 when unanswered, 3 while starting.
 fn location_health(namespace: &Namespace) -> i32 {
     drop(write_output(&[(
         Stream::Stderr,
@@ -82,10 +84,7 @@ fn location_health(namespace: &Namespace) -> i32 {
                 (Stream::Stdout, &format!("{document}\n")),
                 (Stream::Stderr, "Location health checked successfully\n"),
             ]));
-            i32::from(matches!(
-                state,
-                LocationState::Broken | LocationState::FallingBack | LocationState::MissingSecrets
-            ))
+            health_exit_code(state)
         }
         Err(error) => {
             drop(write_output(&[(

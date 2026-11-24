@@ -81,3 +81,44 @@ pub(crate) struct ProviderSecretsHealthTestCase {
     pub(crate) expected_missing: u64,
     pub(crate) expected_state: crate::platform::models::LocationState,
 }
+
+/// A location instance in a health history, by when its process started.
+#[derive(Clone, Copy)]
+pub(crate) enum Instance {
+    /// Started three hours before the read.
+    Previous,
+    /// Started 25 seconds before the read.
+    Restarted,
+    /// Started eight days before the read, before the history kept.
+    LongRunning,
+    /// An instance whose session ID carries no start time.
+    Unordered,
+}
+
+/// One report in a health history: the instance, how many seconds before the read, and what it said.
+pub(crate) struct Reported {
+    pub(crate) instance: Instance,
+    pub(crate) seconds_ago: i64,
+    pub(crate) health: ReportedHealth,
+}
+
+/// What a report in a health history said.
+#[derive(Clone, Copy)]
+pub(crate) enum ReportedHealth {
+    /// The instance's liveness row.
+    CheckIn,
+    /// A publication of the generation, then its healthy connection check.
+    Published(i64),
+    /// A failed load of the generation.
+    Failed(i64),
+    /// A provider check without missing secrets.
+    Secrets,
+}
+
+pub(crate) struct LocationStateTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) reported: Vec<Reported>,
+    /// Provider checks the previous instance sent after the restart, filling the history.
+    pub(crate) later_reports: usize,
+    pub(crate) expected_state: crate::platform::models::LocationState,
+}

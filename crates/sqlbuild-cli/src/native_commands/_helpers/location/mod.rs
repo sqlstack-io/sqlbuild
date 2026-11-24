@@ -11,6 +11,7 @@ pub(crate) mod discovery_state;
 pub(crate) mod dynamic_resume;
 pub(crate) mod env_reload;
 pub(crate) mod execution;
+pub(crate) mod health;
 pub(crate) mod held_copy;
 pub(crate) mod plan_document;
 pub(crate) mod plan_request;
