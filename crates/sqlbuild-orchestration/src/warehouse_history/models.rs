@@ -212,6 +212,8 @@ pub struct CostSummaryRecord {
     pub since: DateTime<Utc>,
     pub credits: f64,
     pub usd: Option<f64>,
+    /// `config`, `rate_sheet`, `list_price` (also when only some are) or `mixed`; None without dollars.
+    pub usd_per_credit_source: Option<String>,
     pub runs: i64,
     /// Runs whose cost is still pending or partial, which a later build re-reads.
     pub incomplete_runs: i64,
@@ -231,6 +233,8 @@ pub struct NodeCostRecord {
     pub status: String,
     pub credits: f64,
     pub usd: Option<f64>,
+    /// Where the build's price per credit came from: `config`, `rate_sheet` or `list_price`.
+    pub usd_per_credit_source: Option<String>,
     pub seconds: f64,
     pub query_count: i64,
 }
@@ -239,7 +243,7 @@ pub struct NodeCostRecord {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct CostPrice {
     pub usd_per_credit: f64,
-    /// `configured`: the project's `[cost] usd_per_credit`.
+    /// `config` (`[cost] usd_per_credit`), `rate_sheet`, `list_price` (also when only some) or `mixed`.
     pub source: String,
 }
 

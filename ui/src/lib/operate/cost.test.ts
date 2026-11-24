@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { RunCostRow } from '$lib/api';
-import { costSummary, formatQueryCost, runCostOf } from './cost';
+import { combinedSource, costSummary, costTitle, formatQueryCost, runCostOf } from './cost';
 
 const row = (overrides: Partial<RunCostRow>): RunCostRow => ({
+	priceSource: overrides.usd === null ? null : 'config',
 	nodeKey: `${overrides.resourceType ?? 'model'}:${overrides.resourceName ?? 'orders'}`,
 	buildRunId: 'b1',
 	resourceType: 'model',
@@ -74,5 +75,23 @@ describe('what the cost figure says', () => {
 		expect(formatQueryCost({ credits: 0.0125, usd: null })).toBe('0.013 credits');
 		expect(formatQueryCost({ credits: 0.001, usd: 0.003 })).toBe('< $0.01');
 		expect(formatQueryCost({ credits: 0, usd: 0 })).toBe('$0.00');
+	});
+});
+
+describe('prices and their sources', () => {
+	it('marks dollars at a list price as an estimate, and names the source in the tooltip', () => {
+		expect(formatQueryCost({ credits: 1, usd: 3.9, priceSource: 'list_price' })).toBe('$3.90 est.');
+		expect(formatQueryCost({ credits: 1, usd: 2.73, priceSource: 'rate_sheet' })).toBe('$2.73');
+		expect(costTitle({ credits: 2, usd: 7.8, priceSource: 'list_price' })).toBe("2.000 credits × $3.90 per credit (Snowflake's list price for the account's region (an estimate))");
+		expect(costTitle({ credits: 2, usd: null, priceSource: null })).toBeUndefined();
+	});
+	it('reads several sources as one: theirs, the list price when any is one, else mixed', () => {
+		expect(combinedSource(['config', 'config', null])).toBe('config');
+		expect(combinedSource(['config', 'list_price'])).toBe('list_price');
+		expect(combinedSource(['config', 'rate_sheet'])).toBe('mixed');
+		expect(combinedSource([null])).toBeNull();
+	});
+	it("gives a run's breakdown its rows' source", () => {
+		expect(runCostOf([row({ resourceType: '_total', resourceName: 'b1', nodeKey: null, priceSource: 'list_price' }), row({ priceSource: 'list_price' })]).priceSource).toBe('list_price');
 	});
 });

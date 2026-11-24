@@ -1,4 +1,4 @@
-import type { RunCostBreakdown, RunCostRow, RunCostStatus } from '$lib/api';
+import type { PriceSource, RunCostBreakdown, RunCostRow, RunCostStatus } from '$lib/api';
 
 /** The resource type of the row carrying a collection's totals. */
 export const TOTAL = '_total';
@@ -26,18 +26,20 @@ export function runCostOf(rows: RunCostRow[]): RunCostBreakdown {
 	const warehouses = new Map<string, RunCostBreakdown['warehouses'][number]>();
 	for (const r of parts) {
 		const nodeKey = r.nodeKey ?? r.resourceName;
-		const resource = resources.get(nodeKey) ?? { nodeKey, credits: 0, usd: 0, seconds: 0, queryCount: 0, bytesScanned: 0, warehouses: [] };
+		const resource = resources.get(nodeKey) ?? { nodeKey, credits: 0, usd: 0, priceSource: null, seconds: 0, queryCount: 0, bytesScanned: 0, warehouses: [] };
 		resource.credits += r.credits;
 		resource.usd = sumUsd(resource.usd, r.usd);
+		resource.priceSource = combinedSource([resource.priceSource, r.priceSource]);
 		resource.seconds += r.seconds;
 		resource.queryCount += r.queryCount;
 		resource.bytesScanned += r.bytesScanned;
 		if (r.warehouseName && !resource.warehouses.includes(r.warehouseName)) resource.warehouses.push(r.warehouseName);
 		resources.set(nodeKey, resource);
 		const warehouseKey = `${r.warehouseName}|${r.warehouseSize}`;
-		const warehouse = warehouses.get(warehouseKey) ?? { name: r.warehouseName, size: r.warehouseSize, credits: 0, usd: 0, seconds: 0, queryCount: 0 };
+		const warehouse = warehouses.get(warehouseKey) ?? { name: r.warehouseName, size: r.warehouseSize, credits: 0, usd: 0, priceSource: null, seconds: 0, queryCount: 0 };
 		warehouse.credits += r.credits;
 		warehouse.usd = sumUsd(warehouse.usd, r.usd);
+		warehouse.priceSource = combinedSource([warehouse.priceSource, r.priceSource]);
 		warehouse.seconds += r.seconds;
 		warehouse.queryCount += r.queryCount;
 		warehouses.set(warehouseKey, warehouse);
@@ -47,6 +49,7 @@ export function runCostOf(rows: RunCostRow[]): RunCostBreakdown {
 		status,
 		credits: runs.reduce((total, r) => total + r.credits, 0),
 		usd: runs.length === 0 ? null : runs.map((r) => r.usd).reduce(sumUsd),
+		priceSource: combinedSource(runs.map((r) => r.priceSource)),
 		seconds: runs.reduce((total, r) => total + r.seconds, 0),
 		queryCount: runs.reduce((total, r) => total + r.queryCount, 0),
 		statementsExpected: runs.reduce((total, r) => total + r.statementsExpected, 0),
@@ -56,9 +59,37 @@ export function runCostOf(rows: RunCostRow[]): RunCostBreakdown {
 	};
 }
 
-/** Dollars when the project priced credits; otherwise credits, so no price is ever guessed. */
-export function formatQueryCost(cost: { credits: number; usd: number | null }): string {
-	if (cost.usd != null) return cost.usd < 0.01 && cost.usd > 0 ? '< $0.01' : `$${cost.usd.toFixed(2)}`;
+/** Where a price per credit came from, as a tooltip says it. */
+export const PRICE_SOURCE_TEXT: Record<PriceSource, string> = {
+	config: "the project's usd_per_credit",
+	rate_sheet: "the account's Snowflake rate sheet",
+	list_price: "Snowflake's list price for the account's region (an estimate)",
+	mixed: 'several prices'
+};
+
+/** A price's source as a short label beside it. */
+export const PRICE_SOURCE_LABEL: Record<PriceSource, string> = { config: 'Project price', rate_sheet: 'Rate sheet', list_price: 'List price', mixed: 'Several prices' };
+
+/** A list price is an estimate, so its dollars say so. */
+export const isEstimate = (source: PriceSource | null | undefined) => source === 'list_price';
+
+/** One source for several: theirs when they agree, the list price when any is one, else `mixed`. */
+export function combinedSource(sources: Iterable<PriceSource | null>): PriceSource | null {
+	const set = new Set([...sources].filter((s): s is PriceSource => s !== null));
+	if (set.size <= 1) return set.values().next().value ?? null;
+	return set.has('list_price') ? 'list_price' : 'mixed';
+}
+
+/** A cost figure's tooltip: its credits and the price that made them dollars, with its source. */
+export function costTitle(cost: { credits: number; usd: number | null; priceSource?: PriceSource | null }): string | undefined {
+	if (cost.usd == null || !cost.credits) return undefined;
+	const source = cost.priceSource ? ` (${PRICE_SOURCE_TEXT[cost.priceSource]})` : '';
+	return `${cost.credits.toFixed(3)} credits × $${(cost.usd / cost.credits).toFixed(2)} per credit${source}`;
+}
+
+/** Dollars when credits have a price, marked `est.` for a list price; otherwise credits, so no price is ever guessed. */
+export function formatQueryCost(cost: { credits: number; usd: number | null; priceSource?: PriceSource | null }): string {
+	if (cost.usd != null) return `${cost.usd < 0.01 && cost.usd > 0 ? '< $0.01' : `$${cost.usd.toFixed(2)}`}${isEstimate(cost.priceSource) ? ' est.' : ''}`;
 	return `${cost.credits < 0.001 && cost.credits > 0 ? '< 0.001' : cost.credits.toFixed(3)} credits`;
 }
 

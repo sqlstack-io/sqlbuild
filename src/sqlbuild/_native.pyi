@@ -5591,6 +5591,13 @@ def build_observations_prune_sql(
     render_qualified_name: Callable[..., str | None],
     retain_versions: int,
 ) -> str: ...
+def build_resource_costs_add_columns_sql(
+    *,
+    database: str | None,
+    schema: str,
+    render_qualified_name: Callable[..., str | None],
+    render_framework_type: Callable[[FrameworkType], str],
+) -> list[str]: ...
 def build_resource_costs_create_table_sql(
     *,
     database: str | None,

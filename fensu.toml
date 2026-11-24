@@ -1726,8 +1726,8 @@ select = [
 
 [[targets.rust.threshold_overrides]]
 paths = ["crates/sqlbuild-python/Cargo.toml"]
-thresholds = { max_crate_code_lines = 51310 }
-reason = "The Python bindings crate is above the code-line limit; this caps it near its current size until it is split into crates by area. The location and plan bindings of the large-project server work and #1560 grew it to 51,122; moving them out would need new cross-crate imports or a policy exception. The dbt event stream moved to sqlbuild-python-output, and the location sync's dynamic-model resume came in (50,945). The CHI-1589 stop handling and dev error fields plus the CHI-1595/CHI-1593 env-file merge took it to 51,210 when combined. The CHI-1443 project layout's exported path constants and its event_sinks and extra_paths keys took it to 51,305. The cap stays near its current size; lower it as code moves out."
+thresholds = { max_crate_code_lines = 51311 }
+reason = "The Python bindings crate is above the code-line limit; this caps it near its current size until it is split into crates by area. The location and plan bindings of the large-project server work and #1560 grew it to 51,122; moving them out would need new cross-crate imports or a policy exception. The dbt event stream moved to sqlbuild-python-output, and the location sync's dynamic-model resume came in (50,945). The CHI-1589 stop handling and dev error fields plus the CHI-1595/CHI-1593 env-file merge took it to 51,210 when combined. The CHI-1443 project layout's exported path constants and its event_sinks and extra_paths keys took it to 51,305, and CHI-1650's older-table read of the two cost price columns to 51,311. The cap stays near its current size; lower it as code moves out."
 
 [[targets.rust.threshold_overrides]]
 paths = ["crates/sqlbuild-python/src/bindings/_helpers"]

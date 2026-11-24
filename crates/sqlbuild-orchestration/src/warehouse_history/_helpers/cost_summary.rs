@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::warehouse_history::_helpers::cost_selection::{
     CostPeriod, CostRow, Dollars, SelectionCosts,
 };
-use crate::warehouse_history::constants::CONFIGURED_PRICE;
+use crate::warehouse_history::_helpers::costs::combined_source;
 use crate::warehouse_history::models::{
     CostFactRecord, CostPrice, CostSelectionRecord, CostSeriesGroup, CostSeriesRecord,
 };
@@ -99,10 +99,12 @@ pub(crate) fn summarise(period: &CostPeriod, costs: SelectionCosts) -> CostSelec
     let facts: Vec<CostFactRecord> = facts(&costs.rows);
     let (mut usd, mut previous_usd) = (Dollars::default(), Dollars::default());
     let mut runs: BTreeSet<&str> = BTreeSet::new();
+    let mut sources: BTreeSet<String> = BTreeSet::new();
     for row in &costs.rows {
         if row.day.is_some() {
             usd.add(row.usd);
             runs.insert(&row.run_id);
+            sources.extend(row.source.clone());
         } else {
             previous_usd.add(row.usd);
         }
@@ -125,7 +127,7 @@ pub(crate) fn summarise(period: &CostPeriod, costs: SelectionCosts) -> CostSelec
         error: costs.error,
         price: usd.filter(|_| credits.is_normal()).map(|usd| CostPrice {
             usd_per_credit: usd / credits,
-            source: CONFIGURED_PRICE.into(),
+            source: combined_source(&sources).unwrap_or_default(),
         }),
         credits,
         previous_credits: facts.iter().map(|fact| fact.previous_credits).sum(),

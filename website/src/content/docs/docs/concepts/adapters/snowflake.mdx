@@ -238,15 +238,26 @@ schema = "dev"
 
 Snowflake builds show a compact per-run busy-compute estimate. SQLBuild attributes visible
 overlapping query intervals fairly across active queries, converts attributed seconds using the
-warehouse-size credit rate, and estimates USD from the configured rate:
+warehouse-size credit rate, and estimates USD from a price per credit. The price is the first of:
 
-```toml
-[cost]
-usd_per_credit = 3.00
-```
+1. `usd_per_credit` under `[cost]`, your contract rate:
 
-The default is `3.00` USD per credit and is visibly marked as a default. Set it to your Snowflake
-contract rate. Use `sqb cost`, `sqb cost latest`, `sqb cost <run_id>`, or
+   ```toml
+   [cost]
+   usd_per_credit = 2.73
+   ```
+
+2. The account's rate sheet, `SNOWFLAKE.ORGANIZATION_USAGE.RATE_SHEET_DAILY`, when the connection's
+   role can read it (an organisation role). Without that permission SQLBuild moves on quietly.
+3. Snowflake's public on-demand list price for the account's region at Enterprise edition, from the
+   Snowflake Service Consumption Table effective 2026-11-20. This is an estimate and shows as
+   "est."; a region not in SQLBuild's table is priced as AWS US East.
+
+The rate sheet or list price is looked up once per account per UTC day and kept in
+`target/cost/credit_price.json`. Each row of `_sqlbuild_resource_costs` records the price it used
+in `usd_per_credit` and where it came from in `usd_per_credit_source` (`config`, `rate_sheet` or
+`list_price`). SQLBuild adds both columns to an existing table the first time it writes to it; rows
+recorded before then leave them empty. Use `sqb cost`, `sqb cost latest`, `sqb cost <run_id>`, or
 `sqb cost history --since 7d` to inspect persisted records. `--json` and `--json-output PATH`
 provide a versioned, decimal-safe output contract. Pending detail records are refreshed from
 Snowflake when inspected again.
@@ -260,8 +271,9 @@ Under [`sqb server`](/docs/cli/server), the UI labels the same figures "estimate
 | Cost | A selection's cost over 7 or 30 days, by job and folder down to each model, against the period before, with a trend per day |
 | Overview | The last 7 days' total, linking to the Cost page |
 
-Figures are in dollars when `usd_per_credit` is set, and in credits with the default rate. A run
-whose cost isn't final shows "Cost pending" or "Partial", never $0.
+Figures are in dollars, marked "est." when priced at the list price; their tooltips give the
+credits, the price per credit and its source. A run whose cost isn't final shows "Cost pending" or
+"Partial", never $0.
 
 The Cost page takes a selection as `sqb build --select` does, and the server resolves it against
 the current deploy. The same reads are in the control API: `readCostSelection` returns each job's

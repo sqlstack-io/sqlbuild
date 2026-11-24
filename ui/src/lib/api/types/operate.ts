@@ -356,21 +356,24 @@ export type RunCostRow = {
 	seconds: number;
 	bytesScanned: number;
 	credits: number;
-	/** Null without a configured credit price; the UI never guesses one. */
+	/** Null without a price per credit; the UI never guesses one. */
 	usd: number | null;
+	/** Where `usd`'s price per credit came from (`PriceSource`); null without one. */
+	priceSource: PriceSource | null;
 	status: Exclude<RunCostStatus, 'none'>;
 	statementsExpected: number;
 	statementsObserved: number;
 };
 
-export type RunCostResource = { nodeKey: string; credits: number; usd: number | null; seconds: number; queryCount: number; bytesScanned: number; warehouses: string[] };
-export type RunCostWarehouse = { name: string; size: string; credits: number; usd: number | null; seconds: number; queryCount: number };
+export type RunCostResource = { nodeKey: string; credits: number; usd: number | null; priceSource: PriceSource | null; seconds: number; queryCount: number; bytesScanned: number; warehouses: string[] };
+export type RunCostWarehouse = { name: string; size: string; credits: number; usd: number | null; priceSource: PriceSource | null; seconds: number; queryCount: number };
 
 /** A run's estimated query cost, with its resources and warehouses most expensive first. */
 export type RunCostBreakdown = {
 	status: RunCostStatus;
 	credits: number;
 	usd: number | null;
+	priceSource: PriceSource | null;
 	seconds: number;
 	queryCount: number;
 	statementsExpected: number;
@@ -386,8 +389,9 @@ export type CostGroup = { key: string | null; credits: number; usd: number | nul
 export type CostSummary = {
 	since: string;
 	credits: number;
-	/** Null when any run in the window had no configured credit price. */
+	/** Null when any run in the window had no price per credit. */
 	usd: number | null;
+	priceSource: PriceSource | null;
 	runs: number;
 	/** Runs whose cost is still pending or partial, which a later build re-reads. */
 	incompleteRuns: number;
@@ -397,8 +401,14 @@ export type CostSummary = {
 	byNode: CostGroup[];
 };
 
-/** The price a cost read's dollars use; `source` is `configured` for the project's `usd_per_credit`. */
-export type CostPrice = { usdPerCredit: number; source: string };
+/**
+ * Where a price per credit came from: the project's `[cost] usd_per_credit`, the account's rate
+ * sheet, the list price for its region (an estimate), or several of the first two.
+ */
+export type PriceSource = 'config' | 'rate_sheet' | 'list_price' | 'mixed';
+
+/** The price a cost read's dollars use, and where it came from. */
+export type CostPrice = { usdPerCredit: number; source: PriceSource };
 
 /** One job's estimated query cost on one node over a period, and in the period before it. */
 export type CostFact = {
@@ -462,6 +472,7 @@ export type NodeBuildCost = {
 	status: Exclude<RunCostStatus, 'none'>;
 	credits: number;
 	usd: number | null;
+	priceSource: PriceSource | null;
 	seconds: number;
 	queryCount: number;
 };

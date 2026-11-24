@@ -2,6 +2,7 @@
 
 import type { components } from '$control/schema.d.ts';
 import { toSelectionProblem } from './http-selection';
+import { priceSource } from './http-runs';
 import type { CostSelection, CostSeriesGroup } from './types/operate';
 
 type Wire = components['schemas'];
@@ -14,7 +15,7 @@ export function toCostSelection(wire: Wire['CostSelectionRecord']): CostSelectio
 		days: wire.days,
 		dates: wire.dates,
 		error: toSelectionProblem(wire.error),
-		price: wire.price ? { usdPerCredit: wire.price.usd_per_credit, source: wire.price.source } : null,
+		price: wire.price ? { usdPerCredit: wire.price.usd_per_credit, source: priceSource(wire.price.source, true) ?? 'config' } : null,
 		credits: wire.credits,
 		previousCredits: wire.previous_credits,
 		usd: wire.usd ?? null,

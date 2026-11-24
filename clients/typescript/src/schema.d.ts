@@ -2282,7 +2282,10 @@ export interface components {
         };
         /** @description The price the dollars of a cost read use, and where it came from. */
         CostPrice: {
-            /** @description `configured`: the project's `[cost] usd_per_credit`. */
+            /**
+             * @description `config` (the project's `[cost] usd_per_credit`), `rate_sheet`, `list_price` (an estimate,
+             *     also when only some rows are) or `mixed`.
+             */
             source: string;
             /** Format: double */
             usd_per_credit: number;
@@ -2360,6 +2363,11 @@ export interface components {
             since: string;
             /** Format: double */
             usd?: number | null;
+            /**
+             * @description Where the dollars' prices came from: `config`, `rate_sheet`, `list_price` (an estimate, also
+             *     when only some are) or `mixed`; None without dollars.
+             */
+            usd_per_credit_source?: string | null;
         };
         /** @description One stretch of the cursor, as raw bound texts. */
         CoverageBatch: {
@@ -3032,6 +3040,8 @@ export interface components {
             status: string;
             /** Format: double */
             usd?: number | null;
+            /** @description Where the build's price per credit came from: `config`, `rate_sheet` or `list_price`. */
+            usd_per_credit_source?: string | null;
         };
         /** @enum {string} */
         NodeEventKind: "success" | "failed" | "recovered";
@@ -5263,6 +5273,10 @@ export interface components {
             statements_observed: number;
             status: string;
             target_name?: string | null;
+            /** @description The price per credit `estimated_usd` used; None on rows recorded before prices were. */
+            usd_per_credit?: string | null;
+            /** @description `config`, `rate_sheet` or `list_price` (an estimate); None on rows recorded before prices were. */
+            usd_per_credit_source?: string | null;
             warehouse_name: string;
             warehouse_size: string;
             warehouse_type?: string | null;

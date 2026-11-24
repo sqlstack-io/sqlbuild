@@ -27,7 +27,7 @@ describe('the mock’s cost of a selection', () => {
 			['daily', 'customers', '', 0.05, 0],
 			[null, 'orders', 'staging', 0.04, 0]
 		]);
-		expect([read.runs, read.price?.source, read.price?.usdPerCredit]).toEqual([2, 'configured', 3]);
+		expect([read.runs, read.price?.source, read.price?.usdPerCredit]).toEqual([2, 'config', 3]);
 		expect(read.jobDaily.find((s) => s.key === null)?.credits[5]).toBe(0.04);
 	});
 

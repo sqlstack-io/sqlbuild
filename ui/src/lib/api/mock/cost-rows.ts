@@ -71,7 +71,7 @@ export function costSelectionOf(rows: CostRowIn[], days: number, now: number, er
 		days,
 		dates: period.dates,
 		error,
-		price: priced !== null && credits > 0 ? { usdPerCredit: priced / credits, source: 'configured' } : null,
+		price: priced !== null && credits > 0 ? { usdPerCredit: priced / credits, source: 'config' } : null,
 		credits,
 		previousCredits: sum((f) => f.previousCredits),
 		usd: priced,

@@ -158,8 +158,8 @@ fn given_job_and_manual_builds_when_people_read_a_selections_cost_then_it_splits
                     all["runs"].clone(),
                     all["price"]["source"].clone()
                 ),
-                (Some(7), json!(2), json!("configured")),
-                "{}",
+                (Some(7), json!(2), json!("list_price")),
+                "{}: an estimate among the prices makes the total one",
                 test_case.description
             );
             assert_eq!(
@@ -169,6 +169,18 @@ fn given_job_and_manual_builds_when_people_read_a_selections_cost_then_it_splits
                 test_case.description
             );
 
+            let (_, customers) = get(
+                &client,
+                (&api.url, &viewer),
+                &format!("{path}/selection?select=model:customers"),
+            )
+            .await;
+            assert_eq!(
+                customers["price"]["source"],
+                json!("config"),
+                "{}: rows recorded before prices were, with dollars, were priced from the project",
+                test_case.description
+            );
             let (_, orders) = get(
                 &client,
                 (&api.url, &viewer),

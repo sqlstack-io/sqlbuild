@@ -137,7 +137,7 @@ from sqlbuild.adapter.type_system.main.first_arg_nullability import first_arg_nu
 from sqlbuild.adapter.type_system.main.normalize_numeric_family import normalize_numeric_family
 from sqlbuild.adapter.type_system.main.types_equal import types_equal
 from sqlbuild.adapters.snowflake._helpers.column_names import logical_column_name
-from sqlbuild.adapters.snowflake._helpers.cost import cost_failure_cause
+from sqlbuild.adapters.snowflake._helpers.cost import cost_failure_cause, resolve_credit_price
 from sqlbuild.adapters.snowflake._helpers.grants import (
     render_snowflake_view_grants,
     render_snowflake_view_revokes,
@@ -168,7 +168,9 @@ from sqlbuild.adapters.snowflake.classes.state_table_retention_fallbacks import 
 )
 from sqlbuild.adapters.snowflake.constants import (
     BASE_TABLE_METADATA_TYPE,
+    CREDIT_PRICE_CACHE_DIR,
     CURRENT_DATABASE_ATTRIBUTE,
+    DEFAULT_RATE_SOURCE,
     EXTERNAL_BROWSER_AUTHENTICATOR,
     FIXED_POINT_RESULT_TYPE,
     MAX_STATEMENT_TIMEOUT_SECONDS,
@@ -187,6 +189,7 @@ from sqlbuild.adapters.snowflake.constants import (
     TRUE_METADATA_VALUE,
     VIEW_RELATION_TYPE_TOKEN,
 )
+from sqlbuild.adapters.snowflake.models import CreditPrice
 from sqlbuild.compiler.compile.types import FunctionLanguage
 from sqlbuild.cost.models import RunCostSummary
 from sqlbuild.cost.types import CostCapability, CostStatus
@@ -482,6 +485,12 @@ class SnowflakeAdapter(
                 rate_source=rate_source,
                 message=f"Snowflake cost collection failed to connect ({type(error).__name__}).",
             )
+        if rate_source == DEFAULT_RATE_SOURCE:
+            price: CreditPrice = resolve_credit_price(
+                connection=connection,
+                cache_dir=statement_ledger_path.parent.parent.parent / CREDIT_PRICE_CACHE_DIR,
+            )
+            usd_per_credit, rate_source = price.usd_per_credit, price.source
         try:
             summary: RunCostSummary = collect_snowflake_cost(
                 connection=connection,

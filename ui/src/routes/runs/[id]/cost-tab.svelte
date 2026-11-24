@@ -4,7 +4,7 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import type { RunCostBreakdown } from '$lib/api';
 	import HelpTip from '$lib/components/help-tip.svelte';
-	import { CREDIT_PRICE_HINT } from '$lib/operate/cost';
+	import { CREDIT_PRICE_HINT, costTitle } from '$lib/operate/cost';
 	import { costSummary, formatQueryCost, formatSpan } from './utils';
 
 	let { cost, filteredBy, onnode }: { cost: RunCostBreakdown; filteredBy: string[]; onnode?: (key: string) => void } = $props();
@@ -49,7 +49,7 @@
 			{#snippet row(r)}
 					<tr>
 						<td class="mono">{#if runStatements(r.nodeKey)}<span class="faint" title="Statements outside any node, such as creating schemas">Run statements</span>{:else if onnode}<Button variant="link" size="inline" class="font-mono" onclick={() => onnode(r.nodeKey)}>{r.nodeKey}</Button>{:else}{r.nodeKey}{/if}</td>
-						<td class="num">{formatQueryCost(r)}</td>
+						<td class="num" title={costTitle(r)}>{formatQueryCost(r)}</td>
 						<td class="num faint">{share(r.credits)}</td>
 						<td class="num faint">{formatSpan(r.seconds)}</td>
 						<td class="num faint">{r.queryCount}</td>
@@ -65,7 +65,7 @@
 					<tr>
 						<td class="mono">{w.name}</td>
 						<td class="faint">{w.size}</td>
-						<td class="num">{formatQueryCost(w)}</td>
+						<td class="num" title={costTitle(w)}>{formatQueryCost(w)}</td>
 						<td class="num faint">{share(w.credits)}</td>
 						<td class="num faint">{formatSpan(w.seconds)}</td>
 						<td class="num faint">{w.queryCount}</td>

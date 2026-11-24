@@ -521,3 +521,39 @@ class SnowflakeChangeTrackingTestCase:
     description: str
     config: dict[str, object]
     expected_sql: str
+
+
+@dataclass
+class CreditPriceTestCase:
+    """A credit price lookup: the account's rows, or the error its rate sheet raises."""
+
+    description: str
+    account_row: tuple[object, ...] | None
+    rate_sheet_row: tuple[object, ...] | None
+    rate_sheet_error: bool
+    expected_price: str
+    expected_source: str
+
+
+@dataclass
+class ListPriceTestCase:
+    description: str
+    region: str | None
+    edition: str
+    expected_price: str
+
+
+@dataclass
+class CreditPriceCacheTestCase:
+    description: str
+    first_rate: str
+    second_rate: str
+    expected_price: str
+
+
+@dataclass
+class AddedCostColumnsTestCase:
+    description: str
+    database: str | None
+    schema: str
+    expected_statements: list[str]

@@ -3,8 +3,8 @@
 use crate::cli_text::models::CliStyle;
 use crate::cost_report::_helpers::decimal_text::fixed;
 use crate::cost_report::constants::{
-    COLLECTION_FAILED_STATUS, COMPLETE_STATUS, DEFAULT_RATE_SOURCE, ESTIMATE_NOTE, RATE_ADVICE,
-    RATE_PLACES, WARNING_STATUSES,
+    COLLECTION_FAILED_STATUS, COMPLETE_STATUS, DEFAULT_RATE_SOURCE, ESTIMATE_NOTE,
+    LIST_PRICE_RATE_SOURCE, RATE_ADVICE, RATE_PLACES, RATE_SHEET_RATE_SOURCE, WARNING_STATUSES,
 };
 use crate::cost_report::models::{CostRun, CostSummary};
 
@@ -22,13 +22,15 @@ pub(crate) fn styled_status(style: CliStyle, status: &str) -> String {
     style.muted(status)
 }
 
-/// The credit rate, flagged when it is the default.
+/// The credit rate and where it came from; the default and the list price are flagged as estimates.
 pub(crate) fn rate_note(style: CliStyle, cost: &CostSummary) -> String {
     let rate: String = fixed(&cost.usd_per_credit, RATE_PLACES);
-    if cost.rate_source == DEFAULT_RATE_SOURCE {
-        return style.warning(&format!("default ${rate}/credit"));
+    match cost.rate_source.as_str() {
+        DEFAULT_RATE_SOURCE => style.warning(&format!("default ${rate}/credit")),
+        LIST_PRICE_RATE_SOURCE => style.warning(&format!("${rate}/credit est. (list price)")),
+        RATE_SHEET_RATE_SOURCE => style.muted(&format!("${rate}/credit (rate sheet)")),
+        _ => style.muted(&format!("${rate}/credit")),
     }
-    style.muted(&format!("${rate}/credit"))
 }
 
 /// The `Run  <id>` line, when shown.
@@ -53,7 +55,7 @@ pub(crate) fn trailer(style: CliStyle, run: &CostRun, limit: Option<usize>) -> V
     if let Some(message) = cost.message.as_ref().filter(|message| !message.is_empty()) {
         lines.push(style.muted(message));
     }
-    if cost.rate_source == DEFAULT_RATE_SOURCE {
+    if [DEFAULT_RATE_SOURCE, LIST_PRICE_RATE_SOURCE].contains(&cost.rate_source.as_str()) {
         lines.push(style.warning(RATE_ADVICE));
     }
     lines.extend(

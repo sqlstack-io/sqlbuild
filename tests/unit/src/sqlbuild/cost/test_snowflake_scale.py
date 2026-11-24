@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from snowflake.connector.errors import ProgrammingError as SnowflakeProgrammingError
 
 from sqlbuild._native import (
     CostCommandRequest,
@@ -286,9 +287,22 @@ def test_given_a_history_read_timeout_when_collecting_then_only_retried_reads_ar
     )
 
 
+class _RefusingCursor:
+    """A role that may read neither the account nor its rate sheet: the list price is used."""
+
+    def execute(self, sql: str) -> None:
+        raise SnowflakeProgrammingError(msg=f"not authorized: {sql}", errno=2003)
+
+    def close(self) -> None:
+        return None
+
+
 class _ClosingHistory(_FakeQueryHistory):
     def close(self) -> None:
         return None
+
+    def cursor(self) -> _RefusingCursor:
+        return _RefusingCursor()
 
 
 class ProgrammingError(Exception):

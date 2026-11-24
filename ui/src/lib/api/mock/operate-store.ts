@@ -421,6 +421,7 @@ export class MockOperate {
 			since: new Date(since).toISOString(),
 			credits: total.credits,
 			usd: total.runs.size ? total.usd : null,
+			priceSource: total.runs.size && total.usd !== null ? 'config' : null,
 			runs: total.runs.size,
 			incompleteRuns,
 			byJob: ranked(byJob),
@@ -478,6 +479,7 @@ export class MockOperate {
 				status: run.status,
 				credits: mine.reduce((t, r) => t + r.credits, 0),
 				usd: mine.some((r) => r.usd === null) ? null : mine.reduce((t, r) => t + (r.usd ?? 0), 0),
+				priceSource: mine.some((r) => r.usd === null) ? null : 'config',
 				seconds: mine.reduce((t, r) => t + r.seconds, 0),
 				queryCount: mine.reduce((t, r) => t + r.queryCount, 0)
 			});
@@ -510,6 +512,7 @@ export class MockOperate {
 			bytesScanned: queryCount * 52_428_800,
 			credits,
 			usd: priced ? credits * 3 : null,
+			priceSource: priced ? 'config' : null,
 			status,
 			statementsExpected: statements.length,
 			statementsObserved: status === 'pending' ? 0 : statements.length

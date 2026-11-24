@@ -374,7 +374,7 @@ function costSelection(query: CostSelectionQuery): CostSelection {
 		days: query.days,
 		dates: period.dates,
 		error,
-		price: error || !facts.length ? null : { usdPerCredit: PRICE, source: 'configured' },
+		price: error || !facts.length ? null : { usdPerCredit: PRICE, source: 'config' },
 		credits: error ? 0 : sum((f) => f.credits),
 		previousCredits: error ? 0 : sum((f) => f.previousCredits),
 		usd: error ? null : sum((f) => f.credits) * PRICE,
@@ -416,7 +416,7 @@ function nodeCosts(nodeKey: string, days: number): NodeBuildCost[] {
 		.runs.filter((r) => r.at >= since && mine.has(r.job ?? MANUAL))
 		.map((r) => {
 			const share = mine.get(r.job ?? MANUAL)!;
-			return { buildRunId: `build-${r.id}`, runId: r.job ? r.id : null, startedAt: new Date(r.at).toISOString(), status: r.status === 'running' ? 'pending' : 'complete', credits: r.credits * share, usd: r.credits * share * PRICE, seconds: r.seconds * share, queryCount: 2 };
+			return { buildRunId: `build-${r.id}`, runId: r.job ? r.id : null, startedAt: new Date(r.at).toISOString(), status: r.status === 'running' ? 'pending' : 'complete', credits: r.credits * share, usd: r.credits * share * PRICE, priceSource: 'config', seconds: r.seconds * share, queryCount: 2 };
 		});
 }
 

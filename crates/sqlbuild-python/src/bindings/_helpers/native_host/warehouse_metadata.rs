@@ -30,7 +30,7 @@ use sqlbuild_state::freshness::constants::{
     OBSERVED_AT_COLUMN, SOURCE_FRESHNESS_COLUMN_TYPES, SQLITE_ADAPTER,
 };
 use sqlbuild_state::observations::constants::OBSERVATION_COLUMN_TYPES;
-use sqlbuild_state::resource_costs::constants::RESOURCE_COST_COLUMN_TYPES;
+use sqlbuild_state::resource_costs::constants as resource_costs;
 use sqlbuild_state::state_tables::main::event_id_index::event_id_index;
 use sqlbuild_state::state_tables::main::read_history_sql::read_history_sql;
 use sqlbuild_state::state_tables::models::{HistoryRead, NewestVersions};
@@ -230,7 +230,7 @@ fn read_page<'py>(
     let freshness_columns = SOURCE_FRESHNESS_COLUMN_TYPES.map(|(name, _)| name);
     let consumption_columns = CONSUMPTION_COLUMN_TYPES.map(|(name, _)| name);
     let observation_columns = OBSERVATION_COLUMN_TYPES.map(|(name, _)| name);
-    let resource_cost_columns = RESOURCE_COST_COLUMN_TYPES.map(|(name, _)| name);
+    let resource_cost_columns = resource_costs::RESOURCE_COST_COLUMN_TYPES.map(|(name, _)| name);
     let event_columns: Vec<String> = match request {
         WarehouseHistoryRead::AuditResults(_) => py
             .import("sqlbuild.executor.audit_results.constants")?
@@ -447,6 +447,7 @@ fn read_page<'py>(
             "expires_at",
             "drop_reason",
         ],
+        WarehouseHistoryRead::ResourceCosts(_) => &resource_costs::ADDED_RESOURCE_COST_COLUMNS,
         _ => &[],
     };
     let key_columns: Option<&[&str]> = match request {

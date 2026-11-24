@@ -14,7 +14,7 @@ use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};
 use crate::store::models::{ControlStore, TransactionMode};
 use crate::warehouse_history::_helpers::costs::{
-    PENDING_STATUSES, TOTAL_RESOURCE_TYPE, amount, latest_costs_in,
+    PENDING_STATUSES, TOTAL_RESOURCE_TYPE, amount, latest_costs_in, price_source,
 };
 
 /// The folder of nodes whose path the publication doesn't give, such as nodes no longer deployed.
@@ -76,6 +76,8 @@ pub(crate) struct CostRow {
     pub(crate) day: Option<usize>,
     pub(crate) credits: f64,
     pub(crate) usd: Option<f64>,
+    /// Where the row's price came from.
+    pub(crate) source: Option<String>,
     pub(crate) seconds: f64,
     pub(crate) queries: i64,
     pub(crate) bytes_scanned: i64,
@@ -178,6 +180,7 @@ pub(crate) async fn selection_costs(
             continue;
         };
         result.rows.push(CostRow {
+            source: price_source(&record).map(str::to_owned),
             folder: folder.clone(),
             day: period.day(record.run_started_at),
             run_id: record.run_id,

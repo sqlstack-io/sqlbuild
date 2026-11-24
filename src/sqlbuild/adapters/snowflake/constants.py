@@ -54,3 +54,38 @@ POLARS_DATAFRAME: str = "polars"
 PYTHON_TABLE_FUNCTION_HANDLER: str = "_SqbHandler"
 PANDAS_PACKAGES: tuple[str, ...] = ("pandas",)
 POLARS_PACKAGES: tuple[str, ...] = ("pandas", "polars", "pyarrow")
+
+DEFAULT_RATE_SOURCE: str = "default"
+RATE_SHEET_SOURCE: str = "rate_sheet"
+LIST_PRICE_SOURCE: str = "list_price"
+RATE_SHEET_CURRENCY: str = "USD"
+CREDIT_PRICE_CACHE_DIR: str = "cost"
+CREDIT_PRICE_CACHE_FILE: str = "credit_price.json"
+RATE_SHEET_SQL: str = (
+    "SELECT EFFECTIVE_RATE, CURRENCY FROM SNOWFLAKE.ORGANIZATION_USAGE.RATE_SHEET_DAILY "
+    "WHERE ACCOUNT_LOCATOR = CURRENT_ACCOUNT() AND SERVICE_TYPE = 'WAREHOUSE_METERING' "
+    "AND USAGE_TYPE = 'compute' AND DATE >= DATEADD(day, -31, CURRENT_DATE()) "
+    "ORDER BY DATE DESC LIMIT 1"
+)
+ACCOUNT_SQL: str = "SELECT CURRENT_ACCOUNT(), CURRENT_REGION()"
+LIST_PRICE_EDITIONS: tuple[str, str, str] = ("STANDARD", "ENTERPRISE", "BUSINESS_CRITICAL")
+DEFAULT_LIST_PRICE_EDITION: str = "ENTERPRISE"
+FALLBACK_LIST_PRICE_REGION: str = "AWS_US_EAST_1"
+LIST_PRICES: dict[str, tuple[str, str, str]] = {
+    "AWS_US_EAST_1": ("2.00", "3.00", "4.00"),
+    "AWS_US_EAST_2": ("2.00", "3.00", "4.00"),
+    "AWS_US_WEST_2": ("2.00", "3.00", "4.00"),
+    "AWS_CA_CENTRAL_1": ("2.25", "3.50", "4.50"),
+    "AWS_EU_WEST_1": ("2.60", "3.90", "5.20"),
+    "AWS_EU_CENTRAL_1": ("2.60", "3.90", "5.20"),
+    "AWS_EU_WEST_2": ("2.70", "4.00", "5.40"),
+    "AWS_AP_SOUTHEAST_1": ("2.50", "3.70", "5.00"),
+    "AWS_AP_SOUTHEAST_2": ("2.75", "4.05", "5.50"),
+    "AWS_AP_NORTHEAST_1": ("2.85", "4.30", "5.70"),
+    "AWS_AP_SOUTH_1": ("2.00", "3.00", "4.00"),
+    "AWS_SA_EAST_1": ("3.10", "4.65", "6.20"),
+    "AZURE_EASTUS2": ("2.00", "3.00", "4.00"),
+    "AZURE_WESTEUROPE": ("2.60", "3.90", "5.20"),
+    "AZURE_JAPANEAST": ("2.85", "4.30", "5.70"),
+    "GCP_US_CENTRAL1": ("2.00", "3.00", "4.00"),
+}

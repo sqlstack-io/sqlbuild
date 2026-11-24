@@ -1,7 +1,8 @@
 // Cost figures: dollars when the read has a price, else credits, so no price is ever guessed; the
 // credits and the price in tooltips. Number formats are made once. Pure; no side effects.
 
-import type { CostPrice } from '$lib/api';
+import type { CostPrice, PriceSource } from '$lib/api';
+import { PRICE_SOURCE_TEXT } from '$lib/operate/cost';
 
 const whole = new Intl.NumberFormat('en', { maximumFractionDigits: 0 });
 const cents = new Intl.NumberFormat('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -27,13 +28,19 @@ export function money(credits: number, price: CostPrice | null): string {
 
 /** A figure's tooltip: its credits and the price that made it dollars. */
 export function costTitle(credits: number, price: CostPrice | null): string {
-	return price ? `${creditsText(credits)} × $${cents.format(price.usdPerCredit)} per credit` : creditsText(credits);
+	return price ? `${creditsText(credits)} × $${cents.format(price.usdPerCredit)} per credit (${PRICE_SOURCE_TEXT[price.source]})` : creditsText(credits);
 }
 
 /** Where a price came from, for its help tip. */
-export function priceHelp(price: CostPrice): string {
-	return price.source === 'configured' ? 'Set by usd_per_credit under [cost] in sqlbuild_project.toml.' : `From ${price.source}.`;
-}
+export const priceHelp = (price: CostPrice): string => PRICE_SOURCE_HELP[price.source];
+
+const PRICE_SOURCE_HELP: Record<PriceSource, string> = {
+	config: 'Set by usd_per_credit under [cost] in sqlbuild_project.toml.',
+	rate_sheet: "Your contract's price per credit, from Snowflake's rate sheet (ORGANIZATION_USAGE.RATE_SHEET_DAILY).",
+	list_price:
+		"An estimate: Snowflake's public on-demand price for the account's region, at Enterprise edition. Set usd_per_credit under [cost] in sqlbuild_project.toml, or let the connection's role read ORGANIZATION_USAGE, for your contract's price.",
+	mixed: 'Builds in this period were priced from more than one source.'
+};
 
 /** Change against the period before, or null without a previous figure. */
 export function change(credits: number, previous: number): { text: string; tone: 'up' | 'down' | 'flat' } | null {

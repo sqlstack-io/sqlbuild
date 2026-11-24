@@ -283,7 +283,7 @@ pub(crate) fn cost_page<'a>(
     Box::pin(ingest_resource_costs(store, scope, page))
 }
 
-/// Builds of the `daily` job 2 hours and 9 days ago, and one from the command line 3 hours ago.
+/// Builds of the `daily` job 2 hours and 9 days ago, and one from the command line 3 hours ago at the list price.
 pub(crate) fn cost_selection_observations(daily: Uuid, old_daily: Uuid) -> Value {
     let row =
         |id: &str, hours: i64, run: Option<Uuid>, (kind, name): (&str, &str), credits: &str| {
@@ -332,6 +332,16 @@ pub(crate) fn cost_selection_observations(daily: Uuid, old_daily: Uuid) -> Value
             "0.20"
         ),
     ]);
+    // The build from the command line was priced from the list price; the job's from the project.
+    for observation in data["observations"]
+        .as_array_mut()
+        .expect("observations")
+        .iter_mut()
+        .filter(|observation| observation["run_id"] == json!("build-b"))
+    {
+        observation["usd_per_credit"] = json!("3.00");
+        observation["usd_per_credit_source"] = json!("list_price");
+    }
     data
 }
 
