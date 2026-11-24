@@ -124,17 +124,19 @@ def test_given_generated_files_when_scanning_then_uses_only_synthetic_identifier
 
 
 def test_given_declarations_when_placing_then_follow_their_users() -> None:
-    assert _placement({"sql/models/staging/a/x", "sql/models/staging/b/y"}, "sql/macros/sql") == (
+    assert _placement({"sql/models/staging/a/x", "sql/models/staging/b/y"}, "macros/sql") == (
         "sql/models/staging/_sqlbuild/macros/sql"
     )
     assert (
         _placement({"sql/models/staging/a"}, "constants")
         == "sql/models/staging/a/_sqlbuild/_constants"
     )
-    assert (
-        _placement({"sql/models/staging/a", "tests/unit/b"}, "sql/macros/sql") == "sql/macros/sql"
+    assert _placement({"sql/models/staging/a", "tests/unit/b"}, "macros/sql") == "sql/macros/sql"
+    assert _placement({"sql/models/staging/a", "sql/sources"}, "enums") == "sql/enums"
+    assert _placement({"sql/models/a", "sql/models/b"}, "enums") == "sql/enums"
+    assert _placement({"tests/unit/a", "tests/unit/b"}, "macros/sql") == (
+        "tests/unit/_sqlbuild/macros/sql"
     )
-    assert _placement({"sql/models/a", "sql/models/b"}, "enums") == "enums"
 
 
 def test_given_full_profile_when_placing_then_every_used_declaration_is_written_once() -> None:
