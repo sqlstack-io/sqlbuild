@@ -12,18 +12,19 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile._test_types import (
     NativeDeclarationErrorTestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
+    MACRO_CALL_LOG_CODE,
     CompileReuseRun,
     lifecycle_error_type,
+    macro_call_log,
     run_reuse_compile,
     write_project_file,
 )
 
-_CALL_LOG: str = "macro_calls.log"
 _COUNTED_MACRO: str = (
     "from pathlib import Path\n\n\n"
     "def counted(expression: str) -> str:\n"
     '    """Return the expression, logging each execution."""\n\n'
-    f"    with (Path(__file__).resolve().parents[2] / {_CALL_LOG!r}).open(\n"
+    f"    with {MACRO_CALL_LOG_CODE}.open(\n"
     '        "a", encoding="utf-8"\n'
     "    ) as log:\n"
     '        _ = log.write("call\\n")\n'
@@ -118,11 +119,12 @@ def test_given_declaration_error_when_compiling_natively_then_error_matches_pyth
         "sql/models/marts/customer_totals.sql": _COUNTED_MART,
         **test_case.project_files,
     }
-    for relative_path, contents in {**files, _CALL_LOG: ""}.items():
+    for relative_path, contents in files.items():
         write_project_file(project_dir, relative_path, contents)
 
+    _ = macro_call_log(project_dir).write_text("", encoding="utf-8")
     run: CompileReuseRun = run_reuse_compile(project_dir=project_dir)
-    macro_calls: int = len((project_dir / _CALL_LOG).read_text(encoding="utf-8").splitlines())
+    macro_calls: int = len(macro_call_log(project_dir).read_text(encoding="utf-8").splitlines())
 
     assert (
         run.returncode,
@@ -161,7 +163,6 @@ def test_given_declaration_error_when_compiling_then_lifecycle_error_type_matche
         **FAILURE_BASE_FILES,
         "sql/macros/python/counted.py": _COUNTED_MACRO,
         "sql/models/marts/customer_totals.sql": _COUNTED_MART,
-        _CALL_LOG: "",
         **test_case.project_files,
     }.items():
         write_project_file(project_dir, relative_path, contents)

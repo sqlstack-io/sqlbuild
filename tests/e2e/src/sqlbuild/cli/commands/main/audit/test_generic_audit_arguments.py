@@ -107,4 +107,4 @@ def test_given_attached_generic_audit_when_compiling_then_rendered_sql_is_writte
     assert rendered == test_case.expected_sql
     assert second.returncode == 0, second.stdout + second.stderr
     assert not audit_file.exists()
-    assert (project_dir / "target/compiled/models/orders.sql").is_file()
+    assert (project_dir / "target/compiled/sql/models/orders.sql").is_file()

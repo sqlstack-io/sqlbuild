@@ -60,8 +60,8 @@ _RATE_TYPE_MISMATCH: str = (
                 **BY_HAND,
             },
             compared_paths=(
-                "target/compiled/models/marts/rates_by_slot.sql",
-                "target/compiled/models/marts/rates_by_hand.sql",
+                "target/compiled/sql/models/marts/rates_by_slot.sql",
+                "target/compiled/sql/models/marts/rates_by_hand.sql",
             ),
             expected_fragment=(
                 "ROW_NUMBER() OVER (PARTITION BY product_id, region ORDER BY s.week DESC)"
@@ -471,7 +471,7 @@ def test_given_slot_reads_when_inspecting_then_tools_see_the_mapped_columns(
                 _RATE_TYPE_MISMATCH,
                 "w.refund_count / NULLIF(w.orders_placed, 0) AS refund_rate",
             ),
-            inspected_paths=("target/compiled/models/marts/rates.sql",),
+            inspected_paths=("target/compiled/sql/models/marts/rates.sql",),
         ),
         SqlMacroCompileTestCase(
             description="the_same_expression_written_by_hand",
@@ -484,7 +484,7 @@ def test_given_slot_reads_when_inspecting_then_tools_see_the_mapped_columns(
                 _RATE_TYPE_MISMATCH,
                 "w.refund_count / NULLIF(w.orders_placed, 0) AS refund_rate",
             ),
-            inspected_paths=("target/compiled/models/marts/rates.sql",),
+            inspected_paths=("target/compiled/sql/models/marts/rates.sql",),
         ),
     ],
     ids=lambda case: case.description,

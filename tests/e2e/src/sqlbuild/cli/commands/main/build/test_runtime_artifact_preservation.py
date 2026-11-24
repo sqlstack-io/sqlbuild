@@ -36,9 +36,9 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
             expected_compiler_cache_count=1,
             expected_local_history=False,
             expected_compiled_paths=(
-                "target/compiled/models/marts/fact_orders.sql",
-                "target/compiled/functions/sql/is_completed_order.sql",
-                "target/compiled/functions/python/is_completed_order_py.sql",
+                "target/compiled/sql/models/marts/fact_orders.sql",
+                "target/compiled/sql/functions/sql/is_completed_order.sql",
+                "target/compiled/sql/functions/python/is_completed_order_py.sql",
             ),
         )
     ],

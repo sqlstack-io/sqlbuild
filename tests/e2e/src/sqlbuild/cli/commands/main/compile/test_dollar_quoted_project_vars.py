@@ -14,7 +14,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
 
 _PROJECT_TOML: str = 'name = "orders"\nadapter = "duckdb"\n\n[vars]\nregion = "north"\n'
 _MODEL_HEADER: str = "MODEL (description 'Order region labels.', materialized view);\n\n"
-_COMPILED_MODEL: Path = Path("target/compiled/models/order_labels.sql")
+_COMPILED_MODEL: Path = Path("target/compiled/sql/models/order_labels.sql")
 
 
 @pytest.mark.parametrize(

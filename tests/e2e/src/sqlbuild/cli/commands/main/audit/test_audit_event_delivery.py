@@ -35,7 +35,7 @@ _WARNING_PATTERN: re.Pattern[str] = re.compile(
     r"(?P<dropped>\d+) of (?P<accepted>\d+) events dropped, (?P<failed>\d+) failed "
     r"\(sink 'slow_orders_events'\)\. "
     r"Check sink health: a sink call slower than 1s drops that sink's events until it returns; "
-    r"events still queued at exit need a longer sinks\.lifecycle\.shutdown_timeout\."
+    r"events still queued at exit need a longer event_sinks\.lifecycle\.shutdown_timeout\."
 )
 
 

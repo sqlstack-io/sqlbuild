@@ -20,7 +20,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.sql_macros.helpers import 
     with_rules,
 )
 
-_COMPILED: str = "target/compiled/models/marts/orders.sql"
+_COMPILED: str = "target/compiled/sql/models/marts/orders.sql"
 _RULE_FAILURES: tuple[str, ...] = ("L005", "rules-unevaluated", "Native SQL parser")
 _CHECK_STATUS: dict[str, str] = orders_model(
     'SELECT order_id, @sql.check(status) AS checked FROM __ref("stg_orders")\n'

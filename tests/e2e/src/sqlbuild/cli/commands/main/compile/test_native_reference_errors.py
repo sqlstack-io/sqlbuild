@@ -15,18 +15,19 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile._test_types import (
     ReferenceScanErrorTestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
+    MACRO_CALL_LOG_CODE,
     CompileReuseRun,
     lifecycle_error_type,
+    macro_call_log,
     run_reuse_compile,
     write_project_file,
 )
 
-_CALL_LOG: str = "macro_calls.log"
 _EMIT_MACRO: str = (
     "from pathlib import Path\n\n\n"
     "def emit(expression: str) -> str:\n"
     '    """Return the expression, logging each execution."""\n\n'
-    f"    with (Path(__file__).resolve().parents[2] / {_CALL_LOG!r}).open(\n"
+    f"    with {MACRO_CALL_LOG_CODE}.open(\n"
     '        "a", encoding="utf-8"\n'
     "    ) as log:\n"
     '        _ = log.write("call\\n")\n'
@@ -181,12 +182,12 @@ def test_given_reference_scan_error_when_compiling_then_it_is_located_and_typed(
     project_dir: Path = tmp_path / "orders"
     for relative_path, contents in {
         **FAILURE_BASE_FILES,
-        _CALL_LOG: "",
         **test_case.project_files,
     }.items():
         write_project_file(project_dir, relative_path, contents)
+    _ = macro_call_log(project_dir).write_text("", encoding="utf-8")
     run: CompileReuseRun = run_reuse_compile(project_dir=project_dir)
-    macro_calls: int = len((project_dir / _CALL_LOG).read_text(encoding="utf-8").splitlines())
+    macro_calls: int = len(macro_call_log(project_dir).read_text(encoding="utf-8").splitlines())
     error_type: str = lifecycle_error_type(project_dir=project_dir, monkeypatch=monkeypatch)
 
     assert (

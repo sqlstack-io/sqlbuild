@@ -14,18 +14,19 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile._test_types import (
     NativeConfigErrorTestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
+    MACRO_CALL_LOG_CODE,
     CompileReuseRun,
     fallback_free_preview_compile,
+    macro_call_log,
     run_reuse_compile,
     write_counted_error_project,
 )
 
-_CALL_LOG: str = "macro_calls.log"
 _COUNTED_MACRO: str = (
     "from pathlib import Path\n\n\n"
     "def counted(expression: str) -> str:\n"
     '    """Return the expression, logging each execution."""\n\n'
-    f"    with (Path(__file__).resolve().parents[2] / {_CALL_LOG!r}).open(\n"
+    f"    with {MACRO_CALL_LOG_CODE}.open(\n"
     '        "a", encoding="utf-8"\n'
     "    ) as log:\n"
     '        _ = log.write("call\\n")\n'
@@ -47,7 +48,6 @@ _FALLBACKS: tuple[tuple[ModuleType, str], ...] = ((_native, "expand_template_dat
 _PROJECT_FILES: dict[str, str] = {
     "sql/macros/python/counted.py": _COUNTED_MACRO,
     "sql/models/marts/customer_totals.sql": _COUNTED_MART,
-    _CALL_LOG: "",
 }
 
 
@@ -125,8 +125,9 @@ def test_given_config_error_when_compiling_then_the_error_is_reported_without_fa
     write_counted_error_project(
         project_dir=project_dir, files={**_PROJECT_FILES, **test_case.project_files}
     )
+    _ = macro_call_log(project_dir).write_text("", encoding="utf-8")
     run: CompileReuseRun = run_reuse_compile(project_dir=project_dir)
-    macro_calls: int = len((project_dir / _CALL_LOG).read_text(encoding="utf-8").splitlines())
+    macro_calls: int = len(macro_call_log(project_dir).read_text(encoding="utf-8").splitlines())
     write_counted_error_project(
         project_dir=tmp_path / "in_process", files={**_PROJECT_FILES, **test_case.project_files}
     )
@@ -165,7 +166,6 @@ def test_given_config_error_when_compiling_then_the_error_is_reported_without_fa
                     'MODEL (\n  description "Order totals per customer",\n);\n\n'
                     "SELECT * FROM @py.upstream()\n"
                 ),
-                _CALL_LOG: "",
             },
             expected_report_text="references unknown model 'ghost'",
             expected_macro_calls=1,
@@ -178,8 +178,9 @@ def test_given_validator_error_from_macro_sql_when_compiling_then_macros_run_onc
 ) -> None:
     project_dir: Path = tmp_path / "orders"
     write_counted_error_project(project_dir=project_dir, files=test_case.project_files)
+    _ = macro_call_log(project_dir).write_text("", encoding="utf-8")
     run: CompileReuseRun = run_reuse_compile(project_dir=project_dir)
-    macro_calls: int = len((project_dir / _CALL_LOG).read_text(encoding="utf-8").splitlines())
+    macro_calls: int = len(macro_call_log(project_dir).read_text(encoding="utf-8").splitlines())
 
     assert (
         run.returncode,

@@ -4676,12 +4676,12 @@ def keep_invalidation(_monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def ignore_project_changes(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Make compile reuse stop watching the models folder, so a model edit goes unseen."""
+    """Make compile reuse stop watching the sql folder, so a model edit goes unseen."""
 
     monkeypatch.setattr(
         native_module,
         "COMPILE_REUSE_EXCLUDED_ROOT_DIRECTORIES",
-        native_module.COMPILE_REUSE_EXCLUDED_ROOT_DIRECTORIES | {"models"},
+        native_module.COMPILE_REUSE_EXCLUDED_ROOT_DIRECTORIES | {"sql"},
     )
 
 
@@ -5382,12 +5382,25 @@ def fallback_free_preview_compile(
     return run, called
 
 
+MACRO_CALL_LOG_CODE: str = (
+    "(Path(__file__).resolve().parents[3].parent"
+    " / (Path(__file__).resolve().parents[3].name + '_macro_calls.log'))"
+)
+
+
+def macro_call_log(project_dir: Path) -> Path:
+    """The file a project's counted macros log their calls to, beside the project."""
+
+    return project_dir.parent / f"{project_dir.name}_macro_calls.log"
+
+
 def write_counted_error_project(*, project_dir: Path, files: dict[str, str]) -> None:
     """Write the failure base project with `files` added or replaced into a fresh directory."""
 
     shutil.rmtree(project_dir, ignore_errors=True)
     for relative_path, contents in {**FAILURE_BASE_FILES, **files}.items():
         write_project_file(project_dir, relative_path, contents)
+    _ = macro_call_log(project_dir).write_text("", encoding="utf-8")
 
 
 def compile_with_binding_error(project_dir: Path) -> dict[str, Any]:

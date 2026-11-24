@@ -458,7 +458,7 @@ def test_given_python_sql_reading_old_name_when_checking_then_p008_rejects_it(
                 materialized="table", extra_config=test_case.header
             )
         },
-        python_files={"tasks.py": _REPORT_TASK},
+        python_files={"report/asset.py": _REPORT_TASK},
     )
 
     result: subprocess.CompletedProcess[str] = sqb(

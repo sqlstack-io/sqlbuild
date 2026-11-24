@@ -29,7 +29,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.sql_macros.helpers import 
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import run_sqb
 
 _FROM: str = 'FROM __ref("stg_orders") AS o'
-_COMPILED: str = "target/compiled/models/marts/orders.sql"
+_COMPILED: str = "target/compiled/sql/models/marts/orders.sql"
 _CLEAN: tuple[str, ...] = ("0 errors, 0 warnings",)
 _MACROS: dict[str, str] = {
     **text_macro("status_bar", "VARCHAR", "bar(LENGTH(@value), 0, 10)"),

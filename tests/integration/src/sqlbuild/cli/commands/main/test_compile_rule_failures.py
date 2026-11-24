@@ -102,7 +102,7 @@ _AFTER_FAILURE_LINE: str = "delta compile fell back: the previous compile failed
             },
             expected_manifest=False,
             expected_output_fragment=(
-                "Failed SQL: target/compiled-failed/models/open_orders.sql\n"
+                "Failed SQL: target/compiled-failed/sql/models/open_orders.sql\n"
                 "  Wrote: target/compiled-failed/\n"
             ),
         ),
@@ -176,7 +176,7 @@ def test_given_rule_findings_when_compiling_then_failed_sql_is_written_beside_co
             expected_artifacts={
                 "compiled_sql_dir": "target/compiled-failed/",
                 "manifest": None,
-                "failed_model_sql": ["target/compiled-failed/models/open_orders.sql"],
+                "failed_model_sql": ["target/compiled-failed/sql/models/open_orders.sql"],
             },
         ),
     ],

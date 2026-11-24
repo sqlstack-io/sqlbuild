@@ -20,7 +20,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.refactor.helpers import (
     write_orders_project,
 )
 
-_MOVED: str = "models.finance._sqlbuild._macros.python.cents"
+_MOVED: str = "sql.models.finance._sqlbuild._macros.python.cents"
 
 
 @pytest.mark.parametrize(
@@ -102,12 +102,12 @@ def test_given_python_imports_of_a_moved_macro_when_moving_then_imports_follow_a
             description="a dynamic import naming the macro module",
             files=cents_check(
                 "import importlib\n\n"
-                'CENTS = importlib.import_module("models.staging._sqlbuild._macros.python.cents")',
+                'CENTS = importlib.import_module("sql.models.staging._sqlbuild._macros.python.cents")',
                 body='    assert CENTS.to_cents("1")\n',
             ),
             expected_location=f"{CENTS_CHECK}:6:9",
             expected_reason=(
-                "imports models.staging._sqlbuild._macros.python.cents dynamically by name, which "
+                "imports sql.models.staging._sqlbuild._macros.python.cents dynamically by name, which "
                 "cannot be rewritten safely"
             ),
         ),
@@ -119,17 +119,17 @@ def test_given_python_imports_of_a_moved_macro_when_moving_then_imports_follow_a
             ),
             expected_location=f"{CENTS_CHECK}:5:1",
             expected_reason=(
-                "star-imports the package of models.staging._sqlbuild._macros.python.cents, which moves"
+                "star-imports the package of sql.models.staging._sqlbuild._macros.python.cents, which moves"
             ),
         ),
         PythonImportRefusalE2ETestCase(
             description="an import without an alias",
             files=cents_check(
                 "import sql.models.staging._sqlbuild._macros.python.cents",
-                body='    assert models.staging._sqlbuild._macros.python.cents.to_cents("1")\n',
+                body='    assert sql.models.staging._sqlbuild._macros.python.cents.to_cents("1")\n',
             ),
             expected_location=f"{CENTS_CHECK}:4:8",
-            expected_reason="imports models.staging._sqlbuild._macros.python.cents without an alias",
+            expected_reason="imports sql.models.staging._sqlbuild._macros.python.cents without an alias",
         ),
         PythonImportRefusalE2ETestCase(
             description="a project Python file that is not UTF-8",

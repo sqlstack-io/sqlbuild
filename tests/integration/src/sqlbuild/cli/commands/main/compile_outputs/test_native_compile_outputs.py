@@ -30,8 +30,8 @@ from tests.integration.src.sqlbuild.cli.commands.main.compile_outputs.helpers im
 _SEQUENCE_STEPS: tuple[str, ...] = ("cold", "warm", "touch", "retouch", "edit", "delete")
 _PUBLICATION_ERROR: str = (
     "[Errno 21] Is a directory: "
-    "'<project>/target/.sqlbuild-staging-<id>/compiled/models/orders_north.sql' -> "
-    "'<project>/target/compiled/models/orders_north.sql'"
+    "'<project>/target/.sqlbuild-staging-<id>/compiled/sql/models/orders_north.sql' -> "
+    "'<project>/target/compiled/sql/models/orders_north.sql'"
 )
 
 
