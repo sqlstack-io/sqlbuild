@@ -66,7 +66,7 @@ pub(crate) fn hidden_parent(
         path: consumer.path.clone(),
         help: format!(
             "move '{}' to a schemas/ role owned by '{}' or one of its parent folders, or to the \
-             project-wide schemas/ when consumers span resource trees",
+             project-wide sql/schemas/ when consumers span resource trees",
             parent.path,
             folder(consumer)
         ),
