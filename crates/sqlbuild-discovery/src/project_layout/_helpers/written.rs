@@ -22,8 +22,7 @@ fn top_entry(root: &Path, path: &Path) -> Option<String> {
     }
 }
 
-/// `path` with its deepest existing ancestor canonicalized and the rest appended, so a missing
-/// path compares with its root in one form (`\\?\` on Windows, `/private` on macOS).
+/// `path` with its deepest existing ancestor canonicalized, so a missing path matches its root.
 fn resolved(path: &Path) -> PathBuf {
     let mut existing: PathBuf = path.to_path_buf();
     let mut rest: Vec<Component<'_>> = Vec::new();
