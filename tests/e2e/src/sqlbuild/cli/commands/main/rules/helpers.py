@@ -336,7 +336,7 @@ def long_literal_hints(result: subprocess.CompletedProcess[str]) -> dict[str, st
 
 INCREMENTAL_RULES_PROJECT: dict[str, str] = {
     "sqlbuild_project.toml": (
-        'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+        'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\nextra_paths = ["config"]\n\n'
         '[connection]\ndatabase = "warehouse.duckdb"\n\n'
         '[targets.dev]\nschema = "dev"\n\n[targets.prod]\nschema = "prod"\n\n'
         '[vars]\ndiscount_rate = "0.1"\n\n'

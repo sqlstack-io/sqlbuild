@@ -2,9 +2,9 @@
 [
 "sql_test_assembly",
 {
+"sql_tests": "74234e98afe7498fb5daf1f3",
 "diagnostics": "74234e98afe7498fb5daf1f3",
-"raised": "eda90da258aa7debe1d39bd6",
-"sql_tests": "74234e98afe7498fb5daf1f3"
+"raised": "eda90da258aa7debe1d39bd6"
 }
 ]
 ]

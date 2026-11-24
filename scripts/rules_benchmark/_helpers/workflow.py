@@ -1171,7 +1171,7 @@ def _workload_counts(*, project_dir: Path) -> dict[str, int]:
         "macros": sum(1 for _ in (project_dir / "sql" / "macros").rglob("*.py")),
         "tests": sum(path.read_text(encoding="utf-8").count("TEST (") for path in test_paths),
         "audits": sum(path.read_text(encoding="utf-8").count("audits [") for path in model_paths),
-        "hooks": sum(1 for _ in (project_dir / "hooks").rglob("*.sql")),
+        "hooks": sum(1 for _ in (project_dir / "sql" / "hooks").rglob("*.sql")),
         "custom_rules": sum(
             path.read_text(encoding="utf-8").count("@rule(") for path in rule_paths
         ),

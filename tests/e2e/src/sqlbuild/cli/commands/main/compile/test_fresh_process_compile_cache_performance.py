@@ -66,7 +66,7 @@ _MAX_CACHE_WRITE_WALL_OVERHEAD_RATIO: float = 1.35
             expected_max_rss_bytes=1152 * _MIB,
             expected_max_cache_bytes=96 * _MIB,
             expected_cold_fingerprint=(
-                "286292a621494a38a59cc7afd76122f44d45f75a7f880dda5f0812bc7f44a96e"
+                "08ca3b298a180994e0cb98da54afe85bdbfd276562d5356542b480904389a848"
             ),
             expected_leaf_edit_fingerprint=(
                 "b05559012bba3690a2b080249a6a3003990dad864117e2a776ccb4ce7f924fea"
@@ -102,7 +102,7 @@ _MAX_CACHE_WRITE_WALL_OVERHEAD_RATIO: float = 1.35
             expected_max_rss_bytes=1152 * _MIB,
             expected_max_cache_bytes=96 * _MIB,
             expected_cold_fingerprint=(
-                "286292a621494a38a59cc7afd76122f44d45f75a7f880dda5f0812bc7f44a96e"
+                "08ca3b298a180994e0cb98da54afe85bdbfd276562d5356542b480904389a848"
             ),
             expected_leaf_edit_fingerprint=(
                 "b05559012bba3690a2b080249a6a3003990dad864117e2a776ccb4ce7f924fea"
@@ -140,7 +140,7 @@ _MAX_CACHE_WRITE_WALL_OVERHEAD_RATIO: float = 1.35
             expected_max_rss_bytes=1664 * _MIB,
             expected_max_cache_bytes=160 * _MIB,
             expected_cold_fingerprint=(
-                "a89cdf1a5367f9c939beb1c3d43b70381e6d9ebcc0b2d246f7db9e2051ab6ecb"
+                "7ce3f1c44d761558e921d3b07748017d09d3c5826e181fcd6c02cbf0bcca2d64"
             ),
             expected_leaf_edit_fingerprint=(
                 "5abf7f05d66a6275cbe3fd11ca75765fc6c565ad8827f28a999a443a59ccde48"
@@ -178,7 +178,7 @@ _MAX_CACHE_WRITE_WALL_OVERHEAD_RATIO: float = 1.35
             expected_max_rss_bytes=3008 * _MIB,
             expected_max_cache_bytes=320 * _MIB,
             expected_cold_fingerprint=(
-                "176af67b3dea1be84c6009e0fea5558914b849abb58a1f6411e56641c9b2ec80"
+                "dae0a6a1551807c88f5186a7f508783021849a2026b4d89261aea585681ebaec"
             ),
             expected_leaf_edit_fingerprint=(
                 "c14622c147922edb801ead1a286b1974719141dfcc08cc2d37d3f77d1270672d"

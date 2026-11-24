@@ -325,7 +325,6 @@ def test_given_relative_project_directory_when_compiling_then_private_macro_is_v
         / "_sqlbuild"
         / "_macros"
         / "python"
-        / "nodes"
         / "order_id.py"
     ).write_text('def order_id() -> str:\n    return "CAST(1 AS INTEGER)"\n', encoding="utf-8")
     (project_dir / "sql" / "models" / "orders" / "orders.sql").write_text(

@@ -10,6 +10,7 @@ import pytest
 from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
     ModelBackedCursorBuildE2ETestCase,
 )
+from tests.e2e.src.sqlbuild.cli.commands.main.build.helpers import take_raw_data_sql
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     prepare_inline_project,
     query_duckdb,
@@ -213,7 +214,7 @@ def test_given_inline_project_when_building_model_backed_cursor_models_then_it_s
     import duckdb
 
     connection: duckdb.DuckDBPyConnection = duckdb.connect(str(db_path))
-    connection.execute((project_dir / "seed_raw_data.sql").read_text(encoding="utf-8"))
+    connection.execute(take_raw_data_sql(project_dir))
     connection.close()
 
     result: object = run_sqb(command=test_case.command, project_dir=project_dir)

@@ -58,17 +58,17 @@ SQL_TEST_MODEL_CHAINS: str = "sql_test_model_chain_names_by_key"
         TargetWriterTestCase(
             description="writes compiled SQL, manifest, audits, and chain tests",
             expected_files={
-                "compiled/models/staging/orders.sql": "SELECT 1 AS order_id\n",
-                "compiled/functions/sql/is_completed_order.sql": (
+                "compiled/sql/models/staging/orders.sql": "SELECT 1 AS order_id\n",
+                "compiled/sql/functions/sql/is_completed_order.sql": (
                     "CREATE OR REPLACE MACRO analytics.is_completed_order(order_status) AS (\n"
                     "order_status = 'completed'\n"
                     ")\n"
                 ),
-                "compiled/functions/python/is_completed_order_py.sql": (
+                "compiled/sql/functions/python/is_completed_order_py.sql": (
                     "REGISTER PYTHON FUNCTION analytics.is_completed_order_py"
                     "(VARCHAR) RETURNS BOOLEAN\n"
                 ),
-                "compiled/audits/generic/orders/not_null__order_id.sql": (
+                "compiled/sql/audits/generic/orders/not_null__order_id.sql": (
                     "SELECT order_id FROM analytics.orders WHERE order_id IS NULL\n"
                 ),
             },
@@ -208,8 +208,8 @@ def test_given_parameterized_test_entries_when_writing_target_then_case_artifact
         TargetWriterTestCase(
             description="writes offline compiled SQL without manifest by default",
             expected_files={
-                "compiled/models/staging/orders.sql": "SELECT 2 AS order_id\n",
-                "compiled/functions/sql/is_completed_order.sql": (
+                "compiled/sql/models/staging/orders.sql": "SELECT 2 AS order_id\n",
+                "compiled/sql/functions/sql/is_completed_order.sql": (
                     "CREATE OR REPLACE MACRO analytics.is_completed_order(order_status) AS (\n"
                     "order_status = 'completed'\n"
                     ")\n"
@@ -404,7 +404,7 @@ def test_given_model_write_failure_and_later_error_when_writing_static_target_th
     "test_case",
     [
         ExpectedMessageTestCase(
-            description="interrupt after the model group", expected_message="compiled/functions"
+            description="interrupt after the model group", expected_message="compiled/sql/functions"
         )
     ],
     ids=lambda case: case.description,
@@ -434,7 +434,7 @@ def test_given_interrupt_after_model_group_when_writing_static_target_then_later
     [
         ExpectedMessageTestCase(
             description="staged model write failure falls back despite a later error",
-            expected_message="compiled/models/staging/orders.sql",
+            expected_message="compiled/sql/models/staging/orders.sql",
         )
     ],
     ids=lambda case: case.description,

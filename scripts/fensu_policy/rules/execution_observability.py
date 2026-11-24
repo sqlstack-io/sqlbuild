@@ -31,7 +31,7 @@ from scripts.fensu_policy.constants import (
     DIAGNOSTIC_CONSTRUCTION_OWNER_PATHS,
     DIAGNOSTIC_LOG_CLASS_NAME,
     EVENT_EXPORTER_DECORATOR_NAMES,
-    EVENT_EXPORTER_DIRECTORY_NAME,
+    EVENT_EXPORTER_DIRECTORY_PARTS,
     EVENT_EXPORTER_MODULE_PARTS,
     EVENT_EXPORTER_RUNTIME_PREFIX,
     LIFECYCLE_CATALOG_NAME_PREFIX,
@@ -182,7 +182,8 @@ def event_construction_ownership(*, module: object, ctx: RuleContext) -> list[Fa
     slug="sink-location",
     message=("sink declarations and private runtime imports must stay in their owner boundary"),
     remediation=(
-        "Put project sink declarations under sinks/**/*.py and use public APIs elsewhere."
+        "Put project sink declarations under python/event_sinks/**/*.py and use public APIs "
+        "elsewhere."
     ),
 )
 def event_exporter_location(*, module: object, ctx: RuleContext) -> list[Fault]:
@@ -210,10 +211,7 @@ def event_exporter_location(*, module: object, ctx: RuleContext) -> list[Fault]:
                 for decorator_name in EVENT_EXPORTER_DECORATOR_NAMES
             ):
                 continue
-            if (
-                EVENT_EXPORTER_DIRECTORY_NAME not in path_parts
-                or path_parts.index(EVENT_EXPORTER_DIRECTORY_NAME) != 0
-            ):
+            if path_parts[: len(EVENT_EXPORTER_DIRECTORY_PARTS)] != EVENT_EXPORTER_DIRECTORY_PARTS:
                 faults.append(
                     ctx.fault_for(path=ctx.path, line=decorator.lineno, column=decorator.col_offset)
                 )

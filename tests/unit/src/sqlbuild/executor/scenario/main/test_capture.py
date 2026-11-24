@@ -144,7 +144,7 @@ class ScenarioSnapshotCaptureTestAdapter(BaseAdapter):
                         ScenarioSnapshotRelation(
                             kind=ScenarioArtifactKind.SEED,
                             logical_name="country_codes",
-                            file_path=Path("sql/seeds/country_codes.jsonl"),
+                            file_path=Path("seeds/country_codes.jsonl"),
                             row_count=1,
                             byte_count=22,
                             columns=(
@@ -158,7 +158,7 @@ class ScenarioSnapshotCaptureTestAdapter(BaseAdapter):
                         ScenarioSnapshotRelation(
                             kind=SCENARIO_PLAN.fixture_plans[0].kind,
                             logical_name="raw__orders",
-                            file_path=Path("sql/sources/raw__orders.jsonl"),
+                            file_path=Path("sources/raw__orders.jsonl"),
                             row_count=2,
                             byte_count=56,
                             columns=(
@@ -194,7 +194,7 @@ class ScenarioSnapshotCaptureTestAdapter(BaseAdapter):
                         source_relation=(
                             "`scenario_schema.__sqb_51b385aebe20__seed__country_codes`"
                         ),
-                        file_path=Path("sql/seeds/country_codes.jsonl"),
+                        file_path=Path("seeds/country_codes.jsonl"),
                         status=ExecutionStatus.SUCCESS,
                         row_count=1,
                         byte_count=22,
@@ -205,7 +205,7 @@ class ScenarioSnapshotCaptureTestAdapter(BaseAdapter):
                         source_relation=(
                             "`scenario_schema.__sqb_51b385aebe20__source__raw__orders`"
                         ),
-                        file_path=Path("sql/sources/raw__orders.jsonl"),
+                        file_path=Path("sources/raw__orders.jsonl"),
                         status=ExecutionStatus.SUCCESS,
                         row_count=2,
                         byte_count=56,
@@ -214,8 +214,8 @@ class ScenarioSnapshotCaptureTestAdapter(BaseAdapter):
             ),
             expected_jsonl_files={
                 Path("refs/stg_customers.jsonl"): '{"customer_id":10}\n',
-                Path("sql/seeds/country_codes.jsonl"): '{"country_code":"US"}\n',
-                Path("sql/sources/raw__orders.jsonl"): (
+                Path("seeds/country_codes.jsonl"): '{"country_code":"US"}\n',
+                Path("sources/raw__orders.jsonl"): (
                     '{"amount":10.5,"order_id":1}\n{"amount":20,"order_id":2}\n'
                 ),
             },
@@ -293,7 +293,7 @@ def test_given_capture_plan_when_executing_snapshot_capture_then_writes_jsonl_an
             description="row limit fails before downloading oversized relation",
             limits=ScenarioSnapshotCaptureLimits(max_rows_per_relation=1),
             expected_error_fragment="exceeding the per-relation capture limit",
-            expected_missing_relative_path=Path("sql/sources/raw__orders.jsonl"),
+            expected_missing_relative_path=Path("sources/raw__orders.jsonl"),
             expected_query_fragment="SELECT COUNT(*)",
             unexpected_query_fragment=(
                 "SELECT * FROM `scenario_schema.__sqb_51b385aebe20__source__raw__orders`"

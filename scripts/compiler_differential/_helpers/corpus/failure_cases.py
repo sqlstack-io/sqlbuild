@@ -690,7 +690,7 @@ def engine_error_cases() -> tuple[FailureCase, ...]:
             expected_code="D013",
             files={"sql/constants/limits.sql": "CONSTANT (name minimum_amount, value \u0663);\n"},
             expected_message=(
-                "<project>/constants/limits.sql has the bare number '\u0663', written with "
+                "<project>/sql/constants/limits.sql has the bare number '\u0663', written with "
                 "non-ASCII digits"
             ),
             expected_help=(
@@ -747,7 +747,7 @@ def engine_error_cases() -> tuple[FailureCase, ...]:
                 )
             },
             expected_message=(
-                "<project>/enums/order_priority.sql has the bare number '\u0663', written with "
+                "<project>/sql/enums/order_priority.sql has the bare number '\u0663', written with "
                 "non-ASCII digits"
             ),
             expected_help=(

@@ -1,13 +1,12 @@
 //! Suggest the one-step `sqb mv` when a rename fails only on the layer-folder rules.
 
-use crate::refactor_command::_helpers::layer_folders::{
-    folder_of, mirrored_folder, name_layer, path_parts,
-};
+use crate::refactor_command::_helpers::layer_folders::{folder_of, mirrored_folder, name_layer};
 use crate::refactor_command::_helpers::quoting::command_line;
 use crate::refactor_command::constants::{
     FOLDER_PLACEHOLDER, LAYER_FOLDER_RULE_CODES, LAYER_FOLDERS, PROJECT_DIR_OPTION, SQL_FILE_SUFFIX,
 };
 use crate::refactor_command::models::{LayerMove, RefactorDiagnostic};
+use crate::refactoring::constants::MODELS_ROOT;
 use crate::refactoring::models::{FileChange, RefactorOperation, RefactorPlan};
 
 /// The `sqb mv` that renames and moves in one step, or none for any other failure.
@@ -40,13 +39,7 @@ pub fn layer_move_suggestion(
     });
     let mut folders: Vec<String> = match &mirrored {
         Some((head, tail)) => head.iter().chain(tail).cloned().collect(),
-        None => vec![
-            path_parts(&renamed.original_path)
-                .first()
-                .map(|part| (*part).to_owned())
-                .unwrap_or_default(),
-            FOLDER_PLACEHOLDER.to_owned(),
-        ],
+        None => vec![MODELS_ROOT.to_owned(), FOLDER_PLACEHOLDER.to_owned()],
     };
     folders.push(format!("{new_name}{SQL_FILE_SUFFIX}"));
     let mut arguments: Vec<String> = vec![

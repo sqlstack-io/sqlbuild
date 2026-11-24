@@ -9,7 +9,7 @@ from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.compiler.compile.types import CompiledProjectView
 
 PROJECT_FILES: dict[str, str] = {
-    "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
+    "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\nextra_paths = ["config"]\n',
     "sql/sources/raw.yml": (
         "sources:\n"
         "  - name: raw_orders\n    description: Raw orders.\n"

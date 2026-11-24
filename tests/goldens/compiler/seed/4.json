@@ -17,33 +17,33 @@
   }
  ],
  "compiled": {
-  "audits/generic/configured_events/accepted_values__id.sql": [
+  "sql/audits/generic/configured_events/accepted_values__id.sql": [
    "SELECT id",
    "FROM __source(\"configured_events\")",
    "WHERE id IS NOT NULL",
    "  AND id NOT IN ('1')",
    ""
   ],
-  "audits/generic/configured_stg_support_0/accepted_values__status.sql": [
+  "sql/audits/generic/configured_stg_support_0/accepted_values__status.sql": [
    "SELECT status",
    "FROM __ref(\"configured_stg_support_0\")",
    "WHERE status IS NOT NULL",
    "  AND status NOT IN ('placed', 'shipped')",
    ""
   ],
-  "audits/generic/configured_stg_support_0/configured_amount_floor.sql": [
+  "sql/audits/generic/configured_stg_support_0/configured_amount_floor.sql": [
    "SELECT *",
    "FROM __ref(\"configured_stg_support_0\")",
    "WHERE amount < -30",
    ""
   ],
-  "audits/generic/configured_stg_support_0/configured_id_present__id.sql": [
+  "sql/audits/generic/configured_stg_support_0/configured_id_present__id.sql": [
    "SELECT id",
    "FROM __ref(\"configured_stg_support_0\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/configured_stg_support_0/unique__id.sql": [
+  "sql/audits/generic/configured_stg_support_0/unique__id.sql": [
    "SELECT id, COUNT(*) AS duplicate_count",
    "FROM __ref(\"configured_stg_support_0\")",
    "WHERE id IS NOT NULL",
@@ -51,31 +51,31 @@
    "HAVING COUNT(*) > 1",
    ""
   ],
-  "audits/generic/guarded_stg_support_0/amount_at_least__amount.sql": [
+  "sql/audits/generic/guarded_stg_support_0/amount_at_least__amount.sql": [
    "SELECT *",
    "FROM __ref(\"guarded_stg_support_0\")",
    "WHERE amount < 0",
    ""
   ],
-  "audits/generic/shaped_stg_support_0/not_null__id.sql": [
+  "sql/audits/generic/shaped_stg_support_0/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"shaped_stg_support_0\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/stg_support_0/not_null__id.sql": [
+  "sql/audits/generic/stg_support_0/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"stg_support_0\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/support_summary_0/not_null__id.sql": [
+  "sql/audits/generic/support_summary_0/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"support_summary_0\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/singular/support_summary_1_matches.sql": [
+  "sql/audits/singular/support_summary_1_matches.sql": [
    "SELECT a.id",
    "FROM __ref(\"support_summary_1\") a",
    "LEFT JOIN __ref(\"support_summary_0\") b ON a.id = b.id",

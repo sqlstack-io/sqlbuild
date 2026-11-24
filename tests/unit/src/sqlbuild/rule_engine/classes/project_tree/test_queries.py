@@ -16,8 +16,8 @@ from tests.unit.src.sqlbuild.rule_engine.classes.project_tree.helpers import lin
 @pytest.mark.parametrize(
     "test_case",
     (
-        TreeQueryTestCase("project root", "", ("models", "rules")),
-        TreeQueryTestCase("current directory", ".", ("models", "rules")),
+        TreeQueryTestCase("project root", "", ("rules", "sql")),
+        TreeQueryTestCase("current directory", ".", ("rules", "sql")),
         TreeQueryTestCase(
             "folder with trailing slash",
             "sql/models/",
@@ -45,12 +45,13 @@ def test_given_directory_when_listing_children_then_returns_direct_entries(
             "everything",
             "",
             (
-                "models",
-                "sql/models/notes.txt",
-                "sql/models/orders.sql",
                 "rules",
                 "rules/inputs",
                 "rules/inputs/limits.yaml",
+                "sql",
+                "sql/models",
+                "sql/models/notes.txt",
+                "sql/models/orders.sql",
             ),
         ),
         TreeQueryTestCase("folder", "rules/", ("rules/inputs", "rules/inputs/limits.yaml")),
@@ -73,7 +74,7 @@ def test_given_directory_when_listing_descendants_then_returns_entries_below_it(
     (
         TreeQueryTestCase("star crosses folders", "*.sql", ("sql/models/orders.sql",)),
         TreeQueryTestCase("single character", "rule?", ("rules",)),
-        TreeQueryTestCase("negated set", "[!m]*s", ("rules", "rules/inputs")),
+        TreeQueryTestCase("negated set", "[!s]*s", ("rules", "rules/inputs")),
         TreeQueryTestCase("no match", "*.py", ()),
     ),
     ids=lambda case: case.description,
@@ -92,7 +93,7 @@ def test_given_pattern_when_globbing_then_returns_fnmatch_matches(
     "test_case",
     (
         RelativePartsTestCase(
-            "relative path", "sql/models/orders.sql", "", ("models", "orders.sql")
+            "relative path", "sql/models/orders.sql", "", ("sql", "models", "orders.sql")
         ),
         RelativePartsTestCase(
             "beneath a folder", "sql/models/orders.sql", "sql/models/", ("orders.sql",)
@@ -117,10 +118,10 @@ def test_given_path_when_reading_relative_parts_then_returns_project_relative_pa
             "through a linked folder",
             "orders/linked_models/orders.sql",
             "",
-            ("models", "orders.sql"),
+            ("sql", "models", "orders.sql"),
         ),
         RelativePartsTestCase(
-            "beneath a folder", "orders/models/orders.sql", "models", ("orders.sql",)
+            "beneath a folder", "orders/sql/models/orders.sql", "sql/models", ("orders.sql",)
         ),
     ),
     ids=lambda case: case.description,

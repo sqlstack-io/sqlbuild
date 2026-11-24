@@ -13,7 +13,10 @@ from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
     MeasurementAuditCliE2ETestCase,
     StandaloneAuditRowE2ETestCase,
 )
-from tests.e2e.src.sqlbuild.cli.commands.main.build.helpers import seed_audit_files
+from tests.e2e.src.sqlbuild.cli.commands.main.build.helpers import (
+    seed_audit_files,
+    take_raw_data_sql,
+)
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     prepare_inline_project,
     run_sqb,
@@ -188,7 +191,7 @@ def test_given_audit_failure_projects_when_running_build_then_cli_reports_failur
     import duckdb
 
     connection: duckdb.DuckDBPyConnection = duckdb.connect(str(db_path))
-    connection.execute((project_dir / "seed_raw_data.sql").read_text(encoding="utf-8"))
+    connection.execute(take_raw_data_sql(project_dir))
     connection.close()
 
     result: subprocess.CompletedProcess[str] = run_sqb(

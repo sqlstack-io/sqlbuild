@@ -12,17 +12,18 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile._test_types import (
     NativeMacroErrorTestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
+    MACRO_CALL_LOG_CODE,
     CompileReuseRun,
     lifecycle_error_type,
+    macro_call_log,
     run_reuse_compile,
     write_project_file,
 )
 
-_CALL_LOG: str = "macro_calls.log"
 _MACROS: str = (
     "from pathlib import Path\n\n\n"
     "def _log(name: str) -> None:\n"
-    f"    with (Path(__file__).resolve().parents[2] / {_CALL_LOG!r}).open(\n"
+    f"    with {MACRO_CALL_LOG_CODE}.open(\n"
     '        "a", encoding="utf-8"\n'
     "    ) as log:\n"
     '        _ = log.write(f"{name}\\n")\n\n\n'
@@ -145,13 +146,13 @@ def test_given_macro_error_when_compiling_then_error_matches_python_once(
         **FAILURE_BASE_FILES,
         "sql/macros/python/orders.py": _MACROS,
         _MART_PATH: _COUNTED_MART,
-        _CALL_LOG: "",
         **test_case.project_files,
     }.items():
         write_project_file(project_dir, relative_path, contents)
 
+    _ = macro_call_log(project_dir).write_text("", encoding="utf-8")
     run: CompileReuseRun = run_reuse_compile(project_dir=project_dir)
-    macro_runs: list[str] = (project_dir / _CALL_LOG).read_text(encoding="utf-8").splitlines()
+    macro_runs: list[str] = macro_call_log(project_dir).read_text(encoding="utf-8").splitlines()
 
     assert (
         run.returncode,
@@ -188,7 +189,6 @@ def test_given_macro_error_when_compiling_then_lifecycle_error_type_matches(
         **FAILURE_BASE_FILES,
         "sql/macros/python/orders.py": _MACROS,
         _MART_PATH: _COUNTED_MART,
-        _CALL_LOG: "",
         **test_case.project_files,
     }.items():
         write_project_file(project_dir, relative_path, contents)

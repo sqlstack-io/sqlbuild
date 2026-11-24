@@ -239,7 +239,7 @@ def test_given_column_rename_when_applied_then_project_tests_and_builds(
             extra_files=ORDER_AMOUNT_CHECK,
             expected_status="refused",
             expected_reason="Python SQL may read column amount of stg_orders",
-            expected_paths=("python/nodes/checks/order_amounts.py",),
+            expected_paths=("python/nodes/checks/order_amounts/checks.py",),
         ),
         RefusedRefactorE2ETestCase(
             description="rename onto an existing model",

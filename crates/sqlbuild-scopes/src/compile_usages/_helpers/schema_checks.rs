@@ -42,20 +42,37 @@ pub(crate) fn visible_from(
     })
 }
 
+/// An S006 keyed by its path and the two names that identify it within the file.
+fn inaccessible(
+    path: &str,
+    names: [&str; 2],
+    message: String,
+    help: String,
+) -> InaccessibleDiagnostic {
+    let [first, second] = names;
+    InaccessibleDiagnostic {
+        key: vec![
+            INACCESSIBLE_CODE.to_owned(),
+            path.to_owned(),
+            first.to_owned(),
+            second.to_owned(),
+        ],
+        message,
+        path: path.to_owned(),
+        help,
+    }
+}
+
 /// The S006 of a schema extending a schema its folder cannot see.
 pub(crate) fn hidden_parent(
     consumer: &NamedRecord,
     name: &str,
     parent: &NamedRecord,
 ) -> InaccessibleDiagnostic {
-    InaccessibleDiagnostic {
-        key: vec![
-            INACCESSIBLE_CODE.to_owned(),
-            consumer.path.clone(),
-            SCHEMA_KIND.to_owned(),
-            name.to_owned(),
-        ],
-        message: format!(
+    inaccessible(
+        &consumer.path,
+        [SCHEMA_KIND, name],
+        format!(
             "Schema '{name}' is not visible from '{}'. It is defined at {} with {} scope owned \
              by '{}'",
             consumer.path,
@@ -63,14 +80,13 @@ pub(crate) fn hidden_parent(
             parent.declared.scope.as_str(),
             owner(parent)
         ),
-        path: consumer.path.clone(),
-        help: format!(
+        format!(
             "move '{}' to a schemas/ role owned by '{}' or one of its parent folders, or to the \
-             project-wide schemas/ when consumers span resource trees",
+             project-wide sql/schemas/ when consumers span resource trees",
             parent.path,
             folder(consumer)
         ),
-    }
+    )
 }
 
 /// The S006 of a schema column typed with an enum the schema cannot see.
@@ -81,14 +97,10 @@ pub(crate) fn hidden_enum(
 ) -> InaccessibleDiagnostic {
     let (record, schema_name) = schema;
     let (column_name, enum_name) = column;
-    InaccessibleDiagnostic {
-        key: vec![
-            INACCESSIBLE_CODE.to_owned(),
-            record.path.clone(),
-            schema_name.to_owned(),
-            column_name.to_owned(),
-        ],
-        message: format!(
+    inaccessible(
+        &record.path,
+        [schema_name, column_name],
+        format!(
             "Schema '{schema_name}' in {} column '{column_name}' uses enum '{enum_name}', which \
              is not visible from the schema's location. The enum is defined at {} with {} scope \
              owned by '{}'",
@@ -97,9 +109,8 @@ pub(crate) fn hidden_enum(
             enum_record.declared.scope.as_str(),
             owner(enum_record)
         ),
-        path: record.path.clone(),
-        help: "move the enum to a role visible from the schema's owning folder, or move the \
-               schema next to the enum"
+        "move the enum to a role visible from the schema's owning folder, or move the schema \
+         next to the enum"
             .to_owned(),
-    }
+    )
 }

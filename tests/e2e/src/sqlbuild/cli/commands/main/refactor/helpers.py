@@ -610,7 +610,7 @@ def run_printed_command(command: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-CENTS_CHECK: str = "python/nodes/checks/order_cents.py"
+CENTS_CHECK: str = "python/nodes/checks/order_cents/checks.py"
 
 
 def cents_check(imports: str, body: str = '    assert to_cents("1")\n') -> dict[str, str]:

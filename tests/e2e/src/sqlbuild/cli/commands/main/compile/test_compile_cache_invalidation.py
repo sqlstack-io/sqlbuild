@@ -183,7 +183,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
             description="python_loader_edit",
             edit=lambda root: replace_project_text(
                 root,
-                "python/nodes/loaders/waffle_sources.py",
+                "python/nodes/loaders/waffle_sources/loaders.py",
                 "from sqlbuild.loaders import loader\n",
                 "from sqlbuild.loaders import loader\n\nLOADER_REVISION: int = 2\n",
             ),

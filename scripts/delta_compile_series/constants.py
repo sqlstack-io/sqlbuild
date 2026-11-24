@@ -7,6 +7,8 @@ import re
 from scripts.delta_compile_series.models import DeltaCompileEdit
 from scripts.delta_compile_series.types import EditTarget
 
+EDIT_ROOTS: dict[EditTarget, str] = {EditTarget.MODELS: "sql/models", EditTarget.TESTS: "tests"}
+
 DELTA_COMPILE_LINE: str = "against the previous compile"
 DELTA_VERIFIED_LINE: str = "delta compile verified"
 DELTA_FALLBACK_PATTERN: str = r"^delta compile fell back: (.*)$"

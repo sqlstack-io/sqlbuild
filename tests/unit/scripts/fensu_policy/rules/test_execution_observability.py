@@ -584,7 +584,7 @@ def test_given_event_usage_when_checking_event_owner_then_matches_contract(
         ),
         CustomRuleTestCase(
             description="core public exporter facade passes",
-            path="src/sqlbuild/sinks.py",
+            path="src/sqlbuild/event_sinks.py",
             source=(
                 "from sqlbuild.runtime.event_exporting.models import LifecycleEventSinkDefinition\n"
             ),

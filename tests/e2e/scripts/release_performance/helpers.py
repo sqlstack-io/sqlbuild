@@ -5,7 +5,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-BASELINE_MARKER: str = "BASELINE_MARKER"
+BASELINE_MARKER: str = ".BASELINE_MARKER"
 _MARKING_WRAPPER: str = """
 
 _unmarked_write_pristine_projects = write_pristine_projects
@@ -16,7 +16,7 @@ def write_pristine_projects(*, root: Path, inspection_models: int, build_models:
         root=root, inspection_models=inspection_models, build_models=build_models
     )
     for project in pristine.iterdir():
-        (project / "BASELINE_MARKER").write_text("baseline", encoding="utf-8")
+        (project / ".BASELINE_MARKER").write_text("baseline", encoding="utf-8")
     return pristine
 """
 _DENSE_MARKING_WRAPPER: str = """
@@ -26,7 +26,7 @@ _unmarked_write_dense_compile_project = write_dense_compile_project
 
 def write_dense_compile_project(*, project_dir: Path, model_count: int) -> None:
     _unmarked_write_dense_compile_project(project_dir=project_dir, model_count=model_count)
-    (project_dir / "BASELINE_MARKER").write_text("baseline", encoding="utf-8")
+    (project_dir / ".BASELINE_MARKER").write_text("baseline", encoding="utf-8")
 """
 
 

@@ -380,7 +380,7 @@ def test_given_any_spelling_of_list_calls_when_building_then_the_model_holds_the
             command=("compile",),
             expected_returncode=0,
             expected_fragments=("'[' || CAST(order_id AS VARCHAR) || ']' AS label",),
-            inspected_paths=("target/compiled/models/marts/orders.sql",),
+            inspected_paths=("target/compiled/sql/models/marts/orders.sql",),
         ),
         SqlMacroCommandTestCase(
             description="typed_argument_in_a_later_union_branch_is_not_checked",

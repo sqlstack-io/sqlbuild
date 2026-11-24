@@ -68,7 +68,7 @@ _SOURCE_FILES: dict[str, str] = {
         ),
         CompileSelectionTestCase(
             description="select file keeps upstream analysis while reporting its downstream",
-            selection_args=("--select-file", "selectors.txt"),
+            selection_args=("--select-file", "../selectors.txt"),
             expected_stdout_fragments=(
                 "Compile ready  1 model",
                 "result",
@@ -103,9 +103,9 @@ def test_given_model_selection_when_compiling_then_limits_offline_analysis_and_r
             "sql/models/unrelated.sql": (
                 "MODEL (description 'Test model unrelated.', columns (missing_column ()));\n\nSELECT 1 AS present_column\n"
             ),
-            "selectors.txt": "result\n",
         },
     )
+    _ = (project_dir.parent / "selectors.txt").write_text("result\n", encoding="utf-8")
 
     result: subprocess.CompletedProcess[str] = run_sqb(
         command=(

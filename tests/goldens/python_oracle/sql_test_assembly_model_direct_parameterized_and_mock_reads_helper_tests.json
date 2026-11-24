@@ -2,33 +2,33 @@
 [
 "sql_test_assembly",
 {
-"diagnostics": "38d030765c7b731a9dc4a02c",
-"raised": "74234e98afe7498fb5daf1f3",
-"sql_tests": "19342e1031f6db6a58950a78"
+"sql_tests": "19342e1031f6db6a58950a78",
+"diagnostics": "8167db451d0378e107cb938d",
+"raised": "74234e98afe7498fb5daf1f3"
 }
 ],
 [
 "sql_test_assembly",
 {
-"diagnostics": "85355a904cd57506ada88c26",
-"raised": "74234e98afe7498fb5daf1f3",
-"sql_tests": "14481c815b4a801c38562317"
+"sql_tests": "14481c815b4a801c38562317",
+"diagnostics": "75471e383377cba1742fa447",
+"raised": "74234e98afe7498fb5daf1f3"
 }
 ],
 [
 "sql_test_assembly",
 {
-"diagnostics": "63ab94227f6c63702ceb04e6",
-"raised": "74234e98afe7498fb5daf1f3",
-"sql_tests": "eb8781590978f943d4cda3a2"
+"sql_tests": "eb8781590978f943d4cda3a2",
+"diagnostics": "ea2cf52456d9b7949c4cc7ad",
+"raised": "74234e98afe7498fb5daf1f3"
 }
 ],
 [
 "sql_test_assembly",
 {
-"diagnostics": "e1b911e742090996c12323e4",
-"raised": "74234e98afe7498fb5daf1f3",
-"sql_tests": "9a64536c2908bed9e46d362e"
+"sql_tests": "9a64536c2908bed9e46d362e",
+"diagnostics": "fef5dc3d21d85330e743ac9d",
+"raised": "74234e98afe7498fb5daf1f3"
 }
 ]
 ]

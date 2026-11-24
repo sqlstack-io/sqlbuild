@@ -341,26 +341,26 @@
   }
  ],
  "compiled": {
-  "audits/generic/audited_stg_sales_0/id_present__id.sql": [
+  "sql/audits/generic/audited_stg_sales_0/id_present__id.sql": [
    "SELECT id",
    "FROM __ref(\"audited_stg_sales_0\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/checked_stg_sales_2/accepted_values__status.sql": [
+  "sql/audits/generic/checked_stg_sales_2/accepted_values__status.sql": [
    "SELECT status",
    "FROM __ref(\"checked_stg_sales_2\")",
    "WHERE status IS NOT NULL",
    "  AND status NOT IN ('placed', 'expédié', '取消', 'returned ✓')",
    ""
   ],
-  "audits/generic/checked_stg_sales_2/expression_is_true.sql": [
+  "sql/audits/generic/checked_stg_sales_2/expression_is_true.sql": [
    "SELECT *",
    "FROM __ref(\"checked_stg_sales_2\")",
    "WHERE NOT (amount >= -1000)",
    ""
   ],
-  "audits/generic/checked_stg_sales_2/relationships__id.sql": [
+  "sql/audits/generic/checked_stg_sales_2/relationships__id.sql": [
    "SELECT id",
    "FROM __ref(\"checked_stg_sales_2\")",
    "WHERE id IS NOT NULL",
@@ -371,32 +371,32 @@
    "  )",
    ""
   ],
-  "audits/generic/sales_summary_0/not_null__id.sql": [
+  "sql/audits/generic/sales_summary_0/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"sales_summary_0\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/sales_summary_1/not_null__id.sql": [
+  "sql/audits/generic/sales_summary_1/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"sales_summary_1\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/stated_stg_sales_1/accepted_values__status.sql": [
+  "sql/audits/generic/stated_stg_sales_1/accepted_values__status.sql": [
    "SELECT status",
    "FROM __ref(\"stated_stg_sales_1\")",
    "WHERE status IS NOT NULL",
    "  AND status NOT IN ('placed', 'expédié', '取消', 'returned ✓')",
    ""
   ],
-  "audits/generic/stg_sales_1/not_null__id.sql": [
+  "sql/audits/generic/stg_sales_1/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"stg_sales_1\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/stg_sales_2/not_null__id.sql": [
+  "sql/audits/generic/stg_sales_2/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"stg_sales_2\")",
    "WHERE id IS NULL",

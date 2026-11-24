@@ -22,7 +22,7 @@ fn given_target_or_prospective_path_when_reporting_then_sections_follow_scope_ru
             expected_nearby: &["enum:e"],
             expected_chain: &[
                 "local sql/models/sales 0",
-                "inherited models 1",
+                "inherited sql/models 1",
                 "global global 1",
             ],
             expected_complete: true,
@@ -36,7 +36,7 @@ fn given_target_or_prospective_path_when_reporting_then_sections_follow_scope_ru
             expected_nearby: &[],
             expected_chain: &[
                 "local sql/models/finance 1",
-                "inherited models 1",
+                "inherited sql/models 1",
                 "global global 1",
             ],
             expected_complete: false,
@@ -117,8 +117,8 @@ fn given_browse_result_when_serializing_then_json_is_sorted_compact_ascii() {
             "{\"complete\":true,\"diagnostics\":[],\"folder\":\".\",\"folders\":[",
             "{\"child_count\":1,\"descendant_count\":1,\"kind_counts\":{\"macro\":1},",
             "\"name\":\"global\",\"path\":\"global\",\"used_count\":0},",
-            "{\"child_count\":2,\"descendant_count\":2,\"kind_counts\":{\"constant\":1,\"enum\":1},",
-            "\"name\":\"models\",\"path\":\"models\",\"used_count\":1}],",
+            "{\"child_count\":1,\"descendant_count\":2,\"kind_counts\":{\"constant\":1,\"enum\":1},",
+            "\"name\":\"sql\",\"path\":\"sql\",\"used_count\":1}],",
             "\"schema_version\":2}\n"
         ),
     }];
@@ -164,7 +164,7 @@ fn given_paths_when_comparing_ancestry_then_whole_components_decide() {
         },
         DescendantTestCase {
             description: "paths compare after normalization",
-            path: "models\\orders\\..\\sales",
+            path: "sql\\models\\orders\\..\\sales",
             ancestor: "sql/models/./sales",
             expected_descendant: true,
         },

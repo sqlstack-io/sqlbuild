@@ -74,6 +74,8 @@ def write_duckdb_sqlbuild_project(project_dir: Path) -> None:
     """Write a SQLBuild project config with an inline DuckDB connection."""
 
     (project_dir / "sqlbuild_project.toml").write_text(
-        'name = "demo"\nadapter = "duckdb"\n\n[connection]\npath = "warehouse.duckdb"\n',
+        'name = "demo"\nadapter = "duckdb"\n'
+        'extra_paths = ["dbt_project", "fake_dbt", "dbt_args.json"]\n\n'
+        '[connection]\npath = "warehouse.duckdb"\n',
         encoding="utf-8",
     )

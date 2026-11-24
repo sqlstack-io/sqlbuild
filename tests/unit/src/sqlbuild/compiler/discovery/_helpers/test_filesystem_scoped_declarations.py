@@ -50,13 +50,13 @@ class _DiscoveredFile(Protocol):
 @pytest.mark.parametrize(
     "test_case",
     (
-        DiscoverScopedDeclarationTestCase("models", "models", "models"),
+        DiscoverScopedDeclarationTestCase("models", "sql/models", "sql/models"),
         DiscoverScopedDeclarationTestCase("unit_tests", "tests/unit", "tests/unit"),
         DiscoverScopedDeclarationTestCase("scenarios", "tests/scenarios", "tests/scenarios"),
         DiscoverScopedDeclarationTestCase(
             "sql_functions", "sql/functions/sql", "sql/functions/sql"
         ),
-        DiscoverScopedDeclarationTestCase("sources", "sources", "sources"),
+        DiscoverScopedDeclarationTestCase("sources", "sql/sources", "sql/sources"),
     ),
     ids=lambda case: case.description,
 )
@@ -152,9 +152,9 @@ def test_given_grouped_declaration_when_discovering_then_owner_is_above_sqlbuild
 @pytest.mark.parametrize(
     "test_case",
     (
-        DiscoverGlobalDeclarationTestCase("macro", "macro", "macros", "global"),
-        DiscoverGlobalDeclarationTestCase("enum", "enum", "enums", "global"),
-        DiscoverGlobalDeclarationTestCase("constant", "constant", "constants", "global"),
+        DiscoverGlobalDeclarationTestCase("macro", "macro", "sql/macros", "global"),
+        DiscoverGlobalDeclarationTestCase("enum", "enum", "sql/enums", "global"),
+        DiscoverGlobalDeclarationTestCase("constant", "constant", "sql/constants", "global"),
     ),
     ids=lambda case: case.description,
 )
@@ -265,7 +265,7 @@ def test_given_old_local_spelling_when_discovering_then_directory_has_no_special
     root_file: Path = tmp_path / test_case.root_relative_path
     model_file: Path = tmp_path / test_case.model_relative_path
     (tmp_path / "sqlbuild_project.toml").write_text(
-        'name = "demo"\nadapter = "duckdb"\n', encoding="utf-8"
+        'name = "demo"\nadapter = "duckdb"\nextra_paths = ["_local_constants"]\n', encoding="utf-8"
     )
     root_file.parent.mkdir(parents=True)
     model_file.parent.mkdir(parents=True)
@@ -297,7 +297,9 @@ def test_given_invalid_scoped_root_when_discovering_project_inputs_then_strict_d
     tmp_path: Path,
 ) -> None:
     config_path: Path = tmp_path / "sqlbuild_project.toml"
-    config_path.write_text('name = "demo"\nadapter = "duckdb"\n', encoding="utf-8")
+    config_path.write_text(
+        'name = "demo"\nadapter = "duckdb"\nextra_paths = ["_enums"]\n', encoding="utf-8"
+    )
     file_path: Path = tmp_path / test_case.relative_path
     file_path.parent.mkdir(parents=True)
     file_path.write_text(test_case.contents, encoding="utf-8")

@@ -58,6 +58,19 @@ pub(crate) fn configured_source(
     }
 }
 
+/// Every non-empty `env_file` the project and its targets set, as written.
+pub(crate) fn named_texts(project: &Built) -> Vec<String> {
+    let targets: Vec<&Built> = match field(project, "targets") {
+        Some(Built::Dict(entries)) => entries.iter().map(|(_, target)| target).collect(),
+        _ => Vec::new(),
+    };
+    std::iter::once(project)
+        .chain(targets)
+        .filter_map(|config| text(field(config, "env_file")))
+        .filter(|written| !written.is_empty())
+        .collect()
+}
+
 /// The path to read, relative to the project directory unless absolute; `""` turns loading off.
 pub(crate) fn choice(source: ChoiceSource) -> EnvFileChoice {
     let configured: bool = source.text.is_some();

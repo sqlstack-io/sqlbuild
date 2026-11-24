@@ -36,8 +36,8 @@ fn given_macro_modules_when_inventoried_then_python_analysis_agrees() {
             ],
             expected_faults: &[],
             expected_modules: Some(&[
-                (0, "macros.shared", &[]),
-                (1, "macros.orders", &["macros.shared"]),
+                (0, "sql.macros.shared", &[]),
+                (1, "sql.macros.orders", &["sql.macros.shared"]),
             ]),
         },
         InventoryMacroModulesTestCase {
@@ -121,11 +121,11 @@ fn given_macro_modules_when_inventoried_then_python_analysis_agrees() {
             expected_faults: &[
                 (
                     0,
-                    "Macro import cycle in 'sql/macros/a.py': macros.a -> macros.b -> macros.a",
+                    "Macro import cycle in 'sql/macros/a.py': sql.macros.a -> sql.macros.b -> sql.macros.a",
                 ),
                 (
                     1,
-                    "Macro module 'sql/macros/b.py' imports project package 'macros.a' instead of a \
+                    "Macro module 'sql/macros/b.py' imports project package 'sql.macros.a' instead of a \
                      macro module",
                 ),
             ],
@@ -152,11 +152,11 @@ fn given_macro_modules_when_inventoried_then_python_analysis_agrees() {
             expected_faults: &[
                 (
                     0,
-                    "Macro module path collision for 'macros.a.b': sql/macros/a/b.py and sql/macros/a.b.py",
+                    "Macro module path collision for 'sql.macros.a.b': sql/macros/a/b.py and sql/macros/a.b.py",
                 ),
                 (
                     1,
-                    "Macro module path collision for 'macros.a.b': sql/macros/a/b.py and sql/macros/a.b.py",
+                    "Macro module path collision for 'sql.macros.a.b': sql/macros/a/b.py and sql/macros/a.b.py",
                 ),
             ],
             expected_modules: None,
@@ -177,9 +177,9 @@ fn given_macro_modules_when_inventoried_then_python_analysis_agrees() {
                 (2, "Macro name collision for 'same' at sql/macros/c.py"),
             ],
             expected_modules: Some(&[
-                (0, "macros.a", &[]),
-                (1, "macros.b", &[]),
-                (2, "macros.c", &[]),
+                (0, "sql.macros.a", &[]),
+                (1, "sql.macros.b", &[]),
+                (2, "sql.macros.c", &[]),
             ]),
         },
     ];

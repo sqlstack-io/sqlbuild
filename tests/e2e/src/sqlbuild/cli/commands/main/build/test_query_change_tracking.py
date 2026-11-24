@@ -13,6 +13,7 @@ import pytest
 from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
     QueryChangeTrackingBuildE2ETestCase,
 )
+from tests.e2e.src.sqlbuild.cli.commands.main.build.helpers import take_raw_data_sql
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     execute_duckdb,
     prepare_inline_project,
@@ -162,7 +163,7 @@ def test_given_unchanged_project_when_planning_after_build_then_models_are_not_q
     import duckdb
 
     connection: duckdb.DuckDBPyConnection = duckdb.connect(str(db_path))
-    connection.execute((project_dir / "seed_raw_data.sql").read_text(encoding="utf-8"))
+    connection.execute(take_raw_data_sql(project_dir))
     connection.close()
 
     build_result: subprocess.CompletedProcess[str] = run_sqb(

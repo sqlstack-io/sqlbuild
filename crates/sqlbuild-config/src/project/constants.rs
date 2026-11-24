@@ -338,3 +338,8 @@ pub(crate) const MICROBATCH_CONCURRENCY_KEY: &str = "microbatch_concurrency";
 pub(crate) const REFERENCES_SECTION: &str = "references";
 pub(crate) const ENFORCE_EXPLICIT_KEY: &str = "enforce_explicit";
 pub(crate) const MICROBATCH_CONCURRENCY_PURPOSE: &str = "to run microbatches concurrently";
+/// Top-level sections an earlier release read, and what replaced each.
+pub(crate) const RENAMED_SECTIONS: [(&str, &str); 2] = [
+    ("event_exporters", "was replaced by event_sinks.lifecycle"),
+    ("sinks", "was renamed event_sinks"),
+];

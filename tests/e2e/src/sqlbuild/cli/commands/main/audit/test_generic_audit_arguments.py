@@ -63,7 +63,7 @@ def test_given_unused_generic_audit_argument_when_compiling_then_compile_fails(
             arguments='group_columns "channel"',
             detached_column=" (type VARCHAR)",
             expected_relative_path=(
-                "target/compiled/audits/generic/orders/unique_within_group__status.sql"
+                "target/compiled/sql/audits/generic/orders/unique_within_group__status.sql"
             ),
             expected_sql=(
                 "SELECT channel, COUNT(DISTINCT status) AS distinct_count\n"
@@ -107,4 +107,4 @@ def test_given_attached_generic_audit_when_compiling_then_rendered_sql_is_writte
     assert rendered == test_case.expected_sql
     assert second.returncode == 0, second.stdout + second.stderr
     assert not audit_file.exists()
-    assert (project_dir / "target/compiled/models/orders.sql").is_file()
+    assert (project_dir / "target/compiled/sql/models/orders.sql").is_file()

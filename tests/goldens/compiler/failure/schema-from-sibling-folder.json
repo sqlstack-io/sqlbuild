@@ -12,7 +12,7 @@
      "resource_type": "model",
      "resource_name": "stg_orders",
      "path": "sql/models/staging/stg_orders.sql",
-     "help": "move 'sql/models/marts/_sqlbuild/_schemas/order_shape.sql' to a schemas/ role owned by 'sql/models/staging' or one of its parent folders, or to the project-wide schemas/ when consumers span resource trees"
+     "help": "move 'sql/models/marts/_sqlbuild/_schemas/order_shape.sql' to a schemas/ role owned by 'sql/models/staging' or one of its parent folders, or to the project-wide sql/schemas/ when consumers span resource trees"
     },
     {
      "phase": "compile",

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from scripts.delta_compile_series.constants import (
     EDIT_ATTEMPTS,
+    EDIT_ROOTS,
     PRIVATE_PATH_MARKER,
     PROJECT_CONFIG,
     RANDOM_VALUE_LIMIT,
@@ -23,7 +24,7 @@ def project_files(*, project_dir: Path, edit: DeltaCompileEdit) -> list[Path]:
 
     if edit.target is EditTarget.PROJECT_CONFIG:
         return [project_dir / PROJECT_CONFIG]
-    root: Path = project_dir / edit.target.value
+    root: Path = project_dir / EDIT_ROOTS[edit.target]
     return sorted(
         path for path in root.rglob(SQL_GLOB) if PRIVATE_PATH_MARKER not in path.as_posix()
     )

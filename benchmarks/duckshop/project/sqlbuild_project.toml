@@ -1,3 +1,4 @@
+extra_paths = ["sqlbuild_local.toml.example"]
 name = "duckshop"
 adapter = "snowflake"
 default_target = "dev"

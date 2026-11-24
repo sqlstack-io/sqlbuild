@@ -65,7 +65,7 @@ def test_given_test_usage_through_macro_when_validating_placement_then_test_path
     test_identity: ResourceIdentity = ResourceIdentity(
         ResourceKind.TEST, "order_policy__returns_quantity"
     )
-    ownership_root: OwnershipRoot = OwnershipRoot("models", resource_kind=ResourceKind.MODEL)
+    ownership_root: OwnershipRoot = OwnershipRoot("sql/models", resource_kind=ResourceKind.MODEL)
     declaration: DeclarationRecord = DeclarationRecord(
         identity=macro_identity,
         path="sql/models/orders/_sqlbuild/_macros/python/policy.py",
@@ -154,7 +154,7 @@ def test_given_non_placement_error_when_placement_enforcement_disabled_then_vali
             ScopeKind.GLOBAL,
             None,
             "sql/constants/limit.sql",
-            "constants",
+            "sql/constants",
             None,
             (),
             (ScopeDiagnosticCode.UNUSED_DECLARATION,),
@@ -164,7 +164,7 @@ def test_given_non_placement_error_when_placement_enforcement_disabled_then_vali
             ScopeKind.GLOBAL,
             None,
             "sql/constants/limit.sql",
-            "constants",
+            "sql/constants",
             None,
             ("sql/models/domain/orders.sql",),
             (ScopeDiagnosticCode.OVER_BROAD_GLOBAL,),
@@ -175,7 +175,7 @@ def test_given_non_placement_error_when_placement_enforcement_disabled_then_vali
             ScopeKind.GLOBAL,
             None,
             "sql/constants/limit.sql",
-            "constants",
+            "sql/constants",
             None,
             ("sql/models/orders/orders.sql", "sql/models/products/products.sql"),
             (),
@@ -185,7 +185,7 @@ def test_given_non_placement_error_when_placement_enforcement_disabled_then_vali
             ScopeKind.GLOBAL,
             None,
             "sql/constants/limit.sql",
-            "constants",
+            "sql/constants",
             None,
             ("sql/models/orders.sql",),
             (ScopeDiagnosticCode.OVER_BROAD_GLOBAL,),
@@ -194,9 +194,9 @@ def test_given_non_placement_error_when_placement_enforcement_disabled_then_vali
         PlacementValidationCase(
             "authored root inherited scope must be project global",
             ScopeKind.INHERITED,
-            "models",
+            "sql/models",
             "sql/models/constants/limit.sql",
-            "models",
+            "sql/models",
             ResourceKind.MODEL,
             ("sql/models/orders/orders.sql", "sql/models/products/products.sql"),
             (ScopeDiagnosticCode.REQUIRES_GLOBAL_PLACEMENT,),
@@ -207,7 +207,7 @@ def test_given_non_placement_error_when_placement_enforcement_disabled_then_vali
             ScopeKind.LOCAL,
             "sql/models/domain",
             "sql/models/domain/_constants/limit.sql",
-            "models",
+            "sql/models",
             ResourceKind.MODEL,
             ("sql/models/domain/orders.sql",),
             (),
@@ -217,7 +217,7 @@ def test_given_non_placement_error_when_placement_enforcement_disabled_then_vali
             ScopeKind.LOCAL,
             "sql/models/domain",
             "sql/models/domain/_sqlbuild/_constants/limit.sql",
-            "models",
+            "sql/models",
             ResourceKind.MODEL,
             ("sql/models/domain/orders.sql",),
             (),
@@ -227,7 +227,7 @@ def test_given_non_placement_error_when_placement_enforcement_disabled_then_vali
             ScopeKind.LOCAL,
             "sql/models/domain",
             "sql/models/domain/_constants/limit.sql",
-            "models",
+            "sql/models",
             ResourceKind.MODEL,
             ("sql/models/domain/child/orders.sql",),
             (ScopeDiagnosticCode.LOCAL_NEEDED_BY_DESCENDANT,),
@@ -237,7 +237,7 @@ def test_given_non_placement_error_when_placement_enforcement_disabled_then_vali
             ScopeKind.INHERITED,
             "sql/models/domain",
             "sql/models/domain/constants/limit.sql",
-            "models",
+            "sql/models",
             ResourceKind.MODEL,
             ("sql/models/domain/a/orders.sql", "sql/models/domain/b/customers.sql"),
             (),
@@ -247,7 +247,7 @@ def test_given_non_placement_error_when_placement_enforcement_disabled_then_vali
             ScopeKind.INHERITED,
             "sql/models/domain",
             "sql/models/domain/_sqlbuild/constants/limit.sql",
-            "models",
+            "sql/models",
             ResourceKind.MODEL,
             ("sql/models/domain/a/orders.sql", "sql/models/domain/b/customers.sql"),
             (),
@@ -257,7 +257,7 @@ def test_given_non_placement_error_when_placement_enforcement_disabled_then_vali
             ScopeKind.INHERITED,
             "sql/models/domain",
             "sql/models/domain/constants/limit.sql",
-            "models",
+            "sql/models",
             ResourceKind.MODEL,
             ("sql/models/domain/orders.sql",),
             (ScopeDiagnosticCode.OVER_BROAD_INHERITED,),
@@ -286,7 +286,7 @@ def test_given_complete_usage_when_validating_then_exact_placement_is_enforced(
         ResourceRecord(
             identity=ResourceIdentity(ResourceKind.MODEL, f"model_{index}"),
             path=path,
-            ownership_root=OwnershipRoot("models", resource_kind=ResourceKind.MODEL),
+            ownership_root=OwnershipRoot("sql/models", resource_kind=ResourceKind.MODEL),
         )
         for index, path in enumerate(test_case.consumer_paths)
     )
@@ -424,7 +424,7 @@ def test_given_declaration_consumption_chains_when_validating_then_anchors_resol
             line=1,
             column=1,
             scope=scope,
-            ownership_root=OwnershipRoot("models", resource_kind=ResourceKind.MODEL),
+            ownership_root=OwnershipRoot("sql/models", resource_kind=ResourceKind.MODEL),
             owning_path=owning_path,
         )
         for name, scope, owning_path, path in test_case.declarations
@@ -439,7 +439,7 @@ def test_given_declaration_consumption_chains_when_validating_then_anchors_resol
             ResourceRecord(
                 identity=model_identity,
                 path=model_path,
-                ownership_root=OwnershipRoot("models", resource_kind=ResourceKind.MODEL),
+                ownership_root=OwnershipRoot("sql/models", resource_kind=ResourceKind.MODEL),
             )
         )
         for declaration_name in declaration_names:
@@ -484,7 +484,7 @@ def test_given_deep_diamond_ladder_when_validating_then_resolution_completes(
             line=1,
             column=1,
             scope=ScopeKind.LOCAL,
-            ownership_root=OwnershipRoot("models", resource_kind=ResourceKind.MODEL),
+            ownership_root=OwnershipRoot("sql/models", resource_kind=ResourceKind.MODEL),
             owning_path="sql/models/domain",
         )
         for name, identity in identities.items()
@@ -511,7 +511,7 @@ def test_given_deep_diamond_ladder_when_validating_then_resolution_completes(
                 ResourceRecord(
                     identity=model_identity,
                     path="sql/models/domain/orders.sql",
-                    ownership_root=OwnershipRoot("models", resource_kind=ResourceKind.MODEL),
+                    ownership_root=OwnershipRoot("sql/models", resource_kind=ResourceKind.MODEL),
                 ),
             ),
             declarations=declarations,
@@ -532,7 +532,7 @@ def test_given_deep_diamond_ladder_when_validating_then_resolution_completes(
             ScopeKind.LOCAL,
             "sql/models/domain",
             "sql/models/domain/_enums/state.sql",
-            "models",
+            "sql/models",
             ResourceKind.MODEL,
             (),
             (),
@@ -553,7 +553,7 @@ def test_given_relationship_and_cross_root_usages_when_validating_then_through_m
         1,
         1,
         ScopeKind.LOCAL,
-        OwnershipRoot("models", resource_kind=ResourceKind.MODEL),
+        OwnershipRoot("sql/models", resource_kind=ResourceKind.MODEL),
         owning_path="sql/models/domain",
     )
     resources: tuple[ResourceRecord, ...] = (
@@ -565,7 +565,7 @@ def test_given_relationship_and_cross_root_usages_when_validating_then_through_m
         ResourceRecord(
             model_identity,
             "sql/models/domain/orders.sql",
-            OwnershipRoot("models", resource_kind=ResourceKind.MODEL),
+            OwnershipRoot("sql/models", resource_kind=ResourceKind.MODEL),
         ),
     )
 

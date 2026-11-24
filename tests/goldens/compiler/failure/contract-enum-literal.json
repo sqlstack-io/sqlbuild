@@ -28,7 +28,7 @@
   }
  ],
  "compiled": {
-  "audits/generic/stg_orders/accepted_values__status.sql": [
+  "sql/audits/generic/stg_orders/accepted_values__status.sql": [
    "SELECT status",
    "FROM __ref(\"stg_orders\")",
    "WHERE status IS NOT NULL",

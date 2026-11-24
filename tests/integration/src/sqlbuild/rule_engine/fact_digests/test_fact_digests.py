@@ -99,7 +99,7 @@ _TEST_EDITED: dict[str, str] = {
         FactDigestEditTestCase("all tests", ("tests.all",), _TEST_EDITED),
         FactDigestEditTestCase("project audits", ("project.audits",), _STG_AUDITED),
         FactDigestEditTestCase("all audits", ("audits.all",), _STG_AUDITED),
-        FactDigestEditTestCase("tree paths", ("tree.paths",), {"docs/notes.yaml": "a: 1\n"}),
+        FactDigestEditTestCase("tree paths", ("tree.paths",), {"config/notes.yaml": "a: 1\n"}),
         FactDigestEditTestCase(
             "public enums",
             ("declarations.public_enums",),
@@ -148,7 +148,7 @@ _TEST_EDITED: dict[str, str] = {
             base_files=_STG_ACCEPTED_INTEGERS,
         ),
         FactDigestEditTestCase("tree children", ("tree.children", "sql/models/marts"), _NEW_MODEL),
-        FactDigestEditTestCase("tree descendants", ("tree.descendants", "models"), _NEW_MODEL),
+        FactDigestEditTestCase("tree descendants", ("tree.descendants", "sql/models"), _NEW_MODEL),
         FactDigestEditTestCase("tree glob", ("tree.glob", "sql/models/**/*.sql"), _NEW_MODEL),
         FactDigestEditTestCase(
             "resources under", ("tree.resources_under", "sql/models/marts"), _NEW_MODEL

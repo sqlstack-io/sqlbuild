@@ -52,8 +52,8 @@ _READERS: dict[str, Callable[..., tuple[object, ...]]] = {
             expected_models=("sql/models/orders.sql",),
             expected_sources=("sql/sources/raw.yml",),
             expected_faults=(
-                (_FILES[1][0], f"Project path ./models/caf\\xe9.sql{_RENAME}"),
-                (_BAD_SOURCE[0], f"Project path ./sources/caf\\xe9.yml{_RENAME}"),
+                (_FILES[1][0], f"Project path ./sql/models/caf\\xe9.sql{_RENAME}"),
+                (_BAD_SOURCE[0], f"Project path ./sql/sources/caf\\xe9.yml{_RENAME}"),
                 (_FILES[4][0], f"Project path ./tests/unit/old\\xe9/orders.sql{_RENAME}"),
             ),
         ),
@@ -70,7 +70,7 @@ _READERS: dict[str, Callable[..., tuple[object, ...]]] = {
             expected_faults=(
                 (
                     os.fsdecode(b"sql/models/st\xe8.sql"),
-                    f"Project path ./models/st\\xe8.sql{_RENAME}",
+                    f"Project path ./sql/models/st\\xe8.sql{_RENAME}",
                 ),
             ),
         ),

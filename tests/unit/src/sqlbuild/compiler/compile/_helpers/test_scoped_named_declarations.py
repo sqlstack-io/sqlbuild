@@ -245,7 +245,7 @@ def test_given_valid_named_declaration_layout_when_compiling_then_project_is_acc
                 "sql/models/marts/orders.sql": _ORDERS,
                 "sql/models/marts/_sqlbuild/hooks/shell/touch.sql": _SQL_HOOK,
             },
-            ("sql/hooks/ accepts only python/nodes/, sql/",),
+            ("hooks/ accepts only python/, sql/",),
         ),
         NamedDeclarationErrorTestCase(
             "scoped audit uses a constant that is not visible from the audit's folder",

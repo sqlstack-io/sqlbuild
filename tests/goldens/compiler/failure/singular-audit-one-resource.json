@@ -18,7 +18,7 @@
   }
  ],
  "compiled": {
-  "audits/singular/positive_totals.sql": [
+  "sql/audits/singular/positive_totals.sql": [
    "SELECT customer_id FROM __ref(\"customer_totals\") WHERE total_amount < 0",
    ""
   ],

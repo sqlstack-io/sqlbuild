@@ -100,7 +100,7 @@ fn given_a_dev_run_output_folder_when_a_file_is_written_then_the_watch_leaves_ou
         },
         OutputWatchTestCase {
             description: "a folder given through a parent reference is resolved",
-            folder: Some("sql/models/../output"),
+            folder: Some("sql/models/../../output"),
             written: "output/runs/run/claim/000000000000.zst",
             expected_seen: false,
         },
@@ -136,7 +136,7 @@ fn given_a_dev_run_output_folder_when_a_file_is_written_then_the_watch_leaves_ou
         },
         OutputWatchTestCase {
             description: "a store resolving to the project root leaves the watch on",
-            folder: Some("sql/models/.."),
+            folder: Some("sql/models/../.."),
             written: "sql/models/orders.sql",
             expected_seen: true,
         },
@@ -165,8 +165,8 @@ fn given_a_dev_run_output_folder_when_a_file_is_written_then_the_watch_leaves_ou
         // sqb dev creates the store's folder before its location starts watching.
         write_tree(
             directory.path(),
-            &["project/models", "project/state"],
-            &[("project/models/orders.sql", "select 1")],
+            &["project/sql/models", "project/state"],
+            &[("project/sql/models/orders.sql", "select 1")],
         );
         let root: PathBuf =
             std::fs::canonicalize(directory.path().join("project")).expect("real project");

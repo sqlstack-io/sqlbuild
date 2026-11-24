@@ -18,7 +18,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.sql_macros.helpers import 
     scoped_model,
 )
 
-_COMPILED: tuple[str, ...] = ("target/compiled/models/marts/scoped.sql",)
+_COMPILED: tuple[str, ...] = ("target/compiled/sql/models/marts/scoped.sql",)
 _CAPTURED: str = (
     "error[P017]: slot weekly.keys column product_id would bind to refunds in this subquery; "
     "write alias.@weekly.keys"

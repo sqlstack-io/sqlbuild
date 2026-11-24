@@ -1368,7 +1368,7 @@ def test_given_invalid_managed_source_target_config_when_planning_then_errors(
             ),
             select=("stg_orders",),
             compiled_relative_paths=(
-                "target/compiled/audits/generic/raw_orders/source_status.sql",
+                "target/compiled/sql/audits/generic/raw_orders/source_status.sql",
             ),
             runtime_relative_paths=(),
             expected_sql_fragments=("prod.raw_orders",),

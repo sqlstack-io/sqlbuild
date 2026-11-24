@@ -74,8 +74,9 @@ def test_given_scenario_compile_when_running_then_presentation_has_one_owner(
     assert test_case.expected_fragment in stream.getvalue()
     assert test_case.unexpected_fragment not in stream.getvalue()
     assert "PASS=0  FAIL=0  TOTAL=0" in stream.getvalue()
-    assert tuple(event.event_type for event in events[-2:]) == (
+    assert tuple(event.event_type for event in events[-3:]) == (
         "operation_started",
+        "invocation_phase",
         test_case.expected_terminal,
     )
 

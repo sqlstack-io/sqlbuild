@@ -11,6 +11,7 @@ import pytest
 from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
     MixedTimestampGrainBuildE2ETestCase,
 )
+from tests.e2e.src.sqlbuild.cli.commands.main.build.helpers import take_raw_data_sql
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     prepare_inline_project,
     query_duckdb,
@@ -207,7 +208,7 @@ def test_given_known_current_upstream_when_rerunning_then_cli_uses_consumer_grai
     import duckdb
 
     connection: duckdb.DuckDBPyConnection = duckdb.connect(str(db_path))
-    connection.execute((project_dir / "seed_raw_data.sql").read_text(encoding="utf-8"))
+    connection.execute(take_raw_data_sql(project_dir))
     connection.close()
 
     initial_result: subprocess.CompletedProcess[str] = run_sqb(

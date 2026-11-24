@@ -283,7 +283,7 @@ def test_given_unhashable_inputs_when_fingerprinting_then_the_cache_is_disabled(
         InterruptedListingFingerprintTestCase(
             description="a hashed directory whose listing fails mid-way",
             files={"sqlbuild_project.toml": 'name = "orders"\n', "sql/models/a.sql": "SELECT 1\n"},
-            interrupted_directory="models",
+            interrupted_directory="sql/models",
             expected_uncacheable_before=(3, 13),
         ),
     ),

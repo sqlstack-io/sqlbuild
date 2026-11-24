@@ -18,7 +18,7 @@
   }
  ],
  "compiled": {
-  "audits/generic/stg_orders/matches_totals.sql": [
+  "sql/audits/generic/stg_orders/matches_totals.sql": [
    "SELECT *",
    "FROM __ref(\"stg_orders\") o",
    "WHERE o.customer_id NOT IN (SELECT customer_id FROM __ref(\"customer_totals\"))",

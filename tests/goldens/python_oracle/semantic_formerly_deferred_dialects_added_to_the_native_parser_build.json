@@ -2,19 +2,19 @@
 [
 "completion",
 {
-"tsql": "d54ac41b7924d8d3eb4b07de",
-"databricks": "d54ac41b7924d8d3eb4b07de",
-"sqlite": "d54ac41b7924d8d3eb4b07de",
-"clickhouse": "d54ac41b7924d8d3eb4b07de"
+"tsql": "f395ebc8b868621bb822bf12",
+"databricks": "f395ebc8b868621bb822bf12",
+"sqlite": "f395ebc8b868621bb822bf12",
+"clickhouse": "f395ebc8b868621bb822bf12"
 }
 ],
 [
 "completion",
 {
-"tsql": "af4024cbb0b1022278fb0039",
-"databricks": "af4024cbb0b1022278fb0039",
-"sqlite": "af4024cbb0b1022278fb0039",
-"clickhouse": "af4024cbb0b1022278fb0039"
+"tsql": "38f56c345838162afa3fd349",
+"databricks": "38f56c345838162afa3fd349",
+"sqlite": "38f56c345838162afa3fd349",
+"clickhouse": "38f56c345838162afa3fd349"
 }
 ]
 ]

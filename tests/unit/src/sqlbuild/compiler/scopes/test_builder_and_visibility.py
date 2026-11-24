@@ -61,7 +61,7 @@ from tests.unit.src.sqlbuild.compiler.scopes.helpers import (
 @pytest.mark.parametrize(
     "test_case",
     [
-        ResourceExpectation("model", "model", "orders", "sql/models/orders.sql", "models"),
+        ResourceExpectation("model", "model", "orders", "sql/models/orders.sql", "sql/models"),
         ResourceExpectation("test", "test", "orders_test", "tests/unit/orders.sql", "tests/unit"),
         ResourceExpectation(
             "scenario", "scenario", "checkout", "tests/scenarios/checkout.sql", "tests/scenarios"
@@ -69,7 +69,7 @@ from tests.unit.src.sqlbuild.compiler.scopes.helpers import (
         ResourceExpectation(
             "function", "function", "tax", "sql/functions/sql/tax.sql", "sql/functions/sql"
         ),
-        ResourceExpectation("source", "source", "raw_orders", "sql/sources/raw.yml", "sources"),
+        ResourceExpectation("source", "source", "raw_orders", "sql/sources/raw.yml", "sql/sources"),
     ],
     ids=lambda case: case.description,
 )
@@ -171,16 +171,16 @@ def test_given_all_scope_tiers_when_resolving_then_classifies_without_shadow_res
     resource: ResourceRecord = ResourceRecord(
         target,
         "sql/models/sales/daily/orders.sql",
-        OwnershipRoot("models", resource_kind=ResourceKind.MODEL),
+        OwnershipRoot("sql/models", resource_kind=ResourceKind.MODEL),
     )
     declarations: tuple[DeclarationRecord, ...] = (
         declaration_record(name="global", scope=ScopeKind.GLOBAL, owner_path=None),
-        declaration_record(name="root", scope=ScopeKind.INHERITED, owner_path="models"),
+        declaration_record(name="root", scope=ScopeKind.INHERITED, owner_path="sql/models"),
         declaration_record(name="near", scope=ScopeKind.INHERITED, owner_path="sql/models/sales"),
         declaration_record(
             name="noncanonical",
             scope=ScopeKind.INHERITED,
-            owner_path=r"models\.\sales\daily\..",
+            owner_path=r"sql\models\.\sales\daily\..",
         ),
         declaration_record(
             name="local", scope=ScopeKind.LOCAL, owner_path="sql/models/sales/daily"
@@ -209,7 +209,7 @@ def test_given_all_scope_tiers_when_resolving_then_classifies_without_shadow_res
         lookup=build_scope_lookup(
             index=ScopeIndex(resources=(resource,), declarations=declarations)
         ),
-        target="models\\sales\\daily\\orders.sql",
+        target="sql\\models\\sales\\daily\\orders.sql",
     )
     visible: dict[str, VisibilityReason] = {
         item.declaration.name: item.reason for item in resolution.visible
@@ -256,7 +256,7 @@ def test_given_out_of_scope_declarations_when_resolving_then_returns_specific_re
     resource: ResourceRecord = ResourceRecord(
         target,
         "sql/models/sales/daily/orders.sql",
-        OwnershipRoot("models", resource_kind=ResourceKind.MODEL),
+        OwnershipRoot("sql/models", resource_kind=ResourceKind.MODEL),
     )
     declarations: tuple[DeclarationRecord, ...] = (
         declaration_record(
@@ -360,8 +360,8 @@ def test_given_public_duplicates_across_scopes_when_building_then_retains_all_an
             "",
             (declaration,),
             ScopeKind.INHERITED,
-            Path("models"),
-            Path("models"),
+            Path("sql/models"),
+            Path("sql/models"),
         ),
         DiscoveredEnumFile(
             Path("sql/models/sales/_enums/status.sql"),
@@ -369,7 +369,7 @@ def test_given_public_duplicates_across_scopes_when_building_then_retains_all_an
             "",
             (declaration,),
             ScopeKind.LOCAL,
-            Path("models"),
+            Path("sql/models"),
             Path("sql/models/sales"),
         ),
     )
@@ -517,7 +517,7 @@ def test_given_loaded_scoped_macro_when_building_then_metadata_is_safe_and_norma
                     path,
                     source,
                     ScopeKind.INHERITED,
-                    Path("models"),
+                    Path("sql/models"),
                     Path("sql/models/sales"),
                     Path("sql/models/sales/macros"),
                 ),

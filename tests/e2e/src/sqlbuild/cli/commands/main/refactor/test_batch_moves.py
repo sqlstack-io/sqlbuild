@@ -60,7 +60,7 @@ _EXPECTED_MOVED: dict[str, str] = {
             arguments=("--from-file", MOVE_FILE_PLACEHOLDER),
             move_file=(
                 "# move every cents user together\n\n"
-                "model:stg_order_cents\tmodels/finance/\n"
+                "model:stg_order_cents\tsql/models/finance/\n"
                 "  stg_order_refunds   sql/models/finance/  \n"
             ),
             expected_moved=_EXPECTED_MOVED,

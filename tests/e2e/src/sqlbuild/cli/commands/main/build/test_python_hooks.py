@@ -16,6 +16,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
     PythonHooksLifecycleMatrixBuildE2ETestCase,
     SnapshotPythonHooksBuildE2ETestCase,
 )
+from tests.e2e.src.sqlbuild.cli.commands.main.build.helpers import take_raw_data_sql
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     execute_duckdb,
     prepare_inline_project,
@@ -594,7 +595,7 @@ def test_given_python_hooks_lifecycle_matrix_when_building_then_all_materializat
     db_path: Path = project_dir / "python_hooks_lifecycle_matrix_project.duckdb"
     execute_duckdb(
         db_path=db_path,
-        sql=(project_dir / "seed_raw_data.sql").read_text(encoding="utf-8"),
+        sql=take_raw_data_sql(project_dir),
     )
 
     result: subprocess.CompletedProcess[str] = run_sqb(

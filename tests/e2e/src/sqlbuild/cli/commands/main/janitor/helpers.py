@@ -272,6 +272,14 @@ def create_direct_state_history(*, db_path: Path, schema: str = "main") -> None:
         connection.close()
 
 
+def janitor_files(project_dir: Path) -> Path:
+    """The folder beside the project where the test adapters read settings and write logs."""
+
+    folder: Path = project_dir.parent / f"{project_dir.name}_janitor"
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder
+
+
 AGED_JANITOR_ADAPTER_NAME: str = "aged_janitor_duckdb"
 JANITOR_TEST_SETTINGS_FILENAME: str = "janitor_test_settings.json"
 AGED_JANITOR_ADAPTER_SOURCE: str = """
@@ -285,7 +293,8 @@ from sqlbuild.adapter.contract.exceptions import AdapterUserError
 from sqlbuild.adapter.contract.models import RelationInfo
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 
-_SETTINGS_PATH = Path(__file__).resolve().parent.parent / "janitor_test_settings.json"
+_PROJECT = Path(__file__).resolve().parents[2]
+_SETTINGS_PATH = _PROJECT.parent / f"{_PROJECT.name}_janitor" / "janitor_test_settings.json"
 
 
 def _settings() -> dict[str, Any]:
@@ -386,7 +395,9 @@ def write_janitor_test_settings(
         "identifier_limit": identifier_limit,
         "fail_janitor_event_insert": fail_janitor_event_insert,
     }
-    (project_dir / JANITOR_TEST_SETTINGS_FILENAME).write_text(json.dumps(payload), encoding="utf-8")
+    (janitor_files(project_dir) / JANITOR_TEST_SETTINGS_FILENAME).write_text(
+        json.dumps(payload), encoding="utf-8"
+    )
 
 
 def archive_timestamp_text(value: datetime) -> str:
@@ -542,7 +553,8 @@ from typing import Any
 from sqlbuild.adapter.contract.exceptions import AdapterUserError
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 
-_ROOT = Path(__file__).resolve().parent.parent
+_PROJECT = Path(__file__).resolve().parents[2]
+_ROOT = _PROJECT.parent / f"{_PROJECT.name}_janitor"
 _LOG_LOCK = threading.Lock()
 
 
@@ -673,8 +685,8 @@ def write_probe_settings(
     (project_dir / "sqlbuild_local.toml").write_text(
         f'adapter = "{PROBE_JANITOR_ADAPTER_NAME}"\n', encoding="utf-8"
     )
-    (project_dir / PROBE_STATEMENT_LOG_FILENAME).write_text("", encoding="utf-8")
-    (project_dir / PROBE_JANITOR_SETTINGS_FILENAME).write_text(
+    (janitor_files(project_dir) / PROBE_STATEMENT_LOG_FILENAME).write_text("", encoding="utf-8")
+    (janitor_files(project_dir) / PROBE_JANITOR_SETTINGS_FILENAME).write_text(
         json.dumps(
             {
                 "log": True,
@@ -691,7 +703,9 @@ def read_probe_statements(*, project_dir: Path) -> tuple[str, ...]:
     """Return every statement the probe adapter logged, in order."""
 
     return tuple(
-        (project_dir / PROBE_STATEMENT_LOG_FILENAME).read_text(encoding="utf-8").splitlines()
+        (janitor_files(project_dir) / PROBE_STATEMENT_LOG_FILENAME)
+        .read_text(encoding="utf-8")
+        .splitlines()
     )
 
 
@@ -778,7 +792,8 @@ from typing import Any
 from sqlbuild.adapter.contract.models import RelationInfo, RelationUsage, RelationUsageReport
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 
-_ROOT = Path(__file__).resolve().parent.parent
+_PROJECT = Path(__file__).resolve().parents[2]
+_ROOT = _PROJECT.parent / f"{_PROJECT.name}_janitor"
 
 
 def _settings() -> dict[str, Any]:
@@ -919,7 +934,7 @@ def write_usage_settings(
     (project_dir / "sqlbuild_local.toml").write_text(
         f'adapter = "{USAGE_JANITOR_ADAPTER_NAME}"\n', encoding="utf-8"
     )
-    (project_dir / USAGE_JANITOR_SETTINGS_FILENAME).write_text(
+    (janitor_files(project_dir) / USAGE_JANITOR_SETTINGS_FILENAME).write_text(
         json.dumps(
             {
                 "changed_at": "2026-09-01T08:00:00+00:00",
@@ -944,7 +959,9 @@ def write_usage_settings(
 def read_usage_calls(*, project_dir: Path) -> dict[str, object]:
     """The relations and window of the usage adapter's last `relation_usage` call."""
 
-    return json.loads((project_dir / USAGE_JANITOR_CALLS_FILENAME).read_text(encoding="utf-8"))
+    return json.loads(
+        (janitor_files(project_dir) / USAGE_JANITOR_CALLS_FILENAME).read_text(encoding="utf-8")
+    )
 
 
 def count_stale_archives(*, db_path: Path) -> int:

@@ -1006,7 +1006,7 @@ def test_given_missing_description_when_formatting_then_check_and_write_fault(
         ),
         FormatPathArgumentsIntegrationTestCase(
             description="positional folder formats every file below it",
-            arguments=("models",),
+            arguments=("sql/models",),
             expected_exit_code=0,
             expected_formatted=("sql/models/marts/orders.sql", "sql/models/staging/stg_orders.sql"),
             expected_unchanged=(),
@@ -1026,7 +1026,7 @@ def test_given_missing_description_when_formatting_then_check_and_write_fault(
             expected_exit_code=1,
             expected_formatted=(),
             expected_unchanged=("sql/models/marts/orders.sql", "sql/models/staging/stg_orders.sql"),
-            expected_output_fragment="use a path under sql/models/, tests/",
+            expected_output_fragment="use a path under sql/, tests/",
         ),
         FormatPathArgumentsIntegrationTestCase(
             description="unknown path selector root lists the formatter roots",
@@ -1034,7 +1034,7 @@ def test_given_missing_description_when_formatting_then_check_and_write_fault(
             expected_exit_code=1,
             expected_formatted=(),
             expected_unchanged=("sql/models/marts/orders.sql", "sql/models/staging/stg_orders.sql"),
-            expected_output_fragment="'sql/functions/'",
+            expected_output_fragment="'sql/', 'tests/'",
         ),
     ],
     ids=lambda case: case.description,

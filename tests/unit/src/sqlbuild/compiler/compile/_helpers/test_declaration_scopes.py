@@ -673,7 +673,7 @@ def test_given_models_in_same_directory_when_reusing_visibility_then_usage_consu
                 "sql/constants/value.sql": "CONSTANT (name value, value 1);",
                 "sql/models/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("value") AS value',
             },
-            expected_fragment="required exact-owner-private at 'models'",
+            expected_fragment="required exact-owner-private at 'sql/models'",
         ),
         ScopePlacementCompileTestCase(
             description="unused global is rejected",

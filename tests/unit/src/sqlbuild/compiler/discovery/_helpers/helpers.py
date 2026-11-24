@@ -151,14 +151,14 @@ def discover_python_function_file(
 _STATEMENT_HEADER_PARSERS: dict[str, Callable[..., object]] = {
     "MODEL": parse_model_sql,
     "AUDIT": lambda *, contents, file_path: discover_declaration_file(
-        project_dir=file_path.parents[2],
-        relative_path=file_path.relative_to(file_path.parents[2]).as_posix(),
+        project_dir=file_path.parents[3],
+        relative_path=file_path.relative_to(file_path.parents[3]).as_posix(),
         contents=contents,
     ),
     "TEST": parse_sql_test_file,
     "HOOK": lambda *, contents, file_path: discover_declaration_file(
-        project_dir=file_path.parents[2],
-        relative_path=file_path.relative_to(file_path.parents[2]).as_posix(),
+        project_dir=file_path.parents[3],
+        relative_path=file_path.relative_to(file_path.parents[3]).as_posix(),
         contents=contents,
     ),
     "SCENARIO": lambda *, contents, file_path: parse_sql_scenario_file(

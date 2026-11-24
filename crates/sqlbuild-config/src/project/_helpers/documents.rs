@@ -27,7 +27,8 @@ use crate::project::_helpers::values::is_truthy;
 use crate::project::constants::{
     ALLOW_MISSING_SECRETS_KEY, COLUMN_CONTRACT_MODES, ENV_FILE_KEY, EXTRA_PATHS_KEY,
     LEGACY_COLUMN_CONTRACT_MODE_KEY, LOCAL_CONFIG_FILENAME, PARENT_SEGMENT, POOLS_KEY,
-    QUERY_CHANGE_TRACKING_KEY, REQUIRE_SQL_ANALYSIS_KEY, SHARED_POLICY_SETTINGS, SQL_ANALYSIS_KEY,
+    QUERY_CHANGE_TRACKING_KEY, RENAMED_SECTIONS, REQUIRE_SQL_ANALYSIS_KEY, SHARED_POLICY_SETTINGS,
+    SQL_ANALYSIS_KEY,
 };
 use crate::project::errors::{ConfigFailure, FailureClass, LoadFailure, MessagePiece};
 use crate::project::models::{
@@ -292,6 +293,12 @@ fn operations(payload: &Entries) -> Loaded<Fields> {
 }
 
 fn project_fields(payload: &Entries) -> Loaded<Fields> {
+    if let Some((key, message)) = RENAMED_SECTIONS
+        .iter()
+        .find(|(key, _)| get(payload, key).is_some())
+    {
+        return Err(ConfigFailure::at(PROJECT_FILE, format!("{key} {message}")));
+    }
     if let Some(recall) = get(payload, RECALL_SECTION) {
         recall_section(recall, RECALL_SECTION)
             .map_err(|message| ConfigFailure::at(PROJECT_FILE, message))?;

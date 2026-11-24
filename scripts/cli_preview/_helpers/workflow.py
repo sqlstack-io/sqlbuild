@@ -15,7 +15,7 @@ from scripts.cli_preview.exceptions import PreviewSetupError
 from scripts.cli_preview.models import PreviewScene
 from sqlbuild._native import supports_color
 
-_PAYMENTS_MODEL_PATH: Path = Path("models/staging/stg_payments.sql")
+_PAYMENTS_MODEL_PATH: Path = Path("sql/models/staging/stg_payments.sql")
 _QUERY_MARKER: str = "  amount_cents,\n"
 _CHANGED_QUERY_MARKER: str = (
     "  CAST(CASE WHEN payment_method = 'card' THEN 'preview'"
