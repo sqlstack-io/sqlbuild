@@ -18,11 +18,11 @@ _BASE_FILES: dict[str, str] = {
         'name = "unbuilt_dependencies"\nadapter = "duckdb"\n\n'
         '[connection]\ndatabase = "warehouse.duckdb"\n\n[defaults]\nmaterialized = "table"\n'
     ),
-    "models/broken_orders.sql": (
+    "sql/models/broken_orders.sql": (
         "MODEL (description 'Test model broken_orders.');\n"
         "SELECT CAST('not a number' AS INTEGER) AS order_id\n"
     ),
-    "models/customers.sql": (
+    "sql/models/customers.sql": (
         "MODEL (description 'Test model customers.');\nSELECT 1 AS customer_id\n"
     ),
 }
@@ -43,7 +43,7 @@ _CUSTOMERS_SQL: str = "SELECT 1 AS customer_id\n"
             description="end-of-build audit over a failed model is skipped",
             repo_files={
                 **_BASE_FILES,
-                "audits/singular/orders_have_customers.sql": (
+                "sql/audits/singular/orders_have_customers.sql": (
                     "AUDIT ();\n"
                     'SELECT o.order_id FROM __ref("broken_orders") AS o\n'
                     'LEFT JOIN __ref("customers") AS c ON c.customer_id = o.order_id\n'
@@ -64,7 +64,7 @@ _CUSTOMERS_SQL: str = "SELECT 1 AS customer_id\n"
             description="full refresh on a fresh warehouse skips the audit over a failed model",
             repo_files={
                 **_BASE_FILES,
-                "audits/singular/orders_have_customers.sql": (
+                "sql/audits/singular/orders_have_customers.sql": (
                     "AUDIT ();\n"
                     'SELECT o.order_id FROM __ref("broken_orders") AS o\n'
                     'LEFT JOIN __ref("customers") AS c ON c.customer_id = o.order_id\n'
@@ -83,13 +83,13 @@ _CUSTOMERS_SQL: str = "SELECT 1 AS customer_id\n"
             description="test calling a skipped table function is skipped",
             repo_files={
                 **_BASE_FILES,
-                "functions/sql/customer_orders.sql": (
+                "sql/functions/sql/customer_orders.sql": (
                     'FUNCTION (description "Test function customer_orders.",\n'
                     "  arguments (p_customer_id INTEGER), returns table (order_id INTEGER));\n"
                     'SELECT o.order_id FROM __ref("broken_orders") AS o\n'
                     "WHERE o.order_id = p_customer_id\n"
                 ),
-                "models/summary.sql": (
+                "sql/models/summary.sql": (
                     "MODEL (description 'Test model summary.');\n"
                     "SELECT c.customer_id, f.order_id\n"
                     'FROM __ref("customers") AS c\n'
@@ -146,10 +146,10 @@ def test_given_hook_skipped_existing_model_when_rebuilding_then_its_end_audits_r
         project_name="unbuilt_dependencies",
         repo_files={
             "sqlbuild_project.toml": _BASE_FILES["sqlbuild_project.toml"],
-            "models/customers.sql": "MODEL (description 'Test model customers.');\n"
+            "sql/models/customers.sql": "MODEL (description 'Test model customers.');\n"
             + _CUSTOMERS_SQL,
-            "models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS order_id\n",
-            "audits/singular/customers_exist.sql": (
+            "sql/models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS order_id\n",
+            "sql/audits/singular/customers_exist.sql": (
                 "AUDIT ();\n"
                 'SELECT o.order_id FROM __ref("orders") AS o\n'
                 'LEFT JOIN __ref("customers") AS c ON c.customer_id = o.order_id\n'
@@ -161,9 +161,9 @@ def test_given_hook_skipped_existing_model_when_rebuilding_then_its_end_audits_r
         command=("--no-color", "build"), project_dir=project_dir
     )
     assert first.returncode == 0, first.stdout + first.stderr
-    (project_dir / "hooks/python").mkdir(parents=True)
-    _ = (project_dir / "hooks/python/skips.py").write_text(_HOOK_FILE)
-    _ = (project_dir / "models/customers.sql").write_text(test_case.hooked_model)
+    (project_dir / "sql/hooks/python").mkdir(parents=True)
+    _ = (project_dir / "sql/hooks/python/skips.py").write_text(_HOOK_FILE)
+    _ = (project_dir / "sql/models/customers.sql").write_text(test_case.hooked_model)
 
     rebuilt: subprocess.CompletedProcess[str] = run_sqb(
         command=("--no-color", "build"), project_dir=project_dir

@@ -35,6 +35,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     query_duckdb,
     run_sqb,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 _CHANGED_CLONE_FIXTURE: Path = REPO_ROOT / "benchmarks/duckshop/edge_cases/changed_builds_clone"
 _UPSTREAMS: tuple[str, ...] = (
@@ -56,7 +57,7 @@ _DEFER_PROJECT_FILES: dict[str, str] = {
     ),
     **{
         str(path.relative_to(_DEFER_FIXTURE)): path.read_text(encoding="utf-8")
-        for path in sorted(_DEFER_FIXTURE.glob("models/*.sql"))
+        for path in sorted(_DEFER_FIXTURE.glob("sql/models/*.sql"))
     },
 }
 
@@ -95,7 +96,7 @@ _DEFER_PROJECT_FILES: dict[str, str] = {
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_orders
@@ -107,7 +108,7 @@ _DEFER_PROJECT_FILES: dict[str, str] = {
                     """
                 ).strip()
                 + "\n",
-                "models/fact_orders.sql": dedent(
+                "sql/models/fact_orders.sql": dedent(
                     """
                     MODEL (description "Test model fact_orders.", materialized table);
 
@@ -115,7 +116,7 @@ _DEFER_PROJECT_FILES: dict[str, str] = {
                     """
                 ).strip()
                 + "\n",
-                "models/orders_enriched.sql": dedent(
+                "sql/models/orders_enriched.sql": dedent(
                     """
                     MODEL (description "Test model orders_enriched.", materialized view);
 
@@ -124,7 +125,7 @@ _DEFER_PROJECT_FILES: dict[str, str] = {
                     """
                 ).strip()
                 + "\n",
-                "models/missing_snapshot.sql": dedent(
+                "sql/models/missing_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model missing_snapshot.", materialized table);
 
@@ -241,7 +242,7 @@ def test_given_clone_command_when_running_then_managed_relations_sync_as_expecte
                     """
                 ).strip()
                 + "\n",
-                "models/fact_orders.sql": (
+                "sql/models/fact_orders.sql": (
                     "MODEL (description 'Test model fact_orders.', materialized table);\n\nSELECT 1 AS order_id, 100 AS amount_cents\n"
                 ),
             },
@@ -338,8 +339,10 @@ def test_given_invalid_origin_connection_when_exact_cloning_then_destination_ses
                     """
                 ).strip()
                 + "\n",
-                "python/loaders/raw.py": dedent(
-                    """
+                **node_module_files(
+                    "python/nodes/loaders/raw.py",
+                    dedent(
+                        """
                     from sqlbuild.loaders import loader
 
                     @loader
@@ -347,9 +350,10 @@ def test_given_invalid_origin_connection_when_exact_cloning_then_destination_ses
                         '''Test loader raw_customers.'''
                         return []
                     """
-                ).strip()
-                + "\n",
-                "sources/raw.yml": dedent(
+                    ).strip()
+                    + "\n",
+                ),
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customers
@@ -364,7 +368,7 @@ def test_given_invalid_origin_connection_when_exact_cloning_then_destination_ses
                     """
                 ).strip()
                 + "\n",
-                "models/stg_customers.sql": dedent(
+                "sql/models/stg_customers.sql": dedent(
                     """
                     MODEL (description "Test model stg_customers.", materialized view);
 
@@ -420,8 +424,10 @@ def test_given_invalid_origin_connection_when_exact_cloning_then_destination_ses
                     """
                 ).strip()
                 + "\n",
-                "python/loaders/raw.py": dedent(
-                    """
+                **node_module_files(
+                    "python/nodes/loaders/raw.py",
+                    dedent(
+                        """
                     from sqlbuild.loaders import loader
 
                     @loader
@@ -429,9 +435,10 @@ def test_given_invalid_origin_connection_when_exact_cloning_then_destination_ses
                         '''Test loader raw_customers.'''
                         return []
                     """
-                ).strip()
-                + "\n",
-                "sources/raw.yml": dedent(
+                    ).strip()
+                    + "\n",
+                ),
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customers
@@ -446,7 +453,7 @@ def test_given_invalid_origin_connection_when_exact_cloning_then_destination_ses
                     """
                 ).strip()
                 + "\n",
-                "models/stg_customers.sql": dedent(
+                "sql/models/stg_customers.sql": dedent(
                     """
                     MODEL (description "Test model stg_customers.", materialized view);
 
@@ -584,8 +591,8 @@ def test_given_multi_schema_functions_when_cloning_then_destination_graph_is_que
                 """
             ).strip()
             + "\n",
-            "seeds/bonuses.csv": "bonus\n5\n",
-            "seeds/schema.yml": dedent(
+            "sql/seeds/bonuses.csv": "bonus\n5\n",
+            "sql/seeds/schema.yml": dedent(
                 """
                 seeds:
                   - name: bonuses
@@ -597,7 +604,7 @@ def test_given_multi_schema_functions_when_cloning_then_destination_graph_is_que
                 """
             ).strip()
             + "\n",
-            "models/orders.sql": dedent(
+            "sql/models/orders.sql": dedent(
                 """
                 MODEL (description "Test model orders.", materialized table, schema model_origin);
 
@@ -606,7 +613,7 @@ def test_given_multi_schema_functions_when_cloning_then_destination_graph_is_que
                 """
             ).strip()
             + "\n",
-            "functions/sql/add_bonus.sql": dedent(
+            "sql/functions/sql/add_bonus.sql": dedent(
                 """
                 FUNCTION (description "Test function add_bonus.",
                   schema scalar_origin,
@@ -618,7 +625,7 @@ def test_given_multi_schema_functions_when_cloning_then_destination_graph_is_que
                 """
             ).strip()
             + "\n",
-            "functions/sql/order_rows.sql": dedent(
+            "sql/functions/sql/order_rows.sql": dedent(
                 """
                 FUNCTION (description "Test function order_rows.",
                   schema table_function_origin,
@@ -635,7 +642,7 @@ def test_given_multi_schema_functions_when_cloning_then_destination_graph_is_que
                 """
             ).strip()
             + "\n",
-            "models/enriched_orders.sql": dedent(
+            "sql/models/enriched_orders.sql": dedent(
                 """
                 MODEL (description "Test model enriched_orders.", materialized view, schema view_origin);
 
@@ -714,7 +721,7 @@ def test_given_python_udf_when_cloning_then_recreates_for_clone_connection_scope
                 """
             ).strip()
             + "\n",
-            "functions/python/add_one.py": dedent(
+            "sql/functions/python/add_one.py": dedent(
                 """
                 from sqlbuild.functions import udf
 
@@ -800,8 +807,10 @@ def test_given_destination_source_deferral_when_cloning_then_function_reads_defe
                 """
             ).strip()
             + "\n",
-            "python/loaders/raw.py": dedent(
-                """
+            **node_module_files(
+                "python/nodes/loaders/raw.py",
+                dedent(
+                    """
                 from sqlbuild.loaders import loader
 
                 @loader
@@ -809,9 +818,10 @@ def test_given_destination_source_deferral_when_cloning_then_function_reads_defe
                     '''Test loader raw_bonus.'''
                     return []
                 """
-            ).strip()
-            + "\n",
-            "sources/raw.yml": dedent(
+                ).strip()
+                + "\n",
+            ),
+            "sql/sources/raw.yml": dedent(
                 """
                 sources:
                   - name: raw_bonus
@@ -824,7 +834,7 @@ def test_given_destination_source_deferral_when_cloning_then_function_reads_defe
                 """
             ).strip()
             + "\n",
-            "functions/sql/add_deferred_bonus.sql": dedent(
+            "sql/functions/sql/add_deferred_bonus.sql": dedent(
                 """
                 FUNCTION (description "Test function add_deferred_bonus.", arguments (amount INTEGER), returns INTEGER);
 
@@ -978,7 +988,7 @@ def test_given_cloned_table_when_planning_changed_then_it_rebuilds(
             + "\n",
             **{
                 str(path.relative_to(_CHANGED_CLONE_FIXTURE)): path.read_text(encoding="utf-8")
-                for path in sorted(_CHANGED_CLONE_FIXTURE.glob("models/*.sql"))
+                for path in sorted(_CHANGED_CLONE_FIXTURE.glob("sql/models/*.sql"))
             },
         },
     )

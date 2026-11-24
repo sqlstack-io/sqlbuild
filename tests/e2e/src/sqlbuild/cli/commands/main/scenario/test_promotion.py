@@ -31,7 +31,7 @@ _MATCHING_COLUMNS: str = (
 _ENFORCED_DEFAULTS: str = 'contract = "enforced"\n'
 _CONFLICT_FRAGMENTS: tuple[str, ...] = (
     "error[K011]",
-    "models/order_totals.sql",
+    "sql/models/order_totals.sql",
     "model 'order_totals': contract enforced requires staged table promotion",
     'sqlbuild_project.toml sets [settings] table_promotion_mode = "immediate"',
     "remove that line to use the default staged promotion, or set this in sqlbuild_project.toml:",

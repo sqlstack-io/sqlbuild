@@ -34,12 +34,12 @@ def test_given_equal_source_expressions_when_compiling_then_infers_once_and_inva
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n[rules]\nselect = []\n'
     )
-    (tmp_path / "models").mkdir()
-    (tmp_path / "models/orders.sql").write_text(
+    (tmp_path / "sql" / "models").mkdir(parents=True)
+    (tmp_path / "sql/models/orders.sql").write_text(
         'MODEL (description "Test model orders.", materialized view); SELECT id FROM __source("raw_orders")'
     )
-    (tmp_path / "sources").mkdir()
-    source: Path = tmp_path / "sources/orders.yml"
+    (tmp_path / "sql" / "sources").mkdir(parents=True)
+    source: Path = tmp_path / "sql/sources/orders.yml"
     source.write_text(
         f"sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n    expression: {test_case.expression}\n  - name: raw_customers\n    description: Test source raw_customers.\n    expression: {test_case.expression}\n"
     )
@@ -76,12 +76,12 @@ def test_given_distinct_source_expressions_when_compiling_then_infers_them_in_on
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n[rules]\nselect = []\n'
     )
-    (tmp_path / "models").mkdir()
-    (tmp_path / "models/orders.sql").write_text(
+    (tmp_path / "sql" / "models").mkdir(parents=True)
+    (tmp_path / "sql/models/orders.sql").write_text(
         'MODEL (description "Test model orders.", materialized view); SELECT id FROM __source("raw_orders")'
     )
-    (tmp_path / "sources").mkdir()
-    (tmp_path / "sources/orders.yml").write_text(
+    (tmp_path / "sql" / "sources").mkdir(parents=True)
+    (tmp_path / "sql/sources/orders.yml").write_text(
         "sources:\n"
         f"  - name: raw_orders\n    description: Test source raw_orders.\n    expression: {test_case.orders_expression}\n"
         f"  - name: raw_customers\n    description: Test source raw_customers.\n    expression: {test_case.customers_expression}\n"
@@ -125,7 +125,7 @@ def test_given_restored_project_without_catalog_when_reading_shapes_then_infers_
         project_dir=tmp_path,
         files={
             "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
-            "sources/sources.yml": sources,
+            "sql/sources/sources.yml": sources,
         },
     )
 

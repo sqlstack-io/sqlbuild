@@ -147,7 +147,7 @@ def test_given_edited_model_when_compiling_through_sqb_then_python_recompiles_th
 ) -> None:
     project_dir: Path = write_project(tmp_path / "project")
     _ = run(NATIVE_SQB, args=test_case.args, cwd=project_dir)
-    model: Path = project_dir / "models" / "orders.sql"
+    model: Path = project_dir / "sql" / "models" / "orders.sql"
     _ = model.write_text(
         model.read_text(encoding="utf-8").replace(test_case.old_text, test_case.new_text),
         encoding="utf-8",
@@ -208,7 +208,7 @@ def test_given_unchanged_project_when_sqb_serves_the_hit_then_python_never_start
     after_first: int = python_starts(marker)
     served: LauncherRun = run(program, args=test_case.args, cwd=project_dir)
     after_served: int = python_starts(marker)
-    model: Path = project_dir / "models" / "orders.sql"
+    model: Path = project_dir / "sql" / "models" / "orders.sql"
     _ = model.write_text(
         model.read_text(encoding="utf-8").replace("1 AS order_id", "2 AS order_id"),
         encoding="utf-8",
@@ -290,12 +290,12 @@ def test_given_cached_compile_when_startup_search_path_changes_then_new_helper_i
 ) -> None:
     program, startup, new_helpers = startup_install(tmp_path / "environment")
     project_dir: Path = write_project(tmp_path / "project")
-    (project_dir / "models" / "_macros" / "python").mkdir(parents=True)
-    _ = (project_dir / "models" / "_macros" / "python" / "orders.py").write_text(
+    (project_dir / "sql" / "models" / "_macros" / "python").mkdir(parents=True)
+    _ = (project_dir / "sql" / "models" / "_macros" / "python" / "orders.py").write_text(
         'import catalog_helper\n\ndef order_value() -> str:\n    """The order value."""\n    return catalog_helper.SQL\n',
         encoding="utf-8",
     )
-    model: Path = project_dir / "models" / "orders.sql"
+    model: Path = project_dir / "sql" / "models" / "orders.sql"
     _ = model.write_text(
         model.read_text().replace("1 AS order_id", "@py.order_value() AS order_id")
     )
@@ -311,5 +311,5 @@ def test_given_cached_compile_when_startup_search_path_changes_then_new_helper_i
     assert compile_timings(edited[1])["project_reuse_misses"] == test_case.expected_misses
     assert (
         test_case.expected_fragment
-        in (project_dir / "target" / "compiled" / "models" / "orders.sql").read_text()
+        in (project_dir / "target" / "compiled" / "sql" / "models" / "orders.sql").read_text()
     )

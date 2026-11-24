@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D002",
-     "message": "MODEL(...) in '<project>/models/fulfillment/marts/fulfillment_summary_0.sql' contains invalid SQLBuild header syntax: expected key at position 267"
+     "message": "MODEL(...) in '<project>/sql/models/fulfillment/marts/fulfillment_summary_0.sql' contains invalid SQLBuild header syntax: expected key at position 267"
     }
    ]
   },
@@ -20,7 +20,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D002",
-     "message": "MODEL(...) in '<project>/models/fulfillment/marts/fulfillment_summary_0.sql' contains invalid SQLBuild header syntax: expected key at position 267"
+     "message": "MODEL(...) in '<project>/sql/models/fulfillment/marts/fulfillment_summary_0.sql' contains invalid SQLBuild header syntax: expected key at position 267"
     }
    ]
   },
@@ -34,7 +34,7 @@
     "Declaration parsing  FAIL  (<elapsed>)",
     "Project assembly  FAIL  (<elapsed>)",
     "Project discovery  FAIL  (<elapsed>)",
-    "error[D002]: MODEL(...) in '<project>/models/fulfillment/marts/fulfillment_summary_0.sql' contains invalid SQLBuild header syntax: expected key at position 267",
+    "error[D002]: MODEL(...) in '<project>/sql/models/fulfillment/marts/fulfillment_summary_0.sql' contains invalid SQLBuild header syntax: expected key at position 267",
     "",
     ""
    ]

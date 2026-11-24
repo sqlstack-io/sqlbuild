@@ -47,7 +47,7 @@ _DESCRIPTION_QUOTE_HELP: str = (
 
 _RULES_CONFIG: str = '\n[rules]\nselect = ["{codes}"]\n'
 
-_ENGINE_ERROR_MACROS: str = "macros/python/cents.py"
+_ENGINE_ERROR_MACROS: str = "sql/macros/python/cents.py"
 _ENGINE_ERROR_CENTS: str = (
     'def cents(expression: str) -> str:\n    """Convert to cents."""\n'
     '    return f"({expression} * 100)"\n'
@@ -131,13 +131,17 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
             name="audit-parse",
             expected_code="D004",
             files={
-                "models/marts/_sqlbuild/audits/singular/broken.sql": "AUDIT (name);\n\nSELECT 1\n"
+                "sql/models/marts/_sqlbuild/audits/singular/broken.sql": (
+                    "AUDIT (name);\n\nSELECT 1\n"
+                )
             },
         ),
         failure_case(
             name="schema-unterminated-declaration",
             expected_code="D013",
-            files={"models/staging/_sqlbuild/_schemas/orders.sql": "SCHEMA (\n  name orders,\n"},
+            files={
+                "sql/models/staging/_sqlbuild/_schemas/orders.sql": "SCHEMA (\n  name orders,\n"
+            },
         ),
         failure_case(
             name="source-parse",
@@ -147,12 +151,12 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
         failure_case(
             name="duplicate-model",
             expected_code="D007",
-            files={"models/marts/stg_orders.sql": FAILURE_BASE_STAGING},
+            files={"sql/models/marts/stg_orders.sql": FAILURE_BASE_STAGING},
         ),
         failure_case(
             name="seed-without-header",
             expected_code="D008",
-            files={"seeds/lookups.csv": ""},
+            files={"sql/seeds/lookups.csv": ""},
         ),
         failure_case(
             name="scenario-parse",
@@ -163,7 +167,7 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
             name="python-node-missing-description",
             expected_code="P010",
             files={
-                "python/tasks/exports.py": (
+                "python/nodes/tasks/exports/asset.py": (
                     "from sqlbuild.assets import AssetContext, asset\n\n\n"
                     "@asset\ndef export_orders(ctx: AssetContext):\n    return None\n"
                 )
@@ -173,7 +177,7 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
             name="python-node-description-too-long",
             expected_code="P027",
             files={
-                "python/tasks/exports.py": (
+                "python/nodes/tasks/exports/asset.py": (
                     "from sqlbuild.assets import AssetContext, asset\n\n\n"
                     "@asset\ndef export_orders(ctx: AssetContext):\n"
                     '    """'
@@ -185,24 +189,26 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
         failure_case(
             name="enum-parse",
             expected_code="D013",
-            files={"enums/order_status.sql": "ENUM (\n  name order_status,\n  members [,\n);\n"},
+            files={
+                "sql/enums/order_status.sql": "ENUM (\n  name order_status,\n  members [,\n);\n"
+            },
         ),
         failure_case(
             name="hook-without-header",
             expected_code="D014",
-            files={"hooks/sql/record_refresh.sql": "SELECT 1\n"},
+            files={"sql/hooks/sql/record_refresh.sql": "SELECT 1\n"},
         ),
         failure_case(
             name="invalid-resource-name",
             expected_code="D016",
-            files={"models/marts/order-totals.sql": FAILURE_BASE_MART},
+            files={"sql/models/marts/order-totals.sql": FAILURE_BASE_MART},
         ),
         failure_case(
             name="built-in-audit-shadow",
             expected_code="S010",
             expected_warning_code="P003",
             files={
-                "models/staging/_sqlbuild/_audits/generic/not_null.sql": (
+                "sql/models/staging/_sqlbuild/_audits/generic/not_null.sql": (
                     'AUDIT (name "not_null");\n\nSELECT 1 WHERE FALSE\n'
                 )
             },
@@ -211,7 +217,7 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
             name="singular-audit-one-resource",
             expected_code="P004",
             files={
-                "models/marts/_sqlbuild/audits/singular/positive_totals.sql": (
+                "sql/models/marts/_sqlbuild/audits/singular/positive_totals.sql": (
                     'AUDIT (name "positive_totals");\n\n'
                     'SELECT customer_id FROM __ref("customer_totals") WHERE total_amount < 0\n'
                 )
@@ -221,7 +227,7 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
             name="macro-generated-reference",
             expected_code="P006",
             files={
-                "models/marts/_sqlbuild/_macros/python/orders.py": (
+                "sql/models/marts/_sqlbuild/_macros/python/orders.py": (
                     "def staged_orders() -> str:\n"
                     '    """Return the staged orders relation."""\n'
                     "    return '__ref(\"stg_orders\")'\n"
@@ -267,7 +273,7 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
             name="failing-macro",
             expected_code="P001",
             files={
-                "models/staging/_sqlbuild/_macros/python/cents.py": (
+                "sql/models/staging/_sqlbuild/_macros/python/cents.py": (
                     "def cents(expression: str) -> str:\n"
                     '    """Refuse every input."""\n'
                     '    raise ValueError(f"cannot convert {expression}")\n'
@@ -283,7 +289,7 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
             name="unknown-enum-member",
             expected_code="P001",
             files={
-                "models/staging/_sqlbuild/_enums/order_status.sql": (
+                "sql/models/staging/_sqlbuild/_enums/order_status.sql": (
                     "ENUM (\n  name order_status,\n  members [PLACED, SHIPPED],\n);\n"
                 ),
                 **staging_files(
@@ -300,7 +306,7 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
             name="invalid-decimal-constant",
             expected_code="D013",
             files={
-                "models/staging/_sqlbuild/_constants/limits.sql": (
+                "sql/models/staging/_sqlbuild/_constants/limits.sql": (
                     'CONSTANT (name minimum_amount, type decimal, value "ten");\n'
                 ),
                 **staging_files(FAILURE_BASE_STAGING + 'WHERE amount > @const("minimum_amount")\n'),
@@ -310,7 +316,7 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
             name="duplicate-declaration",
             expected_code="P001",
             files={
-                "models/staging/_sqlbuild/_constants/limits.sql": (
+                "sql/models/staging/_sqlbuild/_constants/limits.sql": (
                     "CONSTANT (name minimum_amount, value 1);\n"
                     "CONSTANT (name minimum_amount, value 2);\n"
                 ),
@@ -321,7 +327,7 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
             name="inaccessible-declaration",
             expected_code="P001",
             files={
-                "models/marts/_sqlbuild/_constants/limits.sql": (
+                "sql/models/marts/_sqlbuild/_constants/limits.sql": (
                     "CONSTANT (name minimum_amount, value 1);\n"
                 ),
                 **staging_files(FAILURE_BASE_STAGING + 'WHERE amount > @const("minimum_amount")\n'),
@@ -331,7 +337,7 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
             name="over-broad-global",
             expected_code="S024",
             files={
-                "constants/limits.sql": "CONSTANT (name minimum_amount, value 1);\n",
+                "sql/constants/limits.sql": "CONSTANT (name minimum_amount, value 1);\n",
                 **staging_files(FAILURE_BASE_STAGING + 'WHERE amount > @const("minimum_amount")\n'),
             },
         ),
@@ -339,7 +345,7 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
             name="unused-declaration",
             expected_code="S010",
             files={
-                "models/staging/_sqlbuild/_constants/limits.sql": (
+                "sql/models/staging/_sqlbuild/_constants/limits.sql": (
                     "CONSTANT (name spare, value 1);\n"
                 )
             },
@@ -348,14 +354,14 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
             name="macro-import-cycle",
             expected_code="P001",
             files={
-                "macros/python/first.py": (
-                    "from macros.python.second import second_value\n\n\n"
+                "sql/macros/python/first.py": (
+                    "from sql.macros.python.second import second_value\n\n\n"
                     "def first_value() -> str:\n"
                     '    """First value."""\n'
                     "    return second_value()\n"
                 ),
-                "macros/python/second.py": (
-                    "from macros.python.first import first_value\n\n\n"
+                "sql/macros/python/second.py": (
+                    "from sql.macros.python.first import first_value\n\n\n"
                     "def second_value() -> str:\n"
                     '    """Second value."""\n'
                     "    return first_value()\n"
@@ -438,7 +444,7 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
                 FAILURE_CONFIG_PATH: FAILURE_BASE_CONFIG
                 + '\n[vars]\nfloor = "2"\n'
                 + _RULES_CONFIG.format(codes="SQLCLEAN005"),
-                "models/marts/_macros/python/cents.py": _ENGINE_ERROR_CENTS,
+                "sql/models/marts/_macros/python/cents.py": _ENGINE_ERROR_CENTS,
                 **mart_body_files(
                     'WITH totals AS (SELECT customer_id, @py.cents("amount") AS cents, '
                     '@@floor AS floor_cents FROM __ref("stg_orders")), spare AS (SELECT 1 AS one)\n'
@@ -487,7 +493,7 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
                 FAILURE_MART_PATH: FAILURE_BASE_MART.replace(
                     '  description "Order totals per customer",\n', ""
                 ),
-                "models/marts/order_counts.sql": (
+                "sql/models/marts/order_counts.sql": (
                     "MODEL ();\n\nSELECT customer_id, COUNT(*) AS order_count\n"
                     'FROM __ref("stg_orders")\nGROUP BY customer_id\n'
                 ),
@@ -590,7 +596,7 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
                 "__ref(stg_orders) is not a valid __ref() call, returned by macro staged_orders()"
             ),
             files={
-                "models/marts/_sqlbuild/_macros/python/orders.py": (
+                "sql/models/marts/_sqlbuild/_macros/python/orders.py": (
                     "def staged_orders() -> str:\n"
                     '    """Return the staged orders relation."""\n'
                     "    return '__ref(stg_orders)'\n"
@@ -605,7 +611,7 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
             name="invalid-declaration-name",
             expected_code="D016",
             files={
-                "models/staging/_sqlbuild/_constants/limits.sql": (
+                "sql/models/staging/_sqlbuild/_constants/limits.sql": (
                     "CONSTANT (name MinimumAmount, value 1);\n"
                 ),
                 **staging_files(FAILURE_BASE_STAGING + 'WHERE amount > @const("MinimumAmount")\n'),
@@ -614,13 +620,13 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
         failure_case(
             name="python-node-syntax",
             expected_code="D011",
-            files={"python/tasks/exports.py": "def broken(:\n    pass\n"},
+            files={"python/nodes/tasks/exports/asset.py": "def broken(:\n    pass\n"},
         ),
         failure_case(
             name="hook-unknown-argument",
             expected_code="P001",
             files={
-                "hooks/sql/record_refresh.sql": (
+                "sql/hooks/sql/record_refresh.sql": (
                     "HOOK (\n  description \"Record a refresh\"\n);\n\nSELECT @'label' AS label\n"
                 ),
                 FAILURE_MART_PATH: FAILURE_BASE_MART.replace(
@@ -682,7 +688,7 @@ def engine_error_cases() -> tuple[FailureCase, ...]:
         failure_case(
             name="engine-error-non-ascii-digit-constant-value",
             expected_code="D013",
-            files={"constants/limits.sql": "CONSTANT (name minimum_amount, value \u0663);\n"},
+            files={"sql/constants/limits.sql": "CONSTANT (name minimum_amount, value \u0663);\n"},
             expected_message=(
                 "<project>/constants/limits.sql has the bare number '\u0663', written with "
                 "non-ASCII digits"
@@ -712,7 +718,7 @@ def engine_error_cases() -> tuple[FailureCase, ...]:
             name="engine-error-macro-description-escaped-quote",
             expected_code="P015",
             files={
-                "macros/sql/customer_label.sql": (
+                "sql/macros/sql/customer_label.sql": (
                     "MACRO (\n"
                     "  description \"A customer's label,\n"
                     'quoted (\\"VIP\\").",\n'
@@ -728,7 +734,7 @@ def engine_error_cases() -> tuple[FailureCase, ...]:
             },
             expected_message=(
                 'a double quote ends this "..." string early; use """…""" for text '
-                "containing double quotes\n  --> macros/sql/customer_label.sql:3:10"
+                "containing double quotes\n  --> sql/macros/sql/customer_label.sql:3:10"
             ),
             expected_help=_DESCRIPTION_QUOTE_HELP,
         ),
@@ -736,7 +742,7 @@ def engine_error_cases() -> tuple[FailureCase, ...]:
             name="engine-error-non-ascii-digit-bare-number",
             expected_code="D013",
             files={
-                "enums/order_priority.sql": (
+                "sql/enums/order_priority.sql": (
                     "ENUM (\n  name order_priority,\n  members (LOW 1, HIGH \u0663),\n);\n"
                 )
             },

@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P021",
-     "message": "CTE-list macro live_orders() must be called inside a WITH list\n  model: stg_orders\n  --> models/staging/stg_orders.sql:5:47",
+     "message": "CTE-list macro live_orders() must be called inside a WITH list\n  model: stg_orders\n  --> sql/models/staging/stg_orders.sql:5:47",
      "help": "call it between CTEs, such as WITH a AS (...), @sql.live_orders(a) b AS (...) SELECT ..."
     }
    ]

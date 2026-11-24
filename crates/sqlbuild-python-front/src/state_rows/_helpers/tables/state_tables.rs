@@ -30,16 +30,15 @@ const DECLARED_TYPES: [(&str, &str); 3] = [
     (TEXT_TIMESTAMP_STATE_VALUE_TYPE, "TIMESTAMP"),
 ];
 
-/// Create-if-missing DDL whose column types the adapter renders.
-pub(crate) fn state_table_create_sql<'py>(
-    qualified_name: &str,
+/// Each column with the type the adapter renders for it, and whether it is required.
+pub(crate) fn state_table_columns<'py>(
     (columns, column_types, required_columns): (
         &Bound<'py, PyAny>,
         &Bound<'py, PyAny>,
         &Bound<'py, PyAny>,
     ),
     render_framework_type: &Bound<'py, PyAny>,
-) -> PyResult<String> {
+) -> PyResult<Vec<TableColumn>> {
     let py: Python<'py> = render_framework_type.py();
     let framework_types: Bound<'py, PyAny> = host_entry(py, AdapterHost::FrameworkType)?;
     let mut rendered: Vec<(&str, String)> = Vec::with_capacity(DECLARED_TYPES.len());
@@ -64,7 +63,7 @@ pub(crate) fn state_table_create_sql<'py>(
             required: required_columns.contains(&column)?,
         });
     }
-    Ok(create_table_sql(qualified_name, &definitions))
+    Ok(definitions)
 }
 
 /// Render create-if-missing DDL for string, integer, and text-timestamp state columns.
@@ -72,15 +71,18 @@ pub(crate) fn state_table_create_sql<'py>(
 #[pyo3(signature = (**request))]
 pub(crate) fn render_create_sql(request: Option<&Bound<'_, PyDict>>) -> PyResult<String> {
     let request = Request::new("render_state_table_create_sql", request)?;
-    state_table_create_sql(
-        &request.get("qualified_name")?.extract::<String>()?,
+    let definitions: Vec<TableColumn> = state_table_columns(
         (
             &request.get("columns")?,
             &request.get("column_types")?,
             &request.get("required_columns")?,
         ),
         &request.get("render_framework_type")?,
-    )
+    )?;
+    Ok(create_table_sql(
+        &request.get("qualified_name")?.extract::<String>()?,
+        &definitions,
+    ))
 }
 
 fn adapter_user_error(py: Python<'_>, message: &str) -> PyErr {

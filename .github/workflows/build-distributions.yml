@@ -145,9 +145,8 @@ jobs:
     name: Build wheel (${{ matrix.platform.name }})
     needs: source
     runs-on: ${{ matrix.platform.runner }}
-    # Cold dist builds take up to about 2x the 17-31 minute release-profile jobs on Windows and macOS,
-    # and a cold macOS arm64 dist build has taken an hour.
-    timeout-minutes: 150
+    # Release-profile wheel jobs take about 20-40 minutes; the limit leaves room for a slow runner.
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -202,11 +201,15 @@ jobs:
         uses: PyO3/maturin-action@v1
         if: inputs.prebuilt-run-id == ''
         continue-on-error: true
+        # The extension embeds the UI as sqb does, so the sqb build below reuses the crates this
+        # build compiles instead of compiling sqlbuild-orchestration and sqlbuild-cli again.
+        env:
+          SQLBUILD_UI_REQUIRED: "1"
         with:
           command: build
           # One platform records a cargo build timing report for build time work.
           args: >-
-            --profile ${{ inputs.cargo-profile }} --out dist --features extension-module
+            --profile ${{ inputs.cargo-profile }} --out dist --features extension-module,sqlbuild-cli/ui
             ${{ matrix.platform.name == 'linux-x86_64' && '--timings' || '' }}
           target: ${{ matrix.platform.target }}
           manylinux: auto
@@ -215,11 +218,13 @@ jobs:
         uses: PyO3/maturin-action@v1
         if: inputs.prebuilt-run-id == '' && steps.extension.outcome == 'failure'
         continue-on-error: ${{ runner.os != 'Linux' }}
+        env:
+          SQLBUILD_UI_REQUIRED: "1"
         with:
           command: build
           # One platform records a cargo build timing report for build time work.
           args: >-
-            --profile ${{ inputs.cargo-profile }} --out dist --features extension-module
+            --profile ${{ inputs.cargo-profile }} --out dist --features extension-module,sqlbuild-cli/ui
             ${{ matrix.platform.name == 'linux-x86_64' && '--timings' || '' }}
           target: ${{ matrix.platform.target }}
           manylinux: auto
@@ -229,8 +234,9 @@ jobs:
           && steps.extension.outcome == 'failure' && steps.extension-retry.outcome == 'failure'
         shell: bash
         env:
+          SQLBUILD_UI_REQUIRED: "1"
           MATURIN_ARGS: >-
-            --profile ${{ inputs.cargo-profile }} --out dist --features extension-module
+            --profile ${{ inputs.cargo-profile }} --out dist --features extension-module,sqlbuild-cli/ui
           TARGET: ${{ matrix.platform.target }}
         run: scripts/maturin_from_pypi.sh build ${MATURIN_ARGS}
       - id: cli

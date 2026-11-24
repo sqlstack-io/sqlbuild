@@ -481,7 +481,7 @@ pub struct RunEventRecord {
     pub outcome: Option<String>,
     pub row_count: Option<i64>,
     pub affected_rows: Option<i64>,
-    /// A summary the scheduler writes for a group run's member events, such as a member retry; never error or SQL text.
+    /// A summary of what an event names, such as a member retry or the command a worker started; never error or SQL text.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
     /// For a check's result: its name as declared, its ID and this result's, and the rows it found; never its SQL or rows.
@@ -493,6 +493,15 @@ pub struct RunEventRecord {
     pub check_result_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub check_rows: Option<i64>,
+    /// For a phase of a worker's command, such as `compiled` or `planned`: what it counted, what it is about and its sub-steps.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phase: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phase_count: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phase_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phase_detail: Option<String>,
 }
 
 /// One error-severity audit failure a run or one of its current members let through; never its SQL or evidence.
@@ -1181,4 +1190,15 @@ pub struct SelectionVocabulary {
 pub struct VocabularyEntry {
     pub value: String,
     pub count: u64,
+}
+
+/// The nodes a selection picks in the current publication, as a person may view them.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ViewedSelection {
+    /// The publication evaluated; None before the first one.
+    pub snapshot_id: Option<Uuid>,
+    /// Every picked key; None for an empty selection, which is every node.
+    pub keys: Option<std::collections::BTreeSet<String>>,
+    /// Why `sqb` refuses the selection; then no key is picked.
+    pub error: Option<SelectionProblem>,
 }

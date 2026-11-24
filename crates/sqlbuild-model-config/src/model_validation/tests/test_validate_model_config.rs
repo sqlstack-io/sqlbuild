@@ -24,14 +24,14 @@ fn given_effective_configs_when_validating_natively_then_python_outcomes_result(
             config: vec![("materialized", Value::Str("table"))],
             references: &["ref:invoices"],
             query_sql: "select 1",
-            expected_outcome: "Model file models/marts/orders_daily.sql references unknown model 'invoices'",
+            expected_outcome: "Model file sql/models/marts/orders_daily.sql references unknown model 'invoices'",
         },
         ValidateTestCase {
             description: "a table function called as a scalar function",
             config: vec![],
             references: &["udf:order_lines"],
             query_sql: "select 1",
-            expected_outcome: "Model file models/marts/orders_daily.sql references table function 'order_lines' with __udf(); use __table_fn() in SQL contexts that support table-valued functions",
+            expected_outcome: "Model file sql/models/marts/orders_daily.sql references table function 'order_lines' with __udf(); use __table_fn() in SQL contexts that support table-valued functions",
         },
         ValidateTestCase {
             description: "a model marked critical for review",

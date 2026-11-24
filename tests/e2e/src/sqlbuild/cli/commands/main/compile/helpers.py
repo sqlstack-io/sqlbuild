@@ -151,7 +151,7 @@ def prepare_semantic_corpus_project(
         path.write_text(contents, encoding="utf-8")
     ignored: str = ", ".join(f'"{code}"' for code in test_case.ignored_rules)
     ignore_entry: str = (
-        f'\n[[rules.rule_ignores]]\nrules = [{ignored}]\npaths = ["models/**"]\n'
+        f'\n[[rules.rule_ignores]]\nrules = [{ignored}]\npaths = ["sql/models/**"]\n'
         'reason = "The probe SQL exercises compiler semantics, not this Rule."\n'
     )
     with (project / "sqlbuild_project.toml").open("a", encoding="utf-8") as config:
@@ -384,7 +384,7 @@ def run_test_heavy_compile_benchmark(
         project_dir=project_dir,
         expected_max_seconds=expected_warm_max_seconds,
     )
-    _append_benchmark_edit(project_dir / "models" / "model_00000.sql", "model")
+    _append_benchmark_edit(project_dir / "sql" / "models" / "model_00000.sql", "model")
     model_edit_seconds: float = _run_compile_benchmark(
         project_dir=project_dir,
         expected_max_seconds=expected_edit_max_seconds,
@@ -457,7 +457,7 @@ def run_layered_production_compile_benchmark(
         project_dir=project_dir,
         expected_max_seconds=expected_edit_max_seconds,
     )
-    macro_path: Path = project_dir / "macros" / "python" / "macro_00000.py"
+    macro_path: Path = project_dir / "sql" / "macros" / "python" / "macro_00000.py"
     _replace_benchmark_text(
         path=macro_path,
         old='return f"({expression} + 0)"',
@@ -1273,11 +1273,11 @@ def _generated_model_path(project_dir: Path, index: int) -> Path:
         (False, True): "intermediate",
         (False, False): "mart",
     }[(layer_index < 4, layer_index < 8)]
-    return project_dir / "models" / folder / f"model_{index:05d}.sql"
+    return project_dir / "sql" / "models" / folder / f"model_{index:05d}.sql"
 
 
 def measure_model_sql_bytes(project_dir: Path) -> int:
-    return sum(path.stat().st_size for path in (project_dir / "models").rglob("*.sql"))
+    return sum(path.stat().st_size for path in (project_dir / "sql" / "models").rglob("*.sql"))
 
 
 def measure_compiled_test_sql_bytes(project_dir: Path) -> int:
@@ -1288,7 +1288,7 @@ def measure_compiled_test_sql_bytes(project_dir: Path) -> int:
 def measure_declared_model_columns(project_dir: Path) -> int:
     return sum(
         path.read_text(encoding="utf-8").count("(type ")
-        for path in (project_dir / "models").rglob("*.sql")
+        for path in (project_dir / "sql" / "models").rglob("*.sql")
     )
 
 
@@ -1314,7 +1314,7 @@ def write_advanced_compile_project(
     model_count: int,
     scan_event_lines_per_model: int = 0,
 ) -> None:
-    models_dir: Path = project_dir / "models"
+    models_dir: Path = project_dir / "sql" / "models"
     models_dir.mkdir(parents=True)
     _write_compile_project_config(project_dir)
     base_model_sql: str = _with_reference_scan_workload(
@@ -1333,7 +1333,7 @@ def write_advanced_compile_project(
 
 
 def write_dbt_shaped_compile_project(*, project_dir: Path, model_count: int) -> None:
-    models_dir: Path = project_dir / "models"
+    models_dir: Path = project_dir / "sql" / "models"
     models_dir.mkdir(parents=True)
     _write_compile_project_config(project_dir)
     base_model_sql: str = _with_base_generated_logic(
@@ -1357,7 +1357,7 @@ def write_test_heavy_compile_project(
     chain_depth: int,
     fixture_row_count: int,
 ) -> None:
-    models_dir: Path = project_dir / "models"
+    models_dir: Path = project_dir / "sql" / "models"
     tests_dir: Path = project_dir / "tests" / "unit"
     models_dir.mkdir(parents=True)
     tests_dir.mkdir(parents=True)
@@ -1400,7 +1400,7 @@ def _write_compile_project_config(project_dir: Path) -> None:
                 "",
                 "[[rules.rule_ignores]]",
                 'rules = ["SQLCLEAN018"]',
-                'paths = ["models/**"]',
+                'paths = ["sql/models/**"]',
                 'reason = "The generated workload ranks by a non-unique id; keep its SQL stable."',
                 "",
             )
@@ -1780,7 +1780,7 @@ materialized = "table"
 
 {rules_selection}[[rules.rule_ignores]]
 rules = ["SQLCLEAN039"]
-paths = ["models/**"]
+paths = ["sql/models/**"]
 reason = "The workload mixes nested query shapes on purpose to cover their compile path."
 """,
         encoding="utf-8",
@@ -1788,8 +1788,8 @@ reason = "The workload mixes nested query shapes on purpose to cover their compi
 
 
 def _layered_write_sources(*, project_dir: Path, source_count: int) -> None:
-    sources_dir: Path = project_dir / "sources"
-    sources_dir.mkdir()
+    sources_dir: Path = project_dir / "sql" / "sources"
+    sources_dir.mkdir(parents=True)
     entries: str = "\n".join(
         f"""  - name: source_{index:05d}
     description: Test source source_{index:05d}.
@@ -1807,8 +1807,8 @@ def _layered_write_sources(*, project_dir: Path, source_count: int) -> None:
 
 
 def _layered_write_seeds(*, project_dir: Path, seed_count: int) -> None:
-    seeds_dir: Path = project_dir / "seeds"
-    seeds_dir.mkdir()
+    seeds_dir: Path = project_dir / "sql" / "seeds"
+    seeds_dir.mkdir(parents=True)
     schema_entries: str = "\n".join(
         f"""  - name: seed_{index:05d}
     description: Test seed seed_{index:05d}.
@@ -1828,7 +1828,7 @@ def _layered_write_seeds(*, project_dir: Path, seed_count: int) -> None:
 
 
 def _layered_write_functions(*, project_dir: Path, function_count: int) -> None:
-    functions_dir: Path = project_dir / "functions" / "sql"
+    functions_dir: Path = project_dir / "sql" / "functions" / "sql"
     functions_dir.mkdir(parents=True)
     for index in range(function_count):
         (functions_dir / f"fn_{index:05d}.sql").write_text(
@@ -1844,7 +1844,7 @@ input_value + 1
 
 
 def _layered_write_macros(*, project_dir: Path, macro_count: int) -> None:
-    macros_dir: Path = project_dir / "macros" / "python"
+    macros_dir: Path = project_dir / "sql" / "macros" / "python"
     macros_dir.mkdir(parents=True)
     for index in range(macro_count):
         composed_dependency: str = {
@@ -1878,17 +1878,19 @@ def _scope_single_folder_macros(*, project_dir: Path) -> None:
     """Move each macro beside its only consuming folder and drop unused macros."""
 
     consumer_folders: dict[str, set[str]] = {}
-    for model_path in sorted((project_dir / "models").rglob("*.sql")):
+    for model_path in sorted((project_dir / "sql" / "models").rglob("*.sql")):
         for call in _BENCHMARK_MACRO_CALL.findall(model_path.read_text(encoding="utf-8")):
             consumer_folders.setdefault(call, set()).add(model_path.parent.name)
-    macros_dir: Path = project_dir / "macros" / "python"
+    macros_dir: Path = project_dir / "sql" / "macros" / "python"
     generated: set[str] = {path.stem for path in macros_dir.glob("macro_*.py")}
     for unused_stem in sorted(generated - set(consumer_folders)):
         (macros_dir / f"{unused_stem}.py").unlink()
     assert all(len(folders) == 1 for folders in consumer_folders.values())
     for stem, folders in sorted(consumer_folders.items()):
         (folder,) = folders
-        scoped_dir: Path = project_dir / "models" / folder / "_sqlbuild" / "_macros" / "python"
+        scoped_dir: Path = (
+            project_dir / "sql" / "models" / folder / "_sqlbuild" / "_macros" / "python"
+        )
         scoped_dir.mkdir(parents=True, exist_ok=True)
         (macros_dir / f"{stem}.py").rename(scoped_dir / f"{stem}.py")
 
@@ -1897,7 +1899,7 @@ def _layered_write_schemas(*, project_dir: Path) -> None:
     """Write the contract schema beside its only consumer, the first staging model."""
 
     schemas_dir: Path = (
-        project_dir / "models" / _layered_model_folder(index=0) / "_sqlbuild" / "_schemas"
+        project_dir / "sql" / "models" / _layered_model_folder(index=0) / "_sqlbuild" / "_schemas"
     )
     schemas_dir.mkdir(parents=True)
     (schemas_dir / "benchmark_row.sql").write_text(
@@ -1926,7 +1928,7 @@ def _layered_write_models(
 ) -> None:
     for index in range(model_count):
         folder: str = _layered_model_folder(index=index)
-        model_dir: Path = project_dir / "models" / folder
+        model_dir: Path = project_dir / "sql" / "models" / folder
         model_dir.mkdir(parents=True, exist_ok=True)
         sql: str = _layered_model_sql(
             index=index,
@@ -2112,7 +2114,7 @@ def _semantic_write_models(
     macro_call_interval: int = _MACRO_INTERVAL,
 ) -> None:
     for index in range(model_count):
-        model_dir: Path = project_dir / "models" / _layered_model_folder(index=index)
+        model_dir: Path = project_dir / "sql" / "models" / _layered_model_folder(index=index)
         model_dir.mkdir(parents=True, exist_ok=True)
         column_count: int = _semantic_model_column_count(index=index, model_count=model_count)
         builders: dict[bool, Callable[[], str]] = {
@@ -2320,7 +2322,7 @@ def write_shared_diamond_models(*, project_dir: Path, layer_count: int, width: i
     exponentially many paths, and the rollup fans the final layer back in.
     """
 
-    model_dir: Path = project_dir / "models" / _SHARED_DIAMOND_FOLDER
+    model_dir: Path = project_dir / "sql" / "models" / _SHARED_DIAMOND_FOLDER
     model_dir.mkdir(parents=True)
     files: dict[str, str] = {
         SHARED_DIAMOND_HUB: _shared_diamond_sql(inputs=(_SHARED_DIAMOND_UPSTREAM_MODEL,)),
@@ -2515,19 +2517,19 @@ def build_rule_gated_test_project_files(*, filler_model_count: int) -> dict[str,
         "sqlbuild_project.toml": (
             'name = "rule_gated_orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRMODEL102"]\n'
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n"
             "  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n    table: raw_orders\n"
             "  - name: raw_refunds\n    description: Test source raw_refunds.\n"
             "    schema: main\n    table: raw_refunds\n"
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             "MODEL (description 'Test model orders.', materialized view);\n\n"
             'SELECT o.order_id, r.refund_id FROM __source("raw_orders") AS o\n'
             'LEFT JOIN __source("raw_refunds") AS r ON r.order_id = o.order_id\n'
         ),
-        "models/bad_star.sql": (
+        "sql/models/bad_star.sql": (
             'MODEL (description "Test model bad_star.", '
             'materialized view);\n\nSELECT * FROM __source("raw_orders")\n'
         ),
@@ -2540,7 +2542,7 @@ def build_rule_gated_test_project_files(*, filler_model_count: int) -> dict[str,
         ),
     }
     for index in range(filler_model_count):
-        files[f"models/filler/filler_{index:03d}.sql"] = (
+        files[f"sql/models/filler/filler_{index:03d}.sql"] = (
             "MODEL (description 'Test model.', "
             f"materialized view);\n\nSELECT {index} AS filler_id\n"
         )
@@ -2566,24 +2568,24 @@ def build_empty_input_test_project_files(
             "[rules.thresholds]\nmin_tests_per_model = 1\n\n"
             f"[rules.rule_options.SQBRTEST203]\nallowed_tests = {allowed_tests_toml}\n"
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n    table: raw_orders\n"
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             "MODEL (description 'Test model orders.', materialized view);\n\n"
             "SELECT order_id, amount * 2 AS doubled_amount\n"
             'FROM __source("raw_orders")\nWHERE amount > 0\n'
         ),
-        "models/large_orders.sql": (
+        "sql/models/large_orders.sql": (
             "MODEL (description 'Test model large_orders.', materialized view);\n\n"
             'SELECT order_id FROM __source("raw_orders") WHERE amount > 100\n'
         ),
-        "models/customers.sql": (
+        "sql/models/customers.sql": (
             "MODEL (description 'Test model customers.', materialized view);\n\n"
             'SELECT order_id AS customer_id FROM __source("raw_orders") WHERE amount > 10\n'
         ),
-        "models/order_summary.sql": (
+        "sql/models/order_summary.sql": (
             "MODEL (description 'Test model order_summary.', materialized view);\n\n"
             "SELECT COUNT(*) AS order_count, COALESCE(SUM(amount), 0) AS total_amount\n"
             'FROM __source("raw_orders")\n'
@@ -2690,7 +2692,7 @@ def change_benchmark_models(
 
 
 def _benchmark_model_path(*, project_dir: Path, name: str) -> Path:
-    return next((project_dir / "models").rglob(f"{name}.sql"))
+    return next((project_dir / "sql" / "models").rglob(f"{name}.sql"))
 
 
 def plan_reasons_and_migrations(
@@ -2733,21 +2735,21 @@ def write_relation_stub_project(
                 'schema = "main"\n\n'
                 "[[rules.rule_ignores]]\n"
                 'rules = ["SQLCLEAN005"]\n'
-                'paths = ["models/order_status.sql"]\n'
+                'paths = ["sql/models/order_status.sql"]\n'
                 'reason = "The stub-named CTE is left unread on purpose."\n'
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Test model orders.', "
                 "materialized table);\n\nSELECT CAST(7 AS INTEGER) AS order_id\n"
             ),
-            "models/order_status.sql": (
+            "sql/models/order_status.sql": (
                 "MODEL (description 'Test model order_status.', materialized table);\n\n"
                 f"WITH {stub_cte_name} AS (\n"
                 "  SELECT 'pending' AS order_id, 'pending' AS ghost_status\n"
                 ")\n"
                 f'SELECT {selected_column} FROM __ref("orders")\n'
             ),
-            "models/next_order.sql": (
+            "sql/models/next_order.sql": (
                 "MODEL (description 'Test model next_order.',\n"
                 "  materialized table,\n"
                 "  contract enforced,\n"
@@ -2765,13 +2767,13 @@ _COMPILE_CACHE_DIAGNOSTIC_PATTERN: re.Pattern[str] = re.compile(
     r"^(?:error|warning)\[.*$", re.MULTILINE
 )
 _COMPILE_CACHE_EXTRA_PROJECT_FILES: dict[str, str] = {
-    "models/marts/_sqlbuild/_enums/order_channel.sql": (
+    "sql/models/marts/_sqlbuild/_enums/order_channel.sql": (
         'ENUM (\n  name order_channel,\n  members (WEB "web", PARTNER "partner"),\n);\n'
     ),
-    "models/marts/_sqlbuild/_constants/min_quantity.sql": (
+    "sql/models/marts/_sqlbuild/_constants/min_quantity.sql": (
         "CONSTANT (name min_quantity, value 1);\n"
     ),
-    "models/marts/channel_orders.sql": (
+    "sql/models/marts/channel_orders.sql": (
         "MODEL (description 'Test model channel_orders.',\n"
         "  materialized table,\n"
         "  columns (\n"
@@ -2914,7 +2916,7 @@ def prepare_compile_cache_invalidation_project(*, project_dir: Path) -> None:
     )
 
 
-RESOURCE_SQL_MODELS: str = "models/staging"
+RESOURCE_SQL_MODELS: str = "sql/models/staging"
 RESOURCE_SQL_ORDERS: str = f"{RESOURCE_SQL_MODELS}/orders.sql"
 RESOURCE_SQL_SINGULAR_AUDIT: str = (
     f"{RESOURCE_SQL_MODELS}/_sqlbuild/audits/singular/orders_have_customers.sql"
@@ -3062,7 +3064,7 @@ def write_set_operation_project(
         ),
     }
     for model in models:
-        files[f"models/{model.name}.sql"] = (
+        files[f"sql/models/{model.name}.sql"] = (
             "MODEL (description 'Test model.', materialized view, schema analytics);\n\n"
             f"{model.query_sql}\n"
         )
@@ -3135,7 +3137,7 @@ def format_set_operation_models(
 ) -> tuple[subprocess.CompletedProcess[str], tuple[str, ...]]:
     """Format every model and return the result and any set-operation lines left indented."""
 
-    models_dir: Path = project_dir / "models"
+    models_dir: Path = project_dir / "sql" / "models"
     formatted: subprocess.CompletedProcess[str] = run_sqb(
         project_dir=project_dir, command=("format", str(models_dir))
     )
@@ -3192,11 +3194,11 @@ def write_union_fixture_test_project(
             f'name = "orders"\nadapter = "duckdb"\n[connection]\n'
             f'database = "{project_dir / "orders.duckdb"}"\n[rules]\nselect = []\n'
         ),
-        "models/base_orders.sql": (
+        "sql/models/base_orders.sql": (
             "MODEL (description 'Test model base_orders.', materialized view);\n\n"
             "SELECT 1 AS order_id, CAST(1 AS DOUBLE) AS amount, 'open' AS status\n"
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             "MODEL (description 'Test model orders.', materialized view);\n\n"
             'SELECT b.order_id, b.amount, b.status FROM __ref("base_orders") AS b\n'
         ),
@@ -3259,7 +3261,7 @@ def hooked_model_file(*, model_name: str, hook: str) -> tuple[str, str]:
     """Return a described model file whose post hook references ``hook``."""
 
     return (
-        f"models/{model_name}.sql",
+        f"sql/models/{model_name}.sql",
         f'MODEL (description "Orders with a hook", post_hooks [{hook}]);\n\nSELECT 1 AS order_id\n',
     )
 
@@ -3298,7 +3300,7 @@ def compile_inline_files(
         project_name="orders",
         repo_files={
             "sqlbuild_project.toml": REQUIRED_DESCRIPTIONS_PROJECT,
-            "models/orders.sql": _REQUIRED_DESCRIPTIONS_ORDERS_MODEL,
+            "sql/models/orders.sql": _REQUIRED_DESCRIPTIONS_ORDERS_MODEL,
             **dict(files),
         },
     )
@@ -3366,36 +3368,36 @@ _PHASE_DURATION: re.Pattern[str] = re.compile(r"  \(\d+\.\d+s\)")
 _PROGRESS_LINE: re.Pattern[str] = re.compile(r".+  (START|OK  \(\d+\.\d+s\))")
 _COMPILE_TIMINGS_PATTERN: re.Pattern[str] = re.compile(r'\n  "compile_timings": \{[^{}]*\n  \}')
 _COMPILE_REUSE_EXTRA_PROJECT_FILES: dict[str, str] = {
-    "macros/python/_rounding.py": (
+    "sql/macros/python/_rounding.py": (
         "_SCALE: int = 2\n\n\ndef scale() -> int:\n"
         '    """Return the rounding scale."""\n    return _SCALE\n'
     ),
-    "macros/python/currency.py": (
-        '"""Project-wide currency macros."""\n\nfrom macros.python._rounding import scale\n\n\n'
+    "sql/macros/python/currency.py": (
+        '"""Project-wide currency macros."""\n\nfrom sql.macros.python._rounding import scale\n\n\n'
         "def line_total_cents(price_cents: str, quantity: str) -> str:\n"
         '    """Calculate line total cents from a unit price and quantity."""\n'
         '    return f"ROUND({price_cents} * {quantity}, {scale()})"\n'
     ),
-    "models/marts/regional_orders.sql": (
+    "sql/models/marts/regional_orders.sql": (
         "MODEL (description 'Orders tagged with the configured region.');\n\n"
         f"SELECT order_id, '@@ENV:{COMPILE_REUSE_REGION_ENV_VAR}' AS region "
         'FROM __ref("stg_orders")\n'
     ),
-    "models/marts/_sqlbuild/_macros/python/order_source.py": (
+    "sql/models/marts/_sqlbuild/_macros/python/order_source.py": (
         '"""Mart relation macros."""\n\n\n'
         "def order_source() -> str:\n"
         '    """Return the relation orders are read from."""\n'
         "    return '__ref(\"stg_orders\")'\n"
     ),
-    "models/marts/referenced_orders.sql": (
+    "sql/models/marts/referenced_orders.sql": (
         "MODEL (description 'Orders read through a direct reference.');\n\n"
         'SELECT order_id FROM __ref("stg_orders")\n'
     ),
-    "models/marts/macro_sourced_orders.sql": (
+    "sql/models/marts/macro_sourced_orders.sql": (
         "MODEL (description 'Orders read through a macro-built reference.');\n\n"
         "SELECT order_id FROM @py.order_source()\n"
     ),
-    "models/marts/var_sourced_orders.sql": (
+    "sql/models/marts/var_sourced_orders.sql": (
         "MODEL (description 'Orders read through a variable reference.');\n\n"
         'SELECT order_id FROM __ref("@@orders_model")\n'
     ),
@@ -3540,9 +3542,9 @@ def write_recording_sink(
     kinds: str = ", ".join(f"LifecycleEventKind.{kind}" for kind in event_kinds)
     write_project_file(
         project_dir,
-        f"sinks/{sink_name}.py",
+        f"python/event_sinks/{sink_name}.py",
         "import os\nfrom pathlib import Path\n\n"
-        "from sqlbuild.sinks import (\n    LifecycleEvent,\n    LifecycleEventKind,\n"
+        "from sqlbuild.event_sinks import (\n    LifecycleEvent,\n    LifecycleEventKind,\n"
         "    lifecycle_event_sink,\n    lifecycle_event_to_json,\n)\n\n\n"
         f'@lifecycle_event_sink(name="{sink_name}", '
         f"event_kinds={{{kinds}}})\n"
@@ -3576,7 +3578,7 @@ def compile_reuse_entry_paths(*, project_dir: Path) -> tuple[Path, ...]:
 def touch_model_without_change(project_dir: Path) -> None:
     """Move a model's mtime forward without changing its content."""
 
-    path: Path = project_dir / "models/staging/stg_orders.sql"
+    path: Path = project_dir / "sql/models/staging/stg_orders.sql"
     mtime_ns: int = path.stat().st_mtime_ns + _FUTURE_MTIME_OFFSET_NS
     os.utime(path, ns=(mtime_ns, mtime_ns))
 
@@ -3584,27 +3586,27 @@ def touch_model_without_change(project_dir: Path) -> None:
 def rewrite_macro_without_change(project_dir: Path) -> None:
     """Rewrite a macro file with identical bytes."""
 
-    path: Path = project_dir / "macros/python/currency.py"
+    path: Path = project_dir / "sql/macros/python/currency.py"
     path.write_bytes(path.read_bytes())
 
 
 def delete_compiled_model(project_dir: Path) -> None:
     """Delete one compiled artifact by hand."""
 
-    (project_dir / "target/compiled/models/marts/regional_orders.sql").unlink()
+    (project_dir / "target/compiled/sql/models/marts/regional_orders.sql").unlink()
 
 
 def edit_compiled_model(project_dir: Path) -> None:
     """Edit one compiled artifact by hand."""
 
-    path: Path = project_dir / "target/compiled/models/marts/regional_orders.sql"
+    path: Path = project_dir / "target/compiled/sql/models/marts/regional_orders.sql"
     path.write_text(path.read_text(encoding="utf-8") + "-- edited by hand\n", encoding="utf-8")
 
 
 def add_stale_compiled_file(project_dir: Path) -> None:
     """Add a compiled artifact that no model produces."""
 
-    write_project_file(project_dir, "target/compiled/models/stale_model.sql", "SELECT 1\n")
+    write_project_file(project_dir, "target/compiled/sql/models/stale_model.sql", "SELECT 1\n")
 
 
 COMPILED_TREE_STAMP_FILE_NAME: str = "compiled-tree.bin"
@@ -3619,7 +3621,7 @@ def compiled_tree_stamp_path(*, project_dir: Path) -> Path:
 def add_stale_compiled_file_beside_models(project_dir: Path) -> None:
     """Add an unmanaged compiled file to a folder that already holds compiled models."""
 
-    write_project_file(project_dir, "target/compiled/models/marts/stale_mart.sql", "SELECT 1\n")
+    write_project_file(project_dir, "target/compiled/sql/models/marts/stale_mart.sql", "SELECT 1\n")
 
 
 def link_compiled_root(project_dir: Path) -> None:
@@ -3719,7 +3721,7 @@ def write_orders_api_provider(*, project_dir: Path) -> None:
 
     write_project_file(
         project_dir,
-        "providers/orders_api.py",
+        "python/providers/orders_api.py",
         "from pydantic_settings import SettingsConfigDict\n"
         "from sqlbuild.providers import Provider\n\n\n"
         "class OrdersApi(Provider):\n"
@@ -3737,7 +3739,7 @@ def write_custom_source_provider(project_dir: Path) -> None:
 
     write_project_file(
         project_dir,
-        "providers/orders_vault.py",
+        "python/providers/orders_vault.py",
         "from pydantic_settings import BaseSettings, PydanticBaseSettingsSource\n"
         "from sqlbuild.providers import Provider\n\n\n"
         "class OrdersVault(Provider):\n"
@@ -3806,14 +3808,14 @@ def write_before_reuse_store(
 def edit_project_model_during_compile(project_dir: Path) -> None:
     """Change one model's bytes after the compile read it and before it stores."""
 
-    path: Path = project_dir / "models/staging/stg_orders.sql"
+    path: Path = project_dir / "sql/models/staging/stg_orders.sql"
     path.write_bytes(path.read_bytes() + b"\n")
 
 
 def rewrite_compiled_model_unchanged(project_dir: Path) -> None:
     """Rewrite one compiled artifact with the bytes it already holds."""
 
-    path: Path = project_dir / "target/compiled/models/marts/regional_orders.sql"
+    path: Path = project_dir / "target/compiled/sql/models/marts/regional_orders.sql"
     path.write_bytes(path.read_bytes())
 
 
@@ -4012,7 +4014,7 @@ def write_generated_edit_models(*, project_dir: Path, model_count: int, seed: in
     )
     twin_chooser: random.Random = random.Random(seed + 3)
     for index, upstream in enumerate(upstreams):
-        name: str = f"models/generated/{GENERATED_EDIT_MODEL_PREFIX}{index:03d}"
+        name: str = f"sql/models/generated/{GENERATED_EDIT_MODEL_PREFIX}{index:03d}"
         contents: str = (_generated_edit_model_sql, _generated_star_model_sql)[
             star_chooser.random() < _STAR_MODEL_SHARE
         ](upstream=upstream)
@@ -4069,8 +4071,8 @@ class RandomEditChain:
     def __init__(self, *, project_dir: Path, seed: int) -> None:
         self._project_dir: Path = project_dir
         self._random: random.Random = random.Random(seed)
-        self._broken: Path = project_dir / "models" / "generated" / "unbroken.sql"
-        self._dropped: Path = project_dir / "models" / "generated" / "undropped.sql"
+        self._broken: Path = project_dir / "sql" / "models" / "generated" / "unbroken.sql"
+        self._dropped: Path = project_dir / "sql" / "models" / "generated" / "undropped.sql"
         self._added: int = 0
         self._interventions: random.Random = random.Random(seed + 1)
 
@@ -4090,7 +4092,7 @@ class RandomEditChain:
         models: list[Path] = list(
             filter(
                 lambda model: anchor in model.read_text(encoding="utf-8"),
-                sorted((self._project_dir / "models" / "generated").glob("*.sql")),
+                sorted((self._project_dir / "sql" / "models" / "generated").glob("*.sql")),
             )
         )
         edit: Callable[[Path], None] = getattr(self, f"_{kind}")
@@ -4139,14 +4141,14 @@ class RandomEditChain:
         self._added += 1
         write_project_file(
             self._project_dir,
-            f"models/generated/added_step_{self._added:03d}.sql",
+            f"sql/models/generated/added_step_{self._added:03d}.sql",
             _generated_edit_model_sql(upstream=model.stem),
         )
 
     def _macro_edit(self, _model: Path) -> None:
         scale: str = f"_SCALE: int = {2 + self._random.randrange(3)}"
         self._rewrite(
-            self._project_dir / "macros" / "python" / "_rounding.py",
+            self._project_dir / "sql" / "macros" / "python" / "_rounding.py",
             lambda contents: re.sub(r"_SCALE: int = \d+", scale, contents),
         )
 
@@ -4158,10 +4160,10 @@ class RandomEditChain:
         )
 
 
-STG_ORDERS_MODEL: str = "models/staging/stg_orders.sql"
-STG_PAYMENTS_MODEL: str = "models/staging/stg_payments.sql"
-FACT_ORDERS_MODEL: str = "models/marts/fact_orders.sql"
-DIM_CUSTOMERS_ARTIFACT: str = "target/compiled/models/marts/dim_customers.sql"
+STG_ORDERS_MODEL: str = "sql/models/staging/stg_orders.sql"
+STG_PAYMENTS_MODEL: str = "sql/models/staging/stg_payments.sql"
+FACT_ORDERS_MODEL: str = "sql/models/marts/fact_orders.sql"
+DIM_CUSTOMERS_ARTIFACT: str = "target/compiled/sql/models/marts/dim_customers.sql"
 _FACT_QUANTITY_TYPE: str = "    quantity (type INTEGER),\n"
 _FACT_ORDER_ID_COLUMN: str = "    order_id (nullable false, audits [not_null]),\n"
 
@@ -4229,11 +4231,11 @@ INTERVENING_COMMANDS: tuple[Callable[[Path], None], ...] = (
     compile_without_reuse_between,
 )
 _STAR_CHAIN_MODELS: dict[str, str] = {
-    "models/marts/chain_mid.sql": (
+    "sql/models/marts/chain_mid.sql": (
         "MODEL (description 'Every staged order column.', materialized view);\n\n"
         'SELECT * FROM __ref("stg_orders")\n'
     ),
-    "models/marts/chain_leaf.sql": (
+    "sql/models/marts/chain_leaf.sql": (
         "MODEL (description 'Every chained order column.', materialized view);\n\n"
         'SELECT * FROM __ref("chain_mid")\n'
     ),
@@ -4241,14 +4243,14 @@ _STAR_CHAIN_MODELS: dict[str, str] = {
 _STAGING_LAST_COLUMN: str = "  status\nFROM __source"
 
 
-_TWIN_MODEL: str = "models/marts/chain_a_twin.sql"
+_TWIN_MODEL: str = "sql/models/marts/chain_a_twin.sql"
 
 
 def star_chain_with_twin_added(root: Path) -> None:
     """Add the star chain and a twin of its leaf with the same SQL, so both share a cache key."""
 
     star_chain_added(root)
-    write_project_file(root, _TWIN_MODEL, _STAR_CHAIN_MODELS["models/marts/chain_leaf.sql"])
+    write_project_file(root, _TWIN_MODEL, _STAR_CHAIN_MODELS["sql/models/marts/chain_leaf.sql"])
 
 
 def twin_header_changed(root: Path) -> None:
@@ -4363,7 +4365,7 @@ def payment_expression_type_change(root: Path) -> None:
 
     replace_project_text(
         root,
-        "sources/raw.yml",
+        "sql/sources/raw.yml",
         "SELECT 1 AS id, 1 AS order_id,",
         "SELECT 1 AS id, CAST(1 AS BIGINT) AS order_id,",
     )
@@ -4374,7 +4376,7 @@ def completed_order_udf_signature_change(root: Path) -> None:
 
     replace_project_text(
         root,
-        "functions/sql/udf__is_completed_order.sql",
+        "sql/functions/sql/udf__is_completed_order.sql",
         "returns BOOLEAN,\n);\n\norder_status = 'completed'",
         "returns INTEGER,\n);\n\nCAST(order_status = 'completed' AS INTEGER)",
     )
@@ -4385,7 +4387,7 @@ def order_status_nullability_change(root: Path) -> None:
 
     replace_project_text(
         root,
-        "sources/raw.yml",
+        "sql/sources/raw.yml",
         "      - name: status\n        type: VARCHAR\n",
         "      - name: status\n        type: VARCHAR\n        nullable: false\n",
     )
@@ -4699,7 +4701,7 @@ def add_external_flavor_macro(*, project_dir: Path, extlib: Path, value: str) ->
     write_external_flavor(extlib, value)
     write_project_file(
         project_dir,
-        "models/marts/_sqlbuild/_macros/python/flavor.py",
+        "sql/models/marts/_sqlbuild/_macros/python/flavor.py",
         '"""Flavor macros backed by an outside module."""\n\n\n'
         "def flavor() -> str:\n"
         '    """Return the configured flavor literal."""\n'
@@ -4734,7 +4736,7 @@ def add_stored_flavor_macro(
 
     write_project_file(
         project_dir,
-        "models/marts/_sqlbuild/_macros/python/flavor.py",
+        "sql/models/marts/_sqlbuild/_macros/python/flavor.py",
         '"""Flavor macros backed by an outside module."""\n\n\n'
         "def flavor() -> str:\n"
         '    """Return the configured flavor literal and log the call."""\n'
@@ -4819,12 +4821,12 @@ def prepare_reference_call_project(*, tmp_path: Path, staging_from: str, mart_fr
         project_name="orders",
         repo_files={
             "sqlbuild_project.toml": _REFERENCE_CALL_PROJECT_TOML,
-            "sources/raw.yml": _REFERENCE_CALL_SOURCES_YML,
-            "models/staging/stg_orders.sql": (
+            "sql/sources/raw.yml": _REFERENCE_CALL_SOURCES_YML,
+            "sql/models/staging/stg_orders.sql": (
                 'MODEL (description "Staged orders.", materialized view);\n\n'
                 f"SELECT order_id, amount_cents FROM {staging_from}\n"
             ),
-            "models/marts/order_totals.sql": (
+            "sql/models/marts/order_totals.sql": (
                 'MODEL (description "Order totals.", materialized table);\n\n'
                 "SELECT COUNT(*) AS order_count, SUM(amount_cents) AS total_cents\n"
                 f"FROM {mart_from} AS orders\n"
@@ -4866,12 +4868,12 @@ def prepare_macro_reference_call_project(*, tmp_path: Path) -> Path:
         project_name="orders",
         repo_files={
             "sqlbuild_project.toml": _REFERENCE_CALL_PROJECT_TOML,
-            "sources/raw.yml": _REFERENCE_CALL_SOURCES_YML,
-            "models/staging/customers.sql": (
+            "sql/sources/raw.yml": _REFERENCE_CALL_SOURCES_YML,
+            "sql/models/staging/customers.sql": (
                 'MODEL (description "Customers.", materialized view);\n\n'
                 'SELECT order_id AS customer_id FROM __source("raw_orders")\n'
             ),
-            "models/marts/_sqlbuild/_macros/python/customer_relation.py": (
+            "sql/models/marts/_sqlbuild/_macros/python/customer_relation.py": (
                 '"""A macro that returns an unquoted reference call."""\n\n'
                 "import os\n\n\n"
                 "def customer_relation() -> str:\n"
@@ -4883,7 +4885,7 @@ def prepare_macro_reference_call_project(*, tmp_path: Path) -> Path:
                 '    return "__ref(customers)"\n'
             ),
             **{
-                f"models/marts/{name}.sql": (
+                f"sql/models/marts/{name}.sql": (
                     f'MODEL (description "{name}.", materialized view);\n\n'
                     "SELECT customer_id FROM @py.customer_relation()\n"
                 )
@@ -4931,7 +4933,7 @@ STORE_ENVIRONMENT_REGION_VAR: str = "SQB_STORE_TEST_REGION"
 STORE_ARGUMENT_ENV_VAR: str = "STORE_TEST_ARGUMENT"
 _REUSE_DISABLED_VALUES: dict[bool, str] = {True: "0", False: "1"}
 STALE_FLAVOR_EDIT: str = "salty"
-_SOUTH_MODEL: str = "models/south/orders_south.sql"
+_SOUTH_MODEL: str = "sql/models/south/orders_south.sql"
 _STORE_EXTERNAL_MODULE: str = "store_flavor_values"
 _ZIPPED_FLAVOR_MODULE: str = "zipped_flavor_values"
 _STORE_IMPORTED_MODULES: tuple[str, ...] = (
@@ -4941,7 +4943,7 @@ _STORE_IMPORTED_MODULES: tuple[str, ...] = (
     "macros._label_values",
 )
 _STORE_PROJECT_EXTRA_FILES: dict[str, str] = {
-    "macros/python/context_labels.py": (
+    "sql/macros/python/context_labels.py": (
         '"""Macros that read the target, the environment and an outside module."""\n\n'
         "import os\n\n\n"
         "def env_region() -> str:\n"
@@ -4955,11 +4957,11 @@ _STORE_PROJECT_EXTRA_FILES: dict[str, str] = {
         f"    import {_STORE_EXTERNAL_MODULE}\n\n"
         f"    return repr({_STORE_EXTERNAL_MODULE}.VALUE)\n"
     ),
-    "macros/python/_label_values.py": (
+    "sql/macros/python/_label_values.py": (
         'def label_value() -> str:\n    """Return the label literal."""\n    return "\'first\'"\n'
     ),
-    "macros/python/labels.py": (
-        "from macros.python._label_values import label_value\n\n\n"
+    "sql/macros/python/labels.py": (
+        "from sql.macros.python._label_values import label_value\n\n\n"
         'def label() -> str:\n    """Return the label from a helper module."""\n'
         "    return label_value()\n"
     ),
@@ -5023,7 +5025,7 @@ def write_store_flavor(*, extlib: Path, value: str) -> None:
 def edit_label_helper(project_dir: Path, value: str) -> None:
     """Change the literal the helper module behind the label macro returns."""
 
-    replace_project_text(project_dir, "macros/python/_label_values.py", "'first'", f"'{value}'")
+    replace_project_text(project_dir, "sql/macros/python/_label_values.py", "'first'", f"'{value}'")
 
 
 def edit_south_model(project_dir: Path, old: str, new: str) -> None:
@@ -5418,12 +5420,12 @@ def slow_lint_model_files(*, model_count: int) -> dict[str, str]:
     """A macro used by a model, a function, and macro tests that pause when linted."""
 
     return {
-        "macros/python/slow.py": _SLOW_LINT_MACRO,
-        "functions/sql/slow_amount.sql": (
+        "sql/macros/python/slow.py": _SLOW_LINT_MACRO,
+        "sql/functions/sql/slow_amount.sql": (
             'FUNCTION (description "Slow amount", arguments (p_amount INTEGER), returns INTEGER);\n'
             'SELECT @py.slow_total("p_amount")\n'
         ),
-        "models/slow_total.sql": (
+        "sql/models/slow_total.sql": (
             'MODEL (description "Slow total");\n'
             'SELECT @py.slow_total("model_amount") AS amount\n'
             "FROM (SELECT 5 AS model_amount) AS input_values\n"
@@ -5531,7 +5533,7 @@ def dialect_ignored_rules_entry(codes: tuple[str, ...]) -> str:
 
     ignored: str = ", ".join(f'"{code}"' for code in codes)
     return (
-        f'\n[[rules.rule_ignores]]\nrules = [{ignored}]\npaths = ["models/**"]\n'
+        f'\n[[rules.rule_ignores]]\nrules = [{ignored}]\npaths = ["sql/models/**"]\n'
         'reason = "The case covers parsing this SQL shape."\n'
     )
 
@@ -5553,7 +5555,7 @@ def compile_dialect_syntax_project(
                     bool(test_case.ignored_rules)
                 ]
             ),
-            **{f"models/{name}.sql": sql for name, sql in test_case.models.items()},
+            **{f"sql/models/{name}.sql": sql for name, sql in test_case.models.items()},
         },
     )
 
@@ -5596,7 +5598,7 @@ def orders_job_project(job_values: str) -> dict[str, str]:
     """Return a one-model project whose `orders_job` TOML file continues with `job_values`."""
     return {
         "sqlbuild_project.toml": 'name = "python_layout"\nadapter = "duckdb"\n',
-        "models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
+        "sql/models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
         "orchestration/jobs/orders_job.toml": (
             'name = "orders_job"\ndescription = "Orders."\n' + job_values
         ),

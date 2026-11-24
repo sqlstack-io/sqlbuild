@@ -311,6 +311,12 @@ pub struct WarehouseResourceCostRecord {
     pub bytes_scanned: i64,
     pub estimated_credits: String,
     pub estimated_usd: Option<String>,
+    /// The price per credit `estimated_usd` used; None on rows recorded before prices were.
+    #[serde(default)]
+    pub usd_per_credit: Option<String>,
+    /// `config`, `rate_sheet` or `list_price` (an estimate); None on rows recorded before prices were.
+    #[serde(default)]
+    pub usd_per_credit_source: Option<String>,
     pub status: String,
     pub statements_expected: i64,
     pub statements_observed: i64,

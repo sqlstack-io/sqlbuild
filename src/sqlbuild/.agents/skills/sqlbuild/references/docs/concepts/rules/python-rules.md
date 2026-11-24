@@ -2,7 +2,7 @@
 
 # Python Rules
 
-> Check the project's Python for annotations, imports, function shape and the layout of python/.
+> Check the project's Python for annotations, imports, function shape and the layout of python/nodes/.
 
 Online: https://sqlbuild.com/docs/concepts/rules/python-rules/
 
@@ -10,7 +10,7 @@ Online: https://sqlbuild.com/docs/concepts/rules/python-rules/
 
 - Selecting the Python Rules
 - Which files are checked
-- Laying out `python/`
+- Laying out `python/nodes/`
 - Writing nodes as units
 - Laying out providers
 - Laying out sensors and calendars
@@ -32,7 +32,7 @@ select = ["SQBR", "SQBRPYTHON"]
 
 ```text
 error[SQBRPYTHON101]: function parameter 'ctx' must define a type annotation
-  --> hooks/python/alert.py:4:11
+  --> sql/hooks/python/alert.py:4:11
   = help: Annotate every parameter with the value type accepted by the function.
 ```
 
@@ -62,28 +62,28 @@ sqb rules run SQBRPYTHON
 
 ## Which files are checked
 
-The Python Rules read every supported project Python file: the runtime package under `python/` and
-the folders that extend SQLBuild, such as `hooks/python/`, `functions/python/`, `providers/`,
-`rules/` and `macros/`. See [Project Python](../project-configuration.md#project-python)
-for the full list. Under `tests/`, only the [Python tests](#testing-python) in `tests/python/` and
-`tests/providers/` are checked, and only by the Rules marked `tests/`.
+The Python Rules read every supported project Python file: the runtime package under `python/nodes/` and
+the folders that extend SQLBuild, such as `sql/hooks/python/`, `sql/functions/python/`, `python/providers/`,
+`rules/` and `sql/macros/`. See [Project layout](../project-configuration.md#project-layout)
+for the full list. Under `tests/`, only the [Python tests](#testing-python) in `tests/python/nodes/` and
+`tests/python/providers/` are checked, and only by the Rules marked `tests/`.
 
-Rules marked `python/` in the [reference](#rule-reference) check only the runtime package, because
+Rules marked `python/nodes/` in the [reference](#rule-reference) check only the runtime package, because
 they describe how its packages are organised. Rules marked `tests/` check only Python tests. The
 others check every file except Python tests.
 
-## Laying out `python/`
+## Laying out `python/nodes/`
 
-`SQBRPYTHON001` and `SQBRPYTHON002` keep `python/` organised by what the code is for, not by what
-kind of node it holds. Directly under `python/`, keep only domain packages, `utils/` for code no
+`SQBRPYTHON001` and `SQBRPYTHON002` keep `python/nodes/` organised by what the code is for, not by what
+kind of node it holds. Directly under `python/nodes/`, keep only domain packages, `utils/` for code no
 domain owns, and `__init__.py`:
 
 ```text
-python/
+python/nodes/
   __init__.py
   fulfillment/
     shipment_export/
-      node.py          # @asset shipment_export
+      asset.py         # @asset shipment_export
       main.py          # main(), the unit's implementation
   utils/
     currency/
@@ -94,29 +94,32 @@ These layouts are reported:
 
 | Finding | Example | Fix |
 |---|---|---|
-| A module directly under `python/` | `python/report.py` | Move it into the domain that owns it |
-| A folder named for a node kind or a role | `python/loaders/`, `python/_helpers/` | Group the nodes by domain instead |
-| A package with a generic name | `python/inventory/common/` | Name it after what it owns |
+| A module directly under `python/nodes/` | `python/nodes/report.py` | Move it into the domain that owns it |
+| A folder named for a node kind or a role | `python/nodes/loaders/`, `python/nodes/_helpers/` | Group the nodes by domain instead |
+| A package with a generic name | `python/nodes/inventory/common/` | Name it after what it owns |
 
 The generic names are `base`, `common`, `general`, `helpers`, `lib`, `misc`, `shared`, `util` and
-`utils`. `utils/` is allowed directly under `python/`. A finding about a folder points at its
+`utils`. `utils/` is allowed directly under `python/nodes/`. A finding about a folder points at its
 `__init__.py`, or at its first Python file when it has none.
 
 ## Writing nodes as units
 
-A unit is one folder that declares one node, or one factory, and holds its implementation.
+A unit is one folder that declares one node, or one factory, and holds its implementation. Its
+declaration file is named for what it declares: `loader.py`, `asset.py`, `loaders.py`, `assets.py`,
+`factory.py` or `checks.py`, as compilation requires (see
+[Python nodes](../python-nodes/overview.md#the-pythonnodes-folder)).
 `SQBRPYTHON003` to `SQBRPYTHON012` keep each node in its own unit, grouped by domain:
 
 ```text
-python/orders/
+python/nodes/orders/
   constants.py            # shared by the orders units
   partner_export/
-    node.py               # the @asset declaration
+    asset.py              # the @asset declaration
     main.py               # main(), the implementation
     checks.py             # @check declarations for this unit
     _helpers/             # private functions for this unit
   refund_review/
-    node.py               # @asset
+    asset.py              # @asset
     main.py
 ```
 
@@ -124,12 +127,12 @@ A unit folder may also hold `models.py`, `types.py`, `constants.py`, `exceptions
 `__init__.py`. The declaration only passes its arguments to `main()`:
 
 ```python
-# python/orders/partner_export/node.py
+# python/nodes/orders/partner_export/asset.py
 from sqlbuild.assets import AssetContext, asset
 from sqlbuild.executor.python_nodes.models import PythonNodeResult
 
-from providers.partner_files.provider import PartnerFiles
-from python.orders.partner_export.main import main
+from python.providers.partner_files.provider import PartnerFiles
+from python.nodes.orders.partner_export.main import main
 
 @asset(description="Write the daily partner orders file.")
 def partner_export(ctx: AssetContext, *, partner_files: PartnerFiles) -> PythonNodeResult:
@@ -141,15 +144,15 @@ These are reported:
 | Code | Finding | Fix |
 |---|---|---|
 | `SQBRPYTHON003` | A unit without `main.py`, or another module or folder in it | Add `main.py`; move other code into `_helpers/` or a role file |
-| `SQBRPYTHON004` | `node.py` holding a helper, a constant, a class or a second declaration | Keep one `@loader`, `@asset` or `@factory` function and its imports |
+| `SQBRPYTHON004` | A declaration file holding a helper, a constant, a class or a second declaration | Keep one `@loader`, `@asset` or `@factory` function and its imports |
 | `SQBRPYTHON005` | A declaration that does more than `return main(...)`, or passes a positional argument | Move the logic into `main()` and pass every argument as `name=value` |
 | `SQBRPYTHON006` | `main.py` holding more than one function, or a `main()` whose return annotation does not fit the node | Move other code into `_helpers/` and annotate `main()` with its result |
 | `SQBRPYTHON007` | A signature other than `(ctx: <Kind>Context, *, provider: ProviderClass)` | Take `ctx` positionally and providers after `*`, each annotated |
-| `SQBRPYTHON008` | An import of another unit's `main.py`, role files or `_helpers/`, or another domain's code | Import shared code from `python/utils/` or the domain's role files |
+| `SQBRPYTHON008` | An import of another unit's `main.py`, role files or `_helpers/`, or another domain's code | Import shared code from `python/nodes/utils/` or the domain's role files |
 | `SQBRPYTHON009` | `checks.py` holding other code, or a check that does not depend on the unit's node | Name the unit's node in `depends_on` and return directly |
 | `SQBRPYTHON010` | A factory that does not loop over the unit's specs, or a generated node without `name=` | Loop over specs from the unit's `constants.py` or `models.py` and name each node |
 | `SQBRPYTHON011` | A docstring on a node or check, an asset or check without `description=`, or a described loader | Use `description=`; a loader takes its description from its managed source |
-| `SQBRPYTHON012` | A node declared outside a unit's `node.py`, or a check outside its `checks.py` | Move it into its own unit folder |
+| `SQBRPYTHON012` | A node declared outside the unit file named for its kind, or a check outside its `checks.py` | Move it into its own unit folder, in the file named for what it declares |
 
 `main()` returns:
 
@@ -158,12 +161,12 @@ These are reported:
 | `@asset` | `PythonNodeResult` or `PythonNodeSkipResult`, from `ctx.result(...)` and `ctx.skip(...)` |
 | `@loader` | rows such as `list[...]` or `Iterator[...]`, `LoaderResult`, `LoaderSkipResult`, or `None` |
 
-A unit may import another unit's `node.py` only to name that node in `depends_on`. It may import
+A unit may import another unit's declaration file only to name that node in `depends_on`. It may import
 `provider.py`, `models.py`, `types.py`, `constants.py` and `exceptions.py` from
-`providers/<capability>/`.
+`python/providers/<capability>/`.
 
-A factory's `node.py` holds one `@factory` function, and a check generated by a factory may stay in
-`node.py`. `@audit_factory` functions are not units and may sit anywhere under `python/`.
+A factory's declaration file holds one `@factory` function, and a check generated by a factory may
+stay in it. `@audit_factory` functions are not units and may sit anywhere under `python/nodes/`.
 
 ## Laying out providers
 
@@ -171,7 +174,7 @@ A factory's `node.py` holds one `@factory` function, and a check generated by a 
 private code beside it:
 
 ```text
-providers/
+python/providers/
   storefront_api/
     provider.py          # the one public Provider subclass
     models.py
@@ -186,9 +189,9 @@ A capability folder may also hold `types.py`, `constants.py`, `exceptions.py`, `
 
 | Code | Finding | Fix |
 |---|---|---|
-| `SQBRPYTHON013` | A module directly in `providers/`, a capability folder without `provider.py`, or another module or folder in it | Move it to `providers/<capability>/provider.py`, `_helpers/`, `_classes/` or a role file |
+| `SQBRPYTHON013` | A module directly in `python/providers/`, a capability folder without `provider.py`, or another module or folder in it | Move it to `python/providers/<capability>/provider.py`, `_helpers/`, `_classes/` or a role file |
 | `SQBRPYTHON014` | `provider.py` holding a function, a public constant, another class or a second provider | Keep one public `Provider` subclass and private constants; move the rest to `_helpers/`, `_classes/` or `constants.py` |
-| `SQBRPYTHON015` | An import of a provider's `_helpers/` or `_classes/` from outside its folder, or a provider importing `python/` outside `utils/` or anything in `orchestration/` | Import the provider through `provider.py` or its role files; share code through `python/utils/` |
+| `SQBRPYTHON015` | An import of a provider's `_helpers/` or `_classes/` from outside its folder, or a provider importing `python/nodes/` outside `utils/` or anything in `orchestration/` | Import the provider through `provider.py` or its role files; share code through `python/nodes/utils/` |
 
 `SQBRPYTHON014` follows a class's bases through the project's modules, so a provider may subclass
 `Provider` through an alias or a base class in `_classes/`. A class whose base comes from another
@@ -218,38 +221,39 @@ A domain folder's private support is `_models.py`, `_types.py`, `_constants.py`,
 | Code | Finding | Fix |
 |---|---|---|
 | `SQBRPYTHON016` | A module directly in `sensors/` or `calendars/`, nested below its domain folder, or named `main.py`, `definitions.py`, `sensors.py`, `calendars.py` or `processing.py` | Move it to `<role>/<domain>/<capability>.py` |
-| `SQBRPYTHON017` | Other private files or folders, private support outside a domain folder, or an import of another domain's private support | Use the support files or `_helpers/`; share code through `python/utils/` or a provider |
+| `SQBRPYTHON017` | Other private files or folders, private support outside a domain folder, or an import of another domain's private support | Use the support files or `_helpers/`; share code through `python/nodes/utils/` or a provider |
 | `SQBRPYTHON018` | A sensor or calendar module holding a function, a class, a public constant or another statement besides its declaration | Move it to `_helpers/`, `_models.py` or `_constants.py` |
-| `SQBRPYTHON019` | A sensor or calendar importing `python/` outside `utils/`, or code outside `orchestration/` importing it | Read node results through the sensor's context; share code through `python/utils/` or a provider |
+| `SQBRPYTHON019` | A sensor or calendar importing `python/nodes/` outside `utils/`, or code outside `orchestration/` importing it | Read node results through the sensor's context; share code through `python/nodes/utils/` or a provider |
 | `SQBRPYTHON020` | A sensor or calendar function with a docstring | Keep the text in `description=` only |
 
 Providers importing `orchestration/` are reported by `SQBRPYTHON015` instead.
 
 ## Testing Python
 
-`sqb test` runs the pytest modules under `tests/python/`, `tests/providers/` and
+`sqb test` runs the pytest modules under `tests/python/nodes/`, `tests/python/providers/` and
 `tests/orchestration/`; see
 [Python tests](../../cli/test.md#python-tests). `SQBRPYTHON021` keeps each test beside a mirror of the
 code it tests, and `SQBRPYTHON701` to `SQBRPYTHON724` keep tests table-driven:
 
 ```text
-python/
+python/nodes/
   orders/
     storefront_import/
-      node.py
+      asset.py
       _helpers/
         row_mapping.py
 tests/
   python/
-    orders/
-      storefront_import/
-        _helpers/
-          _test_types.py      # the test-case dataclasses
-          test_row_mapping.py # tests row_mapping.py
+    nodes/
+      orders/
+        storefront_import/
+          _helpers/
+            _test_types.py      # the test-case dataclasses
+            test_row_mapping.py # tests row_mapping.py
 ```
 
 ```python
-# tests/python/orders/storefront_import/_helpers/_test_types.py
+# tests/python/nodes/orders/storefront_import/_helpers/_test_types.py
 from dataclasses import dataclass
 
 @dataclass(frozen=True)
@@ -260,11 +264,11 @@ class RowMappingTestCase:
 ```
 
 ```python
-# tests/python/orders/storefront_import/_helpers/test_row_mapping.py
+# tests/python/nodes/orders/storefront_import/_helpers/test_row_mapping.py
 import pytest
 
-from python.orders.storefront_import._helpers.row_mapping import status_label
-from tests.python.orders.storefront_import._helpers._test_types import RowMappingTestCase
+from python.nodes.orders.storefront_import._helpers.row_mapping import status_label
+from tests.python.nodes.orders.storefront_import._helpers._test_types import RowMappingTestCase
 
 @pytest.mark.parametrize(
     "test_case",
@@ -280,7 +284,7 @@ def test_given_a_status_when_mapping_then_returns_its_label(test_case: RowMappin
 
 | Code | Finding | Fix |
 |---|---|---|
-| `SQBRPYTHON021` | A test module whose folder does not mirror one under `python/`, `providers/` or `orchestration/`, or a `test_<name>.py` with no `<name>.py` or `<name>/` package beside the code it tests | Move the test to the mirrored folder, or rename it for the module it tests |
+| `SQBRPYTHON021` | A test module whose folder does not mirror one under `python/nodes/`, `python/providers/` or `orchestration/`, or a `test_<name>.py` with no `<name>.py` or `<name>/` package beside the code it tests | Move the test to the mirrored folder, or rename it for the module it tests |
 | `SQBRPYTHON701` to `SQBRPYTHON711` | A test folder or module whose layout, imports, helpers, conditionals or test-case dataclasses break the pattern above | Follow the pattern above |
 | `SQBRPYTHON712` to `SQBRPYTHON724` | A test function or `pytest.mark.parametrize` that is not named `test_given_<state>_when_<action>_then_<outcome>`, or does not take dataclass cases through `test_case` with ids from each `description` | Follow the pattern above |
 
@@ -293,7 +297,7 @@ those calls reach. A call that reaches a subprocess, an HTTP request, a socket, 
 warehouse driver, or a cloud or SSH client is reported at the call where the walk started:
 
 ```python
-# python/orders/storefront_import/constants.py
+# python/nodes/orders/storefront_import/constants.py
 import requests
 
 STOREFRONT_REGIONS = requests.get("https://example.com/regions").json()  # reported
@@ -301,11 +305,11 @@ STOREFRONT_REGIONS = requests.get("https://example.com/regions").json()  # repor
 
 ```text
 error[SQBRPYTHON022]: Python that runs while the project compiles must not reach a subprocess, the network, a database or a remote client: calls requests.get
-  --> python/orders/storefront_import/constants.py:3:22
+  --> python/nodes/orders/storefront_import/constants.py:3:22
 ```
 
 When the external call sits in a project function, the message names it and its line instead, such
-as `reaches requests.get at python/orders/storefront_import/_helpers/regions.py:8`.
+as `reaches requests.get at python/nodes/orders/storefront_import/_helpers/regions.py:8`.
 
 Calls inside node bodies, `main()`, the nodes a factory generates, and provider methods run when
 the node runs, so they are not checked. Only calls whose target is known from the imports are
@@ -318,7 +322,7 @@ enter an approved function, and an approved factory's body is not checked:
 ```toml
 [rules.rule_options.SQBRPYTHON022]
 approved_loader_boundaries = [
-  "python.inventory.warehouse_snapshots._helpers.spec_loading.load_warehouse_specs",
+  "python.nodes.inventory.warehouse_snapshots._helpers.spec_loading.load_warehouse_specs",
 ]
 ```
 
@@ -328,7 +332,7 @@ Each entry is the fully qualified name of a project function. A glob fails confi
 ## Main modules and entry modules
 
 Some Rules apply only to a domain's main modules: files under a `main/` folder, and a unit's
-`main.py`, such as `python/fulfillment/shipment_export/main.py`. A main module that is not
+`main.py`, such as `python/nodes/fulfillment/shipment_export/main.py`. A main module that is not
 `__init__.py` is an entry module. `SQBRPYTHON617` requires it to expose one public function, and
 `SQBRPYTHON305` requires something outside its domain to import it.
 
@@ -338,8 +342,8 @@ The other size limits check every function.
 ## Unreachable definitions
 
 `SQBRPYTHON306` reports functions, classes and module values that nothing SQLBuild loads can reach.
-SQLBuild loads every decorated function under `python/` (`@loader`, `@asset`, `@check`,
-`@factory` and `@audit_factory`) and everything defined outside `python/`, such as hooks and
+SQLBuild loads every decorated function under `python/nodes/` (`@loader`, `@asset`, `@check`,
+`@factory` and `@audit_factory`) and everything defined outside `python/nodes/`, such as hooks and
 providers. A definition reached only through them is live. Imports through folders without an
 `__init__.py` count too.
 
@@ -349,7 +353,7 @@ exception with a reason:
 ```toml
 [[rules.rule_exceptions]]
 rule = "SQBRPYTHON306"
-path = "python/fulfillment/carriers/registry.py"
+path = "python/nodes/fulfillment/carriers/registry.py"
 reason = "Carriers are looked up by name from the shipment's carrier code."
 ```
 
@@ -386,35 +390,35 @@ numbers fail configuration with `C000`.
 `Default` says whether `SQBRPYTHON` selects the Rule. `sqb rules show <code>` prints the full
 remediation.
 
-### Layout of `python/`
+### Layout of `python/nodes/`
 
 | Code | Name | Files | Default | Checks |
 |---|---|---|---|---|
-| `SQBRPYTHON001` | project-root-allowlist | `python/` | yes | `python/` may hold only domain packages, `utils/` and `__init__.py` |
-| `SQBRPYTHON002` | runtime-package-owner-names | `python/` | yes | Packages under `python/` must be named for what they own |
+| `SQBRPYTHON001` | project-root-allowlist | `python/nodes/` | yes | `python/nodes/` may hold only domain packages, `utils/` and `__init__.py` |
+| `SQBRPYTHON002` | runtime-package-owner-names | `python/nodes/` | yes | Packages under `python/nodes/` must be named for what they own |
 
 ### Node units
 
 | Code | Name | Files | Default | Checks |
 |---|---|---|---|---|
-| `SQBRPYTHON003` | node-unit-layout | `python/` | yes | A unit folder holds `node.py`, `main.py`, optional role files and `_helpers/` only |
-| `SQBRPYTHON004` | node-module-shape | `python/` | yes | `node.py` holds imports and exactly one node or factory declaration |
-| `SQBRPYTHON005` | node-delegates-to-main | `python/` | yes | A declaration's body is `return main(...)` from its unit, with keyword arguments |
-| `SQBRPYTHON006` | main-module-shape | `python/` | yes | `main.py` holds imports and one `main()` whose return annotation fits the node |
-| `SQBRPYTHON007` | node-signature | `python/` | yes | `ctx` is the only positional parameter; providers are annotated and keyword-only |
-| `SQBRPYTHON008` | node-import-boundaries | `python/` | yes | A unit imports only what it owns, its domain's role files, `python/utils/`, provider role files and other nodes for `depends_on` |
-| `SQBRPYTHON009` | checks-module-shape | `python/` | yes | `checks.py` holds checks of the unit's node that return directly, or one factory |
-| `SQBRPYTHON010` | factory-shape | `python/` | yes | A factory loops over its unit's specs and names every node it generates |
-| `SQBRPYTHON011` | node-description-not-docstring | `python/` | yes | Assets and checks set `description=` without a docstring; loaders set neither |
-| `SQBRPYTHON012` | node-declared-in-unit | `python/` | yes | Nodes are declared in a unit's `node.py`, and checks in its `checks.py` |
+| `SQBRPYTHON003` | node-unit-layout | `python/nodes/` | yes | A unit folder holds one declaration file, `main.py`, optional role files and `_helpers/` only |
+| `SQBRPYTHON004` | node-module-shape | `python/nodes/` | yes | A declaration file holds imports and exactly one node or factory declaration |
+| `SQBRPYTHON005` | node-delegates-to-main | `python/nodes/` | yes | A declaration's body is `return main(...)` from its unit, with keyword arguments |
+| `SQBRPYTHON006` | main-module-shape | `python/nodes/` | yes | `main.py` holds imports and one `main()` whose return annotation fits the node |
+| `SQBRPYTHON007` | node-signature | `python/nodes/` | yes | `ctx` is the only positional parameter; providers are annotated and keyword-only |
+| `SQBRPYTHON008` | node-import-boundaries | `python/nodes/` | yes | A unit imports only what it owns, its domain's role files, `python/nodes/utils/`, provider role files and other nodes for `depends_on` |
+| `SQBRPYTHON009` | checks-module-shape | `python/nodes/` | yes | `checks.py` holds checks of the unit's node that return directly, or one factory |
+| `SQBRPYTHON010` | factory-shape | `python/nodes/` | yes | A factory loops over its unit's specs and names every node it generates |
+| `SQBRPYTHON011` | node-description-not-docstring | `python/nodes/` | yes | Assets and checks set `description=` without a docstring; loaders set neither |
+| `SQBRPYTHON012` | node-declared-in-unit | `python/nodes/` | yes | Nodes are declared in a unit's file named for their kind, and checks in its `checks.py` |
 
 ### Providers
 
 | Code | Name | Files | Default | Checks |
 |---|---|---|---|---|
-| `SQBRPYTHON013` | provider-layout | All | yes | `providers/` holds capability folders with `provider.py`, role files, `_helpers/` and `_classes/` only |
+| `SQBRPYTHON013` | provider-layout | All | yes | `python/providers/` holds capability folders with `provider.py`, role files, `_helpers/` and `_classes/` only |
 | `SQBRPYTHON014` | provider-module-shape | All | yes | `provider.py` holds imports, private constants and one public `Provider` subclass |
-| `SQBRPYTHON015` | provider-import-boundaries | All | yes | A provider's `_helpers/` and `_classes/` are private to it; providers import only `python/utils/` from `python/` and nothing from `orchestration/` |
+| `SQBRPYTHON015` | provider-import-boundaries | All | yes | A provider's `_helpers/` and `_classes/` are private to it; providers import only `python/nodes/utils/` from `python/nodes/` and nothing from `orchestration/` |
 
 ### Sensors and calendars
 
@@ -423,7 +427,7 @@ remediation.
 | `SQBRPYTHON016` | orchestration-module-paths | All | yes | Sensor and calendar modules sit at `orchestration/<role>/<domain>/<capability>.py` with a specific name |
 | `SQBRPYTHON017` | orchestration-private-support | All | yes | A domain folder's private support is its support files and `_helpers/`, imported only from that folder |
 | `SQBRPYTHON018` | orchestration-module-surface | All | yes | A sensor or calendar module holds imports, private constants and its one declaration |
-| `SQBRPYTHON019` | orchestration-import-direction | All | yes | Sensors and calendars import only providers, `python/utils/` and their own support; nothing outside `orchestration/` imports them |
+| `SQBRPYTHON019` | orchestration-import-direction | All | yes | Sensors and calendars import only providers, `python/nodes/utils/` and their own support; nothing outside `orchestration/` imports them |
 | `SQBRPYTHON020` | orchestration-no-docstring | All | yes | Sensor and calendar functions have no docstring |
 
 ### Compile-time purity
@@ -436,7 +440,7 @@ remediation.
 
 | Code | Name | Files | Default | Checks |
 |---|---|---|---|---|
-| `SQBRPYTHON021` | python-test-placement | `tests/` | yes | Python tests must mirror an existing module under `python/`, `providers/` or `orchestration/` |
+| `SQBRPYTHON021` | python-test-placement | `tests/` | yes | Python tests must mirror an existing module under `python/nodes/`, `python/providers/` or `orchestration/` |
 | `SQBRPYTHON701` | test-init-module-empty | `tests/` | yes | Test package `__init__.py` files must be empty or docstring-only |
 | `SQBRPYTHON702` | test-absolute-imports | `tests/` | yes | Tests must use absolute imports |
 | `SQBRPYTHON703` | test-no-top-level-helpers | `tests/` | yes | Test modules may contain only tests, imports, and declarations |
@@ -491,11 +495,11 @@ remediation.
 |---|---|---|---|---|
 | `SQBRPYTHON301` | absolute-imports-only | All | yes | Use absolute imports; relative imports hide package boundaries |
 | `SQBRPYTHON302` | no-star-imports | All | yes | Star imports hide names from dependency-boundary analysis |
-| `SQBRPYTHON303` | no-internal-public-surface-imports | `python/` | yes | Internal code must import from the owning module, not the bare package |
-| `SQBRPYTHON304` | no-cross-domain-private-main-imports | `python/` | yes | Domain-private main entries may only be imported within their owning domain |
-| `SQBRPYTHON305` | public-main-entry-external-use | `python/` | yes | Public main entries must have an importer outside their owning domain |
-| `SQBRPYTHON306` | unreachable-definition | `python/` | no | Definition is unreachable from production roots |
-| `SQBRPYTHON307` | no-cross-file-use-of-helper-private-class | `python/` | yes | Helper-private classes are file-local details; move shared classes to `classes/` |
+| `SQBRPYTHON303` | no-internal-public-surface-imports | `python/nodes/` | yes | Internal code must import from the owning module, not the bare package |
+| `SQBRPYTHON304` | no-cross-domain-private-main-imports | `python/nodes/` | yes | Domain-private main entries may only be imported within their owning domain |
+| `SQBRPYTHON305` | public-main-entry-external-use | `python/nodes/` | yes | Public main entries must have an importer outside their owning domain |
+| `SQBRPYTHON306` | unreachable-definition | `python/nodes/` | no | Definition is unreachable from production roots |
+| `SQBRPYTHON307` | no-cross-file-use-of-helper-private-class | `python/nodes/` | yes | Helper-private classes are file-local details; move shared classes to `classes/` |
 
 ### Naming contracts
 
@@ -526,32 +530,32 @@ remediation.
 
 | Code | Name | Files | Default | Checks |
 |---|---|---|---|---|
-| `SQBRPYTHON601` | models-only-models | `python/` | yes | Models role files may contain only structured runtime models |
-| `SQBRPYTHON602` | types-only-types | `python/` | yes | Types role files may contain only type-layer declarations |
-| `SQBRPYTHON603` | constants-only-constants | `python/` | yes | Constants role files may contain only assignments and imports |
-| `SQBRPYTHON604` | exceptions-only-exceptions | `python/` | yes | Exceptions role files may contain only custom exceptions |
-| `SQBRPYTHON605` | constant-outside-constants | `python/` | yes | Public uppercase constants must be defined in the constants role |
+| `SQBRPYTHON601` | models-only-models | `python/nodes/` | yes | Models role files may contain only structured runtime models |
+| `SQBRPYTHON602` | types-only-types | `python/nodes/` | yes | Types role files may contain only type-layer declarations |
+| `SQBRPYTHON603` | constants-only-constants | `python/nodes/` | yes | Constants role files may contain only assignments and imports |
+| `SQBRPYTHON604` | exceptions-only-exceptions | `python/nodes/` | yes | Exceptions role files may contain only custom exceptions |
+| `SQBRPYTHON605` | constant-outside-constants | `python/nodes/` | yes | Public uppercase constants must be defined in the constants role |
 | `SQBRPYTHON606` | banned-generic-filename | All | yes | Generic filenames hide module ownership |
-| `SQBRPYTHON607` | helpers-module-name | `python/` | yes | Use an _helpers package instead of `helpers.py` |
-| `SQBRPYTHON608` | classes-module-name | `python/` | yes | Use a classes package instead of `classes.py` |
-| `SQBRPYTHON609` | helpers-classes-file-private | `python/` | yes | Plain classes in _helpers modules must be file-private |
-| `SQBRPYTHON610` | helpers-package-layout | `python/` | yes | `_helpers/` packages must use bounded flat-or-grouped containers |
-| `SQBRPYTHON611` | main-package-layout | `python/` | yes | `main/` packages must use bounded flat-or-grouped orchestration containers |
-| `SQBRPYTHON612` | helpers-reserved-role-filenames | `python/` | yes | `_helpers/` packages must not contain reserved role filenames |
-| `SQBRPYTHON613` | top-level-domain-shape | `python/` | yes | Top-level domains must be either role leaves or subdomain branches |
-| `SQBRPYTHON614` | top-level-direct-modules | `python/` | yes | Runtime roots and top-level domains must not contain ad hoc direct modules |
-| `SQBRPYTHON615` | shared-domain-prefix | `python/` | yes | Sibling domains must not encode one parent domain through a shared name prefix |
-| `SQBRPYTHON616` | public-facade-import-direction | `python/` | yes | Runtime modules must not import public facade modules |
-| `SQBRPYTHON617` | entry-module-shape | `python/` | yes | `main/` entry modules must expose one focused public function |
-| `SQBRPYTHON618` | init-module-empty | `python/` | yes | Nested `__init__.py` files must be empty or docstring-only |
-| `SQBRPYTHON619` | no-reexport-shim | `python/` | yes | Internal modules must not exist only to re-export imports |
-| `SQBRPYTHON620` | no-internal-helper-exports | `python/` | yes | `_helpers/` modules must not publish an `__all__` surface |
-| `SQBRPYTHON621` | main-entry-name-collision | `python/` | yes | `main/` cannot define a module and package with the same entry name |
-| `SQBRPYTHON622` | public-surface-shape | `python/` | yes | Root package surfaces may contain only imports and one `__all__` declaration |
-| `SQBRPYTHON623` | classes-one-class-per-module | `python/` | yes | `classes/` modules must define exactly one top-level class |
-| `SQBRPYTHON624` | helpers-package-shape | `python/` | yes | `_helpers/` packages must contain no main.py orchestration entrypoints |
-| `SQBRPYTHON625` | private-definition-ordering | `python/` | yes | Private constants and dataclasses must appear before top-level functions |
-| `SQBRPYTHON626` | classes-runtime-reexport | `python/` | yes | `classes/` modules must not publicly re-export imported runtime symbols |
+| `SQBRPYTHON607` | helpers-module-name | `python/nodes/` | yes | Use an _helpers package instead of `helpers.py` |
+| `SQBRPYTHON608` | classes-module-name | `python/nodes/` | yes | Use a classes package instead of `classes.py` |
+| `SQBRPYTHON609` | helpers-classes-file-private | `python/nodes/` | yes | Plain classes in _helpers modules must be file-private |
+| `SQBRPYTHON610` | helpers-package-layout | `python/nodes/` | yes | `_helpers/` packages must use bounded flat-or-grouped containers |
+| `SQBRPYTHON611` | main-package-layout | `python/nodes/` | yes | `main/` packages must use bounded flat-or-grouped orchestration containers |
+| `SQBRPYTHON612` | helpers-reserved-role-filenames | `python/nodes/` | yes | `_helpers/` packages must not contain reserved role filenames |
+| `SQBRPYTHON613` | top-level-domain-shape | `python/nodes/` | yes | Top-level domains must be either role leaves or subdomain branches |
+| `SQBRPYTHON614` | top-level-direct-modules | `python/nodes/` | yes | Runtime roots and top-level domains must not contain ad hoc direct modules |
+| `SQBRPYTHON615` | shared-domain-prefix | `python/nodes/` | yes | Sibling domains must not encode one parent domain through a shared name prefix |
+| `SQBRPYTHON616` | public-facade-import-direction | `python/nodes/` | yes | Runtime modules must not import public facade modules |
+| `SQBRPYTHON617` | entry-module-shape | `python/nodes/` | yes | `main/` entry modules must expose one focused public function |
+| `SQBRPYTHON618` | init-module-empty | `python/nodes/` | yes | Nested `__init__.py` files must be empty or docstring-only |
+| `SQBRPYTHON619` | no-reexport-shim | `python/nodes/` | yes | Internal modules must not exist only to re-export imports |
+| `SQBRPYTHON620` | no-internal-helper-exports | `python/nodes/` | yes | `_helpers/` modules must not publish an `__all__` surface |
+| `SQBRPYTHON621` | main-entry-name-collision | `python/nodes/` | yes | `main/` cannot define a module and package with the same entry name |
+| `SQBRPYTHON622` | public-surface-shape | `python/nodes/` | yes | Root package surfaces may contain only imports and one `__all__` declaration |
+| `SQBRPYTHON623` | classes-one-class-per-module | `python/nodes/` | yes | `classes/` modules must define exactly one top-level class |
+| `SQBRPYTHON624` | helpers-package-shape | `python/nodes/` | yes | `_helpers/` packages must contain no main.py orchestration entrypoints |
+| `SQBRPYTHON625` | private-definition-ordering | `python/nodes/` | yes | Private constants and dataclasses must appear before top-level functions |
+| `SQBRPYTHON626` | classes-runtime-reexport | `python/nodes/` | yes | `classes/` modules must not publicly re-export imported runtime symbols |
 | `SQBRPYTHON627` | source-file-line-count | All | yes | Source files must stay below the configured line limit |
 
 ## Details

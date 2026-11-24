@@ -13,7 +13,7 @@ pub(crate) fn relation(name: &str, schema: Option<&str>, database: Option<&str>)
 fn model(name: &str, migrate_from: Option<&str>) -> ModelReferences {
     ModelReferences {
         name: name.to_owned(),
-        path: format!("models/{name}.sql"),
+        path: format!("sql/models/{name}.sql"),
         destination: relation(name, Some("main"), Some("memory")),
         python_hooks: Vec::new(),
         sql_hooks: Vec::new(),

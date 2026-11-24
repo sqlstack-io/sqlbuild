@@ -36,7 +36,7 @@ fn given_a_selection_when_listing_named_atoms_then_only_single_node_names_count(
         },
         NamedAtomsTestCase {
             description: "folder paths do not count",
-            selection: "models/orders python/orders path:models/finance",
+            selection: "sql/models/orders python/nodes/orders path:sql/models/finance",
             expected_atoms: &[],
         },
         NamedAtomsTestCase {

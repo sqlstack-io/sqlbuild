@@ -42,7 +42,7 @@ def test_given_undecodable_files_when_reading_natively_then_errors_equal_read_te
 ) -> None:
     rng: random.Random = random.Random(test_case.seed)
     files: tuple[tuple[str, bytes], ...] = tuple(
-        (f"sources/file_{index}.yml", random_undecodable_bytes(rng=rng))
+        (f"sql/sources/file_{index}.yml", random_undecodable_bytes(rng=rng))
         for index in range(test_case.case_count)
     )
     write_project(project_dir=tmp_path, files=files)
@@ -63,7 +63,7 @@ def test_given_undecodable_files_when_reading_natively_then_errors_equal_read_te
     [
         UnreadableFileTestCase(
             description="an undecodable model",
-            relative_path="models/orders.sql",
+            relative_path="sql/models/orders.sql",
             data=_STAGING + b"\xff",
             expected_error="UnicodeDecodeError",
             expected_message=(
@@ -90,7 +90,7 @@ def test_given_undecodable_files_when_reading_natively_then_errors_equal_read_te
         ),
         UnreadableFileTestCase(
             description="an undecodable source file",
-            relative_path="sources/raw.yml",
+            relative_path="sql/sources/raw.yml",
             data=b"sources: []\n# \xc0\n",
             expected_error="UnicodeDecodeError",
             expected_message=(
@@ -99,10 +99,10 @@ def test_given_undecodable_files_when_reading_natively_then_errors_equal_read_te
         ),
         UnreadableFileTestCase(
             description="a directory named like a schema file",
-            relative_path="models/marts/schema.yml/notes.txt",
+            relative_path="sql/models/marts/schema.yml/notes.txt",
             data=b"",
             expected_error="IsADirectoryError",
-            expected_message="[Errno 21] Is a directory: '{project}/models/marts/schema.yml'",
+            expected_message="[Errno 21] Is a directory: '{project}/sql/models/marts/schema.yml'",
         ),
     ],
     ids=lambda case: case.description,
@@ -112,7 +112,7 @@ def test_given_unreadable_file_when_discovering_then_python_read_error_is_raised
 ) -> None:
     write_project(
         project_dir=tmp_path,
-        files=(("models/staging.sql", _STAGING), (test_case.relative_path, test_case.data)),
+        files=(("sql/models/staging.sql", _STAGING), (test_case.relative_path, test_case.data)),
     )
 
     failure: tuple[str, str] = compile_failure(project_dir=tmp_path)

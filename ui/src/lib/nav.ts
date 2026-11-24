@@ -1,4 +1,6 @@
 import CheckCircleIcon from '@lucide/svelte/icons/circle-check';
+import CircleDollarSignIcon from '@lucide/svelte/icons/circle-dollar-sign';
+import { reportsCost } from '$lib/operate/cost';
 import ClockIcon from '@lucide/svelte/icons/clock-3';
 import DatabaseIcon from '@lucide/svelte/icons/database';
 import GitBranchIcon from '@lucide/svelte/icons/git-branch';
@@ -21,7 +23,8 @@ export type NavBadge = { value: (counts: NavCounts) => number; tone: 'muted' | '
  * `loads` is the client method the page cannot work without; the entry hides when the server lacks it.
  * `wholeTarget` pages list the selected target, which needs view on every node in it.
  */
-export type NavItem = { label: string; href: string; icon: Component; loads: keyof ApiClient; badge?: NavBadge; requires?: readonly Capability[]; wholeTarget?: true };
+/** `reportsCost`: shown only for locations whose adapter reports query cost. */
+export type NavItem = { label: string; href: string; icon: Component; loads: keyof ApiClient; badge?: NavBadge; requires?: readonly Capability[]; wholeTarget?: true; reportsCost?: true };
 export type NavGroup = { section: string | null; items: NavItem[]; requires?: readonly Capability[] };
 
 export const NAV: readonly NavGroup[] = [
@@ -40,7 +43,8 @@ export const NAV: readonly NavGroup[] = [
 		items: [
 			{ label: 'Runs', href: '/runs', icon: ListIcon, loads: 'listRunRows', badge: { value: (c) => c.activeRuns, tone: 'live' }, wholeTarget: true },
 			{ label: 'Jobs', href: '/jobs', icon: PlayIcon, loads: 'listJobs', wholeTarget: true },
-			{ label: 'Triggers', href: '/triggers', icon: ClockIcon, loads: 'listTriggers', badge: { value: (c) => c.pausedTriggers, tone: 'muted' }, wholeTarget: true }
+			{ label: 'Triggers', href: '/triggers', icon: ClockIcon, loads: 'listTriggers', badge: { value: (c) => c.pausedTriggers, tone: 'muted' }, wholeTarget: true },
+			{ label: 'Cost', href: '/cost', icon: CircleDollarSignIcon, loads: 'readCostSelection', wholeTarget: true, reportsCost: true }
 		]
 	},
 	{
@@ -64,11 +68,11 @@ export const NAV: readonly NavGroup[] = [
 ];
 
 /** Entries the person may use and the server can load; groups left empty disappear. */
-export function visibleNav(client: Pick<ApiClient, 'supports'>, capabilities: readonly Capability[]): NavGroup[] {
+export function visibleNav(client: Pick<ApiClient, 'supports'>, capabilities: readonly Capability[], adapter?: string | null): NavGroup[] {
 	return NAV.filter((g) => !g.requires || hasAnyCapability(capabilities, g.requires))
 		.map((g) => ({
 			...g,
-			items: g.items.filter((i) => client.supports(i.loads) && (!i.requires || hasAnyCapability(capabilities, i.requires)))
+			items: g.items.filter((i) => client.supports(i.loads) && (!i.requires || hasAnyCapability(capabilities, i.requires)) && (!i.reportsCost || reportsCost(adapter)))
 		}))
 		.filter((g) => g.items.length > 0);
 }

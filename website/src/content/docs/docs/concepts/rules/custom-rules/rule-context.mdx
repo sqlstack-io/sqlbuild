@@ -168,8 +168,8 @@ Reading the tree, or any common structure, raises `RuleUsageError` when:
 Use the compiler-owned tree rather than direct filesystem calls:
 
 ```python
-parts = ctx.project.tree.relative_parts(path=model.path, under="models")
-models = ctx.project.tree.resources_under("models/orders")
+parts = ctx.project.tree.relative_parts(path=model.path, under="sql/models")
+models = ctx.project.tree.resources_under("sql/models/orders")
 config = ctx.project.tree.read_text("rules/requirements.yaml")
 ```
 

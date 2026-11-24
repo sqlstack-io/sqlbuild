@@ -18,7 +18,7 @@ def test_given_missing_order_id_when_evaluating_then_reports_finding() -> None:
         test_case=RuleCase(
             description="missing order identifier",
             source='MODEL (description "Orders");\nSELECT 1 AS customer_id\n',
-            path="models/final/customer_orders.sql",
+            path="sql/models/final/customer_orders.sql",
             expected_finding_count=1,
         ),
     )
@@ -50,7 +50,7 @@ passes, the case fails with `custom rule <code> is not deterministic`. The usual
 module-level state, such as a set of already-seen models, that carries over from one subject to
 the next. Compute findings from the subject and `ctx` alone.
 
-Keep Rule tests under the project's `tests/` directory, outside `tests/python/`, `tests/providers/`
+Keep Rule tests under the project's `tests/` directory, outside `tests/python/nodes/`, `tests/python/providers/`
 and `tests/orchestration/`, such as in `tests/rules/`. `sqb test` runs only those three folders, so
 run Rule tests with pytest.
 
@@ -127,7 +127,7 @@ Read supported project text and structure through `ctx.project.tree`:
 
 ```python
 text = ctx.project.tree.read_text("rules/requirements.yaml")
-matches = ctx.project.tree.glob("models/*/interface/*.sql")
+matches = ctx.project.tree.glob("sql/models/*/interface/*.sql")
 ```
 
 Both positive and negative observations are tracked. If `glob` returns no paths, adding a matching

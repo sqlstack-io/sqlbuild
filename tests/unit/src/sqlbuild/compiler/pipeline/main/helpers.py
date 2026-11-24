@@ -45,8 +45,8 @@ def relation_target_python_node() -> None:
 def build_relation_target_project() -> CompiledProjectView:
     source_entry: SourceEntry = SourceEntry(name="orders", schema="load_raw", table="orders")
     source_file: DiscoveredSourceFile = DiscoveredSourceFile(
-        file_path=Path("sources/raw.yml"),
-        relative_path=Path("sources/raw.yml"),
+        file_path=Path("sql/sources/raw.yml"),
+        relative_path=Path("sql/sources/raw.yml"),
         contents="",
         source_entries=(source_entry,),
     )
@@ -74,7 +74,7 @@ def build_plan_output_with_model(name: str = "orders") -> PlanOutput:
     entry: ModelPlanEntry = ModelPlanEntry(
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name=name),
         name=name,
-        relative_path=Path(f"models/{name}.sql"),
+        relative_path=Path(f"sql/models/{name}.sql"),
         materialization_type=MaterializationType.TABLE,
         action=PlanAction.CREATE_TABLE,
         reason=PlanReason.FIRST_RUN,

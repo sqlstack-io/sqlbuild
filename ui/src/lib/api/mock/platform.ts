@@ -770,21 +770,33 @@ export class MockPlatformApi implements PlatformApi {
 
 	async listWarehouseConnections(): Promise<WarehouseConnection[]> {
 		const synced = new Date(Date.now() - 4 * 60_000).toISOString();
+		// The 14 tables a location mirrors; Marketing's statistics read times out and its last check failed.
+		const tableNames = ['audit_results', 'catalog', 'column_migrations', 'consumption', 'fingerprints', 'freshness', 'janitor_events', 'microbatches', 'migrations', 'node_results', 'observations', 'old_name_views', 'resource_costs', 'statistics'];
+		const failedAt = new Date(Date.now() - 2 * 60_000).toISOString();
+		const lastGood = new Date(Date.now() - 3 * 3_600_000).toISOString();
 		const connections = this.#ctx.locations.flatMap((l) =>
 			this.#warehouse({ locationId: l.id })
 				.filter((c) => c.purpose === 'target')
-				.map((c) => ({
-					id: l.id,
-					location: l.name,
-					target: c.target,
-					// Shows the page as it will look once locations publish their settings and the sync schedule.
-					details: mockConnectionDetails(c),
-					stateLocation: { database: typeof c.values.database === 'string' ? c.values.database : null, schema: 'sqlbuild' },
-					lastTest: this.#connectionTests.get(`${l.id}/${c.name}`) ?? c.lastTest,
-					nextSyncAt: new Date(Date.now() + 26 * 60_000).toISOString(),
-					halted: false,
-					tables: ['audit_results', 'catalog', 'fingerprints', 'statistics'].map((table, i) => ({ table, at: synced, recordsSent: 12 * (i + 1), elapsedMs: 180 + 40 * i, failure: null, error: null, waiting: false, lastSyncedAt: synced, mirroredTotal: 4_800 * (i + 1) }))
-				}))
+				.map((c) => {
+					const broken = l.id === LOCATION_MARKETING;
+					const failedTest: ConnectionTest = { outcome: 'failed', at: failedAt, durationMs: 30_000, trigger: 'manual', by: null, message: 'Connection to db.example.com:5432 timed out after 30 s' };
+					return {
+						id: l.id,
+						location: l.name,
+						target: c.target,
+						// Shows the page as it will look once locations publish their settings and the sync schedule.
+						details: mockConnectionDetails(c),
+						stateLocation: { database: typeof c.values.database === 'string' ? c.values.database : null, schema: 'sqlbuild' },
+						lastTest: this.#connectionTests.get(`${l.id}/${c.name}`) ?? (broken ? failedTest : c.lastTest),
+						nextSyncAt: new Date(Date.now() + 26 * 60_000).toISOString(),
+						halted: false,
+						tables: tableNames.map((table, i) =>
+							broken && table === 'statistics'
+								? { table, at: failedAt, recordsSent: 0, elapsedMs: 30_000, failure: 'Failed while reading the warehouse: no reply within 30 s, on a page of 100 relations', error: 'canceling statement due to statement timeout', waiting: false, lastSyncedAt: lastGood, mirroredTotal: 21_400 }
+								: { table, at: synced, recordsSent: 12 * ((i % 5) + 1), elapsedMs: 180 + 40 * (i % 6), failure: null, error: null, waiting: false, lastSyncedAt: synced, mirroredTotal: 1_200 * ((i * 7) % 13 + 1) }
+						)
+					};
+				})
 		);
 		return this.#ctx.reply(structuredClone(connections));
 	}

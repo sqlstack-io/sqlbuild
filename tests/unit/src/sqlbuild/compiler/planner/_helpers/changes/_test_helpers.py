@@ -49,7 +49,7 @@ def build_model_from_test_case(test_case: DetectModelChangesTestCase) -> Compile
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name=test_case.model_name),
         deps=(),
         name=test_case.model_name,
-        relative_path=Path(f"models/{test_case.model_name}.sql"),
+        relative_path=Path(f"sql/models/{test_case.model_name}.sql"),
         query_sql=test_case.query_sql,
         config=CompileModelConfig(values=test_case.config_values),
         destination=CompiledRelationLocation(
@@ -71,7 +71,7 @@ def build_model_from_metadata_test_case(
             for dep_name in test_case.deps
         ),
         name="orders",
-        relative_path=Path("models/orders.sql"),
+        relative_path=Path("sql/models/orders.sql"),
         query_sql="SELECT 1 AS order_id",
         config=CompileModelConfig(values=test_case.config_values),
         destination=CompiledRelationLocation(
@@ -147,7 +147,7 @@ def build_project_for_function_metadata_detection() -> CompiledProjectView:
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="orders"),
         deps=(function_key,),
         name="orders",
-        relative_path=Path("models/orders.sql"),
+        relative_path=Path("sql/models/orders.sql"),
         query_sql="SELECT is_large_order(amount) AS large_order FROM orders",
         config=CompileModelConfig(values={}),
         destination=CompiledRelationLocation(
@@ -164,7 +164,7 @@ def build_project_for_function_metadata_detection() -> CompiledProjectView:
         key=function_key,
         deps=(),
         name="is_large_order",
-        relative_path=Path("functions/is_large_order.sql"),
+        relative_path=Path("sql/functions/is_large_order.sql"),
         arguments=(FunctionArgument(name="amount", type="INTEGER"),),
         returns="BOOLEAN",
         body_sql="amount > 100",

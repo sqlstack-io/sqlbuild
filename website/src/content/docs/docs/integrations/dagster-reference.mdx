@@ -224,7 +224,7 @@ Each `node` dict passed to translator methods contains:
     "name": "fact_orders",
     "qualified_name": "dev.fact_orders"
   },
-  "path": "models/marts/fact_orders.sql",
+  "path": "sql/models/marts/fact_orders.sql",
   "description": "Order fact table with waffle and payment details.",
   "tags": ["marts"],
   "columns": [
@@ -266,7 +266,7 @@ Each `check` dict passed to check translator methods contains:
   "kind": "audit",
   "name": "not_null",
   "checked_asset_ids": ["model:fact_orders"],
-  "path": "audits/generic/not_null.sql",
+  "path": "sql/audits/generic/not_null.sql",
   "severity": "error",
   "attached_target_name": "fact_orders",
   "attached_column_name": "order_id"

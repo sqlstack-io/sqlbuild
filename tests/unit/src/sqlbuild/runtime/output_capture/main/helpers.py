@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from sqlbuild.sinks import CommandOutputRecord, CommandOutputStream
+from sqlbuild.event_sinks import CommandOutputRecord, CommandOutputStream
 
 
 def command_output_record() -> CommandOutputRecord:

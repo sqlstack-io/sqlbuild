@@ -213,7 +213,7 @@ def test_given_custom_materialization_when_failing_then_reports_failure(
             hook_functions=(
                 DiscoveredHookFunction(
                     file_path=Path(__file__),
-                    relative_path=Path("hooks/python/custom.py"),
+                    relative_path=Path("sql/hooks/python/custom.py"),
                     name="insert_hook_log",
                     function=insert_custom_hook_log,
                 ),
@@ -250,7 +250,7 @@ def test_given_custom_materialization_when_failing_then_reports_failure(
             hook_functions=(
                 DiscoveredHookFunction(
                     file_path=Path(__file__),
-                    relative_path=Path("hooks/python/custom.py"),
+                    relative_path=Path("sql/hooks/python/custom.py"),
                     name="fail_hook",
                     function=fail_custom_hook,
                 ),
@@ -267,7 +267,7 @@ def test_given_custom_materialization_when_failing_then_reports_failure(
             hook_functions=(
                 DiscoveredHookFunction(
                     file_path=Path(__file__),
-                    relative_path=Path("hooks/python/custom.py"),
+                    relative_path=Path("sql/hooks/python/custom.py"),
                     name="fail_hook",
                     function=fail_custom_hook,
                 ),

@@ -237,9 +237,10 @@ fn given_relation_slot_reads_when_neutralizing_then_they_stand_as_their_expansio
 
     for test_case in test_cases {
         let source: String = format!("{header}{}\n", test_case.body);
-        let parameters = parse_sql_macro("weekly_rates", "macros/sql/weekly_rates.sql", &source)
-            .map(|definition| definition.parameters)
-            .unwrap_or_default();
+        let parameters =
+            parse_sql_macro("weekly_rates", "sql/macros/sql/weekly_rates.sql", &source)
+                .map(|definition| definition.parameters)
+                .unwrap_or_default();
 
         assert_eq!(
             neutralize_sql_macro_parameters(test_case.body, &parameters).text,
@@ -331,7 +332,7 @@ fn given_inline_directives_when_rejecting_then_each_prints_its_configured_except
                     "SQLCLEAN005",
                     &[
                         "rule = \"SQLCLEAN005\"",
-                        "path = \"models/orders.sql\"",
+                        "path = \"sql/models/orders.sql\"",
                         "reason = \"kept\"",
                     ],
                 ),
@@ -340,7 +341,7 @@ fn given_inline_directives_when_rejecting_then_each_prints_its_configured_except
                     "nope",
                     &[
                         "rule = \"nope\"",
-                        "path = \"models/orders.sql\"",
+                        "path = \"sql/models/orders.sql\"",
                         "reason = \"<why this deviation is intentional>\"",
                     ],
                 ),
@@ -354,7 +355,7 @@ fn given_inline_directives_when_rejecting_then_each_prints_its_configured_except
                 "SQLCLEAN038",
                 &[
                     "rule = \"SQLCLEAN038\"",
-                    "path = \"models/orders.sql\"",
+                    "path = \"sql/models/orders.sql\"",
                     "relation = \"order_policy\"",
                     "reason = \"every order meets every policy\"",
                 ],
@@ -373,7 +374,7 @@ fn given_inline_directives_when_rejecting_then_each_prints_its_configured_except
                 "SQLCLEAN038",
                 &[
                     "rule = \"SQLCLEAN038\"",
-                    "path = \"models/orders.sql\"",
+                    "path = \"sql/models/orders.sql\"",
                     "relation = \"customers\"",
                     "reason = \"deliberate\"",
                 ],
@@ -387,7 +388,7 @@ fn given_inline_directives_when_rejecting_then_each_prints_its_configured_except
                 "SQLCLEAN005",
                 &[
                     "rule = \"SQLCLEAN005\"",
-                    "path = \"models/orders.sql\"",
+                    "path = \"sql/models/orders.sql\"",
                     "reason = \"kept\"",
                 ],
             )],
@@ -400,7 +401,8 @@ fn given_inline_directives_when_rejecting_then_each_prints_its_configured_except
     ];
 
     for test_case in test_cases {
-        let findings = reject_inline_suppressions(&[("models/orders.sql", test_case.contents)])?;
+        let findings =
+            reject_inline_suppressions(&[("sql/models/orders.sql", test_case.contents)])?;
 
         assert_eq!(
             findings, test_case.expected_findings,

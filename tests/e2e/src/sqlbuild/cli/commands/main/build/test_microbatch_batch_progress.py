@@ -22,11 +22,11 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
 _DATABASE: str = "warehouse.duckdb"
 _PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": f'name = "batch_progress"\nadapter = "duckdb"\n\n[connection]\ndatabase = "{_DATABASE}"\n',
-    "sources/raw.yml": (
+    "sql/sources/raw.yml": (
         "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
         "    schema: main\n    table: raw_orders\n"
     ),
-    "models/daily_orders.sql": dedent(
+    "sql/models/daily_orders.sql": dedent(
         """
         MODEL (description "Test model daily_orders.",
           materialized incremental,

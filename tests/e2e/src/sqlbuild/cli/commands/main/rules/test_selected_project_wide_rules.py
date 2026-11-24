@@ -26,14 +26,14 @@ from tests.e2e.src.sqlbuild.cli.commands.main.rules.helpers import (
 )
 
 _FINDING_LINE: re.Pattern[str] = re.compile(r"^(\S+):\d+:\d+ \[(X?SQBR\w+)\] ", re.MULTILINE)
-_RETURNS_PATH: str = "models/sales/mart/sales__mart__returns__finance.sql"
-_REFUNDS_PATH: str = "models/sales/mart/sales__mart__refunds__audit.sql"
-_ORDERS_PATH: str = "models/sales/mart/sales__mart__orders.sql"
-_CUSTOMERS_PATH: str = "models/sales/mart/sales__mart__customers.sql"
-_CONSUMER_PATH: str = "models/finance/staging/finance__stg_v__orders.sql"
+_RETURNS_PATH: str = "sql/models/sales/mart/sales__mart__returns__finance.sql"
+_REFUNDS_PATH: str = "sql/models/sales/mart/sales__mart__refunds__audit.sql"
+_ORDERS_PATH: str = "sql/models/sales/mart/sales__mart__orders.sql"
+_CUSTOMERS_PATH: str = "sql/models/sales/mart/sales__mart__customers.sql"
+_CONSUMER_PATH: str = "sql/models/finance/staging/finance__stg_v__orders.sql"
 _FILES: tuple[tuple[str, str], ...] = (
     (
-        "models/sales/intermediate/clean/sales__int_clean__orders.sql",
+        "sql/models/sales/intermediate/clean/sales__int_clean__orders.sql",
         "MODEL (description 'Clean orders.');\nSELECT 1 AS order_id\n",
     ),
     (_ORDERS_PATH, "MODEL (description 'Published orders.');\nSELECT 1 AS order_id\n"),
@@ -43,7 +43,7 @@ _FILES: tuple[tuple[str, str], ...] = (
         'SELECT o.order_id FROM __ref("sales__int_clean__orders") AS o\n',
     ),
     (
-        "models/sales/mart/sales__mart__products.sql",
+        "sql/models/sales/mart/sales__mart__products.sql",
         "MODEL (description 'Published products.');\nSELECT 1 AS order_id\n",
     ),
     (
@@ -60,7 +60,7 @@ _FILES: tuple[tuple[str, str], ...] = (
         'JOIN __ref("sales__mart__orders") AS o ON r.order_id = o.order_id\n',
     ),
 )
-_PRODUCTS_PATH: str = "models/sales/mart/sales__mart__products.sql"
+_PRODUCTS_PATH: str = "sql/models/sales/mart/sales__mart__products.sql"
 _CACHE_FILES: tuple[tuple[str, str], ...] = (
     (_ORDERS_PATH, "MODEL (description 'Published orders.');\nSELECT 1 AS order_id\n"),
     (_CUSTOMERS_PATH, "MODEL (description 'Published customers.');\nSELECT 1 AS customer_id\n"),
@@ -73,7 +73,7 @@ _QUALIFIED_IGNORES: str = (
     'reason = "Reviewed qualified variants."\n'
 )
 
-_ORDERS_BASE_PATH: str = "models/orders_base.sql"
+_ORDERS_BASE_PATH: str = "sql/models/orders_base.sql"
 _PUBLISHED_VIEW_RULE: str = custom_rule_source(
     code="XSQBRPUB001",
     body=(
@@ -237,12 +237,12 @@ def test_given_selection_when_planning_then_graph_reading_model_rules_see_whole_
             ("rules/published.py", _PUBLISHED_VIEW_RULE),
             (_ORDERS_BASE_PATH, "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n"),
             (
-                "models/orders_report.sql",
+                "sql/models/orders_report.sql",
                 "MODEL (description 'Order report.');\n"
                 'SELECT order_id FROM __ref("orders_base")\n',
             ),
             (
-                "models/orders_published.sql",
+                "sql/models/orders_published.sql",
                 "MODEL (description 'Published orders.', materialized view);\n"
                 + test_case.view_sql,
             ),

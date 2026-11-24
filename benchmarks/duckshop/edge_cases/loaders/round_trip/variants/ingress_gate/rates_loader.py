@@ -1,4 +1,4 @@
-from python.tasks.rates import fetch_rates
+from python.nodes.tasks.rates.asset import fetch_rates
 
 from sqlbuild.loaders import loader
 

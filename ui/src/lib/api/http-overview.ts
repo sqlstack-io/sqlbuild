@@ -115,8 +115,7 @@ export function overviewOf({ runs, checks, nodes, changes, events, triggers, ack
 				active: recent.filter((r) => ACTIVE_STATUSES.has(r.status)).length
 			},
 			checks: checkCountsOf(checks),
-			stale: { nodes: staleNodes, changed: changed.length, behind: behind.length, sources: null },
-			cost: null
+			stale: { nodes: staleNodes, changed: changed.length, behind: behind.length, sources: null }
 		},
 		attention: withConditions(attention, conditions.acknowledgements, now),
 		attentionSnoozeSeconds: conditions.snoozeSeconds,

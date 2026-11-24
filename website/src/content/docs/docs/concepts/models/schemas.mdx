@@ -36,18 +36,18 @@ When multiple models implement the same relation shape, declare it once in a sch
 
 | Location | Who can bind it |
 |----------|-----------------|
-| `schemas/` | Models anywhere in the project |
+| `sql/schemas/` | Models anywhere in the project |
 | `<folder>/_sqlbuild/schemas/` | Models in `<folder>` and below |
 | `<folder>/_sqlbuild/_schemas/` | Models directly in `<folder>` only |
 
 A reusable schema must live under the nearest folder containing every model that binds it or
-schema that extends it. A top-level schema bound only by models under `models/marts/` fails to
-compile with `S024` and names the destination, such as `models/marts/_sqlbuild/_schemas/`. Binding
+schema that extends it. A top-level schema bound only by models under `sql/models/marts/` fails to
+compile with `S024` and names the destination, such as `sql/models/marts/_sqlbuild/_schemas/`. Binding
 a schema that is not visible from the model's folder fails with `S006`. See
 [Where to Put Declarations](/docs/concepts/declaration-scopes/placement).
 
 ```sql
--- schemas/orders/order.sql
+-- sql/schemas/orders/order.sql
 SCHEMA (
   name order,
   description "Canonical staged order shape",

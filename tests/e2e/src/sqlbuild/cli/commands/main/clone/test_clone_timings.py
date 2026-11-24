@@ -25,7 +25,7 @@ _PROJECT_FILES: dict[str, str] = {
         '[targets.dev]\nschema = "dev"\n\n'
         "[targets.dev.clone]\nallow_as_clone_destination = true\n"
     ),
-    "models/fact_orders.sql": (
+    "sql/models/fact_orders.sql": (
         'MODEL (description "Test model fact_orders.", materialized table);\n\n'
         "SELECT 1 AS order_id\n"
     ),

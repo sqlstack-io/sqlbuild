@@ -280,7 +280,6 @@ export class MockBuild {
 			attention.push({ kind: 'calendar_low', triggerId: t.id, triggerName: t.name, detail: t.warning! });
 		}
 
-		const cost = this.#hasCost(scope) ? recent.reduce((s, r) => s + (r.cost?.value ?? 0), 0) : null;
 		const latest = runs.find((r) => r.endedAt);
 		return this.#ctx.reply({
 			metrics: {
@@ -298,9 +297,7 @@ export class MockBuild {
 					active: recent.filter((r) => ['queued', 'launched', 'running', 'unresponsive'].includes(r.status)).length
 				},
 				checks: countChecks(checks),
-				stale: { nodes: new Set([...changed, ...behind]).size, changed: changed.length, behind: behind.length, sources: staleSources.length },
-				// The mock holds one day of costed runs; the server's baseline is the rolling average of the same window.
-				cost: cost === null ? null : { last24h: round(cost), baseline: round(cost * 0.78), baselineDays: 7, unit: 'credits' }
+				stale: { nodes: new Set([...changed, ...behind]).size, changed: changed.length, behind: behind.length, sources: staleSources.length }
 			},
 			attention: withConditions(attention, this.#ctx.operate.conditionAcknowledgements(), now),
 			attentionSnoozeSeconds: 86_400,

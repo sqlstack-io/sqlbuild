@@ -10,7 +10,12 @@ use crate::planner_phases::main::timing::record_step::record_step;
 use crate::planner_phases::main::timing::timed::timed;
 use crate::planner_warehouse::models::PlannerReads;
 use sqlbuild_analysis::planner_scope::constants::MODEL;
+use sqlbuild_python_base::invocation_phases::constants::PLANNED_PHASE;
+use sqlbuild_python_base::invocation_phases::main::phase_since::phase_since;
+use sqlbuild_python_base::invocation_phases::models::InvocationPhase;
+use sqlbuild_python_base::native_host::main::publish_invocation_phase::publish_invocation_phase;
 use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_project::planner_scope::models::RetainedScope;
 
 use crate::planner_changes::main::detect_changes::detect_changes;
 use crate::planner_changes::main::resolve_model_actions::resolve_model_actions;
@@ -175,6 +180,7 @@ pub(crate) fn planned_output<'py>(
     let inspection_scope = class_field(scopes, |s: &PlannerScopeResolution| &s.inspection_scope)?;
     let resolved_actions = resolve_model_actions(&inspection_scope, &changes)?;
     record_step(DETECTING_CHANGES, changes_started.elapsed().as_secs_f64());
+    let freshness_started = Instant::now();
     let source_freshness = timed(SOURCE_FRESHNESS, || {
         build_planner_source_freshness_result(
             (&project, &inspection_scope),
@@ -186,6 +192,7 @@ pub(crate) fn planned_output<'py>(
             &native_field(&snapshot, "source_freshness_state_schemas")?,
         )
     })?;
+    let freshness_seconds: f64 = freshness_started.elapsed().as_secs_f64();
     let entries_started = Instant::now();
     let reconciliation = reconcile_execution_changes(
         (&inspection_scope, &snapshot),
@@ -241,6 +248,24 @@ pub(crate) fn planned_output<'py>(
         add_deferred_origin_notes(output, (&project, scopes), (&deferral, &origin_failures))?;
     let plan_output = add_plan_metadata(output, &source_freshness, &policies)?.build(py)?;
     record_step(ASSEMBLING, assembling_started.elapsed().as_secs_f64());
+    publish_invocation_phase(
+        py,
+        &InvocationPhase {
+            count: Some(
+                i64::try_from(
+                    class_field(scopes, |s: &PlannerScopeResolution| &s.selected_scope)?
+                        .cast::<RetainedScope>()?
+                        .get()
+                        .data
+                        .selected
+                        .len(),
+                )
+                .unwrap_or(i64::MAX),
+            ),
+            detail: Some(format!("source freshness {freshness_seconds:.2} s")),
+            ..phase_since(PLANNED_PHASE, started)
+        },
+    )?;
     let on_progress = args.value("on_progress")?;
     if !on_progress.is_none() {
         on_progress.call1((format!(

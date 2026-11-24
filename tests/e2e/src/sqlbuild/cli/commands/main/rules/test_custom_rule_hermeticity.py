@@ -146,12 +146,12 @@ def test_given_hermetic_rule_when_compiling_then_rule_is_evaluated(
                 code="XSQBROPEN001",
                 body=(
                     '    reader = getattr(pathlib, "__builtins__")["op" + "en"]\n'
-                    '    reader("models/orders.sql").close()\n'
+                    '    reader("sql/models/orders.sql").close()\n'
                     "    return []\n"
                 ),
             ),
             expected_line=9,
-            expected_action="opening 'models/orders.sql'",
+            expected_action="opening 'sql/models/orders.sql'",
         ),
         NonHermeticRuleCase(
             description="file read through an aliased method is rejected even when caught",
@@ -161,14 +161,14 @@ def test_given_hermetic_rule_when_compiling_then_rule_is_evaluated(
                 body=(
                     "    reader = pathlib.Path.read_text\n"
                     "    try:\n"
-                    '        reader(pathlib.Path("models/orders.sql"))\n'
+                    '        reader(pathlib.Path("sql/models/orders.sql"))\n'
                     "    except Exception:\n"
                     "        pass\n"
                     "    return []\n"
                 ),
             ),
             expected_line=10,
-            expected_action="opening 'models/orders.sql'",
+            expected_action="opening 'sql/models/orders.sql'",
         ),
         NonHermeticRuleCase(
             description="file existence probe through pathlib is rejected",
@@ -189,12 +189,12 @@ def test_given_hermetic_rule_when_compiling_then_rule_is_evaluated(
             source=custom_rule_source(
                 code="XSQBRMETA002",
                 body=(
-                    '    modified = pathlib.Path("models/orders.sql").stat().st_mtime\n'
+                    '    modified = pathlib.Path("sql/models/orders.sql").stat().st_mtime\n'
                     "    return [ctx.finding(subject=model)] * int(modified < 0)\n"
                 ),
             ),
             expected_line=8,
-            expected_action="reading file metadata for 'models/orders.sql'",
+            expected_action="reading file metadata for 'sql/models/orders.sql'",
         ),
         NonHermeticRuleCase(
             description="command run through an allowed module is rejected",
@@ -316,14 +316,14 @@ def test_given_rule_iterating_a_string_set_when_compiling_then_order_uses_fixed_
                 code="XSQBRTREE001",
                 body=(
                     '    policy = ctx.project.tree.read_text("rules/orders_policy.yaml")\n'
-                    '    models = ctx.project.tree.glob("models/*.sql")\n'
+                    '    models = ctx.project.tree.glob("sql/models/*.sql")\n'
                     '    required = "required: true" in policy and len(models) > 1\n'
                     "    return [ctx.finding(subject=model)] * int(required)\n"
                 ),
             ),
             policy_path="rules/orders_policy.yaml",
-            added_model_path="models/customers.sql",
-            expected_paths_after_glob_change=("models/customers.sql", "models/orders.sql"),
+            added_model_path="sql/models/customers.sql",
+            expected_paths_after_glob_change=("sql/models/customers.sql", "sql/models/orders.sql"),
             expected_minimum_cache_hits=1,
         )
     ],
@@ -418,7 +418,7 @@ def test_given_rule_observing_cwd_when_invoked_from_different_directories_then_v
     tmp_path: Path, test_case: WorkingDirectoryCase
 ) -> None:
     project_dir: Path = tmp_path / "project"
-    project_dir.mkdir()
+    project_dir.mkdir(parents=True)
     write_custom_rule_project(
         project_dir=project_dir,
         selected_rules=(test_case.code,),
@@ -553,7 +553,7 @@ def test_given_stateful_and_stateless_rules_when_split_across_hosts_then_finding
     single_dir: Path = tmp_path / "single"
     split_dir: Path = tmp_path / "split"
     for project_dir in (single_dir, split_dir):
-        project_dir.mkdir()
+        project_dir.mkdir(parents=True)
         write_custom_rule_project(
             project_dir=project_dir, selected_rules=test_case.selected_rules, files=test_case.files
         )

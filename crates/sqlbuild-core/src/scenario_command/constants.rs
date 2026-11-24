@@ -44,10 +44,10 @@ pub(crate) const GRAPH_SELECTOR_PATH_MARKER: char = '~';
 pub(crate) const SQL_EXTENSION: &str = "sql";
 pub(crate) const SCENARIO_ROOT: [&str; 2] = ["tests", "scenarios"];
 
-pub(crate) const MODELS_DIR: &str = "models";
-pub(crate) const FUNCTIONS_DIR: &str = "functions";
+pub(crate) const MODELS_DIR: &str = crate::constants::MODELS_PATH;
+pub(crate) const FUNCTIONS_DIR: &str = crate::constants::FUNCTIONS_PATH;
 pub(crate) const FIXTURES_DIR: &str = "fixtures";
-pub(crate) const SEEDS_DIR: &str = "seeds";
+pub(crate) const SEEDS_DIR: &str = crate::constants::SEEDS_PATH;
 pub(crate) const EXPECTATIONS_DIR: &str = "expectations";
 pub(crate) const CLEANUP_DIR: &str = "cleanup";
 

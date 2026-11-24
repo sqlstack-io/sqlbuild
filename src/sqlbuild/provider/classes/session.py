@@ -120,6 +120,7 @@ class ProviderSession:
                 return
             self._is_closed = True
             errors: list[str] = []
+            failures: list[str] = []
             for name in reversed(self._setup_names):
                 provider: Provider = self._providers[name]
                 try:
@@ -129,8 +130,14 @@ class ProviderSession:
                         f"Provider '{name}' ({provider.__class__.__name__}) failed during "
                         f"teardown: {error}"
                     )
+                    failures.append(
+                        f"'{name}' ({provider.__class__.__name__}) raised "
+                        f"{error.__class__.__name__}"
+                    )
             if errors:
-                raise ProviderTeardownError("\n".join(errors))
+                teardown_error: ProviderTeardownError = ProviderTeardownError("\n".join(errors))
+                teardown_error.failures = tuple(failures)
+                raise teardown_error
 
     def _instantiate(self, *, name: str) -> Provider:
         """Read a deferred provider's settings from the environment on its first use."""

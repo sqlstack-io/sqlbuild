@@ -1,8 +1,8 @@
 use crate::query_facts::constants::MIN_CAST_TOKENS;
 use crate::query_facts::models::{CodeToken, ComparisonSpan};
-use sqlquack_syntax::LosslessToken;
-use sqlquack_syntax::TokenKind;
 use sqlquack_syntax::tokens::models::TokenType;
+use sqlquack_tokenize::LosslessToken;
+use sqlquack_tokenize::TokenKind;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::ops::Range;

@@ -18,7 +18,7 @@ use sqlbuild_state::events::main::readable_columns::readable_columns;
 use crate::cursor::constants::DATETIME_MODULE;
 use crate::state_rows::_helpers::event_rows::events::typed_insert_sql;
 use crate::state_rows::_helpers::migrations::migration_objects::{qualified_table, state_error};
-use crate::state_rows::_helpers::tables::state_tables::state_table_create_sql;
+use crate::state_rows::_helpers::tables::state_tables::state_table_columns;
 use crate::state_rows::models::{EventTable, EventTableLayout};
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::Request;
@@ -27,6 +27,8 @@ use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_state::state_tables::main::create_table_sql::create_table_sql;
+use sqlbuild_state::state_tables::models::TableColumn;
 
 /// DDL that creates one migration state table when it is missing.
 #[pyfunction(name = "render_migration_state_create_sql")]
@@ -53,8 +55,7 @@ pub(crate) fn create_sql<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<
         )?;
     }
     let columns: Bound<'py, PyAny> = PyTuple::new(py, layout.columns)?.into_any();
-    let sql: String = state_table_create_sql(
-        &table,
+    let definitions: Vec<TableColumn> = state_table_columns(
         (
             &columns,
             column_types.as_any(),
@@ -62,6 +63,7 @@ pub(crate) fn create_sql<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<
         ),
         &request.get("render_framework_type")?,
     )?;
+    let sql: String = create_table_sql(&table, &definitions);
     Ok(PyString::new(py, &sql).into_any())
 }
 

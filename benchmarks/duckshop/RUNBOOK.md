@@ -178,7 +178,7 @@ sqb scenario test --target edge --select edge_cases
 ```
 
 The build loads the `edge__*` sources from fixed rows that `data_scale` does not change, creates
-the area's Python functions (`functions/python/edge_*.py`, tagged `edge_case`), then builds the edge
+the area's Python functions (`sql/functions/python/edge_*.py`, tagged `edge_case`), then builds the edge
 models and runs their tests and audits. `fct_edge_delivery_events` is disabled and reports
 `skip: disabled` (see [Pending acceptance cases](#pending-acceptance-cases)).
 

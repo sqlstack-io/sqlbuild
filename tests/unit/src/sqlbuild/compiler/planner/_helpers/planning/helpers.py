@@ -126,7 +126,7 @@ def _retention_model(
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name=name),
         deps=(),
         name=name,
-        relative_path=Path(f"models/{name}.sql"),
+        relative_path=Path(f"sql/models/{name}.sql"),
         query_sql="SELECT 1 AS order_id",
         config=CompileModelConfig(
             values=config_values,
@@ -153,7 +153,7 @@ def build_full_refresh_model(*, config_values: dict[str, object]) -> CompiledMod
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="order_history"),
         deps=(),
         name="order_history",
-        relative_path=Path("models/order_history.sql"),
+        relative_path=Path("sql/models/order_history.sql"),
         query_sql="SELECT 1 AS id",
         config=CompileModelConfig(
             values={"materialized": "incremental", "incremental_strategy": "merge", **config_values}

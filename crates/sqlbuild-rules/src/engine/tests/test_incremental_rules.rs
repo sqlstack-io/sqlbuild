@@ -381,7 +381,7 @@ fn given_suppression_change_when_evaluating_then_cached_models_are_reused_with_u
         let _ = evaluate_split(&rest, &models)?;
         rest["config"]["rule_ignores"] = json!([{
             "rules": ["SQBRGRAPH102"],
-            "paths": ["models/commerce/mart/commerce__mart__orders.sql"],
+            "paths": ["sql/models/commerce/mart/commerce__mart__orders.sql"],
             "reason": "legacy warehouse table"
         }]);
 
@@ -414,8 +414,8 @@ fn given_removed_model_file_when_cache_is_rewritten_then_only_its_entry_is_dropp
     let test_cases = [test_types::CachePruningTestCase {
         description: "deleted model is pruned while an unselected model is kept",
         expected_paths: &[
-            "models/commerce/mart/commerce__mart__customers.sql",
-            "models/commerce/staging/commerce__stg__products.sql",
+            "sql/models/commerce/mart/commerce__mart__customers.sql",
+            "sql/models/commerce/staging/commerce__stg__products.sql",
         ],
     }];
     for test_case in &test_cases {

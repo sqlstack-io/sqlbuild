@@ -2,7 +2,8 @@
 
 use crate::run_output::constants::{MAX_BATCH_SEGMENTS, MAX_BATCH_TEXT_BYTES};
 use crate::run_output::models::{OutputStream, UploadState};
-use crate::run_output::tests::test_types::OutputUploadTestCase;
+use crate::run_output::tests::helpers::read_at;
+use crate::run_output::tests::test_types::{OutputReadTimeTestCase, OutputUploadTestCase};
 
 #[test]
 fn given_large_or_mixed_output_when_batched_then_every_batch_fits_the_server_and_nothing_is_lost() {
@@ -52,7 +53,7 @@ fn given_large_or_mixed_output_when_batched_then_every_batch_fits_the_server_and
             .refused_before
             .then(|| "the control server did not accept run output".to_owned());
         for (stream, bytes) in &test_case.writes {
-            state.append(("model:orders".into(), *stream), bytes);
+            state.append(("model:orders".into(), *stream), (bytes, read_at(0)));
         }
         state.end_lines();
         state.seal();
@@ -92,6 +93,51 @@ fn given_large_or_mixed_output_when_batched_then_every_batch_fits_the_server_and
             ),
             test_case.expected_queued,
             "{}: (batches, text bytes, replacement characters)",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_lines_read_at_different_times_when_batched_then_each_keeps_the_time_it_was_read() {
+    let out = OutputStream::Stdout;
+    let test_cases = [
+        OutputReadTimeTestCase {
+            description: "lines read in one millisecond share a segment",
+            writes: vec![(b"one\ntwo\n".to_vec(), 0), (b"three\n".to_vec(), 0)],
+            expected_segments: vec![("one\ntwo\nthree\n", 0)],
+        },
+        OutputReadTimeTestCase {
+            description: "a line read later starts a segment with its own time",
+            writes: vec![(b"one\n".to_vec(), 0), (b"two\n".to_vec(), 1_250)],
+            expected_segments: vec![("one\n", 0), ("two\n", 1_250)],
+        },
+        OutputReadTimeTestCase {
+            description: "a line takes the time the bytes completing it were read",
+            writes: vec![(b"on".to_vec(), 0), (b"e\n".to_vec(), 40)],
+            expected_segments: vec![("one\n", 40)],
+        },
+    ];
+    for test_case in test_cases {
+        let mut state = UploadState::default();
+        for (bytes, millis) in &test_case.writes {
+            state.append(("model:orders".into(), out), (bytes, read_at(*millis)));
+        }
+        state.seal();
+        let segments: Vec<(String, chrono::DateTime<chrono::Utc>)> = state
+            .queued
+            .iter()
+            .flat_map(|batch| batch.segments.iter())
+            .map(|segment| (segment.text.clone(), segment.read_at))
+            .collect();
+        assert_eq!(
+            segments,
+            test_case
+                .expected_segments
+                .iter()
+                .map(|(text, millis)| ((*text).to_owned(), read_at(*millis)))
+                .collect::<Vec<_>>(),
+            "{}",
             test_case.description
         );
     }

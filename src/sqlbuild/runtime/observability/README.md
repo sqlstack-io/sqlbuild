@@ -20,7 +20,8 @@ JSON-compatible `payload` object.
 
 The v1 event catalog is:
 
-- Invocation: `invocation_started`, `invocation_completed`, `invocation_failed`
+- Invocation: `invocation_started`, `invocation_completed`, `invocation_failed`; schema version 2 adds
+  `invocation_phase`, one per finished preparation step
 - Run: `run_started`, `run_completed`, `run_failed`
 - Resource attempt: `resource_attempt_started`, `resource_attempt_completed`,
   `resource_attempt_failed`, `resource_attempt_skipped`

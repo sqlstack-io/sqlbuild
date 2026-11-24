@@ -25,9 +25,13 @@ pub(crate) fn test_targets(sources: &[PythonSource]) -> Vec<PythonTarget> {
 }
 
 fn placed((source, python): (usize, &PythonSource)) -> PythonTarget {
-    let parts: Vec<String> = python.relative_path.split('/').map(str::to_owned).collect();
-    if parts.len() > 1 && parts[0] == PACKAGE_ROOT {
-        let relative_parts: Vec<String> = parts[1..].to_vec();
+    let below: Option<&str> = python
+        .relative_path
+        .strip_prefix(PACKAGE_ROOT)
+        .and_then(|rest| rest.strip_prefix('/'))
+        .filter(|rest| !rest.is_empty());
+    if let Some(below) = below {
+        let relative_parts: Vec<String> = below.split('/').map(str::to_owned).collect();
         let first_role: Option<&str> = first_directory_role(&relative_parts);
         let unit_main: bool = first_role.is_none()
             && relative_parts.len() > 1

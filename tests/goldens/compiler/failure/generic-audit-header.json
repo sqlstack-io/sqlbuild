@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D004",
-     "message": "AUDIT() in '<project>/models/marts/_sqlbuild/_audits/generic/at_least.sql:1' has unsupported keys: unknown_option",
+     "message": "AUDIT() in '<project>/sql/models/marts/_sqlbuild/_audits/generic/at_least.sql:1' has unsupported keys: unknown_option",
      "help": "supported keys: always_run, evaluation, minimum_samples, name, run_scope, sample_count, sample_unit, severity, sql_analysis, thresholds, value"
     }
    ]

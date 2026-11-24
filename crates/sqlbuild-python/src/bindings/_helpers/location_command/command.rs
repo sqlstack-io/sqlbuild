@@ -45,6 +45,7 @@ use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_compile::compile_driver::main::setup::compiled_phase::compiled_phase;
 use sqlbuild_python_front::discovered_sets::main::discover_for_publication::discover_for_publication;
 use sqlbuild_python_front::discovered_sets::main::set_discovery_source::set_discovery_source;
+use sqlbuild_python_front::discovered_sets::main::with_set_retries::with_set_retries;
 use sqlbuild_python_front::discovered_sets::models::DiscoverySource;
 use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
 use sqlbuild_python_output::recall::models::InvocationRecall;
@@ -412,7 +413,7 @@ pub(crate) fn run_location<'py>(
             },
         )?;
         let (PublishedGeneration { record, .. }, _) =
-            publish_location(py, &arguments)?.map_err(|failure| {
+            with_set_retries(|| publish_location(py, &arguments))?.map_err(|failure| {
                 PyValueError::new_err(format!(
                     "Compile failed: {} rule findings",
                     failure.finding_count

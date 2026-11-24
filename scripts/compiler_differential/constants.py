@@ -83,6 +83,8 @@ PER_PULL_REQUEST_CORPORA: tuple[str, ...] = (
 CUSTOM_RULE_FILE: str = "rules/order_names.py"
 CUSTOM_RULE_SOURCE: str = """from sqlbuild.rules import Finding, Model, RuleContext, rule
 
+MAX_MODEL_NAME_LENGTH: int = 60
+
 
 @rule(
     code="XSQBRDIFF001",
@@ -90,7 +92,7 @@ CUSTOM_RULE_SOURCE: str = """from sqlbuild.rules import Finding, Model, RuleCont
     remediation="Rename the model.",
 )
 def short_model_names(*, model: Model, ctx: RuleContext) -> list[Finding]:
-    if len(model.name) < 60:
+    if len(model.name) < MAX_MODEL_NAME_LENGTH:
         return []
     return [ctx.finding(subject=model)]
 """
@@ -191,14 +193,14 @@ GROUP BY customer_id
 """
 FAILURE_BASE_FILES: dict[str, str] = {
     "sqlbuild_project.toml": FAILURE_BASE_CONFIG,
-    "sources/raw.yml": FAILURE_BASE_SOURCES,
-    "models/staging/stg_orders.sql": FAILURE_BASE_STAGING,
-    "models/marts/customer_totals.sql": FAILURE_BASE_MART,
+    "sql/sources/raw.yml": FAILURE_BASE_SOURCES,
+    "sql/models/staging/stg_orders.sql": FAILURE_BASE_STAGING,
+    "sql/models/marts/customer_totals.sql": FAILURE_BASE_MART,
 }
-FAILURE_STAGING_PATH: str = "models/staging/stg_orders.sql"
-FAILURE_MART_PATH: str = "models/marts/customer_totals.sql"
+FAILURE_STAGING_PATH: str = "sql/models/staging/stg_orders.sql"
+FAILURE_MART_PATH: str = "sql/models/marts/customer_totals.sql"
 FAILURE_CONFIG_PATH: str = "sqlbuild_project.toml"
-FAILURE_SOURCES_PATH: str = "sources/raw.yml"
+FAILURE_SOURCES_PATH: str = "sql/sources/raw.yml"
 GENERATOR_ENUM_KIND: str = "enum"
 GENERATOR_CONSTANT_KIND: str = "constant"
 GENERATOR_MACRO_KIND: str = "macro"
@@ -248,7 +250,7 @@ GENERATOR_FEATURE_BLOCKS: tuple[str, ...] = (
     "audit_factory",
     "provider",
     "lifecycle_sink",
-    "command_output_sink",
+    "command_output_event_sink",
     "custom_materialization",
     "project_adapter",
     "model_schema",
@@ -271,10 +273,10 @@ GENERATOR_OPTIONAL_FEATURE_SHARE: float = 0.2
 GENERATOR_RARE_FEATURE_PERIOD: int = 12
 GENERATOR_RARE_FEATURE_BLOCKS: dict[str, int] = {"dbt_ref": 1}
 GENERATOR_DBT_REF_ERROR_CODE: str = "C214"
-GENERATOR_FEATURE_FOLDER: str = "models/features"
-GENERATOR_RENDER_FOLDER: str = "models/rendering"
+GENERATOR_FEATURE_FOLDER: str = "sql/models/features"
+GENERATOR_RENDER_FOLDER: str = "sql/models/rendering"
 GENERATOR_RENDER_TEST_FOLDER: str = "tests/unit/rendering"
-GENERATOR_ANALYSIS_FOLDER: str = "models/analysis"
+GENERATOR_ANALYSIS_FOLDER: str = "sql/models/analysis"
 GENERATOR_ANALYSIS_TEST_FOLDER: str = "tests/unit/analysis"
 GENERATOR_OPEN_SOURCE: str = "open_events"
 GENERATOR_DIALECT_CONNECTIONS: dict[str, tuple[str, ...]] = {
@@ -451,7 +453,7 @@ PATH_MARKER: str = "__path__"
 RELATIVE_PATH_FIELDS: frozenset[str] = frozenset({"relative_path"})
 CONFIG_ONLY_KINDS: dict[str, str] = {
     "project_adapter_config": (
-        "the config names a non-built-in adapter; adapters/ modules are resolved after "
+        "the config names a non-built-in adapter; python/adapters/ modules are resolved after "
         "discovery and are not in the capture"
     ),
     "dbt_target_path_config": (

@@ -170,3 +170,15 @@ export function eventLinkLabel(link: PlatformEventLink, locations: readonly Loca
 export function errorMessage(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
 }
+
+/** How a discovered set's newest fetch went (`DiscoveredSetStatus`). */
+export const discoveredStatusLabel: Record<'ok' | 'failed' | 'never', string> = {
+	ok: 'Fetched',
+	failed: 'Fetch failed',
+	never: 'Never fetched'
+};
+export const discoveredStatusTone: Record<'ok' | 'failed' | 'never', string> = {
+	ok: 'var(--sb-success)',
+	failed: 'var(--sb-warning)',
+	never: 'var(--sb-text-faint)'
+};

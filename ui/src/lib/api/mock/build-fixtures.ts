@@ -57,7 +57,7 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
 	stg_inventory: { materialization: 'view', description: 'Stock counts from the warehouse system.', schema: 'ANALYTICS', columns: [c('product_id', 'bigint', 'Product', ['not_null']), c('on_hand', 'bigint', 'Units on hand', ['not_null'])] },
 	stg_products: { materialization: 'view', description: 'Products from the catalogue.', schema: 'ANALYTICS', columns: [c('product_id', 'bigint', 'Product', ['not_null', 'unique'])] },
 	dim_products: { materialization: 'table', description: 'One row per product.', schema: 'ANALYTICS', columns: [c('product_id', 'bigint', 'Product', ['not_null', 'unique']), c('category', 'varchar', 'Category', ['not_null'])] },
-	fct_stock_levels: { materialization: 'incremental', description: 'Stock level of each product, by hour.', schema: 'ANALYTICS', columns: [c('product_id', 'bigint', 'Product', ['not_null']), c('on_hand', 'bigint', 'Units on hand')] },
+	fct_stock_levels: { materialization: 'incremental · delete_insert', description: 'Stock level of each product, by hour.', schema: 'ANALYTICS', columns: [c('product_id', 'bigint', 'Product', ['not_null']), c('on_hand', 'bigint', 'Units on hand')] },
 	agg_stock_by_day: { materialization: 'table', description: 'Stock by day.', schema: 'ANALYTICS', columns: [c('day', 'date', 'Day', ['not_null'])] },
 	rpt_low_stock: { materialization: 'table', description: 'Products below their reorder point.', schema: 'ANALYTICS', columns: [c('product_id', 'bigint', 'Product', ['not_null'])] },
 	stg_shipping: { materialization: 'view', description: 'Shipments from the carrier feed.', schema: 'ANALYTICS', columns: [c('shipment_id', 'bigint', 'Shipment', ['not_null', 'unique'])] },

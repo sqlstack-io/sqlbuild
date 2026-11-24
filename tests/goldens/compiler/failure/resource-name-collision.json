@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D007",
-     "message": "Logical relation name 'stg_orders' is declared as both model in models/staging/stg_orders.sql and seed in seeds/stg_orders.yml"
+     "message": "Logical relation name 'stg_orders' is declared as both model in sql/models/staging/stg_orders.sql and seed in sql/seeds/stg_orders.yml"
     }
    ]
   }

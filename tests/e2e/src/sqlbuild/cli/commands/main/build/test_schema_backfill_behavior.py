@@ -22,10 +22,10 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     [
         SchemaBackfillBuildE2ETestCase(
             description="add column mutation reports bounded schema backfill",
-            mutate_model_file="models/intermediate/order_status_index.sql",
+            mutate_model_file="sql/models/intermediate/order_status_index.sql",
             model_before_text="on_schema_change append_new_columns",
             model_after_text="on_schema_change append_new_columns",
-            mutate_schema_file="models/intermediate/order_status_index.sql",
+            mutate_schema_file="sql/models/intermediate/order_status_index.sql",
             schema_before_text="  columns (\n    order_id (audits [not_null, unique]),\n  ),",
             schema_after_text=(
                 "  columns (\n"
@@ -43,10 +43,10 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
         ),
         SchemaBackfillBuildE2ETestCase(
             description="add column mutation with on_schema_change fail reports error warning",
-            mutate_model_file="models/intermediate/order_status_index.sql",
+            mutate_model_file="sql/models/intermediate/order_status_index.sql",
             model_before_text="on_schema_change append_new_columns",
             model_after_text="on_schema_change fail",
-            mutate_schema_file="models/intermediate/order_status_index.sql",
+            mutate_schema_file="sql/models/intermediate/order_status_index.sql",
             schema_before_text="  columns (\n    order_id (audits [not_null, unique]),\n  ),",
             schema_after_text=(
                 "  columns (\n"
@@ -66,10 +66,10 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
         ),
         SchemaBackfillBuildE2ETestCase(
             description="add column mutation with on_schema_change ignore reports info warning",
-            mutate_model_file="models/intermediate/order_status_index.sql",
+            mutate_model_file="sql/models/intermediate/order_status_index.sql",
             model_before_text="on_schema_change append_new_columns",
             model_after_text="on_schema_change ignore",
-            mutate_schema_file="models/intermediate/order_status_index.sql",
+            mutate_schema_file="sql/models/intermediate/order_status_index.sql",
             schema_before_text="  columns (\n    order_id (audits [not_null, unique]),\n  ),",
             schema_after_text=(
                 "  columns (\n"

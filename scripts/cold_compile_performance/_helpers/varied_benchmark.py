@@ -38,14 +38,14 @@ def run_varied_cache_benchmark(
         project_dir=project_dir, label="warm", budget=test_case.expected_warm_max_seconds
     )
     leaf: Path = next(
-        (project_dir / "models").rglob(f"{dense_model_name(test_case.model_count - 1)}.sql")
+        (project_dir / "sql" / "models").rglob(f"{dense_model_name(test_case.model_count - 1)}.sql")
     )
     _edit_model(leaf)
     measurements.update(_measure_edit(project_dir=project_dir, label="leaf", test_case=test_case))
-    shared: Path = next((project_dir / "models").rglob(f"{dense_model_name(0)}.sql"))
+    shared: Path = next((project_dir / "sql" / "models").rglob(f"{dense_model_name(0)}.sql"))
     _edit_model(shared)
     measurements.update(_measure_edit(project_dir=project_dir, label="shared", test_case=test_case))
-    macro: Path = next((project_dir / "models").rglob("offset00000.py"))
+    macro: Path = next((project_dir / "sql" / "models").rglob("offset00000.py"))
     contents: str = macro.read_text(encoding="utf-8")
     if contents.count('return f"({expression} + 1)"') != 1:
         raise CompileBenchmarkFixtureError("Expected one editable macro expression")

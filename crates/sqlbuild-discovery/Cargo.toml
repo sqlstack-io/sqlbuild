@@ -11,6 +11,7 @@ rust-version.workspace = true
 rayon.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+ignore.workspace = true
 sqlbuild-cache.workspace = true
 sqlbuild-config.workspace = true
 sqlbuild-core.workspace = true

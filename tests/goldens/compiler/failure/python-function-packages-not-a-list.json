@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Python function file functions/python/order_flag.py packages must be a list"
+     "message": "Python function file sql/functions/python/order_flag.py packages must be a list"
     }
    ]
   }

@@ -43,10 +43,19 @@ export type Resource<T> = {
 export function createResource<T>(
 	load: (client: ApiClient, scope: Scope) => Promise<T>,
 	topics: readonly string[] = [],
-	/** `every`: the least time between reloads a stream of change signals starts, for a large read. */
-	options: { every?: number } = {}
+	/**
+	 * `every`: the least time between reloads a stream of change signals starts, for a large read.
+	 * `raw`: the answer is kept as it came, not made deeply reactive, for large reads replaced whole.
+	 */
+	options: { every?: number; raw?: boolean } = {}
 ): Resource<T> {
-	let data = $state<T | undefined>(undefined);
+	let deep = $state<T | undefined>(undefined);
+	let flat = $state.raw<T | undefined>(undefined);
+	const read = (): T | undefined => (options.raw ? flat : deep);
+	const write = (value: T | undefined) => {
+		if (options.raw) flat = value;
+		else deep = value;
+	};
 	let error = $state<string | null>(null);
 	let loading = $state(true);
 	let shownKey = '';
@@ -61,7 +70,7 @@ export function createResource<T>(
 		started = Date.now();
 		// The page's path and query tell apart reads of different jobs, runs and filters made by the same code.
 		const key = `${app.user?.name ?? ''}|${scope.locationId}|${browser ? window.location.pathname + window.location.search : ''}|${load}`;
-		if (key !== shownKey && remembered.has(key)) data = remembered.get(key) as T;
+		if (key !== shownKey && remembered.has(key)) write(remembered.get(key) as T);
 		shownKey = key;
 		loading = true;
 		const done = () => {
@@ -75,7 +84,7 @@ export function createResource<T>(
 			(value) => {
 				if (request !== latest) return;
 				remember(key, value);
-				data = value;
+				write(value);
 				error = null;
 				loading = false;
 				done();
@@ -85,7 +94,7 @@ export function createResource<T>(
 				// A refusal also drops the earlier answer, so a person whose access went sees the refusal, not old data.
 				if (isRefusal(reason)) {
 					remembered.delete(key);
-					data = undefined;
+					write(undefined);
 				}
 				error = reason instanceof Error ? reason.message : String(reason);
 				loading = false;
@@ -127,7 +136,7 @@ export function createResource<T>(
 
 	return {
 		get data() {
-			return data;
+			return read();
 		},
 		get error() {
 			return error;

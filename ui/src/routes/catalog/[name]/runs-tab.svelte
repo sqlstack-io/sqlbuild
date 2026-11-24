@@ -5,6 +5,7 @@
 	import type { CatalogNodeDetail, NodeBuildCost } from '$lib/api';
 	import { CREDIT_PRICE_HINT, formatQueryCost } from '$lib/operate/cost';
 	import CostChart from './cost-chart.svelte';
+	import HelpTip from '$lib/components/help-tip.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
 	import { app } from '$lib/state/app.svelte';
@@ -31,7 +32,7 @@
 
 {#if costs.length}
 	<CostChart {costs} days={costDays} />
-	{#if costs.some((c) => c.usd === null)}<p class="hint">{CREDIT_PRICE_HINT}</p>{/if}
+	{#if costs.some((c) => c.usd === null)}<p class="hint">In credits <HelpTip text={CREDIT_PRICE_HINT} label="Why credits" /></p>{/if}
 {/if}
 
 <DataTable class="static" embedded columns={runColumns} rows={(node.runs ?? []).map((r, i) => ({ ...r, i }))} key={(r) => `${r.runId ?? r.fingerprintRunId}-${r.i}`} empty="No builds yet.">

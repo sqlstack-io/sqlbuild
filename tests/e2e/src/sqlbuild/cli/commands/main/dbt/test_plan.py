@@ -48,7 +48,7 @@ pytestmark: pytest.MarkDecorator = pytest.mark.dbt
         ),
         DbtPlanCliTestCase(
             description="routes explicit model path for SQLBuild model paths",
-            command=("dbt", "plan", "--json", "--select", "path:models/marts"),
+            command=("dbt", "plan", "--json", "--select", "path:sql/models/marts"),
             expected_selected_models=(
                 "deprecated_orders",
                 "downstream_orders",

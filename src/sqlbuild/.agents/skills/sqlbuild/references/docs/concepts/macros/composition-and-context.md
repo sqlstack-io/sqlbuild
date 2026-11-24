@@ -24,7 +24,7 @@ calling each other in their bodies.
 Use underscore-prefixed helpers for implementation details that should not be callable from SQL:
 
 ```python
-# macros/python/currency.py
+# sql/macros/python/currency.py
 def _divide_by_100(expression: str) -> str:
     return f"({expression} / 100.0)"
 
@@ -52,8 +52,8 @@ def formatted_total(expression: str) -> str:
 Import another project macro when it is visible from the importing macro file:
 
 ```python
-# macros/python/orders.py
-from macros.python.currency import add_tax, round_money
+# sql/macros/python/orders.py
+from sql.macros.python.currency import add_tax, round_money
 
 def formatted_order_total(expression: str) -> str:
     return round_money(add_tax(expression))
@@ -73,7 +73,7 @@ The same visibility direction applies to scoped macros:
 - A project-wide macro cannot import a narrower macro.
 - A macro cannot import from a sibling or unrelated scope.
 
-See [Declarations and Scopes](../declaration-scopes.md) when macros are stored under `macros/`
+See [Declarations and Scopes](../declaration-scopes.md) when macros are stored under `sql/macros/`
 or `_macros/`.
 
 ## Macro output is final SQL
@@ -89,7 +89,7 @@ def formatted_order_total(expression: str) -> str:
 SQLBuild rejects this output. Import and call the Python functions instead:
 
 ```python
-from macros.python.currency import add_tax, round_money
+from sql.macros.python.currency import add_tax, round_money
 
 def formatted_order_total(expression: str) -> str:
     return round_money(add_tax(expression))
@@ -117,7 +117,7 @@ When the first parameter is named `ctx`, SQLBuild passes a `MacroContext` with a
 project-variable information:
 
 ```python
-# macros/python/datetime.py
+# sql/macros/python/datetime.py
 def timestamp_trunc(ctx, grain: str, expression: str) -> str:
     if ctx.adapter_name == "bigquery":
         return f"TIMESTAMP_TRUNC({expression}, {grain.upper()})"

@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D006",
-     "message": "<project>/sources/raw.yml uses YAML that SQLBuild does not support at line 17, column 22: values tagged !!binary",
+     "message": "<project>/sql/sources/raw.yml uses YAML that SQLBuild does not support at line 17, column 22: values tagged !!binary",
      "help": "SQLBuild reads plain YAML: block and flow mappings and sequences, plain and quoted scalars, literal and folded block scalars, anchors, aliases and merge keys. Rewrite this part in one of those forms."
     }
    ]

@@ -1,0 +1,19 @@
+{
+ "commands": [
+  {
+   "label": "compile",
+   "exit_code": 1,
+   "diagnostics": [
+    {
+     "phase": "compile",
+     "severity": "error",
+     "code": "D018",
+     "message": "'python/helpers.py' is not part of a SQLBuild project",
+     "help": "move it under one of: python/nodes/, python/providers/, python/event_sinks/, python/materializations/, python/adapters/,\n          or list it in extra_paths in sqlbuild_project.toml if it belongs here on purpose"
+    }
+   ]
+  }
+ ],
+ "compiled": {},
+ "manifest": null
+}

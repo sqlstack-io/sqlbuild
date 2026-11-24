@@ -1,7 +1,7 @@
 use crate::functions::main::frame_argument_error::frame_argument_error;
 use crate::functions::tests::test_types::FrameArgumentTestCase;
 
-const DECIMAL_ERROR: &str = "Python function functions/python/smooth.py argument 'amount' is \
+const DECIMAL_ERROR: &str = "Python function sql/functions/python/smooth.py argument 'amount' is \
      NUMBER(10, 2), which Snowflake passes to a polars frame as Python Decimal objects, a slow \
      object column; declare it as FLOAT, or as INTEGER when it has no fraction";
 
@@ -20,7 +20,7 @@ fn given_table_function_arguments_when_checking_the_frame_then_fractional_number
             dataframe: Some("polars"),
             argument_type: "decimal(12,4)",
             expected_error: Some(
-                "Python function functions/python/smooth.py argument 'amount' is \
+                "Python function sql/functions/python/smooth.py argument 'amount' is \
                  decimal(12,4), which Snowflake passes to a polars frame as Python Decimal \
                  objects, a slow object column; declare it as FLOAT, or as INTEGER when it has \
                  no fraction",
@@ -31,7 +31,7 @@ fn given_table_function_arguments_when_checking_the_frame_then_fractional_number
             dataframe: Some("polars"),
             argument_type: "DEC(10, 2)",
             expected_error: Some(
-                "Python function functions/python/smooth.py argument 'amount' is \
+                "Python function sql/functions/python/smooth.py argument 'amount' is \
                  DEC(10, 2), which Snowflake passes to a polars frame as Python Decimal \
                  objects, a slow object column; declare it as FLOAT, or as INTEGER when it has \
                  no fraction",
@@ -70,7 +70,7 @@ fn given_table_function_arguments_when_checking_the_frame_then_fractional_number
         ];
         assert_eq!(
             frame_argument_error(
-                "Python function functions/python/smooth.py",
+                "Python function sql/functions/python/smooth.py",
                 test_case.dataframe,
                 &arguments
             )

@@ -863,12 +863,12 @@ def write_synthetic_snowflake_project(
 ) -> SyntheticSnowflakeProject:
     """Write a synthetic orders project and the matching warehouse relation set."""
 
-    (project_dir / "models").mkdir(parents=True, exist_ok=True)
-    (project_dir / "sources").mkdir(parents=True, exist_ok=True)
+    (project_dir / "sql" / "models").mkdir(parents=True, exist_ok=True)
+    (project_dir / "sql" / "sources").mkdir(parents=True, exist_ok=True)
     (project_dir / "sqlbuild_project.toml").write_text(
         _project_toml(database=database, model_schemas=model_schemas), encoding="utf-8"
     )
-    (project_dir / "sources" / "raw.yml").write_text(
+    (project_dir / "sql" / "sources" / "raw.yml").write_text(
         _sources_yml(database=database, source_schema=source_schema, sources=sources),
         encoding="utf-8",
     )
@@ -886,7 +886,7 @@ def write_synthetic_snowflake_project(
     schema_index: int
     schema: str
     for schema_index, schema in enumerate(model_schemas):
-        (project_dir / "models" / schema).mkdir(parents=True, exist_ok=True)
+        (project_dir / "sql" / "models" / schema).mkdir(parents=True, exist_ok=True)
         model_index: int
         for model_index in range(models_per_schema):
             name: str = f"{schema}_orders_{model_index}"
@@ -896,7 +896,7 @@ def write_synthetic_snowflake_project(
             )[schema_index == 0]
             incremental: bool = model_index % incremental_every == 0
             header: str = (_TABLE_MODEL_HEADER, _INCREMENTAL_MODEL_HEADER)[incremental]
-            (project_dir / "models" / schema / f"{name}.sql").write_text(
+            (project_dir / "sql" / "models" / schema / f"{name}.sql").write_text(
                 f"{header}SELECT order_id, ordered_at FROM {upstream}\n", encoding="utf-8"
             )
             names_by_schema[name] = schema

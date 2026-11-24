@@ -78,7 +78,7 @@ def validate_natively(  # noqa: PLR0913
     )
     outcome: int | _native.NativeConfigError | None = validator.validate(
         config.values,
-        (model_name, query_sql, f"models/{model_name}.sql"),
+        (model_name, query_sql, f"sql/models/{model_name}.sql"),
         (
             [("ref", name, False) for name in names],
             declared_columns,

@@ -255,7 +255,7 @@ def prepare_bigquery_diff_project(*, tmp_path: Path) -> tuple[Path, str, str]:
         build_bigquery_local_config(location=location),
         encoding="utf-8",
     )
-    models_dir: Path = project_dir / "models" / "staging"
+    models_dir: Path = project_dir / "sql" / "models" / "staging"
     models_dir.mkdir(parents=True, exist_ok=True)
     (models_dir / "stg_orders.sql").write_text(
         "MODEL (description 'Test model stg_orders.',\n"

@@ -22,18 +22,18 @@ import yaml
 PROJECT_DIR = Path(__file__).resolve().parents[1] / "project"
 sys.path.insert(0, str(PROJECT_DIR))
 
-from python.loaders import _edge_cases, _world  # noqa: E402
-from python.loaders._registry import GENERATORS, generate, scale_from_vars  # noqa: E402
+from python.nodes.loaders import _edge_cases, _world  # noqa: E402
+from python.nodes.loaders._registry import GENERATORS, generate, scale_from_vars  # noqa: E402
 
 Rows = list[dict[str, object]]
 
 
-EDGE_SOURCES_FILE = PROJECT_DIR / "sources" / "edge_cases.yml"
+EDGE_SOURCES_FILE = PROJECT_DIR / "sql" / "sources" / "edge_cases.yml"
 
 
 def _sources(*, edge: bool) -> dict[str, dict[str, object]]:
     sources: dict[str, dict[str, object]] = {}
-    for path in sorted((PROJECT_DIR / "sources").glob("*.yml")):
+    for path in sorted((PROJECT_DIR / "sql" / "sources").glob("*.yml")):
         if (path == EDGE_SOURCES_FILE) != edge:
             continue
         for source in yaml.safe_load(path.read_text())["sources"]:
@@ -103,7 +103,7 @@ def test_given_fresh_caches_when_generating_again_then_rows_are_identical(name: 
     first = _digest(generate(name))
     _world.build_world.cache_clear()
     for module in ("_storefront", "_fulfilment", "_inventory", "_clickstream", "_support"):
-        for value in vars(sys.modules[f"python.loaders.{module}"]).values():
+        for value in vars(sys.modules[f"python.nodes.loaders.{module}"]).values():
             if hasattr(value, "cache_clear"):
                 value.cache_clear()
     assert _digest(generate(name)) == first
@@ -409,7 +409,7 @@ class _FakeContext:
 def test_given_loader_context_when_loading_then_table_is_replaced_with_typed_inserts(
     name: str,
 ) -> None:
-    from python.loaders._registry import load
+    from python.nodes.loaders._registry import load
 
     context = _FakeContext()
     result = load(context, name)
@@ -426,7 +426,7 @@ def test_given_loader_context_when_loading_then_table_is_replaced_with_typed_ins
 
 
 def test_given_special_characters_when_rendering_literals_then_they_are_escaped() -> None:
-    from python.loaders._writer import literal
+    from python.nodes.loaders._writer import literal
 
     assert literal("it's") == "'it''s'"
     assert literal({"note": "a\nb"}) == '\'{"note": "a\\\\nb"}\''
@@ -436,7 +436,7 @@ def test_given_special_characters_when_rendering_literals_then_they_are_escaped(
 
 
 def test_given_edge_sources_when_listing_fixed_tables_then_each_has_rows_and_a_loader() -> None:
-    loaders = (PROJECT_DIR / "python" / "loaders" / "edge_cases.py").read_text()
+    loaders = (PROJECT_DIR / "python" / "nodes" / "loaders" / "edge_cases.py").read_text()
 
     assert EDGE_MANAGED
     assert sorted(_edge_cases.TABLES) == EDGE_MANAGED

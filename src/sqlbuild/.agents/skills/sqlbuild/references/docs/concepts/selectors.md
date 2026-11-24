@@ -66,12 +66,12 @@ sqb build --select tag:acceptance
 Select all models under a directory path:
 
 ```bash
-sqb build --select path:models/marts
-sqb build --select models/marts
-sqb build --select path:models/intermediate
+sqb build --select path:sql/models/marts
+sqb build --select sql/models/marts
+sqb build --select path:sql/models/intermediate
 ```
 
-Any name containing `/` is treated as a path selector, so `path:models/marts` and a bare `models/marts` work the same way. Path selectors require an explicit root directory: `models/` for SQL models or `python/` for Python nodes. Nested paths work too: `models/staging/orders` or `python/exports`.
+Any name containing `/` is treated as a path selector, so `path:sql/models/marts` and a bare `sql/models/marts` work the same way. Path selectors require an explicit root directory: `sql/models/` for SQL models or `python/nodes/` for Python nodes. Nested paths work too: `sql/models/staging/orders` or `python/nodes/exports`.
 
 ### Seed and source
 
@@ -86,7 +86,7 @@ Select every node of one kind:
 
 ```bash
 sqb build --select kind:seed
-sqb build --select "kind:model,path:models/marts"
+sqb build --select "kind:model,path:sql/models/marts"
 sqb build --select +kind:asset
 ```
 
@@ -158,7 +158,7 @@ Graph expansion works with all selector types:
 
 ```bash
 sqb build --select +tag:marts
-sqb build --select path:models/staging+
+sqb build --select path:sql/models/staging+
 ```
 
 ## Path-between selectors
@@ -187,10 +187,10 @@ This is useful for rebuilding a specific slice of the DAG without manually listi
 Use commas to intersect selector results:
 
 ```bash
-sqb build --select "tag:staging,path:models/finance"
+sqb build --select "tag:staging,path:sql/models/finance"
 ```
 
-This selects only models that match *both* conditions - in this case, models tagged `staging` that are also under the `models/finance` directory.
+This selects only models that match *both* conditions - in this case, models tagged `staging` that are also under the `sql/models/finance` directory.
 
 Graph expansion applies to the part it is written on, before the parts are intersected.
 `+orders,kind:source` selects `orders` and everything upstream of it, then keeps only the sources:
@@ -201,7 +201,7 @@ results are unioned, so `tag:finance kind:seed` selects nodes tagged `finance` a
 
 ```bash
 # Build all marts except daily_revenue
-sqb build --select path:models/marts --exclude daily_revenue
+sqb build --select path:sql/models/marts --exclude daily_revenue
 
 # Build everything upstream of fact_orders, excluding staging models
 sqb build --select +fact_orders --exclude tag:staging
@@ -215,7 +215,7 @@ clear error messages:
 ```
 error[S007]: unknown selector name 'nonexistent_model'
 error[S007]: unknown selector name 'missing_*'
-error[S009]: no models found under path 'models/nonexistent'.
+error[S009]: no models found under path 'sql/models/nonexistent'.
 error[S000]: no SQL resources or Python nodes found with tag 'nonexistent_tag'
 error[S007]: unknown node kind 'modle'
 error[S003]: path selector 'fact_orders~' requires names on both sides of '~'
@@ -232,5 +232,5 @@ error[S007]: unknown selector name 'order_status_rule'
 If a path selector omits the root directory, SQLBuild asks for the explicit form:
 
 ```
-error[S012]: path selectors require an explicit root: use 'models/' or 'python/'
+error[S012]: path selectors require an explicit root: use 'sql/models/' or 'python/nodes/'
 ```

@@ -36,7 +36,7 @@ from sqlbuild._native import (
 )
 
 _FOLDERS: tuple[str, ...] = ("sales", "sale", "finance", "daily", "orders")
-_ROOTS: tuple[str, ...] = ("models", "tests/unit", "functions/sql")
+_ROOTS: tuple[str, ...] = ("models", "tests/unit", "sql/functions/sql")
 _NAMES: tuple[str, ...] = ("status", "region", "tier", "limit", "currency", "channel")
 _NOISY_SPELLINGS: tuple[Callable[[random.Random, str], str], ...] = (
     lambda _rng, path: path.replace("/", "\\"),
@@ -146,7 +146,7 @@ def _targets(lookup: ScopeLookup) -> list[ResourceIdentity | str]:
     return [
         *lookup.resources,
         *(resource.path for resource in lookup.index.resources),
-        "models/missing.sql",
+        "sql/models/missing.sql",
         "model:missing",
     ]
 

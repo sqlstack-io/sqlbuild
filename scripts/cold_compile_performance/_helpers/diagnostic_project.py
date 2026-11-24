@@ -8,8 +8,8 @@ def write_diagnostic_project(
 ) -> None:
     """Generate large macro-backed CTE models with independent reference and conversion errors."""
     project_dir.mkdir(parents=True, exist_ok=True)
-    models: Path = project_dir / "models"
-    models.mkdir(exist_ok=True)
+    models: Path = project_dir / "sql" / "models"
+    models.mkdir(parents=True, exist_ok=True)
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "diagnostic_orders"\nadapter = "duckdb"\n[rules]\nselect = []\n'
     )
@@ -48,8 +48,8 @@ def write_diagnostic_project(
 def write_cascade_project(*, project_dir: Path, depth: int, width: int = 50) -> None:
     """Generate a reverse-named DAG with many independently poisoned output columns."""
     project_dir.mkdir(parents=True, exist_ok=True)
-    models: Path = project_dir / "models"
-    models.mkdir(exist_ok=True)
+    models: Path = project_dir / "sql" / "models"
+    models.mkdir(parents=True, exist_ok=True)
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "cascade_orders"\nadapter = "duckdb"\n[rules]\nselect = []\n'
     )
@@ -85,8 +85,8 @@ def write_cascade_project(*, project_dir: Path, depth: int, width: int = 50) -> 
 def write_function_name_project(*, project_dir: Path, model_count: int, calls: int) -> None:
     """Generate wide Snowflake models mixing unsupported, accepted, and unknown function calls."""
     project_dir.mkdir(parents=True, exist_ok=True)
-    models: Path = project_dir / "models"
-    models.mkdir(exist_ok=True)
+    models: Path = project_dir / "sql" / "models"
+    models.mkdir(parents=True, exist_ok=True)
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "function_name_orders"\nadapter = "snowflake"\n[rules]\nselect = []\n'
     )
@@ -110,8 +110,8 @@ def write_function_name_project(*, project_dir: Path, model_count: int, calls: i
 def write_single_model_diagnostic_project(*, project_dir: Path, diagnostics: int) -> None:
     """Generate one wide model whose projections each raise an unknown-column or type error."""
     project_dir.mkdir(parents=True, exist_ok=True)
-    models: Path = project_dir / "models"
-    models.mkdir(exist_ok=True)
+    models: Path = project_dir / "sql" / "models"
+    models.mkdir(parents=True, exist_ok=True)
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "dense_diagnostic_orders"\nadapter = "duckdb"\n[rules]\nselect = []\n'
     )
@@ -138,7 +138,7 @@ def write_undescribed_project(*, project_dir: Path, model_count: int, width: int
     """Generate models, seeds, and one large source file whose resources all lack descriptions."""
     project_dir.mkdir(parents=True, exist_ok=True)
     for folder in ("models", "sources", "seeds"):
-        (project_dir / folder).mkdir(exist_ok=True)
+        (project_dir / "sql" / folder).mkdir(parents=True, exist_ok=True)
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "undescribed_orders"\nadapter = "duckdb"\n[rules]\nselect = []\n'
     )
@@ -151,15 +151,15 @@ def write_undescribed_project(*, project_dir: Path, model_count: int, width: int
         )
         sources.append("    columns:")
         sources.extend(f"      - name: {column}\n        type: INTEGER" for column in columns)
-        (project_dir / "models" / f"order_totals_{index:05}.sql").write_text(
+        (project_dir / "sql" / "models" / f"order_totals_{index:05}.sql").write_text(
             "MODEL (materialized view);\n"
             f'SELECT {", ".join(columns)} FROM __source("orders_{index:05}")\n'
         )
         if index % 10 == 0:
             seeds.append(f"  - name: products_{index:05}\n    columns:")
             seeds.extend(f"      - name: {column}\n        type: INTEGER" for column in columns)
-            (project_dir / "seeds" / f"products_{index:05}.csv").write_text(
+            (project_dir / "sql" / "seeds" / f"products_{index:05}.csv").write_text(
                 ",".join(columns) + "\n" + ",".join("1" for _ in columns) + "\n"
             )
-    (project_dir / "sources" / "orders.yml").write_text("\n".join(sources) + "\n")
-    (project_dir / "seeds" / "products.yml").write_text("\n".join(seeds) + "\n")
+    (project_dir / "sql" / "sources" / "orders.yml").write_text("\n".join(sources) + "\n")
+    (project_dir / "sql" / "seeds" / "products.yml").write_text("\n".join(seeds) + "\n")

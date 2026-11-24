@@ -340,7 +340,7 @@ fn given_empty_input_only_tests_when_evaluating_minimum_tests_then_they_do_not_c
             tests: json!([helpers::filler_test()]),
             allowed_tests: json!([]),
             expected_messages: &[
-                "SQBRTEST202 models/orders.sql: model \"orders\" has 0 tests; 1 required (1 empty-input-only test not counted; see SQBRTEST203)",
+                "SQBRTEST202 sql/models/orders.sql: model \"orders\" has 0 tests; 1 required (1 empty-input-only test not counted; see SQBRTEST203)",
             ],
         },
         test_types::EmptyInputMinimumTestsTestCase {
@@ -394,7 +394,7 @@ fn given_cached_minimum_tests_when_filler_becomes_real_test_then_model_cache_is_
             tests: json!([helpers::filler_test()]),
             allowed_tests: json!([]),
             expected_messages: &[
-                "SQBRTEST202 models/orders.sql: model \"orders\" has 0 tests; 1 required (1 empty-input-only test not counted; see SQBRTEST203)",
+                "SQBRTEST202 sql/models/orders.sql: model \"orders\" has 0 tests; 1 required (1 empty-input-only test not counted; see SQBRTEST203)",
             ],
         },
         test_types::EmptyInputMinimumTestsTestCase {

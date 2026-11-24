@@ -9,11 +9,11 @@
      "severity": "error",
      "code": "XSQBRDIFF001",
      "message": "Models avoid the stg_ prefix",
-     "path": "models/staging/stg_orders.sql",
+     "path": "sql/models/staging/stg_orders.sql",
      "line": 1,
      "column": 1,
      "location": {
-      "path": "models/staging/stg_orders.sql",
+      "path": "sql/models/staging/stg_orders.sql",
       "line": 1,
       "column": 1
      },
@@ -24,15 +24,15 @@
  ],
  "compiled": {},
  "compiled_failed": {
-  "models/marts/customer_totals.sql": [
+  "sql/models/marts/customer_totals.sql": [
    "SELECT customer_id, SUM(amount) AS total_amount",
    "FROM __ref(\"stg_orders\")",
    "GROUP BY customer_id",
    ""
   ],
-  "models/staging/stg_orders.sql": [
+  "sql/models/staging/stg_orders.sql": [
    "-- sqb: compile failed for this model; not buildable",
-   "-- XSQBRDIFF001 at models/staging/stg_orders.sql:1:1: Models avoid the stg_ prefix",
+   "-- XSQBRDIFF001 at sql/models/staging/stg_orders.sql:1:1: Models avoid the stg_ prefix",
    "SELECT order_id, customer_id, amount, status",
    "FROM __source(\"raw_orders\")",
    ""

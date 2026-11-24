@@ -54,8 +54,8 @@ pub(crate) fn validate_declaration_groups(tree: &ProjectTree) -> Result<(), Scan
         if parent(&group.directory) == group.root {
             return Err(declaration_failure(format!(
                 "Grouped declaration root {}/ must be below a concrete owner directory; use the \
-                 project-wide macros/, enums/, constants/, audits/, schemas/, or hooks/ root \
-                 instead",
+                 project-wide sql/macros/, sql/enums/, sql/constants/, sql/audits/, sql/schemas/, \
+                 or sql/hooks/ root instead",
                 shown(&group.directory)
             )));
         }

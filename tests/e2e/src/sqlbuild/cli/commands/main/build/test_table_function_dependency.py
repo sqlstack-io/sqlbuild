@@ -47,7 +47,7 @@ def test_given_model_table_function_dependency_when_building_then_creates_and_co
                 """
             ).strip()
             + "\n",
-            "functions/sql/customer_orders.sql": dedent(
+            "sql/functions/sql/customer_orders.sql": dedent(
                 """
                 FUNCTION (description "Test function customer_orders.",
                   arguments (customer_id INTEGER),
@@ -61,7 +61,7 @@ def test_given_model_table_function_dependency_when_building_then_creates_and_co
                 """
             ).strip()
             + "\n",
-            "models/customer_order_summary.sql": dedent(
+            "sql/models/customer_order_summary.sql": dedent(
                 f"""
                 MODEL (description "Test model customer_order_summary.",
                   materialized table

@@ -8,12 +8,12 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Macro arguments of '@py.cents' in '<project>/models/staging/stg_orders.sql' must use only Python literals, nested macro calls, and __ref(), __source(), or __seed() references at line 5, column 57",
-     "path": "models/staging/stg_orders.sql",
+     "message": "Macro arguments of '@py.cents' in '<project>/sql/models/staging/stg_orders.sql' must use only Python literals, nested macro calls, and __ref(), __source(), or __seed() references at line 5, column 57",
+     "path": "sql/models/staging/stg_orders.sql",
      "line": 5,
      "column": 57,
      "location": {
-      "path": "models/staging/stg_orders.sql",
+      "path": "sql/models/staging/stg_orders.sql",
       "line": 5,
       "column": 57
      },

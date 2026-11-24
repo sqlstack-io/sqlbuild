@@ -120,7 +120,7 @@ def build_project_with_targets(
                 key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name=model_name),
                 deps=deps,
                 name=model_name,
-                relative_path=Path(f"models/{model_name}.sql"),
+                relative_path=Path(f"sql/models/{model_name}.sql"),
                 query_sql=f"SELECT * FROM {model_name}",
                 config=CompileModelConfig(),
                 destination=CompiledRelationLocation(
@@ -144,7 +144,7 @@ def build_project_with_targets(
                 key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name=spec.name),
                 deps=(),
                 name=spec.name,
-                relative_path=Path(f"models/{spec.name}.sql"),
+                relative_path=Path(f"sql/models/{spec.name}.sql"),
                 query_sql=f"SELECT * FROM {spec.name}",
                 config=CompileModelConfig(
                     values={
@@ -173,13 +173,13 @@ def build_project_with_targets(
                 deps=(),
                 name=seed_name,
                 seed_file=DiscoveredSeedFile(
-                    file_path=Path(f"seeds/{seed_name}.csv"),
-                    relative_path=Path(f"seeds/{seed_name}.csv"),
+                    file_path=Path(f"sql/seeds/{seed_name}.csv"),
+                    relative_path=Path(f"sql/seeds/{seed_name}.csv"),
                 ),
                 schema_entry=SchemaSeedEntry(name=seed_name, columns=()),
                 schema_file=DiscoveredSchemaFile(
-                    file_path=Path("seeds/schema.yml"),
-                    relative_path=Path("seeds/schema.yml"),
+                    file_path=Path("sql/seeds/schema.yml"),
+                    relative_path=Path("sql/seeds/schema.yml"),
                     contents="",
                     model_entries=(),
                     seed_entries=(),
@@ -207,8 +207,8 @@ def build_project_with_targets(
                     name=source_spec[0], schema=source_spec[1], table=source_spec[2]
                 ),
                 source_file=DiscoveredSourceFile(
-                    file_path=Path("sources/sources.yml"),
-                    relative_path=Path("sources/sources.yml"),
+                    file_path=Path("sql/sources/sources.yml"),
+                    relative_path=Path("sql/sources/sources.yml"),
                     contents="",
                     source_entries=(),
                 ),

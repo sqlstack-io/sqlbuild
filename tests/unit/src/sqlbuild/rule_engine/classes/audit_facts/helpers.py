@@ -11,7 +11,7 @@ from sqlbuild.compiler.compile.types import CompiledAuditView
 
 
 def build_audit(*, name: str, attached_target_name: str | None) -> CompiledAuditView:
-    relative_path: Path = Path(f"audits/{name}.sql")
+    relative_path: Path = Path(f"sql/audits/{name}.sql")
     audit_file: DiscoveredAuditFile = DiscoveredAuditFile(
         file_path=relative_path,
         relative_path=relative_path,

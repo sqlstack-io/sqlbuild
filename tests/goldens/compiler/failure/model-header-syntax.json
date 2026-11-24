@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D002",
-     "message": "MODEL(...) in '<project>/models/staging/stg_orders.sql' contains invalid SQLBuild header syntax: expected key at position 50"
+     "message": "MODEL(...) in '<project>/sql/models/staging/stg_orders.sql' contains invalid SQLBuild header syntax: expected key at position 50"
     }
    ]
   }

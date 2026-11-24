@@ -37,7 +37,7 @@ pub fn parse_schema_document<N: AuthoredNode>(
     let seeds: Option<&N> = get(&entries, "seeds");
     if seeds.is_some_and(truthy) && !in_seeds_directory {
         return Err(ConfigError::compile(format!(
-            "{path} declares seeds, but seed declarations must live under seeds/**/*.yml"
+            "{path} declares seeds, but seed declarations must live under sql/seeds/**/*.yml"
         )));
     }
     if in_seeds_directory {

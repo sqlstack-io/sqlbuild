@@ -61,7 +61,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 """
                 ).strip()
                 + "\n",
-                "models/orders.sql": dedent(
+                "sql/models/orders.sql": dedent(
                     """
                 MODEL (description "Test model orders.",
                   materialized incremental,
@@ -81,7 +81,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 """
                 ).strip()
                 + "\n",
-                "audits/generic/expression_is_true.sql": dedent(
+                "sql/audits/generic/expression_is_true.sql": dedent(
                     """
                 AUDIT ();
 
@@ -135,7 +135,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 """
                 ).strip()
                 + "\n",
-                "models/orders.sql": dedent(
+                "sql/models/orders.sql": dedent(
                     """
                 MODEL (description "Test model orders.",
                   materialized incremental,
@@ -155,7 +155,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 """
                 ).strip()
                 + "\n",
-                "audits/generic/expression_is_true.sql": dedent(
+                "sql/audits/generic/expression_is_true.sql": dedent(
                     """
                 AUDIT ();
 
@@ -211,11 +211,11 @@ def test_given_audit_failure_projects_when_running_build_then_cli_reports_failur
                     'name = "measurement_build"\nadapter = "duckdb"\n'
                     '[connection]\ndatabase = "measurement.duckdb"\n'
                 ),
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     "MODEL (description 'Test model orders.', materialized table, audits [row_rate ("
                     "thresholds (error (below 90)))]) ; SELECT 1 AS order_id"
                 ),
-                "audits/generic/row_rate.sql": (
+                "sql/audits/generic/row_rate.sql": (
                     "AUDIT (evaluation measurement, value rate); "
                     "MEASURE (SELECT 80.0 AS rate FROM @relation LIMIT 1);"
                 ),
@@ -231,13 +231,13 @@ def test_given_audit_failure_projects_when_running_build_then_cli_reports_failur
                     'name = "measurement_audit"\nadapter = "duckdb"\n'
                     '[connection]\ndatabase = "measurement.duckdb"\n'
                 ),
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     "MODEL (description 'Test model orders.', materialized table); SELECT 1 AS order_id"
                 ),
-                "models/customers.sql": (
+                "sql/models/customers.sql": (
                     "MODEL (description 'Test model customers.', materialized table); SELECT 1 AS order_id"
                 ),
-                "audits/singular/rate.sql": (
+                "sql/audits/singular/rate.sql": (
                     "AUDIT (evaluation measurement, value rate, "
                     "thresholds (error (below 90))); "
                     'MEASURE (SELECT 80.0 AS rate FROM __ref("orders") '

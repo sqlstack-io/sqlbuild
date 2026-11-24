@@ -8,7 +8,7 @@ from scripts.compiler_differential.constants import (
 )
 from scripts.compiler_differential.models import FailureCase
 
-_TRINO_ADAPTER_PATH: str = "adapters/warehouse/duckdb_trino.py"
+_TRINO_ADAPTER_PATH: str = "python/adapters/warehouse/duckdb_trino.py"
 _TRINO_ADAPTER: str = (
     "from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter\n\n\n"
     "class DuckDbTrinoAdapter(DuckDbAdapter):\n"

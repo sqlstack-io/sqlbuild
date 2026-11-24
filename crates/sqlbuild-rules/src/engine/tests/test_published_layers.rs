@@ -18,7 +18,7 @@ fn given_published_models_when_evaluating_layer_rules_then_reads_and_shapes_matc
             ],
             options: json!({}),
             expected_faults: &[(
-                "models/sales/mart/sales__mart__orders__finance.sql",
+                "sql/models/sales/mart/sales__mart__orders__finance.sql",
                 "sales__mart__orders__finance reads sales__mart__orders; published models must not read published models of their own domain",
             )],
         },
@@ -28,8 +28,8 @@ fn given_published_models_when_evaluating_layer_rules_then_reads_and_shapes_matc
             models: &[("sales__mart__orders__finance", &["sales__mart__orders"])],
             options: json!({}),
             expected_faults: &[(
-                "models/sales/mart/sales__mart__orders__finance.sql",
-                "sqb mv sales__mart__orders__finance models/sales/intermediate/enriched/sales__int_enriched__orders__finance.sql",
+                "sql/models/sales/mart/sales__mart__orders__finance.sql",
+                "sqb mv sales__mart__orders__finance sql/models/sales/intermediate/enriched/sales__int_enriched__orders__finance.sql",
             )],
         },
         PublishedLayerTestCase {
@@ -58,7 +58,7 @@ fn given_published_models_when_evaluating_layer_rules_then_reads_and_shapes_matc
             models: &[("sales__mart_v__orders__fra", &["sales__mart__orders__deu"])],
             options: json!({}),
             expected_faults: &[(
-                "models/sales/mart/sales__mart_v__orders__fra.sql",
+                "sql/models/sales/mart/sales__mart_v__orders__fra.sql",
                 "sales__mart_v__orders__fra reads sales__mart__orders__deu",
             )],
         },
@@ -68,7 +68,7 @@ fn given_published_models_when_evaluating_layer_rules_then_reads_and_shapes_matc
             models: &[("sales__mart_v__customers", &["sales__mart__orders"])],
             options: json!({}),
             expected_faults: &[(
-                "models/sales/mart/sales__mart_v__customers.sql",
+                "sql/models/sales/mart/sales__mart_v__customers.sql",
                 "sales__mart_v__customers reads sales__mart__orders",
             )],
         },
@@ -103,7 +103,7 @@ fn given_published_models_when_evaluating_layer_rules_then_reads_and_shapes_matc
             ],
             options: json!({}),
             expected_faults: &[(
-                "models/sales/mart/sales__mart__orders__finance.sql",
+                "sql/models/sales/mart/sales__mart__orders__finance.sql",
                 "domain sales publishes 2 models as <domain>__<layer>__<entity> and 1 as <domain>__<layer>__<entity>__<qualifier>; sales__mart__orders__finance does not fit the majority shape <domain>__<layer>__<entity>",
             )],
         },
@@ -117,7 +117,7 @@ fn given_published_models_when_evaluating_layer_rules_then_reads_and_shapes_matc
             ],
             options: json!({}),
             expected_faults: &[(
-                "models/sales/mart/sales__mart__customers.sql",
+                "sql/models/sales/mart/sales__mart__customers.sql",
                 "sqb rename sales__mart__customers sales__mart__customers__core",
             )],
         },
@@ -147,7 +147,7 @@ fn given_published_models_when_evaluating_layer_rules_then_reads_and_shapes_matc
                 {"domain": "finance", "qualifier": "fra", "reason": "Published once per country."}
             ]}),
             expected_faults: &[(
-                "models/sales/mart/sales__mart__orders__fra.sql",
+                "sql/models/sales/mart/sales__mart__orders__fra.sql",
                 "allowed_qualifiers = [{ domain = \"sales\", qualifier = \"fra\"",
             )],
         },
@@ -183,11 +183,11 @@ fn given_published_models_when_evaluating_layer_rules_then_reads_and_shapes_matc
             ]}),
             expected_faults: &[
                 (
-                    "models/sales/mart/sales__mart__orders__finance.sql",
+                    "sql/models/sales/mart/sales__mart__orders__finance.sql",
                     "domain sales publishes 2 models as <domain>__<layer>__<entity> and 2 as",
                 ),
                 (
-                    "models/sales/mart/sales__mart__orders__fra.sql",
+                    "sql/models/sales/mart/sales__mart__orders__fra.sql",
                     "sales__mart__orders__fra does not fit the majority shape",
                 ),
             ],
@@ -201,7 +201,7 @@ fn given_published_models_when_evaluating_layer_rules_then_reads_and_shapes_matc
                 ("sales__mart__orders__deu", &[]),
             ],
             options: json!({"allowed_qualifiers": [
-                {"paths": ["models/sales/*"], "reason": "Published once per country."}
+                {"paths": ["sql/models/sales/*"], "reason": "Published once per country."}
             ]}),
             expected_faults: &[],
         },
@@ -216,10 +216,10 @@ fn given_published_models_when_evaluating_layer_rules_then_reads_and_shapes_matc
                 ("finance__mart__revenue__fra", &[]),
             ],
             options: json!({"allowed_qualifiers": [
-                {"paths": ["models/sales/mart/*"], "reason": "Published once per country."}
+                {"paths": ["sql/models/sales/mart/*"], "reason": "Published once per country."}
             ]}),
             expected_faults: &[(
-                "models/finance/mart/finance__mart__revenue__fra.sql",
+                "sql/models/finance/mart/finance__mart__revenue__fra.sql",
                 "domain finance publishes 1 model as <domain>__<layer>__<entity> and 1 as",
             )],
         },

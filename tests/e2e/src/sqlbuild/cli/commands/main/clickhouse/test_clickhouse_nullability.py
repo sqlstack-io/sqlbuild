@@ -127,14 +127,14 @@ def test_given_non_nullable_target_when_model_starts_producing_nulls_then_policy
             "sqlbuild_project.toml": build_clickhouse_project_toml(
                 project_name="clickhouse_nulls", schema_name=schema_name, config=config
             ),
-            "sources/raw.yml": (
+            "sql/sources/raw.yml": (
                 "sources:\n"
                 "  - name: raw_orders\n"
                 "    description: Synthetic orders.\n"
                 f"    schema: {schema_name}\n"
                 "    table: raw_orders\n"
             ),
-            "models/orders.sql": test_case.model_sql + _FIRST_SELECT,
+            "sql/models/orders.sql": test_case.model_sql + _FIRST_SELECT,
         },
     )
     create_clickhouse_schema(config=config, schema_name=schema_name)
@@ -151,7 +151,7 @@ def test_given_non_nullable_target_when_model_starts_producing_nulls_then_policy
             command=("--no-color", "build"), project_dir=project_dir
         )
         assert first.returncode == 0, first.stdout + first.stderr
-        (project_dir / "models" / "orders.sql").write_text(
+        (project_dir / "sql" / "models" / "orders.sql").write_text(
             test_case.model_sql + test_case.edited_select
         )
 

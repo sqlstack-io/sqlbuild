@@ -17,7 +17,7 @@ SQLBuild starts from the file containing the SQL and walks up that file's direct
 directly containing the file is its **owner folder**.
 
 ```text
-models/
+sql/models/
 ├── constants/                 available throughout models/
 │   └── warehouse.sql
 └── commerce/
@@ -47,18 +47,18 @@ Grouped declaration directories can be placed below these SQL resource roots:
 
 | Root | Contents |
 |------|----------|
-| `models/` | Models, inline model hooks, and scoped audits, schemas, and hooks |
+| `sql/models/` | Models, inline model hooks, and scoped audits, schemas, and hooks |
 | `tests/unit/` | Unit tests |
 | `tests/scenarios/` | Scenarios |
-| `functions/sql/` | SQL functions |
-| `sources/` | Inline source expressions |
+| `sql/functions/sql/` | SQL functions |
+| `sql/sources/` | Inline source expressions |
 
-Project-wide `audits/`, `schemas/`, and `hooks/` are declaration roles, not resource trees: they
+Project-wide `sql/audits/`, `sql/schemas/`, and `sql/hooks/` are declaration roles, not resource trees: they
 cannot contain `_sqlbuild/` or other declaration directories. Scope an audit, schema, or hook by
 moving it under the `_sqlbuild/` folder of the models that use it.
 
-Each root is a separate tree. For example, `models/constants/` does not make declarations available
-under `tests/`. Put a declaration in the top-level `constants/`, `enums/`, or `macros/` directory
+Each root is a separate tree. For example, `sql/models/constants/` does not make declarations available
+under `tests/`. Put a declaration in the top-level `sql/constants/`, `sql/enums/`, or `sql/macros/` directory
 when it must be available across different resource trees. Project-root `_constants/`, `_enums/`,
 and `_macros/` directories are invalid because there is no owner folder at the project root for
 them to be private to.
@@ -68,7 +68,7 @@ preferred layout because it keeps all declarations together without changing the
 Only the declaration-role directories listed on the
 [overview](/docs/concepts/declaration-scopes) are valid directly under `_sqlbuild/`; other entries
 are rejected. `_sqlbuild/` must sit below a concrete owner directory. A project-root
-`_sqlbuild/` or authored-root path such as `models/_sqlbuild/` is invalid; use the project-wide
+`_sqlbuild/` or authored-root path such as `sql/models/_sqlbuild/` is invalid; use the project-wide
 roots at that boundary.
 
 ## Which file controls visibility?
@@ -79,16 +79,16 @@ roots at that boundary.
 | Inline SQL hook in a model | The model file |
 | Unit test SQL | The test file, plus inferred tested-resource relationships |
 | Scenario SQL | The scenario file, plus expected-model enum and constant relationships |
-| Named SQL hook | The owner folder of the hook's role, or the project root for `hooks/sql/` |
-| SQL function | The function file under `functions/sql/` |
-| Audit | The owner folder of the audit's role, or the project root for `audits/` |
+| Named SQL hook | The owner folder of the hook's role, or the project root for `sql/hooks/sql/` |
+| SQL function | The function file under `sql/functions/sql/` |
+| Audit | The owner folder of the audit's role, or the project root for `sql/audits/` |
 | Reusable schema | The owner folder of the schema's role, for `extends` and enum column types |
 | Inline source expression | The source definition |
 
 This means a reusable named hook or audit does not change meaning depending on which model uses
 it. It uses declarations available from the folder that owns it: a hook in
-`models/marts/_sqlbuild/hooks/sql/` sees the same macros, enums, and constants as a model directly
-in `models/marts/`.
+`sql/models/marts/_sqlbuild/hooks/sql/` sees the same macros, enums, and constants as a model directly
+in `sql/models/marts/`.
 
 A model can name an audit, schema, or hook only when that declaration is visible from the model's
 folder, using the same rules as macros. Naming one from a sibling or parent folder fails with
@@ -130,11 +130,11 @@ macro's production owner. SQLBuild infers tested macros from calls in `__macro_a
 filename or directory does not grant production visibility.
 
 ```text
-models/orders/_sqlbuild/_macros/python/order_policy.py
+sql/models/orders/_sqlbuild/_macros/python/order_policy.py
 tests/unit/macros/models/orders/test_order_policy__returns_quantity.sql
 ```
 
-The macro test can call `order_policy` without promoting it to the project-wide `macros/` root. A
+The macro test can call `order_policy` without promoting it to the project-wide `sql/macros/` root. A
 test can also use helper macros scoped to its own test directory:
 
 ```text
@@ -154,8 +154,8 @@ A macro file may import another project macro file when the imported macro is av
 importing file's location. The same directory rules apply as they do to SQL.
 
 ```python
-# models/commerce/macros/python/orders.py
-from macros.python.currency import round_money
+# sql/models/commerce/macros/python/orders.py
+from sql.macros.python.currency import round_money
 
 
 def formatted_total(expression: str) -> str:

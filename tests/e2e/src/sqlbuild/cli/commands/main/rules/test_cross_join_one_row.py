@@ -79,8 +79,8 @@ _MULTIPLYING: str = (
 )
 
 
-_SEED_YAML_FILE: tuple[str, str] = ("seeds/order_policy.yml", _SEED_YAML)
-_RAW_ORDERS_FILE: tuple[str, str] = ("models/raw_orders.sql", _RAW_ORDERS_SQL)
+_SEED_YAML_FILE: tuple[str, str] = ("sql/seeds/order_policy.yml", _SEED_YAML)
+_RAW_ORDERS_FILE: tuple[str, str] = ("sql/models/raw_orders.sql", _RAW_ORDERS_SQL)
 
 
 @pytest.mark.parametrize(
@@ -135,7 +135,7 @@ def test_given_cross_join_when_compiling_then_only_multiplying_joins_are_reporte
         files=(
             _SEED_YAML_FILE,
             _RAW_ORDERS_FILE,
-            ("models/checked_orders.sql", test_case.model_sql),
+            ("sql/models/checked_orders.sql", test_case.model_sql),
         ),
     )
 
@@ -171,7 +171,7 @@ def test_given_one_row_seed_when_a_row_is_added_then_the_cached_compile_reports_
         files=(
             _SEED_YAML_FILE,
             _RAW_ORDERS_FILE,
-            ("models/checked_orders.sql", test_case.model_sql),
+            ("sql/models/checked_orders.sql", test_case.model_sql),
         ),
     )
     first: subprocess.CompletedProcess[str] = run_compile_cli(tmp_path)

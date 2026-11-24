@@ -12,6 +12,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     prepare_inline_project,
     run_sqb,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": dedent(
@@ -55,8 +56,10 @@ PROJECT_FILES: dict[str, str] = {
         allow_as_clone_destination = true
         """
     ).lstrip(),
-    "python/loaders/raw.py": dedent(
-        """
+    **node_module_files(
+        "python/nodes/loaders/raw.py",
+        dedent(
+            """
         from sqlbuild.loaders import loader
 
 
@@ -65,8 +68,9 @@ PROJECT_FILES: dict[str, str] = {
             '''Test loader raw_payments.'''
             return [{"payment_id": 1, "order_id": 1, "amount_cents": 500}]
         """
-    ).lstrip(),
-    "sources/raw.yml": dedent(
+        ).lstrip(),
+    ),
+    "sql/sources/raw.yml": dedent(
         """
         sources:
           - name: raw_payments
@@ -88,8 +92,8 @@ PROJECT_FILES: dict[str, str] = {
                 AS raw_orders(order_id, customer_id, amount_cents)
         """
     ).lstrip(),
-    "seeds/customers.csv": "customer_id,customer_name\n101,Ada\n102,Grace\n",
-    "seeds/schema.yml": dedent(
+    "sql/seeds/customers.csv": "customer_id,customer_name\n101,Ada\n102,Grace\n",
+    "sql/seeds/schema.yml": dedent(
         """
         seeds:
           - name: customers
@@ -101,21 +105,21 @@ PROJECT_FILES: dict[str, str] = {
                 type: VARCHAR
         """
     ).lstrip(),
-    "models/staging/stg_orders.sql": dedent(
+    "sql/models/staging/stg_orders.sql": dedent(
         """
         MODEL (description "Test model stg_orders.", materialized view);
 
         SELECT order_id, customer_id, amount_cents, '@@region' AS region FROM __source("raw_orders")
         """
     ).lstrip(),
-    "models/staging/stg_payments.sql": dedent(
+    "sql/models/staging/stg_payments.sql": dedent(
         """
         MODEL (description "Test model stg_payments.", materialized view);
 
         SELECT * FROM __source("raw_payments")
         """
     ).lstrip(),
-    "models/marts/fct_orders.sql": dedent(
+    "sql/models/marts/fct_orders.sql": dedent(
         """
         MODEL (description "Test model fct_orders.", materialized table);
 
@@ -124,7 +128,7 @@ PROJECT_FILES: dict[str, str] = {
         JOIN __seed("customers") AS c ON c.customer_id = o.customer_id
         """
     ).lstrip(),
-    "models/marts/fct_order_events.sql": dedent(
+    "sql/models/marts/fct_order_events.sql": dedent(
         """
         MODEL (
           description "Test model fct_order_events.",
@@ -135,7 +139,7 @@ PROJECT_FILES: dict[str, str] = {
         SELECT order_id, amount_cents FROM __ref("fct_orders")
         """
     ).lstrip(),
-    "models/marts/orders_summary.sql": dedent(
+    "sql/models/marts/orders_summary.sql": dedent(
         """
         MODEL (description "Test model orders_summary.", materialized view);
 
@@ -144,21 +148,21 @@ PROJECT_FILES: dict[str, str] = {
         LEFT JOIN __ref("stg_payments") AS p ON p.order_id = f.order_id
         """
     ).lstrip(),
-    "models/marts/orders_backlog.sql": dedent(
+    "sql/models/marts/orders_backlog.sql": dedent(
         """
         MODEL (description "Test model orders_backlog.", materialized table);
 
         SELECT order_id FROM __ref("fct_orders") WHERE amount_cents > 150
         """
     ).lstrip(),
-    "models/marts/retired_orders.sql": dedent(
+    "sql/models/marts/retired_orders.sql": dedent(
         """
         MODEL (description "Test model retired_orders.", materialized table, enabled false);
 
         SELECT order_id FROM __ref("fct_orders")
         """
     ).lstrip(),
-    "functions/sql/cents_to_units.sql": dedent(
+    "sql/functions/sql/cents_to_units.sql": dedent(
         """
         FUNCTION (
           description "Test function cents_to_units.",
@@ -225,12 +229,12 @@ def plan_missing_upstreams(
                 f"allow_as_clone_destination = {str(destination_allowed).lower()}\n"
             ),
             **{
-                f"models/{name}.sql": (
+                f"sql/models/{name}.sql": (
                     f"MODEL (description '{name}.', materialized table);\n\nSELECT 1 AS id\n"
                 )
                 for name in MISSING_UPSTREAMS
             },
-            "models/report.sql": (
+            "sql/models/report.sql": (
                 "MODEL (description 'Report.', materialized table);\n\n"
                 'SELECT customers.id FROM __ref("customers") AS customers\n'
                 + "".join(
@@ -268,13 +272,13 @@ def defer_clone_with_missing_origin(
                 '[targets.dev]\nschema = "dev"\n\n'
                 "[targets.dev.clone]\nallow_as_clone_destination = true\n"
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Orders.', materialized table);\n\nSELECT 1 AS id\n"
             ),
-            "models/customers.sql": (
+            "sql/models/customers.sql": (
                 "MODEL (description 'Customers.', materialized table);\n\nSELECT 1 AS id\n"
             ),
-            "models/report.sql": (
+            "sql/models/report.sql": (
                 "MODEL (description 'Report.', materialized table);\n\n"
                 'SELECT o.id FROM __ref("orders") AS o JOIN __ref("customers") AS c USING (id)\n'
             ),

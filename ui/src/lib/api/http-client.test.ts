@@ -773,6 +773,34 @@ describe('republish', () => {
 	});
 });
 
+describe('readDiscovered', () => {
+	it('reads the current snapshot\'s sets with each item\'s node, and none before a publication', async () => {
+		const bodies: unknown[] = [
+			{
+				snapshot_id: 's-1',
+				generation: 3,
+				published_at: '2026-11-23T10:00:00Z',
+				sets: [{ name: 'forecast_plan', status: 'ok', items: 1, digest: 'd-1', tags: { release: '0.58.0' }, assets: ['forecast'], nodes: [{ key: 'asset:forecast[train]', asset: 'forecast', step: 'train', args: { region: 'eu' } }] }]
+			},
+			null
+		];
+		const calls: Request[] = [];
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				calls.push(request);
+				return Response.json(bodies[calls.length - 1]);
+			})
+		);
+		const client = createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} });
+		expect(await client.readDiscovered(ORDERS)).toEqual([
+			{ name: 'forecast_plan', status: 'ok', items: 1, fetchedAt: null, lastGoodAt: null, digest: 'd-1', error: null, checkEverySeconds: null, tags: { release: '0.58.0' }, assets: ['forecast'], nodes: [{ key: 'asset:forecast[train]', asset: 'forecast', step: 'train', args: { region: 'eu' } }] }
+		]);
+		expect(new URL(calls[0].url).pathname).toBe('/api/control/locations/0191f0aa-orders/targets/development/discovered');
+		expect(await client.readDiscovered(ORDERS)).toEqual([]);
+	});
+});
+
 describe('requestWarehouseSync', () => {
 	function server(status: number) {
 		const calls: Request[] = [];

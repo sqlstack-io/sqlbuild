@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D007",
-     "message": "Duplicate model file name found for 'stg_orders' in models/marts/stg_orders.sql and models/staging/stg_orders.sql"
+     "message": "Duplicate model file name found for 'stg_orders' in sql/models/marts/stg_orders.sql and sql/models/staging/stg_orders.sql"
     }
    ]
   }

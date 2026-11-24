@@ -38,7 +38,7 @@ read it, and pointing at the source declaration:
 ```
 error[S405]: cannot build selected scope: 1 source table read by selected resources does not exist in the warehouse:
   - source 'raw_payments' (raw.payments), read by payments
-  = help: create or load the table, correct its database, schema, or table in the source declaration, or stop reading it from the selected models; declared 'raw_payments' at sources/raw.yml:16
+  = help: create or load the table, correct its database, schema, or table in the source declaration, or stop reading it from the selected models; declared 'raw_payments' at sql/sources/raw.yml:16
 ```
 
 Create the table, fix the declaration, or leave the reading models out of the selection. Managed

@@ -33,17 +33,17 @@ const UNINDEXABLE_SCOPE_MESSAGE: &str = "Native scope indexing could not place a
 const INSPECT_MODULE: &str = "inspect";
 const CODE_TYPE_MODULE: &str = "types";
 pub(crate) const PATHLIB_MODULE: &str = "pathlib";
-const PRIVATE_ROOT: &str = "models";
-const MACRO_FALLBACK: &str = "macros";
-const ENUM_FALLBACK: &str = "enums";
-const CONSTANT_FALLBACK: &str = "constants";
+const PRIVATE_ROOT: &str = "sql/models";
+const MACRO_FALLBACK: &str = "sql/macros";
+const ENUM_FALLBACK: &str = "sql/enums";
+const CONSTANT_FALLBACK: &str = "sql/constants";
 const COLLECTION_KINDS: [&str; 3] = ["list", "set", "object"];
 const NULL_KIND: &str = "null";
 /// Each resource kind's own ownership root, in the order Python sorts them by path.
 const KIND_ROOTS: [(ResourceKind, &str); 5] = [
-    (ResourceKind::Function, "functions/sql"),
-    (ResourceKind::Model, "models"),
-    (ResourceKind::Source, "sources"),
+    (ResourceKind::Function, "sql/functions/sql"),
+    (ResourceKind::Model, "sql/models"),
+    (ResourceKind::Source, "sql/sources"),
     (ResourceKind::Scenario, "tests/scenarios"),
     (ResourceKind::Test, "tests/unit"),
 ];
@@ -672,8 +672,8 @@ fn resource_root<'py>(
     root: ResourceRoot,
 ) -> PyResult<Bound<'py, PyAny>> {
     let (path, root_kind, resource_kind): (&str, &str, ResourceKind) = match root {
-        ResourceRoot::Seed => ("seeds", "global", ResourceKind::Seed),
-        ResourceRoot::PythonFunction => ("functions/python", "global", ResourceKind::Function),
+        ResourceRoot::Seed => ("sql/seeds", "global", ResourceKind::Seed),
+        ResourceRoot::PythonFunction => ("sql/functions/python", "global", ResourceKind::Function),
         ResourceRoot::Kind => match KIND_ROOTS.iter().find(|(candidate, _)| *candidate == kind) {
             Some((_, path)) => (path, "resource", kind),
             None => {

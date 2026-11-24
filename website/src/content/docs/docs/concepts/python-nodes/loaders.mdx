@@ -7,18 +7,18 @@ Loaders are Python functions that load data into source tables. They replace exp
 
 ## How it works
 
-1. Write a Python function under `python/` decorated with `@loader`
-2. Declare a managed source in `sources/*.yml` with `managed: true` and **the same name as the loader function**
+1. Write a Python function under `python/nodes/` decorated with `@loader`
+2. Declare a managed source in `sql/sources/*.yml` with `managed: true` and **the same name as the loader function**
 3. SQLBuild calls the function, writes returned rows to a staging table, then applies the configured write strategy to the target
 
 Loaders participate in the build lifecycle. When `sqb build` runs, managed sources are loaded before any dependent model is materialized.
 
 ## Defining a loader
 
-Place Python files under `python/` in your project directory (the playgrounds use `python/loaders/`). Each file can contain one or more loader functions:
+Place Python files under `python/nodes/` in your project directory (the playgrounds use `python/nodes/loaders/`). Each file can contain one or more loader functions:
 
 ```python
-# python/loaders/raw_sources.py
+# python/nodes/loaders/raw_sources.py
 from sqlbuild.loaders import loader
 from sqlbuild.executor.load.models import LoaderContext
 
@@ -35,7 +35,7 @@ The function receives a `LoaderContext` and returns rows as a list of dicts, an 
 
 ## Binding to a source
 
-Declare a managed source in `sources/*.yml`. A managed source is bound to the loader function **with the same name** - there is no separate `loader` field:
+Declare a managed source in `sql/sources/*.yml`. A managed source is bound to the loader function **with the same name** - there is no separate `loader` field:
 
 ```yaml
 sources:
@@ -352,7 +352,7 @@ The `@loader` decorator accepts optional parameters that can also be set in the 
 
 | Parameter | Description |
 |-----------|-------------|
-| `depends_on` | List of loader and asset functions this loader depends on. Depending on one that reads SQL is a [warehouse round trip](/docs/concepts/python-nodes/overview#warehouse-round-trips) |
+| `depends_on` | List of loader and asset functions this loader depends on, and [`job()` or `tag()` sets](/docs/concepts/python-nodes/sql-references#depending-on-a-job-or-a-tag), as for assets. Depending on one that reads SQL is a [warehouse round trip](/docs/concepts/python-nodes/overview#warehouse-round-trips) |
 | `destination` | Override the destination relation name (can include schema or database) |
 | `write_strategy` | `table`, `append`, `delete_insert`, or `merge` |
 | `cursor_column` | Column used for incremental cursor tracking |
@@ -432,17 +432,22 @@ When a loader returns rows with columns not present in the existing target table
 ```
 my-project/
   python/
-    loaders/
-      raw_sources.py         # loader functions
-      api_sources.py         # more loader functions
-  sources/
-    raw.yml                  # managed source declarations (managed: true)
-  models/
-    staging/
-      stg_customers.sql      # __source("raw_customers")
+    nodes/
+      raw/
+        raw_customers/
+          loader.py          # one @loader
+          main.py
+        api_sources/
+          loaders.py         # a @factory that makes several loaders
+  sql/
+    sources/
+      raw.yml                # managed source declarations (managed: true)
+    models/
+      staging/
+        stg_customers.sql    # __source("raw_customers")
 ```
 
-SQLBuild imports all `.py` files under `python/` recursively (excluding `__init__.py`). Functions decorated with `@loader` become loaders; undecorated helpers do not become nodes.
+SQLBuild imports all `.py` files under `python/nodes/` recursively (excluding `__init__.py`). Functions decorated with `@loader` become loaders; undecorated helpers do not become nodes. A `@loader` is declared in a file named `loader.py`, and a factory that makes only loaders in `loaders.py`; any other file name fails compilation with `D011` naming the file the declaration belongs in.
 
 ## Config reference
 

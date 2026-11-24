@@ -3,10 +3,12 @@
 use crate::native_host::constants::ROWS_PER_STATEMENT;
 use crate::native_host::main::execute::execute;
 use crate::native_host::models::Location;
-use crate::resource_costs::_helpers::resource_costs_state::CREATE_TABLE_METHOD;
 use crate::resource_costs::_helpers::resource_costs_state::observation_cells;
 use crate::resource_costs::_helpers::resource_costs_state::run_attempt;
 use crate::resource_costs::_helpers::resource_costs_state::table;
+use crate::resource_costs::_helpers::resource_costs_state::{
+    ADD_COLUMNS_METHOD, CREATE_TABLE_METHOD, TABLES_WITH_ADDED_COLUMNS,
+};
 use pyo3::prelude::Bound;
 use pyo3::prelude::PyAny;
 use pyo3::prelude::PyAnyMethods;
@@ -94,6 +96,7 @@ impl<'py> ResourceCostStore<'py> {
         if !create.is_empty() {
             self.execute(&create)?;
         }
+        self.add_columns(&keywords)?;
         let observed_at: String = call_with(
             &native_field(&self.adapter, "render_current_utc_timestamp")?,
             &[],
@@ -169,6 +172,26 @@ impl<'py> ResourceCostStore<'py> {
                 ),
             ],
         )
+    }
+
+    /// Add the columns an older table lacks, once per table and process.
+    fn add_columns(&self, keywords: &[(&str, Bound<'py, PyAny>)]) -> PyResult<()> {
+        if !self.adapter.hasattr(ADD_COLUMNS_METHOD)?
+            || TABLES_WITH_ADDED_COLUMNS
+                .lock()
+                .is_ok_and(|done| done.contains(&self.table))
+        {
+            return Ok(());
+        }
+        for statement in
+            call_with(&native_field(&self.adapter, ADD_COLUMNS_METHOD)?, keywords)?.try_iter()?
+        {
+            self.execute(&statement?.extract::<String>()?)?;
+        }
+        if let Ok(mut done) = TABLES_WITH_ADDED_COLUMNS.lock() {
+            done.insert(self.table.clone());
+        }
+        Ok(())
     }
 
     pub fn close(self) -> PyResult<()> {

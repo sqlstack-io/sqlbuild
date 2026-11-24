@@ -27,7 +27,7 @@ from tests.e2e.scripts.planner_differential.helpers import (
             expected_clean_line="Planner differential passed: 1 projects matched the baseline",
             expected_difference_line="  - step edit-query: plan_json",
             expected_diff_line='+ "exit_code": 0,',
-            expected_note="edited models/daily_revenue.sql",
+            expected_note="edited sql/models/daily_revenue.sql",
         ),
     ],
     ids=lambda case: case.description,

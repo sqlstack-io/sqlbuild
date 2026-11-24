@@ -7,7 +7,7 @@ use crate::header_changes::tests::test_types::HeaderChangeTestCase;
 use crate::model_files::main::model_file_options::model_file_options;
 use crate::model_files::main::parse_model_text::parse_model_text;
 
-const RELATIVE_PATH: &str = "models/orders.sql";
+const RELATIVE_PATH: &str = "sql/models/orders.sql";
 const UPSTREAM: [(&str, &str); 1] = [("model", "customers")];
 
 /// The change of a recorded model after its file is rewritten, or deleted when none is given.

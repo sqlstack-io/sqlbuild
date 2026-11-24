@@ -23,10 +23,10 @@ PROJECT_FILES: dict[str, str] = {
         'name = "python_tests_project"\nadapter = "duckdb"\n\n'
         '[connection]\ndatabase = "python_tests_project.duckdb"\n'
     ),
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         'MODEL (description "Test model orders.");\n\nSELECT status FROM __source("raw_orders")\n'
     ),
-    "sources/raw_orders.yml": (
+    "sql/sources/raw_orders.yml": (
         "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
         "    schema: main\n    table: raw_orders\n"
     ),
@@ -37,15 +37,15 @@ PROJECT_FILES: dict[str, str] = {
         "__expected__orders AS (SELECT 'open' AS status)\n"
         "SELECT 1\n"
     ),
-    "python/orders/storefront_import/node.py": (
+    "python/nodes/orders/storefront_import/asset.py": (
         "from sqlbuild.assets import asset\n\n\n"
         "@asset(description='Import storefront orders.', tags=['ingest'])\n"
         "def storefront_import(ctx):\n    return None\n"
     ),
-    "python/orders/storefront_import/_helpers/row_mapping.py": (
+    "python/nodes/orders/storefront_import/_helpers/row_mapping.py": (
         "def map_row(raw):\n    return {'status': str(raw['state']).lower()}\n"
     ),
-    "python/inventory/stock_sync/node.py": (
+    "python/nodes/inventory/stock_sync/asset.py": (
         "from sqlbuild.assets import asset\n\n\n"
         "@asset(description='Sync stock.')\n"
         "def stock_sync(ctx):\n    return None\n"
@@ -53,8 +53,8 @@ PROJECT_FILES: dict[str, str] = {
 }
 
 PASSING_PYTHON_TEST: dict[str, str] = {
-    "tests/python/orders/storefront_import/_helpers/test_row_mapping.py": (
-        "from python.orders.storefront_import._helpers.row_mapping import map_row\n\n\n"
+    "tests/python/nodes/orders/storefront_import/_helpers/test_row_mapping.py": (
+        "from python.nodes.orders.storefront_import._helpers.row_mapping import map_row\n\n\n"
         "def test_given_paid_order_when_mapping_then_status_is_paid():\n"
         "    assert map_row({'state': 'PAID'}) == {'status': 'paid'}\n"
     ),
@@ -72,19 +72,19 @@ ORCHESTRATION_PYTHON_TEST: dict[str, str] = {
 }
 
 FAILING_PYTHON_TEST: dict[str, str] = {
-    "tests/python/inventory/stock_sync/test_node.py": (
+    "tests/python/nodes/inventory/stock_sync/test_node.py": (
         "def test_given_stock_when_syncing_then_fails():\n    assert False\n"
     ),
 }
 
 BROKEN_MODEL: dict[str, str] = {
-    "models/broken.sql": (
+    "sql/models/broken.sql": (
         'MODEL (description "Test model broken.");\n\nSELECT missing_column FROM __ref("orders")\n'
     ),
 }
 
-PASSING_FILE: str = "tests/python/orders/storefront_import/_helpers/test_row_mapping.py"
-FAILING_FILE: str = "tests/python/inventory/stock_sync/test_node.py"
+PASSING_FILE: str = "tests/python/nodes/orders/storefront_import/_helpers/test_row_mapping.py"
+FAILING_FILE: str = "tests/python/nodes/inventory/stock_sync/test_node.py"
 
 SQL_PASSED: str = "PASS=1  FAIL=0"
 PYTHON_PASSED: str = "Python tests passed  1 file"
@@ -199,7 +199,7 @@ sys.meta_path[:] = [_HidePytest(finder) for finder in sys.meta_path]
         ),
         PythonTestsE2ETestCase(
             description="--select of a Python node's path runs its mirrored tests",
-            command=("--no-color", "test", "--select", "python/orders/storefront_import"),
+            command=("--no-color", "test", "--select", "python/nodes/orders/storefront_import"),
             extra_repo_files={**PASSING_PYTHON_TEST, **FAILING_PYTHON_TEST},
             expected_exit_code=0,
             expected_output_fragments=(PYTHON_PASSED, "1 passed"),
@@ -313,7 +313,7 @@ def test_given_pytest_missing_when_running_sqb_test_then_only_python_tests_need_
     tmp_path: Path,
 ) -> None:
     hidden: Path = tmp_path / "hidden_pytest"
-    hidden.mkdir()
+    hidden.mkdir(parents=True)
     (hidden / "sitecustomize.py").write_text(HIDDEN_PYTEST_SITECUSTOMIZE, encoding="utf-8")
     project_dir: Path = prepare_inline_project(
         tmp_path=tmp_path,

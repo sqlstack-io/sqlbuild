@@ -52,7 +52,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                 sources:
                   - name: raw_orders
@@ -62,7 +62,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 """
                 ).strip()
                 + "\n",
-                "models/staging/stg_orders.sql": dedent(
+                "sql/models/staging/stg_orders.sql": dedent(
                     """
                 MODEL (description "Test model stg_orders.", materialized view);
 
@@ -70,7 +70,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 """
                 ).strip()
                 + "\n",
-                "models/marts/fact_orders.sql": dedent(
+                "sql/models/marts/fact_orders.sql": dedent(
                     """
                 MODEL (description "Test model fact_orders.", materialized table);
 
@@ -79,7 +79,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 """
                 ).strip()
                 + "\n",
-                "models/marts/hourly_order_activity.sql": dedent(
+                "sql/models/marts/hourly_order_activity.sql": dedent(
                     """
                 MODEL (description "Test model hourly_order_activity.",
                   materialized incremental,
@@ -105,7 +105,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 """
                 ).strip()
                 + "\n",
-                "models/marts/daily_activity_rollup.sql": dedent(
+                "sql/models/marts/daily_activity_rollup.sql": dedent(
                     """
                 MODEL (description "Test model daily_activity_rollup.",
                   materialized incremental,
@@ -135,7 +135,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
             },
             initial_build_command=("--no-color", "build"),
             plan_command=("plan", "--json"),
-            mutation_file="models/marts/hourly_order_activity.sql",
+            mutation_file="sql/models/marts/hourly_order_activity.sql",
             before_text="SUM(line_total_cents) AS revenue_cents",
             after_text="SUM(line_total_cents) + 0 AS revenue_cents",
             expected_exit_code=0,
@@ -176,7 +176,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                 sources:
                   - name: raw_orders
@@ -186,7 +186,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 """
                 ).strip()
                 + "\n",
-                "functions/sql/is_high_value_order.sql": dedent(
+                "sql/functions/sql/is_high_value_order.sql": dedent(
                     """
                 FUNCTION (description "Test function is_high_value_order.",
                   arguments (amount_cents INTEGER),
@@ -197,7 +197,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 """
                 ).strip()
                 + "\n",
-                "models/fact_orders.sql": dedent(
+                "sql/models/fact_orders.sql": dedent(
                     """
                 MODEL (description "Test model fact_orders.",
                   materialized incremental,
@@ -222,7 +222,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
             },
             initial_build_command=("--no-color", "build"),
             plan_command=("plan", "--json"),
-            mutation_file="functions/sql/is_high_value_order.sql",
+            mutation_file="sql/functions/sql/is_high_value_order.sql",
             before_text="amount_cents > 100",
             after_text="amount_cents >= 100",
             expected_exit_code=0,
@@ -260,7 +260,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                 sources:
                   - name: raw_orders
@@ -270,7 +270,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 """
                 ).strip()
                 + "\n",
-                "models/staging/stg_orders.sql": dedent(
+                "sql/models/staging/stg_orders.sql": dedent(
                     """
                 MODEL (description "Test model stg_orders.", materialized view);
 
@@ -278,7 +278,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 """
                 ).strip()
                 + "\n",
-                "models/marts/fact_orders.sql": dedent(
+                "sql/models/marts/fact_orders.sql": dedent(
                     """
                 MODEL (description "Test model fact_orders.", materialized table);
 
@@ -287,7 +287,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 """
                 ).strip()
                 + "\n",
-                "models/marts/hourly_order_activity.sql": dedent(
+                "sql/models/marts/hourly_order_activity.sql": dedent(
                     """
                 MODEL (description "Test model hourly_order_activity.",
                   materialized incremental,
@@ -314,7 +314,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 """
                 ).strip()
                 + "\n",
-                "models/marts/daily_activity_rollup.sql": dedent(
+                "sql/models/marts/daily_activity_rollup.sql": dedent(
                     """
                 MODEL (description "Test model daily_activity_rollup.",
                   materialized incremental,
@@ -344,7 +344,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
             },
             initial_build_command=("--no-color", "build"),
             plan_command=("plan", "--json"),
-            mutation_file="models/marts/hourly_order_activity.sql",
+            mutation_file="sql/models/marts/hourly_order_activity.sql",
             before_text="SUM(line_total_cents) AS revenue_cents",
             after_text="SUM(line_total_cents) + 0 AS revenue_cents",
             expected_exit_code=0,

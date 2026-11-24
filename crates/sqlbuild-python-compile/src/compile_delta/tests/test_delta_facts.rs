@@ -9,31 +9,31 @@ fn given_custom_rule_fact_when_a_delta_compiles_some_models_then_only_facts_it_h
     let test_cases = [
         DeltaFactTestCase {
             description: "the SQL of a compiled model",
-            key: &["sql.for_model", "models/orders.sql"],
+            key: &["sql.for_model", "sql/models/orders.sql"],
             all_sources: false,
             expected_safe: true,
         },
         DeltaFactTestCase {
             description: "the inferred columns of a compiled model",
-            key: &["columns.inferred", "models/orders.sql"],
+            key: &["columns.inferred", "sql/models/orders.sql"],
             all_sources: false,
             expected_safe: true,
         },
         DeltaFactTestCase {
             description: "the SQL of a model the delta does not compile",
-            key: &["sql.for_model", "models/customers.sql"],
+            key: &["sql.for_model", "sql/models/customers.sql"],
             all_sources: false,
             expected_safe: false,
         },
         DeltaFactTestCase {
             description: "the dependencies of a compiled model",
-            key: &["graph.dependencies", "models/orders.sql"],
+            key: &["graph.dependencies", "sql/models/orders.sql"],
             all_sources: false,
             expected_safe: false,
         },
         DeltaFactTestCase {
             description: "the text of any project file",
-            key: &["tree.read_text", "models/customers.sql"],
+            key: &["tree.read_text", "sql/models/customers.sql"],
             all_sources: false,
             expected_safe: true,
         },
@@ -68,7 +68,7 @@ fn given_custom_rule_fact_when_a_delta_compiles_some_models_then_only_facts_it_h
             expected_safe: false,
         },
     ];
-    let compiled: BTreeSet<String> = names(&["models/orders.sql"]);
+    let compiled: BTreeSet<String> = names(&["sql/models/orders.sql"]);
     for test_case in test_cases {
         let safe: bool = delta_safe_fact(&strings(test_case.key), &compiled, test_case.all_sources);
 

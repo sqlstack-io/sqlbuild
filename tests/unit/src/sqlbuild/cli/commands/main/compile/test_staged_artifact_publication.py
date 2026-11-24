@@ -154,7 +154,7 @@ def test_given_cleanup_interleaved_with_staging_when_compiling_then_live_staging
     assert survived == [True]
     assert written is not None
     assert read_target_files(target, test_case.expected_files) == test_case.expected_files
-    assert not (target / "compiled" / "models" / "obsolete.sql").exists()
+    assert not (target / "compiled" / "sql" / "models" / "obsolete.sql").exists()
     assert sorted(path.name for path in target.glob(".sqlbuild-staging-*")) == []
 
 

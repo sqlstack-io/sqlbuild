@@ -287,14 +287,14 @@ def test_given_terminal_when_cloning_then_preparation_spinner_stops_before_items
         ClonePreparationFailureE2ETestCase(
             description="compile error stops the preparation spinner before the error prints",
             columns=120,
-            broken_model_path="models/marts/orders_backlog.sql",
+            broken_model_path="sql/models/marts/orders_backlog.sql",
             broken_model_sql=(
                 'MODEL (description "Test model orders_backlog.", materialized table);\n\n'
                 'SELECT order_id FROM __ref("missing_orders")\n'
             ),
             expected_screen_fragments=(
                 "✓ Warehouse connected  duckdb",
-                "error[P001]: Model file models/marts/orders_backlog.sql references unknown "
+                "error[P001]: Model file sql/models/marts/orders_backlog.sql references unknown "
                 "model 'missing_orders'",
             ),
         ),

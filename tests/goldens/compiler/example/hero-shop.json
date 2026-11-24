@@ -22,7 +22,7 @@
   }
  ],
  "compiled": {
-  "models/finance/daily_revenue.sql": [
+  "sql/models/finance/daily_revenue.sql": [
    "SELECT",
    "  CAST(paid_at AS DATE) AS revenue_date,",
    "  SUM(amount_cents) AS total_revenue_cents",
@@ -40,8 +40,8 @@
     "name": "daily_revenue",
     "resource_type": "model",
     "package_name": "waffle_shop",
-    "path": "models/finance/daily_revenue.sql",
-    "original_file_path": "models/finance/daily_revenue.sql",
+    "path": "sql/models/finance/daily_revenue.sql",
+    "original_file_path": "sql/models/finance/daily_revenue.sql",
     "unique_id": "model.waffle_shop.daily_revenue",
     "fqn": [
      "waffle_shop",
@@ -109,8 +109,8 @@
     "name": "payments",
     "resource_type": "seed",
     "package_name": "waffle_shop",
-    "path": "seeds/payments.csv",
-    "original_file_path": "seeds/payments.csv",
+    "path": "sql/seeds/payments.csv",
+    "original_file_path": "sql/seeds/payments.csv",
     "unique_id": "seed.waffle_shop.payments",
     "fqn": [
      "waffle_shop",

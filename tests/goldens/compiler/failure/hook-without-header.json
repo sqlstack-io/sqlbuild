@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D014",
-     "message": "SQL hook '<project>/hooks/sql/record_refresh.sql' must start with a HOOK() header as the first non-whitespace content"
+     "message": "SQL hook '<project>/sql/hooks/sql/record_refresh.sql' must start with a HOOK() header as the first non-whitespace content"
     }
    ]
   }

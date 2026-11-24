@@ -14,7 +14,7 @@ fn given_an_edited_model_header_when_compared_then_the_change_is_classified() {
             edited_contents: Some(STORED),
             recorded: false,
             expected_change: HeaderChange::Unsupported(
-                "models/orders.sql has no recorded header".to_owned(),
+                "sql/models/orders.sql has no recorded header".to_owned(),
             ),
         },
         HeaderChangeTestCase {
@@ -48,7 +48,8 @@ fn given_an_edited_model_header_when_compared_then_the_change_is_classified() {
             ),
             recorded: true,
             expected_change: HeaderChange::Unsupported(
-                "models/orders.sql changed its materialization beyond views and tables".to_owned(),
+                "sql/models/orders.sql changed its materialization beyond views and tables"
+                    .to_owned(),
             ),
         },
         HeaderChangeTestCase {
@@ -59,7 +60,7 @@ fn given_an_edited_model_header_when_compared_then_the_change_is_classified() {
             ),
             recorded: true,
             expected_change: HeaderChange::Unsupported(
-                "models/orders.sql changed its unique_key header key".to_owned(),
+                "sql/models/orders.sql changed its unique_key header key".to_owned(),
             ),
         },
         HeaderChangeTestCase {
@@ -70,7 +71,7 @@ fn given_an_edited_model_header_when_compared_then_the_change_is_classified() {
             ),
             recorded: true,
             expected_change: HeaderChange::Unsupported(
-                "models/orders.sql changed what it references".to_owned(),
+                "sql/models/orders.sql changed what it references".to_owned(),
             ),
         },
     ];

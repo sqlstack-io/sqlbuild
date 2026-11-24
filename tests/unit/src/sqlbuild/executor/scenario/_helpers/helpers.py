@@ -99,7 +99,7 @@ def build_snapshot_input_specs_test_plan(
                 ),
                 name="currency_codes",
                 destination=_target("seed", "currency_codes"),
-                file_path=Path("seeds/currency_codes.csv"),
+                file_path=Path("sql/seeds/currency_codes.csv"),
                 columns=(),
                 csv_settings=DEFAULT_SEED_CSV_SETTINGS,
             ),
@@ -111,7 +111,7 @@ def build_snapshot_input_specs_test_plan(
                     name="daily_revenue",
                 ),
                 name="daily_revenue",
-                relative_path=Path("models/daily_revenue.sql"),
+                relative_path=Path("sql/models/daily_revenue.sql"),
                 materialization_type=MaterializationType.TABLE,
                 action=PlanAction.CREATE_TABLE,
                 reason=PlanReason.FIRST_RUN,
@@ -152,7 +152,7 @@ def build_snapshot_manifest(*, input_fingerprint: str = "fresh123") -> ScenarioS
             ScenarioSnapshotRelation(
                 kind=ScenarioArtifactKind.SOURCE,
                 logical_name="raw__orders",
-                file_path=Path("sources/raw__orders.jsonl"),
+                file_path=Path("sql/sources/raw__orders.jsonl"),
                 row_count=2,
                 byte_count=100,
                 columns=(
@@ -191,7 +191,7 @@ def build_local_snapshot_load_manifest(
             ScenarioSnapshotRelation(
                 kind=ScenarioArtifactKind.SOURCE,
                 logical_name="raw__orders",
-                file_path=Path("sources/raw__orders.jsonl"),
+                file_path=Path("sql/sources/raw__orders.jsonl"),
                 row_count=1,
                 byte_count=1,
                 columns=tuple(
@@ -228,7 +228,7 @@ def write_local_snapshot_load_test_files(
         manifest=manifest,
     )
     write_scenario_snapshot_jsonl(
-        file_path=snapshot_root / "sources" / "raw__orders.jsonl",
+        file_path=snapshot_root / "sql" / "sources" / "raw__orders.jsonl",
         rows=rows,
     )
 
@@ -249,7 +249,7 @@ def write_local_snapshot_load_test_file_contents(
         manifest_path=snapshot_root / "scenario.json",
         manifest=manifest,
     )
-    file_path: Path = snapshot_root / "sources" / "raw__orders.jsonl"
+    file_path: Path = snapshot_root / "sql" / "sources" / "raw__orders.jsonl"
     file_path.parent.mkdir(parents=True, exist_ok=True)
     file_path.write_text(file_contents, encoding="utf-8")
 

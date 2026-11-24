@@ -12,11 +12,11 @@
      "resource_type": "model",
      "resource_name": "typed_totals",
      "column_name": "total_amount",
-     "path": "models/marts/typed_totals.sql",
+     "path": "sql/models/marts/typed_totals.sql",
      "line": 3,
      "column": 12,
      "location": {
-      "path": "models/marts/typed_totals.sql",
+      "path": "sql/models/marts/typed_totals.sql",
       "line": 3,
       "column": 12,
       "end_line": 3,
@@ -26,7 +26,7 @@
       {
        "label": "output",
        "location": {
-        "path": "models/marts/typed_totals.sql",
+        "path": "sql/models/marts/typed_totals.sql",
         "line": 6,
         "column": 8,
         "end_line": 6,
@@ -44,24 +44,24 @@
      "message": "model 'stg_orders' has contract enforced but declares no columns",
      "resource_type": "model",
      "resource_name": "stg_orders",
-     "path": "models/staging/stg_orders.sql",
+     "path": "sql/models/staging/stg_orders.sql",
      "help": "add MODEL(columns (...)), declare a proven MODEL(dynamic_columns (...)) family, or set contract none for this model"
     }
    ]
   }
  ],
  "compiled": {
-  "models/marts/customer_totals.sql": [
+  "sql/models/marts/customer_totals.sql": [
    "SELECT customer_id, CAST(SUM(amount) AS VARCHAR) AS total_amount",
    "FROM __ref(\"stg_orders\")",
    "GROUP BY customer_id",
    ""
   ],
-  "models/marts/typed_totals.sql": [
+  "sql/models/marts/typed_totals.sql": [
    "SELECT CAST(1.5 AS DOUBLE) AS total_amount",
    ""
   ],
-  "models/staging/stg_orders.sql": [
+  "sql/models/staging/stg_orders.sql": [
    "SELECT order_id, customer_id, amount, status",
    "FROM __source(\"raw_orders\")",
    ""
@@ -75,8 +75,8 @@
     "name": "customer_totals",
     "resource_type": "model",
     "package_name": "failure_corpus",
-    "path": "models/marts/customer_totals.sql",
-    "original_file_path": "models/marts/customer_totals.sql",
+    "path": "sql/models/marts/customer_totals.sql",
+    "original_file_path": "sql/models/marts/customer_totals.sql",
     "unique_id": "model.failure_corpus.customer_totals",
     "fqn": [
      "failure_corpus",
@@ -144,8 +144,8 @@
     "name": "typed_totals",
     "resource_type": "model",
     "package_name": "failure_corpus",
-    "path": "models/marts/typed_totals.sql",
-    "original_file_path": "models/marts/typed_totals.sql",
+    "path": "sql/models/marts/typed_totals.sql",
+    "original_file_path": "sql/models/marts/typed_totals.sql",
     "unique_id": "model.failure_corpus.typed_totals",
     "fqn": [
      "failure_corpus",
@@ -221,8 +221,8 @@
     "name": "stg_orders",
     "resource_type": "model",
     "package_name": "failure_corpus",
-    "path": "models/staging/stg_orders.sql",
-    "original_file_path": "models/staging/stg_orders.sql",
+    "path": "sql/models/staging/stg_orders.sql",
+    "original_file_path": "sql/models/staging/stg_orders.sql",
     "unique_id": "model.failure_corpus.stg_orders",
     "fqn": [
      "failure_corpus",
@@ -292,8 +292,8 @@
     "name": "raw_orders",
     "resource_type": "source",
     "package_name": "failure_corpus",
-    "path": "sources/raw.yml",
-    "original_file_path": "sources/raw.yml",
+    "path": "sql/sources/raw.yml",
+    "original_file_path": "sql/sources/raw.yml",
     "unique_id": "source.failure_corpus.raw_orders",
     "fqn": [
      "failure_corpus",

@@ -221,7 +221,7 @@ max_ranking_order_by = 5   # default
   `@const`: a model-private `constants (_status_pattern '...')` entry in the `MODEL` header when
   only that model uses it; a `CONSTANT (name status_pattern, value '...');` file in
   `_sqlbuild/_constants/` (that folder only) or `_sqlbuild/constants/` (that folder and below) of
-  the nearest folder holding every use; top-level `constants/` only for project-wide values.
+  the nearest folder holding every use; top-level `sql/constants/` only for project-wide values.
   Otherwise shorten the literal. When the identical literal is reported in other files, the help
   lists them (up to five) and names the nearest common folder and its constants directory.
   Literals produced by `@const` or a macro are not reported, and there is no automatic fix.

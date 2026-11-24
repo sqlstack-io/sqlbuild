@@ -13,6 +13,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     prepare_inline_project,
     run_sqb,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 TOKEN_VARIABLE: str = "ENVFILE_E2E_TOKEN"
 REGION_VARIABLE: str = "ENVFILE_E2E_REGION"
@@ -21,7 +22,7 @@ TOKEN_VALUE: str = "t0ken-never-printed"
 PROJECT_HEADER: str = 'name = "env_file_project"\nadapter = "duckdb"\n'
 CONNECTION_TABLE: str = '\n[connection]\ndatabase = "env_file_project.duckdb"\n'
 PROVIDER_FILES: dict[str, str] = {
-    "providers/settings_api.py": dedent(
+    "python/providers/settings_api.py": dedent(
         f"""
         from pydantic import Field, SecretStr
         from sqlbuild.providers import Provider
@@ -34,12 +35,14 @@ PROVIDER_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
-    "python/assets/report_region.py": dedent(
-        """
+    **node_module_files(
+        "python/nodes/assets/report_region.py",
+        dedent(
+            """
         import os
         from pathlib import Path
 
-        from providers.settings_api import SettingsApi
+        from python.providers.settings_api import SettingsApi
         from sqlbuild.assets import asset
 
 
@@ -48,8 +51,9 @@ PROVIDER_FILES: dict[str, str] = {
             '''Test asset report_region.'''
             Path(os.environ["MARKER_PATH"]).write_text(settings_api.region, encoding="utf-8")
         """
-    ).strip()
-    + "\n",
+        ).strip()
+        + "\n",
+    ),
 }
 ENV_FILE: str = (
     f"# provider settings\n{TOKEN_VARIABLE}={TOKEN_VALUE}\n{REGION_VARIABLE}=from-file\n"
@@ -111,7 +115,7 @@ BUILD: tuple[str, ...] = (
         ),
         EnvFileE2ETestCase(
             description="the selected target's env_file replaces the project default",
-            project_toml='\n[targets.uat]\nenv_file = "config/uat.env"\n',
+            project_toml='extra_paths = ["config/"]\n\n[targets.uat]\nenv_file = "config/uat.env"\n',
             files={
                 ".env": (ENV_FILE, PRIVATE),
                 "config/uat.env": (

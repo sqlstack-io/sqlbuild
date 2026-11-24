@@ -227,7 +227,7 @@ def test_given_pre_recorded_hard_skip_when_scheduler_bypasses_downstream_then_on
     bypassed_node: DiscoveredPythonNode = DiscoveredPythonNode(
         kind=PythonNodeKind.ASSET,
         file_path=Path("/project/tasks/bypassed.py"),
-        relative_path=Path("python/tasks/bypassed.py"),
+        relative_path=Path("python/nodes/tasks/bypassed.py"),
         name="bypassed_task",
         function=scheduler_bypassed_task,
     )

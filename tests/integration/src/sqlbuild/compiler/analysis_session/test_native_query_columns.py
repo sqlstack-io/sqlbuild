@@ -54,7 +54,7 @@ def test_given_unprojectable_model_when_compiling_then_parsed_tree_columns_are_k
         project_dir=tmp_path,
         files={
             "sqlbuild_project.toml": _PROJECT,
-            "models/orders.sql": _HEADER + test_case.query_sql,
+            "sql/models/orders.sql": _HEADER + test_case.query_sql,
         },
     )
     model: CompiledModelView = project.models[0]
@@ -83,7 +83,7 @@ def test_given_unprojectable_model_when_compiling_then_parsed_tree_columns_are_k
             returns="table (id INTEGER, label VARCHAR)",
             body_sql="SELECT x AS id",
             expected_error=(
-                "SQL table function functions/sql/table_fn__orders.sql declares 2 return "
+                "SQL table function sql/functions/sql/table_fn__orders.sql declares 2 return "
                 "columns but its query produces 1"
             ),
         ),
@@ -95,7 +95,7 @@ def test_given_table_function_when_compiling_then_body_columns_match_declaration
 ) -> None:
     files: dict[str, str] = {
         "sqlbuild_project.toml": _PROJECT,
-        "functions/sql/table_fn__orders.sql": (
+        "sql/functions/sql/table_fn__orders.sql": (
             "FUNCTION (description 'Test function.', arguments (x INTEGER), "
             f"returns {test_case.returns}); {test_case.body_sql}"
         ),

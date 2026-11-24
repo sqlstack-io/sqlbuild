@@ -55,7 +55,7 @@ fn given_job_and_sensor_selections_when_evaluating_then_more_named_nodes_than_th
                     "orchestration/jobs/orders/nightly.toml",
                     job(
                         "orders_nightly_job",
-                        "a b c a tag:orders models/orders python/orders +fct_orders fct_refunds+ fct_* job:orders_export_job orders_export_job",
+                        "a b c a tag:orders sql/models/orders python/nodes/orders +fct_orders fct_refunds+ fct_* job:orders_export_job orders_export_job",
                     ),
                 ),
             ],

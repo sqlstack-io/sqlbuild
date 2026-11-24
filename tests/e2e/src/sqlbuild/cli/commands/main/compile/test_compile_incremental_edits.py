@@ -109,7 +109,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
                     "model_added",
                     lambda root: write_project_file(
                         root,
-                        "models/marts/order_quantities.sql",
+                        "sql/models/marts/order_quantities.sql",
                         "MODEL (description 'Order quantities.');\n\n"
                         'SELECT order_id, quantity FROM __ref("stg_orders")\n',
                     ),
@@ -119,13 +119,13 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
                     "model_renamed",
                     lambda root: move_project_file(
                         root,
-                        "models/marts/order_quantities.sql",
-                        "models/marts/order_quantity_totals.sql",
+                        "sql/models/marts/order_quantities.sql",
+                        "sql/models/marts/order_quantity_totals.sql",
                     ),
                 ),
                 edit_step(
                     "model_removed",
-                    lambda root: (root / "models/marts/order_quantity_totals.sql").unlink(),
+                    lambda root: (root / "sql/models/marts/order_quantity_totals.sql").unlink(),
                 ),
                 edit_step("edit_after_remove", fact_comment),
             ),
@@ -137,7 +137,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
                     "macro_edit",
                     lambda root: replace_project_text(
                         root,
-                        "macros/python/currency.py",
+                        "sql/macros/python/currency.py",
                         "{price_cents} * {quantity}",
                         "{quantity} * {price_cents}",
                     ),
@@ -146,14 +146,14 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
                 edit_step(
                     "module_imported_by_macro_edit",
                     lambda root: replace_project_text(
-                        root, "macros/python/_rounding.py", "_SCALE: int = 2", "_SCALE: int = 3"
+                        root, "sql/macros/python/_rounding.py", "_SCALE: int = 2", "_SCALE: int = 3"
                     ),
                 ),
                 edit_step(
                     "scoped_macro_edit",
                     lambda root: replace_project_text(
                         root,
-                        "models/marts/_sqlbuild/_macros/python/currency.py",
+                        "sql/models/marts/_sqlbuild/_macros/python/currency.py",
                         "/ 100.0, 2)",
                         "/ 100.0, 3)",
                     ),
@@ -171,7 +171,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
                     "enum_edit",
                     lambda root: replace_project_text(
                         root,
-                        "models/marts/_sqlbuild/_enums/order_channel.sql",
+                        "sql/models/marts/_sqlbuild/_enums/order_channel.sql",
                         'WEB "web"',
                         'WEB "online"',
                     ),
@@ -180,7 +180,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
                     "constant_edit",
                     lambda root: replace_project_text(
                         root,
-                        "models/marts/_sqlbuild/_constants/min_quantity.sql",
+                        "sql/models/marts/_sqlbuild/_constants/min_quantity.sql",
                         "value 1)",
                         "value 2)",
                     ),
@@ -189,7 +189,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
                     "new_scope_folder",
                     lambda root: write_project_file(
                         root,
-                        "models/staging/_sqlbuild/_macros/python/staging_totals.py",
+                        "sql/models/staging/_sqlbuild/_macros/python/staging_totals.py",
                         "def staging_total_cents(price_cents: str, quantity: str) -> str:\n"
                         '    """Calculate a staging line total."""\n'
                         '    return f"({price_cents}) * ({quantity})"\n',
@@ -204,14 +204,14 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
                 edit_step(
                     "seed_edit",
                     lambda root: replace_project_text(
-                        root, "seeds/waffle_types.csv", "Classic Belgian", "Classic Brussels"
+                        root, "sql/seeds/waffle_types.csv", "Classic Belgian", "Classic Brussels"
                     ),
                 ),
                 edit_step(
                     "source_edit",
                     lambda root: replace_project_text(
                         root,
-                        "sources/raw.yml",
+                        "sql/sources/raw.yml",
                         "      - name: quantity\n        type: INTEGER",
                         "      - name: quantity\n        type: BIGINT",
                     ),
@@ -222,7 +222,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
                     "audit_edit",
                     lambda root: replace_project_text(
                         root,
-                        "models/marts/_sqlbuild/_audits/generic/expression_is_true.sql",
+                        "sql/models/marts/_sqlbuild/_audits/generic/expression_is_true.sql",
                         "WHERE NOT (@expression)",
                         "WHERE NOT (@expression) AND 1 = 1",
                     ),

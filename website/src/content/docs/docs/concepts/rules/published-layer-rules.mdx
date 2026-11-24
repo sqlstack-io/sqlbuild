@@ -30,8 +30,8 @@ them and is allowed.
 
 ```text
 error[SQBRGRAPH103]: sales__mart__orders__finance reads sales__mart__orders; published models must not read published models of their own domain
-  --> models/sales/mart/sales__mart__orders__finance.sql:1:1
-  = help: Move the shared logic into a sales__int_* model that both published models read, or move this model into the domain that consumes it. To move it into intermediate: sqb mv sales__mart__orders__finance models/sales/intermediate/enriched/sales__int_enriched__orders__finance.sql
+  --> sql/models/sales/mart/sales__mart__orders__finance.sql:1:1
+  = help: Move the shared logic into a sales__int_* model that both published models read, or move this model into the domain that consumes it. To move it into intermediate: sqb mv sales__mart__orders__finance sql/models/sales/intermediate/enriched/sales__int_enriched__orders__finance.sql
 ```
 
 ## SQBRPROJECT107: one name shape per domain
@@ -73,13 +73,13 @@ allowed_qualifiers = [
 
 An entry with `paths` instead leaves out the published models whose file path, relative to the
 project and written with `/` separators, matches any of its globs. As in selectors and janitor
-`exclude_patterns`, `*` also matches `/`, so `models/sales/mart/*` covers nested folders too. A
+`exclude_patterns`, `*` also matches `/`, so `sql/models/sales/mart/*` covers nested folders too. A
 family published once per qualifier usually lives in one folder:
 
 ```toml
 [rules.rule_options.SQBRPROJECT107]
 allowed_qualifiers = [
-  { paths = ["models/sales/mart/regional/*"], reason = "Published once per region." },
+  { paths = ["sql/models/sales/mart/regional/*"], reason = "Published once per region." },
 ]
 ```
 

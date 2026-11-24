@@ -21,10 +21,10 @@ from tests.integration.src.sqlbuild.cli.commands.main.helpers import (
 )
 
 _NEG: dict[str, str] = {
-    "models/_macros/python/neg.py": 'def neg():\n    """Return minus one."""\n    return "-1"\n'
+    "sql/models/_macros/python/neg.py": 'def neg():\n    """Return minus one."""\n    return "-1"\n'
 }
 _NOTED: dict[str, str] = {
-    "models/_macros/python/noted.py": (
+    "sql/models/_macros/python/noted.py": (
         'def noted():\n    """Return one with a note."""\n    return "1 -- one"\n'
     )
 }
@@ -50,7 +50,7 @@ _NOTED: dict[str, str] = {
             "SELECT 5 -@py.blank()-2 AS x, 7 AS y",
             ((7, 7),),
             files={
-                "models/_macros/python/blank.py": (
+                "sql/models/_macros/python/blank.py": (
                     'def blank():\n    """Return nothing."""\n    return ""\n'
                 )
             },
@@ -60,7 +60,7 @@ _NOTED: dict[str, str] = {
             "SELECT 4 AS @py.stem()_count",
             ((4,),),
             files={
-                "models/_macros/python/stem.py": (
+                "sql/models/_macros/python/stem.py": (
                     'def stem():\n    """Return a stem."""\n    return "orders"\n'
                 )
             },
@@ -69,13 +69,13 @@ _NOTED: dict[str, str] = {
             "a negative constant",
             'SELECT -@const("minus_one") AS x, 7 AS y',
             ((1, 7),),
-            files={"models/_constants/minus_one.sql": "CONSTANT (name minus_one, value -1);\n"},
+            files={"sql/models/_constants/minus_one.sql": "CONSTANT (name minus_one, value -1);\n"},
         ),
         ExpansionBoundaryTestCase(
             "a negative enum member",
             'SELECT -@enum("sign").DOWN AS x, 7 AS y',
             ((1, 7),),
-            files={"models/_enums/sign.sql": "ENUM (name sign, members (DOWN -1, UP 1));\n"},
+            files={"sql/models/_enums/sign.sql": "ENUM (name sign, members (DOWN -1, UP 1));\n"},
         ),
         ExpansionBoundaryTestCase(
             "a negative variable",
@@ -87,7 +87,7 @@ _NOTED: dict[str, str] = {
             "SELECT -@sql.negative_one() AS x, 7 AS y",
             ((1, 7),),
             files={
-                "models/_macros/sql/negative_one.sql": (
+                "sql/models/_macros/sql/negative_one.sql": (
                     'MACRO (\n  description "Minus one",\n);\n\n-1\n'
                 )
             },
@@ -98,7 +98,7 @@ _NOTED: dict[str, str] = {
             ((1, 7),),
             model_config=", audits [x_is (value -1)]",
             files={
-                "audits/generic/x_is.sql": (
+                "sql/audits/generic/x_is.sql": (
                     "AUDIT ();\nSELECT * FROM @relation WHERE x <> -@value AND y > 0\n"
                 )
             },
@@ -109,7 +109,7 @@ _NOTED: dict[str, str] = {
             ((1, 7),),
             model_config=', post_hooks [sql("note_value", value: -1)]',
             files={
-                "hooks/sql/note_value.sql": (
+                "sql/hooks/sql/note_value.sql": (
                     'HOOK (description "Read a value");\nSELECT -@value AS x, 7 AS y\n'
                 )
             },
@@ -119,7 +119,7 @@ _NOTED: dict[str, str] = {
             'SELECT x, 7 AS y FROM __ref("amounts")',
             ((1, 7),),
             files={
-                "models/amounts.sql": (
+                "sql/models/amounts.sql": (
                     "MODEL (description 'Amounts.', materialized table);\nSELECT 1 AS x\n"
                 ),
                 "tests/unit/test_orders.sql": (
@@ -136,7 +136,7 @@ _NOTED: dict[str, str] = {
             'SELECT x, 7 AS y FROM __source("amounts") WHERE x = 2',
             ((2, 7),),
             files={
-                "sources/amounts.yml": (
+                "sql/sources/amounts.yml": (
                     "sources:\n  - name: amounts\n    description: Amounts.\n"
                     '    expression: "(SELECT * FROM (VALUES (1), (2)) AS v(x)) -- amounts"\n'
                 )
@@ -147,7 +147,7 @@ _NOTED: dict[str, str] = {
             "SELECT @sql.same(2 + 3 -- five\n) AS x, 7 AS y",
             ((5, 7),),
             files={
-                "models/_macros/sql/same.sql": (
+                "sql/models/_macros/sql/same.sql": (
                     'MACRO (\n  description "The amount",\n  arguments (amount INTEGER),\n);\n\n'
                     "@amount\n"
                 )

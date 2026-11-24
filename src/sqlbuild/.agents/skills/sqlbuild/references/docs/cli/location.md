@@ -72,7 +72,7 @@ error: nothing is published, and the location's output and its page in the UI sh
 
 ```text
 Compile failed: 1 rule finding
-models/orders.sql:2:8 [SQBRMODEL102] SELECT * is allowed only inside dependency import CTEs
+sql/models/orders.sql:2:8 [SQBRMODEL102] SELECT * is allowed only inside dependency import CTEs
 ```
 
 Runs and plan previews on a published snapshot don't evaluate the Rules again; they passed when it
@@ -154,3 +154,5 @@ curl --fail "$BASE/discovered" -H "Authorization: Bearer $SQLBUILD_API_KEY"
 - A failed discover function doesn't fail the publish, as its set keeps its last good items. Check
   the set's `status` and `tags` in `discovered` to confirm a deploy.
 - The audit log records who asked and why, and the location prints both.
+- A location that [`sqb dev`](dev.md#republish-from-a-script) serves takes the same
+  request at its UI address, with any `SQLBUILD_API_KEY`, as it has no sign-in.

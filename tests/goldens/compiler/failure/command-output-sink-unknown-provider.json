@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D015",
-     "message": "Command-output sink 'publish_output' in sinks/output.py requires unknown provider 'destination_client'"
+     "message": "Command-output sink 'publish_output' in python/event_sinks/output.py requires unknown provider 'destination_client'"
     }
    ]
   }

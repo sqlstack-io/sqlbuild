@@ -79,7 +79,7 @@
 				{/if}
 			</li>
 		{:else}
-			<li class="muted">{#if tokens}No tokens yet. Create one and give it to the location so it can connect.{:else}<Loading lines={2} />{/if}</li>
+			<li class="muted">{#if tokens}No tokens yet.{:else}<Loading lines={2} />{/if}</li>
 		{/each}
 	</ul>
 	<div class="create">

@@ -56,7 +56,7 @@ def test_given_a_published_location_when_an_owner_requests_work_then_results_ret
             "sqlbuild_project.toml": PUBLISHABLE_FILES["sqlbuild_project.toml"]
             + f"\n[connections.local]\ndatabase = {json.dumps(test_case.database)}\n"
             + '\n[targets."preview #1"]\nschema = "main"\n',
-            "adapters/slow.py": (
+            "python/adapters/slow.py": (
                 "import os, sys, time\nfrom pathlib import Path\n"
                 f"if 'debug' in sys.argv and Path({str(blocked)!r}).exists():\n"
                 f"    Path({str(child_pid)!r}).write_text(str(os.getpid()))\n"
@@ -160,8 +160,8 @@ def test_given_a_published_location_when_an_owner_requests_work_then_results_ret
                 enqueue, env=owner_environment, capture_output=True, text=True, check=True
             )
             _ = wait_for_interpreter(process, child_pid, log)
-            _ = (project / "models/stg_orders.sql").write_text(
-                PUBLISHABLE_FILES["models/stg_orders.sql"].replace(
+            _ = (project / "sql/models/stg_orders.sql").write_text(
+                PUBLISHABLE_FILES["sql/models/stg_orders.sql"].replace(
                     "CAST(5 AS INTEGER)", "CAST(17 AS INTEGER)"
                 )
             )

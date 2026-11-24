@@ -53,7 +53,7 @@ def test_given_model_and_non_model_tests_when_querying_model_then_returns_each_m
     project: CompiledProjectView = project_with(
         project=build_project(
             name=test_case.model_name,
-            relative_path="models/orders.sql",
+            relative_path="sql/models/orders.sql",
             sql="SELECT 1 AS order_id",
             config_values={},
         ),
@@ -63,7 +63,7 @@ def test_given_model_and_non_model_tests_when_querying_model_then_returns_each_m
     facts: ModelTestFacts = ModelTestFacts(project=project)
 
     matching_tests: tuple[CompiledSqlTest, ...] = facts.for_model(
-        Model(name=test_case.model_name, path=Path("models/orders.sql"), materialization="view")
+        Model(name=test_case.model_name, path=Path("sql/models/orders.sql"), materialization="view")
     )
     assert tuple(test.name for test in matching_tests) == test_case.expected_matching_names
     assert tuple(test.name for test in facts.all()) == test_case.expected_all_names

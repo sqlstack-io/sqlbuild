@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Invalid declaration scope index:\n[S003] Duplicate declaration 'enum:staged_status' at enums/status.sql:1:1, models/staging/_enums/status.sql:1:1\n[S003] Duplicate declaration 'enum:staged_status' at enums/status.sql:1:1, models/staging/_enums/status.sql:1:1"
+     "message": "Invalid declaration scope index:\n[S003] Duplicate declaration 'enum:staged_status' at sql/enums/status.sql:1:1, sql/models/staging/_enums/status.sql:1:1\n[S003] Duplicate declaration 'enum:staged_status' at sql/enums/status.sql:1:1, sql/models/staging/_enums/status.sql:1:1"
     }
    ]
   }

@@ -38,18 +38,18 @@ def test_given_upstream_function_when_compiling_and_testing_then_mocked_chain_ex
                 'name = "orders_function_chain"\nadapter = "duckdb"\n'
                 '[connection]\ndatabase = "orders.duckdb"\n'
             ),
-            "sources/raw.yml": (
+            "sql/sources/raw.yml": (
                 "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n    schema: main\n    table: raw_orders\n"
             ),
-            "functions/sql/identity_value.sql": (
+            "sql/functions/sql/identity_value.sql": (
                 "FUNCTION (description 'Test function identity_value.', arguments (value INTEGER), returns INTEGER);\nvalue\n"
             ),
-            "models/stg_orders.sql": (
+            "sql/models/stg_orders.sql": (
                 "MODEL (description 'Test model stg_orders.', materialized table);\n"
                 'SELECT __udf("identity_value")(order_id) AS order_id '
                 'FROM __source("raw_orders")\n'
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 'MODEL (description "Test model orders.", materialized table);\nSELECT * FROM __ref("stg_orders")\n'
             ),
             "tests/unit/orders_case.sql": (

@@ -1,6 +1,6 @@
 // Plain one-line summaries of run events; the raw type stays available as a tooltip.
 
-import type { RunEvent, RunEventLevel, RunNode, RunOutputLine } from '$lib/api';
+import type { RunEvent, RunEventLevel, RunEventPhase, RunNode, RunOutputLine } from '$lib/api';
 import { eventTone } from '$lib/operate/labels';
 import { fullStamp } from './stamps';
 import { CHECK_FAILED_CODE } from './failures';
@@ -21,7 +21,43 @@ export function eventCategory(e: RunEvent): EventCategory {
 	return 'run';
 }
 
-export function eventSummary(e: RunEvent): string {
+/** `ms` as a phase's duration: `0.30 s` under a second, else `4.0 s`. */
+export function phaseSeconds(ms: number): string {
+	return `${(ms / 1000).toFixed(ms < 1000 ? 2 : 1)} s`;
+}
+
+const PHASE_TEXT: Record<string, (p: RunEventPhase) => string> = {
+	discovered: () => 'Discovered project',
+	compiled: (p) => (p.count === null ? 'Compiled project' : `Compiled project · ${plural(p.count, 'model', 'models')}`),
+	matched: () => 'Matched published snapshot',
+	discovered_set: (p) => `Used discovered set ${p.name ?? ''}${p.count === null ? '' : ` · ${plural(p.count, 'item', 'items')}`}`,
+	connected: (p) => `Connected to ${p.name ?? 'the warehouse'}`,
+	inspected: () => 'Inspected warehouse',
+	planned: (p) => (p.count === null ? 'Planned' : `Planned · ${p.count.toLocaleString('en-GB')} selected`),
+	started_execution: (p) => ['Started execution', p.count === null ? null : `concurrency ${p.count}`, p.detail].filter(Boolean).join(' · ')
+};
+
+/** A finished preparation step in one line, such as `Compiled project · 2,281 nodes · 4.1 s`. */
+export function phaseSummary(p: RunEventPhase): string {
+	const text = PHASE_TEXT[p.phase]?.(p) ?? `Finished ${p.phase.replace(/_/g, ' ')}`;
+	return p.durationMs === null ? text : `${text} · ${phaseSeconds(p.durationMs)}`;
+}
+
+/** What a finished step opens to: its sub-steps and facts, one per row. */
+function phaseDetails(p: RunEventPhase): [string, string][] {
+	const rows: [string, string][] = [];
+	if (p.phase === 'matched' && p.name) rows.push(['Snapshot', p.name]);
+	if (p.phase === 'connected' && p.count !== null) rows.push(['Connections', String(p.count)]);
+	// Starting execution says all it has in its line.
+	if (p.phase === 'started_execution') return rows;
+	for (const step of p.detail?.split(' · ') ?? []) rows.push(['Detail', step]);
+	return rows;
+}
+
+const plural = (n: number, one: string, many: string) => `${n.toLocaleString('en-GB')} ${n === 1 ? one : many}`;
+
+/** A row's one-line summary; `loadMs` is how long the worker took to become ready, for its ready event. */
+export function eventSummary(e: RunEvent, loadMs?: number): string {
 	switch (e.type) {
 		case 'requested':
 			return e.message;
@@ -43,7 +79,10 @@ export function eventSummary(e: RunEvent): string {
 			if (/^Terminated: skipped/.test(e.message)) return 'Not started';
 			return `Finished${e.message.match(/^Terminated: (\w+)/) ? `: ${e.message.match(/^Terminated: (\w+)/)![1].replace('_', ' ')}` : ''}`;
 		case 'invocation_started':
-			return 'sqb started';
+			// The worker has loaded and its command starts: how long that took since the worker started.
+			return loadMs === undefined ? 'Worker ready' : `Worker ready · ${phaseSeconds(loadMs)}`;
+		case 'invocation_phase':
+			return e.phase ? phaseSummary(e.phase) : 'Prepared';
 		case 'invocation_completed':
 			return `sqb finished: ${e.message}`;
 		case 'invocation_failed':
@@ -91,8 +130,8 @@ export type LogEntry = {
 	queries: LogEntry[];
 	/** Shown even with printed output hidden: a failing run's last printed block, which ends with its failures. */
 	pinned: boolean;
-	/** A short tag in plain words (built, merged, failed, skipped, check, run) and its colour. */
-	tag?: { text: string; tone: string };
+	/** A short tag in plain words (built, failed, skipped, check, queued, ready, finished) and its colour; `repeats` when the text already says it. */
+	tag?: { text: string; tone: string; repeats?: boolean };
 	/** A node line's node: its failure, file and statements, for what its details open to. */
 	node?: RunNode;
 	/** A node line's checks, problems first, for the table its details open to. */
@@ -105,21 +144,58 @@ export type LogEntry = {
 };
 
 const TAG_TONE = { ok: 'var(--sb-success)', err: 'var(--sb-error)', warn: 'var(--sb-warning)', run: 'var(--sb-running)', quiet: 'var(--sb-text-faint)' };
+/** What a run-level event marks in the run's life, in one word. */
+const RUN_KINDS: Partial<Record<RunEvent['type'], string>> = {
+	requested: 'requested',
+	queued: 'queued',
+	claimed: 'queued',
+	launched: 'started',
+	invocation_started: 'ready',
+	invocation_phase: 'preparing',
+	invocation_completed: 'finished',
+	invocation_failed: 'failed',
+	terminated: 'finished',
+	presumed_failed: 'failed',
+	cancel_requested: 'cancelling',
+	member_retrying: 'retrying',
+	member_recovered: 'recovered'
+};
+
 /** The tag an event's row carries: plain words, never the event type. */
 function eventTag(e: RunEvent): LogEntry['tag'] {
+	const kind = e.nodeKey ? undefined : e.phase?.phase === 'planned' ? 'planned' : e.phase?.phase === 'started_execution' ? 'started' : RUN_KINDS[e.type];
+	if (kind) return { text: kind, tone: kind === 'failed' ? TAG_TONE.err : TAG_TONE.quiet };
 	if (e.type === 'resource_attempt_completed') return { text: 'built', tone: TAG_TONE.ok };
 	if (e.type === 'resource_attempt_failed' || e.type === 'statement_failed' || e.type === 'invocation_failed') return { text: 'failed', tone: TAG_TONE.err };
 	if (e.type === 'resource_attempt_skipped') return { text: 'skipped', tone: TAG_TONE.quiet };
 	if (e.type === 'audit_completed') return { text: 'check', tone: e.level === 'info' ? TAG_TONE.ok : TAG_TONE.warn };
 	if (e.type === 'node_log') return { text: 'log', tone: e.level === 'info' ? TAG_TONE.quiet : TAG_TONE.warn };
-	return { text: 'run', tone: TAG_TONE.quiet };
+	return undefined;
+}
+
+/** Whether a tag only says again what its row's text already says, so the row can leave it out. */
+function repeats(tag: LogEntry['tag'], text: string, nodeKey: string | null): boolean {
+	return !!tag && !nodeKey && new RegExp(`\\b${tag.text}\\b`, 'i').test(text);
+}
+
+/** How long each run's worker took to become ready, by its ready event: from the worker's start to its command's. */
+function loadTimes(events: readonly RunEvent[]): Map<string, number> {
+	const launched = new Map<string, number>();
+	const loads = new Map<string, number>();
+	for (const e of events) {
+		if (e.type === 'launched' && !launched.has(e.runId)) launched.set(e.runId, Date.parse(e.occurredAt));
+		const from = launched.get(e.runId);
+		if (e.type === 'invocation_started' && from !== undefined) loads.set(e.id, Math.max(0, Date.parse(e.occurredAt) - from));
+	}
+	return loads;
 }
 
 const QUERY_DONE = new Set(['statement_completed', 'statement_failed']);
 const NODE_ENDS = new Set(['resource_attempt_completed', 'resource_attempt_failed', 'resource_attempt_skipped']);
 
-function entryOf(e: RunEvent): LogEntry {
-	const text = eventSummary(e);
+function entryOf(e: RunEvent, loads?: ReadonlyMap<string, number>): LogEntry {
+	const text = eventSummary(e, loads?.get(e.id));
+	const tag = eventTag(e);
 	return {
 		id: e.id,
 		runId: e.runId,
@@ -134,8 +210,8 @@ function entryOf(e: RunEvent): LogEntry {
 		statementId: e.statementId,
 		queries: [],
 		pinned: false,
-		tag: eventTag(e),
-		details: e.message && e.message !== text ? [['Message', e.message]] : undefined
+		tag: tag && { ...tag, repeats: repeats(tag, text, e.nodeKey) },
+		details: e.phase ? phaseDetails(e.phase) : e.message && e.message !== text ? [[e.type === 'invocation_started' ? 'Command' : 'Message', e.message]] : undefined
 	};
 }
 
@@ -148,6 +224,7 @@ function entryOf(e: RunEvent): LogEntry {
 export function logEntries(events: readonly RunEvent[], output: readonly (RunOutputLine & { runId: string })[], outcomes?: NodeOutcomes): LogEntry[] {
 	if (outcomes) return withOutcomes(events, output, outcomes);
 	const nodeOf = (e: RunEvent) => `${e.runId}|${e.nodeKey}`;
+	const loads = loadTimes(events);
 	const queries = new Map<string, LogEntry[]>();
 	const ended = new Set<string>();
 	for (const e of events) {
@@ -159,7 +236,7 @@ export function logEntries(events: readonly RunEvent[], output: readonly (RunOut
 	const fromEvents = events.flatMap((e): LogEntry[] => {
 		if (e.type.startsWith('statement_')) return e.type === 'statement_failed' ? [entryOf(e)] : [];
 		if (e.type === 'resource_attempt_started' && ended.has(nodeOf(e))) return [];
-		const entry = entryOf(e);
+		const entry = entryOf(e, loads);
 		if (!NODE_ENDS.has(e.type)) return [entry];
 		const text = e.type === 'resource_attempt_completed' ? ['Finished', entry.text].filter(Boolean).join(' · ') : entry.text;
 		return [{ ...entry, text, queries: queries.get(nodeOf(e)) ?? [] }];
@@ -276,9 +353,10 @@ function withOutcomes(events: readonly RunEvent[], output: readonly (RunOutputLi
 	for (const e of events) if (e.nodeKey && known.has(id(e.runId, e.nodeKey))) byNode.set(id(e.runId, e.nodeKey), [...(byNode.get(id(e.runId, e.nodeKey)) ?? []), e]);
 
 	// Run-level events, and a node's `ctx.log` lines, which keep their own rows.
-	const runLines = events.filter((e) => (e.type === 'node_log' || !(e.nodeKey && known.has(id(e.runId, e.nodeKey)))) && !e.type.startsWith('statement_')).map(entryOf);
+	const loads = loadTimes(events);
+	const runLines = events.filter((e) => (e.type === 'node_log' || !(e.nodeKey && known.has(id(e.runId, e.nodeKey)))) && !e.type.startsWith('statement_')).map((e) => entryOf(e, loads));
 	// One failure, one line: a failed query of a node folds into the node's line, with its query in place.
-	const failedQueries = events.filter((e) => e.type === 'statement_failed' && !(e.nodeKey && known.has(id(e.runId, e.nodeKey)))).map(entryOf);
+	const failedQueries = events.filter((e) => e.type === 'statement_failed' && !(e.nodeKey && known.has(id(e.runId, e.nodeKey)))).map((e) => entryOf(e));
 	const nodeLines = nodes.flatMap((n): LogEntry[] => {
 		const evs = byNode.get(id(n.runId, n.nodeKey)) ?? [];
 		const at = n.startedAt ?? n.endedAt ?? evs[0]?.occurredAt;
@@ -309,7 +387,7 @@ function withOutcomes(events: readonly RunEvent[], output: readonly (RunOutputLi
 				tone: o.tone,
 				stream: null,
 				statementId: null,
-				queries: evs.filter((e) => QUERY_DONE.has(e.type)).map(entryOf),
+				queries: evs.filter((e) => QUERY_DONE.has(e.type)).map((e) => entryOf(e)),
 				pinned: false,
 				tag: nodeTag(n, checks),
 				details,

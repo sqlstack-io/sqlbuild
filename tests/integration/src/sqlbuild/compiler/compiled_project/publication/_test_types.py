@@ -193,6 +193,14 @@ class NulLogTestCase(WorkerExecutionTestCase):
 
 
 @dataclass(frozen=True)
+class PhaseEventsTestCase(WorkerExecutionTestCase):
+    description: str
+    backend: Literal["sqlite", "postgres"] = "sqlite"
+    # Each phase in order, and whether it reports a duration.
+    expected_phases: tuple[tuple[str, bool], ...] = ()
+
+
+@dataclass(frozen=True)
 class NulFailureTestCase(WorkerExecutionTestCase):
     description: str
     backend: Literal["sqlite", "postgres"] = "sqlite"
@@ -1015,6 +1023,8 @@ class UnknownDependencyDiscoverTestCase:
 @dataclass(frozen=True)
 class UnknownTagTestCase:
     description: str
-    dependency: str
+    backend: str
+    first: str
+    edits: dict[str, str]
+    expected_nodes: frozenset[str]
     expected_error: str
-    expected_status: int

@@ -139,7 +139,7 @@
 					{/if}
 				</li>
 			{:else}
-				<li class="muted">No working key. Rotate to create one.</li>
+				<li class="muted">No working key.</li>
 			{/each}
 		</ul>
 		{#if canManage}

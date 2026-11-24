@@ -18,7 +18,7 @@ Everything in it is synthetic: order references use a `DS-O-` prefix, email addr
 
 ```text
 benchmarks/duckshop/
-├── project/      the SQLBuild project (Snowflake adapter), with its data loaders in python/loaders/
+├── project/      the SQLBuild project (Snowflake adapter), with its data loaders in python/nodes/loaders/
 ├── scripts/      tooling that is not part of the project: the construct census, cleanup SQL, the
 │                 core-only copy and edge-case expectation capture
 ├── tests/        offline checks for the synthetic data loaders
@@ -53,7 +53,7 @@ The core project, without the [edge-case area](#edge-cases):
 
 ## Tests and scenarios
 
-`tests/unit/` mirrors `models/` and holds 266 core unit tests:
+`tests/unit/` mirrors `sql/models/` and holds 266 core unit tests:
 
 - 260 model tests, including cursor-window tests on incremental models, a table-function mock, a
   macro mock, a fixture built by a test-only Python macro, an empty fixture for a contracted
@@ -111,18 +111,18 @@ The edge-case area holds small, hand-picked cases for SQL whose results are easy
 wrong when translating Snowflake SQL or replaying it on another engine. It lives beside the core
 project and does not change it:
 
-- models in `models/staging/edge_cases/`, `models/intermediate/edge_cases/` and
-  `models/marts/edge_cases/`, each tagged `edge_case`. The `XSQBRDUCK002` Rule fails a model in an
+- models in `sql/models/staging/edge_cases/`, `sql/models/intermediate/edge_cases/` and
+  `sql/models/marts/edge_cases/`, each tagged `edge_case`. The `XSQBRDUCK002` Rule fails a model in an
   `edge_cases` folder without the tag, or a model with the tag outside one;
 - unit tests in the matching `tests/unit/<layer>/edge_cases/` folders and scenarios in
   `tests/scenarios/edge_cases/`;
-- raw `edge__*` sources in `sources/edge_cases.yml`, loaded by `python/loaders/edge_cases.py` from
+- raw `edge__*` sources in `sql/sources/edge_cases.yml`, loaded by `python/nodes/loaders/edge_cases.py` from
   fixed rows that `data_scale` does not change, so core data and core expectations stay the same;
-- Python functions in `functions/python/edge_*.py`, tagged `edge_case`, and their tests in
+- Python functions in `sql/functions/python/edge_*.py`, tagged `edge_case`, and their tests in
   `tests/unit/functions/python/test_edge_*.sql`;
-- a SQL table function, `functions/sql/edge_basket_lines_for.sql`, and a JavaScript function,
+- a SQL table function, `sql/functions/sql/edge_basket_lines_for.sql`, and a JavaScript function,
   `edge_running_peaks`, that a pre-hook of `int_edge_basket_running_peaks` creates
-  (`models/intermediate/edge_cases/_sqlbuild/_hooks/sql/`) and SQLBuild does not declare.
+  (`sql/models/intermediate/edge_cases/_sqlbuild/_hooks/sql/`) and SQLBuild does not declare.
 
 It has 168 models (13 staging, 141 intermediate, 14 marts), 5 Python functions, a SQL table
 function, a hook-created JavaScript function, 193 unit tests and 4 scenarios, in nine groups:

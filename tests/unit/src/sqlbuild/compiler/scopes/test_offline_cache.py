@@ -86,10 +86,10 @@ def test_given_scoped_macro_test_when_loading_warm_cache_then_grant_provenance_i
             "sqlbuild_project.toml": (
                 'name = "orders"\nadapter = "duckdb"\n[scopes]\nenforce_placement = false\n'
             ),
-            "models/orders/_sqlbuild/_macros/python/policy.py": (
+            "sql/models/orders/_sqlbuild/_macros/python/policy.py": (
                 "def order_policy() -> str:\n    return '2'\n"
             ),
-            "models/orders/summary.sql": (
+            "sql/models/orders/summary.sql": (
                 'MODEL (description "Order summary.");\nSELECT @py.order_policy() AS quantity'
             ),
             "tests/unit/macros/models/orders/test_order_policy__returns_quantity.sql": (
@@ -124,15 +124,15 @@ def test_given_macro_side_effect_when_loading_warm_cache_then_module_is_not_exec
         tmp_path,
         {
             "sqlbuild_project.toml": _PROJECT,
-            "models/orders.sql": _MODEL,
-            "macros/python/side_effect.py": (
+            "sql/models/orders.sql": _MODEL,
+            "sql/macros/python/side_effect.py": (
                 "from pathlib import Path\n"
                 "Path(__file__).with_name('executed').write_text('yes')\n"
                 "def identity(value):\n    return str(value)\n"
             ),
         },
     )
-    marker: Path = tmp_path / "macros" / "python" / "executed"
+    marker: Path = tmp_path / "sql" / "macros" / "python" / "executed"
 
     load_or_build_scope_index(project_dir=tmp_path)
     marker.unlink()
@@ -167,7 +167,7 @@ def test_given_no_cache_when_loading_twice_then_cache_is_bypassed(
     (
         FingerprintMutationCase(
             "model content",
-            "models/orders.sql",
+            "sql/models/orders.sql",
             _MODEL,
             "MODEL(description 'Test model orders.');\nSELECT 2 AS id\n",
             True,
@@ -268,10 +268,10 @@ def test_given_source_add_rename_and_delete_when_fingerprinting_then_paths_inval
 ) -> None:
     write_scope_cache_project(root=tmp_path, write_repo_files=write_repo_files)
     original: str | None = scope_index_fingerprint(project_dir=tmp_path)
-    added_path: Path = tmp_path / "models" / "added.sql"
+    added_path: Path = tmp_path / "sql" / "models" / "added.sql"
     added_path.write_text(_MODEL, encoding="utf-8")
     added: str | None = scope_index_fingerprint(project_dir=tmp_path)
-    renamed_path: Path = tmp_path / "models" / "renamed.sql"
+    renamed_path: Path = tmp_path / "sql" / "models" / "renamed.sql"
     added_path.rename(renamed_path)
     renamed: str | None = scope_index_fingerprint(project_dir=tmp_path)
     renamed_path.unlink()
@@ -296,9 +296,9 @@ def test_given_authored_values_and_secrets_when_caching_then_payload_is_value_fr
         tmp_path,
         {
             "sqlbuild_project.toml": _PROJECT + f'\n[connection]\npassword = "{secret}"\n',
-            "models/orders.sql": _MODEL,
-            "constants/private.sql": f'CONSTANT (name token, value "{secret}");',
-            "enums/private.sql": f'ENUM (name status, members (SECRET "{secret}"));',
+            "sql/models/orders.sql": _MODEL,
+            "sql/constants/private.sql": f'CONSTANT (name token, value "{secret}");',
+            "sql/enums/private.sql": f'ENUM (name status, members (SECRET "{secret}"));',
         },
     )
 
@@ -327,15 +327,15 @@ def test_given_target_aware_python_composition_when_switching_target_then_depend
                 _PROJECT + '\ndefault_target = "dev"\n[targets.dev]\n[targets.prod]\n'
             ),
             "sqlbuild_local.toml": 'target = "dev"\n',
-            "models/orders.sql": "MODEL(description 'Test model orders.');\nSELECT @py.choose() AS value\n",
-            "macros/python/choose.py": (
-                "from macros.python.dev import dev_macro\n"
-                "from macros.python.prod import prod_macro\n\n"
+            "sql/models/orders.sql": "MODEL(description 'Test model orders.');\nSELECT @py.choose() AS value\n",
+            "sql/macros/python/choose.py": (
+                "from sql.macros.python.dev import dev_macro\n"
+                "from sql.macros.python.prod import prod_macro\n\n"
                 "def choose(ctx):\n    return dev_macro() "
                 'if ctx.target_name == "dev" else prod_macro()\n'
             ),
-            "macros/python/dev.py": 'def dev_macro():\n    return "1"\n',
-            "macros/python/prod.py": 'def prod_macro():\n    return "2"\n',
+            "sql/macros/python/dev.py": 'def dev_macro():\n    return "1"\n',
+            "sql/macros/python/prod.py": 'def prod_macro():\n    return "2"\n',
         },
     )
 
@@ -365,10 +365,10 @@ def test_given_broken_declaration_category_when_loading_then_other_categories_re
         tmp_path,
         {
             "sqlbuild_project.toml": _PROJECT,
-            "models/orders.sql": _MODEL,
-            "models/domain/enums/_enums/broken.sql": ("ENUM (name broken, members [BROKEN]);"),
-            "constants/limit.sql": "CONSTANT (name limit, value 1);",
-            "macros/python/identity.py": 'def identity():\n    return "1"\n',
+            "sql/models/orders.sql": _MODEL,
+            "sql/models/domain/enums/_enums/broken.sql": ("ENUM (name broken, members [BROKEN]);"),
+            "sql/constants/limit.sql": "CONSTANT (name limit, value 1);",
+            "sql/macros/python/identity.py": 'def identity():\n    return "1"\n',
         },
     )
 
@@ -386,11 +386,11 @@ def test_given_broken_declaration_category_when_loading_then_other_categories_re
         TolerantMacroInventoryCase(
             description="syntax error retains valid composed macro and dependency",
             files={
-                "macros/python/shared.py": "def shared():\n    return 'shared'\n",
-                "macros/python/consumer.py": (
-                    "from macros.python.shared import shared\n\ndef consumer():\n    return shared()\n"
+                "sql/macros/python/shared.py": "def shared():\n    return 'shared'\n",
+                "sql/macros/python/consumer.py": (
+                    "from sql.macros.python.shared import shared\n\ndef consumer():\n    return shared()\n"
                 ),
-                "macros/python/broken.py": "def broken(:\n    return 'broken'\n",
+                "sql/macros/python/broken.py": "def broken(:\n    return 'broken'\n",
             },
             expected_names=frozenset({"shared", "consumer"}),
             unexpected_names=frozenset({"broken"}),
@@ -400,12 +400,14 @@ def test_given_broken_declaration_category_when_loading_then_other_categories_re
         TolerantMacroInventoryCase(
             description="scope-invalid macro import is omitted with diagnostic",
             files={
-                "models/sales/_macros/python/shared.py": ("def shared():\n    return 'shared'\n"),
-                "models/finance/macros/python/consumer.py": (
-                    "from models.sales._macros.python.shared import shared\n\n"
+                "sql/models/sales/_macros/python/shared.py": (
+                    "def shared():\n    return 'shared'\n"
+                ),
+                "sql/models/finance/macros/python/consumer.py": (
+                    "from sql.models.sales._macros.python.shared import shared\n\n"
                     "def consumer():\n    return shared()\n"
                 ),
-                "macros/python/broken.py": "def broken(:\n    return 'broken'\n",
+                "sql/macros/python/broken.py": "def broken(:\n    return 'broken'\n",
             },
             expected_names=frozenset({"shared"}),
             unexpected_names=frozenset({"consumer", "broken"}),
@@ -414,9 +416,9 @@ def test_given_broken_declaration_category_when_loading_then_other_categories_re
         TolerantMacroInventoryCase(
             description="name collision retains unrelated valid macro",
             files={
-                "macros/python/valid.py": "def valid():\n    return 'valid'\n",
-                "macros/python/first.py": "def duplicate():\n    return 'first'\n",
-                "macros/python/second.py": "def duplicate():\n    return 'second'\n",
+                "sql/macros/python/valid.py": "def valid():\n    return 'valid'\n",
+                "sql/macros/python/first.py": "def duplicate():\n    return 'first'\n",
+                "sql/macros/python/second.py": "def duplicate():\n    return 'second'\n",
             },
             expected_names=frozenset({"valid"}),
             unexpected_names=frozenset({"duplicate"}),
@@ -425,12 +427,12 @@ def test_given_broken_declaration_category_when_loading_then_other_categories_re
         TolerantMacroInventoryCase(
             description="import cycle retains unrelated valid macro",
             files={
-                "macros/python/valid.py": "def valid():\n    return 'valid'\n",
-                "macros/python/first.py": (
-                    "from macros.python.second import second\n\ndef first():\n    return second()\n"
+                "sql/macros/python/valid.py": "def valid():\n    return 'valid'\n",
+                "sql/macros/python/first.py": (
+                    "from sql.macros.python.second import second\n\ndef first():\n    return second()\n"
                 ),
-                "macros/python/second.py": (
-                    "from macros.python.first import first\n\ndef second():\n    return first()\n"
+                "sql/macros/python/second.py": (
+                    "from sql.macros.python.first import first\n\ndef second():\n    return first()\n"
                 ),
             },
             expected_names=frozenset({"valid"}),
@@ -440,9 +442,9 @@ def test_given_broken_declaration_category_when_loading_then_other_categories_re
         TolerantMacroInventoryCase(
             description="module path collision omits both ambiguous modules",
             files={
-                "macros/python/valid.py": "def valid():\n    return 'valid'\n",
-                "macros/python/a.b.py": "def dotted():\n    return 'dotted'\n",
-                "macros/python/a/b.py": "def nested():\n    return 'nested'\n",
+                "sql/macros/python/valid.py": "def valid():\n    return 'valid'\n",
+                "sql/macros/python/a.b.py": "def dotted():\n    return 'dotted'\n",
+                "sql/macros/python/a/b.py": "def nested():\n    return 'nested'\n",
             },
             expected_names=frozenset({"valid"}),
             unexpected_names=frozenset({"dotted", "nested"}),
@@ -460,7 +462,7 @@ def test_given_macro_fault_when_loading_offline_then_valid_macro_facts_are_retai
         tmp_path,
         {
             "sqlbuild_project.toml": _PROJECT,
-            "models/orders.sql": _MODEL,
+            "sql/models/orders.sql": _MODEL,
             **test_case.files,
         },
     )
@@ -551,8 +553,8 @@ def test_given_placement_invalid_project_when_loading_then_complete_diagnostics_
         tmp_path,
         {
             "sqlbuild_project.toml": _PROJECT,
-            "models/domain/constants/value.sql": "CONSTANT (name value, value 1);",
-            "models/domain/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("value") AS value',
+            "sql/models/domain/constants/value.sql": "CONSTANT (name value, value 1);",
+            "sql/models/domain/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("value") AS value',
         },
     )
 
@@ -579,8 +581,8 @@ def test_given_cached_placement_error_when_disabling_enforcement_then_cache_retu
         tmp_path,
         {
             "sqlbuild_project.toml": _PROJECT + "\n[scopes]\nenforce_placement = true\n",
-            "constants/value.sql": "CONSTANT (name value, value 1);",
-            "models/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("value") AS value',
+            "sql/constants/value.sql": "CONSTANT (name value, value 1);",
+            "sql/models/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("value") AS value',
         },
     )
     enforced: ScopeIndex = load_or_build_scope_index(project_dir=tmp_path)
@@ -613,9 +615,9 @@ def test_given_one_broken_model_when_loading_then_valid_and_broken_paths_remain_
         tmp_path,
         {
             "sqlbuild_project.toml": _PROJECT,
-            "models/valid.sql": _MODEL,
-            "models/broken.sql": "MODEL(\nSELECT 1",
-            "enums/status.sql": "ENUM status (OPEN = 'open');",
+            "sql/models/valid.sql": _MODEL,
+            "sql/models/broken.sql": "MODEL(\nSELECT 1",
+            "sql/enums/status.sql": "ENUM status (OPEN = 'open');",
         },
     )
 
@@ -628,8 +630,8 @@ def test_given_one_broken_model_when_loading_then_valid_and_broken_paths_remain_
         and not index.completeness.runtime_usage
         and paths
         >= {
-            (ResourceKind.MODEL, "models/valid.sql"),
-            (ResourceKind.MODEL, "models/broken.sql"),
+            (ResourceKind.MODEL, "sql/models/valid.sql"),
+            (ResourceKind.MODEL, "sql/models/broken.sql"),
         }
         and any(item.code is ScopeDiagnosticCode.RESOURCE_PARSE_ERROR for item in index.diagnostics)
     )
@@ -643,38 +645,38 @@ def test_given_one_broken_model_when_loading_then_valid_and_broken_paths_remain_
         TolerantCategoryCase(
             description="SQL functions retain valid siblings",
             files={
-                "functions/sql/valid.sql": "FUNCTION (description 'Test function valid.', returns INTEGER);\n1",
-                "functions/sql/broken.sql": "FUNCTION (\nSELECT 1",
+                "sql/functions/sql/valid.sql": "FUNCTION (description 'Test function valid.', returns INTEGER);\n1",
+                "sql/functions/sql/broken.sql": "FUNCTION (\nSELECT 1",
             },
             expected_kind=ResourceKind.FUNCTION,
-            expected_paths=("functions/sql/broken.sql", "functions/sql/valid.sql"),
+            expected_paths=("sql/functions/sql/broken.sql", "sql/functions/sql/valid.sql"),
         ),
         TolerantCategoryCase(
             description="SQL hooks retain valid siblings",
             files={
-                "hooks/sql/valid.sql": "HOOK (description 'Test hook valid.');\nSELECT 1",
-                "hooks/sql/broken.sql": "HOOK (\nSELECT 1",
+                "sql/hooks/sql/valid.sql": "HOOK (description 'Test hook valid.');\nSELECT 1",
+                "sql/hooks/sql/broken.sql": "HOOK (\nSELECT 1",
             },
             expected_kind=DeclarationKind.SQL_HOOK,
-            expected_paths=("hooks/sql/valid.sql",),
+            expected_paths=("sql/hooks/sql/valid.sql",),
         ),
         TolerantCategoryCase(
             description="audits retain valid siblings",
             files={
-                "audits/singular/valid.sql": "AUDIT ();\nSELECT 1",
-                "audits/singular/broken.sql": "AUDIT (\nSELECT 1",
+                "sql/audits/singular/valid.sql": "AUDIT ();\nSELECT 1",
+                "sql/audits/singular/broken.sql": "AUDIT (\nSELECT 1",
             },
             expected_kind=DeclarationKind.SINGULAR_AUDIT,
-            expected_paths=("audits/singular/valid.sql",),
+            expected_paths=("sql/audits/singular/valid.sql",),
         ),
         TolerantCategoryCase(
             description="sources retain valid siblings",
             files={
-                "sources/valid.yml": "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n    table: orders\n",
-                "sources/broken.yml": "sources: [\n",
+                "sql/sources/valid.yml": "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n    table: orders\n",
+                "sql/sources/broken.yml": "sources: [\n",
             },
             expected_kind=ResourceKind.SOURCE,
-            expected_paths=("sources/broken.yml", "sources/valid.yml"),
+            expected_paths=("sql/sources/broken.yml", "sql/sources/valid.yml"),
         ),
     ),
     ids=lambda case: case.description,
@@ -686,7 +688,7 @@ def test_given_broken_authored_file_when_loading_then_valid_category_siblings_ar
 ) -> None:
     write_repo_files(
         tmp_path,
-        {"sqlbuild_project.toml": _PROJECT, "models/orders.sql": _MODEL} | test_case.files,
+        {"sqlbuild_project.toml": _PROJECT, "sql/models/orders.sql": _MODEL} | test_case.files,
     )
 
     index: ScopeIndex = load_or_build_scope_index(project_dir=tmp_path, no_cache=True)
@@ -718,7 +720,7 @@ def test_given_partial_project_when_loading_then_incomplete_index_is_not_cached(
         tmp_path,
         {
             "sqlbuild_project.toml": _PROJECT,
-            "models/broken.sql": "MODEL (\nSELECT 1",
+            "sql/models/broken.sql": "MODEL (\nSELECT 1",
         },
     )
 

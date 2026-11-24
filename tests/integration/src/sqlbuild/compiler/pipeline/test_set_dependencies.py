@@ -32,7 +32,7 @@ from tests.integration.src.sqlbuild.compiler.pipeline.helpers import (
 
 _GROUP_FILES: tuple[tuple[str, str], ...] = (
     (
-        "models/customer_orders.sql",
+        "sql/models/customer_orders.sql",
         "MODEL (description 'Test model customer_orders.', materialized table);\n"
         'SELECT o.id FROM __ref("orders") AS o JOIN __ref("customers") AS c ON o.id = c.id\n',
     ),
@@ -73,6 +73,20 @@ _GROUP_FILES: tuple[tuple[str, str], ...] = (
             expected_sql_deps=("model:order_items",),
         ),
         SetDependencyPlanTestCase(
+            description="a loader's job dependency reads the job's end nodes",
+            depends_on='[job("nightly_job")]',
+            expected_models=("order_items", "orders", "stg_orders"),
+            expected_sql_deps=("model:order_items", "model:orders"),
+            kind="loader",
+        ),
+        SetDependencyPlanTestCase(
+            description="a loader's tag dependency reads its tagged end nodes",
+            depends_on='[tag("finance", exclude="orders")]',
+            expected_models=("order_items", "stg_orders"),
+            expected_sql_deps=("model:order_items",),
+            kind="loader",
+        ),
+        SetDependencyPlanTestCase(
             description="a model named and reached through a job is read once",
             depends_on='(model("orders"), job("nightly_job"))',
             expected_models=("order_items", "orders", "stg_orders"),
@@ -86,14 +100,18 @@ def test_given_set_dependency_when_planning_the_assets_upstream_then_selects_the
     tmp_path: Path,
     write_repo_files: Callable[[Path, dict[str, str]], None],
 ) -> None:
-    write_repo_files(tmp_path, set_dependency_project(depends_on=test_case.depends_on))
+    write_repo_files(
+        tmp_path, set_dependency_project(depends_on=test_case.depends_on, kind=test_case.kind)
+    )
     discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
 
     result: CompilePipelineResult = run_compile_pipeline(
         discovered_inputs=discovered,
         adapter=DuckDbAdapter(),
         options=CompilePipelineOptions(
-            no_sql_validation=True, select=("+asset:report",), resolve_python_run_selectors=True
+            no_sql_validation=True,
+            select=(f"+{test_case.kind}:report",),
+            resolve_python_run_selectors=True,
         ),
         hooks=ConnectionHooks(),
     )

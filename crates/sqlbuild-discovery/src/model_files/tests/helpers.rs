@@ -86,7 +86,7 @@ pub(super) fn failed(message: &str, help: Option<&str>) -> ModelSummary {
 pub(super) fn parsed_header_facts(contents: &str) -> HeaderFacts {
     let model: DiscoveredModelFile = parse_model_text(FILE_PATH, contents.to_owned(), &options())
         .unwrap_or_else(|failure| panic!("{}", failure.message));
-    header_facts(&model.header_values, "models/orders.sql")
+    header_facts(&model.header_values, "sql/models/orders.sql")
 }
 
 fn macro_path(path: &MacroPath) -> Option<Vec<&str>> {

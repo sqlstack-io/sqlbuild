@@ -62,6 +62,8 @@ mod test_retries;
 mod test_run_logs;
 #[path = "test_selection.rs"]
 mod test_selection;
+#[path = "test_start_message.rs"]
+mod test_start_message;
 #[path = "test_stored_requests.rs"]
 mod test_stored_requests;
 #[path = "test_types.rs"]

@@ -94,7 +94,7 @@ def test_given_discovered_python_functions_when_building_graph_then_indexes_node
         loader_functions=(
             DiscoveredLoaderFunction(
                 file_path=Path("/project/loaders/events.py"),
-                relative_path=Path("python/loaders/events.py"),
+                relative_path=Path("python/nodes/loaders/events.py"),
                 name="load_events",
                 function=load_events,
                 depends_on=(prepare_orders,),
@@ -103,7 +103,7 @@ def test_given_discovered_python_functions_when_building_graph_then_indexes_node
         asset_functions=(
             DiscoveredAssetFunction(
                 file_path=Path("/project/tasks/orders.py"),
-                relative_path=Path("python/tasks/orders.py"),
+                relative_path=Path("python/nodes/tasks/orders.py"),
                 name="prepare_orders",
                 function=prepare_orders,
                 tags=test_case.expected_task_tags,
@@ -114,7 +114,7 @@ def test_given_discovered_python_functions_when_building_graph_then_indexes_node
             ),
             DiscoveredAssetFunction(
                 file_path=Path("/project/assets/orders.py"),
-                relative_path=Path("python/assets/orders.py"),
+                relative_path=Path("python/nodes/assets/orders.py"),
                 name="export_orders",
                 function=export_orders,
                 depends_on=(imported_prepare_orders,),
@@ -126,7 +126,7 @@ def test_given_discovered_python_functions_when_building_graph_then_indexes_node
             ),
             DiscoveredAssetFunction(
                 file_path=Path("/project/assets/notifications.py"),
-                relative_path=Path("python/assets/notifications.py"),
+                relative_path=Path("python/nodes/assets/notifications.py"),
                 name="notify_orders",
                 function=notify_orders,
                 meta={"provider_usages": "user-owned"},
@@ -135,7 +135,7 @@ def test_given_discovered_python_functions_when_building_graph_then_indexes_node
         check_functions=(
             DiscoveredCheckFunction(
                 file_path=Path("/project/checks/orders.py"),
-                relative_path=Path("python/checks/orders.py"),
+                relative_path=Path("python/nodes/checks/orders.py"),
                 name="check_orders_export",
                 function=check_orders_export,
                 depends_on=(export_orders,),
@@ -145,7 +145,7 @@ def test_given_discovered_python_functions_when_building_graph_then_indexes_node
         providers=(
             DiscoveredProvider(
                 file_path=Path("/project/providers/slack.py"),
-                relative_path=Path("providers/slack.py"),
+                relative_path=Path("python/providers/slack.py"),
                 name="slack_provider",
                 provider_class=SlackProvider,
                 settings=SlackProvider(),
@@ -279,7 +279,7 @@ def test_given_fully_configured_python_nodes_when_building_then_identity_config_
             loader_functions=(
                 DiscoveredLoaderFunction(
                     file_path=Path("/project/loaders/events.py"),
-                    relative_path=Path("python/loaders/events.py"),
+                    relative_path=Path("python/nodes/loaders/events.py"),
                     name="load_events",
                     function=load_events,
                     destination="raw.events",
@@ -292,7 +292,7 @@ def test_given_fully_configured_python_nodes_when_building_then_identity_config_
             asset_functions=(
                 DiscoveredAssetFunction(
                     file_path=Path("/project/tasks/orders.py"),
-                    relative_path=Path("python/tasks/orders.py"),
+                    relative_path=Path("python/nodes/tasks/orders.py"),
                     name="prepare_orders",
                     function=prepare_orders,
                     tags=("orders",),
@@ -303,7 +303,7 @@ def test_given_fully_configured_python_nodes_when_building_then_identity_config_
                 ),
                 DiscoveredAssetFunction(
                     file_path=Path("/project/assets/orders.py"),
-                    relative_path=Path("python/assets/orders.py"),
+                    relative_path=Path("python/nodes/assets/orders.py"),
                     name="export_orders",
                     function=export_orders,
                     tags=("orders",),
@@ -317,7 +317,7 @@ def test_given_fully_configured_python_nodes_when_building_then_identity_config_
             check_functions=(
                 DiscoveredCheckFunction(
                     file_path=Path("/project/checks/orders.py"),
-                    relative_path=Path("python/checks/orders.py"),
+                    relative_path=Path("python/nodes/checks/orders.py"),
                     name="check_orders_export",
                     function=check_orders_export,
                     depends_on=(export_orders,),

@@ -239,15 +239,15 @@ fn owned(values: &[&str]) -> Vec<String> {
     values.iter().map(|value| (*value).to_owned()).collect()
 }
 
-/// Six positions: global 0 and 4, local 2 under `models/marts`, inherited 3 and 5.
+/// Six positions: global 0 and 4, local 2 under `sql/models/marts`, inherited 3 and 5.
 fn consumer_table() -> VisibilityTable {
     VisibilityTable {
         identity_keys: vec![0, 1, 2, 3, 4, 5],
         global: vec![0, 4],
-        local: HashMap::from([("models/marts".to_owned(), vec![2])]),
+        local: HashMap::from([("sql/models/marts".to_owned(), vec![2])]),
         inherited: HashMap::from([
             ("models".to_owned(), vec![3]),
-            ("models/staging".to_owned(), vec![5]),
+            ("sql/models/staging".to_owned(), vec![5]),
         ]),
     }
 }

@@ -34,8 +34,8 @@ def test_given_unformatted_sql_when_formatting_then_mode_controls_writes(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(PROJECT_TOML, encoding="utf-8")
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     original: str = 'MODEL (description "Orders");\nselect order_id,status from orders\n'
     model.write_text(original, encoding="utf-8")
 
@@ -60,8 +60,8 @@ def test_given_legacy_lint_configuration_when_formatting_then_it_is_rejected(
     (tmp_path / "sqlbuild_project.toml").write_text(
         f'{PROJECT_TOML}\n[lint]\nselect = ["SQLCLEAN"]\n', encoding="utf-8"
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text('MODEL (description "Orders");\nSELECT 1 AS order_id\n', encoding="utf-8")
 
     exit_code: int = main(["--project-dir", str(tmp_path), "compile"])
@@ -81,8 +81,8 @@ def test_given_unselected_sql_rule_finding_when_formatting_then_rule_is_not_enfo
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(PROJECT_TOML, encoding="utf-8")
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         'MODEL (description "Orders");\nSELECT order_id FROM orders LIMIT 1\n',
         encoding="utf-8",
@@ -120,8 +120,8 @@ def test_given_redundant_typed_fixture_null_when_formatting_then_safe_fix_uses_c
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(PROJECT_TOML, encoding="utf-8")
-    staging_model: Path = tmp_path / "models" / "stg_orders.sql"
-    staging_model.parent.mkdir()
+    staging_model: Path = tmp_path / "sql" / "models" / "stg_orders.sql"
+    staging_model.parent.mkdir(parents=True)
     staging_model.write_text(
         "MODEL (\n"
         '  description "Staged orders",\n'
@@ -134,7 +134,7 @@ def test_given_redundant_typed_fixture_null_when_formatting_then_safe_fix_uses_c
         "SELECT 1 AS order_id, CAST(NULL AS VARCHAR) AS status\n",
         encoding="utf-8",
     )
-    (tmp_path / "models" / "orders.sql").write_text(
+    (tmp_path / "sql" / "models" / "orders.sql").write_text(
         'MODEL (description "Orders");\n\nSELECT order_id, status FROM __ref("stg_orders")\n',
         encoding="utf-8",
     )
@@ -180,8 +180,8 @@ def test_given_all_null_empty_fixture_when_formatting_then_uses_empty_fixture_ma
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(PROJECT_TOML, encoding="utf-8")
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         "MODEL (\n"
         '  description "Orders",\n'
@@ -231,8 +231,8 @@ def test_given_uncompilable_project_with_fixture_null_when_formatting_then_forma
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(PROJECT_TOML, encoding="utf-8")
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         'MODEL (description "Orders");\n\nselect * from __ref("missing_orders")\n',
         encoding="utf-8",
@@ -327,8 +327,8 @@ def test_given_middle_typed_null_when_formatting_then_star_safe_prefix_is_preser
         PROJECT_TOML + '\n[defaults]\ncontract = "enforced"\n',
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         'MODEL (description "Orders", columns ('
         "order_id (type INTEGER), status (type VARCHAR), amount (type DOUBLE)));\n"
@@ -366,8 +366,8 @@ def test_given_empty_explicit_selector_when_formatting_then_no_files_are_modifie
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(PROJECT_TOML, encoding="utf-8")
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     original: str = 'MODEL (description "Orders");\nselect 1 as order_id\n'
     model.write_text(original, encoding="utf-8")
 
@@ -412,7 +412,7 @@ def test_given_macro_expanded_fixture_when_formatting_then_authored_source_is_no
         tmp_path=tmp_path,
         fixture_sql="@py.mock_rows()",
     )
-    macro_file: Path = tmp_path / "macros" / "python" / "rows.py"
+    macro_file: Path = tmp_path / "sql" / "macros" / "python" / "rows.py"
     macro_file.parent.mkdir(parents=True)
     macro_file.write_text(
         "def mock_rows() -> str:\n"
@@ -507,8 +507,8 @@ def test_given_test_path_selector_when_formatting_then_work_is_bounded_to_select
         PROJECT_TOML + '\n[defaults]\ncontract = "enforced"\n',
         encoding="utf-8",
     )
-    model_dir: Path = tmp_path / "models"
-    model_dir.mkdir()
+    model_dir: Path = tmp_path / "sql" / "models"
+    model_dir.mkdir(parents=True)
     model_dir.joinpath("stg_orders.sql").write_text(
         'MODEL (description "Test model stg_orders.", columns (order_id (type INTEGER), status (type VARCHAR)));\n'
         "SELECT 1 AS order_id, 'open' AS status\n",
@@ -545,7 +545,7 @@ def test_given_test_path_selector_when_formatting_then_work_is_bounded_to_select
         encoding="utf-8",
     )
     unselected_file: Path = tmp_path / "tests" / "unit" / "customers" / "test_other.sql"
-    unselected_file.parent.mkdir()
+    unselected_file.parent.mkdir(parents=True)
     unselected_file.write_text(fixture_sql, encoding="utf-8")
     _ = native_module.compile_stage_work_info(reset=True)
 

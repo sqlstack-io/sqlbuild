@@ -17,8 +17,8 @@ pub(super) fn orders_index() -> LineageIndex {
     let fact: LineageKey = key("model", "fact_orders");
     let seed: LineageKey = key("seed", "waffle_types");
     let nodes: HashMap<LineageKey, LineageNode> = [
-        (stg.clone(), Some("models/stg_orders.sql")),
-        (fact.clone(), Some("models/fact_orders.sql")),
+        (stg.clone(), Some("sql/models/stg_orders.sql")),
+        (fact.clone(), Some("sql/models/fact_orders.sql")),
         (raw.clone(), None),
         (seed.clone(), None),
     ]

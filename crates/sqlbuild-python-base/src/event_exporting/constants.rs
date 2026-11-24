@@ -39,3 +39,5 @@ pub const IDLE_WAIT_SECONDS: f64 = 1.0;
 
 /// No time left before a deadline.
 pub const NO_SECONDS: f64 = 0.0;
+/// How the export warning names a failed sink provider teardown that named no provider.
+pub(crate) const UNNAMED_TEARDOWN_FAILURE: &str = "closing the provider session raised";

@@ -329,7 +329,7 @@ def build_intermediate(
             continue
         area = AREA[system]
         for instance in values:
-            folder = f"models/intermediate/{area}/{instance.code}"
+            folder = f"sql/models/intermediate/{area}/{instance.code}"
             result.per_instance[instance.code] = _instance_models(
                 project, instance, tables[instance.code], folder
             )
@@ -350,7 +350,7 @@ def build_intermediate(
                     model = union(
                         project,
                         f"int_{area}_{region.code}__{entity}",
-                        f"models/intermediate/{area}/regions",
+                        f"sql/models/intermediate/{area}/regions",
                         members,
                         f"{entity.replace('_', ' ').capitalize()} from every {region.name} "
                         "storefront",
@@ -369,7 +369,7 @@ def build_intermediate(
             result.combined[f"{area}__{entity}"] = union(
                 project,
                 f"int_{area}__{entity}",
-                f"models/intermediate/{area}",
+                f"sql/models/intermediate/{area}",
                 members,
                 f"{entity.replace('_', ' ').capitalize()} from every {area.removesuffix('s')} "
                 "instance",
@@ -382,7 +382,7 @@ def build_intermediate(
 
 
 def _storefront_globals(project: Project, result: Intermediate) -> None:
-    folder = "models/intermediate/storefronts"
+    folder = "sql/models/intermediate/storefronts"
     orders = result.combined["storefronts__orders_enriched"]
     result.combined["orders_usd"] = to_usd(
         project,
@@ -397,7 +397,7 @@ def _storefront_globals(project: Project, result: Intermediate) -> None:
     result.combined["customer_identity"] = domain.customer_identity(
         project,
         "int_customer_identity",
-        "models/intermediate/customers",
+        "sql/models/intermediate/customers",
         result.combined["storefronts__customer_profile"],
     )
     catalogue = result.per_instance.get("pim")
@@ -508,7 +508,7 @@ def _line_demand(project: Project, line: str, lines: Model) -> Model:
     return project.add(
         Model(
             name=f"int_{line}__sku_demand",
-            folder=f"models/intermediate/product_lines/{line}",
+            folder=f"sql/models/intermediate/product_lines/{line}",
             layer="intermediate",
             description=(
                 f"Units and sales of every {line.title()} product-line SKU per storefront, ranked "
@@ -533,7 +533,7 @@ def _clickstream(
         model = domain.sessions(
             project,
             f"int_{collector.code}__sessions",
-            f"models/intermediate/clickstream/{collector.code}",
+            f"sql/models/intermediate/clickstream/{collector.code}",
             project.ref(stream),
         )
         result.per_instance.setdefault(collector.code, {})["sessions"] = model
@@ -542,7 +542,7 @@ def _clickstream(
         result.combined["clickstream__sessions"] = union(
             project,
             "int_clickstream__sessions",
-            "models/intermediate/clickstream",
+            "sql/models/intermediate/clickstream",
             session_models,
             "Sessions from every web and app collector",
             "session_id",

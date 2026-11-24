@@ -5,6 +5,10 @@ pub(crate) const OUTPUT_SCHEMA_VERSION: i64 = 1;
 pub(crate) const LATEST_SELECTOR: &str = "latest";
 pub(crate) const RUNNING_BUILD_STATUS: &str = "running";
 pub(crate) const DEFAULT_RATE_SOURCE: &str = "default";
+/// The list price for the account's region and edition: an estimate.
+pub(crate) const LIST_PRICE_RATE_SOURCE: &str = "list_price";
+/// The account's contract price, from Snowflake's rate sheet.
+pub(crate) const RATE_SHEET_RATE_SOURCE: &str = "rate_sheet";
 pub(crate) const COMPLETE_STATUS: &str = "complete";
 pub(crate) const COLLECTION_FAILED_STATUS: &str = "collection_failed";
 pub(crate) const WARNING_STATUSES: [&str; 2] = ["partial", "pending"];
@@ -49,8 +53,7 @@ pub(crate) const WIDE_HEADINGS: [&str; 6] = [
     "Attributed credits",
     "Est. cost",
 ];
-pub(crate) const RATE_ADVICE: &str =
-    "Configure cost.usd_per_credit with your Snowflake contract rate.";
+pub(crate) const RATE_ADVICE: &str = "Configure cost.usd_per_credit with your Snowflake contract rate, or let the connection's role read SNOWFLAKE.ORGANIZATION_USAGE.RATE_SHEET_DAILY.";
 pub(crate) const ESTIMATE_NOTE: &str = "Estimate uses fair-share visible warehouse busy time; it is not Snowflake-billed credits or invoice reconciliation.";
 pub(crate) const MICROS_PER_SECOND: i128 = 1_000_000;
 pub(crate) const SECONDS_PER_DAY: i128 = 86_400;

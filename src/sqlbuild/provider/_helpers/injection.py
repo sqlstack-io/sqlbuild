@@ -146,6 +146,6 @@ def _provider_alias_import_message(
         f"{provider_annotation.__name__} imported as "
         f"'{provider_annotation.__module__}', but provider '{parameter_name}' was discovered as "
         f"{provider_class.__module__}.{provider_class.__name__}. Import project providers using "
-        "the project-root providers package path, for example: "
-        "from providers.my_provider import MyProvider"
+        "the project path of the providers package, for example: "
+        "from python.providers.my_provider.provider import MyProvider"
     )

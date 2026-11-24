@@ -1,0 +1,19 @@
+{
+ "commands": [
+  {
+   "label": "compile",
+   "exit_code": 1,
+   "diagnostics": [
+    {
+     "phase": "compile",
+     "severity": "error",
+     "code": "D018",
+     "message": "'sql/notes/' is not part of a SQLBuild project",
+     "help": "move it under one of: sql/models/, sql/seeds/, sql/sources/, sql/macros/, sql/functions/, sql/enums/, sql/constants/, sql/audits/, sql/hooks/, sql/schemas/,\n          or list it in extra_paths in sqlbuild_project.toml if it belongs here on purpose"
+    }
+   ]
+  }
+ ],
+ "compiled": {},
+ "manifest": null
+}

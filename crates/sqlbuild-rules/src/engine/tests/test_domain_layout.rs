@@ -9,19 +9,20 @@ fn given_owner_and_declaration_layouts_when_evaluating_then_returns_expected_fau
 -> Result<(), String> {
     install_test_identity();
     let oversized_paths: Vec<String> = (0..11)
-        .map(|index| format!("models/commerce/_macros/item_{index}.py"))
+        .map(|index| format!("sql/models/commerce/_macros/item_{index}.py"))
         .collect();
     let repeated_paths: Vec<String> = (0..11)
-        .map(|_| "models/commerce/_macros/orders.py".to_owned())
+        .map(|_| "sql/models/commerce/_macros/orders.py".to_owned())
         .collect();
     let python_and_sql: Vec<String> = (0..6)
-        .map(|index| format!("models/commerce/_macros/python/normalise/item_{index}.py"))
+        .map(|index| format!("sql/models/commerce/_macros/python/normalise/item_{index}.py"))
         .chain(
-            (0..7).map(|index| format!("models/commerce/_macros/sql/normalise/item_{index}.sql")),
+            (0..7)
+                .map(|index| format!("sql/models/commerce/_macros/sql/normalise/item_{index}.sql")),
         )
         .collect();
     let oversized_sql: Vec<String> = (0..11)
-        .map(|index| format!("models/commerce/_macros/sql/normalise/item_{index}.sql"))
+        .map(|index| format!("sql/models/commerce/_macros/sql/normalise/item_{index}.sql"))
         .collect();
     let test_cases = [
         test_types::DomainLayoutTestCase {
@@ -44,7 +45,7 @@ fn given_owner_and_declaration_layouts_when_evaluating_then_returns_expected_fau
             scope_index: helpers::scope_with_macros(&oversized_sql),
             expected_codes: &["SQBRDECLARATION304"],
             expected_message_fragments: &[
-                "declaration container \"models/commerce/_macros/sql/normalise\" has 11 files",
+                "declaration container \"sql/models/commerce/_macros/sql/normalise\" has 11 files",
             ],
             expected_absent_fragments: &[],
         },
@@ -55,8 +56,8 @@ fn given_owner_and_declaration_layouts_when_evaluating_then_returns_expected_fau
             thresholds: json!({}),
             layout: json!({}),
             scope_index: helpers::scope_with_macros(&[
-                "models/commerce/_macros/python/normalise_order.py".into(),
-                "models/commerce/_macros/sql/normalise_person.sql".into(),
+                "sql/models/commerce/_macros/python/normalise_order.py".into(),
+                "sql/models/commerce/_macros/sql/normalise_person.sql".into(),
             ]),
             expected_codes: &[],
             expected_message_fragments: &[],
@@ -69,13 +70,13 @@ fn given_owner_and_declaration_layouts_when_evaluating_then_returns_expected_fau
             thresholds: json!({}),
             layout: json!({}),
             scope_index: helpers::scope_with_macros(&[
-                "models/commerce/_macros/sql/normalise_order.sql".into(),
-                "models/commerce/_macros/sql/normalise_person.sql".into(),
+                "sql/models/commerce/_macros/sql/normalise_order.sql".into(),
+                "sql/models/commerce/_macros/sql/normalise_person.sql".into(),
             ]),
             expected_codes: &["SQBRDECLARATION306"],
             expected_message_fragments: &[
                 "2 sibling SQL macro files",
-                "Move these files into models/commerce/_macros/sql/normalise/",
+                "Move these files into sql/models/commerce/_macros/sql/normalise/",
                 "each macro keeps its name",
             ],
             expected_absent_fragments: &[],
@@ -84,8 +85,8 @@ fn given_owner_and_declaration_layouts_when_evaluating_then_returns_expected_fau
             description: "leaf and branch models fault",
             code: "SQBRPROJECT202",
             models: json!([
-                helpers::model("models/commerce/mart/summary.sql"),
-                helpers::model("models/commerce/mart/orders/model.sql")
+                helpers::model("sql/models/commerce/mart/summary.sql"),
+                helpers::model("sql/models/commerce/mart/orders/model.sql")
             ]),
             thresholds: json!({}),
             layout: json!({}),
@@ -98,7 +99,7 @@ fn given_owner_and_declaration_layouts_when_evaluating_then_returns_expected_fau
             description: "default owner depth faults",
             code: "SQBRPROJECT203",
             models: json!([helpers::model(
-                "models/commerce/intermediate/enriched/order/clusters_resolved/model.sql"
+                "sql/models/commerce/intermediate/enriched/order/clusters_resolved/model.sql"
             )]),
             thresholds: json!({}),
             layout: json!({}),
@@ -111,7 +112,7 @@ fn given_owner_and_declaration_layouts_when_evaluating_then_returns_expected_fau
             description: "configured owner depth passes",
             code: "SQBRPROJECT203",
             models: json!([helpers::model(
-                "models/commerce/intermediate/enriched/order/clusters_resolved/model.sql"
+                "sql/models/commerce/intermediate/enriched/order/clusters_resolved/model.sql"
             )]),
             thresholds: json!({"max_subdomain_depth": 2}),
             layout: json!({}),
@@ -124,8 +125,8 @@ fn given_owner_and_declaration_layouts_when_evaluating_then_returns_expected_fau
             description: "longest unary owner prefix faults",
             code: "SQBRPROJECT204",
             models: json!([
-                helpers::model("models/commerce/mart/order_status/model.sql"),
-                helpers::model("models/commerce/mart/order_status_history/model.sql")
+                helpers::model("sql/models/commerce/mart/order_status/model.sql"),
+                helpers::model("sql/models/commerce/mart/order_status_history/model.sql")
             ]),
             thresholds: json!({}),
             layout: json!({}),
@@ -138,9 +139,9 @@ fn given_owner_and_declaration_layouts_when_evaluating_then_returns_expected_fau
             description: "each branching owner prefix faults",
             code: "SQBRPROJECT204",
             models: json!([
-                helpers::model("models/crm/mart/partner_annotation_export/model.sql"),
-                helpers::model("models/crm/mart/partner_annotation_validation/model.sql"),
-                helpers::model("models/crm/mart/partner_events/model.sql")
+                helpers::model("sql/models/crm/mart/partner_annotation_export/model.sql"),
+                helpers::model("sql/models/crm/mart/partner_annotation_validation/model.sql"),
+                helpers::model("sql/models/crm/mart/partner_events/model.sql")
             ]),
             thresholds: json!({}),
             layout: json!({}),
@@ -156,8 +157,8 @@ fn given_owner_and_declaration_layouts_when_evaluating_then_returns_expected_fau
             thresholds: json!({}),
             layout: json!({}),
             scope_index: helpers::scope_with_macros(&[
-                "models/commerce/_macros/direct.py".into(),
-                "models/commerce/_macros/scoring/grouped.py".into(),
+                "sql/models/commerce/_macros/direct.py".into(),
+                "sql/models/commerce/_macros/scoring/grouped.py".into(),
             ]),
             expected_codes: &["SQBRDECLARATION302"],
             expected_message_fragments: &[],
@@ -170,7 +171,7 @@ fn given_owner_and_declaration_layouts_when_evaluating_then_returns_expected_fau
             thresholds: json!({}),
             layout: json!({}),
             scope_index: helpers::scope_with_macros(&[
-                "models/commerce/_macros/scoring/candidates/item.py".into(),
+                "sql/models/commerce/_macros/scoring/candidates/item.py".into(),
             ]),
             expected_codes: &["SQBRDECLARATION303"],
             expected_message_fragments: &[],
@@ -205,7 +206,7 @@ fn given_owner_and_declaration_layouts_when_evaluating_then_returns_expected_fau
             thresholds: json!({}),
             layout: json!({}),
             scope_index: helpers::scope_with_macros(&[
-                "models/commerce/_macros/utils/item.py".into()
+                "sql/models/commerce/_macros/utils/item.py".into()
             ]),
             expected_codes: &["SQBRDECLARATION305"],
             expected_message_fragments: &[],
@@ -218,8 +219,8 @@ fn given_owner_and_declaration_layouts_when_evaluating_then_returns_expected_fau
             thresholds: json!({}),
             layout: json!({}),
             scope_index: helpers::scope_with_macros(&[
-                "models/commerce/_macros/normalise_order.py".into(),
-                "models/commerce/_macros/normalise_person.py".into(),
+                "sql/models/commerce/_macros/normalise_order.py".into(),
+                "sql/models/commerce/_macros/normalise_person.py".into(),
             ]),
             expected_codes: &["SQBRDECLARATION306"],
             expected_message_fragments: &["normalise"],
@@ -228,7 +229,7 @@ fn given_owner_and_declaration_layouts_when_evaluating_then_returns_expected_fau
         test_types::DomainLayoutTestCase {
             description: "model outside configured levels faults",
             code: "SQBRPROJECT201",
-            models: json!([helpers::model("models/commerce/unknown/model.sql")]),
+            models: json!([helpers::model("sql/models/commerce/unknown/model.sql")]),
             thresholds: json!({}),
             layout: json!({}),
             scope_index: helpers::scope_index(),
@@ -240,8 +241,8 @@ fn given_owner_and_declaration_layouts_when_evaluating_then_returns_expected_fau
             description: "implicit domain grouping prefix faults",
             code: "SQBRPROJECT204",
             models: json!([
-                helpers::model("models/partner_annotation_export/mart/model.sql"),
-                helpers::model("models/partner_annotation_validation/mart/model.sql")
+                helpers::model("sql/models/partner_annotation_export/mart/model.sql"),
+                helpers::model("sql/models/partner_annotation_validation/mart/model.sql")
             ]),
             thresholds: json!({}),
             layout: json!({}),
@@ -253,7 +254,7 @@ fn given_owner_and_declaration_layouts_when_evaluating_then_returns_expected_fau
         test_types::DomainLayoutTestCase {
             description: "ambiguous inferred domain root faults",
             code: "SQBRPROJECT201",
-            models: json!([helpers::model("models/commerce/staging/mart/model.sql")]),
+            models: json!([helpers::model("sql/models/commerce/staging/mart/model.sql")]),
             thresholds: json!({}),
             layout: json!({}),
             scope_index: helpers::scope_index(),
@@ -264,7 +265,9 @@ fn given_owner_and_declaration_layouts_when_evaluating_then_returns_expected_fau
         test_types::DomainLayoutTestCase {
             description: "explicit nested domain root resolves",
             code: "SQBRPROJECT201",
-            models: json!([helpers::model("models/commerce/orders/mart/core/model.sql")]),
+            models: json!([helpers::model(
+                "sql/models/commerce/orders/mart/core/model.sql"
+            )]),
             thresholds: json!({}),
             layout: json!({"levels": ["mart"], "domain_roots": ["commerce/orders"]}),
             scope_index: helpers::scope_index(),

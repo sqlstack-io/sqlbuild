@@ -35,7 +35,7 @@ def test_given_config_value_the_encoder_rejects_when_building_natively_then_rule
 ) -> None:
     project: CompiledProjectView = build_project(
         name="orders",
-        relative_path="models/orders.sql",
+        relative_path="sql/models/orders.sql",
         sql="SELECT 1",
         config_values={"priority": test_case.rejected_value},
     )

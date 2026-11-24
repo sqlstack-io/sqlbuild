@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Macro '@py.blow_up' in '<project>/models/marts/customer_totals.sql' failed: cannot render total"
+     "message": "Macro '@py.blow_up' in '<project>/sql/models/marts/customer_totals.sql' failed: cannot render total"
     }
    ]
   }

@@ -11,7 +11,7 @@ use std::path::Path;
 
 use crate::models::{EvaluateRequest, RulesConfig};
 use crate::python_rules::constants::{
-    NAMING_CONTRACTS, NAMING_FAMILY, PACKAGE_ROOT, PROJECT_CONFIG_FILE,
+    NAMING_CONTRACTS, NAMING_FAMILY, PACKAGE_MODULE, PACKAGE_ROOT, PROJECT_CONFIG_FILE,
 };
 use crate::python_rules::models::{PythonRuleSpec, PythonTarget};
 
@@ -92,7 +92,7 @@ pub(crate) fn rule_context(target: &PythonTarget, settings: &ContextSettings) ->
         role: target.role.clone(),
         is_main_module: target.is_main_module,
         is_entry_module: target.is_entry_module,
-        package_name: PACKAGE_ROOT.to_owned(),
+        package_name: PACKAGE_MODULE.to_owned(),
         ownership_root: Some(settings.ownership_root.clone()),
         ownership_roots: vec![settings.ownership_root.clone()],
         ownership_offset: Some(0),

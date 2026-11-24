@@ -61,8 +61,8 @@ def test_given_dialect_line_comment_with_quotes_when_compiling_then_model_is_ana
         project_name="orders_project",
         repo_files={
             "sqlbuild_project.toml": test_case.project_toml,
-            "models/base_orders.sql": _BASE_ORDERS_SQL,
-            "models/commented_orders.sql": (
+            "sql/models/base_orders.sql": _BASE_ORDERS_SQL,
+            "sql/models/commented_orders.sql": (
                 "MODEL (description 'Commented orders.', materialized table);\n\n"
                 f"{test_case.query_sql}\n"
             ),

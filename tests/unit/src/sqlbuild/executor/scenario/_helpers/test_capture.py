@@ -169,7 +169,7 @@ def test_given_multiple_capture_seeds_when_executing_then_operation_and_resource
             name="__sqb_51b385aebe20__seed__country_codes_regions",
             qualified_name="scenario_schema.__sqb_51b385aebe20__seed__country_codes_regions",
         ),
-        file_path=Path("seeds/regions.csv"),
+        file_path=Path("sql/seeds/regions.csv"),
     )
     scenario_plan: ScenarioExecutionPlan = replace(
         SCENARIO_PLAN,

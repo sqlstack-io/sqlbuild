@@ -40,7 +40,7 @@ def test_given_direct_project_when_building_then_manifest_requires_compile_manif
                 "[connection]\n"
                 'database = "warehouse.duckdb"\n'
             ),
-            "models/orders.sql": "MODEL (description 'Test model orders.', materialized table);\n\nSELECT 1 AS order_id\n",
+            "sql/models/orders.sql": "MODEL (description 'Test model orders.', materialized table);\n\nSELECT 1 AS order_id\n",
         },
     )
     manifest_path: Path = project_dir / "target" / "manifest.json"

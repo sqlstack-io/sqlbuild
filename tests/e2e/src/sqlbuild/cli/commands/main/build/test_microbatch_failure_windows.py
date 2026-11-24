@@ -55,13 +55,13 @@ def test_given_completion_write_failure_during_rebuild_when_retried_then_live_ta
                 'adapter = "duckdb"',
                 'adapter = "failing_microbatch_state_duckdb"',
             ),
-            "sources/raw.yml": raw_events_source_yml(),
-            "models/orders.sql": timestamp_microbatch_model_sql(
+            "sql/sources/raw.yml": raw_events_source_yml(),
+            "sql/models/orders.sql": timestamp_microbatch_model_sql(
                 value_expression="payload",
                 batch_concurrency=3,
                 replay_policy="forward",
             ),
-            "adapters/failing_microbatch_state_duckdb.py": (
+            "python/adapters/failing_microbatch_state_duckdb.py": (
                 "import os\n"
                 "from typing import Any\n"
                 "from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter\n\n"
@@ -170,8 +170,8 @@ def test_given_concurrent_delta_audit_failure_when_fixed_then_rejected_partition
                 database_name="delta_audit_failure.duckdb",
                 settings_toml=("\n[settings]\nconcurrency = 3\nmicrobatch_concurrency = true\n"),
             ),
-            "sources/raw.yml": raw_events_source_yml(),
-            "models/orders.sql": timestamp_microbatch_model_sql(
+            "sql/sources/raw.yml": raw_events_source_yml(),
+            "sql/models/orders.sql": timestamp_microbatch_model_sql(
                 value_expression="CAST(payload AS INTEGER)",
                 batch_concurrency=3,
                 replay_policy="forward",
@@ -181,7 +181,7 @@ def test_given_concurrent_delta_audit_failure_when_fixed_then_rejected_partition
                     "run_scope delta_and_final,)],"
                 ),
             ),
-            "audits/generic/expression_is_true.sql": _AUDIT_SQL,
+            "sql/audits/generic/expression_is_true.sql": _AUDIT_SQL,
         },
     )
     db_path: Path = project_dir / "delta_audit_failure.duckdb"
@@ -281,9 +281,9 @@ def test_given_concurrent_batches_when_audit_and_hooks_wrap_model_then_aggregate
                 database_name="aggregate_hooks.duckdb",
                 settings_toml=("\n[settings]\nconcurrency = 3\nmicrobatch_concurrency = true\n"),
             ),
-            "sources/raw.yml": raw_events_source_yml(),
-            "models/orders.sql": model_sql,
-            "audits/generic/expression_is_true.sql": _AUDIT_SQL,
+            "sql/sources/raw.yml": raw_events_source_yml(),
+            "sql/models/orders.sql": model_sql,
+            "sql/audits/generic/expression_is_true.sql": _AUDIT_SQL,
         },
     )
     db_path: Path = project_dir / "aggregate_hooks.duckdb"

@@ -24,7 +24,7 @@ from tests.unit.src.sqlbuild.lint._helpers._test_types import (
     LintRemediationTestCase,
 )
 
-FILE_PATH: Path = Path("models/example.sql")
+FILE_PATH: Path = Path("sql/models/example.sql")
 DEFAULT_CONFIG: LintConfig = LintConfig()
 
 

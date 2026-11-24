@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { copyText } from '$lib/browser/clipboard';
+	import { createCopyState } from '$lib/browser/copy-state.svelte';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import ArrowUpRightIcon from '@lucide/svelte/icons/arrow-up-right';
 	import UnfoldVerticalIcon from '@lucide/svelte/icons/unfold-vertical';
@@ -97,7 +97,8 @@
 	});
 
 	let wrap = $state(false);
-	let copied = $state(false);
+	const copier = createCopyState();
+	const copied = $derived(copier.copied);
 	let activeLine = $state<number | null>(null);
 	let codeEl = $state<HTMLDivElement>();
 
@@ -117,9 +118,8 @@
 		if (ref) onRef?.(ref);
 	}
 
-	async function copy() {
-		copied = await copyText(mode === 'compiled' ? compiled : raw);
-		setTimeout(() => (copied = false), 1200);
+	async function copy(e: MouseEvent) {
+		await copier.copy(mode === 'compiled' ? compiled : raw, e.currentTarget as Element);
 	}
 </script>
 

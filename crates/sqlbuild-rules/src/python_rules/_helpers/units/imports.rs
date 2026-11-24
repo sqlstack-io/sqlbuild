@@ -3,9 +3,9 @@
 use sqlbuild_pysource::node_units::models::UnitImport;
 
 use crate::models::Fault;
-use crate::python_rules::_helpers::units::project::{imported_module, unit_fault};
+use crate::python_rules::_helpers::units::project::{imported_module, module_below, unit_fault};
 use crate::python_rules::constants::{
-    NODE_IMPORT_BOUNDARIES_CODE, PACKAGE_ROOT, PROVIDER_ROLE_MODULES, PROVIDERS_ROOT,
+    NODE_IMPORT_BOUNDARIES_CODE, PACKAGE_MODULE, PROVIDER_ROLE_MODULES, PROVIDERS_MODULE,
     SHARED_ROLE_MODULES, SHARED_UTILITIES_PACKAGE, UNIT_HELPERS_FOLDER,
 };
 use crate::python_rules::models::UnitProject;
@@ -41,10 +41,10 @@ pub(crate) fn import_boundary_faults(project: &UnitProject<'_>) -> Vec<Fault> {
 /// Whether a file of `unit` may import the project module `module` through `import`.
 fn allowed(module: &str, import: &UnitImport, unit: &str, project: &UnitProject<'_>) -> bool {
     let unit_parts: Vec<&str> = unit.split('/').collect();
-    let own: String = format!("{PACKAGE_ROOT}.{}", unit_parts.join("."));
-    let mut shared: Vec<String> = vec![own, format!("{PACKAGE_ROOT}.{SHARED_UTILITIES_PACKAGE}")];
+    let own: String = format!("{PACKAGE_MODULE}.{}", unit_parts.join("."));
+    let mut shared: Vec<String> = vec![own, format!("{PACKAGE_MODULE}.{SHARED_UTILITIES_PACKAGE}")];
     for depth in 1..unit_parts.len() {
-        let ancestor: String = format!("{PACKAGE_ROOT}.{}", unit_parts[..depth].join("."));
+        let ancestor: String = format!("{PACKAGE_MODULE}.{}", unit_parts[..depth].join("."));
         shared.extend(
             SHARED_ROLE_MODULES
                 .iter()
@@ -58,12 +58,11 @@ fn allowed(module: &str, import: &UnitImport, unit: &str, project: &UnitProject<
     project.node_modules.contains(module) && import.only_in_depends_on
 }
 
-/// Whether `module` is a public role file of a provider capability, `providers.<capability>.<role>`.
+/// Whether `module` is a public role file of a provider capability, `python.providers.<capability>.<role>`.
 fn provider_role(module: &str) -> bool {
-    let parts: Vec<&str> = module.split('.').collect();
     matches!(
-        parts.as_slice(),
-        [root, _, role, ..] if *root == PROVIDERS_ROOT && PROVIDER_ROLE_MODULES.contains(role)
+        module_below(module, PROVIDERS_MODULE).as_deref(),
+        Some([_, role, ..]) if PROVIDER_ROLE_MODULES.contains(role)
     )
 }
 

@@ -56,7 +56,7 @@ def test_given_bigquery_string_contract_when_compiling_then_text_types_compare_a
         project_name="shop",
         repo_files={
             "sqlbuild_project.toml": _PROJECT_TOML,
-            "models/order_notes.sql": _MODEL.format(
+            "sql/models/order_notes.sql": _MODEL.format(
                 declared_type=test_case.declared_type, cast_type=test_case.cast_type
             ),
         },

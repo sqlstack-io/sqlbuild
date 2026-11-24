@@ -5,7 +5,7 @@
 		Database,
 		Table2,
 		Eye,
-		Layers,
+		ChartGantt,
 		FunctionSquare,
 		Sprout,
 		Download,
@@ -22,6 +22,11 @@
 	import CompactFace from '$lib/components/graph/compact-face.svelte';
 	import { fonts } from '$lib/components/graph/fonts.svelte';
 	import { fitStatus } from '$lib/lineage/status-line';
+	import { getContext } from 'svelte';
+	import { COMPACT_TAILS, type CompactTails } from '$lib/components/graph/compact-tails';
+	import { measureText, nameOnlyText } from '$lib/components/graph/compact-title';
+	import { cardStage } from '$lib/lineage/fit';
+	import { discoveredStep } from '$lib/lineage/discovered-labels';
 
 	type AssetData = {
 		name: string;
@@ -87,15 +92,27 @@
 		table: Table2,
 		merge: GitMerge,
 		delete_insert: Repeat,
-		microbatch: Layers,
+		microbatch: ChartGantt,
 		asset: Package,
 		udf: FunctionSquare,
 		table_fn: TableProperties,
 		fn: FunctionSquare
 	};
+	// No kind word on the card: the icon tells the kinds and incremental strategies apart, and the full
+	// materialization is in the tooltip and the side panel.
 	const Glyph = $derived(icons[d.icon ?? ''] ?? Table2);
+	// Zoomed out to the name-only stage, the name is fitted to the card at its enlarged size: a
+	// discovered step's shared prefix gives way first, any other name loses its end.
+	const tails = getContext<CompactTails | undefined>(COMPACT_TAILS);
+	const shownName = $derived.by(() => {
+		const label = d.label ?? d.name;
+		const zoom = tails?.zoom();
+		if (zoom === undefined || cardStage(zoom) !== 'name') return label;
+		void fonts.ready;
+		void fonts.version;
+		return nameOnlyText(label, zoom, discoveredStep(id) ? (tails?.lead(id) ?? 0) : 0, measureText);
+	});
 	const tone = $derived(statusColor[d.status] ?? statusColor.none);
-	const kindShort = $derived(d.kind.split(' · ')[0]);
 	const when = $derived(d.lastBuiltAt ? (d.status === 'src' ? `loaded ${formatAgo(d.lastBuiltAt, app.now)}` : formatAgo(d.lastBuiltAt, app.now)) : '');
 
 	// Zoomed out, the card's state is its colour: a failure or a run first, then staleness, then the outcome.
@@ -124,13 +141,12 @@
 	);
 </script>
 
-<div class="node" class:selected class:dimmed={d.dimmed}>
+<div class="node" class:selected class:dimmed={d.dimmed} style:--face={faceTone}>
 	<Handle type="target" position={Position.Left} class="node-handle" />
 
 	<div class="head">
 		<Glyph size={14} strokeWidth={1.75} class="glyph" />
-		<span class="name" title={d.name}>{d.label ?? d.name}</span>
-		{#if f.kind}<span class="kind">{kindShort}</span>{/if}
+		<span class="name" title={d.kind ? `${d.name} · ${d.kind}` : d.name} data-label={d.label ?? d.name}>{shownName}</span>
 	</div>
 
 	{#if hasDetail}
@@ -200,15 +216,31 @@
 		min-width: 0;
 		flex: 1;
 		overflow: hidden;
+		font-family: var(--font-mono);
 		font-size: 12.5px;
 		font-weight: 600;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
-	.kind {
-		flex: 0 0 auto;
-		color: var(--sb-text-faint);
-		font-size: 11px;
+	/* Name-only stage: the same card, its other lines hidden and its name enlarged to stay about 10 px
+	   on screen; the card keeps its size, so nothing moves. Its state shows as a stripe and the icon's colour. */
+	:global(.graph-canvas[data-stage='name']) .node:not(.selected) {
+		box-shadow: inset 3px 0 0 var(--face);
+	}
+	:global(.graph-canvas[data-stage='name']) .detail,
+	:global(.graph-canvas[data-stage='name']) .status {
+		visibility: hidden;
+	}
+	:global(.graph-canvas[data-stage='name']) .head {
+		transform: translateY(13px);
+	}
+	:global(.graph-canvas[data-stage='name']) .head :global(.glyph) {
+		width: calc(14px * min(var(--sb-inv, 1), 1.8));
+		height: calc(14px * min(var(--sb-inv, 1), 1.8));
+		color: var(--face);
+	}
+	:global(.graph-canvas[data-stage='name']) .name {
+		font-size: clamp(12.5px, calc(10px * var(--sb-inv, 1)), 26px);
 	}
 	/* drift is a cause of staleness, so it shares the stale colour */
 	.drift {
@@ -262,6 +294,7 @@
 		padding: 0 10px;
 		border-top: 1px solid var(--border);
 		background: color-mix(in srgb, var(--tone) 9%, var(--card));
+		font-family: var(--font-mono);
 		font-size: 11px;
 		/* One line, whatever the parts: they are fitted to it (status-line.ts); none wraps or shrinks. */
 		white-space: nowrap;

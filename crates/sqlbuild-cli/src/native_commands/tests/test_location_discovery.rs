@@ -19,7 +19,7 @@ use crate::native_commands::tests::test_types::{
     RediscoverTestCase,
 };
 
-const OTHER_FILE: &str = "python/assets/other.py";
+const OTHER_FILE: &str = "python/nodes/assets/other.py";
 const FIFTEEN_MINUTES: Duration = Duration::from_secs(900);
 
 #[test]

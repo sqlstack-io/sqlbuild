@@ -57,7 +57,7 @@ fn given_setting_guidance_when_rendering_then_text_matches_python() {
             rendered: (
                 snippet_help_text(
                     "to describe it",
-                    "add this to seeds/lookups.yml",
+                    "add this to sql/seeds/lookups.yml",
                     &[
                         "- name: product_types".to_owned(),
                         "  description: Types".to_owned(),
@@ -65,7 +65,7 @@ fn given_setting_guidance_when_rendering_then_text_matches_python() {
                 ),
                 String::new(),
             ),
-            expected_note: "to describe it, add this to seeds/lookups.yml:\n            - name: product_types\n              description: Types",
+            expected_note: "to describe it, add this to sql/seeds/lookups.yml:\n            - name: product_types\n              description: Types",
             expected_help: "",
         },
     ];

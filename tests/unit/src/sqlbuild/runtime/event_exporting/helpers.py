@@ -6,6 +6,7 @@ CATALOGUED_EVENT_TYPES: tuple[str, ...] = (
     "invocation_started",
     "invocation_completed",
     "invocation_failed",
+    "invocation_phase",
     "run_started",
     "run_completed",
     "run_failed",

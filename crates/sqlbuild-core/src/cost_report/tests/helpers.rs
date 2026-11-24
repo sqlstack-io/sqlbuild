@@ -47,3 +47,9 @@ pub(super) fn run(completed_at: &str, resources: Vec<CostResource>) -> CostRun {
         had_executable_work: Some(true),
     }
 }
+
+/// `run` priced from `source`.
+pub(crate) fn priced(mut run: CostRun, source: &str) -> CostRun {
+    run.cost.rate_source = source.to_owned();
+    run
+}

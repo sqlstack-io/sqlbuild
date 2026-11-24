@@ -1,46 +1,31 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
-	import DiamondIcon from '@lucide/svelte/icons/diamond';
-	import PlayIcon from '@lucide/svelte/icons/play';
-	import SquareSquareIcon from '@lucide/svelte/icons/square-square';
-	import { COMPACT_LEVELS } from '$lib/lineage/fit';
 	import { fonts } from './fonts.svelte';
-	import { measureCompact, pillFont, pillRoom, pillText } from './compact-title';
+	import { measureCompact, pillFit } from './compact-title';
+	import { discoveredStep } from '$lib/lineage/discovered-labels';
 	import { COMPACT_TAILS, type CompactTails } from './compact-tails';
 
 	// A card's compact form, shown by the graph (the `compact` class on its canvas) when zoomed out too far
-	// for the card's lines to read: a one-line pill across the card, a ring in the colour of the card's
-	// state holding its kind's icon, then the part of its name that tells it apart from the other cards
-	// in its box (`siblingTails`), the full name on hover. The card keeps its size and layout, so edges don't move.
-	// Sizes are on screen: the canvas's --sb-title-unzoom undoes the zoom.
+	// for the card's lines to read: a one-line pill across the card's full width, a dot in the colour of
+	// the card's state, then the part of its name that tells it apart from the other cards in its box
+	// (`siblingTails`), the full name on hover; zoomed out further, the dot alone. The card keeps its size
+	// and layout, so edges don't move. Sizes are on screen: the canvas's --sb-title-unzoom undoes the zoom.
 	let { id, title, tone, kind, badge }: { id: string; title: string; tone: string; kind: 'asset' | 'job' | 'group'; badge?: number } = $props();
 
 	const tails = getContext<CompactTails | undefined>(COMPACT_TAILS);
 	const tail = $derived(tails?.tail(id) ?? title);
-	/**
-	 * The name's size on screen at each level, fitted at the level's lowest zoom, where the card is
-	 * narrowest; measured again once the name's font has loaded.
-	 */
-	const sizes = $derived(
-		(void fonts.ready,
-		void fonts.version,
-		COMPACT_LEVELS.map((zoom) => {
-			const px = pillFont(tail, pillRoom(zoom), measureCompact);
-			return { px, text: pillText(tail, px, pillRoom(zoom), measureCompact) };
-		}))
-	);
-	/** The icon's size on screen. */
-	const ICON = 10;
+	// Only a discovered step drops the prefix it shares with its siblings; other names lose their end.
+	const lead = $derived(discoveredStep(id) ? (tails?.lead(id) ?? 0) : 0);
+	/** The name's size on screen, fitted at the pill stage's lowest zoom; measured again once its font has loaded. */
+	const fit = $derived((void fonts.ready, void fonts.version, pillFit(tail, lead, measureCompact)));
 	/** The badge's size on screen. */
 	const BADGE_PX = 9;
 </script>
 
 <div class="cface" class:group={kind === 'group'} style:--tone={tone} aria-hidden="true">
 	<div class="pill" title={title} data-kind={kind} data-parent={tails?.parent(id) ?? ''}>
-		<span class="ring" class:play={kind === 'job'} style:--icon="calc({ICON}px * var(--sb-title-unzoom, 1))">
-			{#if kind === 'job'}<PlayIcon strokeWidth={2.5} />{:else if kind === 'group'}<SquareSquareIcon strokeWidth={2.25} />{:else}<DiamondIcon strokeWidth={2.5} />{/if}
-		</span>
-		{#each sizes as fit, level (level)}<span class="nm" data-level={level + 1} data-tail={tail} style:font-size="calc({fit.px}px * var(--sb-title-unzoom, 1))">{fit.text}</span>{/each}
+		<span class="dot"></span>
+		<span class="nm" data-tail={tail} style:font-size="calc({fit.px}px * var(--sb-title-unzoom, 1))">{fit.text}</span>
 		{#if badge != null}<span class="cbadge" style:font-size="calc({BADGE_PX}px * var(--sb-title-unzoom, 1))">{badge}</span>{/if}
 	</div>
 </div>
@@ -54,18 +39,21 @@
 		align-items: center;
 		pointer-events: none;
 	}
-	/* Shown by the canvas once the view settles below the compact zoom; the card's own frame and lines
-	   give way to the pill. */
-	:global(.graph-canvas.compact) .cface {
+	/* Shown by the canvas once the view settles below the full cards' zoom; the card's own frame and
+	   lines give way to the pill. Node cards show their name alone first, so not at that stage. */
+	:global(.graph-canvas.compact:not([data-stage='name'])) .cface,
+	:global(.graph-canvas[data-stage='name'] .svelte-flow__node:not(.svelte-flow__node-asset)) .cface {
 		display: flex;
 	}
-	:global(.graph-canvas.compact .svelte-flow__node > :has(> .cface)) {
+	:global(.graph-canvas.compact:not([data-stage='name']) .svelte-flow__node > :has(> .cface)),
+	:global(.graph-canvas[data-stage='name'] .svelte-flow__node:not(.svelte-flow__node-asset) > :has(> .cface)) {
 		border-color: transparent;
 		background: transparent;
 		box-shadow: none;
 		overflow: visible;
 	}
-	:global(.graph-canvas.compact .svelte-flow__node > :has(> .cface) > :not(.cface)) {
+	:global(.graph-canvas.compact:not([data-stage='name']) .svelte-flow__node > :has(> .cface) > :not(.cface)),
+	:global(.graph-canvas[data-stage='name'] .svelte-flow__node:not(.svelte-flow__node-asset) > :has(> .cface) > :not(.cface)) {
 		visibility: hidden;
 	}
 	.pill {
@@ -73,10 +61,10 @@
 		display: flex;
 		box-sizing: border-box;
 		width: 100%;
-		height: calc(30px * var(--u));
+		height: min(calc(26px * var(--u)), 100%);
 		align-items: center;
-		gap: calc(8px * var(--u));
-		padding: 0 calc(14px * var(--u)) 0 calc(4px * var(--u));
+		gap: calc(6px * var(--u));
+		padding: 0 calc(8px * var(--u)) 0 calc(6px * var(--u));
 		border: calc(1px * var(--u)) solid color-mix(in srgb, var(--foreground) 11%, transparent);
 		border-radius: 999px;
 		background: var(--card);
@@ -93,28 +81,15 @@
 		background: color-mix(in srgb, var(--primary) 16%, var(--card));
 		box-shadow: 0 0 0 calc(3px * var(--u)) color-mix(in srgb, var(--primary) 40%, transparent);
 	}
-	.ring {
-		display: grid;
-		box-sizing: border-box;
-		width: calc(20px * var(--u));
-		height: calc(20px * var(--u));
+	/* The card's state. */
+	.dot {
+		width: calc(10px * var(--u));
+		height: calc(10px * var(--u));
 		flex: none;
-		place-items: center;
-		border: calc(2px * var(--u)) solid var(--tone);
 		border-radius: 50%;
-		color: color-mix(in srgb, var(--foreground) 78%, transparent);
-	}
-	.ring :global(svg) {
-		width: var(--icon);
-		height: var(--icon);
-	}
-	/* A play triangle's weight sits a twelfth of its box left of the box's centre: moved right by that,
-	   it looks centred in the ring. */
-	.ring.play :global(svg) {
-		transform: translateX(calc(var(--icon) / 12));
+		background: var(--tone);
 	}
 	.nm {
-		display: none;
 		min-width: 0;
 		overflow: hidden;
 		color: var(--foreground);
@@ -123,10 +98,18 @@
 		line-height: 1.2;
 		white-space: nowrap;
 	}
-	:global(.graph-canvas[data-compact='1']) .nm[data-level='1'],
-	:global(.graph-canvas[data-compact='2']) .nm[data-level='2'],
-	:global(.graph-canvas[data-compact='3']) .nm[data-level='3'] {
-		display: block;
+	/* Zoomed out furthest, the dot alone. */
+	:global(.graph-canvas[data-stage='dot']) .pill {
+		width: max-content;
+		margin: 0 auto;
+		padding: calc(5px * var(--u));
+	}
+	:global(.graph-canvas[data-stage='dot']) .dot {
+		width: calc(14px * var(--u));
+		height: calc(14px * var(--u));
+	}
+	:global(.graph-canvas[data-stage='dot']) .nm {
+		display: none;
 	}
 	/* On the pill's top right, outside the name's room. */
 	.cbadge {

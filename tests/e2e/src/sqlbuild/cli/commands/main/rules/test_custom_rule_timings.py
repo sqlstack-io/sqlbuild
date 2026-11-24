@@ -138,7 +138,7 @@ def test_given_custom_rules_when_compiling_then_timings_and_no_cache_report_each
                 ),
                 *split_model_files(_MODEL_COUNT),
             ),
-            edited_model="models/orders_001.sql",
+            edited_model="sql/models/orders_001.sql",
             expected_misses_after_edit={
                 "XSQBRSTATE001": _MODEL_COUNT + 1,
                 "XSQBRSTATE002": 0,

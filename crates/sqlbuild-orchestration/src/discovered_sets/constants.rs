@@ -2,6 +2,8 @@
 
 /// The snapshot document that keeps every discovered set.
 pub const DISCOVERED_DOCUMENT: &str = "discovered";
+/// The snapshot document that names, for each discovered set, the `for_each` assets that read it.
+pub const DISCOVERED_ASSETS_DOCUMENT: &str = "discovered_assets";
 /// The longest item ID, in characters.
 pub const ITEM_ID_MAX_CHARS: usize = 200;
 /// The characters an item ID may use besides ASCII letters and digits.

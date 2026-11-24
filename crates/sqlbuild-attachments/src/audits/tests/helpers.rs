@@ -38,7 +38,7 @@ pub(super) fn attachment(
     run_scope: Option<&str>,
 ) -> AuditAttachment {
     AuditAttachment {
-        owner_label: "models/schema.yml".to_owned(),
+        owner_label: "sql/models/schema.yml".to_owned(),
         definition_name: "accepted_values".to_owned(),
         definition_path: None,
         sql_body: "SELECT * FROM t WHERE @column NOT IN (@'values')".to_owned(),

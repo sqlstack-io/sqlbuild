@@ -30,7 +30,7 @@ pub(crate) fn request(project_dir: &TempDir, config: &Value) -> String {
         "config": config,
         "models": [{
             "name": "commerce__mart__orders",
-            "relative_path": "models/mart/commerce__mart__orders.sql",
+            "relative_path": "sql/models/mart/commerce__mart__orders.sql",
             "query_sql": "SELECT * FROM orders",
             "authored_sql": "SELECT * FROM orders"
         }]
@@ -77,9 +77,9 @@ pub(crate) fn scope_with_macros(paths: &[String]) -> Value {
             .iter()
             .enumerate()
             .map(|(index, path)| {
-                let relative = path.trim_start_matches("models/commerce/_macros/");
+                let relative = path.trim_start_matches("sql/models/commerce/_macros/");
                 let relative = relative
-                    .strip_prefix("python/")
+                    .strip_prefix("python/nodes/")
                     .or_else(|| relative.strip_prefix("sql/"))
                     .unwrap_or(relative);
                 let bucket_path = std::path::Path::new(relative)
@@ -97,10 +97,10 @@ pub(crate) fn scope_with_macros(paths: &[String]) -> Value {
                     "scope": "local",
                     "role": "macros",
                     "visibility": "exact_owner_private",
-                    "role_root": "models/commerce/_macros",
+                    "role_root": "sql/models/commerce/_macros",
                     "bucket_path": bucket_path,
-                    "ownership_root": "models",
-                    "owning_path": "models/race",
+                    "ownership_root": "sql/models",
+                    "owning_path": "sql/models/race",
                     "metadata": {"macro": {
                         "parameters": [],
                         "dependencies": [],
@@ -127,7 +127,7 @@ pub(crate) fn threshold_request(
         "config": config,
         "models": [{
             "name": "commerce__mart__orders",
-            "relative_path": "models/mart/commerce__mart__orders.sql",
+            "relative_path": "sql/models/mart/commerce__mart__orders.sql",
             "query_sql": query_sql,
             "authored_sql": query_sql,
             "references": references,
@@ -146,8 +146,8 @@ pub(crate) fn scope_index() -> Value {
             "identity": "model:orders",
             "kind": "model",
             "name": "orders",
-            "path": "models/orders.sql",
-            "ownership_root": "models",
+            "path": "sql/models/orders.sql",
+            "ownership_root": "sql/models",
             "ownership_root_kind": "model"
         }],
         "declarations": [{
@@ -155,7 +155,7 @@ pub(crate) fn scope_index() -> Value {
             "kind": "enum",
             "name": "status",
             "owner": null,
-            "path": "enums/status.sql",
+            "path": "sql/enums/status.sql",
             "line": 1,
             "column": 1,
             "scope": "global",
@@ -163,7 +163,7 @@ pub(crate) fn scope_index() -> Value {
             "visibility": "project",
             "role_root": "enums",
             "bucket_path": null,
-            "ownership_root": "enums",
+            "ownership_root": "sql/enums",
             "owning_path": null,
             "metadata": {"enum": {
                 "members": [{"name": "OPEN"}],
@@ -174,7 +174,7 @@ pub(crate) fn scope_index() -> Value {
             "kind": "macro",
             "name": "normalize_status",
             "owner": null,
-            "path": "macros/normalize_status.py",
+            "path": "sql/macros/normalize_status.py",
             "line": 1,
             "column": 1,
             "scope": "global",
@@ -182,7 +182,7 @@ pub(crate) fn scope_index() -> Value {
             "visibility": "project",
             "role_root": "macros",
             "bucket_path": null,
-            "ownership_root": "macros",
+            "ownership_root": "sql/macros",
             "owning_path": null,
             "metadata": {"macro": {
                 "parameters": ["status"],
@@ -295,7 +295,7 @@ pub(crate) fn cached_sql_test_rules_request(project_dir: &TempDir, name: Option<
         "project_dir": project_dir.path(),
         "config": {"select": ["SQBRTEST104"], "cache": {"enabled": true}},
         "models": [{
-            "name": "orders", "relative_path": "models/orders.sql",
+            "name": "orders", "relative_path": "sql/models/orders.sql",
             "query_sql": "SELECT 1", "authored_sql": "SELECT 1"
         }],
         "sql_tests": [sql_test_fact(
@@ -369,7 +369,7 @@ pub(crate) fn dialect_empty_input_rule_evaluation(
         },
         "models": [{
             "name": "orders",
-            "relative_path": "models/orders.sql",
+            "relative_path": "sql/models/orders.sql",
             "query_sql": "SELECT order_id, amount * 2 AS doubled_amount FROM raw_orders",
             "authored_sql": "SELECT order_id, amount * 2 AS doubled_amount FROM raw_orders",
             "targeting_test_count": tests.as_array().map_or(0, Vec::len)
@@ -438,15 +438,15 @@ pub(crate) fn orders_model(path: &str, query: &str) -> Value {
 pub(crate) fn orders_models() -> Vec<Value> {
     vec![
         orders_model(
-            "models/commerce/mart/commerce__mart__orders.sql",
+            "sql/models/commerce/mart/commerce__mart__orders.sql",
             "SELECT * FROM warehouse.raw.orders",
         ),
         orders_model(
-            "models/commerce/mart/commerce__mart__customers.sql",
+            "sql/models/commerce/mart/commerce__mart__customers.sql",
             "WITH customers AS (SELECT 1 AS customer_id) SELECT customer_id FROM customers",
         ),
         orders_model(
-            "models/commerce/staging/commerce__stg__products.sql",
+            "sql/models/commerce/staging/commerce__stg__products.sql",
             "SELECT product_id, 1 AS quantity FROM products WHERE status = 3",
         ),
     ]
@@ -525,7 +525,7 @@ pub(crate) const SPECULATIVE_CACHE_FILE: &str = "target/rules-cache/bulk/native.
 pub(crate) const SPECULATIVE_PYTHON_CACHE_FILE: &str = "target/rules-cache/bulk/python.json";
 /// A project Python file with an unannotated parameter, so the Python rules write their cache.
 const SPECULATIVE_PYTHON_FILE: (&str, &str) = (
-    "hooks/python/notify.py",
+    "sql/hooks/python/notify.py",
     "def send(count) -> None:\n    pass\n",
 );
 const SPECULATIVE_MEMO_FILE: &str = "target/rules-cache/bulk/native-response.json";
@@ -699,7 +699,7 @@ pub(crate) fn restored_rows(retained: &RetainedRows) -> Result<EvaluateRequest, 
 pub(crate) fn every_field_model() -> Model {
     let declaration: Declaration = Declaration {
         name: "status".to_owned(),
-        relative_path: "enums/status.sql".to_owned(),
+        relative_path: "sql/enums/status.sql".to_owned(),
         members: vec![DeclarationMember {
             name: "open".to_owned(),
             value: json!({"code": 1, "ratio": -0.25, "tags": ["a", null, true]}),
@@ -711,7 +711,7 @@ pub(crate) fn every_field_model() -> Model {
     Model {
         sql_analysis_disabled: true,
         name: "orders".to_owned(),
-        relative_path: "models/orders.sql".to_owned(),
+        relative_path: "sql/models/orders.sql".to_owned(),
         query_sql: "SELECT 1".to_owned(),
         authored_sql: "SELECT 1 -- authored".to_owned(),
         config: BTreeMap::from([
@@ -801,7 +801,7 @@ fn published_model(name: &str, references: &[&str]) -> Value {
     let domain: &str = name.split("__").next().unwrap_or_default();
     json!({
         "name": name,
-        "relative_path": format!("models/{domain}/mart/{name}.sql"),
+        "relative_path": format!("sql/models/{domain}/mart/{name}.sql"),
         "query_sql": "SELECT 1",
         "authored_sql": "SELECT 1",
         "references": references
@@ -848,7 +848,7 @@ pub(crate) fn published_layer_faults(
 }
 
 /// The model path the relation-exception cases use.
-pub(crate) const CROSS_JOIN_MODEL_PATH: &str = "models/orders.sql";
+pub(crate) const CROSS_JOIN_MODEL_PATH: &str = "sql/models/orders.sql";
 /// The Rule whose findings name a joined relation.
 pub(crate) const CROSS_JOIN_CODE: &str = "SQLCLEAN038";
 
@@ -867,7 +867,7 @@ fn cross_join_fault(message: &str, line: u64) -> Fault {
 /// Finalize a top-level `order_policy` join and a `customers` join in CTE `checks`.
 pub(crate) fn finalize_cross_joins(exceptions: Value) -> Result<Vec<Fault>, String> {
     let project_dir = TempDir::new().map_err(|error| error.to_string())?;
-    std::fs::create_dir_all(project_dir.path().join("models"))
+    std::fs::create_dir_all(project_dir.path().join("sql/models"))
         .map_err(|error| error.to_string())?;
     std::fs::write(project_dir.path().join(CROSS_JOIN_MODEL_PATH), "SELECT 1")
         .map_err(|error| error.to_string())?;

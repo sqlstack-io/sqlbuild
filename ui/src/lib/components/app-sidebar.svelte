@@ -10,7 +10,7 @@
 	import { signOutFor } from '$lib/platform/sign-out';
 	import ScopeSwitcher from './shell/scope-switcher.svelte';
 
-	const visibleGroups = $derived(visibleNav(app.client, app.capabilities));
+	const visibleGroups = $derived(visibleNav(app.client, app.capabilities, app.location?.target.adapter));
 	const signOut = $derived(signOutFor(app.bootstrap));
 
 	const badgeTone: Record<NavBadge['tone'], string> = {

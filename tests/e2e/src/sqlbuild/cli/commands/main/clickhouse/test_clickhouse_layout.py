@@ -167,7 +167,7 @@ def test_given_changed_layout_when_planning_incremental_then_warns_until_full_re
             command=("--no-color", "build"), project_dir=project_dir
         )
         assert first.returncode == 0, first.stdout + first.stderr
-        model_path: Path = project_dir / "models" / "events.sql"
+        model_path: Path = project_dir / "sql" / "models" / "events.sql"
         model_path.write_text(
             model_path.read_text().replace(
                 test_case.first_partition_by, test_case.changed_partition_by

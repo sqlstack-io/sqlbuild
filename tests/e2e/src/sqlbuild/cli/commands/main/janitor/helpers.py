@@ -63,7 +63,7 @@ def prepare_janitor_project(
         project_name=project_name,
         repo_files={
             "sqlbuild_project.toml": project_config,
-            "models/orders.sql": dedent(
+            "sql/models/orders.sql": dedent(
                 """
                 MODEL (description "Test model orders.");
 
@@ -353,11 +353,11 @@ def prepare_archive_janitor_project(
             'materialized = "table"\n'
         ),
         **{
-            f"models/{model_name}.sql": f"MODEL (description 'Test model.');\n\n"
+            f"sql/models/{model_name}.sql": f"MODEL (description 'Test model.');\n\n"
             f"SELECT 1 AS {model_name}_id\n"
             for model_name in model_names
         },
-        f"adapters/{AGED_JANITOR_ADAPTER_NAME}.py": AGED_JANITOR_ADAPTER_SOURCE,
+        f"python/adapters/{AGED_JANITOR_ADAPTER_NAME}.py": AGED_JANITOR_ADAPTER_SOURCE,
         **{
             False: {},
             True: {"sqlbuild_local.toml": f'adapter = "{AGED_JANITOR_ADAPTER_NAME}"\n'},
@@ -462,7 +462,7 @@ def prepare_two_target_janitor_project(
                 'materialized = "table"\n'
             ),
             **{
-                f"models/{model_name}.sql": f"MODEL (description 'Test model.');\n\n"
+                f"sql/models/{model_name}.sql": f"MODEL (description 'Test model.');\n\n"
                 f"SELECT 1 AS {model_name}_id\n"
                 for model_name in model_names
             },
@@ -506,7 +506,7 @@ def prepare_cruft_in_both_targets(*, tmp_path: Path, project_name: str) -> Path:
             command=build_command, project_dir=project_dir
         )
         assert build_result.returncode == 0, build_result.stdout + build_result.stderr
-    (project_dir / "models" / "customers.sql").unlink()
+    (project_dir / "sql" / "models" / "customers.sql").unlink()
     db_path: Path = project_dir / "janitor.duckdb"
     for schema in ("dev", "prod"):
         execute_duckdb(
@@ -596,7 +596,7 @@ def prepare_probe_janitor_project(
     """Build a DuckDB project with stale tables and an expired archive in each schema."""
 
     models: dict[str, str] = {
-        f"models/{schema}_{name}.sql": _probe_model_sql(schema=schema, migrate_from="")
+        f"sql/models/{schema}_{name}.sql": _probe_model_sql(schema=schema, migrate_from="")
         for schema, name in product(stale_tables, ("orders", *renamed_models))
     }
     project_dir: Path = prepare_inline_project(
@@ -618,7 +618,7 @@ def prepare_probe_janitor_project(
                 "[defaults]\n"
                 'materialized = "table"\n'
             ),
-            f"adapters/{PROBE_JANITOR_ADAPTER_NAME}.py": PROBE_JANITOR_ADAPTER_SOURCE,
+            f"python/adapters/{PROBE_JANITOR_ADAPTER_NAME}.py": PROBE_JANITOR_ADAPTER_SOURCE,
             **models,
         },
     )
@@ -646,8 +646,8 @@ def rename_probe_models(
     schema: str
     name: str
     for schema, name in product(schemas, renamed_models):
-        (project_dir / "models" / f"{schema}_{name}.sql").unlink()
-        (project_dir / "models" / f"{schema}_{name}_v2.sql").write_text(
+        (project_dir / "sql" / "models" / f"{schema}_{name}.sql").unlink()
+        (project_dir / "sql" / "models" / f"{schema}_{name}_v2.sql").write_text(
             _probe_model_sql(schema=schema, migrate_from=f"{schema}.{schema}_{name}"),
             encoding="utf-8",
         )
@@ -883,8 +883,8 @@ def prepare_usage_janitor_project(
                 "[defaults]\n"
                 'materialized = "table"\n'
             ),
-            "models/orders.sql": "MODEL (description 'Test model.');\n\nSELECT 1 AS order_id\n",
-            f"adapters/{USAGE_JANITOR_ADAPTER_NAME}.py": USAGE_JANITOR_ADAPTER_SOURCE,
+            "sql/models/orders.sql": "MODEL (description 'Test model.');\n\nSELECT 1 AS order_id\n",
+            f"python/adapters/{USAGE_JANITOR_ADAPTER_NAME}.py": USAGE_JANITOR_ADAPTER_SOURCE,
         },
     )
     _build(project_dir)

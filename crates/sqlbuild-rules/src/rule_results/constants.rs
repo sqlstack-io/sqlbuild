@@ -8,7 +8,7 @@ pub(crate) const MIN_SCOPED_FOLDER_DEPTH: usize = 2;
 pub(crate) const DECLARATION_GROUP: &str = "_sqlbuild";
 pub(crate) const LOCAL_CONSTANTS: &str = "_sqlbuild/_constants/";
 pub(crate) const INHERITED_CONSTANTS: &str = "_sqlbuild/constants/";
-pub(crate) const PROJECT_CONSTANTS: &str = "constants/";
+pub(crate) const PROJECT_CONSTANTS: &str = "sql/constants/";
 pub(crate) const FIX_AVAILABLE_NOTE: &str =
     "Fix available: `sqb format --fix` applies it after compiler verification";
 pub(crate) const JSON_INDENT: usize = 2;

@@ -116,7 +116,7 @@ def build_project_from_test_case(
                 ),
                 deps=(*model_deps, *function_deps),
                 name=model_name,
-                relative_path=Path(f"models/{model_name}.sql"),
+                relative_path=Path(f"sql/models/{model_name}.sql"),
                 query_sql=query_sql,
                 config=CompileModelConfig(values=config_values),
                 destination=CompiledRelationLocation(
@@ -142,12 +142,12 @@ def build_project_from_test_case(
                 name=seed_name,
                 seed_file=DiscoveredSeedFile(
                     file_path=seed_file_path,
-                    relative_path=Path(f"seeds/{seed_name}.csv"),
+                    relative_path=Path(f"sql/seeds/{seed_name}.csv"),
                 ),
                 schema_entry=SchemaSeedEntry(name=seed_name, columns=()),
                 schema_file=DiscoveredSchemaFile(
-                    file_path=Path("seeds/schema.yml"),
-                    relative_path=Path("seeds/schema.yml"),
+                    file_path=Path("sql/seeds/schema.yml"),
+                    relative_path=Path("sql/seeds/schema.yml"),
                     contents="",
                     model_entries=(),
                     seed_entries=(),
@@ -176,7 +176,7 @@ def build_project_from_test_case(
                 ),
                 deps=(),
                 name=function_name,
-                relative_path=Path(f"functions/{language.value}/{function_name}.sql"),
+                relative_path=Path(f"sql/functions/{language.value}/{function_name}.sql"),
                 arguments=(FunctionArgument(name="value", type="INTEGER"),),
                 returns="INTEGER",
                 body_sql=body_sql,
@@ -239,8 +239,8 @@ def build_project_from_source_cursor_input_test_case(
         name=test_case.source_name,
         source_entry=source_entry,
         source_file=DiscoveredSourceFile(
-            file_path=Path("sources/raw.yml"),
-            relative_path=Path("sources/raw.yml"),
+            file_path=Path("sql/sources/raw.yml"),
+            relative_path=Path("sql/sources/raw.yml"),
             contents="",
             source_entries=(source_entry,),
         ),
@@ -252,7 +252,7 @@ def build_project_from_source_cursor_input_test_case(
         ),
         deps=(source.key,),
         name=test_case.model_name,
-        relative_path=Path(f"models/{test_case.model_name}.sql"),
+        relative_path=Path(f"sql/models/{test_case.model_name}.sql"),
         query_sql=f'SELECT * FROM __source("{test_case.source_name}")',
         references=(
             CompileSqlReference(
@@ -385,7 +385,7 @@ def build_project_from_format_test_case(
                 ),
                 deps=deps,
                 name=model_name,
-                relative_path=Path(f"models/{model_name}.sql"),
+                relative_path=Path(f"sql/models/{model_name}.sql"),
                 query_sql=query_sql,
                 config=CompileModelConfig(values=config_values),
                 destination=CompiledRelationLocation(
@@ -411,12 +411,12 @@ def build_project_from_format_test_case(
                 name=seed_name,
                 seed_file=DiscoveredSeedFile(
                     file_path=seed_file_path,
-                    relative_path=Path(f"seeds/{seed_name}.csv"),
+                    relative_path=Path(f"sql/seeds/{seed_name}.csv"),
                 ),
                 schema_entry=SchemaSeedEntry(name=seed_name, columns=()),
                 schema_file=DiscoveredSchemaFile(
-                    file_path=Path("seeds/schema.yml"),
-                    relative_path=Path("seeds/schema.yml"),
+                    file_path=Path("sql/seeds/schema.yml"),
+                    relative_path=Path("sql/seeds/schema.yml"),
                     contents="",
                     model_entries=(),
                     seed_entries=(),
@@ -689,12 +689,12 @@ def plan_source_reading_project(
 
     project_files: dict[str, str] = {
         "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
             f"    schema: {source_schema}\n"
             f"    table: {source_table}\n"
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             'MODEL (description "Test model orders.", '
             'materialized table);\n\nSELECT * FROM __source("raw_orders")\n'
         ),

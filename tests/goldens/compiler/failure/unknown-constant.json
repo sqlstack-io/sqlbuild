@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Unknown constant 'minimum_amount' in '<project>/models/staging/stg_orders.sql'. Visible constants: none"
+     "message": "Unknown constant 'minimum_amount' in '<project>/sql/models/staging/stg_orders.sql'. Visible constants: none"
     }
    ]
   }

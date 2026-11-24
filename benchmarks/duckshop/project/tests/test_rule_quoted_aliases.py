@@ -12,7 +12,7 @@ _MIXED_CASE = (
     + 'FROM __ref("dim_listings") AS l\n'
 )
 _LISTINGS = RuleFile(
-    path="models/marts/catalogue/dim_listings.sql",
+    path="sql/models/marts/catalogue/dim_listings.sql",
     source=_HEADER + "SELECT 1 AS listing_id, 'new' AS note\n",
 )
 
@@ -23,7 +23,7 @@ def test_given_quoted_mixed_case_alias_outside_an_export_when_evaluating_then_re
         test_case=RuleCase(
             description="a mart names a column in a partner's case",
             source=_MIXED_CASE,
-            path="models/marts/catalogue/rpt_listings.sql",
+            path="sql/models/marts/catalogue/rpt_listings.sql",
             files=(_LISTINGS,),
             expected_finding_count=1,
         ),
@@ -42,7 +42,7 @@ def test_given_quoted_mixed_case_alias_in_an_export_when_evaluating_then_passes(
         test_case=RuleCase(
             description="a partner export writes the partner's own names",
             source=_MIXED_CASE,
-            path="models/marts/edge_cases/rpt_edge_partner_listing_export.sql",
+            path="sql/models/marts/edge_cases/rpt_edge_partner_listing_export.sql",
             files=(_LISTINGS,),
             expected_finding_count=0,
         ),

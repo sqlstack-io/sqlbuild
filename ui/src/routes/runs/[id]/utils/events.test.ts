@@ -19,6 +19,68 @@ const event = (id: string, at: string, extra: Partial<RunEvent> = {}): RunEvent 
 });
 
 describe('run log', () => {
+	it("reads a worker's preparation as steps with durations that open to their sub-steps", () => {
+		const phase = (id: string, at: string, p: Partial<NonNullable<RunEvent['phase']>> & { phase: string }) =>
+			event(id, at, { type: 'invocation_phase', nodeKey: null, phase: { durationMs: null, count: null, name: null, detail: null, ...p } });
+		const entries = logEntries(
+			[
+				phase('d', '2026-11-23T10:00:05Z', { phase: 'discovered', durationMs: 5000 }),
+				phase('c', '2026-11-23T10:00:09Z', { phase: 'compiled', durationMs: 4100, count: 2281, detail: '12 python nodes, 2269 models' }),
+				phase('s', '2026-11-23T10:00:09Z', { phase: 'discovered_set', name: 'fulfilment_plan', count: 3, detail: 'release 2026.11 · discovered 2026-11-23 08:00 UTC' }),
+				phase('k', '2026-11-23T10:00:10Z', { phase: 'connected', durationMs: 300, count: 9, name: 'snowflake' }),
+				phase('p', '2026-11-23T10:00:12Z', { phase: 'planned', durationMs: 1500, count: 93, detail: 'source freshness 1.12 s' }),
+				phase('x', '2026-11-23T10:00:13Z', { phase: 'started_execution', count: 8, detail: '9 connections' })
+			],
+			[]
+		);
+		expect(entries.map((e) => [e.text, e.tag?.text, e.tag?.repeats])).toEqual([
+			['Discovered project · 5.0 s', 'preparing', false],
+			['Compiled project · 2,281 models · 4.1 s', 'preparing', false],
+			['Used discovered set fulfilment_plan · 3 items', 'preparing', false],
+			['Connected to snowflake · 0.30 s', 'preparing', false],
+			['Planned · 93 selected · 1.5 s', 'planned', true],
+			['Started execution · concurrency 8 · 9 connections', 'started', true]
+		]);
+		expect(entries[5].details).toEqual([]);
+		expect(entries[2].details).toEqual([
+			['Detail', 'release 2026.11'],
+			['Detail', 'discovered 2026-11-23 08:00 UTC']
+		]);
+		expect(entries[3].details).toEqual([['Connections', '9']]);
+	});
+
+	it('says when the worker became ready and how long it took, with the command behind the row', () => {
+		const entries = logEntries(
+			[
+				event('launch', '2026-11-23T10:00:00Z', { type: 'launched', nodeKey: null, message: 'Worker started (local process)' }),
+				event('ready', '2026-11-23T10:00:04Z', { type: 'invocation_started', nodeKey: null, message: 'sqb build · target uat · 93 selected · SQLBuild 0.259.0' })
+			],
+			[]
+		);
+		expect(entries.map((e) => e.text)).toEqual(['Worker started (local process)', 'Worker ready · 4.0 s']);
+		expect(entries[1].details).toEqual([['Command', 'sqb build · target uat · 93 selected · SQLBuild 0.259.0']]);
+	});
+
+	it('gives run-level rows a kind in plain words, left out where the text already says it', () => {
+		const entries = logEntries(
+			[
+				event('q', '2026-11-23T10:00:00Z', { type: 'queued', nodeKey: null }),
+				event('c', '2026-11-23T10:00:01Z', { type: 'claimed', nodeKey: null }),
+				event('r', '2026-11-23T10:00:02Z', { type: 'invocation_started', nodeKey: null }),
+				event('f', '2026-11-23T10:00:03Z', { type: 'invocation_failed', nodeKey: null, level: 'error', message: '1 failed' }),
+				event('t', '2026-11-23T10:00:04Z', { type: 'terminated', nodeKey: null, message: 'Terminated: failed' })
+			],
+			[]
+		);
+		expect(entries.map((e) => [e.text, e.tag?.text, e.tag?.repeats])).toEqual([
+			['Queued', 'queued', true],
+			['Claimed write lock', 'queued', false],
+			['Worker ready', 'ready', true],
+			['sqb finished with failures: 1 failed', 'failed', true],
+			['Finished: failed', 'finished', true]
+		]);
+	});
+
 	it("interleaves a group's events and printed lines by time and keeps each line's run", () => {
 		const entries = logEntries(
 			[event('e2', '2026-11-09T08:17:38Z', { type: 'resource_attempt_failed', level: 'error', message: 'ConversionError: no', runId: 'staging' }), event('e1', '2026-11-09T08:17:35Z', { nodeKey: 'model:orders' })],

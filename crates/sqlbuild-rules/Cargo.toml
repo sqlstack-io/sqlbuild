@@ -15,6 +15,7 @@ fensu-policy.workspace = true
 globset.workspace = true
 sqlquack-parse.workspace = true
 sqlquack-syntax.workspace = true
+sqlquack-tokenize.workspace = true
 rayon.workspace = true
 regex.workspace = true
 rustc-hash.workspace = true

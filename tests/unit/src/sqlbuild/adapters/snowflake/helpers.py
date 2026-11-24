@@ -13,6 +13,7 @@ from typing import Any
 
 import pandas
 import pytest
+from snowflake.connector.errors import ProgrammingError
 
 from sqlbuild._native import FunctionArgument, FunctionReturnColumn, NativeProgressProjector
 from sqlbuild.adapter.contract.models import (
@@ -27,6 +28,7 @@ from sqlbuild.adapter.relations.main.relation_metadata_cache_scope import (
 )
 from sqlbuild.adapters.snowflake.classes.snowflake_adapter import SnowflakeAdapter
 from sqlbuild.adapters.snowflake.classes.snowflake_connection import _SnowflakeConnection
+from sqlbuild.adapters.snowflake.constants import ACCOUNT_SQL, RATE_SHEET_SQL
 from sqlbuild.compiler.compile.types import FunctionLanguage
 from sqlbuild.observability import (
     EventDispatcher,
@@ -757,3 +759,49 @@ def pandas_order_totals_statement() -> str:
         entry_point="result",
         dataframe="pandas",
     )[0]
+
+
+class FakeCostAccount:
+    """A Snowflake account answering the credit-price reads, optionally refusing its rate sheet."""
+
+    def __init__(
+        self,
+        *,
+        account_row: tuple[object, ...] | None,
+        rate_sheet_row: tuple[object, ...] | None,
+        rate_sheet_error: bool,
+    ) -> None:
+        self.answers: dict[str, tuple[object, ...] | None] = {
+            ACCOUNT_SQL: account_row,
+            RATE_SHEET_SQL: rate_sheet_row,
+        }
+        refusal: ProgrammingError = ProgrammingError(
+            msg="Object 'SNOWFLAKE.ORGANIZATION_USAGE.RATE_SHEET_DAILY' does not exist "
+            "or not authorized.",
+            errno=2003,
+        )
+        self.refusals: dict[str, tuple[ProgrammingError, ...]] = {
+            RATE_SHEET_SQL: (refusal,) * int(rate_sheet_error)
+        }
+        self.statements: list[str] = []
+
+    def cursor(self) -> FakeCostCursor:
+        return FakeCostCursor(account=self)
+
+
+class FakeCostCursor:
+    def __init__(self, *, account: FakeCostAccount) -> None:
+        self.account: FakeCostAccount = account
+        self.row: tuple[object, ...] | None = None
+
+    def execute(self, sql: str) -> None:
+        self.account.statements.append(sql)
+        for refusal in self.account.refusals.get(sql, ()):
+            raise refusal
+        self.row = self.account.answers.get(sql)
+
+    def fetchone(self) -> tuple[object, ...] | None:
+        return self.row
+
+    def close(self) -> None:
+        return None

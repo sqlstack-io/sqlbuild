@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ANCHOR_MARGIN, CARD_TITLE_PX, COMPACT_LEVELS, COMPACT_ZOOM, LABEL_MIN_ZOOM, MIN_TITLE_PX, READABLE_ZOOM, compactLevel, absolutePosition, anchoredViewport, firstCard, fitViewport, largestBox } from './fit';
+import { ANCHOR_MARGIN, CARD_TITLE_PX, COMPACT_ZOOM, FULL_ZOOM, LABEL_MIN_ZOOM, MIN_TITLE_PX, NAME_SCREEN_PX, NAME_ZOOM, PILL_ZOOM, READABLE_ZOOM, cardStage, compactLevel, absolutePosition, anchoredViewport, firstCard, fitViewport, largestBox } from './fit';
 
 describe('fitting a graph to the view', () => {
 	it('centres a graph that fits, never closer than full size', () => {
@@ -130,17 +130,15 @@ describe('a small graph opens in full form', () => {
 });
 
 describe('semantic zoom', () => {
-	it('draws cards in full down to the compact zoom, well below the readable fit zoom', () => {
-		expect(compactLevel(1)).toBe(0);
-		expect(compactLevel(COMPACT_ZOOM)).toBe(0);
-		expect(compactLevel(COMPACT_ZOOM - 0.01)).toBe(1);
-		expect(compactLevel(0.6)).toBe(1);
-		expect(compactLevel(0.59)).toBe(2);
-		expect(compactLevel(0.44)).toBe(3);
-		expect(compactLevel(0.1)).toBe(3);
+	it('draws cards in stages: full, name only, pill, dot', () => {
+		expect([1, FULL_ZOOM, FULL_ZOOM - 0.01, NAME_ZOOM, NAME_ZOOM - 0.01, PILL_ZOOM, PILL_ZOOM - 0.01, 0.1].map(cardStage)).toEqual(['full', 'full', 'name', 'name', 'pill', 'pill', 'dot', 'dot']);
+		expect([1, 0.5, 0.33, 0.2].map(compactLevel)).toEqual([0, 1, 1, 2]);
 	});
-	it('switches where full cards still show their 11 px lines at 9 px', () => {
-		expect(11 * COMPACT_ZOOM).toBeGreaterThanOrEqual(9);
-		expect(COMPACT_LEVELS.at(-1)).toBe(LABEL_MIN_ZOOM);
+	it('keeps each stage while what it shows reads at about 10 px or more', () => {
+		// The full card's 11 px status line, and the name-only card's name, which grows to 26 canvas px.
+		expect(11 * FULL_ZOOM).toBeGreaterThanOrEqual(8.8);
+		expect(26 * NAME_ZOOM).toBeCloseTo(NAME_SCREEN_PX);
+		// Graphs still open with full cards where they did.
+		expect(COMPACT_ZOOM).toBeGreaterThanOrEqual(FULL_ZOOM);
 	});
 });

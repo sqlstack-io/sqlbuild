@@ -23,14 +23,20 @@
 	import { formatNodeCounts, isActiveRun, nodeOutcomeLabel, nodeOutcomeTone, runOriginLabel, runStatusLabel, runStatusTone } from '$lib/status';
 	import { kindLine, shortName } from '$lib/build-area/labels';
 	import { planHref } from '$lib/run/command';
-	import { CONCURRENCY_DOCS, formatCost, narrowingText, onFailureText, overlapHelp, overlapWhileRunning, poolText, runConcurrencyText, shortRunId } from '$lib/operate/labels';
+	import { CONCURRENCY_DOCS, formatCost, narrowingText, onFailureText, overlapHelp, overlapPlain, poolText, runConcurrencyHelp, shortRunId } from '$lib/operate/labels';
 	import ScopeGraph from '$lib/lineage/scope-graph.svelte';
 	import MemberGraph from '$lib/lineage/member-graph.svelte';
 	import { memberLinks, publishedLinks, waitReasons, type MemberInfo, type MemberSelection } from '$lib/lineage/member-graph';
 	import InspectorHead from '$lib/components/lineage/inspector-head.svelte';
 	import InspectorSection from '$lib/components/lineage/inspector-section.svelte';
+	import HelpTip from '$lib/components/help-tip.svelte';
+	import KeyValues from '$lib/components/platform/key-values.svelte';
 	import OutcomeStrip from '$lib/components/build-area/outcome-strip.svelte';
 	import { formatMs } from '$lib/build-area/labels';
+	import BreakableName from '$lib/components/names/breakable-name.svelte';
+	import PathTail from '$lib/components/names/path-tail.svelte';
+	import DiscoveredFacts from './discovered/discovered-facts.svelte';
+	import { discoveredBoxes, itemOf, setsInJob } from './discovered/utils';
 
 	let { name }: { name: string } = $props();
 
@@ -47,6 +53,10 @@
 	}, ['jobs', 'runs', 'snapshot']);
 
 	const def = $derived(job.data ?? null);
+	// The discovered sets with steps in this job, each framed in the graph under its asset.
+	const discovered = createResource((client, scope) => client.readDiscovered(scope), ['snapshot']);
+	const jobSets = $derived(def ? setsInJob(discovered.data ?? [], def.resolvedNodes) : []);
+	const boxes = $derived(discoveredBoxes(jobSets, def?.resolvedNodes ?? []));
 	// Why each member waits for another, node by node, from the catalog's lineage.
 	// Why members wait, node by node: as the server publishes it, or worked out from lineage for a
 	// snapshot that predates published reasons.
@@ -180,7 +190,7 @@
 	{#if job.error}
 		<div class="msg err">Couldn't load this job: {job.error}</div>
 	{:else if job.data === null}
-		<div class="msg">There's no job or group named <code>{name}</code> in the version deployed to {app.location?.name}.</div>
+		<div class="msg">No job or group <code>{name}</code> in {app.location?.name}.</div>
 	{/if}
 	{#if actionError}<div class="msg err">{actionError}</div>{/if}
 
@@ -199,7 +209,9 @@
 						<!-- A group draws its member jobs; each member's page draws that job's nodes. -->
 						<MemberGraph members={def.groupMembers ?? []} info={memberJobs.data ?? new Map()} catalog={catalog.data ?? []} {links} bind:selection={memberSelection} details={{ open: details.open, toggle: details.toggle }} />
 					{:else if catalog.data}
-						<ScopeGraph bind:this={graph} keys={def.resolvedNodes} catalog={liveCatalog ?? catalog.data} onselect={(keys) => (picked = keys)} />
+						{#key boxes.length}
+							<ScopeGraph bind:this={graph} keys={def.resolvedNodes} catalog={liveCatalog ?? catalog.data} {boxes} onselect={(keys) => (picked = keys)} />
+						{/key}
 					{:else}
 						{#if catalog.error}<p class="faint graph-wait">{catalog.error}</p>{:else}<div class="graph-wait"><Loading /></div>{/if}
 					{/if}
@@ -253,21 +265,33 @@
 						</InspectorSection>
 					{:else if pickedNodes.length === 1}
 						{@const n = pickedNodes[0]}
+						{@const found = itemOf(jobSets, n.key)}
 						<p class="label">{kindLine(n)}</p>
-						<h2 class="mono">{n.key}</h2>
+						<h2 class="mono wrap-name"><BreakableName text={n.key} /></h2>
 						<a class="open" href={to(`/catalog/${n.key}`)}>Open in Catalog ↗</a>
 						{#if n.description}<p class="desc">{n.description}</p>{/if}
 						<dl>
 							{#if n.lastOutcome || n.lastBuild}<div><dt>Last build</dt><dd><i style:background={nodeOutcomeTone[n.lastOutcome ?? 'success']}></i>{n.lastOutcome ? nodeOutcomeLabel[n.lastOutcome] : 'Built'}{n.lastBuild ? ` · ${formatAgo(n.lastBuild.builtAt, app.now)}` : ''}</dd></div>{/if}
 							{#if n.relation}<div><dt>Writes</dt><dd class="mono">{[n.relation.database, n.relation.schema, n.relation.name].filter(Boolean).join('.')}</dd></div>{/if}
-							{#if n.path}<div><dt>Defined in</dt><dd class="mono">{n.path}</dd></div>{/if}
+							{#if n.path}<div><dt>Defined in</dt><dd class="path"><PathTail path={n.path} /></dd></div>{/if}
 						</dl>
+						{#if found}
+							<p class="label sub">Item</p>
+							<dl>
+								<div><dt>Step</dt><dd class="mono">{found.item.step}</dd></div>
+								<div><dt>Asset</dt><dd class="mono"><BreakableName text={found.item.asset} /></dd></div>
+								{#each Object.entries(found.item.args).filter(([k]) => k !== 'step') as [k, v] (k)}<div><dt class="mono">{k}</dt><dd class="mono">{v}</dd></div>{/each}
+							</dl>
+							<p class="label sub">Discovered set</p>
+							<DiscoveredFacts set={found.set} />
+						{/if}
 					{:else if pickedNodes.length > 1}
 						<h2>{pickedNodes.length} nodes selected</h2>
 						<ul class="picked">
 							{#each pickedNodes as n (n.key)}<li><a href={to(`/catalog/${n.key}`)} class="mono">{n.key}</a></li>{/each}
 						</ul>
 					{:else}
+						{#each jobSets as set (set.name)}<InspectorSection title="Discovered set"><DiscoveredFacts {set} /></InspectorSection>{/each}
 						{#if def.description}<InspectorSection title="Description"><p class="about-text">{def.description}</p></InspectorSection>{/if}
 						<InspectorSection title="Recent runs">
 							{#snippet meta()}{#if runs.length}<Button variant="link" size="inline" class="text-[12px]" onclick={() => (tab = 'runs')}>All runs →</Button>{/if}{/snippet}
@@ -302,41 +326,42 @@
 							{#if def.select || def.exclude.length}<p class="label">Selection</p><div class="chips"><SelectionChips select={def.select ?? ''} exclude={def.exclude.join(' ')} /></div>{/if}
 							<dl>
 								{#if def.owner}<div><dt>Owner</dt><dd>{def.owner}</dd></div>{/if}
-								{#if def.sourceFile}<div><dt>Defined in</dt><dd class="mono">{def.sourceFile}</dd></div>{/if}
+								{#if def.sourceFile}<div><dt>Defined in</dt><dd class="path"><PathTail path={def.sourceFile} /></dd></div>{/if}
 								{#if def.memberOf?.length}
 									<div><dt>In groups</dt><dd>{#each def.memberOf as g, i (g)}{i ? ', ' : ''}<a href={to(`/jobs/${g}`)}>{g}</a>{/each}</dd></div>
 								{/if}
 							</dl>
 						</InspectorSection>
-						<!-- Concurrency as plain facts: models at once inside a run, write claims, overlap and pools. -->
+						<!-- Concurrency as facts, each explained in a help tip: nodes at once, shared tables, overlap and pools. -->
 						<InspectorSection title="Concurrency">
+							{#snippet meta()}<HelpTip text="How this job's runs share the warehouse with other runs." docs={CONCURRENCY_DOCS} label="How concurrency works" />{/snippet}
 							{@const resolved = def.resolvedConcurrency}
-							<ul class="concurrency">
-								{#if resolved}
-									<li>{runConcurrencyText(resolved.limit, def.kind)}</li>
-								{/if}
-								<li>Never alongside runs writing the same tables <span class="muted">(automatic)</span></li>
-								{#if def.overlap}
-									<li title="{overlapHelp[def.overlap]} (overlap = {def.overlap})">If triggered while running: {overlapWhileRunning[def.overlap]}</li>
-								{/if}
-								{#if !pools.length}
-									<li>Pools: none</li>
-								{:else}
-									{#each pools as use (use.pool)}
-										{@const text = poolText(use)}
-										{@const holders = holdersOf(use.pool)}
-										<li class="pool" class:clamped={text.clamped}>
-											<span
-												>{#if text.clamped}<TriangleAlertIcon size={12} class="inline-icon" />{/if}{text.text}{#if text.detail}&nbsp;<span class:muted={!text.clamped}>({text.detail})</span>{/if}{#if text.shared.length}, shared with {#each text.shared as other, i (other)}{i ? ', ' : ''}<a href={to(`/jobs/${other}`)}>{other}</a>{/each}{#if text.more}&nbsp;+{text.more} more{/if}{/if}</span
-											>
-											{#if holders.length}
-												<span class="muted">Running now: {#each holders as h, i (h)}{i ? ', ' : ''}<a class="mono" href={to(`/runs/${h}`)} title={h}>{shortRunId(h)}</a>{/each}</span>
-											{/if}
-										</li>
-									{/each}
-								{/if}
-							</ul>
-							<a class="docs" href={CONCURRENCY_DOCS} target="_blank" rel="noreferrer">How concurrency works ↗</a>
+							<div class="concurrency">
+								{#snippet poolList()}
+									<ul class="pools">
+										{#each pools as use (use.pool)}
+											{@const text = poolText(use)}
+											{@const holders = holdersOf(use.pool)}
+											<li class="pool" class:clamped={text.clamped}>
+												<span
+													>{#if text.clamped}<TriangleAlertIcon size={12} class="inline-icon" />{/if}{text.text}{#if text.detail}&nbsp;<span class:muted={!text.clamped}>({text.detail})</span>{/if}{#if text.shared.length}, shared with {#each text.shared as other, i (other)}{i ? ', ' : ''}<a href={to(`/jobs/${other}`)}>{other}</a>{/each}{#if text.more}&nbsp;+{text.more} more{/if}{/if}</span
+												>
+												{#if holders.length}
+													<span class="muted">Running now: {#each holders as h, i (h)}{i ? ', ' : ''}<a class="mono" href={to(`/runs/${h}`)} title={h}>{shortRunId(h)}</a>{/each}</span>
+												{/if}
+											</li>
+										{/each}
+									</ul>
+								{/snippet}
+								<KeyValues
+									rows={[
+										...(resolved ? [{ label: 'Nodes at once', value: String(resolved.limit), help: runConcurrencyHelp(def.kind) }] : []),
+										{ label: 'Shared tables', value: 'Exclusive · automatic', help: 'Never runs alongside runs writing the same tables.' },
+										...(def.overlap ? [{ label: 'When already running', value: overlapPlain[def.overlap], title: `${overlapHelp[def.overlap]} (overlap = ${def.overlap})` }] : []),
+										pools.length ? { label: 'Pools', content: poolList } : { label: 'Pools', value: 'None' }
+									]}
+								/>
+							</div>
 						</InspectorSection>
 						{#if hasSettings}
 							<InspectorSection title="Settings">
@@ -468,6 +493,20 @@
 		font-weight: 600;
 		word-break: break-all;
 	}
+	/* Names wrap between their words only. */
+	.rail h2.wrap-name {
+		word-break: normal;
+		overflow-wrap: normal;
+	}
+	dd.path {
+		flex: 1;
+		min-width: 0;
+	}
+	.label.sub {
+		margin: 14px 0 4px;
+		padding-top: 10px;
+		border-top: 1px solid var(--border);
+	}
 	.rail.sections {
 		padding: 0;
 	}
@@ -531,47 +570,43 @@
 	.picked li {
 		padding: 2px 0;
 	}
-	/* The Concurrency panel: one plain fact per line, any detail quieter beside it. */
-	.concurrency {
+	/* The Concurrency panel: key-value facts; pools list one per line, any detail quieter beside it. */
+	.concurrency :global(dd) {
+		white-space: normal;
+	}
+	.pools {
 		display: flex;
 		flex-direction: column;
 		gap: 6px;
 		margin: 0;
 		padding: 0;
 		list-style: none;
-		font-size: 12.5px;
 		line-height: 1.4;
 	}
-	.concurrency .muted {
+	.pools .muted {
 		color: var(--muted-foreground);
 	}
-	.concurrency .pool {
+	.pools .pool {
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
 	}
 	/* A pool this server caps below what the job asks: it takes the whole pool, so it runs alone there. */
-	.concurrency .pool.clamped {
+	.pools .pool.clamped {
 		padding: 4px 8px;
 		border-left: 3px solid var(--sb-warning);
 		border-radius: 2px;
 		background: color-mix(in srgb, var(--sb-warning) 10%, transparent);
 		color: var(--sb-warning);
 	}
-	.concurrency .pool.clamped a {
+	.pools .pool.clamped a {
 		color: inherit;
 		text-decoration: underline;
 	}
-	.concurrency :global(.inline-icon) {
+	.pools :global(.inline-icon) {
 		display: inline;
 		margin-right: 4px;
 		vertical-align: -1px;
-	}
-	.docs {
-		display: inline-block;
-		margin-top: 10px;
-		color: var(--primary);
-		font-size: 12px;
 	}
 	code,
 	.mono {

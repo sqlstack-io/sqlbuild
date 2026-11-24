@@ -81,7 +81,7 @@ fn given_projects_when_inventorying_then_reads_each_kind_and_names_them() {
         },
         InventoryTestCase {
             description: "no orchestration folder",
-            files: vec![("models/orders.sql", "select 1")],
+            files: vec![("sql/models/orders.sql", "select 1")],
             expected_names: Vec::new(),
             expected_modules: Vec::new(),
             expected_empty: true,

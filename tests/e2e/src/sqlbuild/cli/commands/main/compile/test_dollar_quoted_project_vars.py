@@ -42,7 +42,7 @@ def test_given_dollar_quoted_model_sql_when_compiling_then_vars_substitute_insid
         project_name="orders",
         repo_files={
             "sqlbuild_project.toml": _PROJECT_TOML,
-            "models/order_labels.sql": _MODEL_HEADER + test_case.model_sql,
+            "sql/models/order_labels.sql": _MODEL_HEADER + test_case.model_sql,
         },
     )
 
@@ -75,7 +75,7 @@ def test_given_unclosed_dollar_quote_with_var_when_compiling_then_interpolation_
         project_name="orders",
         repo_files={
             "sqlbuild_project.toml": _PROJECT_TOML,
-            "models/order_labels.sql": _MODEL_HEADER + test_case.model_sql,
+            "sql/models/order_labels.sql": _MODEL_HEADER + test_case.model_sql,
         },
     )
 

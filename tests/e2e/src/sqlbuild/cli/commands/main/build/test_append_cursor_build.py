@@ -29,8 +29,8 @@ _MIXED_CURSOR_PROJECT_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
-    "seeds/raw_orders.csv": "id,ordered_at\n1,2026-01-01 00:00:00\n2,2026-01-01 01:00:00\n",
-    "seeds/raw_orders.yml": dedent(
+    "sql/seeds/raw_orders.csv": "id,ordered_at\n1,2026-01-01 00:00:00\n2,2026-01-01 01:00:00\n",
+    "sql/seeds/raw_orders.yml": dedent(
         """
         seeds:
           - name: raw_orders
@@ -43,7 +43,7 @@ _MIXED_CURSOR_PROJECT_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
-    "models/orders.sql": dedent(
+    "sql/models/orders.sql": dedent(
         """
         MODEL (description "Orders by timestamp cursor.",
           materialized incremental,
@@ -58,7 +58,7 @@ _MIXED_CURSOR_PROJECT_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
-    "models/order_ids.sql": dedent(
+    "sql/models/order_ids.sql": dedent(
         """
         MODEL (description "Orders by integer cursor.",
           materialized incremental,
@@ -105,7 +105,7 @@ _MIXED_CURSOR_PROJECT_FILES: dict[str, str] = {
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_orders
@@ -115,7 +115,7 @@ _MIXED_CURSOR_PROJECT_FILES: dict[str, str] = {
                     """
                 ).strip()
                 + "\n",
-                "models/orders.sql": dedent(
+                "sql/models/orders.sql": dedent(
                     """
                     MODEL (description "Test model orders.",
                       materialized incremental,
@@ -202,7 +202,7 @@ def test_given_append_cursor_project_when_rerunning_build_then_boundary_behavior
         second_result.stdout + second_result.stderr
     )
 
-    runtime_sql: str = (project_dir / "target" / "run" / "models" / "orders.sql").read_text(
+    runtime_sql: str = (project_dir / "target" / "run" / "sql" / "models" / "orders.sql").read_text(
         encoding="utf-8"
     )
     assert test_case.expected_runtime_sql_fragment in runtime_sql
@@ -233,7 +233,7 @@ def test_given_append_cursor_project_when_rerunning_build_then_boundary_behavior
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_orders
@@ -243,7 +243,7 @@ def test_given_append_cursor_project_when_rerunning_build_then_boundary_behavior
                     """
                 ).strip()
                 + "\n",
-                "models/orders.sql": dedent(
+                "sql/models/orders.sql": dedent(
                     """
                     MODEL (description "Test model orders.",
                       materialized incremental,
@@ -308,7 +308,7 @@ def test_given_append_cursor_project_when_rerunning_build_then_boundary_behavior
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_orders
@@ -318,7 +318,7 @@ def test_given_append_cursor_project_when_rerunning_build_then_boundary_behavior
                     """
                 ).strip()
                 + "\n",
-                "models/orders.sql": dedent(
+                "sql/models/orders.sql": dedent(
                     """
                     MODEL (description "Test model orders.",
                       materialized incremental,
@@ -390,7 +390,7 @@ def test_given_timestamp_cursor_start_override_when_building_then_lower_bound_is
     result: object = run_sqb(command=test_case.command, project_dir=project_dir)
     assert result.returncode == test_case.expected_exit_code, result.stdout + result.stderr
 
-    runtime_sql: str = (project_dir / "target" / "run" / "models" / "orders.sql").read_text(
+    runtime_sql: str = (project_dir / "target" / "run" / "sql" / "models" / "orders.sql").read_text(
         encoding="utf-8"
     )
     assert test_case.expected_runtime_sql_fragment in runtime_sql

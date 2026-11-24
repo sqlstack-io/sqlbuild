@@ -14,8 +14,7 @@ use sqlbuild_orchestration::store::errors::ControlError;
 use crate::native_commands::main::effective_target::effective_target;
 
 use crate::native_commands::constants::{
-    CONFIG_ERROR_CODE, CUSTOM_RULES_DIRECTORY, EVENT_EXPORTERS_DIRECTORY, LIFECYCLE_SINK_PATH,
-    SINKS_DIRECTORY,
+    CONFIG_ERROR_CODE, CUSTOM_RULES_DIRECTORY, EVENT_SINKS_DIRECTORY, LIFECYCLE_SINK_PATH,
 };
 
 pub(crate) fn object_field<'a>(built: &'a Built, name: &str) -> Option<&'a Built> {
@@ -42,9 +41,7 @@ fn names_lifecycle_sinks(config: &Built) -> bool {
 
 /// Whether `discover_runtime_extensions` would import nothing and accept the project file.
 pub(crate) fn has_no_runtime_extensions(project_dir: &Path) -> bool {
-    if project_dir.join(EVENT_EXPORTERS_DIRECTORY).exists()
-        || project_dir.join(SINKS_DIRECTORY).is_dir()
-    {
+    if project_dir.join(EVENT_SINKS_DIRECTORY).is_dir() {
         return false;
     }
     let paths: ConfigPaths = project_config_paths(project_dir);

@@ -56,7 +56,7 @@ _REPO_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
-    "sources/raw.yml": dedent(
+    "sql/sources/raw.yml": dedent(
         """
         sources:
           - name: raw_orders
@@ -66,7 +66,7 @@ _REPO_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
-    "models/orders.sql": dedent(
+    "sql/models/orders.sql": dedent(
         """
         MODEL (description "Test model orders.",
           cursor ordered_at,
@@ -189,7 +189,7 @@ def test_given_template_expression_project_when_building_then_config_expressions
         second_result.stdout + second_result.stderr
     )
 
-    runtime_sql: str = (project_dir / "target" / "run" / "models" / "orders.sql").read_text(
+    runtime_sql: str = (project_dir / "target" / "run" / "sql" / "models" / "orders.sql").read_text(
         encoding="utf-8"
     )
     assert test_case.expected_runtime_sql_fragment in runtime_sql

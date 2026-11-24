@@ -22,8 +22,8 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
 )
 
 _MART_SCHEMA_ENV_VAR: str = "SQB_MART_SCHEMA"
-_INCREMENTAL_MODEL: str = "models/marts/orders_incremental.sql"
-_SNAPSHOT_MODEL: str = "models/marts/order_history.sql"
+_INCREMENTAL_MODEL: str = "sql/models/marts/orders_incremental.sql"
+_SNAPSHOT_MODEL: str = "sql/models/marts/order_history.sql"
 _PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": (
         'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
@@ -34,12 +34,12 @@ _PROJECT_FILES: dict[str, str] = {
         'schema = "${coalesce(ENV:SQB_MART_SCHEMA, \'marts\')}"\ntags = ["marts"]\n\n'
         '[path_defaults."staging/*"]\nschema = "staging"\n'
     ),
-    "models/staging/stg_orders.sql": (
+    "sql/models/staging/stg_orders.sql": (
         'MODEL (description "Staged orders.");\n\n'
         "WITH t(order_id, amount, status) AS (VALUES (1, 10, 'placed'), (2, 20, 'shipped'))\n"
         "SELECT * FROM t\n"
     ),
-    "models/marts/order_totals.sql": (
+    "sql/models/marts/order_totals.sql": (
         'MODEL (\n  description "Order totals for ${CTX:run.target}.",\n'
         '  alias "${CTX:model.name}_v2",\n  tags ["daily"],\n);\n\n'
         'SELECT status, SUM(amount) AS total_amount\nFROM __ref("stg_orders")\nGROUP BY status\n'

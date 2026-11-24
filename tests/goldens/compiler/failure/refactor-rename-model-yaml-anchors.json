@@ -8,13 +8,13 @@
     "operation": "rename_model",
     "target": "model:stg_orders",
     "new_name": "stg_order_lines",
-    "destination": "models/staging/stg_order_lines.sql",
+    "destination": "sql/models/staging/stg_order_lines.sql",
     "cascade": false,
     "status": "applied",
     "files_changed": 3,
     "files": [
      {
-      "path": "models/marts/customer_totals.sql",
+      "path": "sql/models/marts/customer_totals.sql",
       "from_path": null,
       "edits": [
        {
@@ -27,12 +27,12 @@
       ]
      },
      {
-      "path": "models/staging/stg_order_lines.sql",
-      "from_path": "models/staging/stg_orders.sql",
+      "path": "sql/models/staging/stg_order_lines.sql",
+      "from_path": "sql/models/staging/stg_orders.sql",
       "edits": []
      },
      {
-      "path": "sources/raw.yml",
+      "path": "sql/sources/raw.yml",
       "from_path": null,
       "edits": [
        {
@@ -75,13 +75,13 @@
   }
  ],
  "compiled": {
-  "models/marts/customer_totals.sql": [
+  "sql/models/marts/customer_totals.sql": [
    "SELECT customer_id, SUM(amount) AS total_amount",
    "FROM __ref(\"stg_order_lines\")",
    "GROUP BY customer_id",
    ""
   ],
-  "models/staging/stg_order_lines.sql": [
+  "sql/models/staging/stg_order_lines.sql": [
    "SELECT order_id, customer_id, amount, status",
    "FROM __source(\"raw_orders\")",
    ""
@@ -95,8 +95,8 @@
     "name": "customer_totals",
     "resource_type": "model",
     "package_name": "failure_corpus",
-    "path": "models/marts/customer_totals.sql",
-    "original_file_path": "models/marts/customer_totals.sql",
+    "path": "sql/models/marts/customer_totals.sql",
+    "original_file_path": "sql/models/marts/customer_totals.sql",
     "unique_id": "model.failure_corpus.customer_totals",
     "fqn": [
      "failure_corpus",
@@ -164,8 +164,8 @@
     "name": "stg_order_lines",
     "resource_type": "model",
     "package_name": "failure_corpus",
-    "path": "models/staging/stg_order_lines.sql",
-    "original_file_path": "models/staging/stg_order_lines.sql",
+    "path": "sql/models/staging/stg_order_lines.sql",
+    "original_file_path": "sql/models/staging/stg_order_lines.sql",
     "unique_id": "model.failure_corpus.stg_order_lines",
     "fqn": [
      "failure_corpus",
@@ -235,8 +235,8 @@
     "name": "raw_orders",
     "resource_type": "source",
     "package_name": "failure_corpus",
-    "path": "sources/raw.yml",
-    "original_file_path": "sources/raw.yml",
+    "path": "sql/sources/raw.yml",
+    "original_file_path": "sql/sources/raw.yml",
     "unique_id": "source.failure_corpus.raw_orders",
     "fqn": [
      "failure_corpus",
@@ -303,8 +303,8 @@
     "name": "raw_orders_copy",
     "resource_type": "source",
     "package_name": "failure_corpus",
-    "path": "sources/raw.yml",
-    "original_file_path": "sources/raw.yml",
+    "path": "sql/sources/raw.yml",
+    "original_file_path": "sql/sources/raw.yml",
     "unique_id": "source.failure_corpus.raw_orders_copy",
     "fqn": [
      "failure_corpus",

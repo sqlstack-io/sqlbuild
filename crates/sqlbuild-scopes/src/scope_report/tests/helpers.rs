@@ -8,7 +8,7 @@ use crate::scope_report::models::{
     DeclarationValues, MacroValues, QueryTarget, ReportFilters, ReportValues,
 };
 
-/// One model under `models/sales`, a global macro, an inherited constant and a local enum.
+/// One model under `sql/models/sales`, a global macro, an inherited constant and a local enum.
 pub(super) fn orders_facts() -> (ReportRecords, ReportLookup, ReportValues) {
     let models: OwnershipRoot = OwnershipRoot {
         path: "models".to_owned(),
@@ -45,7 +45,7 @@ pub(super) fn orders_facts() -> (ReportRecords, ReportLookup, ReportValues) {
         declaration(
             DeclarationKind::Macro,
             "g",
-            "macros/g.py",
+            "sql/macros/g.py",
             ScopeKind::Global,
             &project,
             None,
@@ -53,7 +53,7 @@ pub(super) fn orders_facts() -> (ReportRecords, ReportLookup, ReportValues) {
         declaration(
             DeclarationKind::Constant,
             "c",
-            "models/constants/c.sql",
+            "sql/models/constants/c.sql",
             ScopeKind::Inherited,
             &models,
             Some("models"),
@@ -61,17 +61,17 @@ pub(super) fn orders_facts() -> (ReportRecords, ReportLookup, ReportValues) {
         declaration(
             DeclarationKind::Enum,
             "e",
-            "models/finance/_enums/e.sql",
+            "sql/models/finance/_enums/e.sql",
             ScopeKind::Local,
             &models,
-            Some("models/finance"),
+            Some("sql/models/finance"),
         ),
     ];
     let records: ReportRecords = ReportRecords {
         roots: vec![models.clone()],
         resources: vec![ResourceRecord {
             identity: orders.clone(),
-            path: "models/sales/orders.sql".to_owned(),
+            path: "sql/models/sales/orders.sql".to_owned(),
             ownership_root: models,
         }],
         usages: vec![ReportUsage {

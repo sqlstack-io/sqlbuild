@@ -29,6 +29,7 @@ sqlquack-fingerprint.workspace = true
 sqlquack-parse.workspace = true
 sqlquack-semantics.workspace = true
 sqlquack-syntax.workspace = true
+sqlquack-tokenize.workspace = true
 sqlquack-syntax-bigquery.workspace = true
 sqlquack-syntax-clickhouse.workspace = true
 sqlquack-syntax-databricks.workspace = true

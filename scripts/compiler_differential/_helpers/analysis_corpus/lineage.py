@@ -9,7 +9,7 @@ _RAW: str = '__source("raw_orders")'
 _OPTED_OUT_HEADER: str = (
     'MODEL (\n  description "Order totals per customer",\n  sql_analysis false,\n);\n\n'
 )
-_BROKEN_PATH: str = "models/marts/broken_orders.sql"
+_BROKEN_PATH: str = "sql/models/marts/broken_orders.sql"
 _BROKEN_MODEL: str = (
     'MODEL (\n  description "Orders with an unknown qualifier",\n);\n\n'
     f"SELECT x.order_id\nFROM {_ORDERS} o\n"

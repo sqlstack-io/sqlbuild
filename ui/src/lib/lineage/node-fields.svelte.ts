@@ -3,7 +3,6 @@
 // choice of what to show on nodes survives reloads.
 
 export type NodeFieldKey =
-	| 'kind'
 	| 'status'
 	| 'checks'
 	| 'lastBuilt'
@@ -14,7 +13,6 @@ export type NodeFieldKey =
 export type NodeField = { key: NodeFieldKey; label: string };
 
 export const NODE_FIELDS: NodeField[] = [
-	{ key: 'kind', label: 'Kind' },
 	{ key: 'status', label: 'Status' },
 	{ key: 'checks', label: 'Checks' },
 	{ key: 'lastBuilt', label: 'Last built' },
@@ -24,7 +22,6 @@ export const NODE_FIELDS: NodeField[] = [
 ];
 
 const DEFAULTS: Record<NodeFieldKey, boolean> = {
-	kind: true,
 	status: true,
 	checks: true,
 	lastBuilt: true,

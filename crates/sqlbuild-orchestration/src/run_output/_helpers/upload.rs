@@ -4,6 +4,8 @@ use std::cell::RefCell;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Instant;
 
+use chrono::{DateTime, SubsecRound, Utc};
+
 use crate::api::errors::ClientError;
 use crate::run_output::constants::{
     BATCH_TEXT_BYTES, BATCH_WINDOW, MAX_BATCH_SEGMENTS, MAX_PARTIAL_LINE_BYTES, MAX_QUEUED_BATCHES,
@@ -33,8 +35,12 @@ impl UploadShared {
 }
 
 impl UploadState {
-    /// Take `data` for `node`'s `stream`, holding a line until its newline unless it outgrows its limit and is cut between characters.
-    pub(crate) fn append(&mut self, (node, stream): (String, OutputStream), data: &[u8]) {
+    /// Take `data`, read at `read_at`, for `node`'s `stream`, holding a line until its newline unless it outgrows its limit.
+    pub(crate) fn append(
+        &mut self,
+        (node, stream): (String, OutputStream),
+        (data, read_at): (&[u8], DateTime<Utc>),
+    ) {
         if self.closing.is_some() {
             self.summary.dropped_bytes += data.len() as u64;
             return;
@@ -55,37 +61,46 @@ impl UploadState {
             self.partial.insert(key.clone(), rest);
         }
         if !buffer.is_empty() {
-            self.push_lines(key, &String::from_utf8_lossy(&buffer));
+            self.push_lines(key, (&String::from_utf8_lossy(&buffer), read_at));
         }
     }
 
     /// End every held partial line, as when the run finishes.
     pub(crate) fn end_lines(&mut self) {
+        let read_at: DateTime<Utc> = read_now();
         for (key, mut buffer) in std::mem::take(&mut self.partial) {
             buffer.push(b'\n');
-            self.push_lines(key, &String::from_utf8_lossy(&buffer));
+            self.push_lines(key, (&String::from_utf8_lossy(&buffer), read_at));
         }
     }
 
     /// Add complete lines, sealing the batch before a line would overflow its size or a segment its count.
-    fn push_lines(&mut self, (node, stream): (String, OutputStream), text: &str) {
+    fn push_lines(
+        &mut self,
+        (node, stream): (String, OutputStream),
+        (text, read_at): (&str, DateTime<Utc>),
+    ) {
         let node_key: Option<String> = Some(node).filter(|node| !node.is_empty());
         for line in text.split_inclusive('\n') {
             for piece in line_pieces(line) {
-                self.push_piece((&node_key, stream), &piece);
+                self.push_piece((&node_key, stream), (&piece, read_at));
             }
         }
     }
 
-    fn push_piece(&mut self, (node_key, stream): (&Option<String>, OutputStream), piece: &str) {
+    /// A piece joins the open segment only when it has the same node, stream and read time.
+    fn push_piece(
+        &mut self,
+        (node_key, stream): (&Option<String>, OutputStream),
+        (piece, read_at): (&str, DateTime<Utc>),
+    ) {
         if self.batch_bytes + piece.len() > BATCH_TEXT_BYTES {
             self.seal();
         }
         let joins: bool = self.unreported_drops == 0
-            && self
-                .segments
-                .last()
-                .is_some_and(|last| last.node_key == *node_key && last.stream == stream);
+            && self.segments.last().is_some_and(|last| {
+                last.node_key == *node_key && last.stream == stream && last.read_at == read_at
+            });
         if joins {
             if let Some(last) = self.segments.last_mut() {
                 last.text.push_str(piece);
@@ -98,6 +113,7 @@ impl UploadState {
                 node_key: node_key.clone(),
                 stream,
                 text: piece.to_owned(),
+                read_at,
                 dropped_bytes: std::mem::take(&mut self.unreported_drops),
             });
         }
@@ -287,4 +303,9 @@ fn retryable(error: &ClientError) -> bool {
         }
         _ => false,
     }
+}
+
+/// Now, to the millisecond: lines read within one millisecond share a segment.
+pub(crate) fn read_now() -> DateTime<Utc> {
+    Utc::now().trunc_subsecs(3)
 }

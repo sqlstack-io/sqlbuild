@@ -170,8 +170,8 @@ def test_given_quality_rule_violations_when_compiling_and_fixing_then_findings_a
     test_case: SqlQualityRuleCase, tmp_path: Path
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(_PROJECT_TOML, encoding="utf-8")
-    models: Path = tmp_path / "models"
-    models.mkdir()
+    models: Path = tmp_path / "sql" / "models"
+    models.mkdir(parents=True)
     (models / "raw_orders.sql").write_text(test_case.upstream_header + _UPSTREAM_SQL)
     (models / "order_summary.sql").write_text(_SUMMARY_HEADER + test_case.query_sql)
 
@@ -211,7 +211,7 @@ def test_given_quality_rule_violations_when_compiling_and_fixing_then_findings_a
             upstream_sql=_CURSOR_INCREMENTAL_SQL,
             query_sql=_RENAMED_CHAIN_SQL,
             expected_codes=(),
-            extra_files=(("sources/landing_events.yml", _CURSOR_SOURCE_YML),),
+            extra_files=(("sql/sources/landing_events.yml", _CURSOR_SOURCE_YML),),
         ),
         RankingKeyProofCase(
             description="a key-matched delete_insert unique_key proves the order",
@@ -239,7 +239,7 @@ def test_given_quality_rule_violations_when_compiling_and_fixing_then_findings_a
             upstream_sql=_CURSOR_INCREMENTAL_SQL,
             query_sql=_RENAMED_CHAIN_SQL,
             expected_codes=("SQLCLEAN018",),
-            extra_files=(("sources/landing_events.yml", _CURSOR_SOURCE_YML),),
+            extra_files=(("sql/sources/landing_events.yml", _CURSOR_SOURCE_YML),),
         ),
         RankingKeyProofCase(
             description="a snapshot unique_key identifies entities, not versions",
@@ -273,7 +273,7 @@ def test_given_quality_rule_violations_when_compiling_and_fixing_then_findings_a
                 '__ref("raw_orders")', '__source("landing_orders")'
             ),
             expected_codes=(),
-            extra_files=(("sources/landing.yml", _KEYED_SOURCE_YML),),
+            extra_files=(("sql/sources/landing.yml", _KEYED_SOURCE_YML),),
         ),
         RankingKeyProofCase(
             description="a QUALIFY window cannot prove its own order",
@@ -494,40 +494,40 @@ def test_given_long_value_as_constant_or_literal_when_compiling_then_only_litera
         DuplicateLiteralCase(
             description="two models in one folder share a literal",
             literals=(
-                ("models/sales/orders.sql", _SHARED_LITERAL),
-                ("models/sales/refunds.sql", _SHARED_LITERAL),
-                ("models/support/tickets.sql", _OTHER_LITERAL),
+                ("sql/models/sales/orders.sql", _SHARED_LITERAL),
+                ("sql/models/sales/refunds.sql", _SHARED_LITERAL),
+                ("sql/models/support/tickets.sql", _OTHER_LITERAL),
             ),
             expected_hints=(
                 (
-                    "models/sales/orders.sql",
-                    "The identical literal also appears in models/sales/refunds.sql; their "
-                    "nearest common folder is `models/sales`, so declare it once in "
-                    "`models/sales/_sqlbuild/_constants/` and reference it with `@const` in "
+                    "sql/models/sales/orders.sql",
+                    "The identical literal also appears in sql/models/sales/refunds.sql; their "
+                    "nearest common folder is `sql/models/sales`, so declare it once in "
+                    "`sql/models/sales/_sqlbuild/_constants/` and reference it with `@const` in "
                     "each file.",
                 ),
                 (
-                    "models/sales/refunds.sql",
-                    "The identical literal also appears in models/sales/orders.sql; their "
-                    "nearest common folder is `models/sales`, so declare it once in "
-                    "`models/sales/_sqlbuild/_constants/` and reference it with `@const` in "
+                    "sql/models/sales/refunds.sql",
+                    "The identical literal also appears in sql/models/sales/orders.sql; their "
+                    "nearest common folder is `sql/models/sales`, so declare it once in "
+                    "`sql/models/sales/_sqlbuild/_constants/` and reference it with `@const` in "
                     "each file.",
                 ),
-                ("models/support/tickets.sql", None),
+                ("sql/models/support/tickets.sql", None),
             ),
         ),
         DuplicateLiteralCase(
             description="a subfolder use moves the declaration to the inherited role",
             literals=(
-                ("models/sales/orders.sql", _SHARED_LITERAL),
-                ("models/sales/east/refunds.sql", _SHARED_LITERAL),
+                ("sql/models/sales/orders.sql", _SHARED_LITERAL),
+                ("sql/models/sales/east/refunds.sql", _SHARED_LITERAL),
             ),
             expected_hints=(
                 (
-                    "models/sales/orders.sql",
-                    "The identical literal also appears in models/sales/east/refunds.sql; their "
-                    "nearest common folder is `models/sales`, so declare it once in "
-                    "`models/sales/_sqlbuild/constants/` and reference it with `@const` in "
+                    "sql/models/sales/orders.sql",
+                    "The identical literal also appears in sql/models/sales/east/refunds.sql; their "
+                    "nearest common folder is `sql/models/sales`, so declare it once in "
+                    "`sql/models/sales/_sqlbuild/constants/` and reference it with `@const` in "
                     "each file.",
                 ),
             ),
@@ -535,15 +535,15 @@ def test_given_long_value_as_constant_or_literal_when_compiling_then_only_litera
         DuplicateLiteralCase(
             description="uses in different top folders need a project-wide constant",
             literals=(
-                ("models/sales/orders.sql", _SHARED_LITERAL),
-                ("models/support/tickets.sql", _SHARED_LITERAL),
+                ("sql/models/sales/orders.sql", _SHARED_LITERAL),
+                ("sql/models/support/tickets.sql", _SHARED_LITERAL),
             ),
             expected_hints=(
                 (
-                    "models/sales/orders.sql",
-                    "The identical literal also appears in models/support/tickets.sql; no "
+                    "sql/models/sales/orders.sql",
+                    "The identical literal also appears in sql/models/support/tickets.sql; no "
                     "folder below the project roots holds every use, so declare it once in "
-                    "top-level `constants/` and reference it with `@const` in each file.",
+                    "top-level `sql/constants/` and reference it with `@const` in each file.",
                 ),
             ),
         ),

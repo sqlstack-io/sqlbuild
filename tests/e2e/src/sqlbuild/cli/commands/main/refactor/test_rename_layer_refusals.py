@@ -28,10 +28,10 @@ _PROJECT_TOML: str = (
     f"[rules]\n{_LAYER_RULES}\n"
 )
 _CLEAN_WEB_PATH: str = (
-    "models/orders/intermediate/clean/web/orders__int_clean__order_lines__web.sql"
+    "sql/models/orders/intermediate/clean/web/orders__int_clean__order_lines__web.sql"
 )
-_UNLAYERED_WEB_PATH: str = "models/orders/web/order_lines_web.sql"
-_MART_PATH: str = "models/orders/mart/orders__mart__order_lines.sql"
+_UNLAYERED_WEB_PATH: str = "sql/models/orders/web/order_lines_web.sql"
+_MART_PATH: str = "sql/models/orders/mart/orders__mart__order_lines.sql"
 _ENRICHED_NAME: str = "orders__int_enriched__order_lines__web"
 _STAGING: str = (
     'MODEL (\n  description "Staged order lines",\n  materialized table,\n);\n\n'
@@ -47,13 +47,13 @@ _MART: str = (
 )
 _LAYERED_FILES: dict[str, str] = {
     "sqlbuild_project.toml": _PROJECT_TOML,
-    "models/orders/staging/orders__stg__order_lines.sql": _STAGING,
+    "sql/models/orders/staging/orders__stg__order_lines.sql": _STAGING,
     _CLEAN_WEB_PATH: _WEB_LINES,
     _MART_PATH: _MART.format(upstream="orders__int_clean__order_lines__web"),
 }
 _UNLAYERED_FILES: dict[str, str] = {
     "sqlbuild_project.toml": _PROJECT_TOML,
-    "models/orders/staging/orders__stg__order_lines.sql": _STAGING,
+    "sql/models/orders/staging/orders__stg__order_lines.sql": _STAGING,
     _UNLAYERED_WEB_PATH: _WEB_LINES,
     _MART_PATH: _MART.format(upstream="order_lines_web"),
 }
@@ -68,14 +68,14 @@ _UNLAYERED_FILES: dict[str, str] = {
             old_name="orders__int_clean__order_lines__web",
             new_name=_ENRICHED_NAME,
             expected_hint=(
-                f"{_ENRICHED_NAME} belongs under models/orders/intermediate/enriched/",
+                f"{_ENRICHED_NAME} belongs under sql/models/orders/intermediate/enriched/",
                 "  Rename and move in one step:",
                 "    sqb mv orders__int_clean__order_lines__web "
-                f"models/orders/intermediate/enriched/web/{_ENRICHED_NAME}.sql "
+                f"sql/models/orders/intermediate/enriched/web/{_ENRICHED_NAME}.sql "
                 "--project-dir {project_dir}",
                 "  (change the folder if you want it somewhere else)",
             ),
-            expected_moved_file=f"models/orders/intermediate/enriched/web/{_ENRICHED_NAME}.sql",
+            expected_moved_file=f"sql/models/orders/intermediate/enriched/web/{_ENRICHED_NAME}.sql",
         ),
     ],
     ids=lambda case: case.description,
@@ -147,7 +147,7 @@ def test_given_rename_into_another_layer_when_refused_then_printed_mv_renames_an
             expected_hint=(
                 f"{_ENRICHED_NAME} belongs under a layer folder named intermediate/enriched/",
                 "  Rename and move in one step:",
-                f"    sqb mv order_lines_web 'models/<folder>/{_ENRICHED_NAME}.sql' "
+                f"    sqb mv order_lines_web 'sql/models/<folder>/{_ENRICHED_NAME}.sql' "
                 "--project-dir {project_dir}",
                 "  (replace <folder>/ with the folder the model should live in)",
             ),

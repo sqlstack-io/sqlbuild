@@ -7,7 +7,7 @@ use crate::project::_helpers::defaults::{
 };
 use crate::project::_helpers::fields::{
     coerce_mapping, get, has, object, optional_mapping, optional_str, optional_text_allowing_empty,
-    require_str, string_mapping, text_or_none,
+    require_str, string_mapping, string_sequence, text_or_none,
 };
 use crate::project::_helpers::help::{
     Setting, SettingValue, join_helps, setting_help, setting_note,
@@ -25,8 +25,8 @@ use crate::project::_helpers::targets::{
 };
 use crate::project::_helpers::values::is_truthy;
 use crate::project::constants::{
-    ALLOW_MISSING_SECRETS_KEY, COLUMN_CONTRACT_MODES, ENV_FILE_KEY,
-    LEGACY_COLUMN_CONTRACT_MODE_KEY, LEGACY_EVENT_EXPORTERS_KEY, LOCAL_CONFIG_FILENAME, POOLS_KEY,
+    ALLOW_MISSING_SECRETS_KEY, COLUMN_CONTRACT_MODES, ENV_FILE_KEY, EXTRA_PATHS_KEY,
+    LEGACY_COLUMN_CONTRACT_MODE_KEY, LOCAL_CONFIG_FILENAME, PARENT_SEGMENT, POOLS_KEY,
     QUERY_CHANGE_TRACKING_KEY, REQUIRE_SQL_ANALYSIS_KEY, SHARED_POLICY_SETTINGS, SQL_ANALYSIS_KEY,
 };
 use crate::project::errors::{ConfigFailure, FailureClass, LoadFailure, MessagePiece};
@@ -284,17 +284,14 @@ fn operations(payload: &Entries) -> Loaded<Fields> {
             load_scenario(get(payload, "scenario"), PROJECT_FILE)?,
         ),
         ("dbt", load_dbt(get(payload, "dbt"), PROJECT_FILE)?),
-        ("sinks", load_sinks(get(payload, "sinks"), PROJECT_FILE)?),
+        (
+            "event_sinks",
+            load_sinks(get(payload, "event_sinks"), PROJECT_FILE)?,
+        ),
     ])
 }
 
 fn project_fields(payload: &Entries) -> Loaded<Fields> {
-    if get(payload, LEGACY_EVENT_EXPORTERS_KEY).is_some() {
-        return Err(ConfigFailure::at(
-            PROJECT_FILE,
-            "event_exporters was replaced by sinks.lifecycle",
-        ));
-    }
     if let Some(recall) = get(payload, RECALL_SECTION) {
         recall_section(recall, RECALL_SECTION)
             .map_err(|message| ConfigFailure::at(PROJECT_FILE, message))?;
@@ -316,6 +313,7 @@ fn project_fields(payload: &Entries) -> Loaded<Fields> {
         ENV_FILE_KEY,
         optional_text_allowing_empty(payload, ENV_FILE_KEY)?,
     ));
+    fields.push((EXTRA_PATHS_KEY, Built::Tuple(extra_paths(payload)?)));
     Ok(fields)
 }
 
@@ -580,4 +578,32 @@ fn legacy_column_contract_mode(table: &ConfigValue) -> Option<bool> {
         .iter()
         .find(|(value, _)| value == mode)
         .map(|(_, checked)| *checked)
+}
+
+/// `extra_paths`: the relative entries inside the project that the layout check allows.
+fn extra_paths(payload: &Entries) -> Loaded<Vec<String>> {
+    let paths: Vec<String> = string_sequence(
+        get(payload, EXTRA_PATHS_KEY),
+        Place {
+            file: PROJECT_FILE,
+            label: EXTRA_PATHS_KEY,
+        },
+    )?;
+    for path in &paths {
+        let normalized: String = path.replace('\\', "/");
+        let escapes: bool = normalized.starts_with('/')
+            || normalized.contains(':')
+            || normalized.split('/').any(|part| part == PARENT_SEGMENT)
+            || normalized.trim_matches('/').is_empty();
+        if escapes {
+            return Err(ConfigFailure::at(
+                PROJECT_FILE,
+                format!(
+                    "{EXTRA_PATHS_KEY} entry '{path}' must be a path relative to the project \
+                     directory, inside it"
+                ),
+            ));
+        }
+    }
+    Ok(paths)
 }

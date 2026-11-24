@@ -9,13 +9,13 @@ static ALLOCATOR: &stats_alloc::StatsAlloc<std::alloc::System> = &stats_alloc::I
 /// A shared helper, `modules` modules that import it, and one hook file of 150 functions per 100.
 pub(crate) fn importing_modules(modules: usize) -> Vec<(String, String)> {
     let helper = (
-        "python/shared/text.py".to_owned(),
+        "python/nodes/shared/text.py".to_owned(),
         "\"\"\"Shared text.\"\"\"\n\n\ndef trimmed(value: str) -> str:\n    \"\"\"Return the value.\"\"\"\n    return value\n".to_owned(),
     );
     std::iter::once(helper)
         .chain((0..modules).map(|module| {
             (
-                format!("python/area_{}/module_{module}/entry.py", module % 40),
+                format!("python/nodes/area_{}/module_{module}/entry.py", module % 40),
                 format!(
                     "\"\"\"Module {module}.\"\"\"\n\nfrom python.shared.text import trimmed\n\n\ndef handle_{module}(value: str) -> str:\n    \"\"\"Handle module {module}.\"\"\"\n    return trimmed(value)\n"
                 ),
@@ -25,7 +25,7 @@ pub(crate) fn importing_modules(modules: usize) -> Vec<(String, String)> {
             let body: String = (0..150)
                 .map(|function| format!("def notify_{function}(ctx, reason):\n    print(ctx, reason)\n\n\n"))
                 .collect();
-            (format!("hooks/python/notify_{hook}.py"), body)
+            (format!("sql/hooks/python/notify_{hook}.py"), body)
         }))
         .collect()
 }

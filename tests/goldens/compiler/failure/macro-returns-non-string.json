@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Macro '@py.answer' in '<project>/models/staging/stg_orders.sql' must return a SQL string when used directly in SQL"
+     "message": "Macro '@py.answer' in '<project>/sql/models/staging/stg_orders.sql' must return a SQL string when used directly in SQL"
     }
    ]
   }

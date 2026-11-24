@@ -64,7 +64,7 @@ def test_given_nested_model_policy_when_applying_outer_limit_then_precedence_is_
     entry: ModelPlanEntry = ModelPlanEntry(
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="events"),
         name="events",
-        relative_path=Path("models/events.sql"),
+        relative_path=Path("sql/models/events.sql"),
         materialization_type=MaterializationType.INCREMENTAL,
         action=PlanAction.INCREMENTAL_DELETE_INSERT,
         reason=PlanReason.NORMAL_INCREMENTAL,
@@ -125,7 +125,7 @@ def test_given_coarse_effective_grain_when_applying_limit_then_authored_batch_se
     entry: ModelPlanEntry = ModelPlanEntry(
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="events"),
         name="events",
-        relative_path=Path("models/events.sql"),
+        relative_path=Path("sql/models/events.sql"),
         materialization_type=MaterializationType.INCREMENTAL,
         action=PlanAction.INCREMENTAL_DELETE_INSERT,
         reason=PlanReason.NORMAL_INCREMENTAL,
@@ -251,7 +251,7 @@ def test_given_planner_owned_range_when_applying_limit_then_expected_decision_is
     entry: ModelPlanEntry = ModelPlanEntry(
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="events"),
         name="events",
-        relative_path=Path("models/events.sql"),
+        relative_path=Path("sql/models/events.sql"),
         materialization_type=MaterializationType.INCREMENTAL,
         action=PlanAction(test_case.plan_action),
         reason=PlanReason.NORMAL_INCREMENTAL,
@@ -302,7 +302,7 @@ def test_given_excess_planner_owned_range_when_action_is_error_then_planning_fai
     entry: ModelPlanEntry = ModelPlanEntry(
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="events"),
         name="events",
-        relative_path=Path("models/events.sql"),
+        relative_path=Path("sql/models/events.sql"),
         materialization_type=MaterializationType.INCREMENTAL,
         action=PlanAction.INCREMENTAL_DELETE_INSERT,
         reason=PlanReason.NORMAL_INCREMENTAL,

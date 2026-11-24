@@ -71,8 +71,8 @@ _PROJECT_FILES: dict[str, str] = {
         'name = "orders"\nadapter = "duckdb"\n[connections.local]\ndatabase = "warehouse.db"\n'
         '[targets.development]\nschema = "main"\n'
     ),
-    "seeds/raw_orders.csv": "id,ordered_at\n1,2026-01-01 00:00:00\n2,2026-01-01 01:00:00\n",
-    "seeds/raw_orders.yml": dedent(
+    "sql/seeds/raw_orders.csv": "id,ordered_at\n1,2026-01-01 00:00:00\n2,2026-01-01 01:00:00\n",
+    "sql/seeds/raw_orders.yml": dedent(
         """
         seeds:
           - name: raw_orders
@@ -85,7 +85,7 @@ _PROJECT_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
-    "models/orders.sql": dedent(
+    "sql/models/orders.sql": dedent(
         """
         MODEL (description "Orders by timestamp cursor.",
           materialized incremental,
@@ -99,7 +99,7 @@ _PROJECT_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
-    "models/daily_orders.sql": dedent(
+    "sql/models/daily_orders.sql": dedent(
         """
         MODEL (description "Daily orders rebuilt over a lookback.",
           materialized incremental,
@@ -115,7 +115,7 @@ _PROJECT_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
-    "models/order_count.sql": dedent(
+    "sql/models/order_count.sql": dedent(
         """
         MODEL (description "Order count without a cursor.", materialized table);
 
@@ -123,7 +123,7 @@ _PROJECT_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
-    "models/refunds.sql": dedent(
+    "sql/models/refunds.sql": dedent(
         """
         MODEL (description "Refunds.", materialized table);
 
@@ -131,7 +131,7 @@ _PROJECT_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
-    "sources/raw.yml": _SOURCES.format(expression=_EXPRESSION) + "\n",
+    "sql/sources/raw.yml": _SOURCES.format(expression=_EXPRESSION) + "\n",
 }
 _SELECTION: list[str] = [
     "model:daily_orders",
@@ -167,17 +167,17 @@ _FUNCTION_CALLER_FILES: dict[str, str] = {
         'name = "orders"\nadapter = "duckdb"\n[connections.local]\ndatabase = "warehouse.db"\n'
         '[targets.development]\nschema = "main"\n'
     ),
-    "seeds/orders.csv": "id,ordered_at,amount\n1,2026-09-01,10\n2,2026-09-02,20\n",
-    "seeds/orders.yml": (
+    "sql/seeds/orders.csv": "id,ordered_at,amount\n1,2026-09-01,10\n2,2026-09-02,20\n",
+    "sql/seeds/orders.yml": (
         "seeds:\n- name: orders\n  description: Orders.\n  columns:\n"
         "  - name: id\n    type: INTEGER\n  - name: ordered_at\n    type: DATE\n"
         "  - name: amount\n    type: INTEGER\n"
     ),
-    "functions/sql/udf__adjust_amount.sql": (
+    "sql/functions/sql/udf__adjust_amount.sql": (
         "FUNCTION (description 'Adjusted amount.',\n  arguments (amount INTEGER),\n"
         "  returns INTEGER,\n);\n\namount + 1\n"
     ),
-    "models/order_amounts.sql": (
+    "sql/models/order_amounts.sql": (
         "MODEL (description 'Adjusted order amounts.',\n  materialized incremental,\n"
         "  incremental_strategy merge,\n  unique_key [id],\n  cursor ordered_at,\n"
         "  cursor_type timestamp,\n  cursor_grain day,\n"
@@ -193,7 +193,7 @@ _CANT_RUN: list[dict[str, object]] = [
     {
         "reason": "missing_secret",
         "provider": "region",
-        "path": "providers/region.py",
+        "path": "python/providers/region.py",
         "variables": ["WORKER_ENV_REGION_CODE", "WORKER_ENV_TOKEN"],
         "nodes": ["source:raw_regions"],
         "readers": ["model:orders"],
@@ -232,7 +232,8 @@ _CANT_RUN: list[dict[str, object]] = [
         PlanPreviewTestCase(
             description="an edited expression plans its declared columns and says so",
             edited_files={
-                "sources/raw.yml": _SOURCES.format(expression=f"{_EXPRESSION} WHERE true") + "\n"
+                "sql/sources/raw.yml": _SOURCES.format(expression=f"{_EXPRESSION} WHERE true")
+                + "\n"
             },
             injected_sql=(),
             expected_window_models=("orders",),
@@ -315,7 +316,7 @@ def test_given_a_synced_location_when_a_plan_is_requested_then_it_plans_from_the
     [
         ChangedPlanPreviewTestCase(
             description="an edited model is the only change the copy names",
-            edited_model="models/order_count.sql",
+            edited_model="sql/models/order_count.sql",
             edit=("AS order_count", "AS order_count, 1 AS batch"),
             expected_changed={
                 "counts": ["definition"],
@@ -377,11 +378,13 @@ def test_given_an_edited_model_when_the_location_plans_what_changed_then_it_publ
         'MODEL (description "Order count summary.", materialized table);\n\n'
         'SELECT order_count FROM __ref("order_count")\n'
     )
-    write_files(project_dir=project, files=_PROJECT_FILES | {"models/order_summary.sql": summary})
+    write_files(
+        project_dir=project, files=_PROJECT_FILES | {"sql/models/order_summary.sql": summary}
+    )
     built: subprocess.CompletedProcess[str] = run_sqb(project, "build", "--target", "development")
     assert built.returncode == 0, built.stderr
-    edited: str = _PROJECT_FILES["models/order_count.sql"].replace(*test_case.edit)
-    write_files(project_dir=project, files={"models/order_count.sql": edited})
+    edited: str = _PROJECT_FILES["sql/models/order_count.sql"].replace(*test_case.edit)
+    write_files(project_dir=project, files={"sql/models/order_count.sql": edited})
     # The selection the server freezes `sqb build --changed` to: every node a build runs.
     selection: list[str] = sorted([*_SELECTION, "model:order_summary", "seed:raw_orders"])
 
@@ -411,8 +414,8 @@ def test_given_a_served_location_when_syncs_complete_then_it_replans_only_after_
     built: subprocess.CompletedProcess[str] = run_sqb(project, "build", "--target", "development")
     assert built.returncode == 0, built.stderr
     built_at: float = time.monotonic()
-    edited: str = _PROJECT_FILES["models/order_count.sql"].replace(*test_case.edit)
-    write_files(project_dir=project, files={"models/order_count.sql": edited})
+    edited: str = _PROJECT_FILES["sql/models/order_count.sql"].replace(*test_case.edit)
+    write_files(project_dir=project, files={"sql/models/order_count.sql": edited})
     control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
     log: Path = tmp_path / "location.log"
 
@@ -502,7 +505,7 @@ def test_given_plan_requests_when_the_location_plans_them_then_only_variables_co
     project: Path = tmp_path / "project"
     files: dict[str, str] = _PROJECT_FILES | {
         "sqlbuild_project.toml": _PROJECT_FILES["sqlbuild_project.toml"] + '[vars]\nbatch = "1"\n',
-        "models/order_count.sql": _PROJECT_FILES["models/order_count.sql"].replace(
+        "sql/models/order_count.sql": _PROJECT_FILES["sql/models/order_count.sql"].replace(
             "AS order_count", "AS order_count, @@batch AS batch"
         ),
         "tests/unit/test_refunds.sql": _REFUNDS_TEST,
@@ -533,7 +536,7 @@ def test_given_plan_requests_when_the_location_plans_them_then_only_variables_co
         UnknownSourceAccessTestCase(
             description="a source the synced state does not list is unknown, not probed",
             added_files={
-                "sources/customers.yml": dedent(
+                "sql/sources/customers.yml": dedent(
                     """
                     sources:
                       - name: raw_customers
@@ -546,7 +549,7 @@ def test_given_plan_requests_when_the_location_plans_them_then_only_variables_co
                     """
                 ).strip()
                 + "\n",
-                "models/customers.sql": (
+                "sql/models/customers.sql": (
                     'MODEL (description "Customers.", materialized table);\n'
                     'SELECT customer_id FROM __source("raw_customers")\n'
                 ),
@@ -584,7 +587,7 @@ def test_given_an_unlisted_source_when_the_location_previews_a_plan_then_its_rea
                     '[targets.dev]\nconnection = "warehouse"\ndatabase = "ANALYTICS"\n'
                     'schema = "DEV"\n'
                 ),
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_orders
@@ -598,7 +601,7 @@ def test_given_an_unlisted_source_when_the_location_previews_a_plan_then_its_rea
                     """
                 ).strip()
                 + "\n",
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     "MODEL (description 'Orders.', materialized table);\n"
                     'SELECT order_id FROM __source("raw_orders")\n'
                 ),
@@ -629,7 +632,7 @@ def test_given_a_synced_copy_when_a_preview_reads_source_freshness_then_it_is_un
         FailedPlanTestCase(
             description="a full_refresh false caller of a changed function cannot rebuild",
             files=_FUNCTION_CALLER_FILES,
-            edited_file="functions/sql/udf__adjust_amount.sql",
+            edited_file="sql/functions/sql/udf__adjust_amount.sql",
             edit=("amount + 1", "amount + 100"),
             selection=["model:order_amounts"],
             expected_code="S203",
@@ -686,7 +689,7 @@ def test_given_a_provider_missing_secrets_when_the_location_plans_then_the_plan_
                 '[connections.local]\ndatabase = "warehouse.db"\n'
                 '[targets.dev]\nschema = "main"\n[vars]\nbatch = "1"\n'
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Orders.', materialized table);\n"
                 'SELECT CAST(code AS BIGINT) AS amount FROM __source("raw_regions")\n'
             ),

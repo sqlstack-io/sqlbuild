@@ -60,7 +60,7 @@ def test_given_an_asset_node_when_running_it_then_discovered_items_supply_args_c
 ) -> None:
     node: DiscoveredAssetFunction = DiscoveredAssetFunction(
         file_path=Path("/project/python/plan/node.py"),
-        relative_path=Path("python/plan/node.py"),
+        relative_path=Path("python/nodes/plan/node.py"),
         name="step[b]",
         function=discovered_step,
         discovered=test_case.discovered,

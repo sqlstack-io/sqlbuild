@@ -30,6 +30,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.person
     person_request,
     provision_person,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 WAREHOUSE_REFUSAL: str = (
     "the requested warehouse is not configured for this target on this location; "
@@ -79,7 +80,7 @@ def test_given_an_ad_hoc_command_when_checked_and_launched_then_the_worker_runs_
         expected_status="success",
         expected_rows=[(5,)],
         files={
-            "models/customers.sql": (
+            "sql/models/customers.sql": (
                 "MODEL (description 'Customers.', materialized table);\nSELECT 1 AS id\n"
             )
         }
@@ -238,7 +239,7 @@ REWRITE_CHECKOUT: str = (
             command=SEED,
             expected_selection=["seed:regions"],
             expected_run_nodes=[("seed:regions", "node", "success")],
-            rewrites={"seeds/seeds.yml": SEEDS_YML.format(region_type="INTEGER")},
+            rewrites={"sql/seeds/seeds.yml": SEEDS_YML.format(region_type="INTEGER")},
         ),
         AdhocVerbTestCase(
             description="audit reports each verified audit and its node's worst result",
@@ -249,7 +250,7 @@ REWRITE_CHECKOUT: str = (
                 ("audit:not_null:model:customers:id", "check", "success"),
                 ("model:customers", "node", "success"),
             ],
-            rewrites={"models/customers.sql": CUSTOMERS_SQL.replace("not_null", "unique_x")},
+            rewrites={"sql/models/customers.sql": CUSTOMERS_SQL.replace("not_null", "unique_x")},
         ),
         AdhocVerbTestCase(
             description="test reports each verified SQL test and the model it tests",
@@ -296,7 +297,7 @@ REWRITE_CHECKOUT: str = (
             command=["freshness", "--select", "raw_orders"],
             expected_selection=["source:raw_orders"],
             expected_run_nodes=[("source:raw_orders", "node", "success")],
-            rewrites={"sources/raw.yml": SOURCES_YML.format(table="missing_orders")},
+            rewrites={"sql/sources/raw.yml": SOURCES_YML.format(table="missing_orders")},
         ),
         AdhocVerbTestCase(
             description="a refused test run leaves its unchecked node not run",
@@ -319,12 +320,12 @@ def test_given_an_ad_hoc_verb_when_the_checkout_changes_after_verification_then_
         expected_status="success",
         expected_rows=[(5,)],
         files={
-            "models/customers.sql": CUSTOMERS_SQL,
+            "sql/models/customers.sql": CUSTOMERS_SQL,
             "tests/unit/test_customers.sql": CUSTOMERS_TEST.format(expected=1),
-            "seeds/regions.csv": "region,label\nEU,Europe\n",
-            "seeds/seeds.yml": SEEDS_YML.format(region_type="VARCHAR"),
-            "sources/raw.yml": SOURCES_YML.format(table="raw_orders"),
-            "python/rewrite_checkout.py": REWRITE_CHECKOUT,
+            "sql/seeds/regions.csv": "region,label\nEU,Europe\n",
+            "sql/seeds/seeds.yml": SEEDS_YML.format(region_type="VARCHAR"),
+            "sql/sources/raw.yml": SOURCES_YML.format(table="raw_orders"),
+            **node_module_files("python/nodes/rewrite_checkout.py", REWRITE_CHECKOUT),
         }
         | test_case.files,
     )
@@ -462,7 +463,7 @@ def test_given_ad_hoc_loads_and_variables_when_launched_then_only_permitted_peop
                 '[targets.development]\nschema = "main"\n'
                 '[vars]\nday = "0"\n'
             ),
-            "models/daily_customers.sql": (
+            "sql/models/daily_customers.sql": (
                 "MODEL (description 'Customers of one day.', materialized table);\n"
                 "SELECT @@day AS day\n"
             ),

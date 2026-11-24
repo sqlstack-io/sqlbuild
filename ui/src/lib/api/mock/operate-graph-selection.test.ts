@@ -22,8 +22,9 @@ describe('mock selection evaluation', () => {
 	});
 
 	it('counts models of every materialization as one kind', () => {
+		// 4 plus 42 discovered steps (discovered.ts).
 		expect(mockVocabulary().kinds).toEqual([
-			{ value: 'asset', count: 4 },
+			{ value: 'asset', count: 46 },
 			{ value: 'loader', count: 2 },
 			{ value: 'model', count: 31 },
 			{ value: 'seed', count: 1 },

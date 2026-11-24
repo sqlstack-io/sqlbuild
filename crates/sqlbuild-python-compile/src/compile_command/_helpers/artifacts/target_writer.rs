@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyErr, PyResult, Python};
-use pyo3::types::{PyDict, PyDictMethods, PyTuple, PyTupleMethods};
+use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use pyo3::{IntoPyObjectExt, pyclass, pyfunction};
 use sqlbuild_cache::artifacts::constants::SQL_TEST_CACHE_FILE;
 use sqlbuild_cache::artifacts::main::new_sql_test_record::new_sql_test_record;
@@ -60,8 +60,8 @@ use sqlbuild_python_project::sql_test_glue::models::PlanRow;
 use sqlbuild_python_project::sql_test_glue::models::SqlTestPlanOptions;
 
 const COMPILED_DIR: &str = "compiled";
-const MODELS_DIR: &str = "models";
-const FUNCTIONS_DIR: &str = "functions";
+const MODELS_DIR: &str = sqlbuild_core::constants::MODELS_PATH;
+const FUNCTIONS_DIR: &str = sqlbuild_core::constants::FUNCTIONS_PATH;
 const AUDITS_DIR: &str = "audits";
 const GENERIC_DIR: &str = "generic";
 const SINGULAR_DIR: &str = "singular";
@@ -78,8 +78,6 @@ const NOT_RECORDED: &str = "not_recorded";
 const LOGGED_MISSES: usize = 16;
 /// Leading characters of a record key that name it in a cache-miss debug line.
 const LOGGED_KEY_CHARS: usize = 12;
-/// `functions/<language>` path components that already lead a function's path.
-const LANGUAGE_DIR_DEPTH: usize = 2;
 const PUBLISHED_STAGING_CHANGED: &str = "changed";
 const PUBLISHED_TREE: &str = "tree";
 const TARGET_OPTIONS: (&[&str], &[&str]) = (&["target_dir", "adapter", "project"], &["manifest"]);
@@ -101,12 +99,18 @@ fn path_class(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
     imported(py, "pathlib", "Path")
 }
 
-/// `relative_path` under `models/`, unless it already starts there.
+/// Whether the `/`-separated `path` lies below the folder `root`.
+fn is_below(path: &str, root: &str) -> bool {
+    path.strip_prefix(root)
+        .is_some_and(|rest| rest.starts_with('/'))
+}
+
+/// `relative_path` under `sql/models/`, unless it already starts there.
 fn model_output_path<'py>(relative_path: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = relative_path.py();
-    let parts: Bound<'py, PyTuple> = native_field(relative_path, "parts")?.downcast_into()?;
-    if !parts.is_empty() && parts.get_item(0)?.eq(MODELS_DIR)? {
-        return path_class(py)?.call1(parts);
+    let text: String = path_posix_text(relative_path)?;
+    if is_below(&text, MODELS_DIR) {
+        return path_class(py)?.call1((text,));
     }
     path_class(py)?.call1((MODELS_DIR,))?.div(relative_path)
 }
@@ -114,14 +118,11 @@ fn model_output_path<'py>(relative_path: &Bound<'py, PyAny>) -> PyResult<Bound<'
 /// `compiled / model_output_path(relative_path)` for a `/`-separated relative path.
 fn native_model_output_path(compiled: &Path, relative_path: &str) -> PathBuf {
     let mut path: PathBuf = compiled.to_path_buf();
-    let mut segments = relative_path
-        .split('/')
-        .filter(|segment| !segment.is_empty())
-        .peekable();
-    if segments.peek() != Some(&MODELS_DIR) {
-        path.push(MODELS_DIR);
+    let trimmed: &str = relative_path.trim_start_matches('/');
+    if !is_below(trimmed, MODELS_DIR) {
+        path.extend(MODELS_DIR.split('/'));
     }
-    for segment in segments {
+    for segment in trimmed.split('/').filter(|segment| !segment.is_empty()) {
         path.push(segment);
     }
     path
@@ -138,13 +139,11 @@ fn function_output_path<'py>(
     language: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = relative_path.py();
-    let parts: Bound<'py, PyTuple> = native_field(relative_path, "parts")?.downcast_into()?;
+    let text: String = path_posix_text(relative_path)?;
     let language_dir: Bound<'py, PyAny> = native_field(language, "value")?;
-    let path: Bound<'py, PyAny> = if parts.len() >= LANGUAGE_DIR_DEPTH
-        && parts.get_item(0)?.eq(FUNCTIONS_DIR)?
-        && parts.get_item(1)?.eq(&language_dir)?
-    {
-        path_class(py)?.call1(parts)?
+    let language_name: String = language_dir.extract()?;
+    let path: Bound<'py, PyAny> = if is_below(&text, &format!("{FUNCTIONS_DIR}/{language_name}")) {
+        path_class(py)?.call1((text,))?
     } else {
         path_class(py)?
             .call1((FUNCTIONS_DIR,))?

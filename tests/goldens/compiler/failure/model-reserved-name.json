@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D016",
-     "message": "Invalid model identity '_chain_' in models/marts/_chain_.sql; use snake_case 'chain'",
+     "message": "Invalid model identity '_chain_' in sql/models/marts/_chain_.sql; use snake_case 'chain'",
      "help": "Rename the authored identity and update its references, selectors, and integration keys. SQLBuild does not silently normalize resource identities. Double underscores remain valid."
     }
    ]

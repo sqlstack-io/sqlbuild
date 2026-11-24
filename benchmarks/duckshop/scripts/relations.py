@@ -39,10 +39,10 @@ def _function_arguments(relative_path: str) -> list[str]:
 
 
 def managed_sources() -> list[str]:
-    """Managed source names from sources/*.yml; each loader writes a table of the same name."""
+    """Managed source names from sql/sources/*.yml; each loader writes a table of the same name."""
 
     names: list[str] = []
-    for path in sorted((PROJECT_DIR / "sources").glob("*.yml")):
+    for path in sorted((PROJECT_DIR / "sql" / "sources").glob("*.yml")):
         for block in re.split(r"\n  - name: ", path.read_text())[1:]:
             if re.search(r"^    managed: true$", block, flags=re.MULTILINE):
                 names.append(block.split("\n", 1)[0].strip())
@@ -58,7 +58,7 @@ def hook_functions() -> list[str]:
     """`name(type, ...)` of each function a SQL hook creates; SQLBuild does not declare them."""
 
     found: list[str] = []
-    for path in sorted(PROJECT_DIR.glob("models/**/_hooks/sql/*.sql")):
+    for path in sorted(PROJECT_DIR.glob("sql/models/**/_hooks/sql/*.sql")):
         for name, arguments in HOOK_FUNCTION.findall(path.read_text()):
             types = [
                 part.strip().split(None, 1)[1] for part in arguments.split(",") if part.strip()

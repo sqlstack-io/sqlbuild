@@ -78,8 +78,8 @@ sql_analysis = false
 sql_validation = false
 """.strip()
             + "\n",
-            "models/customers.sql": model_sql,
-            "models/staging/orders.sql": model_sql,
+            "sql/models/customers.sql": model_sql,
+            "sql/models/staging/orders.sql": model_sql,
         },
     )
 
@@ -100,8 +100,8 @@ sql_validation = false
     )
     assert len(locations) == test_case.expected_count
     assert locations == (
-        (Path("models/customers.sql"), Path("models/customers.sql")),
-        (Path("models/staging/orders.sql"), Path("models/staging/orders.sql")),
+        (Path("sql/models/customers.sql"), Path("sql/models/customers.sql")),
+        (Path("sql/models/staging/orders.sql"), Path("sql/models/staging/orders.sql")),
     )
 
 
@@ -111,9 +111,9 @@ sql_validation = false
         ModelSchemaCompilationTestCase(
             description="inherited schemas with additive local columns",
             expected_schema_paths=(
-                "schemas/orders/base.sql",
-                "schemas/orders/observed.sql",
-                "schemas/orders/sourced.sql",
+                "sql/schemas/orders/base.sql",
+                "sql/schemas/orders/observed.sql",
+                "sql/schemas/orders/sourced.sql",
             ),
             expected_exact_column_names=(
                 "order_id",
@@ -138,8 +138,8 @@ sql_validation = false
             ),
             expected_exact_order_audit_names=("not_null", "unique"),
             expected_exact_order_audit_paths=(
-                "schemas/orders/base.sql",
-                "models/exact_orders.sql",
+                "sql/schemas/orders/base.sql",
+                "sql/models/exact_orders.sql",
             ),
             expected_superset_order_audit_names=("not_null",),
         )
@@ -155,8 +155,8 @@ def test_given_inherited_model_schemas_when_compiling_then_attaches_resolved_con
         tmp_path,
         {
             "sqlbuild_project.toml": _PROJECT_FILE,
-            "enums/order_status.sql": "ENUM (name order_status, members [OPEN, CLOSED]);",
-            "schemas/orders/base.sql": """
+            "sql/enums/order_status.sql": "ENUM (name order_status, members [OPEN, CLOSED]);",
+            "sql/schemas/orders/base.sql": """
 SCHEMA (
   name order,
   description "Canonical order schema",
@@ -166,14 +166,14 @@ SCHEMA (
   ),
 );
 """,
-            "schemas/orders/sourced.sql": """
+            "sql/schemas/orders/sourced.sql": """
 SCHEMA (
   name sourced_order,
   extends order,
   columns (source (type VARCHAR, nullable false)),
 );
 """,
-            "schemas/orders/observed.sql": """
+            "sql/schemas/orders/observed.sql": """
 SCHEMA (
   name observed_order,
   extends sourced_order,
@@ -181,7 +181,7 @@ SCHEMA (
   columns (observed_at (type TIMESTAMP)),
 );
 """,
-            "models/exact_orders.sql": """
+            "sql/models/exact_orders.sql": """
 MODEL (
   materialized view,
   schema staging,
@@ -200,7 +200,7 @@ SELECT
   CURRENT_TIMESTAMP::TIMESTAMP AS observed_at,
   TRUE::BOOLEAN AS quality_flag
 """,
-            "models/order_superset.sql": """
+            "sql/models/order_superset.sql": """
 MODEL (
   materialized view,
   schema staging,
@@ -343,7 +343,7 @@ def test_given_named_schema_contract_mismatch_when_validating_then_reports_expec
         tmp_path,
         {
             "sqlbuild_project.toml": _PROJECT_FILE,
-            "schemas/order.sql": """
+            "sql/schemas/order.sql": """
 SCHEMA (
   name order,
   columns (
@@ -352,7 +352,7 @@ SCHEMA (
   ),
 );
 """,
-            "models/orders.sql": f"""
+            "sql/models/orders.sql": f"""
 MODEL (
   model_schema order,
   contract {test_case.contract},
@@ -401,7 +401,7 @@ def test_given_dynamic_pivot_family_when_compiling_then_preserves_closed_contrac
         tmp_path,
         {
             "sqlbuild_project.toml": _PROJECT_FILE,
-            "models/stg_order_amounts.sql": """
+            "sql/models/stg_order_amounts.sql": """
 MODEL (description "Test model stg_order_amounts.",
   contract enforced,
   columns (
@@ -415,7 +415,7 @@ SELECT
   CAST('books' AS VARCHAR) AS category,
   CAST(10.25 AS DECIMAL(12,2)) AS amount
 """,
-            "models/customer_category_amounts.sql": """
+            "sql/models/customer_category_amounts.sql": """
 MODEL (description "Test model customer_category_amounts.",
   contract enforced,
   columns (customer_id (type INTEGER)),
@@ -433,7 +433,7 @@ ON category
 USING MAX(amount)
 GROUP BY customer_id
 """,
-            "models/customer_category_amounts_copy.sql": """
+            "sql/models/customer_category_amounts_copy.sql": """
 MODEL (description "Test model customer_category_amounts_copy.",
   contract enforced,
   columns (customer_id (type INTEGER)),
@@ -514,7 +514,7 @@ def test_given_partial_upstream_schema_when_compiling_dynamic_pivot_then_closure
         tmp_path,
         {
             "sqlbuild_project.toml": _PROJECT_FILE,
-            "models/order_amounts.sql": """
+            "sql/models/order_amounts.sql": """
 MODEL (description "Test model order_amounts.",
   contract none,
   columns (
@@ -529,7 +529,7 @@ SELECT
   CAST(10 AS INTEGER) AS amount,
   CAST(99 AS INTEGER) AS unrelated
 """,
-            "models/customer_category_amounts.sql": """
+            "sql/models/customer_category_amounts.sql": """
 MODEL (description "Test model customer_category_amounts.",
   contract enforced,
   columns (customer_id (type INTEGER)),
@@ -586,7 +586,7 @@ def test_given_unenforced_dynamic_upstream_when_compiling_passthrough_then_closu
         tmp_path,
         {
             "sqlbuild_project.toml": _PROJECT_FILE,
-            "models/order_amounts.sql": """
+            "sql/models/order_amounts.sql": """
 MODEL (description "Test model order_amounts.",
   contract enforced,
   columns (
@@ -602,7 +602,7 @@ SELECT
   CAST(10 AS INTEGER) AS amount,
   CAST(99 AS INTEGER) AS unrelated
 """,
-            "models/open_category_amounts.sql": """
+            "sql/models/open_category_amounts.sql": """
 MODEL (description "Test model open_category_amounts.",
   contract none,
   columns (customer_id (type INTEGER)),
@@ -620,7 +620,7 @@ ON category
 USING MAX(amount)
 GROUP BY customer_id
 """,
-            "models/closed_category_amounts.sql": """
+            "sql/models/closed_category_amounts.sql": """
 MODEL (description "Test model closed_category_amounts.",
   contract enforced,
   columns (customer_id (type INTEGER)),
@@ -674,11 +674,11 @@ def test_given_parent_schema_type_change_when_fingerprinting_superset_then_ident
 ) -> None:
     repo_files: dict[str, str] = {
         "sqlbuild_project.toml": _PROJECT_FILE,
-        "schemas/order.sql": f"""
+        "sql/schemas/order.sql": f"""
 SCHEMA (name order, columns (order_id (type {test_case.initial_type})));
 SCHEMA (name sourced_order, extends order, columns (source (type VARCHAR)));
 """,
-        "models/orders.sql": """
+        "sql/models/orders.sql": """
 MODEL (model_schema sourced_order, contract none);
 SELECT 1 AS order_id, 'feed' AS source
 """,
@@ -690,7 +690,7 @@ SELECT 1 AS order_id, 'feed' AS source
         tmp_path,
         repo_files
         | {
-            "schemas/order.sql": f"""
+            "sql/schemas/order.sql": f"""
 SCHEMA (name order, columns (order_id (type {test_case.changed_type})));
 SCHEMA (name sourced_order, extends order, columns (source (type VARCHAR)));
 """
@@ -723,8 +723,8 @@ def test_given_local_cursor_column_when_validating_named_contract_then_combined_
         tmp_path,
         {
             "sqlbuild_project.toml": _PROJECT_FILE,
-            "schemas/event.sql": "SCHEMA (name event, columns (event_id (type INTEGER)));",
-            "models/events.sql": """
+            "sql/schemas/event.sql": "SCHEMA (name event, columns (event_id (type INTEGER)));",
+            "sql/models/events.sql": """
 MODEL (
   materialized incremental,
   incremental_strategy append,
@@ -755,15 +755,15 @@ SELECT 1::INTEGER AS event_id, CURRENT_TIMESTAMP::TIMESTAMP AS observed_at
         ModelSchemaErrorTestCase(
             description="unknown model schema",
             repo_files={
-                "models/orders.sql": "MODEL (model_schema missing); SELECT 1 AS id",
+                "sql/models/orders.sql": "MODEL (model_schema missing); SELECT 1 AS id",
             },
             expected_error_fragment="unknown model_schema 'missing'",
         ),
         ModelSchemaErrorTestCase(
             description="model-local inherited column type override",
             repo_files={
-                "schemas/order.sql": "SCHEMA (name order, columns (id (type INTEGER)));",
-                "models/orders.sql": """
+                "sql/schemas/order.sql": "SCHEMA (name order, columns (id (type INTEGER)));",
+                "sql/models/orders.sql": """
 MODEL (model_schema order, columns (ID (type BIGINT)));
 SELECT 1 AS id
 """,
@@ -773,8 +773,8 @@ SELECT 1 AS id
         ModelSchemaErrorTestCase(
             description="model-local inherited column nullability override",
             repo_files={
-                "schemas/order.sql": "SCHEMA (name order, columns (id (type INTEGER)));",
-                "models/orders.sql": """
+                "sql/schemas/order.sql": "SCHEMA (name order, columns (id (type INTEGER)));",
+                "sql/models/orders.sql": """
 MODEL (model_schema order, columns (id (nullable false)));
 SELECT 1 AS id
 """,
@@ -784,8 +784,8 @@ SELECT 1 AS id
         ModelSchemaErrorTestCase(
             description="model-local inherited column description override",
             repo_files={
-                "schemas/order.sql": "SCHEMA (name order, columns (id (type INTEGER)));",
-                "models/orders.sql": """
+                "sql/schemas/order.sql": "SCHEMA (name order, columns (id (type INTEGER)));",
+                "sql/models/orders.sql": """
 MODEL (model_schema order, columns (id (description "Local")));
 SELECT 1 AS id
 """,
@@ -795,70 +795,70 @@ SELECT 1 AS id
         ModelSchemaErrorTestCase(
             description="model-local inherited column empty augmentation",
             repo_files={
-                "schemas/order.sql": "SCHEMA (name order, columns (id (type INTEGER)));",
-                "models/orders.sql": "MODEL (model_schema order, columns (id ())); SELECT 1 AS id",
+                "sql/schemas/order.sql": "SCHEMA (name order, columns (id (type INTEGER)));",
+                "sql/models/orders.sql": "MODEL (model_schema order, columns (id ())); SELECT 1 AS id",
             },
             expected_error_fragment="redeclares named-schema column 'id'",
         ),
         ModelSchemaErrorTestCase(
             description="unknown model-local inherited column audit reports model owner",
             repo_files={
-                "schemas/order.sql": "SCHEMA (name order, columns (id (type INTEGER)));",
-                "models/orders.sql": """
+                "sql/schemas/order.sql": "SCHEMA (name order, columns (id (type INTEGER)));",
+                "sql/models/orders.sql": """
 MODEL (model_schema order, columns (id (audits [missing_audit])));
 SELECT 1 AS id
 """,
             },
             expected_error_fragment=(
-                "models/orders.sql references unknown generic audit 'missing_audit'"
+                "sql/models/orders.sql references unknown generic audit 'missing_audit'"
             ),
         ),
         ModelSchemaErrorTestCase(
             description="unknown parent",
             repo_files={
-                "schemas/order.sql": """
+                "sql/schemas/order.sql": """
 SCHEMA (name order, extends missing, columns (id (type INTEGER)));
 """,
-                "models/orders.sql": "MODEL (description 'Test model orders.'); SELECT 1 AS id",
+                "sql/models/orders.sql": "MODEL (description 'Test model orders.'); SELECT 1 AS id",
             },
             expected_error_fragment="extends unknown schema 'missing'",
         ),
         ModelSchemaErrorTestCase(
             description="transitive inheritance cycle",
             repo_files={
-                "schemas/order.sql": """
+                "sql/schemas/order.sql": """
 SCHEMA (name first, extends second, columns (first_id (type INTEGER)));
 SCHEMA (name second, extends third, columns (second_id (type INTEGER)));
 SCHEMA (name third, extends first, columns (third_id (type INTEGER)));
 """,
-                "models/orders.sql": "MODEL (description 'Test model orders.'); SELECT 1 AS id",
+                "sql/models/orders.sql": "MODEL (description 'Test model orders.'); SELECT 1 AS id",
             },
             expected_error_fragment="first -> second -> third -> first",
         ),
         ModelSchemaErrorTestCase(
             description="case insensitive inherited duplicate",
             repo_files={
-                "schemas/order.sql": """
+                "sql/schemas/order.sql": """
 SCHEMA (name base, columns (order_id (type INTEGER)));
 SCHEMA (name child, extends base, columns (ORDER_ID (type INTEGER)));
 """,
-                "models/orders.sql": "MODEL (description 'Test model orders.'); SELECT 1 AS id",
+                "sql/models/orders.sql": "MODEL (description 'Test model orders.'); SELECT 1 AS id",
             },
             expected_error_fragment="redeclares inherited column 'ORDER_ID'",
         ),
         ModelSchemaErrorTestCase(
             description="unknown inherited column audit reports schema owner",
             repo_files={
-                "schemas/order.sql": """
+                "sql/schemas/order.sql": """
 SCHEMA (name order, columns (id (type INTEGER, audits [missing_audit])));
 """,
-                "models/orders.sql": """
+                "sql/models/orders.sql": """
 MODEL (model_schema order);
 SELECT 1 AS id
 """,
             },
             expected_error_fragment=(
-                "schemas/order.sql references unknown generic audit 'missing_audit'"
+                "sql/schemas/order.sql references unknown generic audit 'missing_audit'"
             ),
         ),
     ],

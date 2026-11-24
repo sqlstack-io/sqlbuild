@@ -9,10 +9,10 @@ See [Python Nodes](/docs/concepts/python-nodes/overview) for the shared model an
 
 ## Defining an asset
 
-Place Python files under `python/` and decorate functions with `@asset`:
+Place Python files under `python/nodes/` and decorate functions with `@asset`:
 
 ```python
-# python/exports/orders_export.py
+# python/nodes/exports/orders_export.py
 from sqlbuild.assets import asset, AssetContext
 
 

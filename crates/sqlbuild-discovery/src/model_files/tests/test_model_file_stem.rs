@@ -6,17 +6,17 @@ fn given_relative_paths_when_naming_models_then_stems_match_python() {
     let test_cases = [
         ModelFileStemTestCase {
             description: "a final suffix is dropped",
-            relative_path: "models/orders.sql",
+            relative_path: "sql/models/orders.sql",
             expected_stem: "orders",
         },
         ModelFileStemTestCase {
             description: "only the last suffix is dropped",
-            relative_path: "models/marts/orders.v2.sql",
+            relative_path: "sql/models/marts/orders.v2.sql",
             expected_stem: "orders.v2",
         },
         ModelFileStemTestCase {
             description: "a leading dot is not a suffix",
-            relative_path: "models/.hidden",
+            relative_path: "sql/models/.hidden",
             expected_stem: ".hidden",
         },
         ModelFileStemTestCase {

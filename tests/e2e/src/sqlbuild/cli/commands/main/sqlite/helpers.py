@@ -67,7 +67,7 @@ _SEEDS_YML: str = """seeds:
 """
 
 _MODELS: dict[str, str] = {
-    "models/staging/stg_orders.sql": """MODEL (
+    "sql/models/staging/stg_orders.sql": """MODEL (
   materialized view,
   description "Latest event per order.",
   columns (
@@ -83,7 +83,7 @@ SELECT order_id, customer_id, amount_cents, ordered_at, status
 FROM ranked
 WHERE event_rank = 1
 """,
-    "models/marts/customer_totals.sql": """MODEL (
+    "sql/models/marts/customer_totals.sql": """MODEL (
   materialized table,
   description "Order totals per customer.",
   columns (
@@ -97,7 +97,7 @@ FROM __seed("customers") AS c
 LEFT JOIN __ref("stg_orders") AS o ON o.customer_id = c.customer_id
 GROUP BY c.customer_id, c.customer_name
 """,
-    "models/marts/orders_appended.sql": """MODEL (
+    "sql/models/marts/orders_appended.sql": """MODEL (
   materialized incremental,
   incremental_strategy append,
   cursor order_id,
@@ -107,7 +107,7 @@ GROUP BY c.customer_id, c.customer_name
 
 SELECT order_id, customer_id FROM __ref("stg_orders")
 """,
-    "models/marts/orders_merged.sql": """MODEL (
+    "sql/models/marts/orders_merged.sql": """MODEL (
   materialized incremental,
   incremental_strategy merge,
   unique_key [order_id],
@@ -116,7 +116,7 @@ SELECT order_id, customer_id FROM __ref("stg_orders")
 
 SELECT order_id, status, amount_cents FROM __ref("stg_orders")
 """,
-    "models/marts/orders_replaced.sql": """MODEL (
+    "sql/models/marts/orders_replaced.sql": """MODEL (
   materialized incremental,
   incremental_strategy delete_insert,
   unique_key [order_id],
@@ -174,21 +174,21 @@ def build_orders_project_files(*, adapter: str) -> dict[str, str]:
             'materialized = "table"\n\n'
             "[[rules.rule_ignores]]\n"
             'rules = ["SQLCLEAN018"]\n'
-            'paths = ["models/staging/stg_orders.sql"]\n'
+            'paths = ["sql/models/staging/stg_orders.sql"]\n'
             'reason = "Seed event_seq is unique by construction; seeds declare no keys."\n'
         ),
-        "seeds/customers.csv": _CUSTOMERS_CSV,
-        "seeds/orders.csv": "event_seq,order_id,customer_id,amount_cents,ordered_at,status\n"
+        "sql/seeds/customers.csv": _CUSTOMERS_CSV,
+        "sql/seeds/orders.csv": "event_seq,order_id,customer_id,amount_cents,ordered_at,status\n"
         + "\n".join(_ORDER_ROWS)
         + "\n",
-        "seeds/seeds.yml": _SEEDS_YML,
+        "sql/seeds/seeds.yml": _SEEDS_YML,
         "tests/unit/test_customer_totals.sql": _UNIT_TEST,
         **_MODELS,
     }
 
 
 def append_late_orders(*, project_dir: Path) -> None:
-    orders_path: Path = project_dir / "seeds" / "orders.csv"
+    orders_path: Path = project_dir / "sql" / "seeds" / "orders.csv"
     with orders_path.open("a", encoding="utf-8") as orders_file:
         orders_file.write("\n".join(LATE_ORDER_ROWS) + "\n")
 
@@ -256,10 +256,16 @@ _SQLITE_TOML: str = (
     f'schema = "{SCHEMA}"\n'
 )
 
+_CURRENT_ORDERS_SQL: str = """MODEL (description "Current order state.", materialized table);
+
+SELECT order_id, amount_cents, ordered_at AS updated_at FROM __seed("order_events")
+"""
+
+
 STRATEGY_PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": _SQLITE_TOML,
-    "seeds/order_events.csv": FIRST_EVENTS_CSV,
-    "seeds/seeds.yml": """seeds:
+    "sql/seeds/order_events.csv": FIRST_EVENTS_CSV,
+    "sql/seeds/seeds.yml": """seeds:
   - name: order_events
     description: Order events.
     columns:
@@ -270,7 +276,7 @@ STRATEGY_PROJECT_FILES: dict[str, str] = {
       - name: ordered_at
         type: TIMESTAMP
 """,
-    "models/daily_revenue.sql": """MODEL (
+    "sql/models/daily_revenue.sql": """MODEL (
   description "Daily revenue in sequential microbatches.",
   materialized incremental,
   incremental_strategy delete_insert,
@@ -290,7 +296,7 @@ FROM __seed("order_events")
 WHERE ordered_at >= __cursor_start() AND ordered_at < __cursor_end()
 GROUP BY 1
 """,
-    "models/orders_window.sql": """MODEL (
+    "sql/models/orders_window.sql": """MODEL (
   description "Orders replaced by daily cursor window.",
   materialized incremental,
   incremental_strategy delete_insert,
@@ -303,11 +309,8 @@ GROUP BY 1
 
 SELECT order_id, amount_cents, ordered_at FROM __seed("order_events")
 """,
-    "models/current_orders.sql": """MODEL (description "Current order state.", materialized table);
-
-SELECT order_id, amount_cents, ordered_at AS updated_at FROM __seed("order_events")
-""",
-    "models/order_history.sql": """MODEL (
+    "sql/models/current_orders.sql": _CURRENT_ORDERS_SQL,
+    "sql/models/order_history.sql": """MODEL (
   description "Order history by update time.",
   materialized snapshot,
   unique_key [order_id],
@@ -318,7 +321,7 @@ SELECT order_id, amount_cents, ordered_at AS updated_at FROM __seed("order_event
 
 SELECT order_id, amount_cents, updated_at FROM __ref("current_orders")
 """,
-    "models/order_amount_history.sql": """MODEL (
+    "sql/models/order_amount_history.sql": """MODEL (
   description "Order amount history by checked columns.",
   materialized snapshot,
   unique_key [order_id],
@@ -332,7 +335,7 @@ SELECT order_id, amount_cents FROM __ref("current_orders")
 
 CONTRACT_PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": _SQLITE_TOML,
-    "models/order_amounts.sql": """MODEL (
+    "sql/models/order_amounts.sql": """MODEL (
   description "Order amounts with an exact decimal contract.",
   contract enforced,
   columns (
@@ -348,7 +351,7 @@ UNION ALL SELECT 2, 7
 
 FUNCTION_PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": _SQLITE_TOML,
-    "functions/sql/is_large.sql": """FUNCTION (
+    "sql/functions/sql/is_large.sql": """FUNCTION (
   description "Whether an amount is large.",
   arguments (amount INTEGER),
   returns BOOLEAN,
@@ -356,7 +359,7 @@ FUNCTION_PROJECT_FILES: dict[str, str] = {
 
 amount > 10
 """,
-    "models/large_orders.sql": """MODEL (description "Large orders.", materialized table);
+    "sql/models/large_orders.sql": """MODEL (description "Large orders.", materialized table);
 
 SELECT 1 AS order_id
 """,
@@ -364,9 +367,9 @@ SELECT 1 AS order_id
 
 CONCURRENT_MICROBATCH_PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": _SQLITE_TOML + "\n[settings]\nmicrobatch_concurrency = true\n",
-    "seeds/order_events.csv": FIRST_EVENTS_CSV,
-    "seeds/seeds.yml": STRATEGY_PROJECT_FILES["seeds/seeds.yml"],
-    "models/daily_revenue.sql": STRATEGY_PROJECT_FILES["models/daily_revenue.sql"].replace(
+    "sql/seeds/order_events.csv": FIRST_EVENTS_CSV,
+    "sql/seeds/seeds.yml": STRATEGY_PROJECT_FILES["sql/seeds/seeds.yml"],
+    "sql/models/daily_revenue.sql": STRATEGY_PROJECT_FILES["sql/models/daily_revenue.sql"].replace(
         "  batch_size 1d,\n", "  batch_size 1d,\n  batch_concurrency 4,\n"
     ),
 }
@@ -375,16 +378,24 @@ LOCK_PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": _SQLITE_TOML.replace(
         f'path = "{SQLITE_FILE}"\n', f'path = "{SQLITE_FILE}"\nbusy_timeout = 0.5\n'
     ),
-    "models/order_ids.sql": """MODEL (description "Order ids.", materialized table);
+    "sql/models/order_ids.sql": """MODEL (description "Order ids.", materialized table);
 
 SELECT 1 AS order_id
 """,
 }
 
 
+_CUSTOMER_TOTALS_SQL: str = """MODEL (description 'Totals per customer.', materialized table);
+
+SELECT customer_id, SUM(amount) AS total_amount, COUNT(*) AS order_count
+FROM __ref("orders")
+GROUP BY customer_id
+"""
+
+
 SCENARIO_PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": _SQLITE_TOML,
-    "sources/raw.yml": """sources:
+    "sql/sources/raw.yml": """sources:
   - name: raw_orders
     description: Raw orders.
     schema: main
@@ -399,17 +410,12 @@ SCENARIO_PROJECT_FILES: dict[str, str] = {
       - name: ordered_at
         type: TIMESTAMP
 """,
-    "models/orders.sql": """MODEL (description 'Orders.', materialized table);
+    "sql/models/orders.sql": """MODEL (description 'Orders.', materialized table);
 
 SELECT id AS order_id, customer_id, amount, ordered_at FROM __source("raw_orders")
 """,
-    "models/customer_totals.sql": """MODEL (description 'Totals per customer.', materialized table);
-
-SELECT customer_id, SUM(amount) AS total_amount, COUNT(*) AS order_count
-FROM __ref("orders")
-GROUP BY customer_id
-""",
-    "models/daily_orders.sql": """MODEL (
+    "sql/models/customer_totals.sql": _CUSTOMER_TOTALS_SQL,
+    "sql/models/daily_orders.sql": """MODEL (
   description 'Orders by day, incremental.',
   materialized incremental,
   incremental_strategy delete_insert,
@@ -590,9 +596,9 @@ SELECT payment_id, amount FROM __source("raw_payments")
 """
 DECIMAL_PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": _SQLITE_TOML,
-    "sources/raw.yml": _PAYMENT_SOURCES,
-    "models/payments.sql": _PAYMENTS_MODEL,
-    "models/payment_ledger.sql": """MODEL (
+    "sql/sources/raw.yml": _PAYMENT_SOURCES,
+    "sql/models/payments.sql": _PAYMENTS_MODEL,
+    "sql/models/payment_ledger.sql": """MODEL (
   description "Payments computed from numbers under the same contract.",
   materialized table,
   contract enforced,
@@ -606,7 +612,7 @@ SELECT payment_id, amount * 1.0 AS amount FROM __source("raw_payments")
 """,
 }
 EVOLVED_DECIMAL_PROJECT_FILES: dict[str, str] = {
-    "models/payments.sql": _PAYMENTS_MODEL.replace(
+    "sql/models/payments.sql": _PAYMENTS_MODEL.replace(
         "    amount (type DECIMAL(10,2)),\n",
         "    amount (type DECIMAL(10,2)),\n    fee (type DECIMAL(10,2)),\n",
     ).replace("SELECT payment_id, amount FROM", "SELECT payment_id, amount, 0.1 AS fee FROM"),
@@ -649,9 +655,9 @@ def build_cursor_window_files(*, adapter: str, events_csv: str) -> dict[str, str
             "[targets.dev]\n"
             f'schema = "{SCHEMA}"\n'
         ),
-        "seeds/order_events.csv": events_csv,
-        "seeds/seeds.yml": STRATEGY_PROJECT_FILES["seeds/seeds.yml"],
-        "models/hourly_orders.sql": """MODEL (
+        "sql/seeds/order_events.csv": events_csv,
+        "sql/seeds/seeds.yml": STRATEGY_PROJECT_FILES["sql/seeds/seeds.yml"],
+        "sql/models/hourly_orders.sql": """MODEL (
   description "Orders in hourly microbatches.",
   materialized incremental,
   incremental_strategy delete_insert,
@@ -709,17 +715,20 @@ _SCHEMA_PER_MODEL_TOML: str = (
 )
 STAGING_ORDERS_FILES: dict[str, str] = {
     "sqlbuild_project.toml": _SCHEMA_PER_MODEL_TOML,
-    "models/orders.sql": """MODEL (description "Staged.", materialized table, schema "staging");
+    "sql/models/orders.sql": """MODEL (description "Staged.", materialized table, schema "staging");
 
 SELECT 1 AS order_id
 """,
 }
-MAIN_STAGING_ORDERS_FILES: dict[str, str] = {
-    "sqlbuild_project.toml": _SCHEMA_PER_MODEL_TOML,
-    "models/staging__orders.sql": """MODEL (description "Orders kept in main.", materialized table);
+_STAGING_ORDERS_SQL: str = """MODEL (description "Orders kept in main.", materialized table);
 
 SELECT 2 AS order_id
-""",
+"""
+
+
+MAIN_STAGING_ORDERS_FILES: dict[str, str] = {
+    "sqlbuild_project.toml": _SCHEMA_PER_MODEL_TOML,
+    "sql/models/staging__orders.sql": _STAGING_ORDERS_SQL,
 }
 
 
@@ -750,26 +759,26 @@ _WAFFLE_SQLITE_TOML: str = (
     'materialized = "view"\n'
 )
 _WAFFLE_SQLITE_UNSUPPORTED_FILES: tuple[str, ...] = (
-    "functions/sql/customer_orders.sql",
-    "functions/sql/is_completed_order.sql",
-    "functions/python/is_completed_order_py.py",
+    "sql/functions/sql/customer_orders.sql",
+    "sql/functions/sql/is_completed_order.sql",
+    "sql/functions/python/is_completed_order_py.py",
     "tests/unit/test_customer_orders_table_fn.sql",
     "tests/unit/test_is_completed_order_udf.sql",
-    "models/marts/daily_order_partitioned.sql",
+    "sql/models/marts/daily_order_partitioned.sql",
 )
 _WAFFLE_SQLITE_REWRITES: tuple[tuple[str, str, str], ...] = (
     (
-        "models/marts/fact_orders.sql",
+        "sql/models/marts/fact_orders.sql",
         '__udf("is_completed_order")(o.status) AS is_completed_order,',
         "o.status = 'completed' AS is_completed_order,",
     ),
     (
-        "models/marts/fact_orders.sql",
+        "sql/models/marts/fact_orders.sql",
         '__udf("is_completed_order_py")(o.status) AS is_completed_order_py,',
         "o.status = 'completed' AS is_completed_order_py,",
     ),
     (
-        "models/marts/_macros/python/time.py",
+        "sql/models/marts/_macros/python/time.py",
         "    return f\"DATE_TRUNC('{grain}', {expression})\"",
         '    if ctx.adapter_name == "sqlite" and grain == "day":\n'
         "        return f\"datetime({expression}, 'start of day')\"\n"
@@ -778,7 +787,7 @@ _WAFFLE_SQLITE_REWRITES: tuple[tuple[str, str, str], ...] = (
         "strftime('+%H hours', {expression}))\"\n"
         "    return f\"DATE_TRUNC('{grain}', {expression})\"",
     ),
-    ("models/marts/daily_revenue.sql", "CAST(o.ordered_at AS DATE)", "date(o.ordered_at)"),
+    ("sql/models/marts/daily_revenue.sql", "CAST(o.ordered_at AS DATE)", "date(o.ordered_at)"),
 )
 _TIMESTAMP_LITERAL_CAST: re.Pattern[str] = re.compile(r"CAST\(('[^']*') AS TIMESTAMP\)")
 WAFFLE_ROW_COUNT_RELATIONS: tuple[str, ...] = (
@@ -820,7 +829,7 @@ def prepare_sqlite_waffle_shop(*, tmp_path: Path) -> Path:
     new: str
     for relative_path, old, new in _WAFFLE_SQLITE_REWRITES:
         _replace_in_file(path=project_dir / relative_path, old=old, new=new)
-    sources_path: Path = project_dir / "sources" / "raw.yml"
+    sources_path: Path = project_dir / "sql" / "sources" / "raw.yml"
     sources_path.write_text(
         _TIMESTAMP_LITERAL_CAST.sub(r"\1", sources_path.read_text(encoding="utf-8")),
         encoding="utf-8",
@@ -865,7 +874,7 @@ _WAFFLE_ROW_COUNTERS: MappingProxyType[str, Callable[[Path, str], int]] = Mappin
 
 LOADER_PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": _SQLITE_TOML,
-    "sources/raw.yml": """sources:
+    "sql/sources/raw.yml": """sources:
   - name: raw_events
     description: Order events from a loader.
     managed: true
@@ -881,7 +890,8 @@ LOADER_PROJECT_FILES: dict[str, str] = {
       - name: logged_at
         type: TIMESTAMP
 """,
-    "python/loaders/events.py": '''from datetime import date, datetime, timedelta, timezone
+    "python/nodes/loaders/events/loader.py": (
+        '''from datetime import date, datetime, timedelta, timezone
 
 from sqlbuild.loaders import loader
 
@@ -904,8 +914,9 @@ def raw_events(ctx: object) -> list[dict[str, object]]:
             "logged_at": None,
         },
     ]
-''',
-    "models/events.sql": """MODEL (description "Events from the source.", materialized table);
+'''
+    ),
+    "sql/models/events.sql": """MODEL (description "Events from the source.", materialized table);
 
 SELECT event_id, happened_at, event_day, logged_at FROM __source("raw_events")
 """,

@@ -22,11 +22,11 @@ For shared lifecycle ordering, failure timing, naming, and identity rules, see t
 
 ## Reusable SQL hooks
 
-SQLBuild discovers `.sql` files recursively under `hooks/sql/` and under scoped
+SQLBuild discovers `.sql` files recursively under `sql/hooks/sql/` and under scoped
 `<folder>/_sqlbuild/hooks/sql/` and `<folder>/_sqlbuild/_hooks/sql/` roles; see
 [Hooks](../hooks.md#project-layout) for who can call each. Each file defines exactly one hook and must start with a `HOOK(...)` header as its first non-whitespace content.
 
-**`hooks/sql/permissions/grant_access.sql`**
+**`sql/hooks/sql/permissions/grant_access.sql`**
 
 ```sql
 HOOK (
@@ -36,17 +36,17 @@ HOOK (
 GRANT SELECT ON @relation TO @role
 ```
 
-The hook name is always the filename stem, so this resource is invoked as `sql("grant_access", ...)`. Nested directories organize files but do not namespace names: `hooks/sql/admin/grant_access.sql` is still named `grant_access`.
+The hook name is always the filename stem, so this resource is invoked as `sql("grant_access", ...)`. Nested directories organize files but do not namespace names: `sql/hooks/sql/admin/grant_access.sql` is still named `grant_access`.
 
 `HOOK()` accepts only a required, non-empty `description` ([Descriptions](../configuration.md#descriptions)). It does not accept a `name`; rename the file to rename the hook. The content after the header must be non-empty and becomes the SQL payload for each invocation.
 
-Files beginning with `_` are skipped. All other `.sql` files under `hooks/sql/` are parsed as hook resources and must have a valid `HOOK()` header.
+Files beginning with `_` are skipped. All other `.sql` files under `sql/hooks/sql/` are parsed as hook resources and must have a valid `HOOK()` header.
 
 ## Invoke a named hook
 
 Pass the hook name and its arguments from a model's `pre_hooks` or `post_hooks` list:
 
-**`models/marts/orders.sql`**
+**`sql/models/marts/orders.sql`**
 
 ```sql
 MODEL (
@@ -75,7 +75,7 @@ Named SQL hooks declare parameters by using them in the SQL body. Arguments are 
 | `@name` | Raw substitution. Strings are inserted verbatim for relations, identifiers, keywords, or SQL fragments. |
 | `@'name'` | SQL-literal substitution. Strings are single-quoted and embedded quotes are escaped. |
 
-**`hooks/sql/record_access.sql`**
+**`sql/hooks/sql/record_access.sql`**
 
 ```sql
 HOOK (
@@ -136,7 +136,7 @@ Both named and inline SQL hooks receive the invoking model's runtime context. Th
 For named hooks, SQLBuild first substitutes `@name` and `@'name'` arguments into the hook body. A supplied argument such as `relation: "@@CTX:destination.qualified"` therefore resolves to the invoking model's final target-overridden destination.
 
 An inline hook uses macros, constants, and enums available to its model file. A named hook uses those
-available from the folder that owns its role: project-wide declarations for `hooks/sql/`, or the
+available from the folder that owns its role: project-wide declarations for `sql/hooks/sql/`, or the
 owner folder's declarations for `<folder>/_sqlbuild/hooks/sql/`. See
 [How Visibility Works](../../declaration-scopes/visibility.md#which-file-controls-visibility).
 
@@ -185,7 +185,7 @@ MODEL (
 SELECT order_id FROM __ref("stg_orders")
 ```
 
-**`models/marts/_sqlbuild/_hooks/sql/record_counts.sql`**
+**`sql/models/marts/_sqlbuild/_hooks/sql/record_counts.sql`**
 
 ```sql
 HOOK (description "Record counts");

@@ -1,5 +1,7 @@
 pub(crate) mod audit_repeats;
 pub(crate) mod checks;
+pub(crate) mod cost_selection;
+pub(crate) mod cost_summary;
 pub(crate) mod costs;
 pub(crate) mod coverage;
 pub(crate) mod maintenance;

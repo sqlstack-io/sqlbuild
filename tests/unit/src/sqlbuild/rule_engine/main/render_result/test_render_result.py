@@ -22,7 +22,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.render_result._test_types import (
                 findings=(
                     Finding(
                         code="SQBRCONTRACT101",
-                        path=Path("models/mart/commerce__mart__orders.sql"),
+                        path=Path("sql/models/mart/commerce__mart__orders.sql"),
                         line=3,
                         column=7,
                         message="model SQL must keep transformation logic in top-level CTEs",

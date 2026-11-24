@@ -78,7 +78,7 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
         + f"\n[connections.local]\ndatabase = {json.dumps(test_case.database)}\n"
         + f'\n[targets.{json.dumps(test_case.target)}]\nschema = "main"\n',
         **orchestration,
-        "sinks/orders.py": 'print("Loading orders sink", flush=True)\n',
+        "python/event_sinks/orders.py": 'print("Loading orders sink", flush=True)\n',
     }
     write_files(project_dir=project, files=files)
     _ = subprocess.run(["git", "init", "-q", str(project)], check=True, capture_output=True)
@@ -117,10 +117,10 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
                 log,
             )
             assert initial_health["report"]["session_id"] == heartbeat["report"]["session_id"]
-            staging: Path = project / "models/stg_orders.sql"
+            staging: Path = project / "sql/models/stg_orders.sql"
             for value in (11, 12, 13):
                 _ = staging.write_text(
-                    files["models/stg_orders.sql"].replace(
+                    files["sql/models/stg_orders.sql"].replace(
                         "CAST(5 AS INTEGER)", f"CAST({value} AS INTEGER)"
                     )
                 )
@@ -143,7 +143,9 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
             )
             assert current_snapshot(api, test_case.target)["record"] == second["record"]
             _ = staging.write_text(
-                files["models/stg_orders.sql"].replace("CAST(5 AS INTEGER)", "CAST(14 AS INTEGER)")
+                files["sql/models/stg_orders.sql"].replace(
+                    "CAST(5 AS INTEGER)", "CAST(14 AS INTEGER)"
+                )
             )
             recovered: dict[str, Any] = wait_for_generation(api, test_case.target, 3, process, log)
             assert int(compiler_pid.read_text()) == first_interpreter
@@ -269,7 +271,7 @@ def test_given_a_busy_location_when_stopped_then_its_interpreter_is_reaped(
             "sqlbuild_project.toml": PUBLISHABLE_FILES["sqlbuild_project.toml"]
             + '\n[connections.local]\ndatabase = "warehouse.duckdb"\n'
             + '\n[targets.development]\nschema = "main"\n',
-            "adapters/slow.py": (
+            "python/adapters/slow.py": (
                 "import os, sys, time\nfrom pathlib import Path\n"
                 f"if {test_case.blocked_command!r} in sys.argv:\n"
                 f"    Path({str(child_pid)!r}).write_text(str(os.getpid()))\n"

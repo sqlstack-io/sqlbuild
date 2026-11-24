@@ -718,7 +718,7 @@ pub(crate) fn missing_column_request(audit: AuditSqlInput) -> ResourceSqlRequest
         sql_tests: Vec::new(),
         models: vec![HookModelInput {
             name: "orders".to_owned(),
-            path: "models/orders.sql".to_owned(),
+            path: "sql/models/orders.sql".to_owned(),
             authored_sql: Arc::from(
                 "MODEL (description \"Orders not_null\", columns (order_id (audits [unique]), \
                  shipped_at (audits [not_null, unique])));\nSELECT 1 AS order_id\n",

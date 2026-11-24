@@ -31,7 +31,7 @@ const ORDERS_NODES: &[NodeSpec] = &[
     (
         "load_events",
         "loader",
-        "python/loaders/events.py",
+        "python/nodes/loaders/events.py",
         &[],
         &["prepare_orders"],
         &[],
@@ -39,7 +39,7 @@ const ORDERS_NODES: &[NodeSpec] = &[
     (
         "prepare_orders",
         "asset",
-        "python/tasks/orders.py",
+        "python/nodes/tasks/orders.py",
         &["orders", "daily"],
         &[],
         &[],
@@ -47,7 +47,7 @@ const ORDERS_NODES: &[NodeSpec] = &[
     (
         "export_orders",
         "asset",
-        "python/assets/orders.py",
+        "python/nodes/assets/orders.py",
         &["exports", "daily"],
         &["prepare_orders"],
         &[("model", "orders")],
@@ -55,7 +55,7 @@ const ORDERS_NODES: &[NodeSpec] = &[
     (
         "check_orders_export",
         "check",
-        "python/checks/orders.py",
+        "python/nodes/checks/orders.py",
         &["exports"],
         &["export_orders"],
         &[],
@@ -63,7 +63,7 @@ const ORDERS_NODES: &[NodeSpec] = &[
     (
         "raw_orders",
         "loader",
-        "python/loaders/orders.py",
+        "python/nodes/loaders/orders.py",
         &[],
         &[],
         &[],
@@ -71,7 +71,7 @@ const ORDERS_NODES: &[NodeSpec] = &[
     (
         "check_raw_customers",
         "check",
-        "python/checks/customers.py",
+        "python/nodes/checks/customers.py",
         &["customer_checks"],
         &[],
         &[("source", "raw_customers")],
@@ -92,11 +92,18 @@ fn failure(error: SelectorError) -> OwnedFailure {
 
 /// The orders nodes plus `step`, a `for_each` asset with items `a` and `b`, and `step_total`.
 const DISCOVERED_NODES: &[NodeSpec] = &[
-    ("step[a]", "asset", "python/plan/node.py", &[], &[], &[]),
+    (
+        "step[a]",
+        "asset",
+        "python/nodes/plan/node.py",
+        &[],
+        &[],
+        &[],
+    ),
     (
         "step[b]",
         "asset",
-        "python/plan/node.py",
+        "python/nodes/plan/node.py",
         &[],
         &["step[a]"],
         &[],
@@ -104,7 +111,7 @@ const DISCOVERED_NODES: &[NodeSpec] = &[
     (
         "step_total",
         "asset",
-        "python/plan/total.py",
+        "python/nodes/plan/total.py",
         &[],
         &["step[b]"],
         &[],
@@ -318,7 +325,7 @@ fn round_trip_python_graph(nodes: &[RoundTripNodeSpec]) -> PythonSelectionGraph 
         .map(|(name, _, upstream, _)| InventoryNode {
             name: (*name).to_owned(),
             tags: Vec::new(),
-            relative_path: "python/nodes.py".to_owned(),
+            relative_path: "python/nodes/nodes.py".to_owned(),
             upstream: owned(upstream),
         })
         .collect();

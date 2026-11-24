@@ -74,29 +74,29 @@ _CUSTOMERS_MODEL: str = (
     [
         HeaderQuoteErrorTestCase(
             description="model_description_escaping_a_quote",
-            path="models/customers.sql",
+            path="sql/models/customers.sql",
             contents=(
                 'MODEL (\n  description "Matches a title (\\"Miss\\").",\n);\n\n'
                 "SELECT 1 AS customer_id\n"
             ),
             expected_code="D002",
-            expected_location="models/customers.sql:2:34",
+            expected_location="sql/models/customers.sql:2:34",
             expected_message=_QUOTE_MESSAGE,
         ),
         HeaderQuoteErrorTestCase(
             description="macro_description_escaping_a_quote",
-            path="macros/sql/title.sql",
+            path="sql/macros/sql/title.sql",
             contents=(
                 'MACRO (\n  description "Matches a title (\\"Miss\\").",\n'
                 "  arguments (value VARCHAR),\n  returns VARCHAR,\n);\n\n@value\n"
             ),
             expected_code="P015",
-            expected_location="macros/sql/title.sql:2:34",
+            expected_location="sql/macros/sql/title.sql:2:34",
             expected_message=_QUOTE_MESSAGE,
         ),
         HeaderQuoteErrorTestCase(
             description="wrapped_macro_description_with_apostrophes_escaping_quotes",
-            path="macros/sql/title.sql",
+            path="sql/macros/sql/title.sql",
             contents=(
                 "MACRO (\n"
                 "  description \"True when a name starts with a woman's title: Mme, Mlle, Miss, "
@@ -107,71 +107,71 @@ _CUSTOMERS_MODEL: str = (
                 "  arguments (value VARCHAR),\n  returns VARCHAR,\n);\n\n@value\n"
             ),
             expected_code="P015",
-            expected_location="macros/sql/title.sql:3:25",
+            expected_location="sql/macros/sql/title.sql:3:25",
             expected_message=_QUOTE_MESSAGE,
         ),
         HeaderQuoteErrorTestCase(
             description="schema_description_escaping_a_quote",
-            path="schemas/customer.sql",
+            path="sql/schemas/customer.sql",
             contents=(
                 'SCHEMA (\n  name customer,\n  description "The \\"shop\\" customer",\n'
                 "  columns (customer_id (type BIGINT)),\n);\n"
             ),
             expected_code="D013",
-            expected_location="schemas/customer.sql:3:21",
+            expected_location="sql/schemas/customer.sql:3:21",
             expected_message=_QUOTE_MESSAGE,
         ),
         HeaderQuoteErrorTestCase(
             description="model_description_doubling_a_quote",
-            path="models/customers.sql",
+            path="sql/models/customers.sql",
             contents=('MODEL (\n  description "say ""hi"" now",\n);\n\nSELECT 1 AS customer_id\n'),
             expected_code="D002",
-            expected_location="models/customers.sql:2:20",
+            expected_location="sql/models/customers.sql:2:20",
             expected_message=_QUOTE_MESSAGE,
         ),
         HeaderQuoteErrorTestCase(
             description="macro_description_doubling_a_quote",
-            path="macros/sql/title.sql",
+            path="sql/macros/sql/title.sql",
             contents=(
                 'MACRO (\n  description "say ""hi"" now",\n'
                 "  arguments (value VARCHAR),\n  returns VARCHAR,\n);\n\n@value\n"
             ),
             expected_code="P015",
-            expected_location="macros/sql/title.sql:2:20",
+            expected_location="sql/macros/sql/title.sql:2:20",
             expected_message=_QUOTE_MESSAGE,
         ),
         HeaderQuoteErrorTestCase(
             description="audit_header_scanned_past_a_triple_quoted_string",
-            path="audits/singular/orders_have_customers.sql",
+            path="sql/audits/singular/orders_have_customers.sql",
             contents=(
                 'AUDIT (name "orders_have_customers", '
                 'description """Rerun "sqb audit --all" after loads""");\n\n'
                 'SELECT 1 FROM __seed("raw_customers") WHERE FALSE\n'
             ),
             expected_code="D004",
-            expected_location="audits/singular/orders_have_customers.sql:1",
+            expected_location="sql/audits/singular/orders_have_customers.sql:1",
             expected_message="has unsupported keys: description",
         ),
         HeaderQuoteErrorTestCase(
             description="unclosed_triple_quote",
-            path="models/customers.sql",
+            path="sql/models/customers.sql",
             contents=(
                 'MODEL (\n  description """Never closed,\n  materialized table,\n);\n\n'
                 "SELECT 1 AS customer_id\n"
             ),
             expected_code="D002",
-            expected_location="models/customers.sql:2:15",
+            expected_location="sql/models/customers.sql:2:15",
             expected_message='this """ string is never closed',
         ),
         HeaderQuoteErrorTestCase(
             description="triple_quote_inside_a_triple_quoted_string",
-            path="models/customers.sql",
+            path="sql/models/customers.sql",
             contents=(
                 'MODEL (\n  description """He said """hi""" twice.""",\n);\n\n'
                 "SELECT 1 AS customer_id\n"
             ),
             expected_code="D002",
-            expected_location="models/customers.sql:2:26",
+            expected_location="sql/models/customers.sql:2:26",
             expected_message='""" inside a """...""" string ends it early',
         ),
     ],
@@ -199,9 +199,9 @@ def test_given_misquoted_header_string_when_compiling_then_error_names_the_quote
         FoldedDescriptionTestCase(
             description="triple_quoted_and_wrapped_model_schema_and_macro_descriptions",
             files={
-                "macros/sql/is_womans_title.sql": _TITLE_MACRO,
-                "schemas/customer.sql": _CUSTOMER_SCHEMA,
-                "models/customers.sql": _CUSTOMERS_MODEL,
+                "sql/macros/sql/is_womans_title.sql": _TITLE_MACRO,
+                "sql/schemas/customer.sql": _CUSTOMER_SCHEMA,
+                "sql/models/customers.sql": _CUSTOMERS_MODEL,
             },
             expected_description=(
                 'Customers with a "woman\'s title" flag, one row each.\n\nBuilt from the raw seed.'
@@ -271,7 +271,7 @@ def test_given_model_description_quoted_as_before_when_compiling_then_its_text_i
     test_case: AcceptedDescriptionTestCase, tmp_path: Path
 ) -> None:
     project_dir: Path = header_strings_project(
-        tmp_path, {"models/customers.sql": test_case.header + "\nSELECT 1 AS customer_id\n"}
+        tmp_path, {"sql/models/customers.sql": test_case.header + "\nSELECT 1 AS customer_id\n"}
     )
 
     dag: subprocess.CompletedProcess[str] = run_sqb(
@@ -312,11 +312,11 @@ def test_given_macro_description_quoted_as_before_when_compiling_then_the_projec
     project_dir: Path = header_strings_project(
         tmp_path,
         {
-            "macros/sql/lowered.sql": (
+            "sql/macros/sql/lowered.sql": (
                 f"MACRO (\n  {test_case.header},\n  arguments (value VARCHAR),\n"
                 "  returns VARCHAR,\n);\n\nLOWER(@value)\n"
             ),
-            "models/customers.sql": (
+            "sql/models/customers.sql": (
                 'MODEL (description "Customers.");\n\n'
                 "SELECT customer_id, @sql.lowered(title) AS title\n"
                 'FROM __seed("raw_customers")\n'
@@ -353,7 +353,7 @@ def test_given_adjacent_strings_outside_descriptions_when_compiling_then_they_re
     project_dir: Path = header_strings_project(
         tmp_path,
         {
-            "models/customers.sql": (
+            "sql/models/customers.sql": (
                 f'MODEL (\n  description "Customers.",\n  tags {test_case.tags},\n);\n\n'
                 "SELECT 1 AS customer_id\n"
             )
@@ -386,7 +386,7 @@ def test_given_meta_description_with_escaped_quote_when_building_then_meta_keeps
     project_dir: Path = header_strings_project(
         tmp_path,
         {
-            "models/customers.sql": (
+            "sql/models/customers.sql": (
                 'MODEL (\n  description "Customers.",\n'
                 f"  audits [not_null (column customer_id, {test_case.meta})],\n);\n\n"
                 "SELECT 1 AS customer_id\n"

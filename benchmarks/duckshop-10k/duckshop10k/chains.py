@@ -40,7 +40,7 @@ def customer_chain(project: Project, result: Intermediate) -> None:
     identity = result.combined.get("customer_identity")
     if orders is None or identity is None:
         return
-    folder = "models/intermediate/customers"
+    folder = "sql/models/intermediate/customers"
     value = _model(
         project,
         "int_customer_value",
@@ -160,7 +160,7 @@ def customer_chain(project: Project, result: Intermediate) -> None:
     dim = marts.publish(
         project,
         "dim_customers",
-        "models/marts/core",
+        "sql/models/marts/core",
         segments,
         "global_customer_key",
         "One row per global customer with their value scores and segment",
@@ -168,7 +168,7 @@ def customer_chain(project: Project, result: Intermediate) -> None:
     segment_mix = marts.share_by(
         project,
         "rpt_marketing__segment_mix",
-        "models/marts/marketing",
+        "sql/models/marts/marketing",
         dim,
         "segment",
         "Global customers",
@@ -176,7 +176,7 @@ def customer_chain(project: Project, result: Intermediate) -> None:
     vip_mix = marts.share_by(
         project,
         "rpt_marketing__vip_mix",
-        "models/marts/marketing",
+        "sql/models/marts/marketing",
         dim,
         "is_vip",
         "Global customers",
@@ -191,7 +191,7 @@ def finance_chain(project: Project, result: Intermediate) -> None:
     budgets = result.combined.get("ledgers__budgets")
     if entries is None or budgets is None:
         return
-    folder = "models/intermediate/ledgers"
+    folder = "sql/models/intermediate/ledgers"
     usd = to_usd(
         project,
         "int_gl_entries_usd",
@@ -297,7 +297,7 @@ def finance_chain(project: Project, result: Intermediate) -> None:
     fact = marts.publish(
         project,
         "fct_gl_budget_variance",
-        "models/marts/core",
+        "sql/models/marts/core",
         variance,
         "variance_key",
         "One row per legal entity, cost centre and month with actual and budgeted spend",
@@ -305,7 +305,7 @@ def finance_chain(project: Project, result: Intermediate) -> None:
     by_entity = marts.share_by(
         project,
         "rpt_finance__variance_by_entity",
-        "models/marts/finance",
+        "sql/models/marts/finance",
         fact,
         "legal_entity_code",
         "Budget variance",
@@ -313,7 +313,7 @@ def finance_chain(project: Project, result: Intermediate) -> None:
     quarterly = marts.period_rollup(
         project,
         "rpt_finance__variance_quarterly",
-        "models/marts/finance",
+        "sql/models/marts/finance",
         fact,
         "quarter",
         "Budget variance",
@@ -321,7 +321,7 @@ def finance_chain(project: Project, result: Intermediate) -> None:
     monthly_report = marts.period_rollup(
         project,
         "rpt_finance__variance_monthly",
-        "models/marts/finance",
+        "sql/models/marts/finance",
         fact,
         "month",
         "Budget variance",
@@ -354,7 +354,7 @@ def scorecards(project: Project, result: Intermediate) -> None:
             marts.wide_daily(
                 project,
                 f"rpt_{shop}__weekly_scorecard",
-                f"models/marts/storefronts/{shop}",
+                f"sql/models/marts/storefronts/{shop}",
                 sources,
                 f"One row per week with the sales, payments and refunds of {shop} side by side",
             )
@@ -374,13 +374,13 @@ def scorecards(project: Project, result: Intermediate) -> None:
                 marts.wide_daily(
                     project,
                     f"rpt_{team}_{region.code}__scorecard",
-                    f"models/marts/{team}/{region.code}",
+                    f"sql/models/marts/{team}/{region.code}",
                     weekly,
                     f"One row per week with every weekly {team} headline for {region.name} "
                     "side by side",
                 )
             )
-    folder = "models/marts/executive"
+    folder = "sql/models/marts/executive"
     for team in ("finance", "marketing"):
         cards = [card for card in team_cards if card.name.startswith(f"rpt_{team}_")]
         if len(cards) >= 2:

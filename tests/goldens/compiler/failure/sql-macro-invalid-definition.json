@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P015",
-     "message": "returns TYPE OF w names no argument of macro x()\n  --> models/staging/_sqlbuild/_macros/sql/x.sql:1:63",
+     "message": "returns TYPE OF w names no argument of macro x()\n  --> sql/models/staging/_sqlbuild/_macros/sql/x.sql:1:63",
      "help": "name one of its arguments: v"
     }
    ]

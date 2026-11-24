@@ -26,6 +26,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     query_duckdb,
     run_sqb,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 _EDGE_CASES: Path = Path("benchmarks/duckshop/edge_cases/loaders")
 _LOADER: str = (
@@ -41,7 +42,7 @@ _TASK: str = (
     "    return ctx.result(payload={'announced': True})\n"
 )
 _CHECK: str = (
-    "from python.tasks.announce import announce_orders\nfrom sqlbuild.checks import check\n\n\n"
+    "from python.nodes.tasks.announce.asset import announce_orders\nfrom sqlbuild.checks import check\n\n\n"
     "@check(depends_on=announce_orders)\n"
     "def check_orders_announced(ctx):\n"
     '    """The task announced the orders."""\n'
@@ -49,7 +50,7 @@ _CHECK: str = (
     "    return ctx.pass_(message='announced') if announced else ctx.fail(message='silent')\n"
 )
 _COPYING_LOADER: str = (
-    "from python.loaders.orders import raw_orders\nfrom sqlbuild.loaders import loader\n\n\n"
+    "from python.nodes.loaders.orders.loader import raw_orders\nfrom sqlbuild.loaders import loader\n\n\n"
     "@loader\n"
     "def raw_order_copies(ctx) -> list[dict[str, object]]:\n"
     '    """One order when the orders loader has a result to read, none otherwise."""\n'
@@ -103,14 +104,14 @@ def test_given_target_location_when_building_and_loading_then_node_results_stay_
         tmp_path=tmp_path,
         target_lines=test_case.target_lines,
         files={
-            "sources/raw.yml": node_result_source_yml(test_case.source_location),
-            "sources/copies.yml": node_result_source_yml(test_case.source_location).replace(
+            "sql/sources/raw.yml": node_result_source_yml(test_case.source_location),
+            "sql/sources/copies.yml": node_result_source_yml(test_case.source_location).replace(
                 "raw_orders", "raw_order_copies"
             ),
-            "python/loaders/orders.py": _LOADER,
-            "python/loaders/copies.py": _COPYING_LOADER,
-            "python/tasks/announce.py": _TASK,
-            "python/checks/orders.py": _CHECK,
+            "python/nodes/loaders/orders/loader.py": _LOADER,
+            "python/nodes/loaders/copies/loader.py": _COPYING_LOADER,
+            "python/nodes/tasks/announce/asset.py": _TASK,
+            "python/nodes/checks/orders/checks.py": _CHECK,
         },
     )
 
@@ -166,14 +167,18 @@ def test_given_target_location_when_building_and_loading_then_node_results_stay_
         PreservedTargetRefusalE2ETestCase(
             description="a task under a preserved schema needs a loader schema",
             python_files={
-                "python/tasks/announce.py": _TASK.replace('depends_on=source("raw_orders")', "")
+                "python/nodes/tasks/announce/asset.py": _TASK.replace(
+                    'depends_on=source("raw_orders")', ""
+                )
             },
             expected_error="error[S105]: Target 'dev' keeps each model's own schema",
         ),
         PreservedTargetRefusalE2ETestCase(
             description="a loader schema whose var resolves to empty is no loader schema",
             python_files={
-                "python/tasks/announce.py": _TASK.replace('depends_on=source("raw_orders")', "")
+                "python/nodes/tasks/announce/asset.py": _TASK.replace(
+                    'depends_on=source("raw_orders")', ""
+                )
             },
             expected_error="error[S105]: Target 'dev' keeps each model's own schema",
             target_lines='loader_schema = "${results_schema}"\n\n[vars]\nresults_schema = ""\n',
@@ -181,7 +186,9 @@ def test_given_target_location_when_building_and_loading_then_node_results_stay_
         PreservedTargetRefusalE2ETestCase(
             description="a loader schema that resolves only inside a model is no loader schema",
             python_files={
-                "python/tasks/announce.py": _TASK.replace('depends_on=source("raw_orders")', "")
+                "python/nodes/tasks/announce/asset.py": _TASK.replace(
+                    'depends_on=source("raw_orders")', ""
+                )
             },
             expected_error="error[S105]: Target 'dev' keeps each model's own schema",
             target_lines='loader_schema = "raw_${CTX:model.name}"\n',
@@ -202,7 +209,7 @@ def test_given_preserved_schema_without_loader_schema_when_compiling_then_python
                 '[defaults]\nschema = "mart"\n\n[targets.dev]\nschema = "preserve"\n'
                 + test_case.target_lines
             ),
-            "models/orders.sql": "MODEL (description 'Orders.');\n\nSELECT 1 AS order_id\n",
+            "sql/models/orders.sql": "MODEL (description 'Orders.');\n\nSELECT 1 AS order_id\n",
         }
         | test_case.python_files,
     )
@@ -244,9 +251,9 @@ def test_given_two_builds_when_planning_then_python_nodes_are_not_new(
         tmp_path=tmp_path,
         target_lines=test_case.target_lines,
         files={
-            "sources/raw.yml": node_result_source_yml("    schema: raw\n"),
-            "python/loaders/orders.py": _LOADER,
-            "python/tasks/announce.py": _TASK,
+            "sql/sources/raw.yml": node_result_source_yml("    schema: raw\n"),
+            "python/nodes/loaders/orders/loader.py": _LOADER,
+            "python/nodes/tasks/announce/asset.py": _TASK,
         },
     )
     for _ in range(2):
@@ -282,14 +289,14 @@ def test_given_older_named_schema_results_when_planning_preserved_target_then_lo
         tmp_path=tmp_path,
         target_lines=test_case.earlier_target_lines,
         files={
-            "sources/raw.yml": node_result_source_yml("    schema: raw\n"),
-            "python/loaders/orders.py": _LOADER,
-            "python/tasks/announce.py": _TASK,
-            "models/staged_orders.sql": (
+            "sql/sources/raw.yml": node_result_source_yml("    schema: raw\n"),
+            "python/nodes/loaders/orders/loader.py": _LOADER,
+            "python/nodes/tasks/announce/asset.py": _TASK,
+            "sql/models/staged_orders.sql": (
                 "MODEL (description 'Staged orders.', schema \"staging\");\n\n"
                 "SELECT 1 AS order_id\n"
             ),
-            "models/raw_order_ids.sql": (
+            "sql/models/raw_order_ids.sql": (
                 "MODEL (description 'Order ids beside the raw data.', schema \"raw\");\n\n"
                 "SELECT 1 AS order_id\n"
             ),
@@ -303,7 +310,7 @@ def test_given_older_named_schema_results_when_planning_preserved_target_then_lo
     config.write_text(
         config.read_text().replace(test_case.earlier_target_lines, test_case.target_lines)
     )
-    task: Path = project_dir / "python/tasks/announce.py"
+    task: Path = project_dir / "python/nodes/tasks/announce/asset.py"
     task.write_text(task.read_text().replace("'announced': True", "'announced': 1"))
     for _ in range(2):
         build: subprocess.CompletedProcess[str] = run_sqb(
@@ -344,8 +351,10 @@ def test_given_results_in_the_adapter_default_when_one_loader_rebuilds_then_both
                 'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
                 '[connection]\ndatabase = "dev.duckdb"\n\n[targets.dev]\n'
             ),
-            "sources/events.yml": (_EDGE_CASES / "loader_results.yml").read_text(),
-            "python/loaders/events.py": (_EDGE_CASES / "loader_results.py").read_text(),
+            "sql/sources/events.yml": (_EDGE_CASES / "loader_results.yml").read_text(),
+            **node_module_files(
+                "python/nodes/loaders/events.py", (_EDGE_CASES / "loader_results.py").read_text()
+            ),
         },
     )
     db_path: Path = project_dir / "dev.duckdb"

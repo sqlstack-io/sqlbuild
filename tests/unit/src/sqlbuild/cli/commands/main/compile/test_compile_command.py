@@ -73,7 +73,7 @@ def test_given_local_project_when_running_compile_then_it_does_not_connect(
     assert exit_code == test_case.expected_exit_code
     for fragment in test_case.expected_stdout_fragments:
         assert fragment in rendered_stdout
-    assert (project_dir / "target" / "compiled" / "models" / "orders.sql").exists()
+    assert (project_dir / "target" / "compiled" / "sql" / "models" / "orders.sql").exists()
     assert not (project_dir / "target" / "manifest.json").exists()
 
 
@@ -244,7 +244,7 @@ def test_given_python_project_dag_flag_when_running_compile_then_writes_python_d
                 "orders                   FAIL 1 columns",
                 "error[K001]: declared column 'customer_id' was not found in statically inferred output",
                 "  model: orders",
-                "  --> models/orders.sql:5:5",
+                "  --> sql/models/orders.sql:5:5",
                 "  5 |     customer_id (),",
                 "    |     ^^^^^^^^^^^",
                 "settings.check_declared_columns is true (the default)",
@@ -269,11 +269,11 @@ def test_given_python_project_dag_flag_when_running_compile_then_writes_python_d
             expected_exit_code=1,
             expected_stdout_fragments=(
                 "error[K002]: column 'amount_cents' inferred as VARCHAR but declared type is INTEGER",
-                "  --> models/orders.sql:4:5",
+                "  --> sql/models/orders.sql:4:5",
                 "  4 |     amount_cents (type INTEGER),",
                 "    |     ^^^^^^^^^^^^",
                 "  output:",
-                "  --> models/orders.sql:9:3",
+                "  --> sql/models/orders.sql:9:3",
                 "  9 |   CAST('1' AS VARCHAR) AS amount_cents",
                 "inferred VARCHAR",
                 "  = help: change the declared type or cast the expression explicitly",
@@ -294,7 +294,7 @@ def test_given_python_project_dag_flag_when_running_compile_then_writes_python_d
             expected_exit_code=1,
             expected_stdout_fragments=(
                 "error[K005]: column 'customer_id' is not declared in enforced contract",
-                "  --> models/orders.sql:11:3",
+                "  --> sql/models/orders.sql:11:3",
                 " 11 |   2 AS customer_id",
                 "    |   ^^^^^^^^^^^^^^^^",
                 "  = help: add the column to MODEL(columns) or remove it from the SELECT list",
@@ -323,7 +323,7 @@ def test_given_contract_errors_when_running_compile_then_reports_diagnostics(
 ) -> None:
     project_dir: Path = prepare_static_compile_project(tmp_path)
     assert test_case.model_sql is not None
-    (project_dir / "models" / "orders.sql").write_text(
+    (project_dir / "sql" / "models" / "orders.sql").write_text(
         test_case.model_sql,
         encoding="utf-8",
     )
@@ -339,7 +339,7 @@ def test_given_contract_errors_when_running_compile_then_reports_diagnostics(
     assert exit_code == test_case.expected_exit_code
     for fragment in test_case.expected_stdout_fragments:
         assert fragment in rendered_stdout
-    assert (project_dir / "target" / "compiled" / "models" / "orders.sql").exists()
+    assert (project_dir / "target" / "compiled" / "sql" / "models" / "orders.sql").exists()
     assert not (project_dir / "target" / "manifest.json").exists()
 
 
@@ -378,7 +378,7 @@ def test_given_contract_errors_when_running_compile_json_then_serializes_diagnos
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     project_dir: Path = prepare_static_compile_project(tmp_path)
-    (project_dir / "models" / "orders.sql").write_text(
+    (project_dir / "sql" / "models" / "orders.sql").write_text(
         test_case.model_sql,
         encoding="utf-8",
     )
@@ -403,11 +403,11 @@ def test_given_contract_errors_when_running_compile_json_then_serializes_diagnos
     assert diagnostics[0]["code"] == test_case.expected_code
     assert diagnostics[0]["severity"] == test_case.expected_severity
     assert diagnostics[0]["message"] == test_case.expected_message
-    assert diagnostics[0]["path"] == "models/orders.sql"
+    assert diagnostics[0]["path"] == "sql/models/orders.sql"
     assert diagnostics[0]["line"] == test_case.expected_line
     assert diagnostics[0]["column"] == test_case.expected_column
     assert diagnostics[0]["location"] == {
-        "path": "models/orders.sql",
+        "path": "sql/models/orders.sql",
         "line": test_case.expected_line,
         "column": test_case.expected_column,
         "end_line": test_case.expected_line,
@@ -454,7 +454,7 @@ def test_given_unchecked_declared_columns_when_compiling_column_audit_then_audit
         + f"\n[settings]\n{test_case.settings_toml}\n",
         encoding="utf-8",
     )
-    (project_dir / "models" / "orders.sql").write_text(
+    (project_dir / "sql" / "models" / "orders.sql").write_text(
         "MODEL (description 'Test model orders.',\n"
         "  materialized view,\n"
         "  columns (\n"
@@ -654,4 +654,4 @@ def test_given_collection_state_when_compiling_then_cycles_are_paused_and_state_
     assert exit_code == 0
     assert enabled_during == [test_case.expected_enabled_during]
     assert enabled_after is test_case.expected_enabled_after
-    assert (project_dir / "target" / "compiled" / "models" / "orders.sql").exists()
+    assert (project_dir / "target" / "compiled" / "sql" / "models" / "orders.sql").exists()

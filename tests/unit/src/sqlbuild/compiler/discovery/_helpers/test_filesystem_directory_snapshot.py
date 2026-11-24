@@ -47,7 +47,7 @@ def test_given_randomized_tree_when_listing_python_modules_then_matches_pathlib_
     [
         SharedSnapshotDiscoveryTestCase(
             "scoped_and_grouped_declarations",
-            expected_model_paths=("models/orders.sql", "models/sales/daily.sql"),
+            expected_model_paths=("sql/models/orders.sql", "sql/models/sales/daily.sql"),
         )
     ],
     ids=lambda case: case.description,
@@ -71,11 +71,11 @@ def test_given_shared_snapshot_when_discovering_project_then_matches_isolated_di
         DiscoveryPassRefreshTestCase(
             "added_and_removed_models",
             added_files={
-                "models/sales/weekly.sql": "MODEL (description 'Weekly.');\nSELECT 1 AS week_id\n"
+                "sql/models/sales/weekly.sql": "MODEL (description 'Weekly.');\nSELECT 1 AS week_id\n"
             },
-            removed_path="models/orders.sql",
-            expected_first_paths=("models/orders.sql", "models/sales/daily.sql"),
-            expected_second_paths=("models/sales/daily.sql", "models/sales/weekly.sql"),
+            removed_path="sql/models/orders.sql",
+            expected_first_paths=("sql/models/orders.sql", "sql/models/sales/daily.sql"),
+            expected_second_paths=("sql/models/sales/daily.sql", "sql/models/sales/weekly.sql"),
         )
     ],
     ids=lambda case: case.description,

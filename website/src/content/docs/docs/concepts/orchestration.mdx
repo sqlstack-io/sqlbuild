@@ -394,9 +394,9 @@ sqb rename stg_orders stg_orders_clean
 
 ```text
 Rename model  stg_orders -> stg_orders_clean
-├── models/marts/fact_orders.sql
+├── sql/models/marts/fact_orders.sql
 │   └── 10:13   reference __ref("stg_orders")  ->  __ref("stg_orders_clean")
-├── models/staging/stg_orders_clean.sql  (moved from models/staging/stg_orders.sql)
+├── sql/models/staging/stg_orders_clean.sql  (moved from sql/models/staging/stg_orders.sql)
 │   └── 1:8     migration + migrate_from stg_orders
 └── orchestration/jobs/orders_refresh_job.toml
     └── 3:10    selector  "+stg_orders+ fact_orders"  ->  "+stg_orders_clean+ fact_orders"
@@ -404,7 +404,7 @@ Rename model  stg_orders -> stg_orders_clean
 
 - Exact names are rewritten, including inside graph operators such as `+stg_orders+`, `,` and `~`.
   Tags, globs and `job:` selectors stay as written.
-- A folder selector, such as `models/staging` or `path:models/staging/`, moves when every model
+- A folder selector, such as `sql/models/staging` or `path:sql/models/staging/`, moves when every model
   under it moves to the same folder. When only some leave, the command lists a note at the
   selector to check by hand.
 - A selector in a multi-line TOML string is reported for a manual edit and blocks the refactor.

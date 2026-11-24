@@ -201,7 +201,7 @@ def test_given_served_location_when_catalog_changes_then_facts_and_current_proje
     _ = adapter.execute(connection=connection, sql=fixture["create_sql"])
     adapter.close(connection)
     (project / "orchestration/calendars/unexpected_calendar.py").unlink()
-    write_files(project_dir=project, files={"models/orders.sql": fixture["model"]})
+    write_files(project_dir=project, files={"sql/models/orders.sql": fixture["model"]})
     expected: dict[str, Any] = fixture["record"] | {"relation_type": test_case.expected_table_type}
     control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
     log: Path = tmp_path / "location.log"

@@ -72,7 +72,7 @@ _DUCKDB_PROJECT: str = (
         FunctionNameCompileTestCase(
             description="snowflake derived-table alias named like an alias compiles",
             project_toml=_SNOWFLAKE_PROJECT
-            + '\n[[rules.rule_ignores]]\nrules = ["SQLCLEAN039"]\npaths = ["models/**"]\n'
+            + '\n[[rules.rule_ignores]]\nrules = ["SQLCLEAN039"]\npaths = ["sql/models/**"]\n'
             + 'reason = "The case names a derived table like a date part."\n',
             query_sql="SELECT x FROM (VALUES (1)) day_of_week (x)\n",
             expected_exit_code=0,
@@ -125,8 +125,8 @@ def test_given_builtin_spelling_when_compiling_then_dialect_support_is_enforced(
         project_name="products",
         repo_files={
             "sqlbuild_project.toml": test_case.project_toml,
-            "functions/sql/starts_with.sql": _STARTS_WITH_FUNCTION,
-            "models/products.sql": (
+            "sql/functions/sql/starts_with.sql": _STARTS_WITH_FUNCTION,
+            "sql/models/products.sql": (
                 f"MODEL (description 'Test model products.', database warehouse, schema analytics);\n\n{test_case.query_sql}"
             ),
         },

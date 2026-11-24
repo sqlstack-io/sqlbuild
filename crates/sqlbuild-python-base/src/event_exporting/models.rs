@@ -9,6 +9,7 @@ use crate::event_exporting::_helpers::scope::ScopeState;
 use crate::event_exporting::_helpers::scope::bindings;
 use crate::event_exporting::_helpers::scope::optional;
 use crate::event_exporting::_helpers::scope::providers_missing_secrets;
+use crate::event_exporting::_helpers::scope::teardown_failures;
 use crate::event_exporting::_helpers::scope::tuple_or_empty;
 use crate::event_exporting::_helpers::values::accounting_repr;
 use crate::event_exporting::_helpers::values::bound_exporter_arguments;
@@ -464,6 +465,7 @@ impl EventExporterCommandScope {
                 providers: None,
                 event_exporters: None,
                 command_output_sinks: None,
+                teardown_failures: Vec::new(),
             }),
         }
     }
@@ -601,10 +603,19 @@ impl EventExporterCommandScope {
             session
         };
         let closer: Py<ProviderSessionCloser> = Py::new(py, ProviderSessionCloser { session })?;
-        self.dispatcher
+        if let Err(error) = self
+            .dispatcher
             .bind(py)
-            .call_method1("finalize_when_idle", (closer,))?;
+            .call_method1("finalize_when_idle", (closer,))
+        {
+            self.locked()?.teardown_failures = teardown_failures(py, &error);
+        }
         Ok(summary)
+    }
+
+    /// Each sink provider whose teardown raised when the scope closed, with its error type.
+    pub fn teardown_failures(&self) -> PyResult<Vec<String>> {
+        Ok(self.locked()?.teardown_failures.clone())
     }
 
     /// Reuse bound sink functions and provider instances for output records.

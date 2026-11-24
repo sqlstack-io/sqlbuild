@@ -8,19 +8,19 @@ use crate::yaml_files::tests::test_types::YamlPathsTestCase;
 fn given_sources_directory_when_listing_source_yaml_then_direct_yaml_children_are_sorted() {
     let test_cases = [
         YamlPathsTestCase {
-            description: "yml and yaml files directly below sources/ in path order",
+            description: "yml and yaml files directly below sql/sources/ in path order",
             files: &[
-                "sources/b.yaml",
-                "sources/a.yml",
-                "sources/notes.txt",
-                "sources/.yml",
-                "sources/nested/c.yml",
+                "sql/sources/b.yaml",
+                "sql/sources/a.yml",
+                "sql/sources/notes.txt",
+                "sql/sources/.yml",
+                "sql/sources/nested/c.yml",
             ],
-            expected_paths: Ok(owned_paths(&["sources/a.yml", "sources/b.yaml"])),
+            expected_paths: Ok(owned_paths(&["sql/sources/a.yml", "sql/sources/b.yaml"])),
         },
         YamlPathsTestCase {
             description: "no sources directory",
-            files: &["models/orders.sql"],
+            files: &["sql/models/orders.sql"],
             expected_paths: Ok(Vec::new()),
         },
     ];
@@ -42,25 +42,25 @@ fn given_models_and_seeds_when_listing_schema_yaml_then_unscoped_schemas_and_see
         YamlPathsTestCase {
             description: "unscoped schema files then seed declarations, each in path order",
             files: &[
-                "models/marts/schema.yml",
-                "models/schema.yml",
-                "models/marts/_sqlbuild/schemas/schema.yml",
-                "models/other.yml",
-                "seeds/products.yml",
-                "seeds/customers/customers.yml",
+                "sql/models/marts/schema.yml",
+                "sql/models/schema.yml",
+                "sql/models/marts/_sqlbuild/schemas/schema.yml",
+                "sql/models/other.yml",
+                "sql/seeds/products.yml",
+                "sql/seeds/customers/customers.yml",
             ],
             expected_paths: Ok(owned_paths(&[
-                "models/marts/schema.yml",
-                "models/schema.yml",
-                "seeds/customers/customers.yml",
-                "seeds/products.yml",
+                "sql/models/marts/schema.yml",
+                "sql/models/schema.yml",
+                "sql/seeds/customers/customers.yml",
+                "sql/seeds/products.yml",
             ])),
         },
         YamlPathsTestCase {
             description: "a seed declaration using .yaml fails naming the first one",
-            files: &["seeds/b.yaml", "seeds/a.yaml", "seeds/c.yml"],
+            files: &["sql/seeds/b.yaml", "sql/seeds/a.yaml", "sql/seeds/c.yml"],
             expected_paths: Err(YamlPathFailure::YamlSeedDeclaration(
-                "seeds/a.yaml".to_owned(),
+                "sql/seeds/a.yaml".to_owned(),
             )),
         },
     ];

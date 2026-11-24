@@ -25,7 +25,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.sql_macros.helpers import 
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import query_duckdb, run_sqb
 
 _ORDER_KEY: dict[str, str] = {
-    "macros/sql/order_key.sql": (
+    "sql/macros/sql/order_key.sql": (
         'MACRO (\n  description "Order key from the country and the order",\n'
         "  arguments (country_code VARCHAR, order_ref ANY),\n"
         "  returns VARCHAR,\n);\n\n"
@@ -126,7 +126,7 @@ def test_given_an_any_argument_when_building_then_callers_pass_values_of_any_typ
         SqlMacroErrorTestCase(
             description="any_with_const",
             files={
-                "macros/sql/order_key.sql": (
+                "sql/macros/sql/order_key.sql": (
                     'MACRO (description "Key", arguments (order_ref ANY CONST), '
                     "returns VARCHAR);\n\nCAST(@order_ref AS VARCHAR)\n"
                 ),
@@ -397,7 +397,7 @@ def test_given_an_any_argument_misused_when_compiling_then_it_fails(
             files={
                 **with_rules("SQBRCONTRACT105"),
                 **text_macro("m", "BIGINT", "@value", argument="ANY"),
-                "models/marts/up.sql": (
+                "sql/models/marts/up.sql": (
                     'MODEL (description "Up");\n\nSELECT NULL AS s FROM __ref("stg_orders") AS o\n'
                 ),
                 **contract_model(

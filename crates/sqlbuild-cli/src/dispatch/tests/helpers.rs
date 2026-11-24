@@ -30,6 +30,7 @@ pub(super) fn failure(message: &str, code: &'static str) -> DispatchFailure {
 /// An export summary of `(name, accepted, delivered, failed, dropped)` sinks.
 pub(super) fn export_summary(exporters: &[(&str, u64, u64, u64, u64)]) -> ExportSummary {
     ExportSummary {
+        teardown_failures: Vec::new(),
         accepted: exporters.iter().map(|exporter| exporter.1).sum(),
         dropped: exporters.iter().map(|exporter| exporter.4).sum(),
         failed: exporters.iter().map(|exporter| exporter.3).sum(),

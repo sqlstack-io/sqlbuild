@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from snowflake.connector.errors import ProgrammingError
 
 from sqlbuild.adapters.snowflake.classes.snowflake_adapter import SnowflakeAdapter
 from sqlbuild.cost.models import RunCostSummary
@@ -23,9 +24,22 @@ from tests.unit.src.sqlbuild.adapters.snowflake._test_types import (
 )
 
 
+class _RefusingCursor:
+    """A role that may read neither the account nor its rate sheet: the list price is used."""
+
+    def execute(self, sql: str) -> None:
+        raise ProgrammingError(msg=f"not authorized: {sql}", errno=2003)
+
+    def close(self) -> None:
+        return None
+
+
 class _CostConnection:
     def __init__(self, *, close_error: bool) -> None:
         self.close_error: bool = close_error
+
+    def cursor(self) -> _RefusingCursor:
+        return _RefusingCursor()
 
     def close(self) -> None:
         if self.close_error:

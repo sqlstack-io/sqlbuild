@@ -29,18 +29,18 @@ _SOURCES: str = (
 )
 _FAILING_FILES: dict[str, str] = {
     "sqlbuild_project.toml": _CONFIG + "\n[settings]\nrequire_sql_analysis = true\n",
-    "sources/raw.yml": _SOURCES,
-    "models/staging/stg_orders.sql": (
+    "sql/sources/raw.yml": _SOURCES,
+    "sql/models/staging/stg_orders.sql": (
         'MODEL (description "Staged orders");\n\n'
         "SELECT order_id, customer_id, amonut, status + 1 AS status_rank, ordered_at\n"
         'FROM __source("raw_orders")\n'
     ),
-    "models/marts/customer_totals.sql": (
+    "sql/models/marts/customer_totals.sql": (
         'MODEL (description "Totals per customer");\n\n'
         "SELECT o.customer_id, SUM(o.amount) AS total_amount, MAX(o.status_rank) AS top_rank\n"
         'FROM __ref("stg_orders") AS o\nWHERE o.ordered_at > 5\nGROUP BY o.customer_id\n'
     ),
-    "models/marts/customer_labels.sql": (
+    "sql/models/marts/customer_labels.sql": (
         'MODEL (description "Labels per customer", sql_analysis false);\n\n'
         "SELECT customer_id, UPPER(labell) AS label\n"
         'FROM __ref("stg_orders")\n'
@@ -48,29 +48,29 @@ _FAILING_FILES: dict[str, str] = {
 }
 _METADATA_FILES: dict[str, str] = {
     "sqlbuild_project.toml": _CONFIG,
-    "sources/raw.yml": _SOURCES
+    "sql/sources/raw.yml": _SOURCES
     + (
         "  - name: raw_events\n    description: Loaded events.\n    managed: true\n"
         "    write_strategy: append\n    contract: enforced\n    cursor_column: loaded_at\n"
         "    columns:\n      - name: event_id\n        type: INTEGER\n"
         "      - name: load_seq\n        type: INTEGER\n"
     ),
-    "python/loaders/raw_events.py": (
+    "python/nodes/loaders/raw_events/loader.py": (
         "from sqlbuild.loaders import loader\n\n\n@loader\n"
         "def raw_events(ctx):\n    '''Load events.'''\n"
         "    return [{'event_id': 1, 'load_seq': 1}]\n"
     ),
-    "functions/sql/scaled_amount.sql": (
+    "sql/functions/sql/scaled_amount.sql": (
         'FUNCTION (\n  description "Scale an amount",\n'
         "  arguments (p_amount DOUBLE, p_factor INTEGER),\n  returns DOUBLE,\n);\n\n"
         "p_amount * p_factor\n"
     ),
-    "models/staging/stg_orders.sql": (
+    "sql/models/staging/stg_orders.sql": (
         'MODEL (description "Staged orders");\n\n'
         "SELECT order_id, customer_id, amount, status, ordered_at\n"
         'FROM __source("raw_orders")\n'
     ),
-    "models/marts/customer_totals.sql": (
+    "sql/models/marts/customer_totals.sql": (
         'MODEL (\n  description "Totals per customer",\n'
         "  materialized incremental,\n  incremental_strategy delete_insert,\n"
         "  unique_key [customer_key],\n  cursor ordered_at,\n  cursor_type integer,\n"

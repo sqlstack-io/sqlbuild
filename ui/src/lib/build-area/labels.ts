@@ -5,6 +5,8 @@ import Download from '@lucide/svelte/icons/download';
 import Eye from '@lucide/svelte/icons/eye';
 import GitMerge from '@lucide/svelte/icons/git-merge';
 import Layers from '@lucide/svelte/icons/layers';
+import ChartGantt from '@lucide/svelte/icons/chart-gantt';
+import Repeat from '@lucide/svelte/icons/repeat';
 import Package from '@lucide/svelte/icons/package';
 import SquareFunction from '@lucide/svelte/icons/square-function';
 import TableProperties from '@lucide/svelte/icons/table-properties';
@@ -96,8 +98,8 @@ export const nodeIcon: Record<string, typeof Table2> = {
 	table: Table2,
 	incremental: Layers,
 	merge: GitMerge,
-	delete_insert: Layers,
-	microbatch: Layers,
+	delete_insert: Repeat,
+	microbatch: ChartGantt,
 	asset: Package,
 	udf: SquareFunction,
 	table_fn: TableProperties

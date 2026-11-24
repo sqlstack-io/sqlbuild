@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "S026",
-     "message": "constant price_places is not visible from macros/sql/x.sql\n  model: stg_orders\n  --> models/staging/stg_orders.sql:5:31\n  --> macros/sql/x.sql:3:11",
+     "message": "constant price_places is not visible from sql/macros/sql/x.sql\n  model: stg_orders\n  --> sql/models/staging/stg_orders.sql:5:31\n  --> sql/macros/sql/x.sql:3:11",
      "help": "a SQL macro body resolves constants from its own folder, not its caller's; make it a parameter, e.g. value <type> CONST, and pass @const(\"price_places\") from the model"
     }
    ]

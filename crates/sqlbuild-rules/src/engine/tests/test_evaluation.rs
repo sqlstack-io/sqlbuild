@@ -151,7 +151,7 @@ fn given_conflicting_model_identity_when_evaluating_layer_rules_then_reports_ind
         .map_err(|error| error.to_string())?;
     request["models"][0] = json!({
         "name": "commerce__mart_v__int_v_orders",
-        "relative_path": "models/commerce/intermediate/enriched/orders/commerce__mart_v__int_v_orders.sql",
+        "relative_path": "sql/models/commerce/intermediate/enriched/orders/commerce__mart_v__int_v_orders.sql",
         "query_sql": "SELECT 1 AS order_id",
         "authored_sql": "SELECT 1 AS order_id",
         "config": {"materialized": "table", "schema": "staging"},
@@ -183,7 +183,7 @@ fn given_internal_dependency_edges_when_evaluating_graph_rule_then_only_exact_li
     let models = json!([
         {
             "name": "commerce__stg__orders",
-            "relative_path": "models/commerce/staging/commerce__stg__orders.sql",
+            "relative_path": "sql/models/commerce/staging/commerce__stg__orders.sql",
             "query_sql": "SELECT 1",
             "authored_sql": "SELECT 1",
             "references": [
@@ -193,14 +193,14 @@ fn given_internal_dependency_edges_when_evaluating_graph_rule_then_only_exact_li
         },
         {
             "name": "commerce__int_clean__orders",
-            "relative_path": "models/commerce/intermediate/clean/commerce__int_clean__orders.sql",
+            "relative_path": "sql/models/commerce/intermediate/clean/commerce__int_clean__orders.sql",
             "query_sql": "SELECT 1",
             "authored_sql": "SELECT 1",
             "references": [{"ref_kind": "ref", "ref_name": "commerce__int_enriched__customers"}]
         },
         {
             "name": "commerce__mart__summary",
-            "relative_path": "models/commerce/mart/commerce__mart__summary.sql",
+            "relative_path": "sql/models/commerce/mart/commerce__mart__summary.sql",
             "query_sql": "SELECT 1",
             "authored_sql": "SELECT 1",
             "references": [{"ref_kind": "ref", "ref_name": "commerce__int_enriched__orders"}]
@@ -286,7 +286,7 @@ fn given_repeated_native_evaluation_when_faulting_then_returns_deterministic_com
         }),
         expected_faults: json!([{
             "code": "SQBRCONTRACT101",
-            "path": "models/mart/commerce__mart__orders.sql",
+            "path": "sql/models/mart/commerce__mart__orders.sql",
             "line": 1,
             "column": 1,
             "message": "models must declare an enforced output contract",
@@ -400,7 +400,7 @@ fn given_scoped_suppression_when_evaluating_native_fault_then_returns_no_faults(
             "cache": {"enabled": false},
             "rule_ignores": [{
                 "rules": ["SQBRCONTRACT"],
-                "paths": ["models/mart/**"],
+                "paths": ["sql/models/mart/**"],
                 "reason": "Tracked migration"
             }]
         }),
@@ -443,12 +443,12 @@ fn given_declaration_only_project_when_evaluating_project_rule_then_rule_still_r
         request["public_enums"] = json!([
             {
                 "name": "order_status",
-                "relative_path": "enums/orders/order_status.sql",
+                "relative_path": "sql/enums/orders/order_status.sql",
                 "members": [{"name": "OPEN", "value": "open"}]
             },
             {
                 "name": "support_status",
-                "relative_path": "enums/support/support_status.sql",
+                "relative_path": "sql/enums/support/support_status.sql",
                 "members": [{"name": "OPEN", "value": "open"}]
             }
         ]);
@@ -485,7 +485,7 @@ fn given_scoped_and_global_declarations_when_evaluating_domain_rule_then_only_gl
         test_types::DeclarationScopeTestCase {
             description: "global declaration without domain remains in policy",
             scope: "global",
-            path: "enums/status.sql",
+            path: "sql/enums/status.sql",
             expected_fault_count: 1,
         },
     ];
@@ -1354,7 +1354,7 @@ fn given_path_threshold_overrides_when_evaluating_then_matches_in_authored_order
                 "select": ["SQBRTEST201", "SQBRTEST202"],
                 "thresholds": {"min_audits_per_model": 1, "min_tests_per_model": 1},
                 "threshold_overrides": [{
-                    "paths": ["models/mart/**"],
+                    "paths": ["sql/models/mart/**"],
                     "thresholds": {"min_audits_per_model": 2, "min_tests_per_model": 2},
                     "reason": "marts require stronger evidence"
                 }],
@@ -1370,7 +1370,7 @@ fn given_path_threshold_overrides_when_evaluating_then_matches_in_authored_order
                 "select": ["SQBRTEST201", "SQBRTEST202"],
                 "thresholds": {"min_audits_per_model": 1, "min_tests_per_model": 1},
                 "threshold_overrides": [{
-                    "paths": ["models/staging/**"],
+                    "paths": ["sql/models/staging/**"],
                     "thresholds": {"min_audits_per_model": 2, "min_tests_per_model": 2},
                     "reason": "staging requires stronger evidence"
                 }],
@@ -1387,12 +1387,12 @@ fn given_path_threshold_overrides_when_evaluating_then_matches_in_authored_order
                 "thresholds": {"min_audits_per_model": 1, "min_tests_per_model": 1},
                 "threshold_overrides": [
                     {
-                        "paths": ["models/**"],
+                        "paths": ["sql/models/**"],
                         "thresholds": {"min_audits_per_model": 2, "min_tests_per_model": 2},
                         "reason": "all models require stronger evidence"
                     },
                     {
-                        "paths": ["models/mart/**"],
+                        "paths": ["sql/models/mart/**"],
                         "thresholds": {"min_audits_per_model": 1, "min_tests_per_model": 1},
                         "reason": "mart migration temporarily uses global minima"
                     }
@@ -1409,7 +1409,7 @@ fn given_path_threshold_overrides_when_evaluating_then_matches_in_authored_order
                 "select": ["SQBRTEST201", "SQBRTEST202"],
                 "thresholds": {"min_audits_per_model": 1, "min_tests_per_model": 1},
                 "threshold_overrides": [{
-                    "paths": ["models/mart/**"],
+                    "paths": ["sql/models/mart/**"],
                     "thresholds": {"min_audits_per_model": 2},
                     "reason": "marts require an additional audit"
                 }],
@@ -1424,7 +1424,7 @@ fn given_path_threshold_overrides_when_evaluating_then_matches_in_authored_order
             config: json!({
                 "select": ["SQBRTEST201", "SQBRTEST202"],
                 "threshold_overrides": [{
-                    "paths": ["models/mart/**"],
+                    "paths": ["sql/models/mart/**"],
                     "thresholds": {"min_audits_per_model": 10, "min_tests_per_model": 10},
                     "reason": "marts require strong evidence"
                 }],
@@ -1470,7 +1470,7 @@ fn given_threshold_override_change_when_evaluating_then_ruleset_fingerprint_chan
         overridden_config: json!({
             "select": ["SQBRTEST202"],
             "threshold_overrides": [{
-                "paths": ["models/mart/**"],
+                "paths": ["sql/models/mart/**"],
                 "thresholds": {"min_tests_per_model": 2},
                 "reason": "marts require two focused tests"
             }],
@@ -1535,7 +1535,7 @@ fn given_a_model_whose_analysis_was_skipped_when_building_rules_rows_then_its_ru
     for test_case in test_cases {
         let mut row: ModelRow = ModelRow {
             name: "orders".to_owned(),
-            relative_path: "models/orders.sql".to_owned(),
+            relative_path: "sql/models/orders.sql".to_owned(),
             query_sql: "SELECT 1 AS id".to_owned(),
             sql_analysis_skipped: test_case.sql_analysis_skipped,
             ..ModelRow::default()

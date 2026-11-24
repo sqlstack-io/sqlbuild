@@ -12,6 +12,7 @@ from scripts.build_features.constants import (
     EXTENSION_FEATURES,
     EXTENSION_PACKAGE,
     FEATURE_CRATE,
+    SQB_FEATURES,
     SQB_PACKAGE,
     WHEEL_TARGETS,
 )
@@ -30,7 +31,9 @@ def run_build_features_check(argv: list[str] | None = None) -> int:
                 target=target,
                 sqb=parse_cargo_tree(
                     run_cargo_tree(
-                        root=arguments.root, selection=("--package", SQB_PACKAGE), target=target
+                        root=arguments.root,
+                        selection=("--package", SQB_PACKAGE, "--features", SQB_FEATURES),
+                        target=target,
                     )
                 ),
                 extension=parse_cargo_tree(

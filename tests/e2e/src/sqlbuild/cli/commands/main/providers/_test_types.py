@@ -205,3 +205,10 @@ class ChangedCantRunTestCase:
     expected_cant_run_nodes: list[str]
     expected_cant_run_readers: list[str]
     expected_unchanged: list[str]
+
+
+@dataclass(frozen=True)
+class SinkTeardownFailureE2ETestCase:
+    description: str
+    teardown_error: str
+    expected_warning: str

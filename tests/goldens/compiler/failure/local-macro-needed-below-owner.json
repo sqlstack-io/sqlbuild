@@ -8,12 +8,12 @@
      "phase": "compile",
      "severity": "error",
      "code": "S007",
-     "message": "Declaration 'macro:cents' is currently exact-owner-private at 'models/staging' (models/staging/_sqlbuild/_macros/python/orders.py); required exact-owner-private at 'models/staging/regional'. Consumers: macro:wrapped. Move it to 'models/staging/regional/_sqlbuild/_macros/python/'",
-     "path": "models/staging/_sqlbuild/_macros/python/orders.py",
+     "message": "Declaration 'macro:cents' is currently exact-owner-private at 'sql/models/staging' (sql/models/staging/_sqlbuild/_macros/python/orders.py); required exact-owner-private at 'sql/models/staging/regional'. Consumers: macro:wrapped. Move it to 'sql/models/staging/regional/_sqlbuild/_macros/python/'",
+     "path": "sql/models/staging/_sqlbuild/_macros/python/orders.py",
      "line": 1,
      "column": 1,
      "location": {
-      "path": "models/staging/_sqlbuild/_macros/python/orders.py",
+      "path": "sql/models/staging/_sqlbuild/_macros/python/orders.py",
       "line": 1,
       "column": 1
      }
@@ -22,12 +22,12 @@
      "phase": "compile",
      "severity": "error",
      "code": "S008",
-     "message": "Declaration 'macro:wrapped' is currently descendant-public at 'models/staging' (models/staging/_sqlbuild/macros/python/wrapping.py); required exact-owner-private at 'models/staging/regional'. Consumers: model:stg_regional_orders. Move it to 'models/staging/regional/_sqlbuild/_macros/python/'",
-     "path": "models/staging/_sqlbuild/macros/python/wrapping.py",
+     "message": "Declaration 'macro:wrapped' is currently descendant-public at 'sql/models/staging' (sql/models/staging/_sqlbuild/macros/python/wrapping.py); required exact-owner-private at 'sql/models/staging/regional'. Consumers: model:stg_regional_orders. Move it to 'sql/models/staging/regional/_sqlbuild/_macros/python/'",
+     "path": "sql/models/staging/_sqlbuild/macros/python/wrapping.py",
      "line": 4,
      "column": 1,
      "location": {
-      "path": "models/staging/_sqlbuild/macros/python/wrapping.py",
+      "path": "sql/models/staging/_sqlbuild/macros/python/wrapping.py",
       "line": 4,
       "column": 1
      }
@@ -36,18 +36,18 @@
   }
  ],
  "compiled": {
-  "models/marts/customer_totals.sql": [
+  "sql/models/marts/customer_totals.sql": [
    "SELECT customer_id, SUM(amount) AS total_amount",
    "FROM __ref(\"stg_orders\")",
    "GROUP BY customer_id",
    ""
   ],
-  "models/staging/regional/stg_regional_orders.sql": [
+  "sql/models/staging/regional/stg_regional_orders.sql": [
    "SELECT order_id, (amount * 100) AS amount_cents",
    "FROM __ref(\"stg_orders\")",
    ""
   ],
-  "models/staging/stg_orders.sql": [
+  "sql/models/staging/stg_orders.sql": [
    "SELECT order_id, customer_id, amount, status",
    "FROM __source(\"raw_orders\")",
    ""
@@ -61,8 +61,8 @@
     "name": "customer_totals",
     "resource_type": "model",
     "package_name": "failure_corpus",
-    "path": "models/marts/customer_totals.sql",
-    "original_file_path": "models/marts/customer_totals.sql",
+    "path": "sql/models/marts/customer_totals.sql",
+    "original_file_path": "sql/models/marts/customer_totals.sql",
     "unique_id": "model.failure_corpus.customer_totals",
     "fqn": [
      "failure_corpus",
@@ -130,8 +130,8 @@
     "name": "stg_regional_orders",
     "resource_type": "model",
     "package_name": "failure_corpus",
-    "path": "models/staging/regional/stg_regional_orders.sql",
-    "original_file_path": "models/staging/regional/stg_regional_orders.sql",
+    "path": "sql/models/staging/regional/stg_regional_orders.sql",
+    "original_file_path": "sql/models/staging/regional/stg_regional_orders.sql",
     "unique_id": "model.failure_corpus.stg_regional_orders",
     "fqn": [
      "failure_corpus",
@@ -200,8 +200,8 @@
     "name": "stg_orders",
     "resource_type": "model",
     "package_name": "failure_corpus",
-    "path": "models/staging/stg_orders.sql",
-    "original_file_path": "models/staging/stg_orders.sql",
+    "path": "sql/models/staging/stg_orders.sql",
+    "original_file_path": "sql/models/staging/stg_orders.sql",
     "unique_id": "model.failure_corpus.stg_orders",
     "fqn": [
      "failure_corpus",
@@ -271,8 +271,8 @@
     "name": "raw_orders",
     "resource_type": "source",
     "package_name": "failure_corpus",
-    "path": "sources/raw.yml",
-    "original_file_path": "sources/raw.yml",
+    "path": "sql/sources/raw.yml",
+    "original_file_path": "sql/sources/raw.yml",
     "unique_id": "source.failure_corpus.raw_orders",
     "fqn": [
      "failure_corpus",
@@ -339,8 +339,8 @@
     "name": "cents",
     "resource_type": "macro",
     "package_name": "failure_corpus",
-    "path": "models/staging/_sqlbuild/_macros/python/orders.py",
-    "original_file_path": "models/staging/_sqlbuild/_macros/python/orders.py",
+    "path": "sql/models/staging/_sqlbuild/_macros/python/orders.py",
+    "original_file_path": "sql/models/staging/_sqlbuild/_macros/python/orders.py",
     "unique_id": "macro.failure_corpus.cents",
     "macro_sql": "def cents(expression: str) -> str:\n    \"\"\"Convert to cents.\"\"\"\n    return f\"({expression} * 100)\"\n",
     "depends_on": {
@@ -349,7 +349,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "local",
-     "sqlbuild_scope_path": "models/staging"
+     "sqlbuild_scope_path": "sql/models/staging"
     },
     "docs": {
      "show": true,
@@ -363,10 +363,10 @@
     "name": "wrapped",
     "resource_type": "macro",
     "package_name": "failure_corpus",
-    "path": "models/staging/_sqlbuild/macros/python/wrapping.py",
-    "original_file_path": "models/staging/_sqlbuild/macros/python/wrapping.py",
+    "path": "sql/models/staging/_sqlbuild/macros/python/wrapping.py",
+    "original_file_path": "sql/models/staging/_sqlbuild/macros/python/wrapping.py",
     "unique_id": "macro.failure_corpus.wrapped",
-    "macro_sql": "from models.staging._sqlbuild._macros.python.orders import cents\n\n\ndef wrapped(expression: str) -> str:\n    \"\"\"Wrap cents.\"\"\"\n    return cents(expression)\n",
+    "macro_sql": "from sql.models.staging._sqlbuild._macros.python.orders import cents\n\n\ndef wrapped(expression: str) -> str:\n    \"\"\"Wrap cents.\"\"\"\n    return cents(expression)\n",
     "depends_on": {
      "macros": [
       "macro.failure_corpus.cents"
@@ -375,7 +375,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "inherited",
-     "sqlbuild_scope_path": "models/staging"
+     "sqlbuild_scope_path": "sql/models/staging"
     },
     "docs": {
      "show": true,

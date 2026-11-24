@@ -168,7 +168,7 @@ def test_given_source_probe_not_found_when_checking_then_raises_s405(
     assert raised.value.code == "S405"
     assert all(fragment in raised.value.message for fragment in test_case.expected_error_fragments)
     assert test_case.expected_help_fragment in str(raised.value.help)
-    assert "sources/raw.yml:2" in str(raised.value.help)
+    assert "sql/sources/raw.yml:2" in str(raised.value.help)
     assert test_case.unexpected_output_fragment not in raised.value.message + str(raised.value.help)
     assert tuple(connection.statements) == test_case.expected_probe_statements
 

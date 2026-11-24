@@ -8,6 +8,7 @@
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import HelpTip from '$lib/components/help-tip.svelte';
 	import { formatAgo, formatIn, formatStamp } from '$lib/format/time';
 	import { app } from '$lib/state/app.svelte';
 	import AddServiceAccountDialog from './add-service-account-dialog.svelte';
@@ -17,6 +18,8 @@
 	import { SERVICE_STATE_LABEL, currentKey, oldKey, serviceState } from './utils';
 
 	let { sa }: { sa: ServiceAccountsState } = $props();
+
+	const SERVICE_ACCOUNT_DOCS = 'https://sqlbuild.com/docs/cli/server/#call-the-server-from-scripts-with-service-accounts';
 
 	const canAdd = $derived(app.can('user.manage') && app.can('role.assign'));
 	let query = $state('');
@@ -62,12 +65,16 @@
 					<td colspan={columns.length}>
 						<div class="empty" data-testid="service-accounts-empty">
 							<BotIcon size={22} strokeWidth={1.5} />
-							<div class="empty-title">No service accounts yet</div>
-							<p>A service account lets a script or system call SQLBuild with an API key, such as a deploy that republishes after each release. Its actions appear in the audit log under its own name.</p>
+							<div class="empty-title">
+								No service accounts yet.
+								<HelpTip docs={SERVICE_ACCOUNT_DOCS} label="About service accounts">
+									<p>A service account lets a script or system call SQLBuild with an API key, such as a deploy that republishes after each release. Its actions appear in the audit log under its own name.</p>
+									<p>CLI: <code>sqb admin create-service-account &lt;name&gt; --role &lt;role&gt;</code></p>
+								</HelpTip>
+							</div>
 							{#if canAdd}
 								<Button size="sm" onclick={() => sa.setAdding(true)}><PlusIcon size={14} /> Add service account</Button>
 							{/if}
-							<p class="muted">From a terminal: <code>sqb admin create-service-account &lt;name&gt; --role &lt;role&gt;</code></p>
 						</div>
 					</td>
 				</tr>
@@ -165,11 +172,11 @@
 		white-space: normal;
 	}
 	.empty-title {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
 		color: var(--foreground);
 		font-size: 14px;
 		font-weight: 600;
-	}
-	.empty p {
-		margin: 0;
 	}
 </style>

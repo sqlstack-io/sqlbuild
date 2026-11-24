@@ -43,12 +43,13 @@ def discover_runtime_extensions(*, project_dir: Path) -> DiscoveredRuntimeExtens
         return DiscoveredRuntimeExtensions()
     config: LifecycleEventSinksConfig = _native.load_project_config_file(
         project_dir
-    ).sinks.lifecycle
+    ).event_sinks.lifecycle
     declaration_names: frozenset[str] = frozenset(item.name for item in declarations)
     unknown_names: frozenset[str] = frozenset(config.named) - declaration_names
     if unknown_names:
         raise ProjectConfigError(
-            "sinks.lifecycle.named contains unknown sink(s): " + ", ".join(sorted(unknown_names))
+            "event_sinks.lifecycle.named contains unknown event sink(s): "
+            + ", ".join(sorted(unknown_names))
         )
     if not declarations and not output_declarations:
         return DiscoveredRuntimeExtensions()

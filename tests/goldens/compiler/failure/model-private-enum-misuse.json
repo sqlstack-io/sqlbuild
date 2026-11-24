@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Unknown member 'PENDING' for enum '_state' in '<project>/models/staging/stg_orders.sql'. Available members: OPEN, CLOSED"
+     "message": "Unknown member 'PENDING' for enum '_state' in '<project>/sql/models/staging/stg_orders.sql'. Available members: OPEN, CLOSED"
     }
    ]
   }

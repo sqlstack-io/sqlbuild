@@ -46,9 +46,9 @@ const CONTRACT_KEY: &str = "contract";
 /// Source declaration fields that shape a source mock's columns.
 const SOURCE_SHAPE_FIELDS: [&str; 3] = ["columns", "contract", "type_enforcement"];
 /// Project-local adapter modules.
-const ADAPTERS_DIRECTORY: &str = "adapters";
+const ADAPTERS_DIRECTORY: &str = sqlbuild_core::constants::ADAPTERS_PATH;
 /// Project configuration fields that other nodes fingerprint, or that do not shape compiled SQL.
-const PROJECT_CONFIG_ELSEWHERE: [&str; 11] = [
+const PROJECT_CONFIG_ELSEWHERE: [&str; 12] = [
     "name",
     "settings",
     "vars",
@@ -58,8 +58,9 @@ const PROJECT_CONFIG_ELSEWHERE: [&str; 11] = [
     "diff",
     "janitor",
     "migrations",
-    "sinks",
+    "event_sinks",
     "scenario",
+    "extra_paths",
 ];
 const LOCAL_CONFIG_ELSEWHERE: [&str; 4] = ["settings", "setting_overrides", "vars", "scenario"];
 /// Settings that tune how a run executes or validates, not what a node computes.

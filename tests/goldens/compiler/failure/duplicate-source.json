@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D007",
-     "message": "Duplicate source declaration found for 'raw_orders' in sources/more.yml and sources/raw.yml"
+     "message": "Duplicate source declaration found for 'raw_orders' in sql/sources/more.yml and sql/sources/raw.yml"
     }
    ]
   }

@@ -50,15 +50,15 @@ def write_orders_project(*, tmp_path: Path, name: str, migrate_from: str) -> Pat
 
     project_dir: Path = tmp_path / "orders_project"
     stale: Path
-    for stale in (project_dir / "models").glob("*.sql"):
+    for stale in (project_dir / "sql" / "models").glob("*.sql"):
         stale.unlink()
     return prepare_inline_project(
         tmp_path=tmp_path,
         project_name="orders_project",
         repo_files={
             "sqlbuild_project.toml": _PROJECT_TOML,
-            "sources/raw.yml": _SOURCES_YML,
-            f"models/{name}.sql": orders_sql(migrate_from=migrate_from),
+            "sql/sources/raw.yml": _SOURCES_YML,
+            f"sql/models/{name}.sql": orders_sql(migrate_from=migrate_from),
         },
     )
 
@@ -162,8 +162,8 @@ def write_fct_orders_project(*, tmp_path: Path, model_sql: str) -> Path:
         project_name="orders_project",
         repo_files={
             "sqlbuild_project.toml": _PROJECT_TOML,
-            "sources/raw.yml": _SOURCES_YML,
-            "models/fct_orders.sql": model_sql,
+            "sql/sources/raw.yml": _SOURCES_YML,
+            "sql/models/fct_orders.sql": model_sql,
         },
     )
 
@@ -315,15 +315,15 @@ def write_old_name_project(
 
     project_dir: Path = tmp_path / "orders_project"
     stale: Path
-    for stale in (project_dir / "models").glob("*.sql"):
+    for stale in (project_dir / "sql" / "models").glob("*.sql"):
         stale.unlink()
     for stale in (project_dir / "python").glob("*.py"):
         stale.unlink()
     files: dict[str, str] = {
         "sqlbuild_project.toml": _OLD_NAME_PROJECT_TOML + project_toml_extra,
-        "sources/raw.yml": _SOURCES_YML,
-        **{f"models/{name}.sql": sql for name, sql in models.items()},
-        **{f"python/{name}": source for name, source in (python_files or {}).items()},
+        "sql/sources/raw.yml": _SOURCES_YML,
+        **{f"sql/models/{name}.sql": sql for name, sql in models.items()},
+        **{f"python/nodes/{name}": source for name, source in (python_files or {}).items()},
     }
     return prepare_inline_project(
         tmp_path=tmp_path, project_name="orders_project", repo_files=files

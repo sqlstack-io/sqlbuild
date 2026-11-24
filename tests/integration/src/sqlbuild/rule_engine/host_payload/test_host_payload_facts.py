@@ -23,7 +23,7 @@ from tests.integration.src.sqlbuild.rule_engine.host_payload.helpers import (
 
 _PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
-    "sources/raw.yml": (
+    "sql/sources/raw.yml": (
         "sources:\n"
         "  - name: raw_orders\n    description: Raw orders.\n"
         '    expression: "(SELECT 1 AS id, CAST(10.5 AS DOUBLE) AS amount)"\n'
@@ -31,22 +31,22 @@ _PROJECT_FILES: dict[str, str] = {
         "  - name: raw_customers\n    description: Raw customers.\n"
         '    expression: "(SELECT 1 AS customer_id)"\n'
     ),
-    "seeds/regions.csv": "region_id,name\n1,north\n",
-    "seeds/regions.yml": (
+    "sql/seeds/regions.csv": "region_id,name\n1,north\n",
+    "sql/seeds/regions.yml": (
         "seeds:\n  - name: regions\n    description: Regions.\n    columns:\n"
         "      - name: region_id\n        type: INTEGER\n"
         "      - name: name\n        type: VARCHAR\n"
     ),
-    "functions/sql/is_paid.sql": (
+    "sql/functions/sql/is_paid.sql": (
         "FUNCTION (\n  description 'Paid status.',\n  arguments (status STRING),\n"
         "  returns BOOLEAN,\n);\n\nstatus = 'PAID'\n"
     ),
-    "constants/policy.sql": "CONSTANT (name minimum_amount, value 7);\n",
-    "enums/order_status.sql": "ENUM (name order_status, members [PAID, OPEN]);\n",
-    "models/marts/_sqlbuild/_macros/python/amounts.py": (
+    "sql/constants/policy.sql": "CONSTANT (name minimum_amount, value 7);\n",
+    "sql/enums/order_status.sql": "ENUM (name order_status, members [PAID, OPEN]);\n",
+    "sql/models/marts/_sqlbuild/_macros/python/amounts.py": (
         'def doubled(amount: str) -> str:\n    return f"({amount}) * 2"\n'
     ),
-    "models/staging/stg_orders.sql": (
+    "sql/models/staging/stg_orders.sql": (
         "MODEL (description 'Staged orders.',\n  contract enforced,\n"
         "  columns (\n"
         "    order_id (type INTEGER, nullable false, description 'Order key',\n"
@@ -55,16 +55,16 @@ _PROJECT_FILES: dict[str, str] = {
         "SELECT CAST(id AS INTEGER) AS order_id, amount, 'PAID' AS status\n"
         'FROM __source("raw_orders")\n'
     ),
-    "models/marts/order_totals.sql": (
+    "sql/models/marts/order_totals.sql": (
         'MODEL (description "Order totals", materialized table);\n\n'
         'SELECT o.order_id, @py.doubled("o.amount") AS doubled_amount, o.status\n'
         'FROM __ref("stg_orders") AS o WHERE o.amount > 7\n'
     ),
-    "models/marts/order_flags.sql": (
+    "sql/models/marts/order_flags.sql": (
         'MODEL (description "Order flags");\n\n'
         'SELECT o.order_id, o.missing_flag AS flag FROM __ref("stg_orders") AS o\n'
     ),
-    "models/marts/flag_counts.sql": (
+    "sql/models/marts/flag_counts.sql": (
         'MODEL (description "Flag counts");\n\nSELECT f.flag FROM __ref("order_flags") AS f\n'
     ),
     "tests/unit/test_order_totals.sql": (
@@ -77,7 +77,7 @@ _PROJECT_FILES: dict[str, str] = {
 }
 
 
-_STAGING: str = "models/staging/stg_orders.sql"
+_STAGING: str = "sql/models/staging/stg_orders.sql"
 _POPULATED_FACTS: tuple[str, ...] = (
     "project.sources",
     "project.seeds",
@@ -90,8 +90,8 @@ _POPULATED_FACTS: tuple[str, ...] = (
     f"columns.inferred:{_STAGING}",
     f"columns.enum_types:{_STAGING}",
     f"audits.for_model:{_STAGING}",
-    "tests.for_model:models/marts/order_totals.sql",
-    "graph.dependents:models/marts/order_flags.sql",
+    "tests.for_model:sql/models/marts/order_totals.sql",
+    "graph.dependents:sql/models/marts/order_flags.sql",
 )
 
 

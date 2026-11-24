@@ -43,12 +43,12 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate_rule.helpers import (
                     "WITH final AS (SELECT 1 AS id)\n"
                     "SELECT id FROM final\n"
                 ),
-                path="models/mart/commerce__mart__orders.sql",
+                path="sql/models/mart/commerce__mart__orders.sql",
                 config={"required_domain": "support"},
                 expected_finding_count=1,
             ),
             expected_code="XSQBRD001",
-            expected_path="models/mart/commerce__mart__orders.sql",
+            expected_path="sql/models/mart/commerce__mart__orders.sql",
         )
     ],
     ids=lambda case: case.description,
@@ -75,7 +75,7 @@ def test_given_rule_case_when_evaluating_then_runs_real_pipeline(
                     "WITH final AS (SELECT 1 AS id)\n"
                     "SELECT id FROM final\n"
                 ),
-                path="models/mart/commerce__mart__orders.sql",
+                path="sql/models/mart/commerce__mart__orders.sql",
                 config={"required_domain": "support"},
                 expected_finding_count=1,
             ),
@@ -136,7 +136,7 @@ def test_given_same_custom_rule_when_using_public_and_native_paths_then_faults_h
             rule_case=RuleCase(
                 description="first evaluation reports nothing",
                 source="MODEL (description 'Test model.', materialized table);\n\nSELECT 1 AS id\n",
-                path="models/mart/commerce__mart__orders.sql",
+                path="sql/models/mart/commerce__mart__orders.sql",
                 expected_finding_count=0,
             ),
             expected_error_pattern=(
@@ -180,10 +180,10 @@ def test_given_declared_status_column_when_rule_reads_enum_types_then_sees_decla
             f"  columns (\n    status (type {test_case.status_type}),\n  ),\n);\n\n"
             "SELECT 'open' AS status\n"
         ),
-        path="models/orders.sql",
+        path="sql/models/orders.sql",
         files=(
             RuleFile(
-                path="models/_enums/order_status.sql",
+                path="sql/models/_enums/order_status.sql",
                 source='ENUM (name order_status, members (OPEN "open", CLOSED "closed"));\n',
             ),
         ),

@@ -14,7 +14,9 @@ class ProviderSetupError(RuntimeError):
 
 
 class ProviderTeardownError(RuntimeError):
-    """Raised when provider teardown fails."""
+    """Raised when provider teardown fails; ``failures`` names each provider and error type."""
+
+    failures: tuple[str, ...] = ()
 
 
 class ProviderInjectionError(RuntimeError):

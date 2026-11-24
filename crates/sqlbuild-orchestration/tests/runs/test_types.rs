@@ -626,3 +626,10 @@ pub(crate) struct CancelledRerunTestCase {
     pub(crate) expected_retried: Vec<&'static str>,
     pub(crate) expected_rerun: Vec<&'static str>,
 }
+
+/// The start columns a run's events read selects from an `invocation_started` event, and its message.
+pub(crate) struct StartMessageTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) fields: Vec<(&'static str, serde_json::Value)>,
+    pub(crate) expected_message: Option<&'static str>,
+}
