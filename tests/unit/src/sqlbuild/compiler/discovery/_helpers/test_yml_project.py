@@ -122,7 +122,7 @@ def test_given_audit_lifecycle_sink_filter_when_loading_toml_then_kind_is_accept
 
     config: ProjectConfig = load_project_config(project_dir=tmp_path)
 
-    assert config.sinks.lifecycle.defaults.event_kinds == frozenset(
+    assert config.event_sinks.lifecycle.defaults.event_kinds == frozenset(
         {test_case.expected_error_fragment}
     )
     assert test_case.expected_error_fragment == LifecycleEventKind.AUDIT.value
@@ -1632,7 +1632,7 @@ adapter = "duckdb"
 [path_defaults."sql/models/staging"]
 schema = "staging"
 """.strip(),
-            expected_error_fragment="uses redundant 'sql/models/' prefix",
+            expected_error_fragment="uses a redundant 'sql/models/' prefix",
         ),
         LoadProjectConfigErrorTestCase(
             description="raises when path defaults uses partial segment glob",

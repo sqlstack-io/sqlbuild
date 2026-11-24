@@ -1334,7 +1334,9 @@ def final_directory(*, model: Model, ctx: RuleContext) -> list[Finding]:
     assert len(split["diagnostics"]) == test_case.model_count - test_case.model_count // 3
     assert warm["diagnostics"] == single["diagnostics"]
     assert warm["compile_timings"]["rule_cache_hits"] >= test_case.model_count
-    assert (tmp_path / "target" / "single-rules-cache" / "bulk" / "custom-rules.json").read_bytes() == (
+    assert (
+        tmp_path / "target" / "single-rules-cache" / "bulk" / "custom-rules.json"
+    ).read_bytes() == (
         rules_bulk_cache_path(project_dir=tmp_path, file_name="custom-rules.json").read_bytes()
     )
 

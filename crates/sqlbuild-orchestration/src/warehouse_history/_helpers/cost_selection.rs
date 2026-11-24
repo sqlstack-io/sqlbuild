@@ -107,8 +107,26 @@ pub(crate) fn cost_folder(path: Option<&str>) -> String {
         .to_owned()
 }
 
+/// The period of the last `days` whole UTC days to now, and the selection's cost rows over it.
+pub(crate) async fn selection_costs_in_days(
+    store: &ControlStore,
+    (planner, credentials): (&dyn CommandPlanner, (&AuditContext, Uuid)),
+    (location_id, target): (Uuid, &str),
+    ((select, exclude), days, default_role): ((&str, &str), u32, DefaultRole),
+) -> Result<(CostPeriod, SelectionCosts), ControlError> {
+    let period: CostPeriod = CostPeriod::ending(Utc::now(), days);
+    let costs: SelectionCosts = selection_costs(
+        store,
+        (planner, credentials),
+        (location_id, target),
+        ((select, exclude), &period, default_role),
+    )
+    .await?;
+    Ok((period, costs))
+}
+
 /// The cost rows of the nodes a selection picks over `period` and the one before, or why it's refused.
-pub(crate) async fn selection_costs(
+async fn selection_costs(
     store: &ControlStore,
     (planner, credentials): (&dyn CommandPlanner, (&AuditContext, Uuid)),
     (location_id, target): (Uuid, &str),

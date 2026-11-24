@@ -2282,10 +2282,7 @@ export interface components {
         };
         /** @description The price the dollars of a cost read use, and where it came from. */
         CostPrice: {
-            /**
-             * @description `config` (the project's `[cost] usd_per_credit`), `rate_sheet`, `list_price` (an estimate,
-             *     also when only some rows are) or `mixed`.
-             */
+            /** @description `config` (`[cost] usd_per_credit`), `rate_sheet`, `list_price` (also when only some) or `mixed`. */
             source: string;
             /** Format: double */
             usd_per_credit: number;
@@ -2363,10 +2360,7 @@ export interface components {
             since: string;
             /** Format: double */
             usd?: number | null;
-            /**
-             * @description Where the dollars' prices came from: `config`, `rate_sheet`, `list_price` (an estimate, also
-             *     when only some are) or `mixed`; None without dollars.
-             */
+            /** @description `config`, `rate_sheet`, `list_price` (also when only some are) or `mixed`; None without dollars. */
             usd_per_credit_source?: string | null;
         };
         /** @description One stretch of the cursor, as raw bound texts. */

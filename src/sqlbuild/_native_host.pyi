@@ -128,6 +128,9 @@ from sqlbuild.compiler.discovery._helpers.filesystem.project_modules import (
     install_python_root_package as install_python_root_package,
 )
 from sqlbuild.compiler.discovery._helpers.filesystem.project_modules import (
+    load_event_sink_module as load_event_sink_module,
+)
+from sqlbuild.compiler.discovery._helpers.filesystem.project_modules import (
     load_materialize_function as load_materialize_function,
 )
 from sqlbuild.compiler.discovery._helpers.filesystem.project_modules import (
@@ -138,9 +141,6 @@ from sqlbuild.compiler.discovery._helpers.filesystem.project_modules import (
 )
 from sqlbuild.compiler.discovery._helpers.filesystem.project_modules import (
     load_python_node_module as load_python_node_module,
-)
-from sqlbuild.compiler.discovery._helpers.filesystem.project_modules import (
-    load_sink_module as load_sink_module,
 )
 from sqlbuild.compiler.discovery._helpers.filesystem.project_modules import (
     module_functions as module_functions,
@@ -571,11 +571,11 @@ from sqlbuild.runtime.observability.exceptions import (
 from sqlbuild.runtime.observability.main.create_lifecycle_event import (
     create_lifecycle_event as create_lifecycle_event,
 )
-from sqlbuild.runtime.observability.main.current_execution_identity import (
-    current_execution_identity as current_execution_identity,
-)
 from sqlbuild.runtime.observability.main.current_event_dispatcher import (
     current_event_dispatcher as current_event_dispatcher,
+)
+from sqlbuild.runtime.observability.main.current_execution_identity import (
+    current_execution_identity as current_execution_identity,
 )
 from sqlbuild.runtime.observability.main.diagnostic_log_to_json import (
     diagnostic_log_to_json as diagnostic_log_to_json,

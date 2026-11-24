@@ -1,13 +1,12 @@
 //! Daily cost series of a selection, for a batch of groups by job, folder and node.
 
-use chrono::Utc;
 use uuid::Uuid;
 
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::runs::types::CommandPlanner;
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
-use crate::warehouse_history::_helpers::cost_selection::{CostPeriod, selection_costs};
+use crate::warehouse_history::_helpers::cost_selection::selection_costs_in_days;
 use crate::warehouse_history::_helpers::cost_summary::group_series;
 use crate::warehouse_history::constants::COST_SERIES_GROUPS;
 use crate::warehouse_history::models::{CostSeriesBatch, CostSeriesGroup};
@@ -28,12 +27,11 @@ pub async fn read_person_cost_series(
             "at most {COST_SERIES_GROUPS} groups per request"
         )));
     }
-    let period = CostPeriod::ending(Utc::now(), days);
-    let costs = selection_costs(
+    let (period, costs) = selection_costs_in_days(
         store,
         (planner, credentials),
         (location_id, target),
-        ((select, exclude), &period, default_role),
+        ((select, exclude), days, default_role),
     )
     .await?;
     Ok(CostSeriesBatch {

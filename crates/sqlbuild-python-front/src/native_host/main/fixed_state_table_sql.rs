@@ -1,9 +1,11 @@
 //! Create-if-missing DDL for a state table with fixed columns, typed by the adapter.
 
 use crate::native_host::main::state_table_name::state_table_name;
-use crate::state_rows::main::tables::state_table_create_sql::state_table_create_sql;
+use crate::state_rows::main::tables::state_table_columns::state_table_columns;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyFrozenSet, PyTuple};
+use sqlbuild_state::state_tables::main::create_table_sql::create_table_sql;
+use sqlbuild_state::state_tables::models::TableColumn;
 
 /// Create-if-missing DDL for a state table with fixed columns, typed by the adapter.
 pub fn fixed_state_table_sql(
@@ -27,13 +29,13 @@ pub fn fixed_state_table_sql(
         .map(|(column, _)| *column)
         .filter(|column| !nullable.contains(column))
         .collect();
-    state_table_create_sql(
-        &table,
+    let definitions: Vec<TableColumn> = state_table_columns(
         (
             &columns,
             &types.into_any(),
             &PyFrozenSet::new(py, &required)?.into_any(),
         ),
         render_framework_type,
-    )
+    )?;
+    Ok(create_table_sql(&table, &definitions))
 }

@@ -24,7 +24,9 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_base::warehouse_access::main::ensure_event_id_column::ensure_event_id_column;
 use sqlbuild_python_front::native_host::main::state_table_name::state_table_name;
-use sqlbuild_python_front::state_rows::main::tables::state_table_create_sql::state_table_create_sql;
+use sqlbuild_python_front::state_rows::main::tables::state_table_columns::state_table_columns;
+use sqlbuild_state::state_tables::main::create_table_sql::create_table_sql as table_ddl;
+use sqlbuild_state::state_tables::models::TableColumn;
 
 const MISSING_SCHEMA_MESSAGE: &str = "source freshness table requires a target schema";
 
@@ -97,12 +99,9 @@ fn create_table_sql<'py>(
     column_types.set_item(SOURCE_FRESHNESS_EVENT_ID, STRING_STATE_VALUE_TYPE)?;
     let column_types: Bound<'py, PyAny> = column_types.into_any();
     let required: Bound<'py, PyAny> = PyFrozenSet::new(py, REQUIRED_STATE_COLUMNS)?.into_any();
-    let sql: String = state_table_create_sql(
-        &qualified_name,
-        (&columns, &column_types, &required),
-        render_framework_type,
-    )?;
-    Ok(text(py, &sql))
+    let definitions: Vec<TableColumn> =
+        state_table_columns((&columns, &column_types, &required), render_framework_type)?;
+    Ok(text(py, &table_ddl(&qualified_name, &definitions)))
 }
 
 fn empty_set<'py>(schema: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {

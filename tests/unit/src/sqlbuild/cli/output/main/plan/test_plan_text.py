@@ -728,7 +728,7 @@ from tests.unit.src.sqlbuild.cli.output.main.plan.helpers import (
                 "dependency diff:",
                 "-    return 1",
                 "+    return 2",
-                "python/nodes/tasks/helpers.py :: python.tasks.helpers :: order_label",
+                "python/nodes/tasks/helpers.py :: python.nodes.tasks.helpers :: order_label",
                 "-    return 'old'",
                 "+    return 'new'",
             ),
@@ -1466,7 +1466,7 @@ def test_given_plan_output_when_formatting_then_contains_expected_fragments(
                 ),
             ),
             expected_fragments=(
-                "\033[2m         # python/nodes/tasks/helpers.py :: python.tasks.helpers :: order_label\033[0m",
+                "\033[2m         # python/nodes/tasks/helpers.py :: python.nodes.tasks.helpers :: order_label\033[0m",
                 "\033[38;5;167m      -    return 'old'\033[0m",
                 "\033[32m      +    return 'new'\033[0m",
             ),

@@ -12548,8 +12548,9 @@ class ProjectConfig(NativeRecord):
     snapshots: SnapshotsConfig
     scenario: ScenarioConfig
     dbt: DbtConfig
-    sinks: SinksConfig
+    event_sinks: SinksConfig
     env_file: str | None
+    extra_paths: tuple[str, ...]
     def __init__(
         self,
         name: str,
@@ -12575,8 +12576,9 @@ class ProjectConfig(NativeRecord):
         snapshots: SnapshotsConfig = ...,
         scenario: ScenarioConfig = ...,
         dbt: DbtConfig = ...,
-        sinks: SinksConfig = ...,
+        event_sinks: SinksConfig = ...,
         env_file: str | None = ...,
+        extra_paths: tuple[str, ...] = ...,
     ) -> None: ...
 
 class LocalConfig(NativeRecord):
