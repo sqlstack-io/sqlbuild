@@ -4,6 +4,7 @@
 import type { NodeKind, SnapshotNode } from '../types';
 import { DISCOVERED_NODES } from './discovered';
 import type { SelectionProblem, SelectionVocabulary, VocabularyEntry } from '../types/operate';
+import { MODELS_ROOT, PATH_SELECTOR_ROOTS, PYTHON_NODES_ROOT, SQL_ROOT } from '$lib/project-layout';
 
 function node(
 	key: string,
@@ -15,12 +16,12 @@ function node(
 	const path =
 		options.path ??
 		(kind === 'source'
-			? 'models/sources.yml'
+			? `${SQL_ROOT}/sources/${key.split('__')[0]}.yml`
 			: kind === 'seed'
-				? `seeds/${key}.csv`
+				? `${SQL_ROOT}/seeds/${key}.csv`
 				: kind === 'asset' || kind === 'loader'
-					? `python/${key}.py`
-					: `models/${group}/${key}.sql`);
+					? `${PYTHON_NODES_ROOT}/${key}.py`
+					: `${MODELS_ROOT}/${group}/${key}.sql`);
 	return { key, kind, group, tags: options.tags ?? [], path, cursor: options.cursor ?? null, upstream };
 }
 
@@ -63,17 +64,17 @@ export const SNAPSHOT_NODES: SnapshotNode[] = [
 	node('agg_delivery_times', 'table', 'fulfillment', ['fct_shipments']),
 	node('rpt_late_deliveries', 'table', 'fulfillment', ['agg_delivery_times', 'dim_customers']),
 	// Python nodes (CHI-1591): a loader that prints its paging, and a task that warns.
-	node('raw_events', 'loader', 'ingest', [], { cursor: 'timestamp', path: 'models/ingest/raw_events.py' }),
-	node('score_customers', 'asset', 'ml', ['dim_customers'], { path: 'models/ml/score_customers.py' }),
+	node('raw_events', 'loader', 'ingest', [], { cursor: 'timestamp', path: 'python/nodes/ingest/raw_events.py' }),
+	node('score_customers', 'asset', 'ml', ['dim_customers'], { path: 'python/nodes/ml/score_customers.py' }),
 	// Several checks on one node (CHI-1591): all passing, one warning, two warnings, and a failure with warnings.
 	node('stg_sessions', 'view', 'staging', ['raw__customers']),
 	node('fct_payment_daily', 'table', 'finance', ['stg_payments']),
 	node('fct_order_lines', 'table', 'marts', ['stg_orders', 'stg_payments']),
 	node('fct_refunds', 'table', 'finance', ['stg_payments', 'fact_orders']),
 	// A Python task that fails with a pandas KeyError traceback after printing a few thousand lines.
-	node('score_customers_v2', 'asset', 'ml', ['dim_customers'], { path: 'models/ml/score_customers_v2.py' }),
+	node('score_customers_v2', 'asset', 'ml', ['dim_customers'], { path: 'python/nodes/ml/score_customers_v2.py' }),
 	// A notebook runner that prints about 2 million lines (CHI-1597).
-	node('notebook_runner', 'asset', 'ml', ['fact_orders'], { path: 'models/ml/notebook_runner.py' }),
+	node('notebook_runner', 'asset', 'ml', ['fact_orders'], { path: 'python/nodes/ml/notebook_runner.py' }),
 	// Discovered steps of two forecast plans (discovered.ts).
 	...DISCOVERED_NODES
 ];
@@ -180,9 +181,16 @@ function selectorKind(n: SnapshotNode): string {
 	return MODEL_KINDS.has(n.kind) ? 'model' : n.kind;
 }
 
-/** The folder a node's file is in, such as `models/marts`. */
-function folderOf(n: SnapshotNode): string {
+/** The directory a node's file is in, such as `sql/models/marts`. */
+function dirOf(n: SnapshotNode): string {
 	return n.path.includes('/') ? n.path.slice(0, n.path.lastIndexOf('/')) : '';
+}
+
+/** `path:<dir>`, as SQLBuild resolves it: the nodes in the directory or below it, from `sql/models` or `python/nodes` only. */
+function inDir(n: SnapshotNode, dir: string): boolean {
+	const at = dir.replace(/^\/+|\/+$/g, '');
+	const rooted = PATH_SELECTOR_ROOTS.some((root) => at === root || at.startsWith(`${root}/`));
+	return rooted && (dirOf(n) === at || dirOf(n).startsWith(`${at}/`));
 }
 
 /** `job:<key>`: the job's nodes, as `operate.ts` resolves them (set there, which imports this module). */
@@ -200,7 +208,7 @@ function matchPart(part: string): Set<string> | null {
 	const jobKeys = type === 'job' ? new Set(jobNodesOf(value)) : null;
 	const base = SNAPSHOT_NODES.filter((n) =>
 		jobKeys ? jobKeys.has(n.key) :
-		type === 'tag' ? n.tags.includes(value) : type === 'kind' ? selectorKind(n) === value : type === 'path' ? folderOf(n) === value.replace(/^sql\//, '') || folderOf(n).startsWith(`${value.replace(/^sql\//, '')}/`) : n.key === value
+		type === 'tag' ? n.tags.includes(value) : type === 'kind' ? selectorKind(n) === value : type === 'path' ? inDir(n, value) : n.key === value
 	);
 	if (!base.length) return null;
 	const out = new Set(base.map((n) => n.key));
@@ -249,10 +257,16 @@ export function mockVocabulary(): Omit<SelectionVocabulary, 'snapshotId' | 'jobs
 		for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
 		return [...counts].sort(([a], [b]) => a.localeCompare(b)).map(([value, count]) => ({ value, count }));
 	};
-	const folders = (n: SnapshotNode) => folderOf(n).split('/').filter(Boolean).map((_, i, parts) => parts.slice(0, i + 1).join('/'));
+	// Every directory above a node that a `path:` selector accepts, as the server's vocabulary lists them.
+	const folders = (n: SnapshotNode) =>
+		dirOf(n)
+			.split('/')
+			.filter(Boolean)
+			.map((_, i, parts) => parts.slice(0, i + 1).join('/'))
+			.filter((dir) => PATH_SELECTOR_ROOTS.some((root) => dir === root || dir.startsWith(`${root}/`)));
 	return {
 		tags: counted(SNAPSHOT_NODES.flatMap((n) => n.tags)),
-		paths: counted(SNAPSHOT_NODES.filter((n) => n.kind !== 'source' && n.kind !== 'seed').flatMap(folders)),
+		paths: counted(SNAPSHOT_NODES.flatMap(folders)),
 		sources: counted(SNAPSHOT_NODES.filter((n) => n.kind === 'source').map((n) => n.key)),
 		seeds: counted(SNAPSHOT_NODES.filter((n) => n.kind === 'seed').map((n) => n.key)),
 		kinds: counted(SNAPSHOT_NODES.map(selectorKind))

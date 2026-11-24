@@ -415,7 +415,7 @@ export type CostFact = {
 	/** Null for builds no server run started (by hand or from the command line). */
 	job: string | null;
 	nodeKey: string;
-	/** The node's folder: without `sql/models/` for SQL models (empty at its top), other roots as published, `other` when unknown. */
+	/** The node's folder as the catalog groups it: below `sql/models/` for SQL models (empty at its top), below `sql/` for other SQL resources, `python/<below python/nodes/>` for Python nodes, `other` when unknown. */
 	folder: string;
 	credits: number;
 	previousCredits: number;
@@ -755,7 +755,7 @@ export type VocabularyEntry = { value: string; count: number };
 export type SelectionVocabulary = {
 	snapshotId: string | null;
 	tags: VocabularyEntry[];
-	/** Folders such as `models/staging`, counting the nodes below each at any depth. */
+	/** Folders a `path:` selector accepts, such as `sql/models/staging`, counting the nodes below each at any depth. */
 	paths: VocabularyEntry[];
 	jobs: VocabularyEntry[];
 	sources: VocabularyEntry[];

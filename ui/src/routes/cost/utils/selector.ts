@@ -1,12 +1,13 @@
 // The Cost page's selection read as a place to stand: a free-form base (anything the tree can't
 // break down), then a job, a folder and a model, each a comma part SQLBuild intersects. Drilling
 // adds a part to every token; breadcrumbs take parts away. Pure.
+import { dirOfFolder, folderOfDir } from '$lib/project-layout';
 import { parseSelection, type Part } from '$lib/selection/syntax';
 
-/** A cost folder as `path:` selects it: SQL models under `sql/models/`, other roots (`python/…`, `sql/…`) as they are. */
-export const pathOfFolder = (folder: string) => (/^(python|sql)\//.test(folder) ? folder : `sql/models/${folder}`);
-/** A `path:` value as a cost folder: without `sql/models/` and a trailing slash. */
-export const folderOfPath = (path: string) => path.replace(/^sql\/models(\/|$)/, '').replace(/\/$/, '');
+/** A cost folder as `path:` selects it: `marts` is `sql/models/marts`, `python/exports` is `python/nodes/exports`. */
+export const pathOfFolder = (folder: string) => dirOfFolder(folder);
+/** A `path:` value as a cost folder, as the catalog groups it: `sql/models/marts/` is `marts`. */
+export const folderOfPath = (path: string) => folderOfDir(path);
 
 export type Place = {
 	/** The free-form tokens, each without the structured parts; empty when the tree covers it all. */

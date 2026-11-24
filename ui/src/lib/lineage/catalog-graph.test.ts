@@ -8,14 +8,19 @@ function node(key: string, path: string, upstream: string[] = [], extra: Partial
 }
 
 describe('lineage folders', () => {
-	it('groups models by folder, sources by file, and lets a declared group win', () => {
+	it('groups models below sql/models, other SQL below sql, Python below python/nodes, and lets a declared group win', () => {
 		expect([
-			folderOf(node('model:dim_orders', 'models/marts/core/dim_orders.sql')),
-			folderOf(node('source:shop__orders', 'sources/shop.yml')),
-			folderOf(node('seed:countries', 'seeds/countries.csv')),
-			folderOf(node('model:orders', 'orders.sql')),
-			folderOf(node('model:stg_orders', 'models/staging/stg_orders.sql', [], { group: 'shop' }))
-		]).toEqual(['marts/core', 'sources/shop', 'seeds', 'models', 'shop']);
+			folderOf(node('model:dim_orders', 'sql/models/marts/core/dim_orders.sql')),
+			folderOf(node('model:orders', 'sql/models/orders.sql')),
+			folderOf(node('source:shop__orders', 'sql/sources/shop.yml')),
+			folderOf(node('seed:countries', 'sql/seeds/countries.csv')),
+			folderOf(node('seed:regions', 'sql/seeds/geo/regions.csv')),
+			folderOf(node('udf:clean', 'sql/functions/clean.sql', [], { kind: 'udf' })),
+			folderOf(node('udf:to_cents', 'sql/models/staging/_sqlbuild/functions/to_cents.sql', [], { kind: 'udf' })),
+			folderOf(node('asset:export_csv', 'python/nodes/exports/export_csv.py', [], { kind: 'asset' })),
+			folderOf(node('asset:score', 'python/nodes/score.py', [], { kind: 'asset' })),
+			folderOf(node('model:stg_orders', 'sql/models/staging/stg_orders.sql', [], { group: 'shop' }))
+		]).toEqual(['marts/core', 'models', 'sources/shop', 'seeds', 'seeds/geo', 'functions', 'staging/_sqlbuild/functions', 'python/exports', 'python', 'shop']);
 	});
 });
 

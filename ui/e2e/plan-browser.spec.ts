@@ -234,7 +234,7 @@ test('seeds sit with the models of the same reason: first runs, changes and unch
 });
 
 test('a small plan reads as a short index', async ({ page }) => {
-	await openPlan(page, `/plan?mock&cmd=${encodeURIComponent('sqb build -s path:models/marts')}`);
+	await openPlan(page, `/plan?mock&cmd=${encodeURIComponent('sqb build -s path:sql/models/marts')}`);
 	const entries = page.locator('.index .entry');
 	expect(await entries.count()).toBeGreaterThanOrEqual(1);
 	expect(await entries.count()).toBeLessThanOrEqual(3);

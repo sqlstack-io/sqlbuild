@@ -417,7 +417,8 @@ export class MockBuild {
 			key: sn.key,
 			kind: sn.kind,
 			materialization: spec?.materialization ?? null,
-			group: sn.group,
+			// The server declares no groups: pages group by the folders of the node's path.
+			group: null,
 			tags: [...sn.tags],
 			description: spec?.description ?? '',
 			path: sn.path,

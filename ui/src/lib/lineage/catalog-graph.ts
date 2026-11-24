@@ -4,6 +4,7 @@ import type { Edge, Node } from '@xyflow/svelte';
 import { cardLabel } from './discovered-labels';
 import type { CatalogNode, StaleReason } from '$lib/api';
 import { FUNCTION_KINDS, PYTHON_KINDS, kindLine, nodeIconKey } from '$lib/build-area/labels';
+import { PYTHON_FOLDER, folderOfDir } from '$lib/project-layout';
 
 export type CardStatus = 'ok' | 'fail' | 'warn' | 'src' | 'none';
 export type CardStale = 'changed' | 'compiled' | 'upstream' | 'behind';
@@ -64,16 +65,17 @@ export function catalogGraph(nodes: CatalogNode[]): { nodes: Node[]; edges: Edge
 export const GROUPED_ABOVE = 150;
 
 /**
- * The folder a node lives in, such as `marts/core`, or its source file, such as `sources/orders`;
- * a declared group wins.
+ * The folder a node lives in, as the project layout groups it (`folderOfDir`): a model's folder
+ * below `sql/models/`, such as `marts/core`, a source's file below `sql/`, such as `sources/orders`,
+ * or `python/exports` for a Python node; a declared group wins.
  */
 export function folderOf(node: CatalogNode): string {
 	if (node.group) return node.group;
-	const path = node.path.replace(/^models\//, '');
-	if (node.kind === 'source') return path.replace(/\.[^./]+$/, '') || 'sources';
-	const slash = path.lastIndexOf('/');
-	if (slash > 0) return path.slice(0, slash);
-	return node.kind === 'seed' ? 'seeds' : PYTHON_KINDS.includes(node.kind) ? 'python' : FUNCTION_KINDS.includes(node.kind) ? 'functions' : 'models';
+	if (node.kind === 'source') return folderOfDir(node.path.replace(/\.[^./]+$/, '')) || 'sources';
+	const slash = node.path.lastIndexOf('/');
+	const folder = slash > 0 ? folderOfDir(node.path.slice(0, slash)) : '';
+	if (folder) return folder;
+	return node.kind === 'seed' ? 'seeds' : PYTHON_KINDS.includes(node.kind) ? PYTHON_FOLDER : FUNCTION_KINDS.includes(node.kind) ? 'functions' : 'models';
 }
 
 /** The outermost folder around a node, such as `marts`, which the catalog filters and Overview counts by. */

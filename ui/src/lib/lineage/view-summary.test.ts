@@ -10,10 +10,10 @@ function node(key: string, kind: CatalogNode['kind'], path: string, stale: Stale
 
 const nodes = [
 	node('source:raw_orders', 'source', 'sources/shop.yml'),
-	node('model:orders', 'table', 'models/marts/orders.sql', ['changed', 'behind']),
-	node('model:customers', 'table', 'models/marts/customers.sql', ['behind']),
-	node('model:order_view', 'view', 'models/marts/order_view.sql', ['changed_upstream']),
-	node('model:inventory', 'incremental', 'models/stock/inventory.sql', [], 'failed')
+	node('model:orders', 'table', 'sql/models/marts/orders.sql', ['changed', 'behind']),
+	node('model:customers', 'table', 'sql/models/marts/customers.sql', ['behind']),
+	node('model:order_view', 'view', 'sql/models/marts/order_view.sql', ['changed_upstream']),
+	node('model:inventory', 'incremental', 'sql/models/stock/inventory.sql', [], 'failed')
 ];
 
 describe('view summary', () => {

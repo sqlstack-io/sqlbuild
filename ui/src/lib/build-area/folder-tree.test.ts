@@ -7,51 +7,51 @@ const node = (key: string, path: string, extra: Partial<CatalogNode> = {}): Cata
 	({ key, kind: 'table', path, group: null, upstream: [], stale: [], lastOutcome: 'success', lastBuild: { builtAt: '2026-11-18T00:00:00Z' }, ...extra }) as CatalogNode;
 
 const nodes = [
-	node('card_events', 'models/payments/providers/card/card_events.sql', { stale: behind }),
-	node('card_daily', 'models/payments/providers/card/card_daily.sql'),
-	node('bank_events', 'models/payments/providers/bank/bank_events.sql'),
-	node('settled', 'models/payments/settlement/settled.sql', { lastOutcome: 'failed' }),
-	node('payments_summary', 'models/payments/payments_summary.sql'),
-	node('orders', 'models/orders/marts/orders.sql'),
-	node('raw_orders', 'sources/shop.yml', { kind: 'source' })
+	node('card_events', 'sql/models/payments/providers/card/card_events.sql', { stale: behind }),
+	node('card_daily', 'sql/models/payments/providers/card/card_daily.sql'),
+	node('bank_events', 'sql/models/payments/providers/bank/bank_events.sql'),
+	node('settled', 'sql/models/payments/settlement/settled.sql', { lastOutcome: 'failed' }),
+	node('payments_summary', 'sql/models/payments/payments_summary.sql'),
+	node('orders', 'sql/models/orders/marts/orders.sql'),
+	node('raw_orders', 'sql/sources/shop.yml', { kind: 'source' })
 ];
 const label = (r: TreeRow) => (r.kind === 'folder' ? `${'  '.repeat(r.folder.depth)}${r.folder.group}${r.expandable ? (r.expanded ? ' v' : ' >') : ''}` : r.kind === 'node' ? `${'  '.repeat(r.depth)}· ${r.node.key}` : `${'  '.repeat(r.folder.depth + 1)}+${r.hidden} more`);
 const rows = (opts: Partial<Parameters<typeof visibleTreeRows>[1]> = {}) =>
 	visibleTreeRows(folderTree(nodes), { expanded: new Set(), sort: 'urgency', reverse: false, attentionOnly: false, listNodes: false, ...opts }).map(label);
 
 describe('the catalog folder tree', () => {
-	it('selects a folder by path only when that selects exactly what it counts, and only under models/ or python/', () => {
+	it('selects a folder by path only when that selects exactly what it counts, and only under sql/models/ or python/nodes/', () => {
 		const tree = folderTree([
-			node('orders', 'models/shop/orders/orders.sql'),
+			node('orders', 'sql/models/shop/orders/orders.sql'),
 			// A source declared in the folder: a path would select it, though the folder doesn't count it.
-			node('raw_returns', 'models/shop/returns/sources.yml', { kind: 'source' }),
-			node('returns', 'models/shop/returns/returns.sql'),
+			node('raw_returns', 'sql/models/shop/returns/sources.yml', { kind: 'source' }),
+			node('returns', 'sql/models/shop/returns/returns.sql'),
 			// A node of a declared group whose file sits in the folder.
-			node('loyalty', 'models/shop/customers/loyalty.sql', { group: 'crm' }),
-			node('customers', 'models/shop/customers/customers.sql'),
-			node('codes', 'seeds/lookups/codes.csv', { kind: 'seed' }),
-			node('score', 'python/ml/score.py', { kind: 'asset' })
+			node('loyalty', 'sql/models/shop/customers/loyalty.sql', { group: 'crm' }),
+			node('customers', 'sql/models/shop/customers/customers.sql'),
+			node('codes', 'sql/seeds/lookups/codes.csv', { kind: 'seed' }),
+			node('score', 'python/nodes/ml/score.py', { kind: 'asset' })
 		]);
 		const selection = (path: string) => {
 			const find = (fs: ReturnType<typeof folderTree>): ReturnType<typeof folderTree>[number] | undefined => fs.flatMap((f) => (f.path === path ? [f] : [find(f.children)].filter((x) => !!x)))[0];
 			return find(tree)?.selection;
 		};
-		expect(selection('shop/orders')).toBe('path:models/shop/orders');
+		expect(selection('shop/orders')).toBe('path:sql/models/shop/orders');
 		expect(selection('shop/returns')).toBe('returns');
 		expect(selection('shop/customers')).toBe('customers');
 		expect(selection('shop')).toBe('orders returns customers');
 		// `path:seeds/…` is rejected: path selectors start at models/ or python/.
 		expect([selection('seeds'), selection('seeds/lookups')]).toEqual(['codes', 'codes']);
-		expect(selection('python/ml')).toBe('path:python/ml');
+		expect(selection('python/ml')).toBe('path:python/nodes/ml');
 	});
 
 	it('counts each folder with its subfolders, and selects exactly its nodes', () => {
 		const [payments, orders] = folderTree(nodes);
 		expect([payments.path, payments.total, payments.current, payments.behind, payments.failed]).toEqual(['payments', 5, 3, 1, 1]);
-		expect(payments.selection).toBe('path:models/payments');
+		expect(payments.selection).toBe('path:sql/models/payments');
 		expect(payments.children.map((c) => [c.path, c.total, c.selection])).toEqual([
-			['payments/providers', 3, 'path:models/payments/providers'],
-			['payments/settlement', 1, 'path:models/payments/settlement']
+			['payments/providers', 3, 'path:sql/models/payments/providers'],
+			['payments/settlement', 1, 'path:sql/models/payments/settlement']
 		]);
 		expect(payments.members.map((n) => n.key)).toEqual(['payments_summary']);
 		expect(orders.total).toBe(1);

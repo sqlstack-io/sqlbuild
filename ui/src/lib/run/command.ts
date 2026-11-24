@@ -3,6 +3,7 @@
 // nodes. The server resolves selectors and refuses flags; nothing here decides
 // whether a command may run. Pure: no side effects.
 
+import { canSelectByPath } from '$lib/project-layout';
 import type { ChangedBuild, CursorWindow, LaunchVerb, RerunMode, SnapshotNode } from '$lib/api';
 import { flagSpec, VERBS, type FlagSpec } from './command-table';
 import { plural } from '$lib/format/plural';
@@ -232,7 +233,8 @@ function selectorPool(nodes: SnapshotNode[]): { value: string; hint: string }[] 
 	const unique = (values: string[]) => [...new Set(values)].sort();
 	return [
 		...unique(nodes.flatMap((n) => n.tags)).map((t) => ({ value: `tag:${t}`, hint: 'tag' })),
-		...unique(nodes.filter((n) => n.path.includes('/')).map((n) => n.path.replace(/\/[^/]+$/, ''))).map((p) => ({ value: `path:${p}`, hint: 'folder' })),
+		// Only folders a `path:` selector accepts, below `sql/models/` or `python/nodes/`.
+		...unique(nodes.map((n) => n.path.replace(/\/?[^/]*$/, '')).filter(canSelectByPath)).map((p) => ({ value: `path:${p}`, hint: 'folder' })),
 		...nodes.map((n) => ({ value: selectorOf(n.key), hint: n.kind }))
 	];
 }

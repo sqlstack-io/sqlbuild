@@ -42,12 +42,12 @@ describe('overview from live reads', () => {
 		runs,
 		checks: [check('a', 'pass'), check('b', 'fail'), check('c', 'error'), check('d', 'warn'), check('e', null)],
 		nodes: [
-			node('model:orders', 'table', 'models/marts/core/orders.sql', ['changed', 'behind'], built),
-			node('model:totals', 'view', 'models/marts/totals.sql', [], built),
-			node('model:returns', 'table', 'models/marts/returns.sql', [], { ...built, lastOutcome: 'failed' }),
-			node('model:events', 'incremental', 'models/staging/events.sql', ['behind'], built),
-			node('source:raw', 'source', 'models/staging/sources.yml'),
-			node('seed:regions', 'seed', 'seeds/regions.csv')
+			node('model:orders', 'table', 'sql/models/marts/core/orders.sql', ['changed', 'behind'], built),
+			node('model:totals', 'view', 'sql/models/marts/totals.sql', [], built),
+			node('model:returns', 'table', 'sql/models/marts/returns.sql', [], { ...built, lastOutcome: 'failed' }),
+			node('model:events', 'incremental', 'sql/models/staging/events.sql', ['behind'], built),
+			node('source:raw', 'source', 'sql/sources/raw.yml'),
+			node('seed:regions', 'seed', 'sql/seeds/regions.csv')
 		],
 		changes: [change(1, [['added', 'model:orders'], ['added', 'seed:regions'], ['removed', 'model:old']]), change(24 * 8, [['added', 'model:totals']])],
 		events: [event('scheduler', true), event('cleared', false)],
@@ -103,7 +103,7 @@ describe('overview from live reads', () => {
 	});
 
 	it('leaves parts without a server read empty instead of zero', () => {
-		const unknown = overviewOf({ runs: [], checks: [], nodes: [{ ...node('model:a', 'table', 'models/a.sql'), stale: null }], changes: [], events: [], triggers: [], acknowledgements: new Map(), conditions: { snoozeSeconds: 86_400, acknowledgements: [] }, scopeKey: 'loc-1:dev', now });
+		const unknown = overviewOf({ runs: [], checks: [], nodes: [{ ...node('model:a', 'table', 'sql/models/a.sql'), stale: null }], changes: [], events: [], triggers: [], acknowledgements: new Map(), conditions: { snoozeSeconds: 86_400, acknowledgements: [] }, scopeKey: 'loc-1:dev', now });
 		expect(unknown.groups).toBeNull();
 	});
 });

@@ -5,8 +5,8 @@ import { changedBuildCounts, changedBuildLabel, commandTokens, jobBuildTokens, j
 const node = (key: string, kind: SnapshotNode['kind'], path: string, tags: string[] = []): SnapshotNode => ({ key, kind, group: '', tags, path, cursor: null, upstream: [] });
 
 const NODES: SnapshotNode[] = [
-	node('model:customers', 'table', 'models/marts/customers.sql', ['finance']),
-	node('seed:countries', 'seed', 'seeds/countries.csv'),
+	node('model:customers', 'table', 'sql/models/marts/customers.sql', ['finance']),
+	node('seed:countries', 'seed', 'sql/seeds/countries.csv'),
 	node('source:shop.orders', 'source', 'sources.yml')
 ];
 
@@ -21,7 +21,7 @@ describe('the plan page command line', () => {
 		expect(values('sqb build --select countr')).toEqual(['seed:countries']);
 		expect(values('sqb build --select shop.ord')).toEqual(['source:shop.orders']);
 		expect(values('sqb build --select fin')).toEqual(['tag:finance']);
-		expect(values('sqb build --select marts')).toEqual(['path:models/marts']);
+		expect(values('sqb build --select marts')).toEqual(['path:sql/models/marts']);
 	});
 
 	it('reads --changed as the CLI does: its counts only after =, never the next token', () => {

@@ -9,13 +9,13 @@ function node(key: string, path: string, upstream: string[] = [], extra: Partial
 }
 
 const nodes = [
-	node('source:shop__orders', 'sources/shop.yml'),
-	node('source:shop__customers', 'sources/shop.yml'),
-	node('model:stg_orders', 'models/staging/shop/stg_orders.sql', ['source:shop__orders']),
-	node('model:stg_customers', 'models/staging/crm/stg_customers.sql', ['source:shop__customers'], { stale: [{ reason: 'behind', upstream: [], detail: '', since: '' }] }),
-	node('model:orders', 'models/marts/orders.sql', ['model:stg_orders', 'model:stg_customers'], { lastOutcome: 'failed' }),
-	node('model:order_totals', 'models/marts/order_totals.sql', ['model:orders']),
-	node('model:pick_lists', 'models/orders/fulfilment/staging/pick_lists.sql', ['model:orders'])
+	node('source:shop__orders', 'sql/sources/shop.yml'),
+	node('source:shop__customers', 'sql/sources/shop.yml'),
+	node('model:stg_orders', 'sql/models/staging/shop/stg_orders.sql', ['source:shop__orders']),
+	node('model:stg_customers', 'sql/models/staging/crm/stg_customers.sql', ['source:shop__customers'], { stale: [{ reason: 'behind', upstream: [], detail: '', since: '' }] }),
+	node('model:orders', 'sql/models/marts/orders.sql', ['model:stg_orders', 'model:stg_customers'], { lastOutcome: 'failed' }),
+	node('model:order_totals', 'sql/models/marts/order_totals.sql', ['model:orders']),
+	node('model:pick_lists', 'sql/models/orders/fulfilment/staging/pick_lists.sql', ['model:orders'])
 ];
 const ids = (graph: { nodes: Node[] }) => graph.nodes.map((n) => [n.id, n.parentId ?? null]);
 
@@ -80,7 +80,7 @@ describe('folder graph', () => {
 	});
 
 	it('refuses to lay out more cards than the cap', () => {
-		const many = Array.from({ length: MAX_DRAWN + 1 }, (_, i) => node(`model:orders_${i}`, `models/orders/orders_${i}.sql`));
+		const many = Array.from({ length: MAX_DRAWN + 1 }, (_, i) => node(`model:orders_${i}`, `sql/models/orders/orders_${i}.sql`));
 		expect(tooManyToDraw(folderGraph(many, new Set()))).toBe(false);
 		expect(tooManyToDraw(folderGraph(many, new Set(['orders'])))).toBe(true);
 	});
@@ -111,7 +111,7 @@ describe('opening a folder', () => {
 	it('moves its siblings out of the way: no boxes or cards overlap at any level', () => {
 		const many: CatalogNode[] = [];
 		for (let f = 0; f < 14; f++)
-			for (let i = 0; i < 5; i++) many.push(node(`model:f${f}_${i}`, `models/marts/f${f}/sub${i % 2}/m${i}.sql`, i ? [`model:f${f}_0`] : f ? ['model:f0_0'] : []));
+			for (let i = 0; i < 5; i++) many.push(node(`model:f${f}_${i}`, `sql/models/marts/f${f}/sub${i % 2}/m${i}.sql`, i ? [`model:f${f}_0`] : f ? ['model:f0_0'] : []));
 		const t = folderTree(many);
 		const size = (n: Node) => ({ w: n.width ?? 236, h: n.height ?? 61 });
 		for (const open of [['marts/f0'], ['marts/f3'], ['marts/f3', 'marts/f3/sub0'], ['marts/f13'], ['marts/f3', 'marts/f3/sub0', 'marts/f3/sub1']]) {

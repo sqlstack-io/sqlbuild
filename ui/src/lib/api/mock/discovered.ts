@@ -68,7 +68,7 @@ export const DISCOVERED_PLANS: Plan[] = [
 ];
 
 const stepKey = (asset: string, step: string) => `asset:${asset}[${step}]`;
-const pathOf = (asset: string) => `src/forecast_pipelines/definitions/models/regions/${asset.split('_')[1]}/discovered_model_steps.py`;
+const pathOf = (asset: string) => `python/nodes/forecast/${asset.split('_')[1]}/discovered_model_steps.py`;
 
 /** Every step node, in the snapshot's shape. */
 export const DISCOVERED_NODES: SnapshotNode[] = DISCOVERED_PLANS.flatMap((p) => {

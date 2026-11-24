@@ -4,7 +4,8 @@
 import type { CatalogNode, GroupStatus } from '$lib/api';
 import { shortName } from '$lib/build-area/labels';
 import { folderOf } from '$lib/lineage/catalog-graph';
-import { canSelectByPath, inexactDirs } from '$lib/selection/folders';
+import { canSelectByPath, dirOfFolder } from '$lib/project-layout';
+import { inexactDirs } from '$lib/selection/folders';
 import { needsAttention } from './overview-panels';
 import { sortFolders } from './overview-panels';
 
@@ -34,14 +35,14 @@ export function sortFolderRows<T extends GroupStatus>(rows: readonly T[], by: Fo
 
 /** The top-level folders, each holding its subfolders, unsorted. Sources are left out, as on the Overview. */
 export function folderTree(nodes: readonly CatalogNode[]): FolderNode[] {
-	const byPath = new Map<string, FolderNode & { root: string | null; keys: string[] }>();
+	const byPath = new Map<string, FolderNode & { onDisk: boolean; keys: string[] }>();
 	const top: FolderNode[] = [];
 	for (const n of nodes) {
 		if (n.kind === 'source') continue;
 		const folder = folderOf(n);
 		const dir = dirOf(n.path);
-		// The file-system folder the catalog folder starts at, such as `models/`; null when the folder is a declared group.
-		const root = dir === folder || dir.endsWith(`/${folder}`) ? dir.slice(0, dir.length - folder.length) : null;
+		// Whether the folder is the node's directory, as the layout places it; not for a declared group.
+		const onDisk = dirOfFolder(folder) === dir;
 		const parts = folder.split('/');
 		const stale = n.stale ?? [];
 		const isChanged = stale.some((s) => s.reason !== 'behind');
@@ -53,11 +54,11 @@ export function folderTree(nodes: readonly CatalogNode[]): FolderNode[] {
 			const path = parts.slice(0, i + 1).join('/');
 			let f = byPath.get(path);
 			if (!f) {
-				f = { group: parts[i], path, depth: i, total: 0, current: 0, changed: 0, behind: 0, failed: 0, children: [], members: [], selection: '', root, keys: [] };
+				f = { group: parts[i], path, depth: i, total: 0, current: 0, changed: 0, behind: 0, failed: 0, children: [], members: [], selection: '', onDisk, keys: [] };
 				byPath.set(path, f);
 				(parent ? parent.children : top).push(f);
 			}
-			if (f.root !== root) f.root = null;
+			f.onDisk &&= onDisk;
 			f.total += 1;
 			f.current += Number(isCurrent);
 			f.changed += Number(isChanged);
@@ -71,14 +72,14 @@ export function folderTree(nodes: readonly CatalogNode[]): FolderNode[] {
 	// `path:` selects every node under the folder's directory, so it stands for the folder only when that is
 	// exactly what the folder counts: under a root a path selector accepts, and with no source, and no node
 	// of another folder, in it. Otherwise the folder's nodes are selected by name.
-	const dirOfFolder = new Map<string, string>();
-	for (const f of byPath.values()) if (f.root !== null && canSelectByPath(`${f.root}${f.path}`)) dirOfFolder.set(`${f.root}${f.path}`, f.path);
+	const folderAt = new Map<string, string>();
+	for (const f of byPath.values()) if (f.onDisk && canSelectByPath(dirOfFolder(f.path))) folderAt.set(dirOfFolder(f.path), f.path);
 	const inside = (n: CatalogNode, path: string) => n.kind !== 'source' && (folderOf(n) === path || folderOf(n).startsWith(`${path}/`));
-	const inexact = inexactDirs(nodes, new Set(dirOfFolder.keys()), (n, dir) => inside(n, dirOfFolder.get(dir)!));
+	const inexact = inexactDirs(nodes, new Set(folderAt.keys()), (n, dir) => inside(n, folderAt.get(dir)!));
 	for (const f of byPath.values()) {
-		const dir = f.root !== null ? `${f.root}${f.path}` : null;
-		f.selection = dir && dirOfFolder.has(dir) && !inexact.has(dir) ? `path:${dir}` : [...new Set(f.keys)].join(' ');
-		delete (f as { root?: unknown }).root;
+		const dir = dirOfFolder(f.path);
+		f.selection = folderAt.has(dir) && !inexact.has(dir) ? `path:${dir}` : [...new Set(f.keys)].join(' ');
+		delete (f as { onDisk?: unknown }).onDisk;
 		delete (f as { keys?: unknown }).keys;
 	}
 	return top;
