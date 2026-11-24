@@ -23,6 +23,11 @@ pub async fn read_person_problems(
         .broken
         .iter()
         .map(|location| (location.location_id, location.target.clone()))
+        .chain(
+            scan.failing
+                .iter()
+                .map(|location| (location.location_id, location.target.clone())),
+        )
         .chain(scan.late_targets.iter().cloned())
         .chain(
             scan.low_calendars
@@ -66,6 +71,11 @@ pub async fn read_person_problems(
         overdue_ticks: late_ticks(store, scan.late_targets.intersection(&listed), scan.now).await?,
         broken_locations: scan
             .broken
+            .into_iter()
+            .filter(|location| listed.contains(&(location.location_id, location.target.clone())))
+            .collect(),
+        failing_locations: scan
+            .failing
             .into_iter()
             .filter(|location| listed.contains(&(location.location_id, location.target.clone())))
             .collect(),

@@ -12,29 +12,63 @@ function latestOf<K extends Wire['LocationHealth']['kind']>(observations: Wire['
 	return observations.find((o) => o.report.health.kind === kind) as (Wire['LocationHealthObservation'] & { report: { health: Extract<Wire['LocationHealth'], { kind: K }> } }) | undefined;
 }
 
-/** Health from the newest observations: down without a recent check-in, then load failures, then missing provider secrets, then failed discover functions, then connection failures. */
+/** The most observations a health read keeps, and how long location reports are kept. */
+const HEALTH_READ_LIMIT = 100;
+const RETENTION_MS = 7 * 24 * 3_600_000;
+
+/** When the process that made a time-ordered (v7) session ID started, or null for another ID. */
+function sessionStarted(session: string): number | null {
+	const hex = session.replaceAll('-', '');
+	return /^[0-9a-f]{32}$/i.test(hex) && hex[12] === '7' ? parseInt(hex.slice(0, 12), 16) : null;
+}
+
+const isLoad = (o: Wire['LocationHealthObservation']) => o.report.health.kind === 'compile_failed' || o.report.health.kind === 'connection';
+
+/**
+ * The newest live instance's own observations, `'starting'` until its first load ends, or all of them
+ * when the history can't tell (an instance whose start is no longer kept). As the server's `LocationState`.
+ */
+function currentInstance(observations: Wire['LocationHealthObservation'][], live: Set<string>, now: number): Wire['LocationHealthObservation'][] | 'starting' {
+	const session = [...live].sort().at(-1);
+	if (!session) return observations;
+	const own = observations.filter((o) => o.report.session_id === session);
+	if (own.some(isLoad)) return own;
+	const started = sessionStarted(session);
+	if (started === null || now - started > RETENTION_MS) return observations;
+	const covered = observations.length < HEALTH_READ_LIMIT || observations.some((o) => o.report.health.kind !== 'heartbeat' && Date.parse(o.received_at) <= started);
+	return covered ? 'starting' : observations;
+}
+
+/** Health from the newest observations: down without a recent check-in, then starting until the newest instance's first load ends, then from that instance's own reports load failures, missing provider secrets, a failed plan of what changed, failed discover functions, then connection failures. */
 export function healthOf(observations: Wire['LocationHealthObservation'][], now: number): { health: LocationHealth; liveInstances: number; lastSeenAt: string | null } {
-	// The server's own pool-cap warning is not a location check-in.
-	const reported = observations.filter((o) => o.report.health.kind !== 'pool_capped');
+	// The server's own pool-cap warning and failed-plan record are not location check-ins.
+	const derived = (o: Wire['LocationHealthObservation']) => o.report.health.kind === 'pool_capped' || o.report.health.kind === 'change_plan_failed';
+	const reported = observations.filter((o) => !derived(o));
 	const live = new Set(reported.filter((o) => now - Date.parse(o.received_at) <= LIVE_WINDOW_MS).map((o) => o.report.session_id));
 	const lastSeenAt = reported.reduce<string | null>((latest, o) => (!latest || o.received_at > latest ? o.received_at : latest), null);
+	const liveSessions = new Set(reported.filter((o) => o.report.health.kind === 'heartbeat' && now - Date.parse(o.received_at) <= LIVE_WINDOW_MS).map((o) => o.report.session_id));
+	const own = live.size ? currentInstance(reported, liveSessions, now) : reported;
+	if (own === 'starting') return { health: 'starting', liveInstances: live.size, lastSeenAt };
 	// The newest load report by arrival decides (observations come newest first): a failed load, or the
 	// connection check after a publication. Failed loads keep the generation they tried, so generations can't order them.
-	const load = observations.find((o) => o.report.health.kind === 'compile_failed' || o.report.health.kind === 'connection');
+	const load = own.find(isLoad);
 	const connection = load?.report.health.kind === 'connection' ? load.report.health : null;
-	const secrets = latestOf(observations, 'provider_secrets');
-	const discovery = latestOf(observations, 'discovery');
+	const secrets = latestOf(own, 'provider_secrets');
+	const discovery = latestOf(own, 'discovery');
+	const planFailed = observations.some((o) => o.report.health.kind === 'change_plan_failed');
 	const health: LocationHealth = !live.size
 		? 'broken'
 		: load?.report.health.kind === 'compile_failed'
 			? 'falling_back'
 			: secrets && secrets.report.health.missing > 0
 				? 'missing_secrets'
-				: discovery && discovery.report.health.sets.some((set) => set.status === 'failed')
-					? 'discovery_failed'
-					: connection && !connection.healthy
-					? 'degraded'
-					: 'healthy';
+				: planFailed
+					? 'change_plan_failed'
+					: discovery && discovery.report.health.sets.some((set) => set.status === 'failed')
+						? 'discovery_failed'
+						: connection && !connection.healthy
+							? 'degraded'
+							: 'healthy';
 	return { health, liveInstances: live.size, lastSeenAt };
 }
 
@@ -172,11 +206,11 @@ export function poolCapWarningsOf(observations: Wire['LocationHealthObservation'
 	return (latestOf(observations, 'pool_capped')?.report.health.jobs ?? []).map((w) => ({ jobKey: w.job_key, kind: w.kind === 'group' ? 'group' : 'job', pool: w.pool, amount: w.amount, cap: w.cap, message: w.message }));
 }
 
-/** A location's page from its health observations and newest snapshot; locations never send compile error text, so a failed reload shows only as its health. */
-/** The rule findings that failed the newest load, as `sqb compile` prints them; null when that load had none or a newer one connected. */
+/** Why the newest load failed: the location's error, or its rule findings as `sqb compile` prints them; null when it isn't falling back. */
 export function loadErrorOf(observations: Wire['LocationHealthObservation'][], health: LocationHealth): string | null {
-	const rules = health === 'falling_back' ? latestOf(observations, 'compile_failed')?.report.health.rules : undefined;
-	if (!rules) return null;
+	const failed = health === 'falling_back' ? latestOf(observations, 'compile_failed')?.report.health : undefined;
+	const rules = failed?.rules;
+	if (!rules) return failed?.error ?? null;
 	const noun = rules.finding_count === 1 ? 'rule finding' : 'rule findings';
 	const lines = rules.findings.map((f) => `${f.path ? `${f.path}${f.line ? `:${f.line}` : ''} ` : ''}[${f.code}] ${f.message}`);
 	const more = rules.finding_count - rules.findings.length;

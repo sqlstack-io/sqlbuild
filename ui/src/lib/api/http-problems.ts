@@ -1,4 +1,5 @@
 import type { components } from '$control/schema.d.ts';
+import { formatStamp } from '$lib/format/time';
 import { locationKey as keyOf } from './http-client';
 import type { PlatformEvent } from './types';
 import type { PlatformEventRecord, PlatformHealth } from './types/platform';
@@ -8,6 +9,23 @@ type Wire = components['schemas'];
 const placeOf = (name: string, target: string) => `${name} · ${target}`;
 /** Dropped calendar times a message names before `and N more`. */
 const DROPPED_TIMES_NAMED = 10;
+
+/** What failed, by state, for a failing location's banner. */
+const FAILED: Record<string, string> = {
+	falling_back: 'latest code failed to load',
+	change_plan_failed: 'planning what changed failed',
+	discovery_failed: 'a discover function failed',
+	degraded: 'the warehouse connection check failed'
+};
+
+/** `place: what failed: error. Serving generation N, published at T.`, or what it serves before any publication. */
+function failingMessage(place: string, location: Wire['FailingLocation']): string {
+	const error = location.error ? `: ${location.error}` : '';
+	const serving = location.serving
+		? `Serving generation ${location.serving.generation}, published ${formatStamp(location.serving.published_at)}.`
+		: 'No snapshot published yet.';
+	return `${place}: ${FAILED[location.state] ?? location.state}${error}. ${serving}`;
+}
 
 /** Live problems as active banner events: a stopped scheduler, each broken location, and late schedules, low calendars, skipped triggers, sensors checked again from scratch and calendars' dropped times per location. */
 export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number): PlatformEvent[] {
@@ -38,6 +56,21 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 			locationId: keyOf(location.location_id, location.target),
 			subject: placeOf(location.location_name, location.target),
 			message: `${placeOf(location.location_name, location.target)} stopped checking in, so its scheduled runs aren’t starting.`
+		});
+	}
+	for (const location of problems.failing_locations ?? []) {
+		const place = placeOf(location.location_name, location.target);
+		events.push({
+			id: `failing:${keyOf(location.location_id, location.target)}`,
+			kind: 'location_failing',
+			severity: location.state === 'degraded' ? 'warning' : 'critical',
+			occurredAt: location.failed_at,
+			// The failure's report time tells one failure from the next.
+			occurrence: location.failed_at,
+			active: true,
+			locationId: keyOf(location.location_id, location.target),
+			subject: place,
+			message: failingMessage(place, location)
 		});
 	}
 	const late = new Map<string, Wire['OverdueTick'][]>();
@@ -195,6 +228,15 @@ function storedRecord(wire: Wire['PersonPlatformEvent'], names: Map<string, stri
 			return { ...base, kind: event.kind, severity: 'critical', message: 'No server held the scheduler lease, so schedules and sensors stopped starting runs.', links: [], payload: {} };
 		case 'location_broken':
 			return { ...base, kind: event.kind, severity: 'critical', message: `${place} stopped checking in.`, links: key ? [{ kind: 'location', id: key }] : [], payload: { last_seen_at: event.last_seen_at } };
+		case 'location_failing':
+			return {
+				...base,
+				kind: event.kind,
+				severity: event.state === 'degraded' ? 'warning' : 'critical',
+				message: `${place ?? 'A location'}: ${FAILED[event.state] ?? event.state}${event.error ? `: ${event.error}` : ''}.`,
+				links: key ? [{ kind: 'location', id: key }] : [],
+				payload: { state: event.state, ...(event.serving_generation != null ? { serving_generation: String(event.serving_generation) } : {}) }
+			};
 		case 'tick_overdue':
 			return { ...base, kind: event.kind, severity: 'warning', message: `A schedule in ${place ?? 'a location'} was late.`, links: key ? [{ kind: 'trigger', id: event.trigger_id, name: 'schedule', locationId: key }] : [], payload: { scheduled_for: event.scheduled_for } };
 		case 'calendar_horizon_low':

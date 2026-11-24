@@ -6,7 +6,7 @@ use crate::native_commands::_helpers::location::health::health_exit_code;
 use crate::native_commands::tests::test_types::HealthExitTestCase;
 
 #[test]
-fn given_each_location_state_when_health_exits_then_only_running_states_exit_zero() {
+fn given_each_location_state_when_health_exits_then_only_healthy_exits_zero() {
     let test_cases = [
         HealthExitTestCase {
             description: "the newest instance is loading",
@@ -36,12 +36,17 @@ fn given_each_location_state_when_health_exits_then_only_running_states_exit_zer
         HealthExitTestCase {
             description: "loaded, but the connection check failed",
             state: LocationState::Degraded,
-            expected_code: 0,
+            expected_code: 1,
         },
         HealthExitTestCase {
             description: "loaded, but a discover function failed",
             state: LocationState::DiscoveryFailed,
-            expected_code: 0,
+            expected_code: 1,
+        },
+        HealthExitTestCase {
+            description: "loaded, but the plan of what changed failed",
+            state: LocationState::ChangePlanFailed,
+            expected_code: 1,
         },
     ];
     for test_case in test_cases {

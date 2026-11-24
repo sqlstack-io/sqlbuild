@@ -45,7 +45,14 @@ pub(super) async fn report_changed_build(
         Ok(settings) => settings,
         Err(error) => {
             report(&format!("Could not plan what changed: {error}\n"));
-            return Ok(Some(false));
+            return Ok(Some(
+                report_failed_plan(
+                    (options, client),
+                    (session_id, generation),
+                    &error.to_string(),
+                )
+                .await,
+            ));
         }
     };
     report("Planning what changed from the synced warehouse copy...\n");
@@ -70,27 +77,24 @@ pub(super) async fn report_changed_build(
     keep_plan(keep, (&document, &diffs));
     if let Some(reason) = document["error"]["message"].as_str() {
         report(&format!("Could not plan what changed: {reason}\n"));
-        let request = ChangedBuildReport {
-            session_id,
-            generation,
-            changed: Vec::new(),
-            downstream: Vec::new(),
-            failing: Some(reason.chars().take(MAX_FAILING_REASON_CHARS).collect()),
-        };
-        let reported = match client.report_changed_build(&options.target, &request).await {
-            Ok(_) => document["error"]["code"].as_str() != Some("plan_failed"),
-            Err(error) => {
-                report(&format!("Reporting the failed plan failed: {error}\n"));
-                false
-            }
-        };
-        return Ok(Some(reported));
+        let reported =
+            report_failed_plan((options, client), (session_id, generation), reason).await;
+        return Ok(Some(
+            reported && document["error"]["code"].as_str() != Some("plan_failed"),
+        ));
     }
     let (changed, downstream) = match changed_build_nodes(&document) {
         Ok(nodes) => nodes,
         Err(error) => {
             report(&format!("Could not plan what changed: {error}\n"));
-            return Ok(Some(false));
+            return Ok(Some(
+                report_failed_plan(
+                    (options, client),
+                    (session_id, generation),
+                    &error.to_string(),
+                )
+                .await,
+            ));
         }
     };
     let counts = format!("{} changed, {} downstream", changed.len(), downstream.len());
@@ -113,4 +117,29 @@ pub(super) async fn report_changed_build(
             }
         },
     ))
+}
+
+/// Tell the server the plan failed and why, so its health and pages show it; whether the server took it.
+async fn report_failed_plan(
+    (options, client): (&LocationServe, &LocationWorkClient),
+    (session_id, generation): (Uuid, i64),
+    reason: &str,
+) -> bool {
+    let request = ChangedBuildReport {
+        session_id,
+        generation,
+        changed: Vec::new(),
+        downstream: Vec::new(),
+        failing: Some(reason.chars().take(MAX_FAILING_REASON_CHARS).collect()),
+    };
+    match client.report_changed_build(&options.target, &request).await {
+        Ok(_) => true,
+        Err(error) => {
+            drop(write_output(&[(
+                Stream::Stderr,
+                &format!("Reporting the failed plan failed: {error}\n"),
+            )]));
+            false
+        }
+    }
 }

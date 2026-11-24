@@ -74,6 +74,11 @@ pub enum LocationHealth {
         generation: i64,
         sets: Vec<DiscoveryHealth>,
     },
+    /// The location's plan of what changed on the current snapshot failed, derived by the server from that plan, never reported by a location.
+    ChangePlanFailed {
+        generation: i64,
+        reason: String,
+    },
     /// Jobs and groups this server's `pool_caps` clamp, derived by the server, never reported by a location.
     PoolCapped {
         generation: i64,
@@ -194,7 +199,7 @@ pub struct LocationHealthObservation {
 }
 
 /// One target's state from its newest health observations, as the web UI shows it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum LocationState {
     /// The newest instance has not finished its first load; it reports nothing yet, and earlier instances don't count.
@@ -204,6 +209,8 @@ pub enum LocationState {
     Degraded,
     /// The last load failed, so runs use the previous snapshot.
     FallingBack,
+    /// The plan of what changed on the current snapshot failed, so what needs building is unknown.
+    ChangePlanFailed,
     /// A provider secret is unset in the location's environment, so runs that use the provider fail.
     MissingSecrets,
     /// A discover function failed at the last publication, so its set serves its last good items or none.
@@ -213,7 +220,7 @@ pub enum LocationState {
 }
 
 impl LocationState {
-    /// `target`'s state at `now` from observations that may cover several targets: down without a recent check-in, then starting until the newest instance's first load finishes, then from that instance's own reports a failed load, missing provider secrets, a failed discover function, then a failed connection.
+    /// `target`'s state at `now`: down without a recent check-in, starting until the newest instance's first load finishes, then from that instance's reports a failed load (the newest load report by arrival decides, as failed loads keep the generation they tried), missing secrets, the server's record of a failed plan of what changed, a failed discover function, then a failed connection.
     #[must_use]
     pub fn of(
         observations: &[LocationHealthObservation],
@@ -231,6 +238,12 @@ impl LocationState {
         }) {
             return Self::Broken;
         }
+        let change_plan_failed: bool = own.iter().any(|observation| {
+            matches!(
+                observation.report.health,
+                LocationHealth::ChangePlanFailed { .. }
+            )
+        });
         let own: Vec<&LocationHealthObservation> =
             match current_instance((&own, observations.len()), (silence, now)) {
                 CurrentInstance::Starting => return Self::Starting,
@@ -240,9 +253,6 @@ impl LocationState {
                     .collect(),
                 CurrentInstance::Unknown => own,
             };
-        // The newest load report by arrival decides: a failed load, or the connection check after a
-        // publication. Failed loads keep the generation they tried, so generations can't order them.
-        // On equal times the earlier observation wins, as reads list them newest first.
         let mut load: Option<(DateTime<Utc>, LoadReport)> = None;
         let mut secrets: Option<(DateTime<Utc>, u64)> = None;
         let mut discovery: Option<(DateTime<Utc>, bool)> = None;
@@ -276,6 +286,7 @@ impl LocationState {
         match (load.map(|(_, report)| report), secrets) {
             (Some(LoadReport::Failed), _) => Self::FallingBack,
             (_, Some((_, missing))) if missing > 0 => Self::MissingSecrets,
+            _ if change_plan_failed => Self::ChangePlanFailed,
             _ if discovery.is_some_and(|(_, failing)| failing) => Self::DiscoveryFailed,
             (Some(LoadReport::Published { connected: false }), _) => Self::Degraded,
             _ => Self::Healthy,
@@ -462,6 +473,7 @@ pub enum PlatformEventKind {
     TickOverdue,
     CalendarHorizonLow,
     LocationBroken,
+    LocationFailing,
     LaunchFailed,
     RunFailed,
     TriggerSkipped,
@@ -478,6 +490,7 @@ impl PlatformEventKind {
             Self::TickOverdue => "tick_overdue",
             Self::CalendarHorizonLow => "calendar_horizon_low",
             Self::LocationBroken => "location_broken",
+            Self::LocationFailing => "location_failing",
             Self::LaunchFailed => "launch_failed",
             Self::RunFailed => "run_failed",
             Self::TriggerSkipped => "trigger_skipped",
@@ -510,6 +523,15 @@ pub enum PlatformEvent {
         location_id: Uuid,
         target: String,
         last_seen_at: DateTime<Utc>,
+    },
+    /// A checking-in location's latest load, plan of what changed, discovery or connection check failed; `serving_generation` is what runs use instead.
+    LocationFailing {
+        location_id: Uuid,
+        target: String,
+        state: LocationState,
+        failed_at: DateTime<Utc>,
+        error: Option<String>,
+        serving_generation: Option<i64>,
     },
     /// A launch attempt or its response failed; the worker may still start or finish.
     LaunchFailed {
@@ -558,6 +580,7 @@ impl PlatformEvent {
             Self::TickOverdue { .. } => PlatformEventKind::TickOverdue,
             Self::CalendarHorizonLow { .. } => PlatformEventKind::CalendarHorizonLow,
             Self::LocationBroken { .. } => PlatformEventKind::LocationBroken,
+            Self::LocationFailing { .. } => PlatformEventKind::LocationFailing,
             Self::LaunchFailed { .. } => PlatformEventKind::LaunchFailed,
             Self::RunFailed { .. } => PlatformEventKind::RunFailed,
             Self::TriggerSkipped { .. } => PlatformEventKind::TriggerSkipped,
@@ -574,6 +597,7 @@ impl PlatformEvent {
             Self::TickOverdue { .. } => "platform_tick_overdue",
             Self::CalendarHorizonLow { .. } => "platform_calendar_horizon_low",
             Self::LocationBroken { .. } => "platform_location_broken",
+            Self::LocationFailing { .. } => "platform_location_failing",
             Self::LaunchFailed { .. } => "platform_launch_failed",
             Self::RunFailed { .. } => "platform_run_failed",
             Self::TriggerSkipped { .. } => "platform_trigger_skipped",
@@ -653,6 +677,9 @@ pub struct PlatformProblems {
     /// When the last scheduler lease ran out, or will run out; absent until a server first leads.
     pub scheduler_lease_expires_at: Option<DateTime<Utc>>,
     pub broken_locations: Vec<BrokenLocation>,
+    /// Checking-in locations whose latest load, plan of what changed, discovery or connection check failed.
+    #[serde(default)]
+    pub failing_locations: Vec<FailingLocation>,
     pub overdue_ticks: Vec<OverdueTick>,
     /// Running calendar schedules whose dates run out within a day.
     #[serde(default)]
@@ -758,6 +785,22 @@ pub struct BrokenLocation {
     pub last_seen_at: DateTime<Utc>,
 }
 
+/// A checking-in location whose latest load, plan of what changed, discovery or connection check failed, and what it serves instead.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct FailingLocation {
+    pub location_id: Uuid,
+    pub location_name: String,
+    pub target: String,
+    /// `falling_back`, `change_plan_failed`, `discovery_failed` or `degraded`.
+    pub state: LocationState,
+    /// When the failure was reported.
+    pub failed_at: DateTime<Utc>,
+    /// What failed, redacted; absent when an older location reported no text.
+    pub error: Option<String>,
+    /// The snapshot the target serves; absent before its first publication.
+    pub serving: Option<SnapshotRecord>,
+}
+
 /// A running schedule whose next tick is more than 30 seconds late.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct OverdueTick {
@@ -786,6 +829,7 @@ pub(crate) struct ProblemScan {
     pub(crate) now: DateTime<Utc>,
     pub(crate) lease: Option<SchedulerLease>,
     pub(crate) broken: Vec<BrokenLocation>,
+    pub(crate) failing: Vec<FailingLocation>,
     pub(crate) late_targets: std::collections::BTreeSet<(Uuid, String)>,
     pub(crate) low_calendars: Vec<LowCalendar>,
     pub(crate) skipped_triggers: Vec<SkippedTrigger>,

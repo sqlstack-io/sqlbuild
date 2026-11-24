@@ -2491,6 +2491,23 @@ export interface components {
             /** Format: uuid */
             session_id: string;
         };
+        /** @description A checking-in location whose latest load, plan of what changed, discovery or connection check failed, and what it serves instead. */
+        FailingLocation: {
+            /** @description What failed, redacted; absent when an older location reported no text. */
+            error?: string | null;
+            /**
+             * Format: date-time
+             * @description When the failure was reported.
+             */
+            failed_at: string;
+            /** Format: uuid */
+            location_id: string;
+            location_name: string;
+            serving?: null | components["schemas"]["SnapshotRecord"];
+            /** @description `falling_back`, `change_plan_failed`, `discovery_failed` or `degraded`. */
+            state: components["schemas"]["LocationState"];
+            target: string;
+        };
         /** @description Build evidence only: no SQL, arbitrary metadata, or inference about live relation existence. */
         FingerprintObservation: {
             definition_hash: string;
@@ -2663,6 +2680,8 @@ export interface components {
             /** @enum {string} */
             kind: "heartbeat";
         } | {
+            /** @description Why the load failed, redacted and bounded; absent from older locations. */
+            error?: string | null;
             /** Format: int64 */
             generation: number;
             /** @enum {string} */
@@ -2698,6 +2717,12 @@ export interface components {
             /** @enum {string} */
             kind: "discovery";
             sets: components["schemas"]["DiscoveryHealth"][];
+        } | {
+            /** Format: int64 */
+            generation: number;
+            /** @enum {string} */
+            kind: "change_plan_failed";
+            reason: string;
         } | {
             /** Format: int64 */
             generation: number;
@@ -2765,6 +2790,11 @@ export interface components {
             message: string;
             path?: string | null;
         };
+        /**
+         * @description One target's state from its newest health observations, as the web UI shows it.
+         * @enum {string}
+         */
+        LocationState: "starting" | "healthy" | "degraded" | "falling_back" | "change_plan_failed" | "missing_secrets" | "discovery_failed" | "broken";
         /** @description Only named location operations cross this boundary, never arbitrary SQL or Python. */
         LocationWork: {
             /** @enum {string} */
@@ -3619,6 +3649,18 @@ export interface components {
             location_id: string;
             target: string;
         } | {
+            error?: string | null;
+            /** Format: date-time */
+            failed_at: string;
+            /** @enum {string} */
+            kind: "location_failing";
+            /** Format: uuid */
+            location_id: string;
+            /** Format: int64 */
+            serving_generation?: number | null;
+            state: components["schemas"]["LocationState"];
+            target: string;
+        } | {
             /** Format: uuid */
             claim_id: string;
             code: string;
@@ -3668,12 +3710,14 @@ export interface components {
             trigger_id: string;
         };
         /** @enum {string} */
-        PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "launch_failed" | "run_failed" | "trigger_skipped" | "sensor_rechecked" | "calendar_times_dropped";
+        PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "location_failing" | "launch_failed" | "run_failed" | "trigger_skipped" | "sensor_rechecked" | "calendar_times_dropped";
         /** @description Problems derived from live state when read; nothing here is stored. */
         PlatformProblems: {
             broken_locations: components["schemas"]["BrokenLocation"][];
             /** @description Calendars whose pending times a republish dropped, until their next successful tick. */
             dropped_calendar_times?: components["schemas"]["DroppedCalendarTimes"][];
+            /** @description Checking-in locations whose latest load, plan of what changed, discovery or connection check failed. */
+            failing_locations?: components["schemas"]["FailingLocation"][];
             /** @description Running calendar schedules whose dates run out within a day. */
             low_calendars?: components["schemas"]["LowCalendar"][];
             overdue_ticks: components["schemas"]["OverdueTick"][];

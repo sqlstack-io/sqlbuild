@@ -148,6 +148,7 @@ export function visibleEventKey(key: string, scopeKey: string, healthRead = fals
 	if (key.startsWith('sensor:')) return true;
 	const kinds = [
 		'location_broken',
+		'location_failing',
 		'tick_overdue',
 		'calendar_horizon_low',
 		'trigger_skipped',

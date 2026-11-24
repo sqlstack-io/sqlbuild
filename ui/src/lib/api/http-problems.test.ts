@@ -12,6 +12,15 @@ const tick = (name: string, location: string, scheduledFor: string) => ({
 });
 
 describe('toPlatformEvents', () => {
+	it('makes a location whose latest load failed a critical problem with its error and the snapshot it serves', () => {
+		const serving = { snapshot_id: 's-11', location_id: 'l1', target: 'production', generation: 11, manifest_digest: 'd', published_at: '2026-11-08T09:00:00Z' };
+		const failing = (state: 'falling_back' | 'degraded', error: string | null) => ({ location_id: 'l1', location_name: 'orders', target: 'production', state, failed_at: '2026-11-08T11:59:00Z', error, serving });
+		const [failed, degraded] = toPlatformEvents({ scheduler_leader: true, broken_locations: [], overdue_ticks: [], failing_locations: [failing('falling_back', 'job loaders_job: path selectors require an explicit root'), failing('degraded', null)] }, NOW);
+		expect([failed.kind, failed.severity, failed.active, failed.occurredAt]).toEqual(['location_failing', 'critical', true, '2026-11-08T11:59:00Z']);
+		expect(failed.message).toMatch(/^orders · production: latest code failed to load: job loaders_job: path selectors require an explicit root\. Serving generation 11, published /);
+		expect([degraded.severity, degraded.message.split('. ')[0]]).toEqual(['warning', 'orders · production: the warehouse connection check failed']);
+	});
+
 	it('reports nothing while the scheduler leads and nothing is late', () => {
 		expect(toPlatformEvents({ scheduler_leader: true, scheduler_lease_expires_at: '2026-11-08T12:00:10Z', broken_locations: [], overdue_ticks: [] }, NOW)).toEqual([]);
 	});

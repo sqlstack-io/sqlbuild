@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use crate::platform::models::{PlatformEvent, PlatformEventEnvelope, StorageKind};
+use crate::platform::models::{LocationHealth, PlatformEvent, PlatformEventEnvelope, StorageKind};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
@@ -85,7 +85,7 @@ pub(crate) struct ProviderSecretsHealthTestCase {
 }
 
 /// A location instance in a health history, by when its process started.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Instance {
     /// Started three hours before the read.
     Previous,
@@ -104,18 +104,9 @@ pub(crate) struct Reported {
     pub(crate) health: ReportedHealth,
 }
 
-/// What a report in a health history said.
+/// What an instance said: a report of the generation, built by a health helper such as `published`.
 #[derive(Clone, Copy)]
-pub(crate) enum ReportedHealth {
-    /// The instance's liveness row.
-    CheckIn,
-    /// A publication of the generation, then its healthy connection check.
-    Published(i64),
-    /// A failed load of the generation.
-    Failed(i64),
-    /// A provider check without missing secrets.
-    Secrets,
-}
+pub(crate) struct ReportedHealth(pub(crate) fn(i64) -> LocationHealth, pub(crate) i64);
 
 pub(crate) struct LocationStateTestCase {
     pub(crate) description: &'static str,
@@ -123,4 +114,10 @@ pub(crate) struct LocationStateTestCase {
     /// Provider checks the previous instance sent after the restart, filling the history.
     pub(crate) later_reports: usize,
     pub(crate) expected_state: crate::platform::models::LocationState,
+}
+
+pub(crate) struct FailingLocationTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: crate::store::tests::store_test_types::Backend,
+    pub(crate) expected_error: &'static str,
 }

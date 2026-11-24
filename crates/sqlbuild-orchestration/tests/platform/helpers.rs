@@ -7,7 +7,10 @@ use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::IntoResponse;
 
-use crate::platform::models::{PlatformEvent, PlatformEventEnvelope};
+use crate::platform::models::{
+    LocationHealth, LocationHealthObservation, LocationHealthReport, PlatformEvent,
+    PlatformEventEnvelope,
+};
 use crate::runs::main::execution::claim_next_run::claim_next_run;
 use crate::runs::main::execution::publish_run_recall::publish_run_recall;
 use crate::runs::models::{RecallBatch, RecallRecord};
@@ -22,7 +25,9 @@ use sqlbuild_recall::schema::models::Table;
 use tokio::task::JoinHandle;
 use uuid::Uuid;
 
-use crate::platform::tests::test_types::{Observation, WebhookReceiver};
+use crate::platform::tests::test_types::{
+    Instance, Observation, Reported, ReportedHealth, WebhookReceiver,
+};
 use crate::runs::tests::helpers::{queue, request};
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 
@@ -238,16 +243,12 @@ pub(crate) async fn retained_platform_facts(store: &ControlStore) -> Vec<Observa
 
 /// The health history a test case describes, newest first as the server reads it, and the read time.
 pub(crate) fn health_history(
-    reported: &[crate::platform::tests::test_types::Reported],
+    reported: &[Reported],
     later_reports: usize,
 ) -> (
     Vec<crate::platform::models::LocationHealthObservation>,
     chrono::DateTime<Utc>,
 ) {
-    use crate::platform::models::{
-        LocationHealth, LocationHealthObservation, LocationHealthReport,
-    };
-    use crate::platform::tests::test_types::{Instance, Reported, ReportedHealth};
     let now: chrono::DateTime<Utc> =
         chrono::DateTime::from_timestamp(1_795_000_000, 0).expect("a valid read time");
     // One session ID per instance: v7, stamped with when its process started, except the unordered one.
@@ -261,45 +262,28 @@ pub(crate) fn health_history(
         v7(now - TimeDelta::days(8)),
         Uuid::from_u128(0x5_0000_0000_4000_8000_0000_0000_0000),
     ];
-    let session = |instance: Instance| -> Uuid {
-        sessions[match instance {
-            Instance::Previous => 0,
-            Instance::Restarted => 1,
-            Instance::LongRunning => 2,
-            Instance::Unordered => 3,
-        }]
-    };
+    let sessions: std::collections::BTreeMap<Instance, Uuid> = [
+        Instance::Previous,
+        Instance::Restarted,
+        Instance::LongRunning,
+        Instance::Unordered,
+    ]
+    .into_iter()
+    .zip(sessions)
+    .collect();
     let observation = |reported: &Reported| LocationHealthObservation {
         received_at: now - TimeDelta::seconds(reported.seconds_ago),
         report: LocationHealthReport {
             event_id: Uuid::now_v7(),
-            session_id: session(reported.instance),
+            session_id: sessions[&reported.instance],
             target: "production".into(),
-            health: match reported.health {
-                ReportedHealth::CheckIn => LocationHealth::Heartbeat {},
-                ReportedHealth::Published(generation) => LocationHealth::Connection {
-                    generation,
-                    healthy: true,
-                    trigger: None,
-                    elapsed_millis: None,
-                },
-                ReportedHealth::Failed(generation) => LocationHealth::CompileFailed {
-                    generation,
-                    rules: None,
-                    error: Some(format!("generation {generation} failed to load")),
-                },
-                ReportedHealth::Secrets => LocationHealth::ProviderSecrets {
-                    generation: 1,
-                    missing: 0,
-                    providers: Vec::new(),
-                },
-            },
+            health: (reported.health.0)(reported.health.1),
         },
     };
     let later = (0..later_reports).map(|index| Reported {
         instance: Instance::Previous,
         seconds_ago: 20 - i64::try_from(index % 20).expect("a small index"),
-        health: ReportedHealth::Secrets,
+        health: ReportedHealth(secrets, 0),
     });
     let mut observations: Vec<LocationHealthObservation> = reported
         .iter()
@@ -309,4 +293,58 @@ pub(crate) fn health_history(
     observations.sort_by_key(|observation| std::cmp::Reverse(observation.received_at));
     observations.truncate(crate::platform::constants::RECENT_HEALTH_LIMIT);
     (observations, now)
+}
+
+/// One report in a health history.
+pub(crate) const fn reported(
+    instance: Instance,
+    seconds_ago: i64,
+    health: ReportedHealth,
+) -> Reported {
+    Reported {
+        instance,
+        seconds_ago,
+        health,
+    }
+}
+
+/// The instance's liveness row.
+pub(crate) const fn check_in(_generation: i64) -> LocationHealth {
+    LocationHealth::Heartbeat {}
+}
+
+/// A publication of the generation, then its healthy connection check.
+pub(crate) const fn published(generation: i64) -> LocationHealth {
+    LocationHealth::Connection {
+        generation,
+        healthy: true,
+        trigger: None,
+        elapsed_millis: None,
+    }
+}
+
+/// A failed load of the generation.
+pub(crate) fn failed(generation: i64) -> LocationHealth {
+    LocationHealth::CompileFailed {
+        generation,
+        rules: None,
+        error: Some(format!("generation {generation} failed to load")),
+    }
+}
+
+/// The server's record that the plan of what changed on the generation failed.
+pub(crate) fn change_plan_failed(generation: i64) -> LocationHealth {
+    LocationHealth::ChangePlanFailed {
+        generation,
+        reason: "Model orders cannot plan a full rebuild".into(),
+    }
+}
+
+/// A provider check without missing secrets.
+pub(crate) const fn secrets(_generation: i64) -> LocationHealth {
+    LocationHealth::ProviderSecrets {
+        generation: 1,
+        missing: 0,
+        providers: Vec::new(),
+    }
 }

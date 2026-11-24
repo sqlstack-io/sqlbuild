@@ -31,6 +31,23 @@ describe('location health', () => {
 		expect(healthOf(observations, now)).toMatchObject({ health: 'healthy', liveInstances: 2, lastSeenAt: at(10) });
 	});
 
+	it('is starting while the newest instance loads, though an earlier one published, then judges that instance', () => {
+		// Time-ordered (v7) session IDs carry when each process started.
+		const v7 = (secondsAgo: number) => `${(now - secondsAgo * 1000).toString(16).padStart(12, '0')}-7000-8000-000000000000`.replace(/^(.{8})(.{4})/, '$1-$2');
+		const [previous, restarted] = [v7(3 * 3600), v7(25)];
+		const history = [seen(5, { kind: 'heartbeat' }, restarted), seen(30, { kind: 'heartbeat' }, previous), seen(3 * 3600 - 60, { kind: 'connection', generation: 11, healthy: true }, previous)];
+		expect(healthOf(history, now).health).toBe('starting');
+		expect(healthOf([seen(4, { kind: 'compile_failed', generation: 12 }, restarted), ...history], now).health).toBe('falling_back');
+		expect(healthOf([seen(4, { kind: 'connection', generation: 12, healthy: true }, restarted), ...history], now).health).toBe('healthy');
+	});
+
+	it("reports the server's record of a failed plan of what changed, below a failed load", () => {
+		const plan = seen(3, { kind: 'change_plan_failed', generation: 2, reason: 'Model orders cannot plan a full rebuild' }, '00000000-0000-0000-0000-000000000000');
+		const published = seen(10, { kind: 'connection', generation: 2, healthy: true });
+		expect(healthOf([seen(1, { kind: 'heartbeat' }), plan, published], now).health).toBe('change_plan_failed');
+		expect(healthOf([seen(1, { kind: 'heartbeat' }), plan, seen(5, { kind: 'compile_failed', generation: 3 }), published], now).health).toBe('falling_back');
+	});
+
 	it('takes the newest load report by arrival, whatever its generation', () => {
 		const failedAt = (secondsAgo: number) => seen(secondsAgo, { kind: 'compile_failed', generation: 12 });
 		const published = (secondsAgo: number) => seen(secondsAgo, { kind: 'connection', generation: 12, healthy: true });

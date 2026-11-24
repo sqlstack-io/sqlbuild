@@ -46,13 +46,14 @@ sqb location health --server https://control.example.com --location-id "$LOCATIO
 | --- | --- | --- |
 | `starting` | The newest instance checked in but hasn't finished its first load | `3` |
 | `healthy` | An instance checked in within 90 seconds and its last load published | `0` |
-| `degraded` | The warehouse connection check after the last load failed | `0` |
+| `degraded` | The warehouse connection check after the last load failed | `1` |
 | `missing_secrets` | A provider [secret](../concepts/python-nodes/providers.md#secrets) is unset in the location's environment, and the target's [`allow_missing_secrets`](../concepts/project-configuration.md#allowed-missing-secrets) doesn't list the provider, so runs that use it fail | `1` |
-| `discovery_failed` | A [discover function](../concepts/python-nodes/discovered-nodes.md) failed at the last publication, so its set serves its last good items, or none | `0` |
+| `change_plan_failed` | The location's plan of what changed on the current snapshot failed, so the UI's **Build what changed** and the nodes' changed state are unknown | `1` |
+| `discovery_failed` | A [discover function](../concepts/python-nodes/discovered-nodes.md) failed at the last publication, so its set serves its last good items, or none | `1` |
 | `falling_back` | The last load failed, so runs use the previous snapshot | `1` |
 | `broken` | No instance has checked in for 90 seconds | `1` |
 
-The command exits `2` when it cannot read the state: the server is unreachable, or the token is
+Only `healthy` exits `0`. The command exits `2` when it cannot read the state: the server is unreachable, or the token is
 missing, expired or for another location. It needs the location's token, not a person's sign-in.
 
 The state is the newest instance's: the one that started last among those that checked in within
@@ -72,7 +73,15 @@ healthcheck:
 ```
 
 A `falling_back` location still runs scheduled jobs from its last good snapshot. Restarting it
-does not fix the failed load; fix the project and deploy it again.
+does not fix the failed load; fix the project and deploy it again. Plan previews on it fail at once
+with the load's error instead of waiting for the location.
+
+A location that checks in but is `falling_back`, `change_plan_failed`, `discovery_failed` or
+`degraded` is a problem everyone who can view its target sees: a banner on every page of the UI
+names the location and target, the error, and the generation it serves instead with when that was
+published; the Overview lists it under **Needs attention**; and the server sends a
+[`location_failing` platform event](server.md#receive-platform-events) once per failure, so a
+platform webhook or a [`platform_event` sensor](../concepts/orchestration.md) with `PlatformEventKind.LOCATION_FAILING` can alert on it.
 
 Loading a project is a full compile, as [`sqb compile`](compile.md) runs it, including the
 configured [Rules](../concepts/rules.md). A Rule finding fails the load like any other compile

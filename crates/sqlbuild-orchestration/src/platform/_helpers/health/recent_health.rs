@@ -3,7 +3,7 @@
 use uuid::Uuid;
 
 use crate::platform::constants::{LOCATION_RETENTION_DAYS, RECENT_HEALTH_LIMIT};
-use crate::platform::models::LocationHealthObservation;
+use crate::platform::models::{LocationHealth, LocationHealthObservation, LocationHealthReport};
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
 use crate::store::main::query::query;
@@ -83,5 +83,53 @@ pub(crate) async fn recent_health(
     );
     observations.sort_by_key(|observation| std::cmp::Reverse(observation.received_at));
     observations.truncate(RECENT_HEALTH_LIMIT);
+    let Some(target) = target else {
+        return Ok((transaction, observations));
+    };
+    let (transaction, failed_plan) = failed_change_plan(transaction, (location_id, target)).await?;
+    if let Some(failed_plan) = failed_plan {
+        observations.push(failed_plan);
+        observations.sort_by_key(|observation| std::cmp::Reverse(observation.received_at));
+    }
     Ok((transaction, observations))
+}
+
+/// The location's plan of what changed on the current snapshot, as health when it failed: the server derives it, so the history's bound never drops it.
+async fn failed_change_plan(
+    transaction: ControlTransaction,
+    (location_id, target): (Uuid, &str),
+) -> Result<(ControlTransaction, Option<LocationHealthObservation>), ControlError> {
+    let (transaction, rows) = query(
+        transaction,
+        "SELECT b.generation, b.reported_at, b.report_json->>'failing' AS failing FROM sqb_changed_builds b \
+         JOIN sqb_current_snapshots c ON c.location_id=b.location_id AND c.target=b.target \
+         JOIN sqb_snapshots s ON s.snapshot_id=c.snapshot_id \
+         WHERE b.location_id=$1 AND b.target=$2 AND s.generation=b.generation",
+        vec![Parameter::Id(location_id), Parameter::Text(target.to_owned())],
+    )
+    .await?;
+    let Some(row) = rows.into_iter().next() else {
+        return Ok((transaction, None));
+    };
+    let (Some(reason), Some(generation)) = (row["failing"].as_str(), row["generation"].as_i64())
+    else {
+        return Ok((transaction, None));
+    };
+    let received_at = serde_json::from_value(row["reported_at"].clone())
+        .map_err(|error| ControlError::Invalid(format!("stored changed build: {error}")))?;
+    Ok((
+        transaction,
+        Some(LocationHealthObservation {
+            received_at,
+            report: LocationHealthReport {
+                event_id: Uuid::nil(),
+                session_id: Uuid::nil(),
+                target: target.to_owned(),
+                health: LocationHealth::ChangePlanFailed {
+                    generation,
+                    reason: reason.to_owned(),
+                },
+            },
+        }),
+    ))
 }

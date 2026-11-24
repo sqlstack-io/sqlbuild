@@ -71,7 +71,7 @@ pub(crate) fn run_location_invocation(namespace: &Namespace, script: Option<&Pat
     })
 }
 
-/// `sqb location health`: 0 when healthy, degraded or failing discovery, 1 when down or falling back, 2 when unanswered, 3 while starting.
+/// `sqb location health`: 0 when healthy, 1 when anything failed or is down, 2 when unanswered, 3 while starting.
 fn location_health(namespace: &Namespace) -> i32 {
     drop(write_output(&[(
         Stream::Stderr,

@@ -61,7 +61,7 @@ fn is_load_outcome(health: &LocationHealth) -> bool {
 /// When the process that made a time-ordered (v7) session ID started; none for other IDs.
 fn session_started(session: Uuid) -> Option<DateTime<Utc>> {
     let (seconds, nanos) = session.get_timestamp()?.to_unix();
-    DateTime::from_timestamp(i64::try_from(seconds).ok()?, nanos)
+    DateTime::from_timestamp(i64::try_from(seconds).unwrap_or(i64::MAX), nanos)
 }
 
 /// Whether the history reaches back to `started`: none of the `read` observations was cut off, or an older one is kept.
