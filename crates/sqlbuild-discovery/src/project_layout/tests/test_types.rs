@@ -14,3 +14,10 @@ pub(super) struct WrittenEntriesTestCase {
     pub(super) written: &'static [&'static str],
     pub(super) expected_entries: &'static [&'static str],
 }
+
+/// The env file settings of a project and the top-level entries they allow.
+pub(super) struct EnvFileEntriesTestCase {
+    pub(super) description: &'static str,
+    pub(super) config: &'static str,
+    pub(super) expected_entries: &'static [&'static str],
+}

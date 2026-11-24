@@ -86,8 +86,12 @@ pub const SCENARIOS_PATH: &str = "tests/scenarios";
 /// The folders a project's top level may hold.
 pub const TOP_LEVEL_DIRECTORIES: [&str; 5] = ["sql", "python", "orchestration", "rules", "tests"];
 /// The files a project's top level may hold.
-pub const TOP_LEVEL_FILES: [&str; 3] =
-    ["sqlbuild_project.toml", "sqlbuild_local.toml", "README.md"];
+pub const TOP_LEVEL_FILES: [&str; 4] = [
+    "sqlbuild_project.toml",
+    "sqlbuild_local.toml",
+    "roles.toml",
+    "README.md",
+];
 /// Stem of a Python package's initializer module.
 pub const PYTHON_INIT_MODULE_STEM: &str = "__init__";
 /// State table of model, seed and hook fingerprints.

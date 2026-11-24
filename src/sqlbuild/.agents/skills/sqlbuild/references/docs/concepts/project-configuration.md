@@ -935,6 +935,7 @@ under `python/`:
 ├── rules/                custom project rules
 ├── tests/                SQL tests, scenarios and Python tests
 ├── README.md             optional
+├── roles.toml            optional project roles
 ├── sqlbuild_project.toml
 └── sqlbuild_local.toml
 ```
@@ -954,7 +955,7 @@ error[D018]: 'migrations/' is not part of a SQLBuild project
 
 These entries are always allowed:
 
-- the two configuration files and `README.md`;
+- the two configuration files, `roles.toml` (see [project roles](../cli/server.md#define-project-roles)) and `README.md`;
 - hidden entries such as `.gitignore`, `.env` and the `.agents/` and `.claude/` skill folders;
 - `__pycache__/` at any level, and the `target/` and `logs/` folders SQLBuild writes at the top
   level;
@@ -965,6 +966,8 @@ These entries are always allowed:
   `Pipfile.lock` and `requirements*.txt`;
 - the control store file and the run output folder `sqb dev` writes, when they are inside the
   project;
+- the file each `env_file` setting names (the project's and every target's), when it is inside the
+  project, such as `development.env`;
 - anything the project's `.gitignore` files ignore, read from the project directory up to the
   repository root, with the repository's `.git/info/exclude`.
 

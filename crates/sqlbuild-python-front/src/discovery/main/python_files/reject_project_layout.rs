@@ -5,12 +5,13 @@ use crate::discovery::constants::{
     LAYOUT_EXTRA_PATHS_HELP, LAYOUT_HELP_CONTINUATION, LAYOUT_HELP_LINE,
 };
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use sqlbuild_discovery::project_layout::main::env_file_entries::env_file_entries;
 use sqlbuild_discovery::project_layout::main::layout_problems::layout_problems;
 use sqlbuild_discovery::project_layout::main::written_entries::written_entries;
 use sqlbuild_discovery::project_layout::models::LayoutProblem;
 use std::path::PathBuf;
 
-/// Raise `ProjectLayoutError` for each entry outside the layout, other than what `sqb dev` writes.
+/// Raise `ProjectLayoutError` for each entry outside the layout, other than written and env files.
 pub fn reject_project_layout(
     project_dir: &Bound<'_, PyAny>,
     extra_paths: &[String],
@@ -18,6 +19,7 @@ pub fn reject_project_layout(
     let root: PathBuf = project_dir.extract()?;
     let mut allowed: Vec<String> = extra_paths.to_vec();
     allowed.extend(written_entries(&root));
+    allowed.extend(env_file_entries(&root));
     let problems: Vec<LayoutProblem> = layout_problems(&root, &allowed);
     if problems.is_empty() {
         return Ok(());
