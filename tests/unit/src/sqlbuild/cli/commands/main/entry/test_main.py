@@ -207,7 +207,7 @@ def test_given_compile_command_arguments_when_running_with_dependencies_then_it_
                 "plan",
                 "--json",
                 "--select",
-                "path:models/marts",
+                "path:sql/models/marts",
                 "--project-dir",
                 "dbt_project",
                 "--start-cursor-int",
@@ -219,7 +219,7 @@ def test_given_compile_command_arguments_when_running_with_dependencies_then_it_
             expected_dbt_args=(
                 "--json",
                 "--select",
-                "path:models/marts",
+                "path:sql/models/marts",
                 "--project-dir",
                 "dbt_project",
                 "--start-cursor-int",

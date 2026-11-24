@@ -35,7 +35,7 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import (
         ),
         NativeGraphSelectionTestCase(
             description="models-rooted folder",
-            select=("--select", "models/marts"),
+            select=("--select", "sql/models/marts"),
             expected_models=frozenset({"orders", "customers"}),
             expected_graph_builds=2,
         ),

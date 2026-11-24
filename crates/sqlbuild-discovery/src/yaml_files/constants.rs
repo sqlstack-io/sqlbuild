@@ -1,9 +1,9 @@
 //! Where authored source and schema YAML files live.
 
 /// The directory whose direct YAML children declare sources.
-pub(crate) const SOURCES_DIRECTORY: &str = "sources";
-pub(crate) const MODELS_DIRECTORY: &str = "models";
-pub(crate) const SEEDS_DIRECTORY: &str = "seeds";
+pub(crate) const SOURCES_DIRECTORY: &str = sqlbuild_core::constants::SOURCES_PATH;
+pub(crate) const MODELS_DIRECTORY: &str = sqlbuild_core::constants::MODELS_PATH;
+pub(crate) const SEEDS_DIRECTORY: &str = sqlbuild_core::constants::SEEDS_PATH;
 /// Python's `YAML_FILE_SUFFIXES`.
 pub(crate) const YAML_FILE_SUFFIXES: [&str; 2] = [".yml", ".yaml"];
 /// Python's `SCHEMA_FILE_NAME`.

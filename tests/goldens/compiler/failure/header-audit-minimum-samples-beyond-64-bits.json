@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "models/staging/stg_orders.sql model audit 'not_null' 'minimum_samples' 18446744073709551616 is larger than a 64-bit integer",
+     "message": "sql/models/staging/stg_orders.sql model audit 'not_null' 'minimum_samples' 18446744073709551616 is larger than a 64-bit integer",
      "help": "set minimum_samples to a value that fits in 64 bits, add this to the MODEL header:\n            MODEL (\n              audits [not_null (name \"order_ids_present\", minimum_samples 9223372036854775807, severity \"warn\", meta (tiers [\"gold\"]))],\n              ...\n            );"
     }
    ]

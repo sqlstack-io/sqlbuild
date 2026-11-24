@@ -18,8 +18,8 @@ fn given_targets_when_selecting_lineage_then_stdout_matches() {
             direction: "upstream",
             depth: None,
             expected_stdout: Ok(
-                "\nLineage  model  fact_orders  models/fact_orders.sql  upstream\n\
-                \u{251c}\u{2500}\u{2500} model  stg_orders  models/stg_orders.sql\n\
+                "\nLineage  model  fact_orders  sql/models/fact_orders.sql  upstream\n\
+                \u{251c}\u{2500}\u{2500} model  stg_orders  sql/models/stg_orders.sql\n\
                 \u{2502}   \u{2514}\u{2500}\u{2500} source  raw_orders\n\
                 \u{2514}\u{2500}\u{2500} seed  waffle_types\n\n",
             ),
@@ -43,9 +43,9 @@ fn given_targets_when_selecting_lineage_then_stdout_matches() {
             expected_stdout: Ok(
                 "{\n  \"nodes\": [\n    {\n      \"id\": \"model:fact_orders\",\n      \
                 \"name\": \"fact_orders\",\n      \"resource_type\": \"model\",\n      \
-                \"relative_path\": \"models/fact_orders.sql\"\n    },\n    {\n      \
+                \"relative_path\": \"sql/models/fact_orders.sql\"\n    },\n    {\n      \
                 \"id\": \"model:stg_orders\",\n      \"name\": \"stg_orders\",\n      \
-                \"resource_type\": \"model\",\n      \"relative_path\": \"models/stg_orders.sql\"\n    \
+                \"resource_type\": \"model\",\n      \"relative_path\": \"sql/models/stg_orders.sql\"\n    \
                 }\n  ],\n  \"edges\": [\n    {\n      \"from\": \"model:stg_orders\",\n      \
                 \"to\": \"model:fact_orders\"\n    }\n  ],\n  \"focus\": [\n    \
                 \"model:stg_orders\"\n  ],\n  \"direction\": \"downstream\"\n}\n",

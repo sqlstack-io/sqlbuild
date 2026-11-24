@@ -37,7 +37,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
                     """
                 ).strip()
                 + "\n",
-                "models/commerce/partner_feed/staging/orders.sql": "MODEL (description 'Test model orders.');\n\nSELECT 1 AS id\n",
+                "sql/models/commerce/partner_feed/staging/orders.sql": "MODEL (description 'Test model orders.');\n\nSELECT 1 AS id\n",
             },
             expected_exit_code=0,
             expected_stderr_fragment="",
@@ -61,7 +61,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
                     """
                 ).strip()
                 + "\n",
-                "models/commerce/eu/staging/orders.sql": "MODEL (description 'Test model orders.');\n\nSELECT 1 AS id\n",
+                "sql/models/commerce/eu/staging/orders.sql": "MODEL (description 'Test model orders.');\n\nSELECT 1 AS id\n",
             },
             expected_exit_code=1,
             expected_stderr_fragment=(

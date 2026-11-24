@@ -22,12 +22,12 @@ Checks are separate graph nodes, not callbacks embedded in an asset. A check dec
 
 ## Defining a check
 
-Place Python files under `python/` (the playgrounds use `python/checks/`) and decorate functions with `@check`. `depends_on` is required:
+Place Python files under `python/nodes/` (the playgrounds use `python/nodes/checks/`) and decorate functions with `@check`. `depends_on` is required:
 
 ```python
-# python/checks/orders.py
+# python/nodes/checks/orders.py
 from sqlbuild.checks import check, CheckContext
-from python.exports.orders import export_orders
+from python.nodes.exports.orders import export_orders
 
 @check(depends_on=export_orders)
 def check_orders_exported(ctx: CheckContext):
@@ -144,7 +144,7 @@ sqb check --select tag:exports
 | | Checks | Audits |
 |---|--------|--------|
 | Validates | Python assets, loaders, and SQL relations | SQL relations |
-| Authored in | `python/` (Python) | `MODEL()` headers / `audits/` (SQL) |
+| Authored in | `python/nodes/` (Python) | `MODEL()` headers / `sql/audits/` (SQL) |
 | Run by | `sqb build`, `sqb check` | `sqb build`, `sqb audit` |
 | Severity | `error`, `warn` | `error`, `warn` |
 

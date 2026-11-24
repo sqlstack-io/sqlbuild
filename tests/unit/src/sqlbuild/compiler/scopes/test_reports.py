@@ -40,8 +40,8 @@ from tests.unit.src.sqlbuild.compiler.scopes.helpers import report_scope_lookup
     "test_case",
     (
         ScopeReportTargetCase("qualified", "model:orders", "model:orders", ()),
-        ScopeReportTargetCase("exact_path", "models/staging/orders.sql", "model:orders", ()),
-        ScopeReportTargetCase("windows_path", r"models\staging\orders.sql", "model:orders", ()),
+        ScopeReportTargetCase("exact_path", "sql/models/staging/orders.sql", "model:orders", ()),
+        ScopeReportTargetCase("windows_path", r"sql\models\staging\orders.sql", "model:orders", ()),
         ScopeReportTargetCase(
             "bare", "orders", None, (ScopeDiagnosticCode.UNQUALIFIED_TARGET.value,)
         ),
@@ -79,8 +79,8 @@ def test_given_resource_when_querying_then_sections_and_scope_chain_are_separate
     ]
     assert [item.identity for item in report.relationship_scope] == ["enum:mart_status"]
     assert [item.path for item in report.scope_chain] == [
-        "models/staging",
-        "models",
+        "sql/models/staging",
+        "sql/models",
         "global",
     ]
     assert [item.identity for item in report.nearby_unavailable] == ["enum:other_status"]
@@ -94,16 +94,16 @@ def test_given_prospective_paths_when_querying_then_visibility_is_pure_and_parti
     test_case: ExpectedBooleanCase,
 ) -> None:
     file_report: ScopeReport = query_scope_report(
-        lookup=report_scope_lookup(), at=r"models\staging\new.sql"
+        lookup=report_scope_lookup(), at=r"sql\models\staging\new.sql"
     )
     directory_report: ScopeReport = query_scope_report(
-        lookup=report_scope_lookup(), at="models/staging", directory=True
+        lookup=report_scope_lookup(), at="sql/models/staging", directory=True
     )
     invalid_report: ScopeReport = query_scope_report(
         lookup=report_scope_lookup(), at="../outside.sql"
     )
     invalid_suffix: ScopeReport = query_scope_report(
-        lookup=report_scope_lookup(), at="models/staging/new.txt"
+        lookup=report_scope_lookup(), at="sql/models/staging/new.txt"
     )
 
     assert "enum:order_status" in {item.identity for item in file_report.available}
@@ -123,13 +123,13 @@ def test_given_empty_authored_root_when_querying_prospective_path_then_root_fact
 ) -> None:
     lookup: ScopeLookup = build_scope_lookup(
         index=ScopeIndex(
-            ownership_roots=(OwnershipRoot("models", resource_kind=ResourceKind.MODEL),)
+            ownership_roots=(OwnershipRoot("sql/models", resource_kind=ResourceKind.MODEL),)
         )
     )
 
-    report: ScopeReport = query_scope_report(lookup=lookup, at="models/new.sql")
+    report: ScopeReport = query_scope_report(lookup=lookup, at="sql/models/new.sql")
 
-    assert report.resource.path == "models/new.sql"
+    assert report.resource.path == "sql/models/new.sql"
     assert report.resource.prospective is test_case.expected_result
     assert report.diagnostics[-1].code is ScopeDiagnosticCode.INCOMPLETE_USAGE
 
@@ -227,7 +227,7 @@ def test_given_folder_tree_when_browsing_and_listing_then_counts_are_exact(
         filters=ScopeReportFilters(page_size=10_001),
     )
 
-    assert [item.path for item in root.folders] == ["global", "models"]
+    assert [item.path for item in root.folders] == ["global", "sql"]
     assert constants.folders[0].descendant_count == 10_000
     assert listed.section.total == 10_000
     assert len(listed.declarations) == 10_000
@@ -246,12 +246,12 @@ def test_given_target_when_browsing_and_listing_used_declarations_then_counts_ar
     lookup: ScopeLookup = report_scope_lookup()
     browse: ScopeBrowseResult = browse_scope_folders(
         lookup=lookup,
-        folder="models/marts",
+        folder="sql/models/marts",
         target="model:orders",
     )
     listed: ScopeListResult = list_scope_declarations(
         lookup=lookup,
-        folder="models/marts",
+        folder="sql/models/marts",
         target="model:orders",
         filters=ScopeReportFilters(used_only=True),
     )
@@ -283,7 +283,7 @@ def test_given_declaration_when_explaining_then_metadata_is_typed_and_value_safe
         "render_as": None,
         "role": "constants",
         "visibility_label": "project",
-        "role_root": "constants",
+        "role_root": "sql/constants",
         "bucket_path": None,
     }
     assert test_case.expected_result
@@ -318,7 +318,7 @@ def test_given_resource_move_when_previewing_then_deltas_and_grants_are_separate
     preview, diagnostics = preview_scope_move(
         lookup=report_scope_lookup(),
         resource="model:orders",
-        destination="models/marts/orders.sql",
+        destination="sql/models/marts/orders.sql",
     )
     invalid, invalid_diagnostics = preview_scope_move(
         lookup=report_scope_lookup(),
@@ -328,11 +328,11 @@ def test_given_resource_move_when_previewing_then_deltas_and_grants_are_separate
     occupied, occupied_diagnostics = preview_scope_move(
         lookup=report_scope_lookup(),
         resource="model:orders",
-        destination="models/marts/expected_orders.sql",
+        destination="sql/models/marts/expected_orders.sql",
     )
     base_lookup: ScopeLookup = report_scope_lookup()
     source: ResourceRecord = base_lookup.index.resources[0]
-    duplicate_path: str = "models/marts/duplicate_orders.sql"
+    duplicate_path: str = "sql/models/marts/duplicate_orders.sql"
     duplicate_lookup: ScopeLookup = build_scope_lookup(
         index=replace(
             base_lookup.index,
@@ -341,7 +341,7 @@ def test_given_resource_move_when_previewing_then_deltas_and_grants_are_separate
     )
     duplicate, duplicate_diagnostics = preview_scope_move(
         lookup=duplicate_lookup,
-        resource="models/staging/orders.sql",
+        resource="sql/models/staging/orders.sql",
         destination=duplicate_path,
     )
 

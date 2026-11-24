@@ -14,7 +14,7 @@ from sqlbuild._native import (
 from sqlbuild.compiler.discovery._helpers.filesystem.command_output_sinks import (
     discover_command_output_sink_functions,
 )
-from sqlbuild.sinks import CommandOutputStream
+from sqlbuild.event_sinks import CommandOutputStream
 from tests.unit.src.sqlbuild.compiler.discovery._helpers._test_types import (
     CommandOutputSinkDiscoveryTestCase,
 )
@@ -33,10 +33,10 @@ def test_given_explicit_command_output_sink_when_discovering_then_returns_typed_
     write_repo_files(
         tmp_path,
         {
-            "sinks/output.py": """
-from sqlbuild.sinks import CommandOutputRecord, command_output_sink
+            "python/event_sinks/output.py": """
+from sqlbuild.event_sinks import CommandOutputRecord, command_output_event_sink
 
-@command_output_sink(streams={"stderr"})
+@command_output_event_sink(streams={"stderr"})
 def publish_output(record: CommandOutputRecord) -> None:
     del record
 """,
@@ -64,8 +64,8 @@ def test_given_only_lifecycle_sink_when_discovering_output_then_returns_empty(
     write_repo_files(
         tmp_path,
         {
-            "sinks/lifecycle.py": """
-from sqlbuild.sinks import lifecycle_event_sink
+            "python/event_sinks/lifecycle.py": """
+from sqlbuild.event_sinks import lifecycle_event_sink
 
 @lifecycle_event_sink
 def publish_lifecycle(event):
@@ -91,17 +91,17 @@ def test_given_provider_parameter_when_discovering_output_then_records_shared_us
     write_repo_files(
         tmp_path,
         {
-            "providers/destination.py": """
+            "python/providers/destination.py": """
 from sqlbuild.providers import Provider
 
 class Destination(Provider):
     pass
 """,
-            "sinks/output.py": """
-from providers.destination import Destination
-from sqlbuild.sinks import command_output_sink
+            "python/event_sinks/output.py": """
+from python.providers.destination import Destination
+from sqlbuild.event_sinks import command_output_event_sink
 
-@command_output_sink
+@command_output_event_sink
 def publish_output(record, destination: Destination):
     del record, destination
 """,
@@ -130,10 +130,10 @@ def test_given_wrong_first_parameter_when_discovering_output_then_rejects_signat
     write_repo_files(
         tmp_path,
         {
-            "sinks/output.py": """
-from sqlbuild.sinks import command_output_sink
+            "python/event_sinks/output.py": """
+from sqlbuild.event_sinks import command_output_event_sink
 
-@command_output_sink
+@command_output_event_sink
 def publish_output(event):
     del event
 """,

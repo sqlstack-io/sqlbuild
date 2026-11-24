@@ -46,7 +46,7 @@ def test_given_attached_and_project_audits_when_querying_model_then_returns_only
     project: CompiledProjectView = project_with(
         project=build_project(
             name="orders",
-            relative_path="models/orders.sql",
+            relative_path="sql/models/orders.sql",
             sql="SELECT 1 AS order_id",
             config_values={},
         ),
@@ -56,7 +56,7 @@ def test_given_attached_and_project_audits_when_querying_model_then_returns_only
     facts: AuditFacts = AuditFacts(project=project)
 
     attached_audits: tuple[CompiledAuditView, ...] = facts.for_model(
-        Model(name="orders", path=Path("models/orders.sql"), materialization="view")
+        Model(name="orders", path=Path("sql/models/orders.sql"), materialization="view")
     )
     assert tuple(audit.name for audit in attached_audits) == test_case.expected_attached_names
     assert tuple(audit.name for audit in facts.all()) == test_case.expected_all_names

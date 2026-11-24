@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D014",
-     "message": "HOOK() in '<project>/hooks/sql/record_refresh.sql:3' has unsupported keys: phase",
+     "message": "HOOK() in '<project>/sql/hooks/sql/record_refresh.sql:3' has unsupported keys: phase",
      "help": "supported keys: description"
     }
    ]

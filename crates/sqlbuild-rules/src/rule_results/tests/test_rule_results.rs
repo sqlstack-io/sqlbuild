@@ -17,40 +17,40 @@ fn given_repeated_long_literals_when_hinting_then_matches_python_wording() {
     let test_cases = [
         HintTestCase {
             description: "two files in one folder share a local constants folder",
-            paths: vec!["models/a/x.sql", "models/a/y.sql"],
+            paths: vec!["sql/models/a/x.sql", "sql/models/a/y.sql"],
             expected_hint: Some(
-                "The identical literal also appears in models/a/y.sql; their nearest common folder is `models/a`, so declare it once in `models/a/_sqlbuild/_constants/`",
+                "The identical literal also appears in sql/models/a/y.sql; their nearest common folder is `sql/models/a`, so declare it once in `sql/models/a/_sqlbuild/_constants/`",
             ),
         },
         HintTestCase {
             description: "a declaration group file and subfolders inherit constants",
             paths: vec![
-                "models/a/_sqlbuild/x.sql",
-                "models/a/b/y.sql",
-                "models/a/c/z.sql",
+                "sql/models/a/_sqlbuild/x.sql",
+                "sql/models/a/b/y.sql",
+                "sql/models/a/c/z.sql",
             ],
             expected_hint: Some(
-                "The identical literal also appears in models/a/b/y.sql, models/a/c/z.sql; their nearest common folder is `models/a`, so declare it once in `models/a/_sqlbuild/constants/`",
+                "The identical literal also appears in sql/models/a/b/y.sql, sql/models/a/c/z.sql; their nearest common folder is `sql/models/a`, so declare it once in `sql/models/a/_sqlbuild/constants/`",
             ),
         },
         HintTestCase {
             description: "paths sort by parts and only five are listed",
             paths: vec![
-                "models/a-b/x.sql",
-                "models/a/b/x.sql",
-                "models/a/y.sql",
+                "sql/models/a-b/x.sql",
+                "sql/models/a/b/x.sql",
+                "sql/models/a/y.sql",
                 "m/1.sql",
                 "m/2.sql",
                 "m/3.sql",
                 "m/4.sql",
             ],
             expected_hint: Some(
-                "The identical literal also appears in m/1.sql, m/2.sql, m/3.sql, m/4.sql, models/a/b/x.sql and 1 more; no folder below the project roots holds every use, so declare it once in top-level `constants/`",
+                "The identical literal also appears in m/1.sql, m/2.sql, m/3.sql, m/4.sql, sql/models/a/b/x.sql and 1 more; no folder below the project roots holds every use, so declare it once in top-level `sql/constants/`",
             ),
         },
         HintTestCase {
             description: "a literal in one file gets no hint",
-            paths: vec!["models/a/x.sql"],
+            paths: vec!["sql/models/a/x.sql"],
             expected_hint: None,
         },
     ];
@@ -89,17 +89,17 @@ fn given_rules_result_when_formatting_then_matches_python_text_and_json() {
         ResultTestCase {
             description: "text lists affected rules, the fix note and unevaluated resources",
             json_output: false,
-            expected_text: "models/o.sql:3:4 [SQLCLEAN001] bad \u{e9}\n  Remediation: Fix it.\n  Affected Rules: A, B\n  Fix available: `sqb format --fix` applies it after compiler verification\nFound 1 Rules findings\n2 models evaluated, 1 resources could not be evaluated",
+            expected_text: "sql/models/o.sql:3:4 [SQLCLEAN001] bad \u{e9}\n  Remediation: Fix it.\n  Affected Rules: A, B\n  Fix available: `sqb format --fix` applies it after compiler verification\nFound 1 Rules findings\n2 models evaluated, 1 resources could not be evaluated",
         },
         ResultTestCase {
             description: "JSON is indented, key-sorted and ASCII-escaped",
             json_output: true,
-            expected_text: "{\n  \"cache_hits\": 1,\n  \"cache_misses\": 1,\n  \"evaluated_models\": 2,\n  \"finding_count\": 1,\n  \"findings\": [\n    {\n      \"affected_rules\": [\n        \"A\",\n        \"B\"\n      ],\n      \"code\": \"SQLCLEAN001\",\n      \"column\": 4,\n      \"fixable\": true,\n      \"line\": 3,\n      \"message\": \"bad \\u00e9\",\n      \"path\": \"models/o.sql\",\n      \"remediation\": \"Fix it.\"\n    }\n  ],\n  \"unevaluated_resources\": 1\n}",
+            expected_text: "{\n  \"cache_hits\": 1,\n  \"cache_misses\": 1,\n  \"evaluated_models\": 2,\n  \"finding_count\": 1,\n  \"findings\": [\n    {\n      \"affected_rules\": [\n        \"A\",\n        \"B\"\n      ],\n      \"code\": \"SQLCLEAN001\",\n      \"column\": 4,\n      \"fixable\": true,\n      \"line\": 3,\n      \"message\": \"bad \\u00e9\",\n      \"path\": \"sql/models/o.sql\",\n      \"remediation\": \"Fix it.\"\n    }\n  ],\n  \"unevaluated_resources\": 1\n}",
         },
     ];
     let finding = RuleFinding {
         code: "SQLCLEAN001".to_owned(),
-        path: "models/o.sql".to_owned(),
+        path: "sql/models/o.sql".to_owned(),
         line: 3,
         column: 4,
         message: "bad \u{e9}".to_owned(),
@@ -177,7 +177,7 @@ fn given_unevaluated_findings_when_grouping_then_one_finding_per_path_and_reason
             unevaluated("SQBRB", 3),
             RuleFinding {
                 code: "SQBRZ".into(),
-                path: "models/a.sql".into(),
+                path: "sql/models/a.sql".into(),
                 line: 1,
                 ..RuleFinding::default()
             },

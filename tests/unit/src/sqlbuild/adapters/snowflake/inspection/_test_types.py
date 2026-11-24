@@ -160,6 +160,7 @@ class MissingSchemaTestCase:
     forbidden_schemas: frozenset[str]
     expected_error_fragment: str
     expected_schema_checks: int
+    expected_failed_reads: int
 
 
 @dataclass(frozen=True)

@@ -75,7 +75,7 @@ fn given_stored_results_when_looking_up_then_unchanged_subjects_and_reads_hit() 
             description: "a renamed model misses only that subject",
             current_digest: "digest-a",
             model_name: "orders_v2",
-            expected_plan: vec![("CUSTOM001", Some(vec!["models/orders.sql"]))],
+            expected_plan: vec![("CUSTOM001", Some(vec!["sql/models/orders.sql"]))],
             expected_hits: 1,
         },
     ];

@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "models/staging/stg_orders.sql model column 'order_id' audit 'not_null' 'evidence_limit' 18446744073709551616 is larger than a 64-bit integer",
+     "message": "sql/models/staging/stg_orders.sql model column 'order_id' audit 'not_null' 'evidence_limit' 18446744073709551616 is larger than a 64-bit integer",
      "help": "set evidence_limit to a value that fits in 64 bits, add this to the MODEL header:\n            MODEL (\n              columns (order_id (audits [not_null (evidence_limit 9223372036854775807)])),\n              ...\n            );"
     }
    ]

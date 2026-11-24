@@ -37,7 +37,7 @@ plan, and ships tools for proving a change is correct. Use those tools; do not s
   flag without the user's say-so.
 
 ```sql
--- models/marts/fact_orders.sql
+-- sql/models/marts/fact_orders.sql
 MODEL (
   description "One row per order with its payment total",
   materialized table,
@@ -185,9 +185,9 @@ parameterised cases, scenarios, audits and Rules.
 swap for tables, and on each delta before DML for incremental models. Attach built-ins such as
 `not_null` and `unique` in the column schema.
 
-**Macros, enums and constants.** SQL macros (`macros/sql/`, one per file, called `@sql.name(...)`)
+**Macros, enums and constants.** SQL macros (`sql/macros/sql/`, one per file, called `@sql.name(...)`)
 are typed, logic-free SQL fragments; prefer them when no logic is needed. Python macros
-(`macros/python/`, called `@py.name(...)`) are functions returning SQL strings; arguments are
+(`sql/macros/python/`, called `@py.name(...)`) are functions returning SQL strings; arguments are
 Python literals, and SQL expressions are passed as quoted strings. Public functions become macros;
 prefix helpers with `_`. Macros work in model SQL, SQL hooks, tests, scenarios, audits and SQL
 functions, but not in ordinary `MODEL()` config fields. Placement decides visibility. Read

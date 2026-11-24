@@ -18,7 +18,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_waffle_sh
     [
         PlanCommandBuildE2ETestCase(
             description="plan select no-color scopes to marts",
-            command=("--no-color", "plan", "--select", "path:models/marts"),
+            command=("--no-color", "plan", "--select", "path:sql/models/marts"),
             expected_exit_code=0,
             expected_stdout_fragments=(
                 "Plan ready  10 selected",
@@ -37,7 +37,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_waffle_sh
                 "--no-color",
                 "plan",
                 "--select",
-                "/models/marts",
+                "/sql/models/marts",
                 "--exclude",
                 "hourly_order_activity",
             ),

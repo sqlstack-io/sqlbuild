@@ -6,10 +6,12 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use pyo3::prelude::{
-    Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python, pyclass,
+    Bound, Py, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python, pyclass,
     pyfunction, pymethods, wrap_pyfunction,
 };
 use pyo3::sync::PyOnceLock;
+
+use crate::event_exporting::constants::UNNAMED_TEARDOWN_FAILURE;
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyTuple};
 use sqlbuild_host::entries::models::ExecutorHost;
 
@@ -36,6 +38,8 @@ pub(crate) struct ScopeState {
     pub(crate) providers: Option<Py<PyAny>>,
     pub(crate) event_exporters: Option<Py<PyAny>>,
     pub(crate) command_output_sinks: Option<Py<PyAny>>,
+    /// Each sink provider whose teardown raised at close, with the error type, never its message.
+    pub(crate) teardown_failures: Vec<String>,
 }
 
 /// Releases and force-closes a provider session on the closing thread once sink delivery is idle.
@@ -162,6 +166,17 @@ pub(crate) fn bindings<'py>(
         )?);
     }
     Ok((PyTuple::new(py, exporters)?, PyTuple::new(py, sinks)?))
+}
+
+/// The providers a failed teardown names with their error types, or a note that closing the session raised.
+pub(crate) fn teardown_failures(py: Python<'_>, error: &PyErr) -> Vec<String> {
+    let named: Vec<String> = native_field(error.value(py), "failures")
+        .and_then(|failures| failures.extract())
+        .unwrap_or_default();
+    if named.is_empty() {
+        return vec![UNNAMED_TEARDOWN_FAILURE.to_owned()];
+    }
+    named
 }
 
 #[pymethods]

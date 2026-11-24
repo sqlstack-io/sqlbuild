@@ -71,7 +71,7 @@ _NOTE_LINE: re.Pattern[str] = re.compile(r"^.*kept in its folder.*$", re.MULTILI
         ),
         FollowedUnitTestE2ETestCase(
             description="move to another folder moves the test to the mirrored folder",
-            command=("mv", "model:fact_orders", "models/reporting/"),
+            command=("mv", "model:fact_orders", "sql/models/reporting/"),
             expected_fragments={
                 "tests/unit/reporting/test_fact_orders__keeps_orders.sql": (
                     'TEST (name "fact_orders__keeps_orders");',
@@ -81,7 +81,7 @@ _NOTE_LINE: re.Pattern[str] = re.compile(r"^.*kept in its folder.*$", re.MULTILI
         ),
         FollowedUnitTestE2ETestCase(
             description="move with a new name moves and renames the test",
-            command=("mv", "model:fact_orders", "models/reporting/order_facts.sql"),
+            command=("mv", "model:fact_orders", "sql/models/reporting/order_facts.sql"),
             expected_fragments={
                 "tests/unit/reporting/test_order_facts__keeps_orders.sql": (
                     'TEST (name "order_facts__keeps_orders");',
@@ -167,8 +167,8 @@ def test_given_dry_run_when_renaming_model_with_unit_test_then_reports_move_and_
         ScopedUnitTestMoveE2ETestCase(
             description="a project-wide constant lets the test move",
             extra_files={
-                "constants/orders.sql": "CONSTANT (name sample_amount, value 25);\n",
-                "models/marts/customer_totals.sql": CUSTOMER_TOTALS.replace(
+                "sql/constants/orders.sql": "CONSTANT (name sample_amount, value 25);\n",
+                "sql/models/marts/customer_totals.sql": CUSTOMER_TOTALS.replace(
                     "GROUP BY customer_id\n",
                     'GROUP BY customer_id\nHAVING SUM(amount) >= @const("sample_amount")\n',
                 ),
@@ -198,7 +198,7 @@ def test_given_scoped_declarations_when_moving_model_then_test_moves_only_if_the
     remove_files(project_dir=project_dir, paths=("tests/unit/test_fact_orders.sql",))
 
     result: subprocess.CompletedProcess[str] = sqb(
-        project_dir, "mv", "model:fact_orders", "models/reporting/order_facts.sql"
+        project_dir, "mv", "model:fact_orders", "sql/models/reporting/order_facts.sql"
     )
     tested: subprocess.CompletedProcess[str] = sqb(project_dir, "test")
 

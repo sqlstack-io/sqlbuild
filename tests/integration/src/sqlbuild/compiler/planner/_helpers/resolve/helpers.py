@@ -72,15 +72,15 @@ def compile_resolution_project(project_dir: Path) -> CompiledProjectView:
             'name = "resolution"\nadapter = "duckdb"\n'
             '[connection]\ndatabase = ":memory:"\n[defaults]\nschema = "staging"\n'
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             'MODEL (description "Orders", alias "orders_alias"); SELECT 9 AS order_id'
         ),
-        "functions/sql/order_lookup.sql": (
+        "sql/functions/sql/order_lookup.sql": (
             'FUNCTION (description "Order lookup", arguments (id INTEGER), '
             "returns table (order_id INTEGER)); "
             'SELECT order_id FROM __ref("orders") WHERE order_id = id'
         ),
-        "models/report.sql": (
+        "sql/models/report.sql": (
             'MODEL (description "Report", pre_hooks [inline_sql(\'SELECT order_id '
             'FROM __ref("orders")\')]); SELECT o.order_id FROM __ref("orders") o '
             'JOIN __table_fn("order_lookup")(9) f ON o.order_id = f.order_id'
@@ -145,7 +145,7 @@ def build_model(
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name=name),
         deps=(),
         name=name,
-        relative_path=Path(f"models/{name}.sql"),
+        relative_path=Path(f"sql/models/{name}.sql"),
         query_sql=query_sql,
         config=CompileModelConfig(values=config),
         destination=CompiledRelationLocation(

@@ -1130,7 +1130,7 @@ def test_given_unimportable_project_extension_when_running_raw_query_diff_then_i
 ) -> None:
     project_dir: Path = prepare_diff_project(tmp_path)
     build_both_environments(project_dir=project_dir)
-    sink_path: Path = project_dir / "sinks" / "broken_sink.py"
+    sink_path: Path = project_dir / "python" / "event_sinks" / "broken_sink.py"
     sink_path.parent.mkdir(parents=True, exist_ok=True)
     sink_path.write_text("import package_that_is_not_installed\n", encoding="utf-8")
 
@@ -1247,7 +1247,7 @@ def test_given_layered_sampling_config_when_diffing_then_model_and_cli_precedenc
         f"row_diff_sample_seed = {test_case.path_seed}\n"
     )
     project_config_path.write_text(project_config, encoding="utf-8")
-    model_path: Path = project_dir / "models/intermediate/orders_snapshot.sql"
+    model_path: Path = project_dir / "sql/models/intermediate/orders_snapshot.sql"
     model_sql: str = model_path.read_text(encoding="utf-8")
     model_sql = model_sql.replace(
         "  cursor_type timestamp,",

@@ -103,7 +103,7 @@ SNAPSHOT_CAPTURE_FINGERPRINT: str = build_scenario_snapshot_input_fingerprint(
                         logical_name="currency_codes",
                         source_target=SNAPSHOT_CAPTURE_PLAN.seed_entries[0].destination,
                         file_path=Path("seeds/currency_codes.jsonl"),
-                        capture_sql="seed_file:seeds/currency_codes.csv",
+                        capture_sql="seed_file:sql/seeds/currency_codes.csv",
                     ),
                     ScenarioSnapshotCaptureRelationPlan(
                         kind=ScenarioArtifactKind.SOURCE,
@@ -269,7 +269,7 @@ def test_given_invalid_snapshot_jsonl_when_reading_then_raises_clear_error(
     tmp_path: Path,
     test_case: ScenarioSnapshotJsonlErrorTestCase,
 ) -> None:
-    file_path: Path = tmp_path / "sources" / "raw__orders.jsonl"
+    file_path: Path = tmp_path / "sql" / "sources" / "raw__orders.jsonl"
     file_path.parent.mkdir(parents=True, exist_ok=True)
     file_path.write_text(test_case.file_contents, encoding="utf-8")
 
@@ -399,7 +399,7 @@ def test_given_snapshot_manifest_state_when_classifying_then_returns_expected_st
                     kind=ScenarioArtifactKind.SEED,
                     logical_name="currency_codes",
                     file_path=Path("seeds/currency_codes.jsonl"),
-                    capture_sql="seed_file:seeds/currency_codes.csv",
+                    capture_sql="seed_file:sql/seeds/currency_codes.csv",
                 ),
                 ScenarioSnapshotInputSpec(
                     kind=ScenarioArtifactKind.SOURCE,

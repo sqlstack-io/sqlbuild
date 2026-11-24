@@ -19,6 +19,9 @@ use crate::planner_warehouse::models::MigrationFingerprintCache;
 use crate::planner_warehouse::models::SnapshotRequest;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
+use sqlbuild_python_base::invocation_phases::constants::INSPECTED_PHASE;
+use sqlbuild_python_base::invocation_phases::main::phase_since::phase_since;
+use sqlbuild_python_base::native_host::main::publish_invocation_phase::publish_invocation_phase;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_project::graph::main::project::compiled_graph_keys::compiled_graph_keys;
@@ -174,6 +177,7 @@ pub(crate) fn gather_planner_warehouse_state<'py>(
         },
         (&migration_entries, &column_entries),
     )?;
+    publish_invocation_phase(py, &phase_since(INSPECTED_PHASE, started))?;
     if !runtime_field(runtime, |runtime| &runtime.on_progress)?.is_none() {
         progress(
             runtime,

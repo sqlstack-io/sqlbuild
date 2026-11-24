@@ -58,8 +58,8 @@ def test_given_built_snapshot_when_building_again_then_validity_columns_are_not_
         project_name="customers_project",
         repo_files={
             "sqlbuild_project.toml": _PROJECT_TOML,
-            "models/customers.sql": _CUSTOMERS_SQL,
-            "models/customer_history.sql": (
+            "sql/models/customers.sql": _CUSTOMERS_SQL,
+            "sql/models/customer_history.sql": (
                 "MODEL (\n  description 'Customer history.',\n  materialized snapshot,\n"
                 "  unique_key [customer_id],\n  snapshot_strategy timestamp,\n"
                 f"  updated_at updated_at,\n{test_case.validity_config});\n\n"

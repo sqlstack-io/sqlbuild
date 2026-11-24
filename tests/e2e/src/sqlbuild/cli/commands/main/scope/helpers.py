@@ -52,8 +52,8 @@ def write_scope_performance_project(
         next_model_index: int = (domain + 1) * model_count // domain_count
         models_in_domain: int = next_model_index - first_model_index
         root_model_count: int = min(10, models_in_domain)
-        domain_dir: Path = project_dir / "models" / f"domain_{domain:03d}"
-        macros_dir: Path = domain_dir / "macros" / "python"
+        domain_dir: Path = project_dir / "sql" / "models" / f"domain_{domain:03d}"
+        macros_dir: Path = domain_dir / "sql" / "macros" / "python"
         macros_dir.mkdir(parents=True)
         macro_source: str = "\n\n".join(
             f"def domain_{domain:03d}_identity_{offset:02d}(expression: str) -> str:\n"
@@ -69,7 +69,7 @@ def write_scope_performance_project(
                 macro_name=f"domain_{domain:03d}_identity_{offset:02d}",
             )
         detail_dir: Path = domain_dir / "detail"
-        detail_dir.mkdir()
+        detail_dir.mkdir(parents=True)
         for offset in range(root_model_count, models_in_domain):
             model_index = first_model_index + offset
             _write_scope_model(
@@ -82,18 +82,20 @@ def write_scope_performance_project(
 def write_unicode_macro_project(*, project_dir: Path, macro_names: tuple[str, ...]) -> None:
     """Write one model and a global macro file defining each named macro."""
 
-    (project_dir / "models").mkdir(parents=True)
-    (project_dir / "macros" / "python").mkdir(parents=True)
+    (project_dir / "sql" / "models").mkdir(parents=True)
+    (project_dir / "sql" / "macros" / "python").mkdir(parents=True)
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "scope_unicode"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    (project_dir / "models" / "orders.sql").write_text(
+    (project_dir / "sql" / "models" / "orders.sql").write_text(
         'MODEL(description "Test model orders.");\nSELECT 1 AS id\n', encoding="utf-8"
     )
     macro_source: str = "\n\n".join(
         f"def {name}(expression: str) -> str:\n    return expression\n" for name in macro_names
     )
-    (project_dir / "macros" / "python" / "names.py").write_text(macro_source, encoding="utf-8")
+    (project_dir / "sql" / "macros" / "python" / "names.py").write_text(
+        macro_source, encoding="utf-8"
+    )
 
 
 def _write_scope_model(*, model_dir: Path, model_index: int, macro_name: str) -> None:

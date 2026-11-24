@@ -162,9 +162,9 @@ These fail with `P017`, naming the argument, the expected type or column and wha
 
 ```
 error[P017]: argument src of macro clean_orders() needs column is_deleted BOOLEAN; orders_raw has no column is_deleted
-  --> models/marts/orders_clean.sql:2:1
+  --> sql/models/marts/orders_clean.sql:2:1
   parameter declared here:
-  --> macros/sql/clean_orders.sql:3:14
+  --> sql/macros/sql/clean_orders.sql:3:14
   = help: pass a relation with these columns: order_id BIGINT, updated_at TIMESTAMP, is_deleted BOOLEAN
 ```
 

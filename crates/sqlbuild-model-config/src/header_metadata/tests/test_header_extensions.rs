@@ -16,7 +16,7 @@ fn given_dynamic_columns_when_parsing_then_families_or_first_error_are_returned(
             description: "empty block",
             raw: map(&[]),
             expected_families: Err(
-                "model 'orders' dynamic_columns must be a non-empty named block in models/orders.sql",
+                "model 'orders' dynamic_columns must be a non-empty named block in sql/models/orders.sql",
             ),
         },
         DynamicColumnsTestCase {
@@ -78,27 +78,27 @@ fn given_audit_factories_when_resolving_then_references_or_first_error_are_retur
         FactoryReferencesTestCase {
             description: "a tuple is not a list",
             raw: Value::Tuple(vec![Value::Str("freshness")]),
-            expected_references: Err("models/orders.sql model audit_factories must be a list"),
+            expected_references: Err("sql/models/orders.sql model audit_factories must be a list"),
         },
         FactoryReferencesTestCase {
             description: "dotted entry",
             raw: Value::List(vec![Value::Str("pkg.freshness")]),
             expected_references: Err(
-                "models/orders.sql model audit_factories entry 'pkg.freshness' must be a bare identifier",
+                "sql/models/orders.sql model audit_factories entry 'pkg.freshness' must be a bare identifier",
             ),
         },
         FactoryReferencesTestCase {
             description: "repeated entry",
             raw: Value::List(vec![Value::Str("freshness"), Value::Str("freshness")]),
             expected_references: Err(
-                "model 'orders' in models/orders.sql references audit factory 'freshness' more than once",
+                "model 'orders' in sql/models/orders.sql references audit factory 'freshness' more than once",
             ),
         },
         FactoryReferencesTestCase {
             description: "unknown entry lists sorted factories",
             raw: Value::List(vec![Value::Str("volume")]),
             expected_references: Err(
-                "model 'orders' in models/orders.sql references unknown audit factory 'volume'. \
+                "model 'orders' in sql/models/orders.sql references unknown audit factory 'volume'. \
                  Available audit factories: daily_checks, freshness",
             ),
         },

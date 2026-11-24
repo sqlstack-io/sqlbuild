@@ -167,7 +167,7 @@ class RenderFeatureWriter:
     def _table_function(self) -> None:
         self._features.add("table_function")
         base: ModelPlan = self._base()
-        self._files["functions/sql/table_fn__events_above.sql"] = (
+        self._files["sql/functions/sql/table_fn__events_above.sql"] = (
             "FUNCTION (\n"
             '  description "Events above an amount",\n'
             "  arguments (p_minimum DOUBLE),\n"
@@ -222,7 +222,7 @@ class RenderFeatureWriter:
         self._deferred_placeholder(base)
 
     def _deferred_placeholder(self, base: ModelPlan) -> None:
-        self._files["materializations/windowed_copy.py"] = (
+        self._files["python/materializations/windowed_copy.py"] = (
             "from sqlbuild.executor.custom.models import MaterializationContext, "
             "MaterializationResult\n\n\n"
             "def materialize(ctx: MaterializationContext) -> MaterializationResult:\n"
@@ -272,7 +272,7 @@ class RenderFeatureWriter:
         self._features.add("macros_across_resources")
         base: ModelPlan = self._base()
         source: str = base.inputs[0].split(":", 1)[1]
-        self._files["macros/python/labels.py"] = (
+        self._files["sql/macros/python/labels.py"] = (
             "def tidy_label(expression: str) -> str:\n"
             '    """Trim and lower-case a label."""\n'
             '    return f"LOWER(TRIM({expression}))"\n'
@@ -281,7 +281,7 @@ class RenderFeatureWriter:
             'AUDIT ();\n\nSELECT *\nFROM __ref("@model")\nWHERE @column <> '
             '@py.tidy_label("@column")\n'
         )
-        self._files["functions/sql/tidy_status.sql"] = (
+        self._files["sql/functions/sql/tidy_status.sql"] = (
             "FUNCTION (\n"
             '  description "Normalise a status label.",\n'
             "  arguments (raw_status STRING),\n"
@@ -298,7 +298,7 @@ class RenderFeatureWriter:
                 f'FROM __ref("{base.name}")\n'
             ),
         )
-        self._files["sources/labelled.yml"] = (
+        self._files["sql/sources/labelled.yml"] = (
             "sources:\n"
             "  - name: labelled_channels\n"
             "    description: Channel labels normalised in the source expression.\n"
@@ -382,7 +382,7 @@ class RenderFeatureWriter:
 
     def _resource_audits(self) -> None:
         self._features.add("resource_audits")
-        self._files["sources/audited.yml"] = (
+        self._files["sql/sources/audited.yml"] = (
             "sources:\n"
             "  - name: audited_events\n"
             "    description: Events with source audits.\n"
@@ -398,8 +398,8 @@ class RenderFeatureWriter:
             "      - name: amount\n"
             "        type: DOUBLE\n"
         )
-        self._files["seeds/channel_codes.csv"] = f'id,label\n1,"{self._label()}"\n2,web\n'
-        self._files["seeds/channel_codes.yml"] = (
+        self._files["sql/seeds/channel_codes.csv"] = f'id,label\n1,"{self._label()}"\n2,web\n'
+        self._files["sql/seeds/channel_codes.yml"] = (
             "seeds:\n"
             "  - name: channel_codes\n"
             "    description: Channel codes with seed audits.\n"
@@ -456,7 +456,7 @@ class RenderFeatureWriter:
             ),
             body=f'SELECT id, amount, status\nFROM __ref("{base.name}")\n',
         )
-        self._files["sources/configured.yml"] = (
+        self._files["sql/sources/configured.yml"] = (
             "sources:\n"
             "  - name: configured_events\n"
             f'    description: "Configured feed ${{coalesce(ENV:{GENERATOR_MISSING_ENV_VAR}, '
@@ -474,7 +474,7 @@ class RenderFeatureWriter:
             "      - name: amount\n"
             "        type: DOUBLE\n"
         )
-        self._files["functions/sql/configured_label.sql"] = (
+        self._files["sql/functions/sql/configured_label.sql"] = (
             "FUNCTION (\n"
             '  description "Label a configured status.",\n'
             f"  schema \"${{coalesce(ENV:{GENERATOR_MISSING_ENV_VAR}, 'udfs')}}\",\n"

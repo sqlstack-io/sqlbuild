@@ -525,7 +525,7 @@ def stage_instance(project: Project, instance: Instance, folder: str) -> list[St
         )
         staged.append(StagedTable(instance, archetype, stg.name, children, history))
     project.write(
-        f"sources/{instance.code}.yml",
+        f"sql/sources/{instance.code}.yml",
         f"# Raw tables from {instance.label}.\nsources:\n" + "\n".join(yaml_entries) + "\n",
     )
     return staged
@@ -553,7 +553,7 @@ EVENT_COLUMNS: tuple[tuple[str, str], ...] = (
 def stage_collector(project: Project, instance: Instance, folder: str) -> tuple[str, list[str]]:
     source = f"{instance.code}__events"
     project.write(
-        f"sources/{instance.code}.yml",
+        f"sql/sources/{instance.code}.yml",
         "\n".join(
             [
                 f"# Raw events from the {instance.label} collector.",

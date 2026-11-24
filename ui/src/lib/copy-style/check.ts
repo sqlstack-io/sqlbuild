@@ -69,6 +69,21 @@ const lineOf = (source: string, index: number) => source.slice(0, index).split('
 const MAP = /export const (\w+)\s*:\s*Record<[^>]+,\s*string>\s*=\s*\{([\s\S]*?)\n\};/g;
 const SKIP_MAP = /(Help|Hint|Technical|Tone)$/;
 const STRING = /(['"`])((?:\\.|(?!\1)[^\\\n])*)\1/g;
+/** Exported functions in label files; those named for explanations or tooltips are skipped. */
+const FUNCTION = /export function (\w+)\([^)]*\)[^{]*\{/g;
+const SKIP_FUNCTION = /(Help|Hint|Technical|Tone|Title|Explanation|Tooltip)$/;
+/** A string a function returns, directly or as a branch of a conditional. */
+const RETURNED = /(?:\breturn|[?:])\s*(['"`])((?:\\.|(?!\1)[^\\\n])*)\1/g;
+
+/** The body of the function whose `{` ends just before `start`, and where it starts. */
+function functionBody(source: string, start: number): { text: string; start: number } {
+	let depth = 1;
+	for (let i = start; i < source.length; i++) {
+		if (source[i] === '{') depth++;
+		else if (source[i] === '}' && !--depth) return { text: source.slice(start, i), start };
+	}
+	return { text: source.slice(start), start };
+}
 
 /** The copy sites in one file. `labelFile` turns on label-map scanning for labels.ts-style files. */
 export function findCopy(file: string, source: string, labelFile = false): CopySite[] {
@@ -79,6 +94,12 @@ export function findCopy(file: string, source: string, labelFile = false): CopyS
 			if (SKIP_MAP.test(m[1])) continue;
 			const bodyStart = m.index + m[0].indexOf(m[2]);
 			for (const v of m[2].matchAll(/:\s*(['"`])((?:\\.|(?!\1)[^\\\n])*)\1/g)) add(bodyStart + v.index, 'value', v[2]);
+		}
+		// Values made by functions: each string an exported function returns, except explanations.
+		for (const m of source.matchAll(FUNCTION)) {
+			if (SKIP_FUNCTION.test(m[1])) continue;
+			const body = functionBody(source, m.index + m[0].length);
+			for (const r of body.text.matchAll(RETURNED)) add(body.start + r.index, 'value', r[2]);
 		}
 	}
 	if (!file.endsWith('.svelte')) return sites;
@@ -97,15 +118,49 @@ export function findCopy(file: string, source: string, labelFile = false): CopyS
 		else for (const s of m[2].matchAll(STRING)) add(m.index, 'empty', s[2]);
 	}
 	for (const m of source.matchAll(/<StatusLabel\b[^>]*?\blabel="([^"]*)"/g)) add(m.index, 'value', m[1]);
+	for (const m of source.matchAll(/<InspectorSection\b[^>]*?\btitle="([^"]*)"/g)) add(m.index, 'label', m[1]);
+	// List items written into the markup are facts, like values: one text per `{#if}` branch.
+	for (const m of source.matchAll(/<li\b[^>]*>/g)) {
+		for (const text of blockTexts(source, 'li', m.index + m[0].length)) if (/[a-z]/i.test(text)) add(m.index, 'value', text);
+	}
 	// Column headers, keys and short values written into the markup.
 	for (const m of source.matchAll(/<(th|dt)\b[^>]*>([^<{]*[a-z][^<{]*)<\/\1>/gi)) add(m.index, 'label', m[2]);
 	for (const m of source.matchAll(/<dd\b[^>]*>([^<{]*[a-z][^<{]*)<\/dd>/gi)) add(m.index, 'value', m[1]);
 	// Key-value rows, table columns and filter options: `label: '…'` and `value: '…'` literals.
 	for (const m of source.matchAll(/\blabel:\s*(['"`])((?:(?!\1)[^\\\n])*)\1/g)) add(m.index, 'label', m[2]);
 	for (const m of source.matchAll(/\{\s*label:[^{}]*?\bvalue:\s*(['"`])((?:(?!\1)[^\\\n])*)\1/g)) add(m.index + m[0].lastIndexOf('value:'), 'value', m[2]);
-	// Empty states and messages written as text.
-	for (const m of source.matchAll(/class="(?:[^"]*\s)?(?:empty|msg)(?:\s[^"]*)?"[^>]*>([^<{]*[a-z][^<{]*)</gi)) add(m.index, 'empty', m[1]);
+	// Empty states and messages, read as all the text of their element, nested elements included.
+	for (const m of source.matchAll(/<([a-z]+)\b[^>]*\bclass="(?:[^"]*\s)?(?:empty|msg)(?:\s[^"]*)?"[^>]*>/gi)) {
+		for (const text of blockTexts(source, m[1], m.index + m[0].length)) if (/[a-z]/i.test(text)) add(m.index, 'empty', text);
+	}
 	return sites;
+}
+
+/** The texts of the element whose content starts at `start`, one per `{#if}` branch, without buttons, help tips or code. */
+function blockTexts(source: string, tag: string, start: number): string[] {
+	const open = new RegExp(`<${tag}\\b|</${tag}>`, 'gi');
+	open.lastIndex = start;
+	let depth = 1;
+	let end = source.length;
+	for (let m = open.exec(source); m; m = open.exec(source)) {
+		depth += m[0].startsWith('</') ? -1 : 1;
+		if (!depth) {
+			end = m.index;
+			break;
+		}
+	}
+	let text = source.slice(start, end).replace(/<(Button|button|HelpTip|code)\b[\s\S]*?<\/\1>/g, ' ');
+	// Template expressions, innermost first, become one token; block tags split the branches.
+	for (let before = ''; before !== text; ) {
+		before = text;
+		text = text.replace(/\{([#:/@]?)[^{}]*\}/g, (_, block: string) => (block ? '\u0000' : '#'));
+	}
+	return text
+		.replace(/<[^>]*>/g, ' ')
+		.replace(/&(?:[a-z]+|#\d+);/gi, ' ')
+		.split('\u0000')
+		.map((part) => part.replace(/\s+/g, ' ').trim())
+		.filter(Boolean);
 }
 
 /** The findings in one file, with `copy-allow` markers honoured; a bare marker is itself a finding. */

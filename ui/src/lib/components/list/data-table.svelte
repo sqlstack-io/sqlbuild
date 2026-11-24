@@ -25,6 +25,7 @@
 		class: className = '',
 		label,
 		windowAbove = WINDOW_ABOVE,
+		overscan = 8,
 		onwindow,
 		after,
 		emptyRow
@@ -48,6 +49,8 @@
 		label?: string;
 		/** Window lists longer than this; 0 windows every list, as an endless list does. */
 		windowAbove?: number;
+		/** Rows drawn beyond the view on either side of a windowed list. */
+		overscan?: number;
 		/** The rows drawn, as indices into `rows`; an endless list loads more as the end comes into view. */
 		onwindow?: (range: { first: number; last: number }) => void;
 		/** Rows after the list, such as "Loading more…". */
@@ -60,7 +63,7 @@
 	// Rows drawn, and the height they took: the average sizes the spacers for rows not drawn.
 	let average = $state(44);
 	const fixed = untrack(() => rowHeight);
-	const win = createVirtualRows(fixed ?? (() => average), () => rows.length);
+	const win = createVirtualRows(fixed ?? (() => average), () => rows.length, untrack(() => overscan));
 	const first = $derived(isWindowed ? win.first : 0);
 	const last = $derived(isWindowed ? win.last : rows.length);
 	const shown = $derived(rows.slice(first, last));

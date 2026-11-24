@@ -20,7 +20,7 @@ _COMPILE_TIME_BOUND_SECONDS: float = 120.0
 _NESTING_HELP: str = "help: flatten the value so it nests at most 256 levels deep"
 _CONSTANT_CALL_NESTING: tuple[str, ...] = (
     "error[D013]",
-    "constants/limits.sql:3' contains invalid SQLBuild header syntax: "
+    "sql/constants/limits.sql:3' contains invalid SQLBuild header syntax: "
     "values nest deeper than 256 levels",
     _NESTING_HELP,
 )
@@ -31,26 +31,26 @@ _CONSTANT_CALL_NESTING: tuple[str, ...] = (
     [
         DeepHeaderNestingCompileCase(
             description="native_model_1k",
-            path="models/orders.sql",
+            path="sql/models/orders.sql",
             prefix="MODEL (\n  description 'Orders.',\n  tags ",
             suffix=",\n);\n\nSELECT 1 AS order_id\n",
             depth=1_000,
             expected_fragments=(
                 "error[D002]",
-                "models/orders.sql:3' contains invalid SQLBuild header syntax: "
+                "sql/models/orders.sql:3' contains invalid SQLBuild header syntax: "
                 "values nest deeper than 256 levels",
                 _NESTING_HELP,
             ),
         ),
         DeepHeaderNestingCompileCase(
             description="native_constant_20k",
-            path="constants/limits.sql",
+            path="sql/constants/limits.sql",
             prefix="\nCONSTANT (\n  name order_limits,\n  value ",
             suffix=",\n);\n",
             depth=20_000,
             expected_fragments=(
                 "error[D013]",
-                "constants/limits.sql:4' contains invalid SQLBuild header syntax: "
+                "sql/constants/limits.sql:4' contains invalid SQLBuild header syntax: "
                 "values nest deeper than 256 levels",
                 _NESTING_HELP,
             ),
@@ -67,7 +67,7 @@ def test_given_deeply_nested_header_value_when_compiling_then_fails_with_coded_d
         project_name="orders",
         repo_files={
             "sqlbuild_project.toml": _PROJECT_CONFIG,
-            "models/orders.sql": _ORDERS_MODEL,
+            "sql/models/orders.sql": _ORDERS_MODEL,
             test_case.path: test_case.prefix + nested_value + test_case.suffix,
         },
     )
@@ -119,8 +119,8 @@ def test_given_deeply_nested_constant_calls_when_compiling_then_fails_coded(
         project_name="orders",
         repo_files={
             "sqlbuild_project.toml": _PROJECT_CONFIG,
-            "models/orders.sql": _ORDERS_MODEL,
-            "constants/limits.sql": (
+            "sql/models/orders.sql": _ORDERS_MODEL,
+            "sql/constants/limits.sql": (
                 "CONSTANT (\n  name order_limits,\n  value "
                 + "limit(level " * test_case.depth
                 + "1"

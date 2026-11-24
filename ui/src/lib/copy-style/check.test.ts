@@ -48,6 +48,26 @@ describe('copy sites and exceptions', () => {
 		expect(findCopy('labels.ts', labels, true).map((s) => s.text)).toEqual(['Fails if any rows break the rule']);
 	});
 
+	it('reads an empty state with nested elements as one text, without its buttons and help', () => {
+		const block =
+			'<div class="empty">\n<BotIcon />\n<div class="empty-title">No service accounts yet</div>\n<p>A service account lets a script call SQLBuild.</p>\n{#if canAdd}<Button>Add service account</Button>{/if}\n<HelpTip><code>sqb admin</code></HelpTip>\n</div>';
+		expect(findCopy('a.svelte', block).map((s) => [s.kind, s.text])).toEqual([['empty', 'No service accounts yet A service account lets a script call SQLBuild.']]);
+		const branches = '<p class="empty">{#if failed}Couldn\'t load: {error}{:else}No runs in {`${days} days`}.{/if}</p>';
+		expect(findCopy('a.svelte', branches).map((s) => s.text)).toEqual(["Couldn't load: #", 'No runs in #.']);
+		expect(findings('a.svelte', block).findings.map((f) => f.rule)).toContain('empty state over 8 words');
+	});
+
+	it('reads list items, section titles and the strings a label function returns', () => {
+		const svelte = '<InspectorSection title="Concurrency">\n<ul><li>Never alongside runs writing the same tables&nbsp;(automatic)</li>\n<li>{#if a}Pools: none{:else}{pool}{/if}</li></ul>';
+		expect(findCopy('a.svelte', svelte).map((s) => [s.kind, s.text])).toEqual([
+			['label', 'Concurrency'],
+			['value', 'Never alongside runs writing the same tables (automatic)'],
+			['value', 'Pools: none']
+		]);
+		const labels = "export function limitText(n: number, group: boolean): string {\n\treturn group ? `Members: at most ${n}` : 'Inside a run';\n}\nexport function limitHelp(): string {\n\treturn 'At most this many run together in one run.';\n}";
+		expect(findCopy('labels.ts', labels, true).map((s) => s.text)).toEqual(['Members: at most ${n}', 'Inside a run']);
+	});
+
 	it('honours copy-allow with a reason, and reports a bare one', () => {
 		const ok = '<!-- copy-allow: consequence warning -->\n<Panel title="A" note="This will replace every row in the table">';
 		expect(findings('a.svelte', ok)).toEqual({ findings: [], allowed: 1 });

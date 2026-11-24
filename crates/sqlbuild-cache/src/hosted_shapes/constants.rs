@@ -1,7 +1,7 @@
 //! The Python shape names of the natively hosted compiler shapes.
 
 /// The Python model type a natively hosted compiler shape is captured as.
-pub const HOSTED_SHAPE_TYPES: [(&str, &str); 486] = [
+pub const HOSTED_SHAPE_TYPES: [(&str, &str); 487] = [
     (
         "sqlbuild._native:AlignedInterval",
         "sqlbuild.cursor_algebra.models:AlignedInterval",
@@ -1283,6 +1283,10 @@ pub const HOSTED_SHAPE_TYPES: [(&str, &str); 486] = [
     (
         "sqlbuild._native:ProjectPathError",
         "sqlbuild.compiler.discovery.exceptions:ProjectPathError",
+    ),
+    (
+        "sqlbuild._native:ProjectLayoutError",
+        "sqlbuild.compiler.discovery.exceptions:ProjectLayoutError",
     ),
     (
         "sqlbuild._native:ProjectPythonPathError",

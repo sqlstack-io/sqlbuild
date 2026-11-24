@@ -25,26 +25,35 @@ _WITH_QUERY: str = "WITH base AS (SELECT 1 AS id)\nSELECT id FROM base\n"
         OneModelEditTestCase(
             description="the middle model by path gets a comment before its query",
             model_files={
-                "models/a/orders_a.sql": _HEADER + "SELECT 1 AS id\n",
-                "models/b/orders_b.sql": _HEADER + _WITH_QUERY,
-                "models/c/orders_c.sql": _HEADER + "SELECT 3 AS id\n",
+                "sql/models/a/orders_a.sql": _HEADER + "SELECT 1 AS id\n",
+                "sql/models/b/orders_b.sql": _HEADER + _WITH_QUERY,
+                "sql/models/c/orders_c.sql": _HEADER + "SELECT 3 AS id\n",
             },
             revisions=1,
-            expected_paths=("models/b/orders_b.sql",),
+            expected_paths=("sql/models/b/orders_b.sql",),
             expected_files={
-                "models/a/orders_a.sql": _HEADER + "SELECT 1 AS id\n",
-                "models/b/orders_b.sql": _HEADER + "-- Benchmark edit 0.\n" + _WITH_QUERY,
-                "models/c/orders_c.sql": _HEADER + "SELECT 3 AS id\n",
+                "sql/models/a/orders_a.sql": _HEADER + "SELECT 1 AS id\n",
+                "sql/models/b/orders_b.sql": _HEADER + "-- Benchmark edit 0.\n" + _WITH_QUERY,
+                "sql/models/c/orders_c.sql": _HEADER + "SELECT 3 AS id\n",
             },
         ),
         OneModelEditTestCase(
             description="each revision adds a distinct comment so every run is a new edit",
-            model_files={"models/orders.sql": _HEADER + "SELECT 1 AS id\n"},
+            model_files={"sql/models/orders.sql": _HEADER + "SELECT 1 AS id\n"},
             revisions=2,
-            expected_paths=("models/orders.sql", "models/orders.sql"),
+            expected_paths=("sql/models/orders.sql", "sql/models/orders.sql"),
             expected_files={
-                "models/orders.sql": _HEADER
+                "sql/models/orders.sql": _HEADER
                 + "-- Benchmark edit 0.\n-- Benchmark edit 1.\nSELECT 1 AS id\n"
+            },
+        ),
+        OneModelEditTestCase(
+            description="a base checkout's project from before the sql/ layout keeps models/",
+            model_files={"models/orders.sql": _HEADER + "SELECT 1 AS id\n"},
+            revisions=1,
+            expected_paths=("models/orders.sql",),
+            expected_files={
+                "models/orders.sql": _HEADER + "-- Benchmark edit 0.\nSELECT 1 AS id\n"
             },
         ),
     ),
@@ -76,7 +85,7 @@ def test_given_benchmark_project_when_editing_one_model_then_changes_only_the_mi
         ),
         OneModelEditErrorTestCase(
             description="a model without a query start is reported",
-            model_files={"models/orders.sql": _HEADER + "  select 1 as id\n"},
+            model_files={"sql/models/orders.sql": _HEADER + "  select 1 as id\n"},
             expected_message="has no line starting a WITH or SELECT query to edit",
         ),
     ),

@@ -41,7 +41,7 @@ pub fn paired_seeds(
                     .str()?
                     .extract()?;
             let message: String = format!(
-                "Seed declaration '{}' in {relative_path} has no matching CSV file under seeds/",
+                "Seed declaration '{}' in {relative_path} has no matching CSV file under sql/seeds/",
                 names[missing]
             );
             return Err(PyErr::from_value(compile_error.call1((message,))?));

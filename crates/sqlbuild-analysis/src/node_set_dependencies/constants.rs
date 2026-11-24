@@ -10,8 +10,6 @@ pub(crate) const NODE_SET_CODE: &str = "S000";
 pub(crate) const DEPENDABLE_SQL_KINDS: [&str; 3] = ["model", "seed", "source"];
 /// Python node kinds a Python node may depend on.
 pub(crate) const DEPENDABLE_PYTHON_KINDS: [&str; 2] = ["loader", "asset"];
-/// The Python node kind that may depend on Python nodes only.
-pub(crate) const LOADER_KIND: &str = "loader";
 /// The SQL resource type a loader fills.
 pub(crate) const SOURCE_KIND: &str = "source";
 /// What separates a code location from a job name in a cross-location dependency.

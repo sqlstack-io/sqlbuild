@@ -750,6 +750,11 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
         edge: HostEdge::Executor,
     },
     HostEntry {
+        name: "current_event_dispatcher",
+        kind: HostKind::Function,
+        edge: HostEdge::Executor,
+    },
+    HostEntry {
         name: "diagnostic_log_to_json",
         kind: HostKind::Function,
         edge: HostEdge::Executor,

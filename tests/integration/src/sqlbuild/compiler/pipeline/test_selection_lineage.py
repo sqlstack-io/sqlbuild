@@ -18,18 +18,18 @@ _PROJECT_TOML: str = 'name = "demo"\nadapter = "duckdb"\n\n[connection]\ndatabas
 
 _PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": _PROJECT_TOML,
-    "sources/raw.yml": (
+    "sql/sources/raw.yml": (
         "sources:\n"
         "  - name: raw_payments\n    description: Test source raw_payments.\n"
         "    expression: SELECT 1 AS payment_id\n"
         "  - name: raw_orders\n    description: Test source raw_orders.\n"
         "    expression: SELECT 1 AS order_id\n"
     ),
-    "models/stg_payments.sql": (
+    "sql/models/stg_payments.sql": (
         "MODEL (description 'Test model stg_payments.', materialized table, audits [orders_backed]);\n\n"
         'SELECT payment_id FROM __source("raw_payments")'
     ),
-    "audits/generic/orders_backed.sql": (
+    "sql/audits/generic/orders_backed.sql": (
         "AUDIT ();\n\n"
         "SELECT m.*\n"
         'FROM __ref("@model") m\n'

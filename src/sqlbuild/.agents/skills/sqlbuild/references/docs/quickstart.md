@@ -77,7 +77,7 @@ Seeds (1)
 ✓ Plan complete  15 selected, 2 sources to load
 ```
 
-`raw__customers` and `raw__orders` are loaded by a Python loader (`python/loaders/waffle_sources.py`) at the start of the build; `raw__payments` is an inline expression in `sources/raw.yml`. Incremental models also list their cursor and window under their row; they are left out here.
+`raw__customers` and `raw__orders` are loaded by a Python loader (`python/nodes/loaders/waffle_sources.py`) at the start of the build; `raw__payments` is an inline expression in `sql/sources/raw.yml`. Incremental models also list their cursor and window under their row; they are left out here.
 
 ## 3. Build
 
@@ -157,7 +157,7 @@ The models and functions are no longer listed as first run, and the seed is curr
 
 ## 5. Change a model
 
-Edit `models/staging/stg_orders.sql` to drop cancelled orders, by adding this line at the end:
+Edit `sql/models/staging/stg_orders.sql` to drop cancelled orders, by adding this line at the end:
 
 ```sql
 WHERE status <> 'cancelled'
@@ -195,7 +195,7 @@ history. See [Planning](concepts/planning.md).
 sqb build daily_revenue
 
 # Rebuild models under a path
-sqb build path:models/marts
+sqb build path:sql/models/marts
 
 # Full refresh of everything
 sqb build --full-refresh

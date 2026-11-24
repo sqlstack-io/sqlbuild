@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D002",
-     "message": "MODEL() in '<project>/models/staging/stg_orders.sql:3' has unsupported keys: materialised",
+     "message": "MODEL() in '<project>/sql/models/staging/stg_orders.sql:3' has unsupported keys: materialised",
      "help": "did you mean 'materialized'?"
     }
    ]

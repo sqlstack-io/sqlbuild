@@ -52,8 +52,8 @@ def test_given_dollar_quoted_literal_when_building_then_literal_is_preserved_and
         'name = "orders"\nadapter = "duckdb"\n\n[connection]\ndatabase = "orders.duckdb"\n',
         encoding="utf-8",
     )
-    models: Path = tmp_path / "models"
-    models.mkdir()
+    models: Path = tmp_path / "sql" / "models"
+    models.mkdir(parents=True)
     (models / "orders.sql").write_text(
         'MODEL (description "Orders", materialized table);\nSELECT 1 AS order_id\n',
         encoding="utf-8",

@@ -24,7 +24,7 @@ Every `MODEL()` key must be one of the fields on this page. Any other key fails 
 (`-- ...` and `/* ... */`) inside a header are ignored:
 
 ```text
-error[D002]: MODEL() in 'models/fct_orders.sql:3' has unsupported keys: descripton
+error[D002]: MODEL() in 'sql/models/fct_orders.sql:3' has unsupported keys: descripton
   = help: did you mean 'description'?
 ```
 
@@ -66,8 +66,8 @@ to add:
 
 ```text
 error[P010]: model 'orders_summary' has no description
-  --> models/marts/orders_summary.sql:1:1
-  = help: to describe model 'orders_summary', add this to the MODEL header in models/marts/orders_summary.sql:
+  --> sql/models/marts/orders_summary.sql:1:1
+  = help: to describe model 'orders_summary', add this to the MODEL header in sql/models/marts/orders_summary.sql:
             MODEL (
               description "What one row of orders_summary represents",
               ...
@@ -78,8 +78,8 @@ error[P010]: model 'orders_summary' has no description
 |----------|----------------------------|
 | Model | `MODEL (description "...")`, or the `description` of its `model_schema` |
 | Scenario | `SCENARIO (description "...")` |
-| Seed | `description:` on its entry in `seeds/*.yml` |
-| Source | `description:` on its entry in `sources/*.yml` |
+| Seed | `description:` on its entry in `sql/seeds/*.yml` |
+| Source | `description:` on its entry in `sql/sources/*.yml` |
 | SQL function or table function | `FUNCTION (description "...")` |
 | Python UDF | `@udf(description="...")` or the function docstring |
 | Named SQL hook | `HOOK (description "...")` |
@@ -122,7 +122,7 @@ Quotes inside strings:
 - In a `'...'` string, `\'` and `''` both stand for one `'`, as in `'it\'s'` and `'it''s'`.
 
 ```text
-error[D002]: MODEL(...) in 'models/customers.sql:2:34' contains invalid SQLBuild header syntax: a double quote ends this "..." string early; use """…""" for text containing double quotes
+error[D002]: MODEL(...) in 'sql/models/customers.sql:2:34' contains invalid SQLBuild header syntax: a double quote ends this "..." string early; use """…""" for text containing double quotes
   = help: write the text between triple quotes, where quotes need no escaping: description """Matches "Miss"."""; sqb format --fix rewrites a description that escapes its quotes as \" or doubles them as ""
 ```
 
@@ -200,7 +200,7 @@ by kind:
 
 ```text
 error[P009]: `sql_analysis false` is not needed for model 'orders_summary'
-  --> models/marts/orders_summary.sql:4:3
+  --> sql/models/marts/orders_summary.sql:4:3
   = note: sqlbuild_project.toml sets [settings] require_sql_analysis = true, which only allows `sql_analysis false` on SQL that SQLBuild cannot parse; this model parses successfully.
   = help: remove `sql_analysis false` and fix the findings it was hiding: 2 unknown columns, 1 type mismatch (run `sqb compile` to see them)
   = help: to allow `sql_analysis false` on any model, SQL test or audit, set this in sqlbuild_project.toml:

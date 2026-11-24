@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Macro '@py.staged_amount' in '<project>/models/marts/customer_totals.sql' is inaccessible. Defined at 'models/staging/_macros/python/amounts.py:1:1' with scope owner 'models/staging'; consumer/definition path is '<project>/models/marts/customer_totals.sql'. Visible macros: none"
+     "message": "Macro '@py.staged_amount' in '<project>/sql/models/marts/customer_totals.sql' is inaccessible. Defined at 'sql/models/staging/_macros/python/amounts.py:1:1' with scope owner 'sql/models/staging'; consumer/definition path is '<project>/sql/models/marts/customer_totals.sql'. Visible macros: none"
     }
    ]
   }

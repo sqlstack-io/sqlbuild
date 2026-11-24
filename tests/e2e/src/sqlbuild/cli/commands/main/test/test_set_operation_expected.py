@@ -22,10 +22,10 @@ _PROJECT_FILES: dict[str, str] = {
         '[connection]\ndatabase = "set_operation_expected.duckdb"\n\n'
         '[defaults]\nmaterialized = "table"\n'
     ),
-    "macros/python/status.py": (
+    "sql/macros/python/status.py": (
         'def normalize_status(value: str) -> str:\n    return f"LOWER(TRIM({value}))"\n'
     ),
-    "sources/raw_orders.yml": (
+    "sql/sources/raw_orders.yml": (
         "sources:\n"
         "  - name: raw_orders\n    description: Test source raw_orders.\n"
         "    schema: main\n"
@@ -34,7 +34,7 @@ _PROJECT_FILES: dict[str, str] = {
         "      - name: order_id\n        type: INTEGER\n"
         "      - name: status\n        type: VARCHAR\n"
     ),
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         "MODEL (description 'Test model orders.');\n\n"
         'SELECT order_id, @py.normalize_status("status") AS status FROM __source("raw_orders")\n'
     ),

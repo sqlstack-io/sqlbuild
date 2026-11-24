@@ -95,6 +95,9 @@ use sqlbuild_python_base::build_progress::main::terminal::tty_flag::tty_flag;
 use sqlbuild_python_base::build_progress::main::terminal::write::write;
 use sqlbuild_python_base::build_progress::main::transient_status::status_reporter::status_reporter;
 use sqlbuild_python_base::build_progress::models::NativeProgressProjector;
+use sqlbuild_python_base::invocation_phases::constants::CONNECTED_PHASE;
+use sqlbuild_python_base::invocation_phases::models::InvocationPhase;
+use sqlbuild_python_base::native_host::main::publish_invocation_phase::publish_invocation_phase;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
@@ -1335,7 +1338,16 @@ impl ConnectionProgressReporter {
         connection_count: i64,
         elapsed_seconds: f64,
     ) -> PyResult<()> {
-        let _ = connection_count;
+        publish_invocation_phase(
+            py,
+            &InvocationPhase {
+                phase: CONNECTED_PHASE,
+                duration_ms: Some(elapsed_seconds * 1000.0),
+                count: Some(connection_count),
+                name: Some(self.adapter_name.clone()),
+                detail: None,
+            },
+        )?;
         let line: String =
             connection_phase_line(self.style, true, (&self.adapter_name, elapsed_seconds));
         self.write(py, &line)?;

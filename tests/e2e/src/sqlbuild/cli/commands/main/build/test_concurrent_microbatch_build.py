@@ -49,7 +49,7 @@ def test_given_project_capability_disabled_when_batch_concurrency_exceeds_one_th
                 """
             ).strip()
             + "\n",
-            "models/orders.sql": dedent(
+            "sql/models/orders.sql": dedent(
                 """
                 MODEL (description "Test model orders.",
                   materialized incremental,
@@ -72,7 +72,7 @@ def test_given_project_capability_disabled_when_batch_concurrency_exceeds_one_th
                 """
             ).strip()
             + "\n",
-            "sources/raw.yml": (
+            "sql/sources/raw.yml": (
                 "sources:\n  - name: raw_events\n    description: Test source raw_events.\n    schema: main\n    table: raw_events\n"
             ),
         },
@@ -116,7 +116,7 @@ def test_given_opt_in_concurrent_microbatch_when_building_twice_then_records_all
                 """
             ).strip()
             + "\n",
-            "sources/raw.yml": dedent(
+            "sql/sources/raw.yml": dedent(
                 """
                 sources:
                   - name: raw_events
@@ -126,7 +126,7 @@ def test_given_opt_in_concurrent_microbatch_when_building_twice_then_records_all
                 """
             ).strip()
             + "\n",
-            "models/orders.sql": dedent(
+            "sql/models/orders.sql": dedent(
                 """
                 MODEL (description "Test model orders.",
                   materialized incremental,
@@ -242,7 +242,7 @@ def test_given_later_batches_succeed_when_one_batch_fails_then_next_run_preserve
                 """
             ).strip()
             + "\n",
-            "sources/raw.yml": dedent(
+            "sql/sources/raw.yml": dedent(
                 """
                 sources:
                   - name: raw_events
@@ -252,7 +252,7 @@ def test_given_later_batches_succeed_when_one_batch_fails_then_next_run_preserve
                 """
             ).strip()
             + "\n",
-            "models/orders.sql": dedent(
+            "sql/models/orders.sql": dedent(
                 """
                 MODEL (description "Test model orders.",
                   materialized incremental,
@@ -309,22 +309,30 @@ def test_given_later_batches_succeed_when_one_batch_fails_then_next_run_preserve
         "(7, '2026-01-01 06:30:00', '7')"
     )
     connection.close()
+    completion_events_sql: str = (
+        "SELECT event_id, partition_start FROM main._sqlbuild_microbatches "
+        "WHERE record_type = 'partition_completion'"
+    )
+    initial_completion_ids: set[str] = {
+        row[0] for row in query_duckdb(db_path=db_path, sql=completion_events_sql)
+    }
 
     failed: subprocess.CompletedProcess[str] = run_sqb(
         command=("--no-color", "build"), project_dir=project_dir
     )
     assert failed.returncode != 0
-    assert (
-        query_duckdb(
-            db_path=db_path,
-            sql=(
-                "SELECT COUNT(*) FROM main._sqlbuild_microbatches "
-                "WHERE record_type = 'partition_completion' "
-                "AND partition_start >= '2026-01-01T03:00:00'"
-            ),
-        )[0][0]
-        == 2
+    completion_starts: dict[str, str] = dict(
+        query_duckdb(db_path=db_path, sql=completion_events_sql)
     )
+    failed_run_completion_starts: set[str] = set(
+        map(completion_starts.__getitem__, completion_starts.keys() - initial_completion_ids)
+    )
+    # The failing 02:00 batch records no completion. Its 03:00 sibling is handed to a worker
+    # before the coordinator runs 04:00 itself, and sibling failures are only examined after
+    # 04:00 finishes, so both always complete. Whether 05:00 and 06:00 also start before the
+    # failure is seen depends on runner timing.
+    assert "2026-01-01T02:00:00" not in failed_run_completion_starts
+    assert {"2026-01-01T03:00:00", "2026-01-01T04:00:00"} <= failed_run_completion_starts
 
     connection = duckdb.connect(str(db_path))
     connection.execute("UPDATE raw_events SET payload = '3' WHERE id = 3")
@@ -400,7 +408,7 @@ def test_given_microbatch_history_is_lost_when_reconciling_then_policy_is_applie
                 """
             ).strip()
             + "\n",
-            "sources/raw.yml": dedent(
+            "sql/sources/raw.yml": dedent(
                 """
                 sources:
                   - name: raw_events
@@ -410,7 +418,7 @@ def test_given_microbatch_history_is_lost_when_reconciling_then_policy_is_applie
                 """
             ).strip()
             + "\n",
-            "models/orders.sql": dedent(
+            "sql/models/orders.sql": dedent(
                 """
                 MODEL (description "Test model orders.",
                   materialized incremental,
@@ -510,7 +518,7 @@ def test_given_bounded_replay_on_change_when_model_changes_then_requirement_is_d
                 """
             ).strip()
             + "\n",
-            "sources/raw.yml": dedent(
+            "sql/sources/raw.yml": dedent(
                 """
                 sources:
                   - name: raw_events
@@ -520,7 +528,7 @@ def test_given_bounded_replay_on_change_when_model_changes_then_requirement_is_d
                 """
             ).strip()
             + "\n",
-            "models/orders.sql": replay_microbatch_model_sql(
+            "sql/models/orders.sql": replay_microbatch_model_sql(
                 value_expression="CAST(payload AS INTEGER)"
             ),
         },
@@ -546,7 +554,7 @@ def test_given_bounded_replay_on_change_when_model_changes_then_requirement_is_d
     )
     assert initial.returncode == 0, initial.stdout + initial.stderr
 
-    (project_dir / "models" / "orders.sql").write_text(
+    (project_dir / "sql" / "models" / "orders.sql").write_text(
         replay_microbatch_model_sql(value_expression="CAST(payload AS INTEGER) + 1"),
         encoding="utf-8",
     )
@@ -610,7 +618,7 @@ def test_given_full_replay_fails_when_retried_then_original_requirement_is_reuse
                 """
             ).strip()
             + "\n",
-            "sources/raw.yml": dedent(
+            "sql/sources/raw.yml": dedent(
                 """
                 sources:
                   - name: raw_events
@@ -620,7 +628,7 @@ def test_given_full_replay_fails_when_retried_then_original_requirement_is_reuse
                 """
             ).strip()
             + "\n",
-            "models/orders.sql": replay_microbatch_model_sql(
+            "sql/models/orders.sql": replay_microbatch_model_sql(
                 value_expression="CAST(payload AS INTEGER)", replay_policy="full"
             ),
         },
@@ -644,7 +652,7 @@ def test_given_full_replay_fails_when_retried_then_original_requirement_is_reuse
     )
     assert initial.returncode == 0, initial.stdout + initial.stderr
 
-    (project_dir / "models" / "orders.sql").write_text(
+    (project_dir / "sql" / "models" / "orders.sql").write_text(
         replay_microbatch_model_sql(
             value_expression="CAST(payload AS INTEGER) + 1", replay_policy="full"
         ),
@@ -701,7 +709,7 @@ def test_given_version_hash_returns_when_replaying_then_new_transition_gets_new_
                 """
             ).strip()
             + "\n",
-            "sources/raw.yml": dedent(
+            "sql/sources/raw.yml": dedent(
                 """
                 sources:
                   - name: raw_events
@@ -711,7 +719,7 @@ def test_given_version_hash_returns_when_replaying_then_new_transition_gets_new_
                 """
             ).strip()
             + "\n",
-            "models/orders.sql": replay_microbatch_model_sql(
+            "sql/models/orders.sql": replay_microbatch_model_sql(
                 value_expression="CAST(payload AS INTEGER)"
             ),
         },
@@ -731,7 +739,7 @@ def test_given_version_hash_returns_when_replaying_then_new_transition_gets_new_
     )
     connection.close()
 
-    model_path: Path = project_dir / "models" / "orders.sql"
+    model_path: Path = project_dir / "sql" / "models" / "orders.sql"
     f1_sql: str = replay_microbatch_model_sql(value_expression="CAST(payload AS INTEGER)")
     f2_sql: str = replay_microbatch_model_sql(value_expression="CAST(payload AS INTEGER) + 1")
     initial: subprocess.CompletedProcess[str] = run_sqb(
@@ -792,7 +800,7 @@ def test_given_historical_backfill_when_normal_run_resumes_then_gap_to_normal_fl
                 """
             ).strip()
             + "\n",
-            "sources/raw.yml": dedent(
+            "sql/sources/raw.yml": dedent(
                 """
                 sources:
                   - name: raw_events
@@ -802,7 +810,7 @@ def test_given_historical_backfill_when_normal_run_resumes_then_gap_to_normal_fl
                 """
             ).strip()
             + "\n",
-            "models/orders.sql": dedent(
+            "sql/models/orders.sql": dedent(
                 """
                 MODEL (description "Test model orders.",
                   materialized incremental,
@@ -901,7 +909,7 @@ def test_given_no_new_cursor_work_when_history_is_lost_then_reconciliation_still
                 """
             ).strip()
             + "\n",
-            "sources/raw.yml": dedent(
+            "sql/sources/raw.yml": dedent(
                 """
                 sources:
                   - name: raw_events
@@ -911,7 +919,7 @@ def test_given_no_new_cursor_work_when_history_is_lost_then_reconciliation_still
                 """
             ).strip()
             + "\n",
-            "models/orders.sql": dedent(
+            "sql/models/orders.sql": dedent(
                 """
                 MODEL (description "Test model orders.",
                   materialized incremental,

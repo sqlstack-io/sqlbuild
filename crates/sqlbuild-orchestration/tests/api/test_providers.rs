@@ -87,9 +87,9 @@ fn given_published_providers_when_people_read_them_then_jobs_using_their_nodes_a
                 "providers".into(),
                 json!({"providers": [{
                     "name": "fulfillment_api",
-                    "class": "providers.fulfillment.FulfillmentApi",
+                    "class": "python.providers.fulfillment.FulfillmentApi",
                     "description": "Client for the fulfillment service.",
-                    "path": "providers/fulfillment.py",
+                    "path": "python/providers/fulfillment.py",
                     "settings": [
                         {"name": "api_key", "type": "SecretStr", "required": true, "secret": true, "env": "API_KEY", "description": null, "missing": true},
                         {"name": "endpoint", "type": "str", "required": false, "secret": false, "env": "ENDPOINT", "description": "Base URL"},
@@ -109,9 +109,9 @@ fn given_published_providers_when_people_read_them_then_jobs_using_their_nodes_a
                 json!(read_back.providers),
                 json!([{
                     "name": "fulfillment_api",
-                    "class": "providers.fulfillment.FulfillmentApi",
+                    "class": "python.providers.fulfillment.FulfillmentApi",
                     "description": "Client for the fulfillment service.",
-                    "path": "providers/fulfillment.py",
+                    "path": "python/providers/fulfillment.py",
                     "settings": [
                         {"name": "api_key", "type": "SecretStr", "required": true, "secret": true, "env": "API_KEY", "description": null, "missing": true},
                         {"name": "endpoint", "type": "str", "required": false, "secret": false, "env": "ENDPOINT", "description": "Base URL", "missing": false},

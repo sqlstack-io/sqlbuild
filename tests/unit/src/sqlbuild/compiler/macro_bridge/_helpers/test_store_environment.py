@@ -106,17 +106,17 @@ def test_given_module_digests_when_encoding_then_validation_returns_them(
         ),
         StoreEnvironmentTestCase(
             description="model edit",
-            edit=lambda root: (root / "models/orders.sql").write_text("SELECT 2\n"),
+            edit=lambda root: (root / "sql/models/orders.sql").write_text("SELECT 2\n"),
             expected_unchanged=True,
         ),
         StoreEnvironmentTestCase(
             description="macro edit",
-            edit=lambda root: (root / "macros/python/common.py").write_text("X = 2\n"),
+            edit=lambda root: (root / "sql/macros/python/common.py").write_text("X = 2\n"),
             expected_unchanged=False,
         ),
         StoreEnvironmentTestCase(
             description="model the caller does not exclude",
-            edit=lambda root: (root / "models/customers.sql").write_text("SELECT 1\n"),
+            edit=lambda root: (root / "sql/models/customers.sql").write_text("SELECT 1\n"),
             expected_unchanged=False,
         ),
     ],

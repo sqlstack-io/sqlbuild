@@ -20,7 +20,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
 
 _PROJECT_TOML: str = (
     'name = "orders"\nadapter = "duckdb"\n[connection]\ndatabase = "orders.duckdb"\n\n'
-    '[[rules.rule_ignores]]\nrules = ["SQLCLEAN039"]\npaths = ["models/flagged_orders.sql"]\n'
+    '[[rules.rule_ignores]]\nrules = ["SQLCLEAN039"]\npaths = ["sql/models/flagged_orders.sql"]\n'
     'reason = "One case stars over a derived table on purpose."\n'
 )
 _BASE_ORDERS_SQL: str = (
@@ -60,8 +60,8 @@ def test_given_star_beside_cast_constant_when_compiling_and_building_then_starre
         project_name="orders_project",
         repo_files={
             "sqlbuild_project.toml": _PROJECT_TOML,
-            "models/base_orders.sql": _BASE_ORDERS_SQL,
-            "models/flagged_orders.sql": f"{_FLAGGED_ORDERS_HEADER}{test_case.query_sql}\n",
+            "sql/models/base_orders.sql": _BASE_ORDERS_SQL,
+            "sql/models/flagged_orders.sql": f"{_FLAGGED_ORDERS_HEADER}{test_case.query_sql}\n",
         },
     )
 

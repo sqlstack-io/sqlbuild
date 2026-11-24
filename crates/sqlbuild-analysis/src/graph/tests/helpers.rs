@@ -33,7 +33,7 @@ const ORDERS_PROJECT: &[ResourceSpec] = &[
         "order_items",
         &[("model", "orders"), ("seed", "countries")],
         &["daily", "finance"],
-        Some("models/mart/items"),
+        Some("sql/models/mart/items"),
     ),
     ("model", "customers", &[], &[], Some("staging/crm")),
     (

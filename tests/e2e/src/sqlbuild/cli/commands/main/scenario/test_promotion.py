@@ -31,7 +31,7 @@ _MATCHING_COLUMNS: str = (
 _ENFORCED_DEFAULTS: str = 'contract = "enforced"\n'
 _CONFLICT_FRAGMENTS: tuple[str, ...] = (
     "error[K011]",
-    "models/order_totals.sql",
+    "sql/models/order_totals.sql",
     "model 'order_totals': contract enforced requires staged table promotion",
     'sqlbuild_project.toml sets [settings] table_promotion_mode = "immediate"',
     "remove that line to use the default staged promotion, or set this in sqlbuild_project.toml:",
@@ -113,7 +113,7 @@ def test_given_promotion_configuration_when_running_scenario_then_matches_build_
     for fragment in test_case.unexpected_stdout_fragments:
         assert fragment not in output
     model_sql: str = (
-        project_dir / "target/run/scenarios/order_totals_pass/models/order_totals.sql"
+        project_dir / "target/run/scenarios/order_totals_pass/sql/models/order_totals.sql"
     ).read_text(encoding="utf-8")
     assert ("__staging" in model_sql) is test_case.expect_staged_promotion, model_sql
     assert list_scenario_relation_names(db_path=project_dir / "scenario_promotion.duckdb") == ()

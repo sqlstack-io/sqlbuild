@@ -12,21 +12,22 @@ SQL snippets.
 
 ## Create a constant
 
-Put project-wide constants under the top-level `constants/` directory. Files are discovered
+Put project-wide constants under the top-level `sql/constants/` directory. Files are discovered
 recursively, and one file may contain more than one declaration.
 
 ```text
 my_project/
-├── constants/
-│   ├── commerce/
-│   │   └── thresholds.sql
-│   └── reporting_day.sql
-├── models/
+├── sql/
+│   ├── constants/
+│   │   ├── commerce/
+│   │   │   └── thresholds.sql
+│   │   └── reporting_day.sql
+│   └── models/
 └── sqlbuild_project.toml
 ```
 
 ```sql
--- constants/commerce/thresholds.sql
+-- sql/constants/commerce/thresholds.sql
 CONSTANT (name min_items, value 7);
 CONSTANT (name fallback_source, value "web");
 CONSTANT (name enabled, value true);
@@ -34,7 +35,7 @@ CONSTANT (name ratio, value 0.75);
 CONSTANT (name missing_value, value null);
 ```
 
-Folders below `constants/` are organizational. They do not change where project-wide constants are
+Folders below `sql/constants/` are organizational. They do not change where project-wide constants are
 available.
 
 ## Use a constant

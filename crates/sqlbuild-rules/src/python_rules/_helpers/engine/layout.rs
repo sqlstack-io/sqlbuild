@@ -86,11 +86,14 @@ fn generic_package_faults(sources: &[PythonSource]) -> Vec<Fault> {
         .collect()
 }
 
-/// Each `python/` file's path parts below `python/`.
+/// Each `python/nodes/` file's path parts below `python/nodes/`.
 fn package_parts(sources: &[PythonSource]) -> impl Iterator<Item = Vec<&str>> {
     sources.iter().filter_map(|source| {
-        let mut parts = source.relative_path.split('/');
-        (parts.next() == Some(PACKAGE_ROOT)).then(|| parts.collect())
+        let below: &str = source
+            .relative_path
+            .strip_prefix(PACKAGE_ROOT)?
+            .strip_prefix('/')?;
+        Some(below.split('/').collect())
     })
 }
 

@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P025",
-     "message": "body of macro x() does not accept every value of v ANY NUMERIC: Function 'upper' argument 1 expects String, found numeric\n  model: stg_orders\n  --> models/staging/_sqlbuild/_macros/sql/x.sql:3:1\n  --> models/staging/stg_orders.sql:5:31",
+     "message": "body of macro x() does not accept every value of v ANY NUMERIC: Function 'upper' argument 1 expects String, found numeric\n  model: stg_orders\n  --> sql/models/staging/_sqlbuild/_macros/sql/x.sql:3:1\n  --> sql/models/staging/stg_orders.sql:5:31",
      "help": "an ANY family argument may be any type of its family; the body is checked with the family's widest type, so CAST the argument or narrow its declared type"
     }
    ]

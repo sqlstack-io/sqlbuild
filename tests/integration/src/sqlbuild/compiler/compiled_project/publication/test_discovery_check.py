@@ -18,6 +18,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     wait_for_generation,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 _NODES: str = '''\
 import os
@@ -97,7 +98,7 @@ def test_given_a_check_that_never_returns_when_the_location_is_stopped_then_it_e
             "sqlbuild_project.toml": 'name = "fulfilment"\nadapter = "duckdb"\n'
             'default_target = "development"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
             '[targets.development]\nschema = "main"\n',
-            "python/plan/nodes.py": nodes,
+            **node_module_files("python/nodes/plan/nodes.py", nodes),
         },
     )
     log: Path = tmp_path / "location.log"
@@ -158,9 +159,10 @@ def test_given_a_running_check_when_a_publish_waits_then_only_a_check_past_its_g
             "sqlbuild_project.toml": 'name = "fulfilment"\nadapter = "duckdb"\n'
             'default_target = "development"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
             '[targets.development]\nschema = "main"\n',
-            "models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
-            "python/plan/nodes.py": _SLOW_ONCE.format(
-                directory=str(tmp_path), check_seconds=test_case.check_seconds
+            "sql/models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
+            **node_module_files(
+                "python/nodes/plan/nodes.py",
+                _SLOW_ONCE.format(directory=str(tmp_path), check_seconds=test_case.check_seconds),
             ),
         },
     )
@@ -190,7 +192,7 @@ def test_given_a_running_check_when_a_publish_waits_then_only_a_check_past_its_g
                 assert process.poll() is None, log.read_text()
                 assert time.monotonic() < deadline, log.read_text()
                 time.sleep(0.2)
-            (project / "models/orders.sql").write_text(
+            (project / "sql/models/orders.sql").write_text(
                 "MODEL (description 'Orders.');\nSELECT 2 AS order_id\n"
             )
             publish_deadline: float = time.monotonic() + 45

@@ -24,8 +24,8 @@ from tests.integration.src.sqlbuild.compiler.planner._helpers._test_types import
 )
 
 _STUB_FILE: DiscoveredAuditFile = DiscoveredAuditFile(
-    file_path=Path("audits/generic/not_null.sql"),
-    relative_path=Path("audits/generic/not_null.sql"),
+    file_path=Path("sql/audits/generic/not_null.sql"),
+    relative_path=Path("sql/audits/generic/not_null.sql"),
     contents="",
     blocks=(),
 )

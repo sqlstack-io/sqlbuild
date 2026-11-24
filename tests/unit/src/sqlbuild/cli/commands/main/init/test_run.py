@@ -18,40 +18,40 @@ from tests.unit.src.sqlbuild.presentation.helpers import use_color_terminal, use
             description="creates blank project directories for all resource types",
             project_dir_name="demo-project",
             expected_directories=(
-                "models/staging",
-                "models/marts",
-                "schemas",
-                "sources",
-                "seeds",
+                "sql/models/staging",
+                "sql/models/marts",
+                "sql/schemas",
+                "sql/sources",
+                "sql/seeds",
                 "python",
-                "hooks/sql",
-                "hooks/python",
+                "sql/hooks/sql",
+                "sql/hooks/python",
                 "tests/unit",
                 "tests/scenarios",
-                "functions/sql",
-                "functions/python",
-                "macros/sql",
-                "macros/python",
-                "audits/generic",
-                "audits/singular",
+                "sql/functions/sql",
+                "sql/functions/python",
+                "sql/macros/sql",
+                "sql/macros/python",
+                "sql/audits/generic",
+                "sql/audits/singular",
             ),
             expected_gitkeep_files=(
-                "models/staging/.gitkeep",
-                "models/marts/.gitkeep",
-                "schemas/.gitkeep",
-                "sources/.gitkeep",
-                "seeds/.gitkeep",
-                "python/.gitkeep",
-                "hooks/sql/.gitkeep",
-                "hooks/python/.gitkeep",
+                "sql/models/staging/.gitkeep",
+                "sql/models/marts/.gitkeep",
+                "sql/schemas/.gitkeep",
+                "sql/sources/.gitkeep",
+                "sql/seeds/.gitkeep",
+                "python/nodes/.gitkeep",
+                "sql/hooks/sql/.gitkeep",
+                "sql/hooks/python/.gitkeep",
                 "tests/unit/.gitkeep",
                 "tests/scenarios/.gitkeep",
-                "functions/sql/.gitkeep",
-                "functions/python/.gitkeep",
-                "macros/sql/.gitkeep",
-                "macros/python/.gitkeep",
-                "audits/generic/.gitkeep",
-                "audits/singular/.gitkeep",
+                "sql/functions/sql/.gitkeep",
+                "sql/functions/python/.gitkeep",
+                "sql/macros/sql/.gitkeep",
+                "sql/macros/python/.gitkeep",
+                "sql/audits/generic/.gitkeep",
+                "sql/audits/singular/.gitkeep",
             ),
             expected_config_fragment=(
                 '[connections.developer]\ndatabase = "demo_project.duckdb"\n\n[settings]'
@@ -61,12 +61,12 @@ from tests.unit.src.sqlbuild.presentation.helpers import use_color_terminal, use
                 "Project: demo_project",
                 "Config:  sqlbuild_project.toml",
                 "Next steps:",
-                "1. Add sources to sources/",
-                "2. Add seeds to seeds/",
-                "3. Add Python loaders, assets, checks, and factories to python/",
-                "4. Add SQL hooks to hooks/sql/, Python hooks to hooks/python/",
-                "reusable audits to audits/generic/",
-                "standalone audits to audits/singular/",
+                "1. Add sources to sql/sources/",
+                "2. Add seeds to sql/seeds/",
+                "3. Add Python loaders, assets, checks, and factories to python/nodes/",
+                "4. Add SQL hooks to sql/hooks/sql/, Python hooks to sql/hooks/python/",
+                "reusable audits to sql/audits/generic/",
+                "standalone audits to sql/audits/singular/",
                 "7. sqb compile",
                 "8. sqb build",
             ),
@@ -87,7 +87,7 @@ def test_given_empty_directory_when_running_init_then_scaffolds_project_director
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     project_dir: Path = tmp_path / test_case.project_dir_name
-    project_dir.mkdir()
+    project_dir.mkdir(parents=True)
     monkeypatch.setattr(native_module, "update_sqlbuild_skills", lambda *, project_dir: None)
     use_plain_terminal(monkeypatch)
 
@@ -131,7 +131,7 @@ def test_given_color_terminal_when_running_init_then_it_styles_heading(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     project_dir: Path = tmp_path / test_case.project_dir_name
-    project_dir.mkdir()
+    project_dir.mkdir(parents=True)
     monkeypatch.setattr(native_module, "update_sqlbuild_skills", lambda *, project_dir: None)
     use_color_terminal(monkeypatch)
 

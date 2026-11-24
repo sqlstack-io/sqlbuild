@@ -133,30 +133,30 @@ def test_given_function_when_compiling_then_native_project_holds_its_attachment(
         NativeFunctionErrorTestCase(
             description="table function called with the wrong argument count",
             files={
-                "functions/sql/customer_orders.sql": (
+                "sql/functions/sql/customer_orders.sql": (
                     "FUNCTION (description 'Customer orders.', arguments (customer_id INTEGER),"
                     " returns table (order_id INTEGER));\nSELECT customer_id AS order_id\n"
                 ),
-                "models/report.sql": (
+                "sql/models/report.sql": (
                     "MODEL (description 'Report.');\n"
                     'SELECT * FROM __table_fn("customer_orders")(1, 2)\n'
                 ),
             },
             expected_message=(
-                "Model file models/report.sql table function 'customer_orders' expects 1"
+                "Model file sql/models/report.sql table function 'customer_orders' expects 1"
                 " argument but received 2"
             ),
         ),
         NativeFunctionErrorTestCase(
             description="function body reading an unknown model",
             files={
-                "functions/sql/lookup.sql": (
+                "sql/functions/sql/lookup.sql": (
                     "FUNCTION (description 'Lookup.', returns INTEGER);\n"
                     'SELECT COUNT(*) FROM __ref("missing_orders")\n'
                 ),
             },
             expected_message=(
-                "SQL function file functions/sql/lookup.sql references unknown model"
+                "SQL function file sql/functions/sql/lookup.sql references unknown model"
                 " 'missing_orders'"
             ),
         ),
@@ -195,8 +195,8 @@ def test_given_invalid_function_when_compiling_then_native_attachment_rejects_it
                     'name = "orders"\nadapter = "snowflake"\n'
                     '[defaults]\nfunction_dataframe = "pandas"\n'
                 ),
-                "functions/python/smooth.py": TABLE_FUNCTION_PROJECT_FILES[
-                    "functions/python/smooth.py"
+                "sql/functions/python/smooth.py": TABLE_FUNCTION_PROJECT_FILES[
+                    "sql/functions/python/smooth.py"
                 ].replace("readings: pl.DataFrame", "readings"),
             },
             expected_summaries={
@@ -225,13 +225,13 @@ def test_given_python_table_functions_when_compiling_then_each_keeps_its_columns
         NativeFunctionErrorTestCase(
             description="a Python table function called without a partition",
             files={
-                "models/smoothed.sql": (
+                "sql/models/smoothed.sql": (
                     "MODEL (description 'Smoothed.');\nSELECT s.* FROM __ref(\"readings\") r,\n"
                     '  __table_fn("smooth")(r.device_id, r.reading) OVER () s\n'
                 ),
             },
             expected_message=(
-                "Model file models/smoothed.sql calls Python table function 'smooth' without"
+                "Model file sql/models/smoothed.sql calls Python table function 'smooth' without"
                 " OVER (PARTITION BY ...)"
             ),
         ),
@@ -255,24 +255,24 @@ def test_given_python_table_functions_when_compiling_then_each_keeps_its_columns
         NativeFunctionErrorTestCase(
             description="a polars table function with a fractional NUMBER argument",
             files={
-                "functions/python/smooth.py": TABLE_FUNCTION_PROJECT_FILES[
-                    "functions/python/smooth.py"
+                "sql/functions/python/smooth.py": TABLE_FUNCTION_PROJECT_FILES[
+                    "sql/functions/python/smooth.py"
                 ].replace("'reading': 'FLOAT'}", "'reading': 'NUMBER(10, 2)'}"),
             },
             expected_message=(
-                "Python function functions/python/smooth.py argument 'reading' is NUMBER(10, 2),"
+                "Python function sql/functions/python/smooth.py argument 'reading' is NUMBER(10, 2),"
                 " which Snowflake passes to a polars frame as Python Decimal objects"
             ),
         ),
         NativeFunctionErrorTestCase(
             description="a table function returning a scalar type",
             files={
-                "functions/python/rank_readings.py": TABLE_FUNCTION_PROJECT_FILES[
-                    "functions/python/rank_readings.py"
+                "sql/functions/python/rank_readings.py": TABLE_FUNCTION_PROJECT_FILES[
+                    "sql/functions/python/rank_readings.py"
                 ].replace("returns={'position': 'INTEGER'}", "returns='INTEGER'"),
             },
             expected_message=(
-                "functions/python/rank_readings.py returns must map each column name to its type"
+                "sql/functions/python/rank_readings.py returns must map each column name to its type"
             ),
         ),
     ],

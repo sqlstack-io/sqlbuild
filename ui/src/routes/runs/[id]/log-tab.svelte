@@ -240,10 +240,10 @@
 								ev.preventDefault();
 								onnode(e.nodeKey!);
 							}}>{nodeLabel(e.nodeKey)}</a
-						>{:else}{e.nodeKey ? nodeLabel(e.nodeKey) : 'run'}{/if}
+						>{:else}{e.nodeKey ? nodeLabel(e.nodeKey) : '—'}{/if}
 					{#if grouped && memberOf(e.runId)}<a class="member" href={to(`/runs/${e.runId}`)} title="In member job run {shortRunId(e.runId)}">{memberOf(e.runId)}</a>{/if}
 				</td>
-				{#if !printed}<td class="tagcell">{#if e.tag}<span class="tag" style:--tone={e.tag.tone}>{e.tag.text}</span>{/if}</td>{/if}
+				{#if !printed}<td class="tagcell">{#if e.tag && !e.tag.repeats}<span class="tag" style:--tone={e.tag.tone}>{e.tag.text}</span>{/if}</td>{/if}
 				<td class:out={e.stream} class:opens={!!e.details?.length} onclick={() => e.details?.length && (detailOpen = toggle(detailOpen, e.id))}>
 					{#if e.omitted && e.nodeKey}
 						<!-- The live view is capped: earlier lines are in the paged viewer, not here. -->

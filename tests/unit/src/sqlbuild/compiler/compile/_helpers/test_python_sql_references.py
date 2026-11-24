@@ -17,7 +17,7 @@ from tests.unit.src.sqlbuild.compiler.compile._helpers.helpers import (
     gate_model,
     python_check_source,
     python_hook_source,
-    python_loader_source,
+    python_loader_files,
     python_task_source,
     render_compile_diagnostics,
 )
@@ -31,27 +31,26 @@ sql_analysis = false
 sql_validation = false
 """
 _DISABLED_PROJECT_FILE: str = _PROJECT_FILE + "\n[references]\nenforce_explicit = false\n"
-_HOOK_PATH: str = "models/marts/_sqlbuild/_hooks/python/lookups.py"
-_TASK_PATH: str = "python/tasks/export.py"
+_HOOK_PATH: str = "sql/models/marts/_sqlbuild/_hooks/python/lookups.py"
+_TASK_PATH: str = "python/nodes/tasks/export/asset.py"
 _HOOKED_HEADER: str = (
     'MODEL (description "Test model export.", post_hooks [python("refresh_lookup")]);'
 )
 _MODELS: dict[str, str] = {
-    "models/marts/customers.sql": gate_model(sql="SELECT 1 AS customer_id"),
-    "models/marts/orders.sql": gate_model(sql="SELECT 1 AS order_id", header=_HOOKED_HEADER),
+    "sql/models/marts/customers.sql": gate_model(sql="SELECT 1 AS customer_id"),
+    "sql/models/marts/orders.sql": gate_model(sql="SELECT 1 AS order_id", header=_HOOKED_HEADER),
 }
 _COUNTRY_SEED: dict[str, str] = {
-    "seeds/country_codes.yml": (
+    "sql/seeds/country_codes.yml": (
         "seeds:\n  - name: country_codes\n    description: Test seed country_codes.\n    columns:\n      - name: code\n        type: VARCHAR\n"
     ),
-    "seeds/country_codes.csv": "code\nGB\n",
+    "sql/seeds/country_codes.csv": "code\nGB\n",
 }
 
 
-_CHECK_PATH: str = "python/checks/orders.py"
-_LOADER_PATH: str = "python/loaders/raw.py"
+_CHECK_PATH: str = "python/nodes/checks/orders/checks.py"
 _RAW_SOURCES: dict[str, str] = {
-    "sources/raw.yml": (
+    "sql/sources/raw.yml": (
         "sources:\n"
         "  - name: raw_regions\n    description: Test source raw_regions.\n    managed: true\n    write_strategy: table\n"
         "    columns:\n      - name: id\n        type: INTEGER\n"
@@ -77,7 +76,7 @@ _RAW_SOURCES: dict[str, str] = {
                 "[P008]",
                 "asset:export_orders names model:customers as 'customers' in SQL passed to "
                 "ctx.query()",
-                "python/tasks/export.py:7",
+                "python/nodes/tasks/export/asset.py:7",
                 'depends_on=model("customers")',
                 "if 'customers' is an external table that shares the name, qualify it with its "
                 "schema",
@@ -102,13 +101,13 @@ _RAW_SOURCES: dict[str, str] = {
             },
             expected_error_fragments=(
                 "[P008] check:orders_present names model:customers as 'customers' in SQL passed "
-                "to ctx.query() --> python/checks/orders.py:7",
+                "to ctx.query() --> python/nodes/checks/orders/checks.py:7",
                 "[P008] asset:export_orders names model:customers as 'customers' in SQL passed to "
-                "ctx.query() --> python/tasks/export.py:7",
+                "ctx.query() --> python/nodes/tasks/export/asset.py:7",
                 "[P008] asset:export_orders names model:customers as 'customers' in SQL passed to "
-                "ctx.query() --> python/tasks/export.py:8",
+                "ctx.query() --> python/nodes/tasks/export/asset.py:8",
                 "[P008] asset:export_orders names model:orders as 'orders' in SQL passed to "
-                "ctx.query() --> python/tasks/export.py:8",
+                "ctx.query() --> python/nodes/tasks/export/asset.py:8",
             ),
         ),
         PythonSqlReferenceErrorTestCase(
@@ -122,7 +121,7 @@ _RAW_SOURCES: dict[str, str] = {
             },
             expected_error_fragments=(
                 "[P008] asset:export_orders names model:customers as 'customers' in SQL passed to "
-                "ctx.query() --> python/tasks/export.py:7",
+                "ctx.query() --> python/nodes/tasks/export/asset.py:7",
             ),
         ),
         PythonSqlReferenceErrorTestCase(
@@ -182,7 +181,7 @@ _RAW_SOURCES: dict[str, str] = {
                 "[P008]",
                 "check:orders_present names model:customers as 'customers' in SQL passed to "
                 "ctx.query()",
-                "python/checks/orders.py:7",
+                "python/nodes/checks/orders/checks.py:7",
                 'declare it with depends_on=model("customers")',
             ),
         ),
@@ -192,7 +191,7 @@ _RAW_SOURCES: dict[str, str] = {
                 **_MODELS,
                 **_RAW_SOURCES,
                 _HOOK_PATH: python_hook_source(),
-                _LOADER_PATH: python_loader_source(
+                **python_loader_files(
                     depends_on="", body='    ctx.query("SELECT * FROM raw_regions")\n'
                 ),
             },
@@ -207,7 +206,7 @@ _RAW_SOURCES: dict[str, str] = {
                 **_MODELS,
                 **_RAW_SOURCES,
                 _HOOK_PATH: python_hook_source(),
-                _LOADER_PATH: python_loader_source(
+                **python_loader_files(
                     depends_on="raw_regions", body='    ctx.query("SELECT * FROM raw_regions")\n'
                 ),
             },
@@ -219,7 +218,7 @@ _RAW_SOURCES: dict[str, str] = {
                 **_MODELS,
                 **_RAW_SOURCES,
                 _HOOK_PATH: python_hook_source(),
-                _LOADER_PATH: python_loader_source(
+                **python_loader_files(
                     depends_on="", body='    ctx.query("SELECT * FROM customers")\n'
                 ),
             },
@@ -345,7 +344,7 @@ def test_given_hard_coded_project_relation_when_compiling_then_it_reports_p008(
                 **_MODELS,
                 **_RAW_SOURCES,
                 _HOOK_PATH: python_hook_source(),
-                _LOADER_PATH: python_loader_source(
+                **python_loader_files(
                     depends_on="raw_regions",
                     body=(
                         "    regions = ctx.loader(raw_regions)\n"

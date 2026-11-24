@@ -191,9 +191,9 @@ def generated_lineage_files(*, rng: random.Random, model_count: int) -> dict[str
 
     files: dict[str, str] = {
         "sqlbuild_project.toml": _PROJECT_TOML,
-        "sources/raw.yml": _SOURCES,
-        "seeds/regions.yml": _SEEDS,
-        "seeds/regions.csv": "region,region_label\neast,East\n",
+        "sql/sources/raw.yml": _SOURCES,
+        "sql/seeds/regions.yml": _SEEDS,
+        "sql/seeds/regions.csv": "region,region_label\neast,East\n",
     }
     relations: list[tuple[str, tuple[str, ...]]] = list(_INITIAL_RELATIONS.items())
     for index in range(model_count):
@@ -202,7 +202,7 @@ def generated_lineage_files(*, rng: random.Random, model_count: int) -> dict[str
         sql, columns = template(rng, inputs)
         name: str = f"orders_model_{index}"
         opt_out: str = _OPT_OUTS[rng.random() < _OPT_OUT_SHARE]
-        files[f"models/layer_{index % 3}/{name}.sql"] = (
+        files[f"sql/models/layer_{index % 3}/{name}.sql"] = (
             f'MODEL (description "Generated orders model {index}"{opt_out});\n\n{sql}\n'
         )
         relations.append((f'__ref("{name}")', columns))

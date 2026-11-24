@@ -30,14 +30,14 @@ from tests.unit.src.sqlbuild.compiler.python_nodes._helpers.helpers import (
         ),
         PythonSqlSelectorTestCase(
             description="selects expanded Python asset path for run",
-            select=("+path:python/assets",),
+            select=("+path:python/nodes/assets",),
             exclude=(),
             expected_sql_names=frozenset(),
             expected_python_node_names=frozenset({"prepare_orders", "export_orders"}),
         ),
         PythonSqlSelectorTestCase(
             description="selects a Python asset without its unselected Python dependency",
-            select=("path:python/assets",),
+            select=("path:python/nodes/assets",),
             exclude=(),
             expected_sql_names=frozenset(),
             expected_python_node_names=frozenset({"export_orders"}),

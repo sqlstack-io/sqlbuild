@@ -60,8 +60,8 @@ fn given_config_file_when_fingerprinting_then_only_scope_relevant_keys_are_hashe
         ConfigBytesTestCase {
             description: "a non-TOML config file hashes its raw bytes",
             name: ".sqlbuildignore",
-            text: "models/tmp\n",
-            expected_bytes: "models/tmp\n",
+            text: "sql/models/tmp\n",
+            expected_bytes: "sql/models/tmp\n",
         },
         ConfigBytesTestCase {
             description: "invalid TOML hashes its raw bytes",

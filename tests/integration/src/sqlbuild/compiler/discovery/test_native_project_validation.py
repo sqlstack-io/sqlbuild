@@ -28,7 +28,7 @@ from tests.integration.src.sqlbuild.compiler.discovery.helpers import (
             files=seed_project_files(header=b"code,name"),
             expected_error_type="SeedDiscoveryError",
             expected_message=(
-                "seeds/countries.csv header ('code', 'name') does not match declared seed "
+                "sql/seeds/countries.csv header ('code', 'name') does not match declared seed "
                 "columns ('code', 'label') for 'countries'"
             ),
         ),
@@ -40,37 +40,37 @@ from tests.integration.src.sqlbuild.compiler.discovery.helpers import (
             ),
             expected_error_type="SeedDiscoveryError",
             expected_message=(
-                "seeds/countries.csv header ('code', 'label', 'extra') does not match declared "
+                "sql/seeds/countries.csv header ('code', 'label', 'extra') does not match declared "
                 "seed columns ('code', 'label') for 'countries'"
             ),
         ),
         ProjectValidationTestCase(
             description="a seed CSV without a declaration",
-            files=(VALIDATION_MODEL, ("seeds/regions.csv", b"code\nEU\n")),
+            files=(VALIDATION_MODEL, ("sql/seeds/regions.csv", b"code\nEU\n")),
             expected_error_type="SeedDiscoveryError",
             expected_message=(
-                "Seed CSV seeds/regions.csv has no matching declaration for seed 'regions' under "
-                "seeds/**/*.yml"
+                "Seed CSV sql/seeds/regions.csv has no matching declaration for seed 'regions' under "
+                "sql/seeds/**/*.yml"
             ),
         ),
         ProjectValidationTestCase(
             description="two model files with one name",
             files=(
                 VALIDATION_MODEL,
-                ("models/marts/orders.sql", b"MODEL ();\nSELECT 2 AS order_id"),
+                ("sql/models/marts/orders.sql", b"MODEL ();\nSELECT 2 AS order_id"),
             ),
             expected_error_type="DiscoveryConflictError",
             expected_message=(
-                "Duplicate model file name found for 'orders' in models/marts/orders.sql and "
-                "models/orders.sql"
+                "Duplicate model file name found for 'orders' in sql/models/marts/orders.sql and "
+                "sql/models/orders.sql"
             ),
         ),
         ProjectValidationTestCase(
             description="a non-canonical model identity",
-            files=(("models/Orders.sql", b"MODEL ();\nSELECT 1 AS order_id"),),
+            files=(("sql/models/Orders.sql", b"MODEL ();\nSELECT 1 AS order_id"),),
             expected_error_type="ResourceIdentityError",
             expected_message=(
-                "Invalid model identity 'Orders' in models/Orders.sql; use snake_case 'orders'"
+                "Invalid model identity 'Orders' in sql/models/Orders.sql; use snake_case 'orders'"
             ),
         ),
     ],

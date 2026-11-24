@@ -23,7 +23,7 @@ decide which files can access it. No TOML configuration is required.
 
 | Where the declaration lives | Who can use it |
 |-------------------------------------|--------------------|
-| Top-level `macros/`, `constants/`, or `enums/` | The whole project |
+| Top-level `sql/macros/`, `sql/constants/`, or `sql/enums/` | The whole project |
 | Nested `_sqlbuild/macros/`, `_sqlbuild/constants/`, or `_sqlbuild/enums/` | Files in the owner folder and folders below it |
 | Nested `_sqlbuild/_macros/`, `_sqlbuild/_constants/`, or `_sqlbuild/_enums/` | Files directly in the owner folder only |
 | An underscored constant or enum inside `MODEL()` | That model and its inline SQL hooks only |
@@ -32,20 +32,20 @@ The same three placements apply to every kind of reusable declaration used by na
 
 | Kind | Project-wide role | Owner and below | Owner folder only |
 |------|-------------------|-----------------|-------------------|
-| Macros | `macros/python/`, `macros/sql/` | `_sqlbuild/macros/python/`, `_sqlbuild/macros/sql/` | `_sqlbuild/_macros/python/`, `_sqlbuild/_macros/sql/` |
-| Enums | `enums/` | `_sqlbuild/enums/` | `_sqlbuild/_enums/` |
-| Constants | `constants/` | `_sqlbuild/constants/` | `_sqlbuild/_constants/` |
-| Generic audits | `audits/generic/` | `_sqlbuild/audits/generic/` | `_sqlbuild/_audits/generic/` |
-| Singular audits | `audits/singular/` | `_sqlbuild/audits/singular/` | Not supported |
-| Reusable schemas | `schemas/` | `_sqlbuild/schemas/` | `_sqlbuild/_schemas/` |
-| Named SQL hooks | `hooks/sql/` | `_sqlbuild/hooks/sql/` | `_sqlbuild/_hooks/sql/` |
-| Python hooks | `hooks/python/` | `_sqlbuild/hooks/python/` | `_sqlbuild/_hooks/python/` |
+| Macros | `sql/macros/python/`, `sql/macros/sql/` | `_sqlbuild/macros/python/`, `_sqlbuild/macros/sql/` | `_sqlbuild/_macros/python/`, `_sqlbuild/_macros/sql/` |
+| Enums | `sql/enums/` | `_sqlbuild/enums/` | `_sqlbuild/_enums/` |
+| Constants | `sql/constants/` | `_sqlbuild/constants/` | `_sqlbuild/_constants/` |
+| Generic audits | `sql/audits/generic/` | `_sqlbuild/audits/generic/` | `_sqlbuild/_audits/generic/` |
+| Singular audits | `sql/audits/singular/` | `_sqlbuild/audits/singular/` | Not supported |
+| Reusable schemas | `sql/schemas/` | `_sqlbuild/schemas/` | `_sqlbuild/_schemas/` |
+| Named SQL hooks | `sql/hooks/sql/` | `_sqlbuild/hooks/sql/` | `_sqlbuild/_hooks/sql/` |
+| Python hooks | `sql/hooks/python/` | `_sqlbuild/hooks/python/` | `_sqlbuild/_hooks/python/` |
 
 Macro and Python hook declarations are Python files (`.py`). All other declarations are SQL files
 (`.sql`). Singular audits are never used by name, so they have no folder-only role; a scoped
 singular audit may reference only resources at or below its owner.
 
-Functions (`functions/sql/`, `functions/python/`) stay project-wide. They are deployed warehouse
+Functions (`sql/functions/sql/`, `sql/functions/python/`) stay project-wide. They are deployed warehouse
 objects and graph nodes, so a compile-time folder restriction would not match what the warehouse
 allows.
 
@@ -54,7 +54,7 @@ allows.
 The annotation beside each directory shows where its contents are available:
 
 ```text
-models/
+sql/models/
 ├── constants/                 published throughout models/
 │   └── warehouse.sql
 └── commerce/
@@ -79,13 +79,13 @@ Legacy macro, enum, and constant roles directly below an owner remain supported;
 and hooks are scoped only through `_sqlbuild/`.
 
 `_sqlbuild/` is reserved for the declaration-role directories in the table above. Other direct
-files or folders are rejected, as are unknown entries inside an `audits/` or `hooks/` role. It must
+files or folders are rejected, as are unknown entries inside an `sql/audits/` or `sql/hooks/` role. It must
 also sit below a concrete owner directory. A project-root `_sqlbuild/` or authored-root path such as
-`models/_sqlbuild/` is invalid; declarations at that boundary belong in the project-wide roots.
+`sql/models/_sqlbuild/` is invalid; declarations at that boundary belong in the project-wide roots.
 
 A declaration file resolves the macros, enums, and constants it uses from its owner folder, not
-from the role directory that contains it. A generic audit in `models/marts/_sqlbuild/_audits/generic/`
-therefore sees the same declarations as a model in `models/marts/`. Those uses must be visible from
+from the role directory that contains it. A generic audit in `sql/models/marts/_sqlbuild/_audits/generic/`
+therefore sees the same declarations as a model in `sql/models/marts/`. Those uses must be visible from
 the owner folder, or compilation fails; they never change where the declaration itself must live.
 
 | Resource | Visible from the example tree | Not visible |

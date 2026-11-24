@@ -38,7 +38,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_orders
@@ -63,7 +63,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                     """
                 ).strip()
                 + "\n",
-                "models/fact_orders.sql": dedent(
+                "sql/models/fact_orders.sql": dedent(
                     """
                     MODEL (description "Test model fact_orders.", materialized table);
 
@@ -127,9 +127,9 @@ def test_given_expression_source_when_building_then_inline_source_sql_is_used(
         actual_rows: list[tuple[object, ...]] = query_duckdb(db_path=db_path, sql=query)
         assert tuple(tuple(row) for row in actual_rows) == expected_rows
 
-    runtime_sql: str = (project_dir / "target" / "run" / "models" / "fact_orders.sql").read_text(
-        encoding="utf-8"
-    )
+    runtime_sql: str = (
+        project_dir / "target" / "run" / "sql" / "models" / "fact_orders.sql"
+    ).read_text(encoding="utf-8")
     fragment: str
     for fragment in test_case.expected_runtime_fragments:
         assert fragment in runtime_sql

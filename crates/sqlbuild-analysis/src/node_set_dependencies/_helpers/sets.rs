@@ -3,14 +3,14 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::graph::errors::SelectorError;
-use crate::graph::models::JobSelection;
+use crate::graph::models::{JobSelection, ProjectGraph};
 use crate::node_set_dependencies::_helpers::combined::Combined;
 use crate::node_set_dependencies::_helpers::labels::{
     excluding, listed, node_label, node_name, set_label,
 };
 use crate::node_set_dependencies::constants::{
-    DEPENDABLE_PYTHON_KINDS, DEPENDABLE_SQL_KINDS, JOB_SET, LOADER_KIND, LOCATION_SEPARATOR,
-    NODE_SET_CODE, TAG_SET,
+    DEPENDABLE_PYTHON_KINDS, DEPENDABLE_SQL_KINDS, JOB_SET, LOCATION_SEPARATOR, NODE_SET_CODE,
+    TAG_SET,
 };
 use crate::node_set_dependencies::models::{
     DependantNode, GraphNode, NodeSetDependency, ResolvedNode,
@@ -35,6 +35,12 @@ pub(crate) fn python_kinds(python: &PythonSelectionGraph) -> HashMap<String, Str
         .collect()
 }
 
+/// Whether any SQL resource or Python node carries `tag`.
+pub(crate) fn tag_carried(graph: &ProjectGraph, python: &PythonSelectionGraph, tag: &str) -> bool {
+    graph.tags.iter().any(|(name, _)| name == tag)
+        || python.tags.iter().any(|(name, _)| name == tag)
+}
+
 /// The dependable nodes `dependency` names, less its `exclude`.
 pub(crate) fn members(
     (sql, python): (SqlSelectionGraph<'_>, &PythonSelectionGraph),
@@ -43,12 +49,6 @@ pub(crate) fn members(
 ) -> Result<BTreeSet<GraphNode>, SelectorError> {
     let owner: String = format!("{} '{}'", dependant.kind, dependant.name);
     let set: String = set_label(dependency);
-    if dependant.kind == LOADER_KIND {
-        return Err(failure(
-            format!("{owner} depends on {set}; loaders cannot depend on a job or a tag"),
-            Some("name the loaders or assets it depends on one by one".to_owned()),
-        ));
-    }
     if dependency.name.contains(LOCATION_SEPARATOR) {
         return Err(failure(
             format!("{owner} depends on {set}, a job of another code location"),
@@ -64,13 +64,7 @@ pub(crate) fn members(
             ),
         ));
     }
-    let tagged: bool = sql
-        .graph
-        .tags
-        .iter()
-        .any(|(tag, _)| *tag == dependency.name)
-        || python.tags.iter().any(|(tag, _)| *tag == dependency.name);
-    if dependency.kind == TAG_SET && !tagged {
+    if dependency.kind == TAG_SET && !tag_carried(sql.graph, python, &dependency.name) {
         return Err(failure(
             format!("{owner} depends on {set}, which no node carries"),
             None,

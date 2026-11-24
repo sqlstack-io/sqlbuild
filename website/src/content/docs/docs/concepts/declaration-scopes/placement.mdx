@@ -8,14 +8,14 @@ import Card from '../../../../../components/mintlify/Card.astro';
 Start with the ordinary project-wide directories unless you have a reason to limit access:
 
 ```text
-macros/
-enums/
-constants/
-audits/generic/
-audits/singular/
-schemas/
-hooks/sql/
-hooks/python/
+sql/macros/
+sql/enums/
+sql/constants/
+sql/audits/generic/
+sql/audits/singular/
+sql/schemas/
+sql/hooks/sql/
+sql/hooks/python/
 ```
 
 Move a declaration closer to its users when it should be available only in one folder or one folder
@@ -28,19 +28,19 @@ tree.
 | One model only | Inside that model's `MODEL()` header, for enums and constants |
 | SQL files directly in one directory | The underscored role under that directory's `_sqlbuild/`, such as `_sqlbuild/_macros/`, `_sqlbuild/_audits/generic/`, `_sqlbuild/_schemas/`, or `_sqlbuild/_hooks/sql/` |
 | A directory and its descendants | The unprefixed role under the nearest shared directory's `_sqlbuild/`, such as `_sqlbuild/constants/`, `_sqlbuild/audits/generic/`, `_sqlbuild/schemas/`, or `_sqlbuild/hooks/python/` |
-| Sibling folders of one resource tree, such as `models/marts/` and `models/staging/` | The top-level role, such as `macros/`, `audits/generic/`, or `schemas/` |
+| Sibling folders of one resource tree, such as `sql/models/marts/` and `sql/models/staging/` | The top-level role, such as `sql/macros/`, `sql/audits/generic/`, or `sql/schemas/` |
 | Different trees, such as models and tests, or models and sources | The top-level role |
 
 Singular audits have no folder-only role. A singular audit that references resources under one
 directory tree lives in that directory's `_sqlbuild/audits/singular/`; one that references a source,
-a seed, or models in sibling top-level folders lives in `audits/singular/`.
+a seed, or models in sibling top-level folders lives in `sql/audits/singular/`.
 
 ## One directory
 
 These two models use the same constant and both sit directly in `commerce/`:
 
 ```text
-models/
+sql/models/
 └── commerce/
     ├── _sqlbuild/
     │   └── _constants/
@@ -56,7 +56,7 @@ Use `_sqlbuild/_constants/` because no descendant directory needs the value.
 These models use the same constant across two child directories:
 
 ```text
-models/
+sql/models/
 └── commerce/
     ├── _sqlbuild/
     │   └── constants/
@@ -75,10 +75,11 @@ When a declaration is used directly from unrelated trees, make it project-wide:
 
 ```text
 my_project/
-├── constants/
-│   └── order_status.sql
-├── models/
-│   └── commerce/orders.sql
+├── sql/
+│   ├── constants/
+│   │   └── order_status.sql
+│   └── models/
+│       └── commerce/orders.sql
 └── tests/
     └── scenarios/order_lifecycle.sql
 ```
@@ -95,7 +96,7 @@ the audit cases returned by an audit factory. A child schema's `extends` counts 
 child schema's owner folder.
 
 ```text
-models/
+sql/models/
 └── marts/
     ├── _sqlbuild/
     │   ├── _audits/generic/

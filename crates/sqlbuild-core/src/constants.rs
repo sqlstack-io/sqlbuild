@@ -14,8 +14,84 @@ pub const SETTINGS_SECTION: &str = "settings";
 pub const TABLE_PROMOTION_MODE_SETTING_KEY: &str = "table_promotion_mode";
 /// Table promotion mode that builds into a staging relation before swapping.
 pub const STAGED_PROMOTION_MODE: &str = "staged";
-/// Project directory holding Python node modules.
-pub const PYTHON_NODE_ROOT: &str = "python";
+/// Project folder holding everything the warehouse runs.
+pub const SQL_DIRECTORY: &str = "sql";
+/// Project folder holding everything SQLBuild imports as Python, imported as the `python` package.
+pub const PYTHON_DIRECTORY: &str = "python";
+/// Project folder of SQL models.
+pub const MODELS_PATH: &str = "sql/models";
+/// Project folder of seeds.
+pub const SEEDS_PATH: &str = "sql/seeds";
+/// Project folder of sources.
+pub const SOURCES_PATH: &str = "sql/sources";
+/// Project folder of project-wide macros.
+pub const MACROS_PATH: &str = "sql/macros";
+/// Project folder of functions.
+pub const FUNCTIONS_PATH: &str = "sql/functions";
+/// Project folder of project-wide enums.
+pub const ENUMS_PATH: &str = "sql/enums";
+/// Project folder of project-wide constants.
+pub const CONSTANTS_PATH: &str = "sql/constants";
+/// Project folder of project-wide audits.
+pub const AUDITS_PATH: &str = "sql/audits";
+/// Project folder of project-wide hooks.
+pub const HOOKS_PATH: &str = "sql/hooks";
+/// Project folder of project-wide schemas.
+pub const SCHEMAS_PATH: &str = "sql/schemas";
+/// The folders `sql/` may hold.
+pub const SQL_CHILDREN: [&str; 10] = [
+    "models",
+    "seeds",
+    "sources",
+    "macros",
+    "functions",
+    "enums",
+    "constants",
+    "audits",
+    "hooks",
+    "schemas",
+];
+/// Project folder holding Python node modules.
+pub const PYTHON_NODE_ROOT: &str = "python/nodes";
+/// Project folder of providers.
+pub const PROVIDERS_PATH: &str = "python/providers";
+/// Project folder of lifecycle event and command output event sinks.
+pub const EVENT_SINKS_PATH: &str = "python/event_sinks";
+/// Project folder of custom materializations.
+pub const MATERIALIZATIONS_PATH: &str = "python/materializations";
+/// Project folder of custom adapters.
+pub const ADAPTERS_PATH: &str = "python/adapters";
+/// Project file of a single custom adapter.
+pub const ADAPTER_FILE_PATH: &str = "python/adapter.py";
+/// The entries `python/` may hold.
+pub const PYTHON_CHILDREN: [&str; 7] = [
+    "nodes",
+    "providers",
+    "event_sinks",
+    "materializations",
+    "adapters",
+    "adapter.py",
+    "__init__.py",
+];
+/// Project folder of jobs, job groups, calendars and sensors.
+pub const ORCHESTRATION_PATH: &str = "orchestration";
+/// Project folder of custom rules.
+pub const RULES_PATH: &str = "rules";
+/// Project folder of SQL tests, scenarios and Python tests.
+pub const TESTS_PATH: &str = "tests";
+/// Project folder of SQL unit tests.
+pub const UNIT_TESTS_PATH: &str = "tests/unit";
+/// Project folder of SQL scenarios.
+pub const SCENARIOS_PATH: &str = "tests/scenarios";
+/// The folders a project's top level may hold.
+pub const TOP_LEVEL_DIRECTORIES: [&str; 5] = ["sql", "python", "orchestration", "rules", "tests"];
+/// The files a project's top level may hold.
+pub const TOP_LEVEL_FILES: [&str; 4] = [
+    "sqlbuild_project.toml",
+    "sqlbuild_local.toml",
+    "roles.toml",
+    "README.md",
+];
 /// Stem of a Python package's initializer module.
 pub const PYTHON_INIT_MODULE_STEM: &str = "__init__";
 /// State table of model, seed and hook fingerprints.
@@ -69,3 +145,7 @@ pub const STATE_TABLE_NAMES: [&str; 14] = [
 pub const ZERO_DAY_DURATION: &str = "0d";
 /// Node key of a common table expression in the polyglot SQL AST.
 pub const CTE_AST_KIND: &str = "cte";
+/// How `sqb dev` hands its location the SQLite control store file it writes.
+pub const DEVELOPMENT_CONTROL_FILE_ENV: &str = "SQLBUILD_DEVELOPMENT_CONTROL_FILE";
+/// How `sqb dev` hands its location the folder it writes run output to.
+pub const DEVELOPMENT_OUTPUT_FOLDER_ENV: &str = "SQLBUILD_DEVELOPMENT_OUTPUT_FOLDER";

@@ -79,40 +79,40 @@ FACT_ORDERS_TEST: str = (
 )
 BASE_FILES: dict[str, str] = {
     "sqlbuild_project.toml": _PROJECT_TOML,
-    "sources/raw.yml": _SOURCES_YML,
-    "models/staging/stg_orders.sql": STG_ORDERS,
-    "models/marts/fact_orders.sql": FACT_ORDERS,
-    "models/marts/customer_totals.sql": CUSTOMER_TOTALS,
+    "sql/sources/raw.yml": _SOURCES_YML,
+    "sql/models/staging/stg_orders.sql": STG_ORDERS,
+    "sql/models/marts/fact_orders.sql": FACT_ORDERS,
+    "sql/models/marts/customer_totals.sql": CUSTOMER_TOTALS,
     "tests/unit/test_fact_orders.sql": FACT_ORDERS_TEST,
 }
 UDF_FILE: tuple[str, str] = (
-    "functions/sql/udf__is_large_order.sql",
+    "sql/functions/sql/udf__is_large_order.sql",
     "FUNCTION (description 'Test function udf__is_large_order.',"
     "\n  arguments (amount INTEGER),\n  returns BOOLEAN,\n);\n\namount >= 100\n",
 )
 CENTS_MACRO: dict[str, str] = {
-    "models/staging/_sqlbuild/_macros/python/cents.py": (
+    "sql/models/staging/_sqlbuild/_macros/python/cents.py": (
         'def to_cents(expression: str) -> str:\n    return f"({expression}) * 100"\n'
     ),
-    "models/staging/stg_order_cents.sql": (
+    "sql/models/staging/stg_order_cents.sql": (
         "MODEL (description 'Test model stg_order_cents.',\n  materialized view,\n);\n\n"
         'SELECT\n  order_id,\n  @py.to_cents("amount") AS amount_cents\nFROM __ref("stg_orders")\n'
     ),
 }
 ORDER_REFUNDS: dict[str, str] = {
-    "models/staging/stg_order_refunds.sql": (
+    "sql/models/staging/stg_order_refunds.sql": (
         "MODEL (description 'Test model stg_order_refunds.',\n  materialized view,\n);\n\n"
         'SELECT\n  order_id,\n  @py.to_cents("amount") AS refund_cents\nFROM __ref("stg_orders")\n'
     ),
 }
 SPLIT_CENTS_MACROS: dict[str, str] = {
     **CENTS_MACRO,
-    "models/staging/_sqlbuild/_macros/python/cents.py": (
-        CENTS_MACRO["models/staging/_sqlbuild/_macros/python/cents.py"]
+    "sql/models/staging/_sqlbuild/_macros/python/cents.py": (
+        CENTS_MACRO["sql/models/staging/_sqlbuild/_macros/python/cents.py"]
         + '\n\ndef to_dollars(expression: str) -> str:\n    return f"({expression}) / 100"\n'
     ),
-    "models/staging/stg_order_refunds.sql": ORDER_REFUNDS[
-        "models/staging/stg_order_refunds.sql"
+    "sql/models/staging/stg_order_refunds.sql": ORDER_REFUNDS[
+        "sql/models/staging/stg_order_refunds.sql"
     ].replace("to_cents", "to_dollars"),
 }
 
@@ -124,38 +124,40 @@ _LABEL_MACRO: str = 'def upper_label(expression: str) -> str:\n    return f"UPPE
 def grouped_role_files(*, cents_path: str, labels_path: str) -> dict[str, str]:
     """Return the cents users with ``cents_path`` and a shared label macro at ``labels_path``.
 
-    Both cents users sit in ``models/staging``; the label macro is read there and from
-    ``models/staging/eu``, so it is descendant-public at ``models/staging``.
+    Both cents users sit in ``sql/models/staging``; the label macro is read there and from
+    ``sql/models/staging/eu``, so it is descendant-public at ``sql/models/staging``.
     """
 
     return {
         "sqlbuild_project.toml": project_toml() + _LAYOUT_RULES,
-        cents_path: CENTS_MACRO["models/staging/_sqlbuild/_macros/python/cents.py"],
-        "models/staging/stg_order_cents.sql": CENTS_MACRO["models/staging/stg_order_cents.sql"],
-        "models/staging/stg_order_refunds.sql": ORDER_REFUNDS[
-            "models/staging/stg_order_refunds.sql"
+        cents_path: CENTS_MACRO["sql/models/staging/_sqlbuild/_macros/python/cents.py"],
+        "sql/models/staging/stg_order_cents.sql": CENTS_MACRO[
+            "sql/models/staging/stg_order_cents.sql"
+        ],
+        "sql/models/staging/stg_order_refunds.sql": ORDER_REFUNDS[
+            "sql/models/staging/stg_order_refunds.sql"
         ].replace(
             "AS refund_cents\n", "AS refund_cents,\n  @py.upper_label(\"'refund'\") AS label\n"
         ),
         labels_path: _LABEL_MACRO,
-        "models/staging/eu/stg_order_labels.sql": _label_model("stg_order_labels"),
+        "sql/models/staging/eu/stg_order_labels.sql": _label_model("stg_order_labels"),
     }
 
 
 def shared_cents_with_grouped_global_role() -> dict[str, str]:
-    """Return two staging users of a direct local cents macro beside a grouped ``macros/`` role.
+    """Return two staging users of a direct local cents macro beside a grouped ``sql/macros/`` role.
 
-    Moving only one user to ``models/finance`` would carry cents to the grouped top-level role,
-    which a direct file cannot join; moving both leaves it local to ``models/finance``.
+    Moving only one user to ``sql/models/finance`` would carry cents to the grouped top-level role,
+    which a direct file cannot join; moving both leaves it local to ``sql/models/finance``.
     """
 
     return {
         "sqlbuild_project.toml": project_toml() + _LAYOUT_RULES,
         **CENTS_MACRO,
         **ORDER_REFUNDS,
-        "macros/python/text/labels.py": _LABEL_MACRO,
-        "models/staging/stg_order_labels.sql": _label_model("stg_order_labels"),
-        "models/marts/order_labels.sql": _label_model("order_labels"),
+        "sql/macros/python/text/labels.py": _LABEL_MACRO,
+        "sql/models/staging/stg_order_labels.sql": _label_model("stg_order_labels"),
+        "sql/models/marts/order_labels.sql": _label_model("order_labels"),
     }
 
 
@@ -163,12 +165,14 @@ def same_named_local_macros() -> dict[str, str]:
     """Return two models in different folders, each using its own local ``helpers.py`` macro."""
 
     return {
-        "models/staging/_sqlbuild/_macros/python/helpers.py": CENTS_MACRO[
-            "models/staging/_sqlbuild/_macros/python/cents.py"
+        "sql/models/staging/_sqlbuild/_macros/python/helpers.py": CENTS_MACRO[
+            "sql/models/staging/_sqlbuild/_macros/python/cents.py"
         ],
-        "models/staging/stg_order_cents.sql": CENTS_MACRO["models/staging/stg_order_cents.sql"],
-        "models/marts/_sqlbuild/_macros/python/helpers.py": _LABEL_MACRO,
-        "models/marts/order_labels.sql": _label_model("order_labels"),
+        "sql/models/staging/stg_order_cents.sql": CENTS_MACRO[
+            "sql/models/staging/stg_order_cents.sql"
+        ],
+        "sql/models/marts/_sqlbuild/_macros/python/helpers.py": _LABEL_MACRO,
+        "sql/models/marts/order_labels.sql": _label_model("order_labels"),
     }
 
 
@@ -192,12 +196,12 @@ def order_amount_union(*, first: str, second: str) -> dict[str, str]:
     """Return a view unioning amount from two models, and a view reading its output."""
 
     return {
-        "models/marts/order_amounts.sql": (
+        "sql/models/marts/order_amounts.sql": (
             "MODEL (description 'Test model order_amounts.',\n  materialized view,\n);\n\n"
             f'SELECT amount FROM __ref("{first}")\nUNION ALL\n'
             f'SELECT amount FROM __ref("{second}")\n'
         ),
-        "models/marts/order_amount_reads.sql": (
+        "sql/models/marts/order_amount_reads.sql": (
             'MODEL (description "Test model order_amount_reads.",'
             '\n  materialized view,\n);\n\nSELECT amount FROM __ref("order_amounts")\n'
         ),
@@ -205,13 +209,13 @@ def order_amount_union(*, first: str, second: str) -> dict[str, str]:
 
 
 ORDER_EXPORT: dict[str, str] = {
-    "models/marts/order_export.sql": (
+    "sql/models/marts/order_export.sql": (
         'MODEL (description "Test model order_export.",'
         '\n  materialized view,\n);\n\nSELECT *\nFROM __ref("fact_orders")\n'
     ),
 }
 ORDER_AMOUNT_CHECK: dict[str, str] = {
-    "python/checks/order_amounts.py": (
+    "python/nodes/checks/order_amounts/checks.py": (
         "from sqlbuild.checks import check\n"
         "from sqlbuild.refs import model\n\n\n"
         '@check(depends_on=model("stg_orders"))\n'
@@ -221,8 +225,8 @@ ORDER_AMOUNT_CHECK: dict[str, str] = {
     ),
 }
 CUSTOMER_DECLARATIONS: dict[str, str] = {
-    "seeds/customers.csv": "customer_id,customer_name\n10,Ada\n11,Bo\n",
-    "seeds/customers.yml": (
+    "sql/seeds/customers.csv": "customer_id,customer_name\n10,Ada\n11,Bo\n",
+    "sql/seeds/customers.yml": (
         "seeds:\n"
         "  - name: customers\n    description: Test seed customers.\n"
         "    columns:\n"
@@ -235,7 +239,7 @@ CUSTOMER_DECLARATIONS: dict[str, str] = {
         "      - name: customer_name\n"
         "        type: VARCHAR\n"
     ),
-    "sources/customers.yml": (
+    "sql/sources/customers.yml": (
         "sources:\n"
         "  - name: raw_customers\n    description: Test source raw_customers.\n"
         '    expression: "SELECT 10 AS customer_id UNION ALL SELECT 11"\n'
@@ -246,12 +250,12 @@ CUSTOMER_DECLARATIONS: dict[str, str] = {
     ),
 }
 ORDER_SHAPE: dict[str, str] = {
-    "models/marts/_sqlbuild/_schemas/order_shape.sql": (
+    "sql/models/marts/_sqlbuild/_schemas/order_shape.sql": (
         "SCHEMA (description 'Test schema.',"
         "\n  name order_shape,\n  columns (\n    customer_id (audits [relationships "
         '(to __ref("stg_orders"), field customer_id)]),\n  ),\n);\n'
     ),
-    "models/marts/fact_orders.sql": FACT_ORDERS.replace(
+    "sql/models/marts/fact_orders.sql": FACT_ORDERS.replace(
         "materialized table,", "materialized table,\n  model_schema order_shape,"
     ),
 }
@@ -283,14 +287,14 @@ FLAGGED_ORDER_SUMMARY: str = (
     "FROM orders\n"
 )
 FLAGGED_CONTRACT: dict[str, str] = {
-    "models/marts/flagged_orders.sql": FLAGGED_ORDERS,
-    "models/marts/flagged_order_summary.sql": FLAGGED_ORDER_SUMMARY,
+    "sql/models/marts/flagged_orders.sql": FLAGGED_ORDERS,
+    "sql/models/marts/flagged_order_summary.sql": FLAGGED_ORDER_SUMMARY,
 }
 FLAGGED_AUDITS: dict[str, str] = {
-    "models/marts/_sqlbuild/_audits/generic/flag_check.sql": (
+    "sql/models/marts/_sqlbuild/_audits/generic/flag_check.sql": (
         "AUDIT ();\n\nSELECT *\nFROM @relation\nWHERE @where_condition AND order_id IS NULL\n"
     ),
-    "models/marts/flagged_orders.sql": FLAGGED_ORDERS.replace(
+    "sql/models/marts/flagged_orders.sql": FLAGGED_ORDERS.replace(
         "is_flagged (type BOOLEAN)",
         "is_flagged (type BOOLEAN, audits [flag_check "
         "(where_condition \"is_flagged = TRUE AND 'is_flagged' <> ''\")])",
@@ -298,7 +302,7 @@ FLAGGED_AUDITS: dict[str, str] = {
         "  ),\n);",
         '  ),\n  audits [flag_check (name "orders_flag", where_condition "NOT is_flagged")],\n);',
     ),
-    "models/marts/flagged_order_summary.sql": FLAGGED_ORDER_SUMMARY.replace(
+    "sql/models/marts/flagged_order_summary.sql": FLAGGED_ORDER_SUMMARY.replace(
         "  materialized table,\n",
         '  materialized table,\n  audits [flag_check (where_condition "is_flagged IS NULL")],\n',
     ),
@@ -307,12 +311,12 @@ _FLAG_CHECK: str = (
     "AUDIT ();\n\nSELECT *\nFROM @relation\nWHERE @where_condition AND order_id IS NULL\n"
 )
 FLAGGED_SUBQUERY_AUDITS: dict[str, str] = {
-    "models/marts/_sqlbuild/_audits/generic/flag_check.sql": _FLAG_CHECK,
-    "models/marts/vip_flags.sql": (
+    "sql/models/marts/_sqlbuild/_audits/generic/flag_check.sql": _FLAG_CHECK,
+    "sql/models/marts/vip_flags.sql": (
         'MODEL (description "VIP flags", materialized table);\n'
         "SELECT CAST(TRUE AS BOOLEAN) AS is_flagged\n"
     ),
-    "models/marts/flagged_orders.sql": FLAGGED_ORDERS.replace(
+    "sql/models/marts/flagged_orders.sql": FLAGGED_ORDERS.replace(
         "  ),\n);",
         "  ),\n  audits [\n"
         '    flag_check (name "vip_flag", where_condition '
@@ -324,7 +328,7 @@ FLAGGED_SUBQUERY_AUDITS: dict[str, str] = {
 }
 FLAGGED_USING_AUDIT: dict[str, str] = {
     **FLAGGED_SUBQUERY_AUDITS,
-    "models/marts/flagged_orders.sql": FLAGGED_ORDERS.replace(
+    "sql/models/marts/flagged_orders.sql": FLAGGED_ORDERS.replace(
         "  ),\n);",
         "  ),\n  audits [\n"
         '    flag_check (name "joined_flag", where_condition '
@@ -334,8 +338,8 @@ FLAGGED_USING_AUDIT: dict[str, str] = {
     ),
 }
 FLAGGED_LAMBDA_AUDIT: dict[str, str] = {
-    "models/marts/_sqlbuild/_audits/generic/flag_check.sql": _FLAG_CHECK,
-    "models/marts/flagged_orders.sql": FLAGGED_ORDERS.replace(
+    "sql/models/marts/_sqlbuild/_audits/generic/flag_check.sql": _FLAG_CHECK,
+    "sql/models/marts/flagged_orders.sql": FLAGGED_ORDERS.replace(
         "  ),\n);",
         "  ),\n  audits [\n"
         '    flag_check (name "lambda_flag", where_condition '
@@ -344,19 +348,19 @@ FLAGGED_LAMBDA_AUDIT: dict[str, str] = {
     ),
 }
 FLAGGED_LITERAL_AUDIT: dict[str, str] = {
-    "models/marts/_sqlbuild/_audits/generic/prefix_check.sql": (
+    "sql/models/marts/_sqlbuild/_audits/generic/prefix_check.sql": (
         "AUDIT ();\n\nSELECT *\nFROM @relation\nWHERE @'prefix' = ''\n"
     ),
-    "models/marts/flagged_orders.sql": FLAGGED_ORDERS.replace(
+    "sql/models/marts/flagged_orders.sql": FLAGGED_ORDERS.replace(
         "  ),\n);", '  ),\n  audits [prefix_check (prefix "is_flagged")],\n);'
     ),
 }
 ORDERS_MACRO: dict[str, str] = {
     "sqlbuild_project.toml": _PROJECT_TOML + "\n[references]\nenforce_explicit = false\n",
-    "models/staging/_sqlbuild/_macros/python/orders.py": (
+    "sql/models/staging/_sqlbuild/_macros/python/orders.py": (
         "def staged_orders() -> str:\n    return '__ref(\"stg_orders\")'\n"
     ),
-    "models/staging/stg_order_count.sql": (
+    "sql/models/staging/stg_order_count.sql": (
         "MODEL (description 'Test model stg_order_count.',\n  materialized view,\n);\n\n"
         "SELECT COUNT(*) AS order_count\nFROM @py.staged_orders()\n"
     ),
@@ -389,7 +393,7 @@ def order_history_files(*, materialized: str, udf: bool) -> dict[str, str]:
     """Return an order_history model, optionally calling a UDF discovery cannot fingerprint."""
 
     return {
-        "models/marts/order_history.sql": (
+        "sql/models/marts/order_history.sql": (
             "MODEL (description 'Test model order_history.',"
             f"\n{_HISTORY_HEADERS[materialized]});\n\n"
             f"SELECT\n  order_id,\n  amount,\n  order_date{_UDF_COLUMN[udf]}\n"
@@ -415,9 +419,9 @@ def order_history_copy() -> dict[str, str]:
     """Return a second model with exactly the order_history definition."""
 
     return {
-        "models/marts/order_history_copy.sql": order_history_files(
+        "sql/models/marts/order_history_copy.sql": order_history_files(
             materialized="incremental", udf=False
-        )["models/marts/order_history.sql"]
+        )["sql/models/marts/order_history.sql"]
     }
 
 
@@ -462,7 +466,7 @@ def drop_view_outside_sqlbuild(*, project_dir: Path, name: str) -> None:
 def declare_missing_column_origin(*, project_dir: Path) -> None:
     """Add a revenue column that declares migrate_from a column the table never had."""
 
-    path: Path = project_dir / "models/marts/order_history.sql"
+    path: Path = project_dir / "sql/models/marts/order_history.sql"
     contents: str = path.read_text(encoding="utf-8")
     _ = path.write_text(
         contents.replace(
@@ -523,11 +527,11 @@ def project_text(project_dir: Path) -> dict[str, str]:
 
     paths: tuple[Path, ...] = (
         project_dir / "sqlbuild_project.toml",
-        *project_dir.glob("sources/*.yml"),
-        *project_dir.glob("seeds/*.yml"),
-        *project_dir.glob("models/**/*.sql"),
-        *project_dir.glob("models/**/*.py"),
-        *project_dir.glob("functions/**/*.sql"),
+        *project_dir.glob("sql/sources/*.yml"),
+        *project_dir.glob("sql/seeds/*.yml"),
+        *project_dir.glob("sql/models/**/*.sql"),
+        *project_dir.glob("sql/models/**/*.py"),
+        *project_dir.glob("sql/functions/**/*.sql"),
         *project_dir.glob("tests/**/*.sql"),
     )
     return {
@@ -606,7 +610,7 @@ def run_printed_command(command: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-CENTS_CHECK: str = "python/checks/order_cents.py"
+CENTS_CHECK: str = "python/nodes/checks/order_cents/checks.py"
 
 
 def cents_check(imports: str, body: str = '    assert to_cents("1")\n') -> dict[str, str]:
@@ -662,24 +666,24 @@ OVER_FULL_STAGING: dict[str, str] = {
     + "[rules.thresholds]\nmin_custom_rule_test_cases = 0\n",
     "rules/layout.py": _FOLDER_LIMIT_RULE,
     **{
-        f"models/staging/stg_order_{name}.sql": layout_view(f"stg_order_{name}")
+        f"sql/models/staging/stg_order_{name}.sql": layout_view(f"stg_order_{name}")
         for name in ("lines", "refunds", "returns", "notes")
     },
 }
 _DOMAIN_RULES: str = '\n[rules]\nselect = ["SQBRPROJECT202"]\ndomains = ["orders"]\n'
 MIXED_OWNER: dict[str, str] = {
     "sqlbuild_project.toml": project_toml() + _DOMAIN_RULES,
-    "models/orders/staging/orders__stg__lines.sql": layout_view(
+    "sql/models/orders/staging/orders__stg__lines.sql": layout_view(
         "orders__stg__lines", '__source("raw_orders")'
     ),
-    "models/orders/staging/orders__stg__refunds.sql": layout_view(
+    "sql/models/orders/staging/orders__stg__refunds.sql": layout_view(
         "orders__stg__refunds", '__source("raw_orders")'
     ),
-    "models/orders/staging/web/orders__stg__web_lines.sql": layout_view(
+    "sql/models/orders/staging/web/orders__stg__web_lines.sql": layout_view(
         "orders__stg__web_lines", '__source("raw_orders")'
     ),
 }
-MIXED_OWNER_CHILD: str = "models/orders/staging/core/"
+MIXED_OWNER_CHILD: str = "sql/models/orders/staging/core/"
 
 RESERVED_CTE_FACT_ORDERS: str = (
     "MODEL (description 'Test model.',\n  materialized table,\n);\n\n"
@@ -692,7 +696,7 @@ SIBLING_OWNERS: dict[str, str] = {
     + '\n[rules]\nselect = ["SQBRPROJECT204"]\ndomains = ["orders"]\n\n'
     + "[rules.thresholds]\nmin_shared_owner_prefix_directories = 2\n",
     **{
-        f"models/orders/staging/{folder}/orders__stg__{name}.sql": layout_view(
+        f"sql/models/orders/staging/{folder}/orders__stg__{name}.sql": layout_view(
             f"orders__stg__{name}", '__source("raw_orders")'
         )
         for folder, name in (("fin_a", "a"), ("fin_b", "b"), ("core", "c"))

@@ -33,7 +33,7 @@ PROJECT_FILES: dict[str, str] = {
         'connection = "local"\n'
         'schema = "dev"\n'
     ),
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         'MODEL (\n  description "One row per order",\n  materialized table,\n);\n\n'
         "SELECT 1 AS order_id, CAST('2026-04-01' AS DATE) AS ordered_on\n"
     ),
@@ -130,7 +130,7 @@ def write_linked_project(project_dir: Path) -> Path:
     """Put the model behind a file link to an external input."""
 
     project: Path = write_project(project_dir)
-    model: Path = project / "models" / "orders.sql"
+    model: Path = project / "sql" / "models" / "orders.sql"
     target: Path = project.parent / "linked_orders.sql"
     _ = model.replace(target)
     model.symlink_to(target)
@@ -140,7 +140,7 @@ def write_linked_project(project_dir: Path) -> Path:
 def rewrite_model_preserving_mtime(project_dir: Path) -> None:
     """Change equal-length SQL bytes, including through a link, without changing mtime."""
 
-    model: Path = project_dir / "models" / "orders.sql"
+    model: Path = project_dir / "sql" / "models" / "orders.sql"
     original: os.stat_result = model.stat()
     _ = model.write_text(model.read_text().replace("1 AS order_id", "2 AS order_id"))
     os.utime(model, ns=(original.st_atime_ns, original.st_mtime_ns))
@@ -189,8 +189,8 @@ def startup_install(directory: Path) -> tuple[Path, Path, Path]:
     )
     old: Path = directory.parent / "old_helpers"
     new: Path = directory.parent / "new_helpers"
-    old.mkdir()
-    new.mkdir()
+    old.mkdir(parents=True)
+    new.mkdir(parents=True)
     _ = (old / "catalog_helper.py").write_text("SQL = '1'\n", encoding="utf-8")
     _ = (new / "catalog_helper.py").write_text("SQL = '2'\n", encoding="utf-8")
     startup: Path = site_packages / "catalog.pth"
@@ -284,7 +284,7 @@ def prepare_custom_rules(directory: Path) -> None:
     """Write the project with a custom rules directory."""
 
     _ = write_project(directory)
-    (directory / "rules").mkdir()
+    (directory / "rules").mkdir(parents=True)
 
 
 def prepare_removed_allow_exceptions(directory: Path) -> None:
@@ -349,13 +349,13 @@ def write_janitor_project(project_dir: Path, *, extra_toml: str) -> Path:
     """Write a DuckDB project with one model, janitor left disabled, and extra settings."""
 
     project_dir.mkdir(parents=True, exist_ok=True)
-    (project_dir / "models").mkdir(exist_ok=True)
+    (project_dir / "sql" / "models").mkdir(parents=True, exist_ok=True)
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "orders_shop"\nadapter = "duckdb"\n\n[connection]\n'
         f'database = "orders.duckdb"\n{extra_toml}',
         encoding="utf-8",
     )
-    (project_dir / "models" / "orders.sql").write_text(
+    (project_dir / "sql" / "models" / "orders.sql").write_text(
         "MODEL (description 'Orders.');\n\nSELECT 1 AS order_id\n", encoding="utf-8"
     )
     return project_dir

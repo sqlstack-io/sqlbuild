@@ -3,6 +3,7 @@ from typing import overload
 
 from sqlbuild._native import SourceColumnEntry
 from sqlbuild.python_nodes.models import LoaderDefinition as LoaderDefinition
+from sqlbuild.python_nodes.models import NodeSetRef
 from sqlbuild.python_nodes.types import LoaderColumnSpec
 
 @overload
@@ -11,7 +12,8 @@ def loader(function: Callable[..., object]) -> Callable[..., object]: ...
 def loader(
     *,
     name: str | None = None,
-    depends_on: tuple[Callable[..., object], ...] | list[Callable[..., object]] = (),
+    depends_on: tuple[Callable[..., object] | NodeSetRef, ...]
+    | list[Callable[..., object] | NodeSetRef] = (),
     destination: str | None = None,
     write_strategy: str | None = None,
     cursor_column: str | None = None,

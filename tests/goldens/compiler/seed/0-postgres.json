@@ -12,20 +12,20 @@
   }
  ],
  "compiled": {
-  "audits/generic/checked_stg_fulfillment_1/accepted_values__status.sql": [
+  "sql/audits/generic/checked_stg_fulfillment_1/accepted_values__status.sql": [
    "SELECT status",
    "FROM __ref(\"checked_stg_fulfillment_1\")",
    "WHERE status IS NOT NULL",
    "  AND status NOT IN ('placed', 'expédié', '取消', 'returned ✓')",
    ""
   ],
-  "audits/generic/checked_stg_fulfillment_1/expression_is_true.sql": [
+  "sql/audits/generic/checked_stg_fulfillment_1/expression_is_true.sql": [
    "SELECT *",
    "FROM __ref(\"checked_stg_fulfillment_1\")",
    "WHERE NOT (amount >= -1000)",
    ""
   ],
-  "audits/generic/checked_stg_fulfillment_1/relationships__id.sql": [
+  "sql/audits/generic/checked_stg_fulfillment_1/relationships__id.sql": [
    "SELECT id",
    "FROM __ref(\"checked_stg_fulfillment_1\")",
    "WHERE id IS NOT NULL",
@@ -36,43 +36,43 @@
    "  )",
    ""
   ],
-  "audits/generic/fulfillment_summary_1/not_null__id.sql": [
+  "sql/audits/generic/fulfillment_summary_1/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"fulfillment_summary_1\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/sales_summary_0/not_null__id.sql": [
+  "sql/audits/generic/sales_summary_0/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"sales_summary_0\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/sales_summary_2/not_null__id.sql": [
+  "sql/audits/generic/sales_summary_2/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"sales_summary_2\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/stg_fulfillment_0/not_null__id.sql": [
+  "sql/audits/generic/stg_fulfillment_0/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"stg_fulfillment_0\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/stg_sales_0/not_null__id.sql": [
+  "sql/audits/generic/stg_sales_0/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"stg_sales_0\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/stg_sales_1/not_null__id.sql": [
+  "sql/audits/generic/stg_sales_1/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"stg_sales_1\")",
    "WHERE id IS NULL",
    ""
   ],
-  "functions/sql/scaled_amount.sql": [
+  "sql/functions/sql/scaled_amount.sql": [
    "CREATE OR REPLACE FUNCTION analytics.scaled_amount(p_amount DOUBLE, p_factor INTEGER)",
    "RETURNS DOUBLE",
    "LANGUAGE SQL AS $$",
@@ -80,7 +80,7 @@
    "$$",
    ""
   ],
-  "functions/sql/table_fn__amount_bands.sql": [
+  "sql/functions/sql/table_fn__amount_bands.sql": [
    "CREATE OR REPLACE FUNCTION analytics.table_fn__amount_bands(p_floor DOUBLE)",
    "RETURNS TABLE (id INTEGER, band VARCHAR)",
    "LANGUAGE SQL AS $$",
@@ -90,32 +90,32 @@
    "$$",
    ""
   ],
-  "models/analysis/banded_amounts.sql": [
+  "sql/models/analysis/banded_amounts.sql": [
    "SELECT bands.id, bands.band",
    "FROM __table_fn(\"table_fn__amount_bands\")(2.5) AS bands",
    ""
   ],
-  "models/analysis/chain_1_stg_sales_0.sql": [
+  "sql/models/analysis/chain_1_stg_sales_0.sql": [
    "SELECT id, label, amount",
    "FROM __ref(\"contracted_stg_sales_0\")",
    ""
   ],
-  "models/analysis/chain_2_stg_sales_0.sql": [
+  "sql/models/analysis/chain_2_stg_sales_0.sql": [
    "SELECT id, UPPER(label) AS label, amount",
    "FROM __ref(\"chain_1_stg_sales_0\")",
    ""
   ],
-  "models/analysis/chain_3_stg_sales_0.sql": [
+  "sql/models/analysis/chain_3_stg_sales_0.sql": [
    "SELECT id, label, amount",
    "FROM __ref(\"chain_2_stg_sales_0\")",
    ""
   ],
-  "models/analysis/checked_stg_fulfillment_1.sql": [
+  "sql/models/analysis/checked_stg_fulfillment_1.sql": [
    "SELECT id, amount, status",
    "FROM __ref(\"stg_fulfillment_1\")",
    ""
   ],
-  "models/analysis/combined_stg_fulfillment_0.sql": [
+  "sql/models/analysis/combined_stg_fulfillment_0.sql": [
    "WITH recent AS (",
    "  SELECT id, created_at FROM __ref(\"stg_fulfillment_0\") WHERE amount > 0",
    "),",
@@ -127,28 +127,28 @@
    "SELECT id, created_at FROM older",
    ""
   ],
-  "models/analysis/contracted_stg_sales_0.sql": [
+  "sql/models/analysis/contracted_stg_sales_0.sql": [
    "SELECT CAST(id AS INTEGER) AS id, CAST(status AS VARCHAR(19)) AS label,",
    "  amount",
    "FROM __source(\"raw_events_0\")",
    ""
   ],
-  "models/analysis/every_open_event.sql": [
+  "sql/models/analysis/every_open_event.sql": [
    "SELECT *",
    "FROM __source(\"open_events\")",
    ""
   ],
-  "models/analysis/every_raw_events_0.sql": [
+  "sql/models/analysis/every_raw_events_0.sql": [
    "SELECT *",
    "FROM __source(\"raw_events_0\")",
    ""
   ],
-  "models/analysis/every_stg_fulfillment_0.sql": [
+  "sql/models/analysis/every_stg_fulfillment_0.sql": [
    "SELECT *",
    "FROM __ref(\"stg_fulfillment_0\")",
    ""
   ],
-  "models/analysis/passed_stg_fulfillment_0.sql": [
+  "sql/models/analysis/passed_stg_fulfillment_0.sql": [
    "WITH passthrough AS (",
    "  SELECT id, created_at FROM __ref(\"stg_fulfillment_0\")",
    ")",
@@ -156,29 +156,29 @@
    "FROM passthrough",
    ""
   ],
-  "models/analysis/regional_stg_fulfillment_1.sql": [
+  "sql/models/analysis/regional_stg_fulfillment_1.sql": [
    "SELECT id, amount, 'east' AS region",
    "FROM __ref(\"stg_fulfillment_1\")",
    ""
   ],
-  "models/analysis/scaled_stg_fulfillment_0.sql": [
+  "sql/models/analysis/scaled_stg_fulfillment_0.sql": [
    "SELECT id, __udf(\"scaled_amount\")(amount, 2) AS scaled_amount",
    "FROM __ref(\"stg_fulfillment_0\")",
    ""
   ],
-  "models/analysis/typed_stg_fulfillment_0.sql": [
+  "sql/models/analysis/typed_stg_fulfillment_0.sql": [
    "SELECT id, amount * 2 AS doubled_amount, CAST(status AS VARCHAR) AS status_text,",
    "  created_at, NULL AS missing_note",
    "FROM __ref(\"stg_fulfillment_0\")",
    ""
   ],
-  "models/analysis/unanalysed_stg_fulfillment_0.sql": [
+  "sql/models/analysis/unanalysed_stg_fulfillment_0.sql": [
    "SELECT a.id, a.amount",
    "FROM __ref(\"stg_fulfillment_0\") AS a",
    "JOIN __ref(\"stg_fulfillment_0\") AS b NEAREST 1 BY DISTANCE abs(a.amount - b.amount)",
    ""
   ],
-  "models/fulfillment/marts/fulfillment_summary_0.sql": [
+  "sql/models/fulfillment/marts/fulfillment_summary_0.sql": [
    "SELECT",
    "  t.id,",
    "  t.amount,",
@@ -191,7 +191,7 @@
    "LEFT JOIN __seed(\"lookup_1\") j2 ON t.id = j2.id",
    ""
   ],
-  "models/fulfillment/marts/fulfillment_summary_1.sql": [
+  "sql/models/fulfillment/marts/fulfillment_summary_1.sql": [
    "SELECT",
    "  t.id,",
    "  t.amount,",
@@ -200,7 +200,7 @@
    "FROM __ref(\"stg_fulfillment_0\") t",
    ""
   ],
-  "models/fulfillment/marts/fulfillment_summary_2.sql": [
+  "sql/models/fulfillment/marts/fulfillment_summary_2.sql": [
    "SELECT",
    "  t.id,",
    "  t.amount,",
@@ -213,7 +213,7 @@
    "LEFT JOIN __seed(\"lookup_0\") j1 ON t.id = j1.id",
    ""
   ],
-  "models/fulfillment/staging/stg_fulfillment_0.sql": [
+  "sql/models/fulfillment/staging/stg_fulfillment_0.sql": [
    "SELECT",
    "  t.id,",
    "  t.amount,",
@@ -224,7 +224,7 @@
    "FROM __source(\"raw_events_1\") t",
    ""
   ],
-  "models/fulfillment/staging/stg_fulfillment_1.sql": [
+  "sql/models/fulfillment/staging/stg_fulfillment_1.sql": [
    "SELECT",
    "  t.id,",
    "  t.amount,",
@@ -236,7 +236,7 @@
    "WHERE t.status <> 'expédié'",
    ""
   ],
-  "models/sales/marts/sales_summary_0.sql": [
+  "sql/models/sales/marts/sales_summary_0.sql": [
    "SELECT",
    "  t.id,",
    "  t.amount,",
@@ -248,7 +248,7 @@
    "LEFT JOIN __seed(\"lookup_1\") j1 ON t.id = j1.id",
    ""
   ],
-  "models/sales/marts/sales_summary_1.sql": [
+  "sql/models/sales/marts/sales_summary_1.sql": [
    "SELECT",
    "  t.id,",
    "  t.amount,",
@@ -261,7 +261,7 @@
    "WHERE t.status <> '取消'",
    ""
   ],
-  "models/sales/marts/sales_summary_2.sql": [
+  "sql/models/sales/marts/sales_summary_2.sql": [
    "SELECT",
    "  t.id,",
    "  t.amount,",
@@ -275,7 +275,7 @@
    "LEFT JOIN __seed(\"lookup_1\") j2 ON t.id = j2.id",
    ""
   ],
-  "models/sales/staging/stg_sales_0.sql": [
+  "sql/models/sales/staging/stg_sales_0.sql": [
    "SELECT",
    "  t.id,",
    "  t.amount,",
@@ -286,7 +286,7 @@
    "FROM __source(\"raw_events_0\") t",
    ""
   ],
-  "models/sales/staging/stg_sales_1.sql": [
+  "sql/models/sales/staging/stg_sales_1.sql": [
    "SELECT",
    "  t.id,",
    "  t.amount,",
@@ -331,8 +331,8 @@
     "name": "banded_amounts",
     "resource_type": "model",
     "package_name": "generated_0",
-    "path": "models/analysis/banded_amounts.sql",
-    "original_file_path": "models/analysis/banded_amounts.sql",
+    "path": "sql/models/analysis/banded_amounts.sql",
+    "original_file_path": "sql/models/analysis/banded_amounts.sql",
     "unique_id": "model.generated_0.banded_amounts",
     "fqn": [
      "generated_0",
@@ -400,8 +400,8 @@
     "name": "chain_1_stg_sales_0",
     "resource_type": "model",
     "package_name": "generated_0",
-    "path": "models/analysis/chain_1_stg_sales_0.sql",
-    "original_file_path": "models/analysis/chain_1_stg_sales_0.sql",
+    "path": "sql/models/analysis/chain_1_stg_sales_0.sql",
+    "original_file_path": "sql/models/analysis/chain_1_stg_sales_0.sql",
     "unique_id": "model.generated_0.chain_1_stg_sales_0",
     "fqn": [
      "generated_0",
@@ -469,8 +469,8 @@
     "name": "chain_2_stg_sales_0",
     "resource_type": "model",
     "package_name": "generated_0",
-    "path": "models/analysis/chain_2_stg_sales_0.sql",
-    "original_file_path": "models/analysis/chain_2_stg_sales_0.sql",
+    "path": "sql/models/analysis/chain_2_stg_sales_0.sql",
+    "original_file_path": "sql/models/analysis/chain_2_stg_sales_0.sql",
     "unique_id": "model.generated_0.chain_2_stg_sales_0",
     "fqn": [
      "generated_0",
@@ -538,8 +538,8 @@
     "name": "chain_3_stg_sales_0",
     "resource_type": "model",
     "package_name": "generated_0",
-    "path": "models/analysis/chain_3_stg_sales_0.sql",
-    "original_file_path": "models/analysis/chain_3_stg_sales_0.sql",
+    "path": "sql/models/analysis/chain_3_stg_sales_0.sql",
+    "original_file_path": "sql/models/analysis/chain_3_stg_sales_0.sql",
     "unique_id": "model.generated_0.chain_3_stg_sales_0",
     "fqn": [
      "generated_0",
@@ -607,8 +607,8 @@
     "name": "checked_stg_fulfillment_1",
     "resource_type": "model",
     "package_name": "generated_0",
-    "path": "models/analysis/checked_stg_fulfillment_1.sql",
-    "original_file_path": "models/analysis/checked_stg_fulfillment_1.sql",
+    "path": "sql/models/analysis/checked_stg_fulfillment_1.sql",
+    "original_file_path": "sql/models/analysis/checked_stg_fulfillment_1.sql",
     "unique_id": "model.generated_0.checked_stg_fulfillment_1",
     "fqn": [
      "generated_0",
@@ -697,8 +697,8 @@
     "name": "combined_stg_fulfillment_0",
     "resource_type": "model",
     "package_name": "generated_0",
-    "path": "models/analysis/combined_stg_fulfillment_0.sql",
-    "original_file_path": "models/analysis/combined_stg_fulfillment_0.sql",
+    "path": "sql/models/analysis/combined_stg_fulfillment_0.sql",
+    "original_file_path": "sql/models/analysis/combined_stg_fulfillment_0.sql",
     "unique_id": "model.generated_0.combined_stg_fulfillment_0",
     "fqn": [
      "generated_0",
@@ -767,8 +767,8 @@
     "name": "contracted_stg_sales_0",
     "resource_type": "model",
     "package_name": "generated_0",
-    "path": "models/analysis/contracted_stg_sales_0.sql",
-    "original_file_path": "models/analysis/contracted_stg_sales_0.sql",
+    "path": "sql/models/analysis/contracted_stg_sales_0.sql",
+    "original_file_path": "sql/models/analysis/contracted_stg_sales_0.sql",
     "unique_id": "model.generated_0.contracted_stg_sales_0",
     "fqn": [
      "generated_0",
@@ -864,8 +864,8 @@
     "name": "every_open_event",
     "resource_type": "model",
     "package_name": "generated_0",
-    "path": "models/analysis/every_open_event.sql",
-    "original_file_path": "models/analysis/every_open_event.sql",
+    "path": "sql/models/analysis/every_open_event.sql",
+    "original_file_path": "sql/models/analysis/every_open_event.sql",
     "unique_id": "model.generated_0.every_open_event",
     "fqn": [
      "generated_0",
@@ -933,8 +933,8 @@
     "name": "every_raw_events_0",
     "resource_type": "model",
     "package_name": "generated_0",
-    "path": "models/analysis/every_raw_events_0.sql",
-    "original_file_path": "models/analysis/every_raw_events_0.sql",
+    "path": "sql/models/analysis/every_raw_events_0.sql",
+    "original_file_path": "sql/models/analysis/every_raw_events_0.sql",
     "unique_id": "model.generated_0.every_raw_events_0",
     "fqn": [
      "generated_0",
@@ -1002,8 +1002,8 @@
     "name": "every_stg_fulfillment_0",
     "resource_type": "model",
     "package_name": "generated_0",
-    "path": "models/analysis/every_stg_fulfillment_0.sql",
-    "original_file_path": "models/analysis/every_stg_fulfillment_0.sql",
+    "path": "sql/models/analysis/every_stg_fulfillment_0.sql",
+    "original_file_path": "sql/models/analysis/every_stg_fulfillment_0.sql",
     "unique_id": "model.generated_0.every_stg_fulfillment_0",
     "fqn": [
      "generated_0",
@@ -1071,8 +1071,8 @@
     "name": "passed_stg_fulfillment_0",
     "resource_type": "model",
     "package_name": "generated_0",
-    "path": "models/analysis/passed_stg_fulfillment_0.sql",
-    "original_file_path": "models/analysis/passed_stg_fulfillment_0.sql",
+    "path": "sql/models/analysis/passed_stg_fulfillment_0.sql",
+    "original_file_path": "sql/models/analysis/passed_stg_fulfillment_0.sql",
     "unique_id": "model.generated_0.passed_stg_fulfillment_0",
     "fqn": [
      "generated_0",
@@ -1140,8 +1140,8 @@
     "name": "regional_stg_fulfillment_1",
     "resource_type": "model",
     "package_name": "generated_0",
-    "path": "models/analysis/regional_stg_fulfillment_1.sql",
-    "original_file_path": "models/analysis/regional_stg_fulfillment_1.sql",
+    "path": "sql/models/analysis/regional_stg_fulfillment_1.sql",
+    "original_file_path": "sql/models/analysis/regional_stg_fulfillment_1.sql",
     "unique_id": "model.generated_0.regional_stg_fulfillment_1",
     "fqn": [
      "generated_0",
@@ -1209,8 +1209,8 @@
     "name": "scaled_stg_fulfillment_0",
     "resource_type": "model",
     "package_name": "generated_0",
-    "path": "models/analysis/scaled_stg_fulfillment_0.sql",
-    "original_file_path": "models/analysis/scaled_stg_fulfillment_0.sql",
+    "path": "sql/models/analysis/scaled_stg_fulfillment_0.sql",
+    "original_file_path": "sql/models/analysis/scaled_stg_fulfillment_0.sql",
     "unique_id": "model.generated_0.scaled_stg_fulfillment_0",
     "fqn": [
      "generated_0",
@@ -1279,8 +1279,8 @@
     "name": "typed_stg_fulfillment_0",
     "resource_type": "model",
     "package_name": "generated_0",
-    "path": "models/analysis/typed_stg_fulfillment_0.sql",
-    "original_file_path": "models/analysis/typed_stg_fulfillment_0.sql",
+    "path": "sql/models/analysis/typed_stg_fulfillment_0.sql",
+    "original_file_path": "sql/models/analysis/typed_stg_fulfillment_0.sql",
     "unique_id": "model.generated_0.typed_stg_fulfillment_0",
     "fqn": [
      "generated_0",
@@ -1348,8 +1348,8 @@
     "name": "unanalysed_stg_fulfillment_0",
     "resource_type": "model",
     "package_name": "generated_0",
-    "path": "models/analysis/unanalysed_stg_fulfillment_0.sql",
-    "original_file_path": "models/analysis/unanalysed_stg_fulfillment_0.sql",
+    "path": "sql/models/analysis/unanalysed_stg_fulfillment_0.sql",
+    "original_file_path": "sql/models/analysis/unanalysed_stg_fulfillment_0.sql",
     "unique_id": "model.generated_0.unanalysed_stg_fulfillment_0",
     "fqn": [
      "generated_0",
@@ -1417,8 +1417,8 @@
     "name": "fulfillment_summary_0",
     "resource_type": "model",
     "package_name": "generated_0",
-    "path": "models/fulfillment/marts/fulfillment_summary_0.sql",
-    "original_file_path": "models/fulfillment/marts/fulfillment_summary_0.sql",
+    "path": "sql/models/fulfillment/marts/fulfillment_summary_0.sql",
+    "original_file_path": "sql/models/fulfillment/marts/fulfillment_summary_0.sql",
     "unique_id": "model.generated_0.fulfillment_summary_0",
     "fqn": [
      "generated_0",
@@ -1489,8 +1489,8 @@
     "name": "fulfillment_summary_1",
     "resource_type": "model",
     "package_name": "generated_0",
-    "path": "models/fulfillment/marts/fulfillment_summary_1.sql",
-    "original_file_path": "models/fulfillment/marts/fulfillment_summary_1.sql",
+    "path": "sql/models/fulfillment/marts/fulfillment_summary_1.sql",
+    "original_file_path": "sql/models/fulfillment/marts/fulfillment_summary_1.sql",
     "unique_id": "model.generated_0.fulfillment_summary_1",
     "fqn": [
      "generated_0",
@@ -1563,7 +1563,7 @@
          "type": "sql",
          "statement": "SELECT 'analytics.fulfillment_summary_1' AS refreshed_relation, 'Ελληνικά orders' AS refresh_label",
          "name": "record_refresh",
-         "relative_path": "hooks/sql/record_refresh.sql",
+         "relative_path": "sql/hooks/sql/record_refresh.sql",
          "definition_sql": "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label",
          "kwargs": {
           "relation": "@@CTX:destination.qualified",
@@ -1603,8 +1603,8 @@
     "name": "fulfillment_summary_2",
     "resource_type": "model",
     "package_name": "generated_0",
-    "path": "models/fulfillment/marts/fulfillment_summary_2.sql",
-    "original_file_path": "models/fulfillment/marts/fulfillment_summary_2.sql",
+    "path": "sql/models/fulfillment/marts/fulfillment_summary_2.sql",
+    "original_file_path": "sql/models/fulfillment/marts/fulfillment_summary_2.sql",
     "unique_id": "model.generated_0.fulfillment_summary_2",
     "fqn": [
      "generated_0",
@@ -1667,7 +1667,7 @@
          "type": "sql",
          "statement": "SELECT 'analytics.fulfillment_summary_2' AS refreshed_relation, 'café ☕ counter' AS refresh_label",
          "name": "record_refresh",
-         "relative_path": "hooks/sql/record_refresh.sql",
+         "relative_path": "sql/hooks/sql/record_refresh.sql",
          "definition_sql": "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label",
          "kwargs": {
           "relation": "@@CTX:destination.qualified",
@@ -1708,8 +1708,8 @@
     "name": "stg_fulfillment_0",
     "resource_type": "model",
     "package_name": "generated_0",
-    "path": "models/fulfillment/staging/stg_fulfillment_0.sql",
-    "original_file_path": "models/fulfillment/staging/stg_fulfillment_0.sql",
+    "path": "sql/models/fulfillment/staging/stg_fulfillment_0.sql",
+    "original_file_path": "sql/models/fulfillment/staging/stg_fulfillment_0.sql",
     "unique_id": "model.generated_0.stg_fulfillment_0",
     "fqn": [
      "generated_0",
@@ -1792,8 +1792,8 @@
     "name": "stg_fulfillment_1",
     "resource_type": "model",
     "package_name": "generated_0",
-    "path": "models/fulfillment/staging/stg_fulfillment_1.sql",
-    "original_file_path": "models/fulfillment/staging/stg_fulfillment_1.sql",
+    "path": "sql/models/fulfillment/staging/stg_fulfillment_1.sql",
+    "original_file_path": "sql/models/fulfillment/staging/stg_fulfillment_1.sql",
     "unique_id": "model.generated_0.stg_fulfillment_1",
     "fqn": [
      "generated_0",
@@ -1866,8 +1866,8 @@
     "name": "sales_summary_0",
     "resource_type": "model",
     "package_name": "generated_0",
-    "path": "models/sales/marts/sales_summary_0.sql",
-    "original_file_path": "models/sales/marts/sales_summary_0.sql",
+    "path": "sql/models/sales/marts/sales_summary_0.sql",
+    "original_file_path": "sql/models/sales/marts/sales_summary_0.sql",
     "unique_id": "model.generated_0.sales_summary_0",
     "fqn": [
      "generated_0",
@@ -1953,8 +1953,8 @@
     "name": "sales_summary_1",
     "resource_type": "model",
     "package_name": "generated_0",
-    "path": "models/sales/marts/sales_summary_1.sql",
-    "original_file_path": "models/sales/marts/sales_summary_1.sql",
+    "path": "sql/models/sales/marts/sales_summary_1.sql",
+    "original_file_path": "sql/models/sales/marts/sales_summary_1.sql",
     "unique_id": "model.generated_0.sales_summary_1",
     "fqn": [
      "generated_0",
@@ -2023,7 +2023,7 @@
          "type": "sql",
          "statement": "SELECT 'analytics.sales_summary_1' AS refreshed_relation, '東京 warehouse' AS refresh_label",
          "name": "record_refresh",
-         "relative_path": "hooks/sql/record_refresh.sql",
+         "relative_path": "sql/hooks/sql/record_refresh.sql",
          "definition_sql": "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label",
          "kwargs": {
           "relation": "@@CTX:destination.qualified",
@@ -2064,8 +2064,8 @@
     "name": "sales_summary_2",
     "resource_type": "model",
     "package_name": "generated_0",
-    "path": "models/sales/marts/sales_summary_2.sql",
-    "original_file_path": "models/sales/marts/sales_summary_2.sql",
+    "path": "sql/models/sales/marts/sales_summary_2.sql",
+    "original_file_path": "sql/models/sales/marts/sales_summary_2.sql",
     "unique_id": "model.generated_0.sales_summary_2",
     "fqn": [
      "generated_0",
@@ -2152,8 +2152,8 @@
     "name": "stg_sales_0",
     "resource_type": "model",
     "package_name": "generated_0",
-    "path": "models/sales/staging/stg_sales_0.sql",
-    "original_file_path": "models/sales/staging/stg_sales_0.sql",
+    "path": "sql/models/sales/staging/stg_sales_0.sql",
+    "original_file_path": "sql/models/sales/staging/stg_sales_0.sql",
     "unique_id": "model.generated_0.stg_sales_0",
     "fqn": [
      "generated_0",
@@ -2236,8 +2236,8 @@
     "name": "stg_sales_1",
     "resource_type": "model",
     "package_name": "generated_0",
-    "path": "models/sales/staging/stg_sales_1.sql",
-    "original_file_path": "models/sales/staging/stg_sales_1.sql",
+    "path": "sql/models/sales/staging/stg_sales_1.sql",
+    "original_file_path": "sql/models/sales/staging/stg_sales_1.sql",
     "unique_id": "model.generated_0.stg_sales_1",
     "fqn": [
      "generated_0",
@@ -2320,8 +2320,8 @@
     "name": "lookup_0",
     "resource_type": "seed",
     "package_name": "generated_0",
-    "path": "seeds/lookup_0.csv",
-    "original_file_path": "seeds/lookup_0.csv",
+    "path": "sql/seeds/lookup_0.csv",
+    "original_file_path": "sql/seeds/lookup_0.csv",
     "unique_id": "seed.generated_0.lookup_0",
     "fqn": [
      "generated_0",
@@ -2405,8 +2405,8 @@
     "name": "lookup_1",
     "resource_type": "seed",
     "package_name": "generated_0",
-    "path": "seeds/lookup_1.csv",
-    "original_file_path": "seeds/lookup_1.csv",
+    "path": "sql/seeds/lookup_1.csv",
+    "original_file_path": "sql/seeds/lookup_1.csv",
     "unique_id": "seed.generated_0.lookup_1",
     "fqn": [
      "generated_0",
@@ -2492,8 +2492,8 @@
     "name": "open_events",
     "resource_type": "source",
     "package_name": "generated_0",
-    "path": "sources/open.yml",
-    "original_file_path": "sources/open.yml",
+    "path": "sql/sources/open.yml",
+    "original_file_path": "sql/sources/open.yml",
     "unique_id": "source.generated_0.open_events",
     "fqn": [
      "generated_0",
@@ -2523,8 +2523,8 @@
     "name": "raw_events_0",
     "resource_type": "source",
     "package_name": "generated_0",
-    "path": "sources/raw.yml",
-    "original_file_path": "sources/raw.yml",
+    "path": "sql/sources/raw.yml",
+    "original_file_path": "sql/sources/raw.yml",
     "unique_id": "source.generated_0.raw_events_0",
     "fqn": [
      "generated_0",
@@ -2591,8 +2591,8 @@
     "name": "raw_events_1",
     "resource_type": "source",
     "package_name": "generated_0",
-    "path": "sources/raw.yml",
-    "original_file_path": "sources/raw.yml",
+    "path": "sql/sources/raw.yml",
+    "original_file_path": "sql/sources/raw.yml",
     "unique_id": "source.generated_0.raw_events_1",
     "fqn": [
      "generated_0",
@@ -2659,8 +2659,8 @@
     "name": "adjust_0",
     "resource_type": "macro",
     "package_name": "generated_0",
-    "path": "macros/python/adjust_0.py",
-    "original_file_path": "macros/python/adjust_0.py",
+    "path": "sql/macros/python/adjust_0.py",
+    "original_file_path": "sql/macros/python/adjust_0.py",
     "unique_id": "macro.generated_0.adjust_0",
     "macro_sql": "def adjust_0_round(expression: str) -> str:\n    \"\"\"Round an amount to two places.\"\"\"\n    return f\"ROUND({expression}, 2)\"\n\n\ndef adjust_0(expression: str) -> str:\n    \"\"\"Double and round an amount.\"\"\"\n    return adjust_0_round(f\"({expression} * 2)\")\n",
     "depends_on": {
@@ -2685,8 +2685,8 @@
     "name": "adjust_0_round",
     "resource_type": "macro",
     "package_name": "generated_0",
-    "path": "macros/python/adjust_0.py",
-    "original_file_path": "macros/python/adjust_0.py",
+    "path": "sql/macros/python/adjust_0.py",
+    "original_file_path": "sql/macros/python/adjust_0.py",
     "unique_id": "macro.generated_0.adjust_0_round",
     "macro_sql": "def adjust_0_round(expression: str) -> str:\n    \"\"\"Round an amount to two places.\"\"\"\n    return f\"ROUND({expression}, 2)\"\n\n\ndef adjust_0(expression: str) -> str:\n    \"\"\"Double and round an amount.\"\"\"\n    return adjust_0_round(f\"({expression} * 2)\")\n",
     "depends_on": {
@@ -2709,8 +2709,8 @@
     "name": "adjust_2",
     "resource_type": "macro",
     "package_name": "generated_0",
-    "path": "macros/python/adjust_2.py",
-    "original_file_path": "macros/python/adjust_2.py",
+    "path": "sql/macros/python/adjust_2.py",
+    "original_file_path": "sql/macros/python/adjust_2.py",
     "unique_id": "macro.generated_0.adjust_2",
     "macro_sql": "def adjust_2(ctx, expression: str) -> str:\n    \"\"\"Scale an amount by the configured discount.\"\"\"\n    rate = ctx.vars[\"discount_rate\"]\n    return f\"({expression} * (1 - {rate}))\"\n",
     "depends_on": {
@@ -2733,8 +2733,8 @@
     "name": "analysis_region",
     "resource_type": "macro",
     "package_name": "generated_0",
-    "path": "models/analysis/_sqlbuild/_macros/python/regions.py",
-    "original_file_path": "models/analysis/_sqlbuild/_macros/python/regions.py",
+    "path": "sql/models/analysis/_sqlbuild/_macros/python/regions.py",
+    "original_file_path": "sql/models/analysis/_sqlbuild/_macros/python/regions.py",
     "unique_id": "macro.generated_0.analysis_region",
     "macro_sql": "def analysis_region() -> str:\n    \"\"\"Return the region rows are assigned to.\"\"\"\n    return \"'east'\"\n",
     "depends_on": {
@@ -2743,7 +2743,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "local",
-     "sqlbuild_scope_path": "models/analysis"
+     "sqlbuild_scope_path": "sql/models/analysis"
     },
     "docs": {
      "show": true,
@@ -2757,8 +2757,8 @@
     "name": "adjust_1",
     "resource_type": "macro",
     "package_name": "generated_0",
-    "path": "models/fulfillment/staging/_sqlbuild/_macros/python/adjust_1.py",
-    "original_file_path": "models/fulfillment/staging/_sqlbuild/_macros/python/adjust_1.py",
+    "path": "sql/models/fulfillment/staging/_sqlbuild/_macros/python/adjust_1.py",
+    "original_file_path": "sql/models/fulfillment/staging/_sqlbuild/_macros/python/adjust_1.py",
     "unique_id": "macro.generated_0.adjust_1",
     "macro_sql": "import os\n\n\ndef adjust_1(expression: str) -> str:\n    \"\"\"Tag an amount with the deployment region.\"\"\"\n    region = os.environ.get(\"SQB_DIFFERENTIAL_REGION\", \"east\")\n    return f\"({expression} + LENGTH('{region}'))\"\n",
     "depends_on": {
@@ -2767,7 +2767,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "local",
-     "sqlbuild_scope_path": "models/fulfillment/staging"
+     "sqlbuild_scope_path": "sql/models/fulfillment/staging"
     },
     "docs": {
      "show": true,
@@ -2781,8 +2781,8 @@
     "name": "record_refresh",
     "resource_type": "macro",
     "package_name": "generated_0__sqlbuild_hooks",
-    "path": "hooks/sql/record_refresh.sql",
-    "original_file_path": "hooks/sql/record_refresh.sql",
+    "path": "sql/hooks/sql/record_refresh.sql",
+    "original_file_path": "sql/hooks/sql/record_refresh.sql",
     "unique_id": "macro.generated_0__sqlbuild_hooks.record_refresh",
     "macro_sql": "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label",
     "depends_on": {

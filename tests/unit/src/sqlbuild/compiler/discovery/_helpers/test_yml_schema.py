@@ -84,7 +84,7 @@ def test_given_schema_yaml_variants_when_parsing_then_it_returns_expected_raw_me
     model_entries: tuple[SchemaModelEntry, ...]
     seed_entries: tuple[SchemaSeedEntry, ...]
     model_entries, seed_entries = parse_schema_yml(
-        contents=test_case.contents, file_path=Path("seeds/lookups.yml")
+        contents=test_case.contents, file_path=Path("sql/seeds/lookups.yml")
     )
 
     assert tuple(entry.name for entry in model_entries) == test_case.expected_model_names
@@ -179,7 +179,7 @@ def test_given_seed_csv_settings_when_parsing_then_it_returns_normalized_setting
     test_case: ParseSeedCsvSettingsYamlTestCase,
 ) -> None:
     _, seed_entries = parse_schema_yml(
-        contents=test_case.contents, file_path=Path("seeds/lookups.yml")
+        contents=test_case.contents, file_path=Path("sql/seeds/lookups.yml")
     )
 
     assert seed_entries[0].csv_settings == SeedCsvSettings(
@@ -420,7 +420,7 @@ def test_given_invalid_schema_yaml_when_parsing_then_it_raises_clear_errors(
     test_case: ParseSchemaYamlErrorTestCase,
 ) -> None:
     with pytest.raises(ValueError, match=test_case.expected_error_fragment):
-        parse_schema_yml(contents=test_case.contents, file_path=Path("seeds/lookups.yml"))
+        parse_schema_yml(contents=test_case.contents, file_path=Path("sql/seeds/lookups.yml"))
 
 
 @pytest.mark.parametrize(
@@ -451,7 +451,7 @@ def test_given_seed_audits_when_parsing_then_table_and_column_audits_are_kept(
 ) -> None:
     seed_entries: tuple[SchemaSeedEntry, ...]
     _models, seed_entries = parse_schema_yml(
-        contents=test_case.contents, file_path=Path("seeds/lookups.yml")
+        contents=test_case.contents, file_path=Path("sql/seeds/lookups.yml")
     )
 
     table_audits: tuple[str, ...] = tuple(audit.definition_name for audit in seed_entries[0].audits)

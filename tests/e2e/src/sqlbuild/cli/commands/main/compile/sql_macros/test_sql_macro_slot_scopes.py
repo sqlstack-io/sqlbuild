@@ -18,7 +18,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.sql_macros.helpers import 
     scoped_model,
 )
 
-_COMPILED: tuple[str, ...] = ("target/compiled/models/marts/scoped.sql",)
+_COMPILED: tuple[str, ...] = ("target/compiled/sql/models/marts/scoped.sql",)
 _CAPTURED: str = (
     "error[P017]: slot weekly.keys column product_id would bind to refunds in this subquery; "
     "write alias.@weekly.keys"
@@ -248,7 +248,7 @@ _SCOPED_ARGUMENTS: str = (
                 "SELECT * FROM counted",
             ),
             expected_returncode=1,
-            expected_fragments=(_CAPTURED, "--> models/marts/scoped.sql:5:1"),
+            expected_fragments=(_CAPTURED, "--> sql/models/marts/scoped.sql:5:1"),
         ),
         SqlMacroCompileTestCase(
             description="plain_group_read_in_a_join_lateral_subquery_that_captures_it",
@@ -264,7 +264,7 @@ _SCOPED_ARGUMENTS: str = (
                 "SELECT * FROM counted",
             ),
             expected_returncode=1,
-            expected_fragments=(_CAPTURED, "--> models/marts/scoped.sql:5:1"),
+            expected_fragments=(_CAPTURED, "--> sql/models/marts/scoped.sql:5:1"),
         ),
         SqlMacroCompileTestCase(
             description="plain_group_read_in_a_subquery_over_the_passed_relation",
@@ -296,7 +296,7 @@ _SCOPED_ARGUMENTS: str = (
                 "SELECT * FROM latest",
             ),
             expected_returncode=1,
-            expected_fragments=(_CAPTURED, "--> models/marts/scoped.sql:5:1"),
+            expected_fragments=(_CAPTURED, "--> sql/models/marts/scoped.sql:5:1"),
         ),
         SqlMacroCompileTestCase(
             description="aliased_group_read_in_a_column_list_macro",

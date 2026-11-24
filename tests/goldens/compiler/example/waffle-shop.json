@@ -22,13 +22,13 @@
   }
  ],
  "compiled": {
-  "audits/generic/customer_status_snapshot/not_null__customer_id.sql": [
+  "sql/audits/generic/customer_status_snapshot/not_null__customer_id.sql": [
    "SELECT customer_id",
    "FROM __ref(\"customer_status_snapshot\")",
    "WHERE customer_id IS NULL",
    ""
   ],
-  "audits/generic/customer_status_snapshot/unique__customer_id.sql": [
+  "sql/audits/generic/customer_status_snapshot/unique__customer_id.sql": [
    "SELECT customer_id, COUNT(*) AS duplicate_count",
    "FROM __ref(\"customer_status_snapshot\")",
    "WHERE customer_id IS NOT NULL",
@@ -36,43 +36,43 @@
    "HAVING COUNT(*) > 1",
    ""
   ],
-  "audits/generic/daily_order_partitioned/not_null__order_date.sql": [
+  "sql/audits/generic/daily_order_partitioned/not_null__order_date.sql": [
    "SELECT order_date",
    "FROM __ref(\"daily_order_partitioned\")",
    "WHERE order_date IS NULL",
    ""
   ],
-  "audits/generic/daily_order_partitioned/waffles_ordered_is_positive.sql": [
+  "sql/audits/generic/daily_order_partitioned/waffles_ordered_is_positive.sql": [
    "SELECT *",
    "FROM __ref(\"daily_order_partitioned\")",
    "WHERE NOT (waffles_ordered > 0)",
    ""
   ],
-  "audits/generic/daily_order_rollup/daily_orders_placed_is_non_negative.sql": [
+  "sql/audits/generic/daily_order_rollup/daily_orders_placed_is_non_negative.sql": [
    "SELECT *",
    "FROM __ref(\"daily_order_rollup\")",
    "WHERE NOT (orders_placed >= 0)",
    ""
   ],
-  "audits/generic/daily_order_rollup/not_null__activity_day.sql": [
+  "sql/audits/generic/daily_order_rollup/not_null__activity_day.sql": [
    "SELECT activity_day",
    "FROM __ref(\"daily_order_rollup\")",
    "WHERE activity_day IS NULL",
    ""
   ],
-  "audits/generic/daily_revenue/revenue_is_non_negative.sql": [
+  "sql/audits/generic/daily_revenue/revenue_is_non_negative.sql": [
    "SELECT *",
    "FROM __ref(\"daily_revenue\")",
    "WHERE NOT (total_revenue_cents >= 0)",
    ""
   ],
-  "audits/generic/dim_customers/not_null__customer_id.sql": [
+  "sql/audits/generic/dim_customers/not_null__customer_id.sql": [
    "SELECT customer_id",
    "FROM __ref(\"dim_customers\")",
    "WHERE customer_id IS NULL",
    ""
   ],
-  "audits/generic/dim_customers/unique__customer_id.sql": [
+  "sql/audits/generic/dim_customers/unique__customer_id.sql": [
    "SELECT customer_id, COUNT(*) AS duplicate_count",
    "FROM __ref(\"dim_customers\")",
    "WHERE customer_id IS NOT NULL",
@@ -80,43 +80,43 @@
    "HAVING COUNT(*) > 1",
    ""
   ],
-  "audits/generic/fact_orders/not_null__order_id.sql": [
+  "sql/audits/generic/fact_orders/not_null__order_id.sql": [
    "SELECT order_id",
    "FROM __ref(\"fact_orders\")",
    "WHERE order_id IS NULL",
    ""
   ],
-  "audits/generic/hourly_activity_with_daily_context/day_orders_cover_hourly_orders.sql": [
+  "sql/audits/generic/hourly_activity_with_daily_context/day_orders_cover_hourly_orders.sql": [
    "SELECT *",
    "FROM __ref(\"hourly_activity_with_daily_context\")",
    "WHERE NOT (day_orders_placed >= orders_placed)",
    ""
   ],
-  "audits/generic/hourly_activity_with_daily_context/not_null__activity_hour.sql": [
+  "sql/audits/generic/hourly_activity_with_daily_context/not_null__activity_hour.sql": [
    "SELECT activity_hour",
    "FROM __ref(\"hourly_activity_with_daily_context\")",
    "WHERE activity_hour IS NULL",
    ""
   ],
-  "audits/generic/hourly_order_activity/not_null__activity_hour.sql": [
+  "sql/audits/generic/hourly_order_activity/not_null__activity_hour.sql": [
    "SELECT activity_hour",
    "FROM __ref(\"hourly_order_activity\")",
    "WHERE activity_hour IS NULL",
    ""
   ],
-  "audits/generic/hourly_order_activity/orders_placed_is_non_negative.sql": [
+  "sql/audits/generic/hourly_order_activity/orders_placed_is_non_negative.sql": [
    "SELECT *",
    "FROM __ref(\"hourly_order_activity\")",
    "WHERE NOT (orders_placed >= 0)",
    ""
   ],
-  "audits/generic/order_status_index/not_null__order_id.sql": [
+  "sql/audits/generic/order_status_index/not_null__order_id.sql": [
    "SELECT order_id",
    "FROM __ref(\"order_status_index\")",
    "WHERE order_id IS NULL",
    ""
   ],
-  "audits/generic/order_status_index/unique__order_id.sql": [
+  "sql/audits/generic/order_status_index/unique__order_id.sql": [
    "SELECT order_id, COUNT(*) AS duplicate_count",
    "FROM __ref(\"order_status_index\")",
    "WHERE order_id IS NOT NULL",
@@ -124,19 +124,19 @@
    "HAVING COUNT(*) > 1",
    ""
   ],
-  "audits/generic/stg_customers/not_null__customer_id.sql": [
+  "sql/audits/generic/stg_customers/not_null__customer_id.sql": [
    "SELECT customer_id",
    "FROM __ref(\"stg_customers\")",
    "WHERE customer_id IS NULL",
    ""
   ],
-  "audits/generic/stg_customers/not_null__email.sql": [
+  "sql/audits/generic/stg_customers/not_null__email.sql": [
    "SELECT email",
    "FROM __ref(\"stg_customers\")",
    "WHERE email IS NULL",
    ""
   ],
-  "audits/generic/stg_customers/unique__customer_id.sql": [
+  "sql/audits/generic/stg_customers/unique__customer_id.sql": [
    "SELECT customer_id, COUNT(*) AS duplicate_count",
    "FROM __ref(\"stg_customers\")",
    "WHERE customer_id IS NOT NULL",
@@ -144,26 +144,26 @@
    "HAVING COUNT(*) > 1",
    ""
   ],
-  "audits/generic/stg_orders/accepted_values__status.sql": [
+  "sql/audits/generic/stg_orders/accepted_values__status.sql": [
    "SELECT status",
    "FROM __ref(\"stg_orders\")",
    "WHERE status IS NOT NULL",
    "  AND status NOT IN ('placed', 'preparing', 'ready', 'completed', 'cancelled')",
    ""
   ],
-  "audits/generic/stg_orders/not_null__customer_id.sql": [
+  "sql/audits/generic/stg_orders/not_null__customer_id.sql": [
    "SELECT customer_id",
    "FROM __ref(\"stg_orders\")",
    "WHERE customer_id IS NULL",
    ""
   ],
-  "audits/generic/stg_orders/not_null__order_id.sql": [
+  "sql/audits/generic/stg_orders/not_null__order_id.sql": [
    "SELECT order_id",
    "FROM __ref(\"stg_orders\")",
    "WHERE order_id IS NULL",
    ""
   ],
-  "audits/generic/stg_orders/relationships__waffle_type_id.sql": [
+  "sql/audits/generic/stg_orders/relationships__waffle_type_id.sql": [
    "SELECT waffle_type_id",
    "FROM __ref(\"stg_orders\")",
    "WHERE waffle_type_id IS NOT NULL",
@@ -174,7 +174,7 @@
    "  )",
    ""
   ],
-  "audits/generic/stg_orders/unique__order_id.sql": [
+  "sql/audits/generic/stg_orders/unique__order_id.sql": [
    "SELECT order_id, COUNT(*) AS duplicate_count",
    "FROM __ref(\"stg_orders\")",
    "WHERE order_id IS NOT NULL",
@@ -182,19 +182,19 @@
    "HAVING COUNT(*) > 1",
    ""
   ],
-  "audits/generic/stg_payments/not_null__order_id.sql": [
+  "sql/audits/generic/stg_payments/not_null__order_id.sql": [
    "SELECT order_id",
    "FROM __ref(\"stg_payments\")",
    "WHERE order_id IS NULL",
    ""
   ],
-  "audits/generic/stg_payments/not_null__payment_id.sql": [
+  "sql/audits/generic/stg_payments/not_null__payment_id.sql": [
    "SELECT payment_id",
    "FROM __ref(\"stg_payments\")",
    "WHERE payment_id IS NULL",
    ""
   ],
-  "audits/generic/stg_payments/relationships__order_id.sql": [
+  "sql/audits/generic/stg_payments/relationships__order_id.sql": [
    "SELECT order_id",
    "FROM __ref(\"stg_payments\")",
    "WHERE order_id IS NOT NULL",
@@ -205,7 +205,7 @@
    "  )",
    ""
   ],
-  "audits/generic/stg_payments/unique__payment_id.sql": [
+  "sql/audits/generic/stg_payments/unique__payment_id.sql": [
    "SELECT payment_id, COUNT(*) AS duplicate_count",
    "FROM __ref(\"stg_payments\")",
    "WHERE payment_id IS NOT NULL",
@@ -213,13 +213,13 @@
    "HAVING COUNT(*) > 1",
    ""
   ],
-  "audits/generic/waffle_types/not_null__waffle_type_id.sql": [
+  "sql/audits/generic/waffle_types/not_null__waffle_type_id.sql": [
    "SELECT waffle_type_id",
    "FROM __seed(\"waffle_types\")",
    "WHERE waffle_type_id IS NULL",
    ""
   ],
-  "audits/generic/waffle_types/unique__waffle_type_id.sql": [
+  "sql/audits/generic/waffle_types/unique__waffle_type_id.sql": [
    "SELECT waffle_type_id, COUNT(*) AS duplicate_count",
    "FROM __seed(\"waffle_types\")",
    "WHERE waffle_type_id IS NOT NULL",
@@ -227,14 +227,14 @@
    "HAVING COUNT(*) > 1",
    ""
   ],
-  "audits/singular/fact_orders_have_customers.sql": [
+  "sql/audits/singular/fact_orders_have_customers.sql": [
    "SELECT f.order_id, f.customer_id",
    "FROM __ref(\"fact_orders\") f",
    "LEFT JOIN __ref(\"dim_customers\") d ON f.customer_id = d.customer_id",
    "WHERE d.customer_id IS NULL",
    ""
   ],
-  "functions/sql/table_fn__customer_orders.sql": [
+  "sql/functions/sql/table_fn__customer_orders.sql": [
    "CREATE OR REPLACE MACRO dev.table_fn__customer_orders(p_customer_id) AS TABLE",
    "SELECT",
    "  order_id,",
@@ -247,13 +247,13 @@
    "WHERE customer_id = p_customer_id",
    ""
   ],
-  "functions/sql/udf__is_completed_order.sql": [
+  "sql/functions/sql/udf__is_completed_order.sql": [
    "CREATE OR REPLACE MACRO dev.udf__is_completed_order(order_status) AS (",
    "order_status = 'completed'",
    ")",
    ""
   ],
-  "models/intermediate/customer_status_snapshot.sql": [
+  "sql/models/intermediate/customer_status_snapshot.sql": [
    "SELECT",
    "  customer_id,",
    "  MAX(ordered_at) AS last_ordered_at,",
@@ -264,7 +264,7 @@
    "GROUP BY customer_id",
    ""
   ],
-  "models/intermediate/order_status_index.sql": [
+  "sql/models/intermediate/order_status_index.sql": [
    "SELECT",
    "  order_id,",
    "  customer_id,",
@@ -274,7 +274,7 @@
    "FROM __ref(\"fact_orders\")",
    ""
   ],
-  "models/marts/daily_order_partitioned.sql": [
+  "sql/models/marts/daily_order_partitioned.sql": [
    "SELECT",
    "  CAST(o.ordered_at AS DATE) AS order_date,",
    "  COUNT(DISTINCT o.order_id) AS order_count,",
@@ -286,7 +286,7 @@
    "GROUP BY CAST(o.ordered_at AS DATE)",
    ""
   ],
-  "models/marts/daily_order_rollup.sql": [
+  "sql/models/marts/daily_order_rollup.sql": [
    "SELECT",
    "  DATE_TRUNC('day', activity_hour) AS activity_day,",
    "  SUM(orders_placed) AS orders_placed,",
@@ -296,7 +296,7 @@
    "GROUP BY DATE_TRUNC('day', activity_hour)",
    ""
   ],
-  "models/marts/daily_revenue.sql": [
+  "sql/models/marts/daily_revenue.sql": [
    "SELECT",
    "  CAST(o.ordered_at AS DATE) AS revenue_date,",
    "  COUNT(DISTINCT o.order_id) AS order_count,",
@@ -309,7 +309,7 @@
    "GROUP BY CAST(o.ordered_at AS DATE)",
    ""
   ],
-  "models/marts/dim_customers.sql": [
+  "sql/models/marts/dim_customers.sql": [
    "SELECT",
    "  c.customer_id,",
    "  c.first_name,",
@@ -324,7 +324,7 @@
    "GROUP BY c.customer_id, c.first_name, c.last_name, c.email, c.created_at",
    ""
   ],
-  "models/marts/fact_orders.sql": [
+  "sql/models/marts/fact_orders.sql": [
    "SELECT",
    "  o.order_id,",
    "  o.customer_id,",
@@ -344,7 +344,7 @@
    "LEFT JOIN __ref(\"stg_payments\") p ON o.order_id = p.order_id",
    ""
   ],
-  "models/marts/hourly_activity_with_daily_context.sql": [
+  "sql/models/marts/hourly_activity_with_daily_context.sql": [
    "SELECT",
    "  h.activity_hour,",
    "  h.orders_placed,",
@@ -356,7 +356,7 @@
    "  ON DATE_TRUNC('day', h.activity_hour) = d.activity_day",
    ""
   ],
-  "models/marts/hourly_order_activity.sql": [
+  "sql/models/marts/hourly_order_activity.sql": [
    "SELECT",
    "  DATE_TRUNC('hour', o.ordered_at) AS activity_hour,",
    "  COUNT(*) AS orders_placed,",
@@ -366,7 +366,7 @@
    "GROUP BY DATE_TRUNC('hour', o.ordered_at)",
    ""
   ],
-  "models/staging/stg_customers.sql": [
+  "sql/models/staging/stg_customers.sql": [
    "SELECT",
    "  id AS customer_id,",
    "  first_name,",
@@ -376,7 +376,7 @@
    "FROM __source(\"raw__customers\")",
    ""
   ],
-  "models/staging/stg_orders.sql": [
+  "sql/models/staging/stg_orders.sql": [
    "SELECT",
    "  id AS order_id,",
    "  customer_id,",
@@ -387,7 +387,7 @@
    "FROM __source(\"raw__orders\")",
    ""
   ],
-  "models/staging/stg_payments.sql": [
+  "sql/models/staging/stg_payments.sql": [
    "SELECT",
    "  id AS payment_id,",
    "  order_id,",
@@ -616,8 +616,8 @@
     "name": "customer_status_snapshot",
     "resource_type": "model",
     "package_name": "waffle_shop",
-    "path": "models/intermediate/customer_status_snapshot.sql",
-    "original_file_path": "models/intermediate/customer_status_snapshot.sql",
+    "path": "sql/models/intermediate/customer_status_snapshot.sql",
+    "original_file_path": "sql/models/intermediate/customer_status_snapshot.sql",
     "unique_id": "model.waffle_shop.customer_status_snapshot",
     "fqn": [
      "waffle_shop",
@@ -703,8 +703,8 @@
     "name": "order_status_index",
     "resource_type": "model",
     "package_name": "waffle_shop",
-    "path": "models/intermediate/order_status_index.sql",
-    "original_file_path": "models/intermediate/order_status_index.sql",
+    "path": "sql/models/intermediate/order_status_index.sql",
+    "original_file_path": "sql/models/intermediate/order_status_index.sql",
     "unique_id": "model.waffle_shop.order_status_index",
     "fqn": [
      "waffle_shop",
@@ -790,8 +790,8 @@
     "name": "daily_order_partitioned",
     "resource_type": "model",
     "package_name": "waffle_shop",
-    "path": "models/marts/daily_order_partitioned.sql",
-    "original_file_path": "models/marts/daily_order_partitioned.sql",
+    "path": "sql/models/marts/daily_order_partitioned.sql",
+    "original_file_path": "sql/models/marts/daily_order_partitioned.sql",
     "unique_id": "model.waffle_shop.daily_order_partitioned",
     "fqn": [
      "waffle_shop",
@@ -873,8 +873,8 @@
     "name": "daily_order_rollup",
     "resource_type": "model",
     "package_name": "waffle_shop",
-    "path": "models/marts/daily_order_rollup.sql",
-    "original_file_path": "models/marts/daily_order_rollup.sql",
+    "path": "sql/models/marts/daily_order_rollup.sql",
+    "original_file_path": "sql/models/marts/daily_order_rollup.sql",
     "unique_id": "model.waffle_shop.daily_order_rollup",
     "fqn": [
      "waffle_shop",
@@ -958,8 +958,8 @@
     "name": "daily_revenue",
     "resource_type": "model",
     "package_name": "waffle_shop",
-    "path": "models/marts/daily_revenue.sql",
-    "original_file_path": "models/marts/daily_revenue.sql",
+    "path": "sql/models/marts/daily_revenue.sql",
+    "original_file_path": "sql/models/marts/daily_revenue.sql",
     "unique_id": "model.waffle_shop.daily_revenue",
     "fqn": [
      "waffle_shop",
@@ -1042,8 +1042,8 @@
     "name": "dim_customers",
     "resource_type": "model",
     "package_name": "waffle_shop",
-    "path": "models/marts/dim_customers.sql",
-    "original_file_path": "models/marts/dim_customers.sql",
+    "path": "sql/models/marts/dim_customers.sql",
+    "original_file_path": "sql/models/marts/dim_customers.sql",
     "unique_id": "model.waffle_shop.dim_customers",
     "fqn": [
      "waffle_shop",
@@ -1129,8 +1129,8 @@
     "name": "fact_orders",
     "resource_type": "model",
     "package_name": "waffle_shop",
-    "path": "models/marts/fact_orders.sql",
-    "original_file_path": "models/marts/fact_orders.sql",
+    "path": "sql/models/marts/fact_orders.sql",
+    "original_file_path": "sql/models/marts/fact_orders.sql",
     "unique_id": "model.waffle_shop.fact_orders",
     "fqn": [
      "waffle_shop",
@@ -1215,8 +1215,8 @@
     "name": "hourly_activity_with_daily_context",
     "resource_type": "model",
     "package_name": "waffle_shop",
-    "path": "models/marts/hourly_activity_with_daily_context.sql",
-    "original_file_path": "models/marts/hourly_activity_with_daily_context.sql",
+    "path": "sql/models/marts/hourly_activity_with_daily_context.sql",
+    "original_file_path": "sql/models/marts/hourly_activity_with_daily_context.sql",
     "unique_id": "model.waffle_shop.hourly_activity_with_daily_context",
     "fqn": [
      "waffle_shop",
@@ -1301,8 +1301,8 @@
     "name": "hourly_order_activity",
     "resource_type": "model",
     "package_name": "waffle_shop",
-    "path": "models/marts/hourly_order_activity.sql",
-    "original_file_path": "models/marts/hourly_order_activity.sql",
+    "path": "sql/models/marts/hourly_order_activity.sql",
+    "original_file_path": "sql/models/marts/hourly_order_activity.sql",
     "unique_id": "model.waffle_shop.hourly_order_activity",
     "fqn": [
      "waffle_shop",
@@ -1384,8 +1384,8 @@
     "name": "stg_customers",
     "resource_type": "model",
     "package_name": "waffle_shop",
-    "path": "models/staging/stg_customers.sql",
-    "original_file_path": "models/staging/stg_customers.sql",
+    "path": "sql/models/staging/stg_customers.sql",
+    "original_file_path": "sql/models/staging/stg_customers.sql",
     "unique_id": "model.waffle_shop.stg_customers",
     "fqn": [
      "waffle_shop",
@@ -1476,8 +1476,8 @@
     "name": "stg_orders",
     "resource_type": "model",
     "package_name": "waffle_shop",
-    "path": "models/staging/stg_orders.sql",
-    "original_file_path": "models/staging/stg_orders.sql",
+    "path": "sql/models/staging/stg_orders.sql",
+    "original_file_path": "sql/models/staging/stg_orders.sql",
     "unique_id": "model.waffle_shop.stg_orders",
     "fqn": [
      "waffle_shop",
@@ -1586,8 +1586,8 @@
     "name": "stg_payments",
     "resource_type": "model",
     "package_name": "waffle_shop",
-    "path": "models/staging/stg_payments.sql",
-    "original_file_path": "models/staging/stg_payments.sql",
+    "path": "sql/models/staging/stg_payments.sql",
+    "original_file_path": "sql/models/staging/stg_payments.sql",
     "unique_id": "model.waffle_shop.stg_payments",
     "fqn": [
      "waffle_shop",
@@ -1678,8 +1678,8 @@
     "name": "waffle_types",
     "resource_type": "seed",
     "package_name": "waffle_shop",
-    "path": "seeds/waffle_types.csv",
-    "original_file_path": "seeds/waffle_types.csv",
+    "path": "sql/seeds/waffle_types.csv",
+    "original_file_path": "sql/seeds/waffle_types.csv",
     "unique_id": "seed.waffle_shop.waffle_types",
     "fqn": [
      "waffle_shop",
@@ -1783,8 +1783,8 @@
     "name": "raw__customers",
     "resource_type": "source",
     "package_name": "waffle_shop",
-    "path": "sources/raw.yml",
-    "original_file_path": "sources/raw.yml",
+    "path": "sql/sources/raw.yml",
+    "original_file_path": "sql/sources/raw.yml",
     "unique_id": "source.waffle_shop.raw__customers",
     "fqn": [
      "waffle_shop",
@@ -1866,8 +1866,8 @@
     "name": "raw__orders",
     "resource_type": "source",
     "package_name": "waffle_shop",
-    "path": "sources/raw.yml",
-    "original_file_path": "sources/raw.yml",
+    "path": "sql/sources/raw.yml",
+    "original_file_path": "sql/sources/raw.yml",
     "unique_id": "source.waffle_shop.raw__orders",
     "fqn": [
      "waffle_shop",
@@ -1959,8 +1959,8 @@
     "name": "raw__payments",
     "resource_type": "source",
     "package_name": "waffle_shop",
-    "path": "sources/raw.yml",
-    "original_file_path": "sources/raw.yml",
+    "path": "sql/sources/raw.yml",
+    "original_file_path": "sql/sources/raw.yml",
     "unique_id": "source.waffle_shop.raw__payments",
     "fqn": [
      "waffle_shop",
@@ -2000,8 +2000,8 @@
     "name": "line_total_cents",
     "resource_type": "macro",
     "package_name": "waffle_shop",
-    "path": "macros/python/currency.py",
-    "original_file_path": "macros/python/currency.py",
+    "path": "sql/macros/python/currency.py",
+    "original_file_path": "sql/macros/python/currency.py",
     "unique_id": "macro.waffle_shop.line_total_cents",
     "macro_sql": "\"\"\"Project-wide currency macros.\"\"\"\n\n\ndef line_total_cents(price_cents: str, quantity: str) -> str:\n    \"\"\"Calculate line total cents from a unit price and quantity.\"\"\"\n    return f\"{price_cents} * {quantity}\"\n",
     "depends_on": {
@@ -2024,8 +2024,8 @@
     "name": "cents_to_dollars",
     "resource_type": "macro",
     "package_name": "waffle_shop",
-    "path": "models/marts/_sqlbuild/_macros/python/currency.py",
-    "original_file_path": "models/marts/_sqlbuild/_macros/python/currency.py",
+    "path": "sql/models/marts/_sqlbuild/_macros/python/currency.py",
+    "original_file_path": "sql/models/marts/_sqlbuild/_macros/python/currency.py",
     "unique_id": "macro.waffle_shop.cents_to_dollars",
     "macro_sql": "\"\"\"Currency formatting macros.\"\"\"\n\n\ndef cents_to_dollars(column: str) -> str:\n    \"\"\"Convert a cents integer column to a dollars decimal with two decimal places.\"\"\"\n    return f\"ROUND(({column}) / 100.0, 2)\"\n",
     "depends_on": {
@@ -2034,7 +2034,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "local",
-     "sqlbuild_scope_path": "models/marts"
+     "sqlbuild_scope_path": "sql/models/marts"
     },
     "docs": {
      "show": true,
@@ -2048,8 +2048,8 @@
     "name": "timestamp_trunc",
     "resource_type": "macro",
     "package_name": "waffle_shop",
-    "path": "models/marts/_sqlbuild/_macros/python/datetime.py",
-    "original_file_path": "models/marts/_sqlbuild/_macros/python/datetime.py",
+    "path": "sql/models/marts/_sqlbuild/_macros/python/datetime.py",
+    "original_file_path": "sql/models/marts/_sqlbuild/_macros/python/datetime.py",
     "unique_id": "macro.waffle_shop.timestamp_trunc",
     "macro_sql": "\"\"\"Datetime portability macros.\"\"\"\n\n\ndef timestamp_trunc(ctx, grain: str, expr: str) -> str:\n    if ctx.adapter_name == \"bigquery\":\n        return f\"TIMESTAMP_TRUNC({expr}, {grain.upper()})\"\n    return f\"DATE_TRUNC('{grain}', {expr})\"\n",
     "depends_on": {
@@ -2058,7 +2058,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "local",
-     "sqlbuild_scope_path": "models/marts"
+     "sqlbuild_scope_path": "sql/models/marts"
     },
     "docs": {
      "show": true,

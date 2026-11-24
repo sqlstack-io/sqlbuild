@@ -11,11 +11,11 @@
      "message": "Unknown table or alias 'x' referenced by column 'order_id'",
      "resource_type": "model",
      "resource_name": "broken_orders",
-     "path": "models/marts/broken_orders.sql",
+     "path": "sql/models/marts/broken_orders.sql",
      "line": 5,
      "column": 8,
      "location": {
-      "path": "models/marts/broken_orders.sql",
+      "path": "sql/models/marts/broken_orders.sql",
       "line": 5,
       "column": 8,
       "end_line": 5,
@@ -27,19 +27,19 @@
   }
  ],
  "compiled": {
-  "models/marts/broken_orders.sql": [
+  "sql/models/marts/broken_orders.sql": [
    "SELECT x.order_id",
    "FROM __ref(\"stg_orders\") o",
    ""
   ],
-  "models/marts/customer_totals.sql": [
+  "sql/models/marts/customer_totals.sql": [
    "SELECT \"Customer_ID\", SUM(O.Amount) AS \"Total_Amount\",",
    "  CAST(MAX(o.status) AS VARCHAR) AS last_status, 'fixed' AS label",
    "FROM __ref(\"stg_orders\") AS O",
    "GROUP BY 1",
    ""
   ],
-  "models/staging/stg_orders.sql": [
+  "sql/models/staging/stg_orders.sql": [
    "SELECT order_id, customer_id, amount, status",
    "FROM __source(\"raw_orders\")",
    ""
@@ -53,8 +53,8 @@
     "name": "broken_orders",
     "resource_type": "model",
     "package_name": "failure_corpus",
-    "path": "models/marts/broken_orders.sql",
-    "original_file_path": "models/marts/broken_orders.sql",
+    "path": "sql/models/marts/broken_orders.sql",
+    "original_file_path": "sql/models/marts/broken_orders.sql",
     "unique_id": "model.failure_corpus.broken_orders",
     "fqn": [
      "failure_corpus",
@@ -122,8 +122,8 @@
     "name": "customer_totals",
     "resource_type": "model",
     "package_name": "failure_corpus",
-    "path": "models/marts/customer_totals.sql",
-    "original_file_path": "models/marts/customer_totals.sql",
+    "path": "sql/models/marts/customer_totals.sql",
+    "original_file_path": "sql/models/marts/customer_totals.sql",
     "unique_id": "model.failure_corpus.customer_totals",
     "fqn": [
      "failure_corpus",
@@ -191,8 +191,8 @@
     "name": "stg_orders",
     "resource_type": "model",
     "package_name": "failure_corpus",
-    "path": "models/staging/stg_orders.sql",
-    "original_file_path": "models/staging/stg_orders.sql",
+    "path": "sql/models/staging/stg_orders.sql",
+    "original_file_path": "sql/models/staging/stg_orders.sql",
     "unique_id": "model.failure_corpus.stg_orders",
     "fqn": [
      "failure_corpus",
@@ -262,8 +262,8 @@
     "name": "raw_orders",
     "resource_type": "source",
     "package_name": "failure_corpus",
-    "path": "sources/raw.yml",
-    "original_file_path": "sources/raw.yml",
+    "path": "sql/sources/raw.yml",
+    "original_file_path": "sql/sources/raw.yml",
     "unique_id": "source.failure_corpus.raw_orders",
     "fqn": [
      "failure_corpus",

@@ -179,7 +179,7 @@ def test_given_unselected_upstream_in_closure_when_filtering_metadata_then_uses_
         key=selected_key,
         deps=(upstream_key,),
         name="fact_orders",
-        relative_path=Path("models/fact_orders.sql"),
+        relative_path=Path("sql/models/fact_orders.sql"),
         query_sql='SELECT * FROM __ref("stg_orders")',
         config=CompileModelConfig(),
         destination=CompiledRelationLocation(
@@ -193,7 +193,7 @@ def test_given_unselected_upstream_in_closure_when_filtering_metadata_then_uses_
         key=upstream_key,
         deps=(),
         name="stg_orders",
-        relative_path=Path("models/stg_orders.sql"),
+        relative_path=Path("sql/models/stg_orders.sql"),
         query_sql="SELECT 1 AS id",
         config=CompileModelConfig(),
         destination=CompiledRelationLocation(

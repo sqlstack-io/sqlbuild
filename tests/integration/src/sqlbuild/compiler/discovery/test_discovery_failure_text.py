@@ -18,9 +18,9 @@ from tests.integration.src.sqlbuild.compiler.discovery.helpers import (
     write_project,
 )
 
-_MODEL: tuple[str, bytes] = ("models/orders.sql", b"MODEL ();\nSELECT 1 AS order_id")
-_HOOK: tuple[str, bytes] = ("hooks/sql/refresh.sql", b"HOOK (descri\x00ption 'x');\nSELECT 1")
-_CONSTANT: tuple[str, bytes] = ("constants/limits.sql", b"CONSTANT (name cap, valu\x00e 1);")
+_MODEL: tuple[str, bytes] = ("sql/models/orders.sql", b"MODEL ();\nSELECT 1 AS order_id")
+_HOOK: tuple[str, bytes] = ("sql/hooks/sql/refresh.sql", b"HOOK (descri\x00ption 'x');\nSELECT 1")
+_CONSTANT: tuple[str, bytes] = ("sql/constants/limits.sql", b"CONSTANT (name cap, valu\x00e 1);")
 
 
 @pytest.mark.parametrize(
@@ -28,7 +28,7 @@ _CONSTANT: tuple[str, bytes] = ("constants/limits.sql", b"CONSTANT (name cap, va
     [
         FailureTextTestCase(
             description="a NUL in a model header key",
-            files=(("models/orders.sql", b"MODEL (descri\x00ption 'x');\nSELECT 1"),),
+            files=(("sql/models/orders.sql", b"MODEL (descri\x00ption 'x');\nSELECT 1"),),
             expected_error_type="ModelSqlParseError",
             expected_message_suffix="has unsupported keys: descri\x00ption",
         ),
@@ -48,7 +48,7 @@ _CONSTANT: tuple[str, bytes] = ("constants/limits.sql", b"CONSTANT (name cap, va
             description="a NUL in an audit header key",
             files=(
                 _MODEL,
-                ("audits/generic/positive.sql", b"AUDIT (sever\x00ity warn);\nSELECT 1"),
+                ("sql/audits/generic/positive.sql", b"AUDIT (sever\x00ity warn);\nSELECT 1"),
             ),
             expected_error_type="SqlAuditParseError",
             expected_message_suffix="has unsupported keys: sever\x00ity",
@@ -58,7 +58,7 @@ _CONSTANT: tuple[str, bytes] = ("constants/limits.sql", b"CONSTANT (name cap, va
             files=(
                 _MODEL,
                 (
-                    "functions/sql/cents.sql",
+                    "sql/functions/sql/cents.sql",
                     b'FUNCTION (arguments (), returns INTEGER, descri\x00ption "x");\nSELECT 1',
                 ),
             ),
@@ -67,9 +67,9 @@ _CONSTANT: tuple[str, bytes] = ("constants/limits.sql", b"CONSTANT (name cap, va
         ),
         FailureTextTestCase(
             description="a raw entry name in a declaration group",
-            files=(_MODEL, (os.fsdecode(b"models/orders/_sqlbuild/caf\xe9.txt"), b"x")),
+            files=(_MODEL, (os.fsdecode(b"sql/models/orders/_sqlbuild/caf\xe9.txt"), b"x")),
             expected_error_type="DeclarationParseError",
-            expected_message_suffix="unsupported entries: models/orders/_sqlbuild/caf\\xe9.txt",
+            expected_message_suffix="unsupported entries: sql/models/orders/_sqlbuild/caf\\xe9.txt",
         ),
     ],
     ids=lambda case: case.description,

@@ -47,8 +47,8 @@ from tests.unit.scripts.compiler_differential._helpers.comparing._test_types imp
         ),
         JsonDifferenceTestCase(
             description="key_order",
-            left={"name": "orders", "path": "models/orders.sql"},
-            right={"path": "models/orders.sql", "name": "orders"},
+            left={"name": "orders", "path": "sql/models/orders.sql"},
+            right={"path": "sql/models/orders.sql", "name": "orders"},
             expected_location="/ (key order)",
         ),
         JsonDifferenceTestCase(
@@ -59,9 +59,9 @@ from tests.unit.scripts.compiler_differential._helpers.comparing._test_types imp
         ),
         JsonDifferenceTestCase(
             description="escaped_pointer_token",
-            left={"models/orders.sql": {"a~b": 1}},
-            right={"models/orders.sql": {"a~b": 2}},
-            expected_location="/models~1orders.sql/a~0b",
+            left={"sql/models/orders.sql": {"a~b": 1}},
+            right={"sql/models/orders.sql": {"a~b": 2}},
+            expected_location="/sql~1models~1orders.sql/a~0b",
         ),
     ],
     ids=lambda case: case.description,

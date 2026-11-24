@@ -50,11 +50,11 @@ def unused_declaration_index(*, enforce_placement: bool) -> ScopeIndex:
             declarations=(
                 DeclarationRecord(
                     identity=declaration_identity,
-                    path="constants/limit.sql",
+                    path="sql/constants/limit.sql",
                     line=1,
                     column=1,
                     scope=ScopeKind.GLOBAL,
-                    ownership_root=OwnershipRoot("constants"),
+                    ownership_root=OwnershipRoot("sql/constants"),
                 ),
             ),
             completeness=ScopeCompleteness(runtime_usage=True, placement=False),
@@ -72,7 +72,7 @@ def write_scope_cache_project(
         root,
         {
             "sqlbuild_project.toml": SCOPE_CACHE_PROJECT,
-            "models/orders.sql": SCOPE_CACHE_MODEL,
+            "sql/models/orders.sql": SCOPE_CACHE_MODEL,
         },
     )
 
@@ -162,11 +162,11 @@ def declaration_record(
 
     return DeclarationRecord(
         DeclarationIdentity(kind, name, owner),
-        path or f"enums/{name}.sql",
+        path or f"sql/enums/{name}.sql",
         1,
         1,
         scope,
-        OwnershipRoot("models", resource_kind=ResourceKind.MODEL),
+        OwnershipRoot("sql/models", resource_kind=ResourceKind.MODEL),
         owning_path=owner_path,
     )
 
@@ -176,17 +176,17 @@ def scope_index() -> ScopeIndex:
 
     model: ResourceIdentity = ResourceIdentity(kind=ResourceKind.MODEL, name="stg_orders")
     model_root: OwnershipRoot = OwnershipRoot(
-        path="models",
+        path="sql/models",
         kind=OwnershipRootKind.RESOURCE,
         resource_kind=ResourceKind.MODEL,
     )
     enum: DeclarationRecord = DeclarationRecord(
         DeclarationIdentity(DeclarationKind.ENUM, "order_status"),
-        "enums/order_status.sql",
+        "sql/enums/order_status.sql",
         2,
         1,
         ScopeKind.GLOBAL,
-        OwnershipRoot("enums", OwnershipRootKind.GLOBAL),
+        OwnershipRoot("sql/enums", OwnershipRootKind.GLOBAL),
         enum=EnumMetadata(
             (
                 EnumMemberMetadata("OPEN"),
@@ -197,25 +197,25 @@ def scope_index() -> ScopeIndex:
     )
     constant: DeclarationRecord = DeclarationRecord(
         DeclarationIdentity(DeclarationKind.CONSTANT, "minimum_value"),
-        "models/staging/constants/limits.sql",
+        "sql/models/staging/constants/limits.sql",
         8,
         3,
         ScopeKind.INHERITED,
-        OwnershipRoot("models", resource_kind=ResourceKind.MODEL),
-        owning_path="models/staging",
+        OwnershipRoot("sql/models", resource_kind=ResourceKind.MODEL),
+        owning_path="sql/models/staging",
         constant=ConstantMetadata("integer", render_as="value_list"),
     )
     macro: DeclarationRecord = DeclarationRecord(
         DeclarationIdentity(DeclarationKind.MACRO, "normalize_status"),
-        "macros/python/normalize_status.py",
+        "sql/macros/python/normalize_status.py",
         1,
         1,
         ScopeKind.GLOBAL,
-        OwnershipRoot("macros", OwnershipRootKind.GLOBAL),
+        OwnershipRoot("sql/macros", OwnershipRootKind.GLOBAL),
         macro=MacroMetadata(("status",), (enum.identity,)),
     )
     return ScopeIndex(
-        resources=(ResourceRecord(model, "models/staging/stg_orders.sql", model_root),),
+        resources=(ResourceRecord(model, "sql/models/staging/stg_orders.sql", model_root),),
         declarations=(macro, constant, enum),
         usages=(UsageRecord(model, constant.identity), UsageRecord(model, enum.identity)),
         completeness=ScopeCompleteness(runtime_usage=False),
@@ -225,17 +225,17 @@ def scope_index() -> ScopeIndex:
 def report_scope_lookup(*, extra_globals: int = 0) -> ScopeLookup:
     """Return representative complete facts for scope report tests."""
 
-    model_root: OwnershipRoot = OwnershipRoot("models", resource_kind=ResourceKind.MODEL)
-    global_root: OwnershipRoot = OwnershipRoot("constants", OwnershipRootKind.GLOBAL)
+    model_root: OwnershipRoot = OwnershipRoot("sql/models", resource_kind=ResourceKind.MODEL)
+    global_root: OwnershipRoot = OwnershipRoot("sql/constants", OwnershipRootKind.GLOBAL)
     orders: ResourceIdentity = ResourceIdentity(ResourceKind.MODEL, "orders")
     expected: ResourceIdentity = ResourceIdentity(ResourceKind.MODEL, "expected_orders")
     resources: tuple[ResourceRecord, ...] = (
-        ResourceRecord(orders, "models/staging/orders.sql", model_root),
-        ResourceRecord(expected, "models/marts/expected_orders.sql", model_root),
+        ResourceRecord(orders, "sql/models/staging/orders.sql", model_root),
+        ResourceRecord(expected, "sql/models/marts/expected_orders.sql", model_root),
     )
     global_constant: DeclarationRecord = DeclarationRecord(
         DeclarationIdentity(DeclarationKind.CONSTANT, "warehouse_password"),
-        "constants/warehouse_password.yml",
+        "sql/constants/warehouse_password.yml",
         2,
         3,
         ScopeKind.GLOBAL,
@@ -244,12 +244,12 @@ def report_scope_lookup(*, extra_globals: int = 0) -> ScopeLookup:
     )
     inherited: DeclarationRecord = DeclarationRecord(
         DeclarationIdentity(DeclarationKind.ENUM, "order_status"),
-        "models/staging/enums/order_status.sql",
+        "sql/models/staging/enums/order_status.sql",
         1,
         1,
         ScopeKind.INHERITED,
         model_root,
-        owning_path="models/staging",
+        owning_path="sql/models/staging",
         enum=EnumMetadata(
             tuple(EnumMemberMetadata(f"STATUS_{index:02d}") for index in range(25)),
             "VARCHAR",
@@ -257,44 +257,44 @@ def report_scope_lookup(*, extra_globals: int = 0) -> ScopeLookup:
     )
     sibling: DeclarationRecord = DeclarationRecord(
         DeclarationIdentity(DeclarationKind.ENUM, "mart_status"),
-        "models/marts/_enums/mart_status.sql",
+        "sql/models/marts/_enums/mart_status.sql",
         1,
         1,
         ScopeKind.LOCAL,
         model_root,
-        owning_path="models/marts",
+        owning_path="sql/models/marts",
     )
     nearby_sibling: DeclarationRecord = DeclarationRecord(
         DeclarationIdentity(DeclarationKind.ENUM, "other_status"),
-        "models/other/_enums/other_status.sql",
+        "sql/models/other/_enums/other_status.sql",
         1,
         1,
         ScopeKind.LOCAL,
         model_root,
-        owning_path="models/other",
+        owning_path="sql/models/other",
     )
     private: DeclarationRecord = DeclarationRecord(
         DeclarationIdentity(DeclarationKind.ENUM, "expected_status", expected),
-        "models/marts/expected_orders.sql",
+        "sql/models/marts/expected_orders.sql",
         4,
         2,
         ScopeKind.PRIVATE,
         model_root,
-        owning_path="models/marts",
+        owning_path="sql/models/marts",
     )
     macro: DeclarationRecord = DeclarationRecord(
         DeclarationIdentity(DeclarationKind.MACRO, "normalize"),
-        "macros/python/normalize.py",
+        "sql/macros/python/normalize.py",
         1,
         1,
         ScopeKind.GLOBAL,
-        OwnershipRoot("macros", OwnershipRootKind.GLOBAL),
+        OwnershipRoot("sql/macros", OwnershipRootKind.GLOBAL),
         macro=MacroMetadata(("value",), (inherited.identity,), "secret-source-digest"),
     )
     generated: tuple[DeclarationRecord, ...] = tuple(
         DeclarationRecord(
             DeclarationIdentity(DeclarationKind.CONSTANT, f"global_{index:05d}"),
-            f"constants/generated/{index:05d}.yml",
+            f"sql/constants/generated/{index:05d}.yml",
             1,
             1,
             ScopeKind.GLOBAL,
@@ -308,8 +308,8 @@ def report_scope_lookup(*, extra_globals: int = 0) -> ScopeLookup:
             model_root,
             OwnershipRoot("tests/unit", resource_kind=ResourceKind.TEST),
             OwnershipRoot("tests/scenarios", resource_kind=ResourceKind.SCENARIO),
-            OwnershipRoot("functions/sql", resource_kind=ResourceKind.FUNCTION),
-            OwnershipRoot("sources", resource_kind=ResourceKind.SOURCE),
+            OwnershipRoot("sql/functions/sql", resource_kind=ResourceKind.FUNCTION),
+            OwnershipRoot("sql/sources", resource_kind=ResourceKind.SOURCE),
         ),
         resources=resources,
         declarations=(
@@ -333,7 +333,7 @@ def report_scope_lookup(*, extra_globals: int = 0) -> ScopeLookup:
     return build_scope_lookup(index=index)
 
 
-_RELOCATION_ROOT: OwnershipRoot = OwnershipRoot("models", resource_kind=ResourceKind.MODEL)
+_RELOCATION_ROOT: OwnershipRoot = OwnershipRoot("sql/models", resource_kind=ResourceKind.MODEL)
 _CENTS_MACRO: DeclarationIdentity = DeclarationIdentity(DeclarationKind.MACRO, "to_cents")
 _ORDER_SHAPE: DeclarationIdentity = DeclarationIdentity(DeclarationKind.SCHEMA, "order_shape")
 
@@ -355,21 +355,21 @@ def relocation_index(consumer_paths: tuple[str, ...]) -> ScopeIndex:
         declarations=(
             DeclarationRecord(
                 identity=_ORDER_SHAPE,
-                path="models/staging/_sqlbuild/_schemas/order_shape.sql",
+                path="sql/models/staging/_sqlbuild/_schemas/order_shape.sql",
                 line=1,
                 column=1,
                 scope=ScopeKind.LOCAL,
                 ownership_root=_RELOCATION_ROOT,
-                owning_path="models/staging",
+                owning_path="sql/models/staging",
             ),
             DeclarationRecord(
                 identity=_CENTS_MACRO,
-                path="models/staging/_sqlbuild/_macros/python/cents.py",
+                path="sql/models/staging/_sqlbuild/_macros/python/cents.py",
                 line=1,
                 column=1,
                 scope=ScopeKind.LOCAL,
                 ownership_root=_RELOCATION_ROOT,
-                owning_path="models/staging",
+                owning_path="sql/models/staging",
             ),
         ),
         usages=(

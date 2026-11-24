@@ -115,17 +115,12 @@ export const SHARED_SHOWN = 3;
 export const CONCURRENCY_DOCS = 'https://sqlbuild.com/docs/concepts/concurrency/';
 
 /**
- * A run's concurrency as the panel states it. A group's limit is the target's, which each member
- * job's run uses unless the job sets its own.
+ * What the "Nodes at once" limit means. A group's limit is the target's, which each member job's run
+ * uses unless the job sets its own.
  */
-export function runConcurrencyText(limit: number, kind: 'job' | 'group'): string {
-	return kind === 'group'
-		? `Members without their own limit: at most ${limit} nodes at once`
-		: `Inside a run: at most ${limit} of this job's nodes at once`;
+export function runConcurrencyHelp(kind: 'job' | 'group'): string {
+	return kind === 'group' ? 'Members without their own limit run at most this many nodes together.' : "At most this many of the job's nodes run together in one run.";
 }
-
-/** What a job does when triggered while a run of it is active, finishing "If triggered while running: …". */
-export const overlapWhileRunning: Record<OverlapPolicy, string> = { queue: 'waits', skip: 'is skipped' };
 
 /**
  * A pool the job takes, in plain words. Normally "supplier_api: takes 1 of 2", against the limit on

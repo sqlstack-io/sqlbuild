@@ -11,6 +11,7 @@ import pytest
 from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
     CliFailureBuildE2ETestCase,
 )
+from tests.e2e.src.sqlbuild.cli.commands.main.build.helpers import take_raw_data_sql
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     prepare_inline_project,
     run_sqb,
@@ -35,11 +36,11 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                     "CREATE TABLE main.customer_status_snapshot "
                     "(customer_id INTEGER, last_ordered_at TIMESTAMP);\n"
                 ),
-                "models/stg_orders.sql": (
+                "sql/models/stg_orders.sql": (
                     "MODEL (description 'Test model stg_orders.', materialized view);\n\n"
                     "SELECT id AS order_id, ordered_at FROM main.raw_orders\n"
                 ),
-                "models/fact_orders.sql": (
+                "sql/models/fact_orders.sql": (
                     "MODEL (description 'Test model fact_orders.',\n"
                     "  materialized table,\n"
                     "  contract enforced,\n"
@@ -50,7 +51,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                     ");\n\n"
                     'SELECT order_id, ordered_at FROM __ref("stg_orders")\n'
                 ),
-                "models/customer_status_snapshot.sql": dedent(
+                "sql/models/customer_status_snapshot.sql": dedent(
                     """
                 MODEL (description "Test model customer_status_snapshot.",
                   materialized incremental,
@@ -73,7 +74,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
             command=("--no-color", "build", "--select", "+customer_status_snapshot"),
             expected_exit_code=1,
             expected_stderr_fragments=(
-                "error[B300]: [B300] models/customer_status_snapshot.sql:9:17: cursor_inputs "
+                "error[B300]: [B300] sql/models/customer_status_snapshot.sql:9:17: cursor_inputs "
                 "fact_orders references unknown column 'missing_column'",
             ),
             verification_sql="SELECT COUNT(*) FROM main.customer_status_snapshot",
@@ -92,7 +93,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 "seed_raw_data.sql": (
                     "CREATE TABLE main.raw_orders (id INTEGER, ordered_at TIMESTAMP);\n"
                 ),
-                "models/customer_status_snapshot.sql": dedent(
+                "sql/models/customer_status_snapshot.sql": dedent(
                     """
                 MODEL (description "Test model customer_status_snapshot.",
                   materialized incremental,
@@ -133,12 +134,12 @@ def test_given_cursor_runtime_failure_projects_when_running_build_then_cli_fails
         project_name="cursor_runtime_project",
         repo_files=test_case.repo_files,
     )
-    seed_file: Path = project_dir / "seed_raw_data.sql"
+    raw_data_sql: str = take_raw_data_sql(project_dir)
     import duckdb
 
     db_path: Path = project_dir / "cursor_runtime.duckdb"
     connection: duckdb.DuckDBPyConnection = duckdb.connect(str(db_path))
-    connection.execute(seed_file.read_text(encoding="utf-8"))
+    connection.execute(raw_data_sql)
     connection.close()
 
     pre_command: tuple[str, ...]

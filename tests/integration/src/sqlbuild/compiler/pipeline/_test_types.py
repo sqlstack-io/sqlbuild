@@ -431,6 +431,8 @@ class SetDependencyPlanTestCase:
     depends_on: str
     expected_models: tuple[str, ...]
     expected_sql_deps: tuple[str, ...]
+    # The dependant: an asset, or a loader, which takes a job or a tag the same way.
+    kind: str = "asset"
 
 
 @dataclass(frozen=True)

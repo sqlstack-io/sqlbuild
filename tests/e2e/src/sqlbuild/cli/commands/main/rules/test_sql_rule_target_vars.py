@@ -16,20 +16,20 @@ _PROJECT_TOML: str = (
     '[vars]\nprobe = "1"\n\n[targets.dev]\n\n[targets.prod]\n\n'
     '[targets.prod.vars]\nprobe = "NULL"\nregion = "us"\n'
 )
-_MODEL_PATH: str = "models/orders.sql"
+_MODEL_PATH: str = "sql/models/orders.sql"
 _MODEL_SQL: str = (
     "MODEL (description 'Test model orders.');\n"
     'SELECT o.id FROM __ref("raw_orders") AS o WHERE o.id = @@probe\n'
 )
 _UPSTREAM_FILES: dict[str, str] = {
-    "models/raw_orders.sql": "MODEL (description 'Test model raw orders.');\nSELECT 1 AS id\n"
+    "sql/models/raw_orders.sql": "MODEL (description 'Test model raw orders.');\nSELECT 1 AS id\n"
 }
 _PROD_ONLY_MODEL: dict[str, str] = {
-    "models/regions.sql": (
+    "sql/models/regions.sql": (
         "MODEL (description 'Test model regions.');\nSELECT '@@region' AS region\n"
     )
 }
-_AUDIT_PATH: str = "audits/singular/orders_have_ids.sql"
+_AUDIT_PATH: str = "sql/audits/singular/orders_have_ids.sql"
 _AUDIT_BODY: str = (
     'SELECT o.id\nFROM __ref("orders") AS o\n'
     'INNER JOIN __ref("raw_orders") AS r ON o.id = r.id\nWHERE o.id = NULL\n'

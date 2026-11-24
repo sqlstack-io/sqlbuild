@@ -32,6 +32,7 @@ def dense_model_path(*, project_dir: Path, index: int) -> Path:
 
     return (
         project_dir
+        / "sql"
         / "models"
         / f"sales{index // 1000:03d}"
         / "intermediate"
@@ -89,11 +90,13 @@ def write_dense_compile_project(
     _layered_write_seeds(project_dir=project_dir, seed_count=seed_count)
     _layered_write_functions(project_dir=project_dir, function_count=function_count)
     for cohort in range((model_count + 999) // 1000):
-        models: Path = project_dir / "models" / f"sales{cohort:03d}" / "intermediate" / "clean"
+        models: Path = (
+            project_dir / "sql" / "models" / f"sales{cohort:03d}" / "intermediate" / "clean"
+        )
         models.mkdir(parents=True)
         macro_count: int = max(1, min(1000, model_count - cohort * 1000) // 80)
         _layered_write_macros(project_dir=project_dir, macro_count=macro_count)
-        macro_root: Path = project_dir / "macros" / "python"
+        macro_root: Path = project_dir / "sql" / "macros" / "python"
         for macro_index, macro_path in enumerate(sorted(macro_root.glob("*.py"))):
             bucket: Path = (
                 models / "_sqlbuild" / "macros" / "python" / f"adjustment{macro_index // 8:03d}"
@@ -111,7 +114,13 @@ def write_dense_compile_project(
         name: str = dense_model_name(index)
         domain: str = f"sales{index // 1000:03d}"
         model_owner: Path = (
-            project_dir / "models" / domain / "intermediate" / "clean" / f"batch{index // 5:05d}"
+            project_dir
+            / "sql"
+            / "models"
+            / domain
+            / "intermediate"
+            / "clean"
+            / f"batch{index // 5:05d}"
         )
         test_owner: Path = (
             project_dir
@@ -172,8 +181,8 @@ def write_dense_compile_project(
 
 
 def _write_sources(*, project_dir: Path, source_count: int) -> None:
-    sources: Path = project_dir / "sources"
-    sources.mkdir()
+    sources: Path = project_dir / "sql" / "sources"
+    sources.mkdir(parents=True)
     entries: list[str] = ["sources:"]
     for index in range(source_count):
         width: int = dense_column_count(index % 240)

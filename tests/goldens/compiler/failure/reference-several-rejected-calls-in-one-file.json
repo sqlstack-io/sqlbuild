@@ -11,11 +11,11 @@
      "message": "__ref(stg_orders) is not a valid __ref() call",
      "resource_type": "model",
      "resource_name": "customer_totals",
-     "path": "models/marts/customer_totals.sql",
+     "path": "sql/models/marts/customer_totals.sql",
      "line": 8,
      "column": 6,
      "location": {
-      "path": "models/marts/customer_totals.sql",
+      "path": "sql/models/marts/customer_totals.sql",
       "line": 8,
       "column": 6,
       "end_line": 8,
@@ -30,11 +30,11 @@
      "message": "__source( 'raw_orders' ) is not a valid __source() call",
      "resource_type": "model",
      "resource_name": "customer_totals",
-     "path": "models/marts/customer_totals.sql",
+     "path": "sql/models/marts/customer_totals.sql",
      "line": 9,
      "column": 6,
      "location": {
-      "path": "models/marts/customer_totals.sql",
+      "path": "sql/models/marts/customer_totals.sql",
       "line": 9,
       "column": 6,
       "end_line": 9,
@@ -49,11 +49,11 @@
      "message": "__seed(\"a\", \"b\") is not a valid __seed() call",
      "resource_type": "model",
      "resource_name": "customer_totals",
-     "path": "models/marts/customer_totals.sql",
+     "path": "sql/models/marts/customer_totals.sql",
      "line": 10,
      "column": 47,
      "location": {
-      "path": "models/marts/customer_totals.sql",
+      "path": "sql/models/marts/customer_totals.sql",
       "line": 10,
       "column": 47,
       "end_line": 10,
@@ -65,7 +65,7 @@
   }
  ],
  "compiled": {
-  "models/marts/customer_totals.sql": [
+  "sql/models/marts/customer_totals.sql": [
    "-- __ref(hidden)",
    "SELECT order_id AS customer_id, 'é __ref(hidden)' AS note, $$__ref(hidden)$$ AS body,",
    "  1 AS total_amount /* __ref(hidden) */",
@@ -74,7 +74,7 @@
    "WHERE customer_id IN (SELECT customer_id FROM __seed(\"a\", \"b\"))",
    ""
   ],
-  "models/staging/stg_orders.sql": [
+  "sql/models/staging/stg_orders.sql": [
    "SELECT order_id, customer_id, amount, status",
    "FROM __source(\"raw_orders\")",
    ""
@@ -88,8 +88,8 @@
     "name": "customer_totals",
     "resource_type": "model",
     "package_name": "failure_corpus",
-    "path": "models/marts/customer_totals.sql",
-    "original_file_path": "models/marts/customer_totals.sql",
+    "path": "sql/models/marts/customer_totals.sql",
+    "original_file_path": "sql/models/marts/customer_totals.sql",
     "unique_id": "model.failure_corpus.customer_totals",
     "fqn": [
      "failure_corpus",
@@ -155,8 +155,8 @@
     "name": "stg_orders",
     "resource_type": "model",
     "package_name": "failure_corpus",
-    "path": "models/staging/stg_orders.sql",
-    "original_file_path": "models/staging/stg_orders.sql",
+    "path": "sql/models/staging/stg_orders.sql",
+    "original_file_path": "sql/models/staging/stg_orders.sql",
     "unique_id": "model.failure_corpus.stg_orders",
     "fqn": [
      "failure_corpus",
@@ -226,8 +226,8 @@
     "name": "raw_orders",
     "resource_type": "source",
     "package_name": "failure_corpus",
-    "path": "sources/raw.yml",
-    "original_file_path": "sources/raw.yml",
+    "path": "sql/sources/raw.yml",
+    "original_file_path": "sql/sources/raw.yml",
     "unique_id": "source.failure_corpus.raw_orders",
     "fqn": [
      "failure_corpus",

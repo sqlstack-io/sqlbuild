@@ -51,7 +51,7 @@ _LINEAGE_TYPES: str = "sqlbuild.compiler.lineage.types"
                 "__type__": f"{HELPERS_MODULE}:OrderLine",
                 "order_id": 7,
                 "status": {"__enum__": f"{HELPERS_MODULE}:OrderStatus.PLACED"},
-                "path": {"__path__": "models/a.sql"},
+                "path": {"__path__": "sql/models/a.sql"},
             },
         ),
         StageCaptureTestCase(
@@ -224,7 +224,7 @@ def test_given_reordered_value_when_rendering_capture_then_only_unordered_collec
                 "__type__": f"{HELPERS_MODULE}:OrderLine",
                 "order_id": 7,
                 "status": {"__enum__": f"{HELPERS_MODULE}:OrderStatus.PLACED"},
-                "path": {"__path__": "models/a.sql"},
+                "path": {"__path__": "sql/models/a.sql"},
             },
         ),
     ],

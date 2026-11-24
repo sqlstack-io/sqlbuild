@@ -97,7 +97,7 @@ def test_given_removed_interface_when_running_cli_then_reports_unknown_argument(
             "removed unchanged MODEL field",
             "MODEL (description 'Test model.', materialized table, run_despite_unchanged always); SELECT 1 AS order_id",
             "run_despite_unchanged",
-            "models/orders.sql",
+            "sql/models/orders.sql",
             "",
         ),
         RemovedConfigTestCase(
@@ -158,7 +158,7 @@ def test_given_removed_config_when_running_cli_then_explains_direct_mode(
 ) -> None:
     files: dict[str, str] = {
         "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
-        "models/orders.sql": "MODEL (description 'Test model orders.', materialized view);\nSELECT 1 AS order_id",
+        "sql/models/orders.sql": "MODEL (description 'Test model orders.', materialized view);\nSELECT 1 AS order_id",
     }
     files[test_case.filename] = test_case.prefix + test_case.content
     project: Path = prepare_inline_project(
@@ -193,8 +193,8 @@ def test_given_prepare_version_hook_when_running_cli_then_rejects_removed_hook(
         project_name="removed_hook",
         repo_files={
             "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n[connection]\ndatabase = "orders.duckdb"\n',
-            "models/orders.sql": "MODEL (description 'Test model orders.', materialized custom_order);\nSELECT 1 AS order_id",
-            "materializations/custom_order.py": (
+            "sql/models/orders.sql": "MODEL (description 'Test model orders.', materialized custom_order);\nSELECT 1 AS order_id",
+            "python/materializations/custom_order.py": (
                 "from sqlbuild.executor.custom.models import PrepareVersionContext\n\n"
                 "def prepare_version(ctx: PrepareVersionContext):\n    pass\n\n"
                 "def materialize(ctx):\n    pass\n"

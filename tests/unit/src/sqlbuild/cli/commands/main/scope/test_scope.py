@@ -76,7 +76,7 @@ def test_given_verbose_flag_when_rendering_json_then_bytes_match_default_json(
         exit_code: int = run_scope_command(
             request=ScopeCommandRequest(
                 target="model:orders",
-                as_path="models/marts/orders.sql",
+                as_path="sql/models/marts/orders.sql",
                 json_output=True,
                 verbose=verbose,
             ),
@@ -120,14 +120,14 @@ def test_given_incomplete_index_when_running_then_prints_useful_payload_and_exit
     index: ScopeIndex = ScopeIndex(completeness=ScopeCompleteness(discovery=False))
     stream: StringIO = StringIO()
     exit_code: int = run_scope_command(
-        request=ScopeCommandRequest(at="models/new.sql", json_output=True),
+        request=ScopeCommandRequest(at="sql/models/new.sql", json_output=True),
         load_scope_index=lambda **_kwargs: index,
         output_stream=stream,
     )
     payload: dict[str, object] = json.loads(stream.getvalue())
     resource: dict[str, object] = payload["resource"]
     assert exit_code == test_case.expected_exit_code
-    assert resource["path"] == "models/new.sql"
+    assert resource["path"] == "sql/models/new.sql"
     assert payload["complete"] is False
 
 
@@ -140,14 +140,14 @@ def test_given_prospective_directory_with_trailing_slash_when_running_then_prese
     index: ScopeIndex = report_scope_lookup().index
     stream: StringIO = StringIO()
     exit_code: int = run_scope_command(
-        request=ScopeCommandRequest(at="models/staging/", json_output=True),
+        request=ScopeCommandRequest(at="sql/models/staging/", json_output=True),
         load_scope_index=lambda **_kwargs: index,
         output_stream=stream,
     )
     payload: dict[str, object] = json.loads(stream.getvalue())
     resource: dict[str, object] = payload["resource"]
     assert exit_code == test_case.expected_exit_code
-    assert resource["target"] == "models/staging/"
+    assert resource["target"] == "sql/models/staging/"
     assert resource["directory"] is True
 
 
@@ -159,7 +159,7 @@ def test_given_existing_target_and_destination_when_running_then_text_has_move_s
 ) -> None:
     stream: StringIO = StringIO()
     exit_code: int = run_scope_command(
-        request=ScopeCommandRequest(target="model:orders", as_path="models/marts/orders.sql"),
+        request=ScopeCommandRequest(target="model:orders", as_path="sql/models/marts/orders.sql"),
         load_scope_index=lambda **_kwargs: report_scope_lookup().index,
         output_stream=stream,
     )

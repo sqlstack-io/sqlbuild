@@ -42,7 +42,7 @@ def test_given_attached_measurement_audit_when_compiling_then_full_contract_reac
                 "[connection]\n"
                 'database = ":memory:"\n'
             ),
-            "models/orders.sql": """
+            "sql/models/orders.sql": """
                 MODEL (description "Test model orders.",
                   materialized table,
                   audits [
@@ -60,7 +60,7 @@ def test_given_attached_measurement_audit_when_compiling_then_full_contract_reac
 
                 SELECT 1 AS order_id
             """,
-            "audits/generic/valid_order_rate.sql": """
+            "sql/audits/generic/valid_order_rate.sql": """
                 AUDIT (
                   evaluation measurement,
                   value valid_rate,
@@ -137,8 +137,8 @@ def test_given_generic_measurement_definition_with_policy_when_compiling_then_de
         tmp_path,
         {
             "sqlbuild_project.toml": 'name = "demo"\nadapter = "duckdb"\n',
-            "models/orders.sql": "MODEL (description 'Test model orders.', audits [rate (thresholds (warn (below 100)))]); SELECT 1",
-            "audits/generic/rate.sql": """
+            "sql/models/orders.sql": "MODEL (description 'Test model orders.', audits [rate (thresholds (warn (below 100)))]); SELECT 1",
+            "sql/audits/generic/rate.sql": """
                 AUDIT (evaluation measurement, value rate, thresholds (warn (below 100)));
                 MEASURE (SELECT 100 AS rate FROM @relation);
             """,
@@ -168,8 +168,8 @@ def test_given_measurement_attachment_without_thresholds_when_compiling_then_pol
         tmp_path,
         {
             "sqlbuild_project.toml": 'name = "demo"\nadapter = "duckdb"\n',
-            "models/orders.sql": "MODEL (description 'Test model orders.', audits [rate]); SELECT 1",
-            "audits/generic/rate.sql": """
+            "sql/models/orders.sql": "MODEL (description 'Test model orders.', audits [rate]); SELECT 1",
+            "sql/audits/generic/rate.sql": """
                 AUDIT (evaluation measurement, value rate);
                 MEASURE (SELECT 100 AS rate FROM @relation);
             """,
@@ -199,10 +199,10 @@ def test_given_measurement_attachment_with_severity_when_compiling_then_conflict
         tmp_path,
         {
             "sqlbuild_project.toml": 'name = "demo"\nadapter = "duckdb"\n',
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Test model orders.', audits [rate (severity warn, thresholds (warn (below 100)))]); SELECT 1"
             ),
-            "audits/generic/rate.sql": """
+            "sql/audits/generic/rate.sql": """
                 AUDIT (evaluation measurement, value rate);
                 MEASURE (SELECT 100 AS rate FROM @relation);
             """,
@@ -233,9 +233,9 @@ def test_given_standalone_measurement_with_header_policy_when_compiling_then_it_
         tmp_path,
         {
             "sqlbuild_project.toml": 'name = "demo"\nadapter = "duckdb"\n',
-            "models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS order_id",
-            "models/customers.sql": "MODEL (description 'Test model customers.');\nSELECT 1 AS order_id",
-            "audits/singular/rate.sql": """
+            "sql/models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS order_id",
+            "sql/models/customers.sql": "MODEL (description 'Test model customers.');\nSELECT 1 AS order_id",
+            "sql/audits/singular/rate.sql": """
                 AUDIT (
                   evaluation measurement,
                   value rate,

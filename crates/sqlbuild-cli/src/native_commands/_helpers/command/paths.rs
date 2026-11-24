@@ -12,7 +12,9 @@ use sqlbuild_core::git_revisions::main::head_commit::head_commit;
 use sqlbuild_rules::project_tree::main::project_real_path::project_real_path;
 use tokio::time::Instant;
 
-use crate::native_commands::constants::{DEVELOPMENT_OUTPUT_FOLDER, LOCATION_COMMIT_CHECK_SECONDS};
+use crate::native_commands::constants::{
+    DEVELOPMENT_CONTROL_FILE, DEVELOPMENT_OUTPUT_FOLDER, LOCATION_COMMIT_CHECK_SECONDS,
+};
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::models::{LocationWatch, ProjectLocation};
 use crate::replay::main::output_file_identities::output_file_identities;
@@ -20,7 +22,7 @@ use crate::replay::main::output_file_identities::output_file_identities;
 /// Observe the same project inputs as compiler reuse, excluding redirected command output.
 pub(crate) fn location_watch(root: &Path) -> LocationWatch {
     let rules = location_rules();
-    let files: Vec<String> = std::env::var_os("SQLBUILD_DEVELOPMENT_CONTROL_FILE")
+    let files: Vec<String> = std::env::var_os(DEVELOPMENT_CONTROL_FILE)
         .into_iter()
         .map(|path| path.to_string_lossy().into_owned())
         .collect();

@@ -242,7 +242,7 @@ pytestmark: pytest.MarkDecorator = pytest.mark.dbt
         ),
         RealDbtInteropPlanTestCase(
             description="routes explicit model path selector for real SQLBuild project",
-            args=("--select", "path:models/marts"),
+            args=("--select", "path:sql/models/marts"),
             sqlbuild_model_contents_by_relative_path={
                 "marts/mart_orders.sql": "MODEL (description 'Test model mart_orders.');\n\nselect 1 as order_id\n",
             },
@@ -275,7 +275,7 @@ pytestmark: pytest.MarkDecorator = pytest.mark.dbt
             expected_dbt_anchor_unique_ids_by_term={},
             expected_dbt_skip_reason=DbtInteropSkipReason.NO_DBT_WORK,
             expected_sqlbuild_skip_reason=None,
-            expected_path_translations=(("path:models\\marts", "path:models/marts"),),
+            expected_path_translations=(("path:models\\marts", "path:sql/models/marts"),),
         ),
         RealDbtInteropPlanTestCase(
             description="preserves routed SQLBuild cursor args in real plan argv",

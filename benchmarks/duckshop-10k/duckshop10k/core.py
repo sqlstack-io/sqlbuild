@@ -115,6 +115,8 @@ def declaration_uses(text: str) -> set[tuple[str, str]]:
     return uses
 
 
+SQL_ROOT = "sql"
+
 _KIND_OF_ROLE = {
     "macros/sql": "macro",
     "macros/python": "macro",
@@ -185,7 +187,7 @@ class Project:
     def _consumers(self, files: dict[str, str]) -> dict[tuple[str, str], set[str]]:
         direct: dict[tuple[str, str], set[str]] = {}
         for path, text in files.items():
-            if not path.endswith(".sql") or not path.startswith(("models/", "tests/")):
+            if not path.endswith(".sql") or not path.startswith(("sql/models/", "tests/")):
                 continue
             folder = str(PurePosixPath(path).parent)
             uses = declaration_uses(text)
@@ -196,9 +198,9 @@ class Project:
                     continue
                 direct.setdefault(use, set()).add(folder)
         for path, text in files.items():
-            if path.startswith(("sources/", "seeds/")):
+            if path.startswith(("sql/sources/", "sql/seeds/")):
                 for use in declaration_uses(text):
-                    direct.setdefault(use, set()).add(path.split("/")[0])
+                    direct.setdefault(use, set()).add("/".join(path.split("/")[:2]))
         # A declaration used inside another declaration is used wherever that one is.
         uses_of: dict[tuple[str, str], set[tuple[str, str]]] = {
             key: declaration_uses(declaration.content) & set(self.declarations)
@@ -222,18 +224,20 @@ class Project:
 
 
 def _placement(folders: set[str], role: str) -> str:
-    roots = {folder.split("/")[0] for folder in folders}
+    """The global `sql/<role>`, or the `_sqlbuild/` role of the deepest folder all users share."""
+    # Below sql/, each resource kind's folder (sql/models, sql/sources) is its own root.
+    parts = [PurePosixPath(folder.removeprefix(f"{SQL_ROOT}/")).parts for folder in folders]
+    roots = {folder_parts[0] for folder_parts in parts}
     if len(roots) > 1:
-        return role
-    parts = [PurePosixPath(folder).parts for folder in folders]
+        return f"{SQL_ROOT}/{role}"
     common: list[str] = []
     for level in zip(*parts, strict=False):
         if len(set(level)) != 1:
             break
         common.append(level[0])
     if len(common) < 2:
-        return role
-    owner = "/".join(common)
+        return f"{SQL_ROOT}/{role}"
+    owner = "/".join(common) if common[0] == "tests" else "/".join((SQL_ROOT, *common))
     private = all(folder == owner for folder in folders)
     return f"{owner}/_sqlbuild/{'_' if private else ''}{role}"
 

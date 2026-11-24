@@ -9,77 +9,84 @@ fn given_declaration_layouts_when_scanning_then_facts_and_failures_match_python(
             kind: None,
             description: "global, inherited, grouped and local roots sort by relative path",
             files: &[
-                "macros/python/text.py",
-                "macros/python/__init__.py",
-                "macros/__init__.py",
-                "macros/sql/totals.sql",
-                "enums/status.sql",
-                "models/marts/_enums/local.sql",
-                "models/marts/_sqlbuild/constants/limits.sql",
-                "models/marts/_sqlbuild/audits/generic/positive.sql",
+                "sql/macros/python/text.py",
+                "sql/macros/python/__init__.py",
+                "sql/macros/__init__.py",
+                "sql/macros/sql/totals.sql",
+                "sql/enums/status.sql",
+                "sql/models/marts/_enums/local.sql",
+                "sql/models/marts/_sqlbuild/constants/limits.sql",
+                "sql/models/marts/_sqlbuild/audits/generic/positive.sql",
             ],
             directories: &[],
             expected_facts: Ok(&[
-                ("enums/status.sql", "enum", "global", "enums", None, "enums"),
                 (
-                    "macros/python/text.py",
-                    "macro",
+                    "sql/enums/status.sql",
+                    "enum",
                     "global",
-                    "macros",
+                    "sql/enums",
                     None,
-                    "macros",
+                    "sql/enums",
                 ),
                 (
-                    "macros/sql/totals.sql",
+                    "sql/macros/python/text.py",
                     "macro",
                     "global",
-                    "macros",
+                    "sql/macros",
                     None,
-                    "macros",
+                    "sql/macros",
                 ),
                 (
-                    "models/marts/_enums/local.sql",
+                    "sql/macros/sql/totals.sql",
+                    "macro",
+                    "global",
+                    "sql/macros",
+                    None,
+                    "sql/macros",
+                ),
+                (
+                    "sql/models/marts/_enums/local.sql",
                     "enum",
                     "local",
-                    "models",
-                    Some("models/marts"),
-                    "models/marts/_enums",
+                    "sql/models",
+                    Some("sql/models/marts"),
+                    "sql/models/marts/_enums",
                 ),
                 (
-                    "models/marts/_sqlbuild/constants/limits.sql",
+                    "sql/models/marts/_sqlbuild/constants/limits.sql",
                     "constant",
                     "inherited",
-                    "models",
-                    Some("models/marts"),
-                    "models/marts/_sqlbuild/constants",
+                    "sql/models",
+                    Some("sql/models/marts"),
+                    "sql/models/marts/_sqlbuild/constants",
                 ),
             ]),
-            expected_groups: Ok(&[("models", "models/marts/_sqlbuild")]),
+            expected_groups: Ok(&[("sql/models", "sql/models/marts/_sqlbuild")]),
         },
         LayoutTestCase {
             kind: None,
             description: "a declaration group directly below a canonical root fails",
-            files: &["models/_sqlbuild/macros/text.py"],
+            files: &["sql/models/_sqlbuild/macros/text.py"],
             directories: &[],
             expected_facts: Err(
-                "Grouped declaration root models/_sqlbuild/ must be below a concrete owner \
-                 directory; use the project-wide macros/, enums/, constants/, audits/, \
-                 schemas/, or hooks/ root instead",
+                "Grouped declaration root sql/models/_sqlbuild/ must be below a concrete owner \
+                 directory; use the project-wide sql/macros/, sql/enums/, sql/constants/, sql/audits/, \
+                 sql/schemas/, or sql/hooks/ root instead",
             ),
             expected_groups: Ok(&[]),
         },
         LayoutTestCase {
             kind: None,
             description: "a nested declaration root fails in both scans",
-            files: &["models/a/_enums/macros/x.py"],
-            directories: &["schemas/enums"],
+            files: &["sql/models/a/_enums/macros/x.py"],
+            directories: &["sql/schemas/enums"],
             expected_facts: Err(
-                "Declaration root models/a/_enums/macros/ is nested inside another declaration \
+                "Declaration root sql/models/a/_enums/macros/ is nested inside another declaration \
                  tree",
             ),
             expected_groups: Err(
-                "Declaration directory schemas/enums/ is not allowed inside the project-wide \
-                 schemas/ role; scoped declarations belong under <folder>/_sqlbuild/ below a \
+                "Declaration directory sql/schemas/enums/ is not allowed inside the project-wide \
+                 sql/schemas/ role; scoped declarations belong under <folder>/_sqlbuild/ below a \
                  resource tree",
             ),
         },
@@ -87,18 +94,18 @@ fn given_declaration_layouts_when_scanning_then_facts_and_failures_match_python(
             kind: None,
             description: "unsupported group and role entries list every entry",
             files: &[
-                "models/a/_sqlbuild/notes.txt",
-                "audits/x.sql",
-                "audits/.keep",
+                "sql/models/a/_sqlbuild/notes.txt",
+                "sql/audits/x.sql",
+                "sql/audits/.keep",
             ],
-            directories: &["models/a/_sqlbuild/extra"],
+            directories: &["sql/models/a/_sqlbuild/extra"],
             expected_facts: Err(
-                "Declaration group models/a/_sqlbuild/ contains unsupported entries: \
-                 models/a/_sqlbuild/extra, models/a/_sqlbuild/notes.txt",
+                "Declaration group sql/models/a/_sqlbuild/ contains unsupported entries: \
+                 sql/models/a/_sqlbuild/extra, sql/models/a/_sqlbuild/notes.txt",
             ),
             expected_groups: Err(
-                "Unsupported entries in audits/: audits/x.sql; audit files must live in \
-                 audits/generic/ or audits/singular/",
+                "Unsupported entries in sql/audits/: sql/audits/x.sql; audit files must live in \
+                 sql/audits/generic/ or sql/audits/singular/",
             ),
         },
         LayoutTestCase {
@@ -106,12 +113,12 @@ fn given_declaration_layouts_when_scanning_then_facts_and_failures_match_python(
             description: "local singular audits and unknown hook roles fail the named layout",
             files: &[],
             directories: &[
-                "models/a/_sqlbuild/_audits/singular",
-                "models/b/_sqlbuild/hooks/x",
+                "sql/models/a/_sqlbuild/_audits/singular",
+                "sql/models/b/_sqlbuild/hooks/x",
             ],
             expected_facts: Ok(&[]),
             expected_groups: Err(
-                "models/a/_sqlbuild/_audits/singular/ is invalid: singular audits are never used \
+                "sql/models/a/_sqlbuild/_audits/singular/ is invalid: singular audits are never used \
                  by name, so folder-only visibility has no meaning; use \
                  _sqlbuild/audits/singular/",
             ),
@@ -119,23 +126,23 @@ fn given_declaration_layouts_when_scanning_then_facts_and_failures_match_python(
         LayoutTestCase {
             kind: None,
             description: "a macro file directly below a macro root names its kind folder",
-            files: &["models/marts/_sqlbuild/_macros/text.py"],
+            files: &["sql/models/marts/_sqlbuild/_macros/text.py"],
             directories: &[],
             expected_facts: Err(
-                "macro file models/marts/_sqlbuild/_macros/text.py must live in \
-                 models/marts/_sqlbuild/_macros/python/ or models/marts/_sqlbuild/_macros/sql/\n  \
-                 --> models/marts/_sqlbuild/_macros/text.py",
+                "macro file sql/models/marts/_sqlbuild/_macros/text.py must live in \
+                 sql/models/marts/_sqlbuild/_macros/python/ or sql/models/marts/_sqlbuild/_macros/sql/\n  \
+                 --> sql/models/marts/_sqlbuild/_macros/text.py",
             ),
-            expected_groups: Ok(&[("models", "models/marts/_sqlbuild")]),
+            expected_groups: Ok(&[("sql/models", "sql/models/marts/_sqlbuild")]),
         },
         LayoutTestCase {
             kind: None,
             description: "a macro file in the other kind folder fails",
-            files: &["macros/python/totals.sql"],
+            files: &["sql/macros/python/totals.sql"],
             directories: &[],
             expected_facts: Err(
-                "macro file macros/python/totals.sql must live in macros/python/ or \
-                 macros/sql/\n  --> macros/python/totals.sql",
+                "macro file sql/macros/python/totals.sql must live in sql/macros/python/ or \
+                 sql/macros/sql/\n  --> sql/macros/python/totals.sql",
             ),
             expected_groups: Ok(&[]),
         },
@@ -154,20 +161,27 @@ fn given_declaration_layouts_when_scanning_then_facts_and_failures_match_python(
             description: "an isolated kind skips the misplaced roots of other kinds",
             files: &[
                 "_macros/text.py",
-                "enums/status.sql",
-                "models/a/macros/x.py",
+                "sql/enums/status.sql",
+                "sql/models/a/macros/x.py",
             ],
             directories: &[],
-            expected_facts: Ok(&[("enums/status.sql", "enum", "global", "enums", None, "enums")]),
+            expected_facts: Ok(&[(
+                "sql/enums/status.sql",
+                "enum",
+                "global",
+                "sql/enums",
+                None,
+                "sql/enums",
+            )]),
             expected_groups: Ok(&[]),
         },
         LayoutTestCase {
             kind: Some(DeclarationKind::Constant),
             description: "an isolated kind still rejects a root nested in its own tree",
-            files: &["models/a/constants/_enums/x.sql"],
+            files: &["sql/models/a/constants/_enums/x.sql"],
             directories: &[],
             expected_facts: Err(
-                "Declaration root models/a/constants/_enums/ is nested inside another \
+                "Declaration root sql/models/a/constants/_enums/ is nested inside another \
                  declaration tree",
             ),
             expected_groups: Ok(&[]),

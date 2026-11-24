@@ -79,7 +79,7 @@ def build_model_entry(
     return ModelPlanEntry(
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name=name),
         name=name,
-        relative_path=Path(f"models/{name}.sql"),
+        relative_path=Path(f"sql/models/{name}.sql"),
         materialization_type=materialization_type,
         action=action,
         reason=reason,
@@ -179,7 +179,7 @@ def build_plan_provider_usage(
     consumer_name: str = "raw_orders",
     parameter_name: str = "marker_provider",
     annotation_class_name: str | None = "MarkerProvider",
-    annotation_module: str | None = "providers.marker",
+    annotation_module: str | None = "python.providers.marker",
 ) -> PlanProviderUsage:
     return PlanProviderUsage(
         provider_name=provider_name,
@@ -196,7 +196,7 @@ def build_discovered_provider_usage(
     provider_name: str = "marker_provider",
     parameter_name: str = "marker_provider",
     annotation_class_name: str | None = "MarkerProvider",
-    annotation_module: str | None = "providers.marker",
+    annotation_module: str | None = "python.providers.marker",
 ) -> DiscoveredProviderUsage:
     return DiscoveredProviderUsage(
         provider_name=provider_name,
@@ -237,7 +237,7 @@ def build_seed_entry(*, name: str, reason: PlanReason = PlanReason.FIRST_RUN) ->
         destination=CompiledRelationLocation(
             database=None, schema="main", name=name, qualified_name=f"main.{name}"
         ),
-        file_path=Path(f"seeds/{name}.csv"),
+        file_path=Path(f"sql/seeds/{name}.csv"),
         columns=(),
         csv_settings=SeedCsvSettings(),
         reason=reason,
@@ -256,7 +256,7 @@ def build_function_entry(
     return FunctionPlanEntry(
         key=CompiledObjectKey(resource_type=CompiledResourceType.UDF, name=name),
         name=name,
-        relative_path=Path(f"functions/{language.value}/{name}.sql"),
+        relative_path=Path(f"sql/functions/{language.value}/{name}.sql"),
         destination=CompiledRelationLocation(
             database=None, schema="main", name=name, qualified_name=f"main.{name}"
         ),

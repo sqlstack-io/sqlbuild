@@ -20,30 +20,52 @@ export const READABLE_ZOOM = MIN_TITLE_PX / CARD_TITLE_PX;
 
 /**
  * A graph of up to this many cards opens, and resets, showing all of it; only a larger one opens at
- * `READABLE_ZOOM` on its start card. Zoomed out further, cards take their compact form (`compactLevel`).
+ * `READABLE_ZOOM` on its start card. Zoomed out further, cards take their compact forms (`cardStage`).
  */
 export const WHOLE_FIT_CARDS = 150;
 
 /** The lowest zoom down to which titles are counter-scaled to `MIN_TITLE_PX`, and the lowest a whole-graph fit goes. */
 export const LABEL_MIN_ZOOM = 0.35;
 
+// Cards are drawn in stages, each kept while the card's name renders at about 10 px or more on screen:
+// the full card (name and status line) down to `FULL_ZOOM`, where the 11 px status line would read
+// under 9 px; then the same card with its name alone, enlarged up to `NAME_MAX_PX` canvas px so it
+// stays `NAME_SCREEN_PX` on screen, down to `NAME_ZOOM`; then a pill across the card's full width
+// down to `PILL_ZOOM`; then a dot.
+
+/** The lowest zoom a card is drawn in full at. */
+export const FULL_ZOOM = 0.8;
 /**
- * Below this zoom cards take their compact form, a one-line pill (CompactFace), since the cards' detail
- * lines (11 px) would show under 9 px. Above it cards are drawn in full.
+ * The zoom a small graph that doesn't quite fit opens at instead of shrinking further, so it opens
+ * with its cards in full; kept as before the staged cards, so graphs open where they did.
  */
 export const COMPACT_ZOOM = 0.82;
-/**
- * The compact levels' lowest zooms. A pill's name is fitted once per level, at that level's lowest zoom,
- * and keeps its size on screen through the level (`--sb-title-unzoom`); the last level runs on down,
- * the pill shrinking with the card below `LABEL_MIN_ZOOM`.
- */
-export const COMPACT_LEVELS = [0.6, 0.45, LABEL_MIN_ZOOM] as const;
+/** The largest a name-only card's name grows, in canvas px: the card's height leaves room for it. */
+export const NAME_MAX_PX = 26;
+/** The name's size on screen a stage keeps. */
+export const NAME_SCREEN_PX = 10;
+/** The lowest zoom a card shows its name alone at. */
+export const NAME_ZOOM = NAME_SCREEN_PX / NAME_MAX_PX;
+/** The lowest zoom a card is a pill at; below it, a dot. */
+export const PILL_ZOOM = 0.315;
 
-/** How cards are drawn at `zoom`: 0 in full, else the compact level, from 1. */
+export type CardStage = 'full' | 'name' | 'pill' | 'dot';
+
+/** How cards are drawn at `zoom`. */
+export function cardStage(zoom: number): CardStage {
+	if (zoom >= FULL_ZOOM) return 'full';
+	if (zoom >= NAME_ZOOM) return 'name';
+	return zoom >= PILL_ZOOM ? 'pill' : 'dot';
+}
+
+/**
+ * The canvas's compact level at `zoom`: 0 for full cards; 1 through the name-only and pill stages
+ * (cards without a name-only form, such as folders and member jobs, show their pill from the
+ * name-only stage on); 2 for dots.
+ */
 export function compactLevel(zoom: number): number {
-	if (zoom >= COMPACT_ZOOM) return 0;
-	const level = COMPACT_LEVELS.findIndex((low) => zoom >= low);
-	return level < 0 ? COMPACT_LEVELS.length : level + 1;
+	const stage = cardStage(zoom);
+	return stage === 'full' ? 0 : stage === 'dot' ? 2 : 1;
 }
 
 type FitOptions = {

@@ -1041,7 +1041,7 @@ def native_yaml_tags_and_values(
     return [{True: "error", False: "ok"}[failure] for failure in failed], [row[1] for row in loaded]
 
 
-VALIDATION_MODEL: tuple[str, bytes] = ("models/orders.sql", b"MODEL ();\nSELECT 1 AS order_id")
+VALIDATION_MODEL: tuple[str, bytes] = ("sql/models/orders.sql", b"MODEL ();\nSELECT 1 AS order_id")
 
 
 def seed_project_files(*, header: bytes, settings: bytes = b"") -> tuple[tuple[str, bytes], ...]:
@@ -1049,9 +1049,9 @@ def seed_project_files(*, header: bytes, settings: bytes = b"") -> tuple[tuple[s
 
     return (
         VALIDATION_MODEL,
-        ("seeds/countries.csv", header + b"\nGB,United Kingdom\n"),
+        ("sql/seeds/countries.csv", header + b"\nGB,United Kingdom\n"),
         (
-            "seeds/countries.yml",
+            "sql/seeds/countries.yml",
             b"seeds:\n  - name: countries\n"
             + settings
             + b"    columns:\n      - name: code\n        type: VARCHAR\n"
@@ -1085,7 +1085,7 @@ def model_file_record() -> DiscoveredSqlModelFile:
 
     return DiscoveredSqlModelFile(
         file_path=Path("/project/models/orders.sql"),
-        relative_path=Path("models/orders.sql"),
+        relative_path=Path("sql/models/orders.sql"),
         contents="MODEL ();\nselect 1 as order_id",
         header_values={},
         header_column_locations={},

@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Unknown macro '@py.not_a_macro' in '<project>/models/inventory/marts/inventory_summary_0.sql'. Available macros: adjust_0, adjust_1"
+     "message": "Unknown macro '@py.not_a_macro' in '<project>/sql/models/inventory/marts/inventory_summary_0.sql'. Available macros: adjust_0, adjust_1"
     }
    ]
   },
@@ -20,7 +20,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Unknown macro '@py.not_a_macro' in '<project>/models/inventory/marts/inventory_summary_0.sql'. Available macros: adjust_0, adjust_1"
+     "message": "Unknown macro '@py.not_a_macro' in '<project>/sql/models/inventory/marts/inventory_summary_0.sql'. Available macros: adjust_0, adjust_1"
     }
    ]
   },
@@ -37,7 +37,7 @@
     "Project assembly  OK  (<elapsed>)",
     "Project discovery  OK  (<elapsed>)",
     "Compiling project...",
-    "error[P001]: Unknown macro '@py.not_a_macro' in '<project>/models/inventory/marts/inventory_summary_0.sql'. Available macros: adjust_0, adjust_1",
+    "error[P001]: Unknown macro '@py.not_a_macro' in '<project>/sql/models/inventory/marts/inventory_summary_0.sql'. Available macros: adjust_0, adjust_1",
     "",
     ""
    ]

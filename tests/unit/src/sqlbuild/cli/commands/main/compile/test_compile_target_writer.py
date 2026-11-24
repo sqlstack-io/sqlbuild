@@ -58,17 +58,17 @@ SQL_TEST_MODEL_CHAINS: str = "sql_test_model_chain_names_by_key"
         TargetWriterTestCase(
             description="writes compiled SQL, manifest, audits, and chain tests",
             expected_files={
-                "compiled/models/staging/orders.sql": "SELECT 1 AS order_id\n",
-                "compiled/functions/sql/is_completed_order.sql": (
+                "compiled/sql/models/staging/orders.sql": "SELECT 1 AS order_id\n",
+                "compiled/sql/functions/sql/is_completed_order.sql": (
                     "CREATE OR REPLACE MACRO analytics.is_completed_order(order_status) AS (\n"
                     "order_status = 'completed'\n"
                     ")\n"
                 ),
-                "compiled/functions/python/is_completed_order_py.sql": (
+                "compiled/sql/functions/python/is_completed_order_py.sql": (
                     "REGISTER PYTHON FUNCTION analytics.is_completed_order_py"
                     "(VARCHAR) RETURNS BOOLEAN\n"
                 ),
-                "compiled/audits/generic/orders/not_null__order_id.sql": (
+                "compiled/sql/audits/generic/orders/not_null__order_id.sql": (
                     "SELECT order_id FROM analytics.orders WHERE order_id IS NULL\n"
                 ),
             },
@@ -208,8 +208,8 @@ def test_given_parameterized_test_entries_when_writing_target_then_case_artifact
         TargetWriterTestCase(
             description="writes offline compiled SQL without manifest by default",
             expected_files={
-                "compiled/models/staging/orders.sql": "SELECT 2 AS order_id\n",
-                "compiled/functions/sql/is_completed_order.sql": (
+                "compiled/sql/models/staging/orders.sql": "SELECT 2 AS order_id\n",
+                "compiled/sql/functions/sql/is_completed_order.sql": (
                     "CREATE OR REPLACE MACRO analytics.is_completed_order(order_status) AS (\n"
                     "order_status = 'completed'\n"
                     ")\n"
@@ -225,7 +225,7 @@ def test_given_compiled_project_when_writing_static_target_then_expected_files_a
 ) -> None:
     project: CompiledProjectView = build_static_target_writer_project()
     target_dir: Path = tmp_path / "target"
-    stale_path: Path = target_dir / "compiled" / "models" / "deleted.sql"
+    stale_path: Path = target_dir / "compiled" / "sql" / "models" / "deleted.sql"
     stale_path.parent.mkdir(parents=True)
     stale_path.write_text("SELECT 'stale'\n", encoding="utf-8")
 
@@ -234,7 +234,7 @@ def test_given_compiled_project_when_writing_static_target_then_expected_files_a
         adapter=DuckDbAdapter(),
         project=project,
     )
-    model_path: Path = target_dir / "compiled" / "models" / "staging" / "orders.sql"
+    model_path: Path = target_dir / "compiled" / "sql" / "models" / "staging" / "orders.sql"
     unchanged_mtime_ns: int = 1_000_000_000
     os.utime(model_path, ns=(unchanged_mtime_ns, unchanged_mtime_ns))
     _ = write_static_compile_target(
@@ -295,7 +295,7 @@ def test_given_unicode_sql_when_writing_static_target_twice_then_bytes_remain_un
         adapter=DuckDbAdapter(),
         project=project,
     )
-    model_path: Path = target_dir / "compiled" / "models" / "staging" / "orders.sql"
+    model_path: Path = target_dir / "compiled" / "sql" / "models" / "staging" / "orders.sql"
     unchanged_mtime_ns: int = 1_000_000_000
     os.utime(model_path, ns=(unchanged_mtime_ns, unchanged_mtime_ns))
     _ = write_static_compile_target(
@@ -328,7 +328,7 @@ def test_given_invalid_utf8_artifact_when_writing_again_then_existing_decode_err
         adapter=DuckDbAdapter(),
         project=project,
     )
-    model_path: Path = target_dir / "compiled" / "models" / "staging" / "orders.sql"
+    model_path: Path = target_dir / "compiled" / "sql" / "models" / "staging" / "orders.sql"
     model_path.write_bytes(b"\xff")
 
     with pytest.raises(UnicodeDecodeError, match=test_case.expected_message):
@@ -354,7 +354,7 @@ def test_given_unwritable_model_artifact_when_writing_static_target_then_later_g
 ) -> None:
     project: CompiledProjectView = build_static_target_writer_project()
     target_dir: Path = tmp_path / "target"
-    blocker: Path = target_dir / "compiled" / "models" / "staging"
+    blocker: Path = target_dir / "compiled" / "sql" / "models" / "staging"
     blocker.parent.mkdir(parents=True)
     blocker.write_text("not a directory\n", encoding="utf-8")
 
@@ -366,8 +366,8 @@ def test_given_unwritable_model_artifact_when_writing_static_target_then_later_g
         )
 
     assert blocker.read_text(encoding="utf-8") == "not a directory\n"
-    assert not (target_dir / "compiled" / "functions").exists()
-    assert not (target_dir / "compiled" / "audits").exists()
+    assert not (target_dir / "compiled" / "sql" / "functions").exists()
+    assert not (target_dir / "compiled" / "sql" / "audits").exists()
     assert not (target_dir / "compiled" / "tests").exists()
 
 
@@ -386,7 +386,7 @@ def test_given_model_write_failure_and_later_error_when_writing_static_target_th
     test_case: ExpectedMessageTestCase,
 ) -> None:
     target_dir: Path = tmp_path / "target"
-    blocker: Path = target_dir / "compiled" / "models" / "staging"
+    blocker: Path = target_dir / "compiled" / "sql" / "models" / "staging"
     blocker.parent.mkdir(parents=True)
     blocker.write_text("not a directory\n", encoding="utf-8")
 
@@ -397,14 +397,14 @@ def test_given_model_write_failure_and_later_error_when_writing_static_target_th
             project=build_static_target_writer_project(),
         )
 
-    assert not (target_dir / "compiled" / "functions").exists()
+    assert not (target_dir / "compiled" / "sql" / "functions").exists()
 
 
 @pytest.mark.parametrize(
     "test_case",
     [
         ExpectedMessageTestCase(
-            description="interrupt after the model group", expected_message="compiled/functions"
+            description="interrupt after the model group", expected_message="compiled/sql/functions"
         )
     ],
     ids=lambda case: case.description,
@@ -425,7 +425,7 @@ def test_given_interrupt_after_model_group_when_writing_static_target_then_later
 
     assert time.monotonic() - started < INTERRUPT_RETURN_SECONDS
     assert not (target_dir / test_case.expected_message).exists()
-    assert not (target_dir / "compiled" / "audits").exists()
+    assert not (target_dir / "compiled" / "sql" / "audits").exists()
     assert not (target_dir / "compiled" / "tests").exists()
 
 
@@ -434,7 +434,7 @@ def test_given_interrupt_after_model_group_when_writing_static_target_then_later
     [
         ExpectedMessageTestCase(
             description="staged model write failure falls back despite a later error",
-            expected_message="compiled/models/staging/orders.sql",
+            expected_message="compiled/sql/models/staging/orders.sql",
         )
     ],
     ids=lambda case: case.description,
@@ -640,7 +640,7 @@ def test_given_changed_unrelated_model_when_writing_then_reuses_test_artifact(
         compiled_model_record(project.models[0]),
         key=replace(project.models[0].key, name="unrelated"),
         name="unrelated",
-        relative_path=Path("models/unrelated.sql"),
+        relative_path=Path("sql/models/unrelated.sql"),
         query_sql="SELECT 9 AS unrelated_id",
     )
     changed_project: CompiledProjectView = project_with(

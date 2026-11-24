@@ -1,5 +1,6 @@
 //! Declaration-definition folders: browsing their children and listing what lies beneath.
 
+use crate::scope_index::constants::GLOBAL_ROLE_PARENT;
 use crate::scope_index::models::{
     DeclarationIdentity, DeclarationRecord, QualifiedIdentity, ScopeKind,
 };
@@ -81,13 +82,19 @@ pub(crate) fn definition_folder(record: &DeclarationRecord) -> String {
     if record.scope != ScopeKind::Global {
         return posix_parent(&record.path);
     }
-    let source_root: &str = record
-        .path
-        .split_once('/')
-        .map_or(record.path.as_str(), |(root, _)| root);
+    let role_depth: usize = if posix_parts(&record.path).first() == Some(&GLOBAL_ROLE_PARENT) {
+        2
+    } else {
+        1
+    };
+    let source_root: String = posix_parts(&record.path)
+        .into_iter()
+        .take(role_depth)
+        .collect::<Vec<&str>>()
+        .join("/");
     let parent: String = posix_parent(&record.path);
     let relative: &str = parent
-        .strip_prefix(source_root)
+        .strip_prefix(source_root.as_str())
         .unwrap_or(&parent)
         .trim_matches('/');
     let base: String = format!("global/{}s", record.identity.kind.as_str());

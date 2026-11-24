@@ -239,8 +239,8 @@ DIAGNOSTIC_CONSTRUCTION_OWNER_PATHS: frozenset[str] = frozenset(
 )
 
 EVENT_EXPORTER_RUNTIME_PREFIX: str = "src/sqlbuild/runtime/event_exporting/"
-EVENT_EXPORTER_PUBLIC_PATH: str = "src/sqlbuild/sinks.py"
-EVENT_EXPORTER_DIRECTORY_NAME: str = "sinks"
+EVENT_EXPORTER_PUBLIC_PATH: str = "src/sqlbuild/event_sinks.py"
+EVENT_EXPORTER_DIRECTORY_PARTS: tuple[str, ...] = ("python", "event_sinks")
 EVENT_EXPORTER_MODULE_PARTS: tuple[str, ...] = ("sqlbuild", "runtime", "event_exporting")
 CORE_EVENT_EXPORTER_CLASS_NAMES: frozenset[str] = frozenset(
     {
@@ -268,7 +268,7 @@ LIFECYCLE_EVENT_CLASS_NAME: str = "LifecycleEvent"
 DIAGNOSTIC_LOG_CLASS_NAME: str = "DiagnosticLog"
 LIFECYCLE_EVENT_FACTORY_NAME: str = "create_lifecycle_event"
 EVENT_EXPORTER_DECORATOR_NAMES: frozenset[str] = frozenset(
-    {"lifecycle_event_sink", "command_output_sink"}
+    {"lifecycle_event_sink", "command_output_event_sink"}
 )
 OBSERVABILITY_LIFECYCLE_EVENT_MODULES: tuple[tuple[str, ...], ...] = (
     ("sqlbuild", "observability"),
@@ -282,7 +282,7 @@ OBSERVABILITY_FACTORY_MODULES: tuple[tuple[str, ...], ...] = (
 OBSERVABILITY_DEFINITION_MODULES: tuple[tuple[str, ...], ...] = (
     ("sqlbuild", "runtime", "observability", "models"),
 )
-PUBLIC_EVENT_EXPORTER_MODULE_PARTS: tuple[str, ...] = ("sqlbuild", "sinks")
+PUBLIC_EVENT_EXPORTER_MODULE_PARTS: tuple[str, ...] = ("sqlbuild", "event_sinks")
 NATIVE_BINDINGS_ROOTS: tuple[str, ...] = (
     "crates/sqlbuild-python/src/",
     "crates/sqlbuild-python-base/src/",

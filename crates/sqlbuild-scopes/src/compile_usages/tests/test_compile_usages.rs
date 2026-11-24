@@ -28,8 +28,8 @@ fn given_schemas_when_collecting_scope_usages_then_python_usages_and_s006_hold()
             enum_records: hidden_enum_records,
             expected_usages: &[(0, 1), (0, 2)],
             expected_messages: &[
-                "Schema 'base_schema' is not visible from 'models/sales/schemas/orders.yml'. It is defined at models/finance/schemas/base.yml with inherited scope owned by 'models/finance'",
-                "Schema 'orders_schema' in models/sales/schemas/orders.yml column 'status' uses enum 'order_status', which is not visible from the schema's location. The enum is defined at models/finance/enums/status.yml with local scope owned by 'models/finance'",
+                "Schema 'base_schema' is not visible from 'sql/models/sales/schemas/orders.yml'. It is defined at sql/models/finance/schemas/base.yml with inherited scope owned by 'sql/models/finance'",
+                "Schema 'orders_schema' in sql/models/sales/schemas/orders.yml column 'status' uses enum 'order_status', which is not visible from the schema's location. The enum is defined at sql/models/finance/enums/status.yml with local scope owned by 'sql/models/finance'",
             ],
         },
     ];

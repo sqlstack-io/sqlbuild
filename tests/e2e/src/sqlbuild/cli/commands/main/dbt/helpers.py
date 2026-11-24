@@ -139,12 +139,12 @@ def write_sqlbuild_defer_target_models(*, project_dir: Path) -> None:
         + 'schema = "prod"\n',
         encoding="utf-8",
     )
-    project_dir.joinpath("models", "deferred_upstream.sql").write_text(
+    project_dir.joinpath("sql", "models", "deferred_upstream.sql").write_text(
         "MODEL (description 'Test model deferred_upstream.', "
         "materialized table);\n\nSELECT 42 AS order_id\n",
         encoding="utf-8",
     )
-    project_dir.joinpath("models", "deferred_consumer.sql").write_text(
+    project_dir.joinpath("sql", "models", "deferred_consumer.sql").write_text(
         'MODEL (description "Test model deferred_consumer.", '
         'materialized table);\n\nSELECT order_id FROM __ref("deferred_upstream")\n',
         encoding="utf-8",
@@ -162,7 +162,7 @@ def declare_missing_origin_requiring_confirmation(*, project_dir: Path) -> None:
         + '\n[targets.main]\nschema = "main"\nmissing_migration_origin = "require_confirmation"\n',
         encoding="utf-8",
     )
-    model_path: Path = project_dir / "models" / "local_only.sql"
+    model_path: Path = project_dir / "sql" / "models" / "local_only.sql"
     model_path.write_text(
         model_path.read_text(encoding="utf-8").replace(
             "MODEL (\n", "MODEL (\n  materialized table,\n  migrate_from retired_local_orders,\n", 1
@@ -254,7 +254,7 @@ def write_sqlbuild_order_status_snapshot(*, project_dir: Path) -> None:
         + '\n[snapshots]\ncurrent_state_full_refresh = "require_confirmation"\n',
         encoding="utf-8",
     )
-    project_dir.joinpath("models", "order_status_history.sql").write_text(
+    project_dir.joinpath("sql", "models", "order_status_history.sql").write_text(
         "MODEL (description 'Test model order_status_history.',"
         "\n  materialized snapshot,\n  unique_key [order_id],\n"
         "  snapshot_strategy check,\n  check_columns [status],\n);\n\n"

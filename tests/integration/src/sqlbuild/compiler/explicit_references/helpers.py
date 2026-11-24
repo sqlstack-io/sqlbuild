@@ -32,12 +32,13 @@ _PROJECT: str = (
 )
 _DISABLED: str = _PROJECT + "\n[references]\nenforce_explicit = false\n"
 _OLD_NAMES_OFF: str = _PROJECT + "\n[migrations]\nold_name_views = false\n"
-_HOOK_PATH: str = "models/marts/_sqlbuild/_hooks/python/lookups.py"
-_SQL_HOOK_PATH: str = "models/marts/_sqlbuild/_hooks/sql/record_rows.sql"
-_TASK_PATH: str = "python/tasks/export.py"
-_CHECK_PATH: str = "python/checks/orders.py"
-_ASSET_PATH: str = "python/assets/snapshot.py"
-_LOADER_PATH: str = "python/loaders/raw.py"
+_HOOK_PATH: str = "sql/models/marts/_sqlbuild/_hooks/python/lookups.py"
+_SQL_HOOK_PATH: str = "sql/models/marts/_sqlbuild/_hooks/sql/record_rows.sql"
+_TASK_PATH: str = "python/nodes/tasks/export/asset.py"
+_CHECK_PATH: str = "python/nodes/checks/orders/checks.py"
+_ASSET_PATH: str = "python/nodes/assets/snapshot/asset.py"
+_REGIONS_LOADER_PATH: str = "python/nodes/loaders/raw_regions/loader.py"
+_CUSTOMERS_LOADER_PATH: str = "python/nodes/loaders/raw_customers/loader.py"
 _HOOKED: str = 'MODEL (description "Orders.", post_hooks [python("refresh_lookup")]);'
 _NAMED_SQL_HOOK: str = 'MODEL (description "Orders.", post_hooks [sql("record_rows")]);'
 
@@ -78,29 +79,37 @@ def _asset(body: str) -> str:
     )
 
 
-def _loaders(*, depends_on: str, body: str) -> str:
-    return (
-        "from sqlbuild.loaders import loader\n\n\n"
-        "@loader\ndef raw_regions(ctx):\n    '''Test loader raw_regions.'''\n"
-        "    return [{'id': 1}]\n\n\n"
-        f"@loader(depends_on=[{depends_on}])\ndef raw_customers(ctx):\n{body}"
-        "    return [{'id': 1}]\n"
-    )
+def _loaders(*, depends_on: str, body: str) -> dict[str, str]:
+    """Loaders raw_regions and raw_customers, each in its unit folder, at their old line numbers."""
+
+    return {
+        _REGIONS_LOADER_PATH: (
+            "from sqlbuild.loaders import loader\n\n\n"
+            "@loader\ndef raw_regions(ctx):\n    '''Test loader raw_regions.'''\n"
+            "    return [{'id': 1}]\n"
+        ),
+        _CUSTOMERS_LOADER_PATH: (
+            "from sqlbuild.loaders import loader\n\n"
+            "from python.nodes.loaders.raw_regions.loader import raw_regions\n\n\n\n\n\n\n"
+            f"@loader(depends_on=[{depends_on}])\ndef raw_customers(ctx):\n{body}"
+            "    return [{'id': 1}]\n"
+        ),
+    }
 
 
 _MODELS: dict[str, str] = {
-    "models/marts/customers.sql": _model("SELECT 1 AS customer_id"),
-    "models/marts/orders.sql": _model("SELECT 1 AS order_id", header=_HOOKED),
+    "sql/models/marts/customers.sql": _model("SELECT 1 AS customer_id"),
+    "sql/models/marts/orders.sql": _model("SELECT 1 AS order_id", header=_HOOKED),
 }
 _SEED: dict[str, str] = {
-    "seeds/country_codes.yml": (
+    "sql/seeds/country_codes.yml": (
         "seeds:\n  - name: country_codes\n    description: Country codes.\n"
         "    columns:\n      - name: code\n        type: VARCHAR\n"
     ),
-    "seeds/country_codes.csv": "code\nGB\n",
+    "sql/seeds/country_codes.csv": "code\nGB\n",
 }
 _MANAGED: dict[str, str] = {
-    "sources/raw.yml": (
+    "sql/sources/raw.yml": (
         "sources:\n"
         "  - name: raw_regions\n    description: Raw regions.\n    managed: true\n"
         "    write_strategy: table\n    columns:\n      - name: id\n        type: INTEGER\n"
@@ -109,7 +118,7 @@ _MANAGED: dict[str, str] = {
     ),
 }
 _EXTERNAL: dict[str, str] = {
-    "sources/landing.yml": (
+    "sql/sources/landing.yml": (
         "sources:\n  - name: landing_orders\n    description: Landing orders.\n"
         "    schema: landing\n    table: orders_feed\n"
         "  - name: computed\n    description: Computed.\n    expression: SELECT 1 AS id\n"
@@ -130,7 +139,7 @@ EXPLICIT_REFERENCE_PROJECTS: tuple[tuple[str, dict[str, str], str], ...] = (
             **_MODELS,
             **_MANAGED,
             _HOOK_PATH: _hook(),
-            _LOADER_PATH: _loaders(depends_on="", body=""),
+            **_loaders(depends_on="", body=""),
             _TASK_PATH: _task(
                 '    ctx.query("SELECT * FROM raw_customers JOIN customers ON true")\n'
                 '    ctx.execute_sql(sql="DELETE FROM main.orders")\n'
@@ -185,7 +194,7 @@ EXPLICIT_REFERENCE_PROJECTS: tuple[tuple[str, dict[str, str], str], ...] = (
             **_MANAGED,
             **_SEED,
             _HOOK_PATH: _hook(),
-            _LOADER_PATH: _loaders(
+            **_loaders(
                 depends_on="raw_regions",
                 body=(
                     '    ctx.query("SELECT * FROM raw_customers JOIN raw_regions ON true")\n'
@@ -201,7 +210,7 @@ EXPLICIT_REFERENCE_PROJECTS: tuple[tuple[str, dict[str, str], str], ...] = (
             **_MODELS,
             **_MANAGED,
             _HOOK_PATH: _hook(),
-            _LOADER_PATH: _loaders(
+            **_loaders(
                 depends_on="",
                 body='    ctx.query("SELECT * FROM raw_regions")\n',
             ),
@@ -211,21 +220,21 @@ EXPLICIT_REFERENCE_PROJECTS: tuple[tuple[str, dict[str, str], str], ...] = (
     (
         "old names kept as compatibility views",
         {
-            "models/marts/customers.sql": _model(
+            "sql/models/marts/customers.sql": _model(
                 "SELECT 1 AS customer_id",
                 header=(
                     'MODEL (description "Customers.", materialized table, '
                     "migrate_from legacy_customers);"
                 ),
             ),
-            "models/marts/orders.sql": _model(
+            "sql/models/marts/orders.sql": _model(
                 "SELECT 1 AS order_id",
                 header=(
                     'MODEL (description "Orders.", materialized table, '
                     'migrate_from "archive.old_orders");'
                 ),
             ),
-            "models/marts/regions.sql": _model(
+            "sql/models/marts/regions.sql": _model(
                 "SELECT 1 AS region_id",
                 header=(
                     'MODEL (description "Regions.", materialized table, migrate_from customers);'
@@ -241,14 +250,14 @@ EXPLICIT_REFERENCE_PROJECTS: tuple[tuple[str, dict[str, str], str], ...] = (
     (
         "old names off leave old relations unmatched",
         {
-            "models/marts/customers.sql": _model(
+            "sql/models/marts/customers.sql": _model(
                 "SELECT 1 AS customer_id",
                 header=(
                     'MODEL (description "Customers.", materialized table, '
                     "migrate_from legacy_customers);"
                 ),
             ),
-            "models/marts/orders.sql": _model("SELECT 1 AS order_id"),
+            "sql/models/marts/orders.sql": _model("SELECT 1 AS order_id"),
             _TASK_PATH: _task('    ctx.query("SELECT * FROM legacy_customers")\n'),
         },
         _OLD_NAMES_OFF,
@@ -293,17 +302,17 @@ EXPLICIT_REFERENCE_PROJECTS: tuple[tuple[str, dict[str, str], str], ...] = (
                 'HOOK (description "Records rows.");\n'
                 'INSERT INTO audit_log SELECT count(*) FROM __ref("item_totals")\n'
             ),
-            "models/marts/orders.sql": _model("SELECT 1 AS order_id", header=_HOOKED),
-            "models/marts/customers.sql": _model('SELECT * FROM __ref("orders")'),
-            "models/marts/items.sql": _model("SELECT 1 AS item_id", header=_NAMED_SQL_HOOK),
-            "models/marts/item_totals.sql": _model(
+            "sql/models/marts/orders.sql": _model("SELECT 1 AS order_id", header=_HOOKED),
+            "sql/models/marts/customers.sql": _model('SELECT * FROM __ref("orders")'),
+            "sql/models/marts/items.sql": _model("SELECT 1 AS item_id", header=_NAMED_SQL_HOOK),
+            "sql/models/marts/item_totals.sql": _model(
                 'SELECT * FROM __ref("items")',
                 header=(
                     'MODEL (description "Totals.", pre_hooks '
                     "[inline_sql('SELECT * FROM __ref(\"item_rollup\")')]);"
                 ),
             ),
-            "models/marts/item_rollup.sql": _model('SELECT * FROM __ref("item_totals")'),
+            "sql/models/marts/item_rollup.sql": _model('SELECT * FROM __ref("item_totals")'),
         },
         _PROJECT,
     ),
@@ -312,44 +321,48 @@ EXPLICIT_REFERENCE_PROJECTS: tuple[tuple[str, dict[str, str], str], ...] = (
         {
             **_SEED,
             **_EXTERNAL,
-            "audits/generic/gated_lookup.sql": _GATED_AUDIT.format(read='__ref("enriched")'),
-            "audits/generic/source_lookup.sql": _GATED_AUDIT.format(read='__ref("landing_view")'),
-            "models/marts/base.sql": _gate_model("SELECT 'GB' AS code", "gated_lookup"),
-            "models/marts/enriched.sql": _model('SELECT * FROM __ref("base")'),
-            "audits/generic/seed_lookup.sql": _GATED_AUDIT.format(read='__ref("coded")'),
-            "models/marts/landing_view.sql": _model('SELECT * FROM __source("landing_audited")'),
-            "models/marts/coded.sql": _model('SELECT * FROM __seed("audited_codes")'),
-            "sources/landing_audits.yml": (
+            "sql/audits/generic/gated_lookup.sql": _GATED_AUDIT.format(read='__ref("enriched")'),
+            "sql/audits/generic/source_lookup.sql": _GATED_AUDIT.format(
+                read='__ref("landing_view")'
+            ),
+            "sql/models/marts/base.sql": _gate_model("SELECT 'GB' AS code", "gated_lookup"),
+            "sql/models/marts/enriched.sql": _model('SELECT * FROM __ref("base")'),
+            "sql/audits/generic/seed_lookup.sql": _GATED_AUDIT.format(read='__ref("coded")'),
+            "sql/models/marts/landing_view.sql": _model(
+                'SELECT * FROM __source("landing_audited")'
+            ),
+            "sql/models/marts/coded.sql": _model('SELECT * FROM __seed("audited_codes")'),
+            "sql/sources/landing_audits.yml": (
                 "sources:\n  - name: landing_audited\n    description: Landing audited.\n"
                 "    schema: landing\n    audits:\n      - source_lookup\n"
             ),
-            "seeds/audited_codes.yml": (
+            "sql/seeds/audited_codes.yml": (
                 "seeds:\n  - name: audited_codes\n    description: Audited codes.\n"
                 "    columns:\n      - name: code\n        type: VARCHAR\n"
                 "    audits:\n      - seed_lookup\n"
             ),
-            "seeds/audited_codes.csv": "code\nGB\n",
+            "sql/seeds/audited_codes.csv": "code\nGB\n",
         },
         _PROJECT,
     ),
     (
         "audit gates, hook cycles and hard-coded names together",
         {
-            "audits/generic/gated_lookup.sql": _GATED_AUDIT.format(read='__ref("enriched")'),
-            "models/marts/base.sql": _gate_model("SELECT 'GB' AS code", "gated_lookup"),
-            "models/marts/enriched.sql": _model('SELECT * FROM __ref("base")'),
+            "sql/audits/generic/gated_lookup.sql": _GATED_AUDIT.format(read='__ref("enriched")'),
+            "sql/models/marts/base.sql": _gate_model("SELECT 'GB' AS code", "gated_lookup"),
+            "sql/models/marts/enriched.sql": _model('SELECT * FROM __ref("base")'),
             _HOOK_PATH: _hook(
                 reads='model("customers")',
                 body='    ctx.query("SELECT * FROM legacy_orders JOIN orders ON true")\n',
             ),
-            "models/marts/orders.sql": _model(
+            "sql/models/marts/orders.sql": _model(
                 "SELECT 1 AS order_id",
                 header=(
                     'MODEL (description "Orders.", materialized table, '
                     'migrate_from legacy_orders, post_hooks [python("refresh_lookup")]);'
                 ),
             ),
-            "models/marts/customers.sql": _model('SELECT * FROM __ref("orders")'),
+            "sql/models/marts/customers.sql": _model('SELECT * FROM __ref("orders")'),
             _TASK_PATH: _task('    ctx.query("SELECT * FROM enriched")\n'),
         },
         _PROJECT,

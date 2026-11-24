@@ -30,16 +30,16 @@ _COMPILE_STARTS: tuple[str, ...] = (
     "Verifying the edited project compiles...",
 )
 _RENAMED_FILES: tuple[str, ...] = (
-    "models/marts/fact_order_lines.sql",
-    "models/staging/stg_order_lines.sql",
+    "sql/models/marts/fact_order_lines.sql",
+    "sql/models/staging/stg_order_lines.sql",
 )
 _RENAMED_FRAGMENTS: dict[str, tuple[str, ...]] = {
-    "models/marts/fact_order_lines.sql": (
+    "sql/models/marts/fact_order_lines.sql": (
         '__ref("stg_order_lines")',
         "migrate_from fact_orders",
     ),
-    "models/staging/stg_order_lines.sql": ("migrate_from stg_orders",),
-    "models/marts/customer_totals.sql": ('__ref("fact_order_lines")',),
+    "sql/models/staging/stg_order_lines.sql": ("migrate_from stg_orders",),
+    "sql/models/marts/customer_totals.sql": ('__ref("fact_order_lines")',),
     "tests/unit/test_fact_order_lines.sql": (
         "__ref__stg_order_lines AS (",
         "__expected__fact_order_lines AS (",
@@ -99,8 +99,8 @@ def test_given_several_renames_when_renamed_together_then_one_verification_appli
     assert existing_files(
         project_dir=project_dir,
         paths=(
-            "models/staging/stg_orders.sql",
-            "models/marts/fact_orders.sql",
+            "sql/models/staging/stg_orders.sql",
+            "sql/models/marts/fact_orders.sql",
             *test_case.expected_files,
         ),
     ) == tuple(sorted(test_case.expected_files))

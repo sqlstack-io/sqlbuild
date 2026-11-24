@@ -29,7 +29,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.sql_macros.helpers import 
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import run_sqb
 
 _FROM: str = 'FROM __ref("stg_orders") AS o'
-_COMPILED: str = "target/compiled/models/marts/orders.sql"
+_COMPILED: str = "target/compiled/sql/models/marts/orders.sql"
 _CLEAN: tuple[str, ...] = ("0 errors, 0 warnings",)
 _MACROS: dict[str, str] = {
     **text_macro("status_bar", "VARCHAR", "bar(LENGTH(@value), 0, 10)"),
@@ -297,7 +297,7 @@ def test_given_a_known_different_body_when_compiling_then_the_inferred_type_stan
                 **orders_model(f"SELECT @sql.status_bar(o.status) AS x, o.missing {_FROM}\n"),
             },
             expected_returncode=1,
-            expected_fragments=("--> models/marts/orders.sql:3:42",),
+            expected_fragments=("--> sql/models/marts/orders.sql:3:42",),
         ),
         SqlMacroCompileTestCase(
             description="the_reserved_analysis_function_is_rejected_in_a_model",

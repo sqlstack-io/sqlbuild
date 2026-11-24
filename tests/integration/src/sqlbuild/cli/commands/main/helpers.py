@@ -46,6 +46,7 @@ from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
     RepeatedJsonParseTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 from tests.unit.src.sqlbuild.rule_engine._helpers.run.helpers import rebuild_identity
 
 STAGE_CAPTURE_SUFFIX: str = ".json"
@@ -92,8 +93,10 @@ def write_staging_directory(*, target_dir: Path, name: str) -> Path:
     """Write one artifact staging directory with a staged model file."""
 
     directory: Path = target_dir / name
-    (directory / "compiled" / "models").mkdir(parents=True)
-    (directory / "compiled" / "models" / "orders.sql").write_text("SELECT 1\n", encoding="utf-8")
+    (directory / "compiled" / "sql" / "models").mkdir(parents=True)
+    (directory / "compiled" / "sql" / "models" / "orders.sql").write_text(
+        "SELECT 1\n", encoding="utf-8"
+    )
     return directory
 
 
@@ -104,8 +107,8 @@ def write_prepared_artifacts_project(*, project_dir: Path, model_count: int) -> 
         'name = "orders"\nadapter = "duckdb"\n[rules]\nselect = ["SQLCLEAN021"]\n',
         encoding="utf-8",
     )
-    models: Path = project_dir / "models"
-    models.mkdir()
+    models: Path = project_dir / "sql" / "models"
+    models.mkdir(parents=True)
     for index in range(model_count):
         (models / f"orders_{index:03}.sql").write_text(
             "MODEL (description 'Test model.', materialized table, contract enforced, "
@@ -129,9 +132,9 @@ def write_test_planning_project(
     (project_dir / "sqlbuild_project.toml").write_text(
         f'name = "orders"\nadapter = "duckdb"\n{rules_config}', encoding="utf-8"
     )
-    models: Path = project_dir / "models"
+    models: Path = project_dir / "sql" / "models"
     tests: Path = project_dir / "tests" / "unit"
-    models.mkdir()
+    models.mkdir(parents=True)
     tests.mkdir(parents=True)
     header: str = (
         "MODEL (description 'Test model.', materialized table, contract enforced, "
@@ -270,8 +273,8 @@ def write_compile_startup_project(project_dir: Path) -> None:
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    models_dir: Path = project_dir / "models"
-    models_dir.mkdir()
+    models_dir: Path = project_dir / "sql" / "models"
+    models_dir.mkdir(parents=True)
     (models_dir / "orders.sql").write_text(
         "MODEL (description 'Test model orders.', materialized table);\nSELECT 1 AS order_id\n",
         encoding="utf-8",
@@ -282,13 +285,13 @@ def write_from_values_format_project(*, tmp_path: Path, adapter: str) -> tuple[P
     """Write a format project containing an authored values relation."""
 
     project_dir: Path = tmp_path / adapter
-    project_dir.mkdir()
+    project_dir.mkdir(parents=True)
     (project_dir / "sqlbuild_project.toml").write_text(
         f'name = "orders"\nadapter = "{adapter}"\n\n[rules]\nselect = ["SQLCLEAN039"]\n',
         encoding="utf-8",
     )
-    models: Path = project_dir / "models"
-    models.mkdir()
+    models: Path = project_dir / "sql" / "models"
+    models.mkdir(parents=True)
     (models / "customers.sql").write_text(
         'MODEL (description "Customers.");\nSELECT 1 AS customer_key, 1 AS order_count\n',
         encoding="utf-8",
@@ -341,10 +344,10 @@ def prepare_contract_project(tmp_path: Path, *, prod_connection_toml: str = "") 
         ),
         encoding="utf-8",
     )
-    models: Path = tmp_path / "models"
-    sources: Path = tmp_path / "sources"
-    models.mkdir()
-    sources.mkdir()
+    models: Path = tmp_path / "sql" / "models"
+    sources: Path = tmp_path / "sql" / "sources"
+    models.mkdir(parents=True)
+    sources.mkdir(parents=True)
     _ = (models / "orders.sql").write_text(
         """MODEL (description "Test model orders.",
   materialized table
@@ -380,7 +383,7 @@ SELECT CAST(1 AS INTEGER) AS id, CAST('a' AS VARCHAR) AS name
 def add_second_contract_source(*, project_dir: Path, database: Path) -> None:
     """Add another physical source declared in the existing source YAML file."""
 
-    source_path: Path = project_dir / "sources" / "raw.yml"
+    source_path: Path = project_dir / "sql" / "sources" / "raw.yml"
     _ = source_path.write_text(
         source_path.read_text(encoding="utf-8")
         + """  - name: raw_customers
@@ -454,7 +457,7 @@ def install_live_retention_fake(
 def write_retention_policy_project(*, project_dir: Path, target_lines: tuple[str, ...]) -> None:
     """Write a DuckDB project with one table and one view under a prod target."""
 
-    (project_dir / "models").mkdir(parents=True, exist_ok=True)
+    (project_dir / "sql" / "models").mkdir(parents=True, exist_ok=True)
     _ = (project_dir / "sqlbuild_project.toml").write_text(
         "\n".join(
             (
@@ -475,11 +478,11 @@ def write_retention_policy_project(*, project_dir: Path, target_lines: tuple[str
         ),
         encoding="utf-8",
     )
-    _ = (project_dir / "models" / "orders.sql").write_text(
+    _ = (project_dir / "sql" / "models" / "orders.sql").write_text(
         "MODEL (description 'Test model orders.', materialized table);\n\nSELECT 1 AS order_id\n",
         encoding="utf-8",
     )
-    _ = (project_dir / "models" / "order_view.sql").write_text(
+    _ = (project_dir / "sql" / "models" / "order_view.sql").write_text(
         'MODEL (description "Test model order_view.", '
         'materialized view);\n\nSELECT order_id FROM __ref("orders")\n',
         encoding="utf-8",
@@ -521,15 +524,15 @@ def write_dropped_relation_project(
 ) -> Path:
     """Write a DuckDB project with raw order sources, one seed, and one model."""
 
-    (project_dir / "models").mkdir(parents=True, exist_ok=True)
-    (project_dir / "sources").mkdir(parents=True, exist_ok=True)
-    (project_dir / "seeds").mkdir(parents=True, exist_ok=True)
+    (project_dir / "sql" / "models").mkdir(parents=True, exist_ok=True)
+    (project_dir / "sql" / "sources").mkdir(parents=True, exist_ok=True)
+    (project_dir / "sql" / "seeds").mkdir(parents=True, exist_ok=True)
     _ = (project_dir / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n\n[connection]\ndatabase = "orders.duckdb"\n'
         + settings_toml,
         encoding="utf-8",
     )
-    _ = (project_dir / "sources" / "raw.yml").write_text(
+    _ = (project_dir / "sql" / "sources" / "raw.yml").write_text(
         "sources:\n"
         "  - name: raw_orders\n    description: Test source raw_orders.\n"
         "    schema: main\n"
@@ -539,10 +542,10 @@ def write_dropped_relation_project(
         "    table: raw_customers\n",
         encoding="utf-8",
     )
-    _ = (project_dir / "seeds" / "order_statuses.csv").write_text(
+    _ = (project_dir / "sql" / "seeds" / "order_statuses.csv").write_text(
         "status_code,status_name\n1,placed\n2,shipped\n", encoding="utf-8"
     )
-    _ = (project_dir / "seeds" / "lookups.yml").write_text(
+    _ = (project_dir / "sql" / "seeds" / "lookups.yml").write_text(
         "seeds:\n"
         "  - name: order_statuses\n    description: Test seed order_statuses.\n"
         "    columns:\n"
@@ -552,7 +555,9 @@ def write_dropped_relation_project(
         "        type: VARCHAR\n",
         encoding="utf-8",
     )
-    _ = (project_dir / "models" / f"{model_name}.sql").write_text(model_sql, encoding="utf-8")
+    _ = (project_dir / "sql" / "models" / f"{model_name}.sql").write_text(
+        model_sql, encoding="utf-8"
+    )
     db_path: Path = project_dir / "orders.duckdb"
     execute_duckdb_sql(
         db_path=db_path,
@@ -656,8 +661,8 @@ def compile_duckdb_query(
     """Compile one DuckDB model query and return the exit and diagnostic codes."""
 
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
-    models: Path = tmp_path / "models"
-    models.mkdir()
+    models: Path = tmp_path / "sql" / "models"
+    models.mkdir(parents=True)
     (models / "orders.sql").write_text(f"MODEL (description 'Test model orders.');\n{query}")
     exit_code: int = main(["--project-dir", str(tmp_path), "compile", "--json", "--no-cache"])
     result: dict[str, object] = json.loads(capsys.readouterr().out)
@@ -673,7 +678,7 @@ def write_boundary_project(*, project_dir: Path, test_case: ExpansionBoundaryTes
             'name = "orders"\nadapter = "duckdb"\n[connection]\ndatabase = "orders.duckdb"\n'
             '[vars]\nnegative = "-1"\n'
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             f"MODEL (description 'Orders.', materialized table{test_case.model_config});\n"
             f"{test_case.model_sql}\n"
         ),
@@ -688,13 +693,13 @@ def write_expression_source_project(
 ) -> None:
     """Write a DuckDB project with one typed expression source and one reading model."""
 
-    (project_dir / "sources").mkdir(parents=True)
-    (project_dir / "models").mkdir()
+    (project_dir / "sql" / "sources").mkdir(parents=True)
+    (project_dir / "sql" / "models").mkdir(parents=True)
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n[connection]\ndatabase = "orders.duckdb"\n',
         encoding="utf-8",
     )
-    (project_dir / "sources" / "orders.yml").write_text(
+    (project_dir / "sql" / "sources" / "orders.yml").write_text(
         "sources:\n"
         "  - name: typed_orders\n    description: Test source typed_orders.\n"
         f'    expression: "{source_expression}"\n'
@@ -703,7 +708,7 @@ def write_expression_source_project(
         "        type: INTEGER\n",
         encoding="utf-8",
     )
-    (project_dir / "models" / "orders.sql").write_text(model_sql, encoding="utf-8")
+    (project_dir / "sql" / "models" / "orders.sql").write_text(model_sql, encoding="utf-8")
 
 
 def source_rebinding_analyses() -> int:
@@ -741,7 +746,7 @@ def write_repeated_json_parse_project(
         encoding="utf-8",
     )
     files: tuple[tuple[str, str], ...] = (
-        ("models/order_events.sql", f"{test_case.header}{test_case.sql}"),
+        ("sql/models/order_events.sql", f"{test_case.header}{test_case.sql}"),
         *test_case.extra_files,
     )
     for relative_path, contents in files:
@@ -837,8 +842,8 @@ def write_snowflake_warehouse_project(
         encoding="utf-8",
     )
     (project_dir / "sqlbuild_local.toml").write_text(local_config, encoding="utf-8")
-    (project_dir / "models").mkdir()
-    (project_dir / "models" / "orders.sql").write_text(
+    (project_dir / "sql" / "models").mkdir(parents=True)
+    (project_dir / "sql" / "models" / "orders.sql").write_text(
         "MODEL (description 'Orders.', materialized table);\nSELECT 1 AS order_id\n",
         encoding="utf-8",
     )
@@ -847,9 +852,9 @@ def write_snowflake_warehouse_project(
 def write_default_connection_project(*, project_dir: Path, project_toml: str) -> None:
     """Write a one-model DuckDB project with the given project config."""
 
-    (project_dir / "models").mkdir()
+    (project_dir / "sql" / "models").mkdir(parents=True)
     _ = (project_dir / "sqlbuild_project.toml").write_text(project_toml, encoding="utf-8")
-    _ = (project_dir / "models" / "orders.sql").write_text(
+    _ = (project_dir / "sql" / "models" / "orders.sql").write_text(
         'MODEL (description "Orders.", materialized table);\n\nSELECT 1 AS order_id\n',
         encoding="utf-8",
     )
@@ -858,7 +863,7 @@ def write_default_connection_project(*, project_dir: Path, project_toml: str) ->
 def write_default_connection_sql_test(*, project_dir: Path) -> None:
     """Add a downstream model and a SQL test that mocks its orders dependency."""
 
-    _ = (project_dir / "models" / "order_totals.sql").write_text(
+    _ = (project_dir / "sql" / "models" / "order_totals.sql").write_text(
         'MODEL (description "Order totals.", materialized table);\n\n'
         'SELECT order_id FROM __ref("orders")\n',
         encoding="utf-8",
@@ -887,14 +892,14 @@ EARLY_LINT_PROJECT_FILES: dict[str, str] = {
         'name = "orders"\nadapter = "duckdb"\n\n[vars]\nfloor = "2"\n\n'
         '[rules]\nselect = ["SQLCLEAN005"]\n'
     ),
-    "models/_macros/python/cents.py": (
+    "sql/models/_macros/python/cents.py": (
         'def cents(expression: str) -> str:\n    """Convert to cents."""\n'
         '    return f"({expression} * 100)"\n'
     ),
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         'MODEL (description "Orders");\nSELECT 1 AS order_id, CAST(5 AS DOUBLE) AS amount\n'
     ),
-    "models/order_cents.sql": (
+    "sql/models/order_cents.sql": (
         'MODEL (description "Order amounts in cents");\n'
         'WITH floored AS (SELECT order_id, @py.cents("amount") AS amount_cents, '
         '@@floor AS floor_amount FROM __ref("orders")), spare AS (SELECT 1 AS one)\n'
@@ -932,7 +937,7 @@ def write_custom_host_project(*, project_dir: Path, model_count: int, rule_body:
         encoding="utf-8",
     )
     for index in range(model_count):
-        model: Path = project_dir / "models" / f"orders_{index:03d}.sql"
+        model: Path = project_dir / "sql" / "models" / f"orders_{index:03d}.sql"
         model.parent.mkdir(parents=True, exist_ok=True)
         model.write_text(
             f'MODEL (description "Orders {index}");\nSELECT {index} AS order_id\n',
@@ -997,14 +1002,15 @@ def write_provider_asset_project(*, project_dir: Path, annotation: str) -> None:
             'name = "orders_assets"\nadapter = "duckdb"\n\n'
             '[connection]\ndatabase = "orders.duckdb"\n'
         ),
-        "providers/orders.py": PROVIDER_SOURCE,
-        "python/orders.py": (
-            "from providers.orders import OrdersProvider\n"
+        "python/providers/orders.py": PROVIDER_SOURCE,
+        **node_module_files(
+            "python/nodes/orders.py",
+            "from python.providers.orders import OrdersProvider\n"
             "from sqlbuild.assets import asset\n\n\n"
             "@asset\n"
             f"def refresh_orders(ctx, orders_provider: {annotation}):\n"
             '    """Refresh the order snapshot."""\n'
-            "    return None\n"
+            "    return None\n",
         ),
     }
     for relative_path, text in files.items():
@@ -1017,8 +1023,8 @@ def write_header_project(project_dir: Path, models: dict[str, str], project_toml
     """Write a DuckDB project with one SQL model file per name."""
 
     _ = (project_dir / "sqlbuild_project.toml").write_text(project_toml)
-    model_dir: Path = project_dir / "models"
-    model_dir.mkdir()
+    model_dir: Path = project_dir / "sql" / "models"
+    model_dir.mkdir(parents=True)
     for name, contents in models.items():
         _ = (model_dir / f"{name}.sql").write_text(contents)
 
@@ -1053,8 +1059,8 @@ def typed_config_reads(*, project_dir: Path, extra_header: str) -> int:
         '[targets.dev]\nschema = "main"\n',
         encoding="utf-8",
     )
-    models_dir: Path = project_dir / "models"
-    models_dir.mkdir()
+    models_dir: Path = project_dir / "sql" / "models"
+    models_dir.mkdir(parents=True)
     for index, own_config in enumerate((', materialized table, tags ["daily"]', "", "")):
         (models_dir / f"orders_{index}.sql").write_text(
             f'MODEL (description "Orders {index}."{own_config}{extra_header});\n\n'
@@ -1096,8 +1102,8 @@ def write_orders_project(project_dir: Path) -> None:
         '[connections.local]\ndatabase = ":memory:"\n\n[targets.dev]\nschema = "main"\n',
         encoding="utf-8",
     )
-    models_dir: Path = project_dir / "models"
-    models_dir.mkdir()
+    models_dir: Path = project_dir / "sql" / "models"
+    models_dir.mkdir(parents=True)
     (models_dir / "orders.sql").write_text(
         'MODEL (description "Orders.", materialized table, contract enforced, '
         'columns (order_id (type "INTEGER"), loaded_at (type "INTEGER")));\n\n'
@@ -1139,8 +1145,8 @@ def write_formatted_cache_project(*, project_dir: Path) -> None:
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    models_dir: Path = project_dir / "models"
-    models_dir.mkdir()
+    models_dir: Path = project_dir / "sql" / "models"
+    models_dir.mkdir(parents=True)
     name: str
     sql: str
     for name, sql in FORMAT_CACHE_UNFORMATTED_MODELS.items():
@@ -1170,7 +1176,7 @@ def check_format_with_work(
 def edit_cached_orders_model(project_dir: Path, _monkeypatch: pytest.MonkeyPatch) -> None:
     """Make one cached model unformatted again."""
 
-    (project_dir / "models" / "orders.sql").write_text(
+    (project_dir / "sql" / "models" / "orders.sql").write_text(
         FORMAT_CACHE_UNFORMATTED_MODELS["orders.sql"], encoding="utf-8"
     )
 
@@ -1234,8 +1240,10 @@ def write_project_scratch_rules(project_dir: Path) -> None:
                 'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["XSQBRSCR"]\n\n'
                 "[rules.thresholds]\nmin_custom_rule_test_cases = 0\n"
             ),
-            "models/orders.sql": 'MODEL (description "Orders");\nSELECT 1 AS order_id\n',
-            "models/customers.sql": ('MODEL (description "Customers");\nSELECT 1 AS customer_id\n'),
+            "sql/models/orders.sql": 'MODEL (description "Orders");\nSELECT 1 AS order_id\n',
+            "sql/models/customers.sql": (
+                'MODEL (description "Customers");\nSELECT 1 AS customer_id\n'
+            ),
             "rules/scratch.py": PROJECT_SCRATCH_RULES,
         },
     )
@@ -1245,12 +1253,12 @@ def write_enum_project(*, root: Path, model_sql: str, contract: str) -> None:
     """Write an orders project whose model fills an `order_status` column from `model_sql`."""
 
     (root / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
-    (root / "models" / "_enums").mkdir(parents=True)
-    (root / "models" / "_enums" / "order_status.sql").write_text(
+    (root / "sql" / "models" / "_enums").mkdir(parents=True)
+    (root / "sql" / "models" / "_enums" / "order_status.sql").write_text(
         'ENUM (name order_status, members (OPEN "open", CLOSED "closed"));\n'
     )
-    (root / "sources").mkdir()
-    (root / "sources" / "orders.yml").write_text(
+    (root / "sql" / "sources").mkdir(parents=True)
+    (root / "sql" / "sources" / "orders.yml").write_text(
         "sources:\n"
         "  - name: web_orders\n    description: Web orders.\n    contract: enforced\n"
         '    expression: "(SELECT CAST(1 AS INTEGER) AS order_id)"\n'
@@ -1259,7 +1267,7 @@ def write_enum_project(*, root: Path, model_sql: str, contract: str) -> None:
         '    expression: "(SELECT CAST(2 AS INTEGER) AS order_id)"\n'
         "    columns:\n      - name: order_id\n        type: INTEGER\n"
     )
-    (root / "models" / "orders.sql").write_text(
+    (root / "sql" / "models" / "orders.sql").write_text(
         f"MODEL (\n  description 'Orders from every channel.',\n  contract {contract},\n"
         "  columns (\n    order_id (type INTEGER),\n    status (type order_status),\n  ),\n);\n\n"
         f"{model_sql}"
@@ -1286,9 +1294,9 @@ def refund_rates_project(first_step: str) -> dict[str, str]:
     """Weekly orders, refund-rate models and the SQL macro whose first CTE is `first_step`."""
 
     return {
-        "models/weekly_orders.sql": _WEEKLY_ORDERS,
-        "models/refund_rates.sql": _REFUND_RATES,
-        "models/_macros/sql/weekly_rates.sql": _weekly_rates(first_step),
+        "sql/models/weekly_orders.sql": _WEEKLY_ORDERS,
+        "sql/models/refund_rates.sql": _REFUND_RATES,
+        "sql/models/_macros/sql/weekly_rates.sql": _weekly_rates(first_step),
     }
 
 
@@ -1311,14 +1319,14 @@ def write_endless_scenario_project(project_dir: Path) -> Path:
             "[connection]\n"
             'database = "scenario_signals.duckdb"\n'
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n"
             "  - name: raw_orders\n"
             "    description: Raw orders.\n"
             "    schema: main\n"
             "    table: raw_orders\n"
         ),
-        "models/order_totals.sql": (
+        "sql/models/order_totals.sql": (
             "MODEL (description 'Order totals.', materialized table, sql_analysis false);\n\n"
             f"SELECT SUM(o.amount) + {_ENDLESS_ORDER_TOTAL} AS total_amount "
             'FROM __source("raw_orders") AS o\n'
@@ -1390,8 +1398,8 @@ def write_prompting_project(project_dir: Path, *, connect: str, files: dict[str,
             '[targets.development]\nschema = "main"\n'
             "[rules]\nselect = []\n"
         ),
-        "adapters/duckdb_sign_in.py": adapter,
-        "models/customers.sql": (
+        "python/adapters/duckdb_sign_in.py": adapter,
+        "sql/models/customers.sql": (
             "MODEL (description 'Customers.', materialized table);\nSELECT 1 AS customer_id\n"
         ),
     } | files
@@ -1513,7 +1521,7 @@ def write_python_rules_project(*, project_dir: Path, fixture: str, rules_toml: s
             "sqlbuild_project.toml": (
                 f'name = "orders"\nadapter = "duckdb"\n\n[rules]\n{rules_toml}'
             ),
-            "models/orders.sql": 'MODEL (description "Orders");\nSELECT 1 AS order_id\n',
+            "sql/models/orders.sql": 'MODEL (description "Orders");\nSELECT 1 AS order_id\n',
         },
     )
 
@@ -1523,21 +1531,21 @@ RUN_RECORD_COLUMNS: str = (
 )
 
 RUN_RECORD_PROJECT_FILES: dict[str, str] = {
-    "models/stg_orders.sql": (
+    "sql/models/stg_orders.sql": (
         "MODEL (description 'Staged orders.', materialized table);\nSELECT 1 AS order_id\n"
     ),
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         "MODEL (description 'Orders.', materialized table);\n"
         'SELECT order_id FROM __ref("stg_orders")\n'
     ),
-    "models/broken_orders.sql": (
+    "sql/models/broken_orders.sql": (
         "MODEL (description 'Fails at run time.', materialized table);\n"
         "SELECT CAST('x' AS INTEGER) AS order_id\n"
     ),
     "orchestration/jobs/nightly_job.toml": (
         'name = "nightly_job"\ndescription = "Orders."\nselect = "+orders"\n'
     ),
-    "python/crash.py": (
+    "python/nodes/crash/asset.py": (
         '"""A task that kills its process, as a crash or kill -9 would."""\n\n'
         "import os\n\n"
         "from sqlbuild.assets import asset\n\n\n"
@@ -1546,7 +1554,7 @@ RUN_RECORD_PROJECT_FILES: dict[str, str] = {
         '    """End the process without unwinding."""\n\n'
         "    os._exit(137)\n"
     ),
-    "python/fail.py": (
+    "python/nodes/fail/asset.py": (
         '"""A task that raises, so the build exits non-zero."""\n\n'
         "from sqlbuild.assets import asset\n\n\n"
         "@asset()\n"
@@ -1558,55 +1566,55 @@ RUN_RECORD_PROJECT_FILES: dict[str, str] = {
 
 
 RUN_RECORD_MARTS_FILES: dict[str, str] = {
-    "models/marts/revenue.sql": (
+    "sql/models/marts/revenue.sql": (
         "MODEL (description 'Revenue in the marts schema.', materialized table);\n"
         "SELECT 10 AS amount\n"
     ),
-    "models/marts/daily_events.sql": (
+    "sql/models/marts/daily_events.sql": (
         "MODEL (description 'Loaded events in the marts schema.', materialized table);\n"
         'SELECT event_id FROM __source("landed_events")\n'
     ),
-    "python/loaders/events.py": (
+    "python/nodes/loaders/events/loader.py": (
         "from sqlbuild.loaders import loader\n\n\n"
         "@loader\n"
         "def landed_events(ctx):\n"
         '    """Load one event."""\n\n'
         '    return [{"event_id": 1}]\n'
     ),
-    "sources/landed.yml": (
+    "sql/sources/landed.yml": (
         "sources:\n  - name: landed_events\n    description: Loaded events.\n    schema: landing\n"
         "    managed: true\n    write_strategy: table\n    columns:\n"
         "      - name: event_id\n        type: INTEGER\n"
     ),
-    "models/upper/revenue_upper.sql": (
+    "sql/models/upper/revenue_upper.sql": (
         "MODEL (description 'Revenue under an upper-case schema name.', materialized table);\n"
         "SELECT 20 AS amount\n"
     ),
-    "models/marts/doubled.sql": (
+    "sql/models/marts/doubled.sql": (
         "MODEL (description 'Calls a function in its own schema.', materialized table);\n"
         'SELECT __udf("udf__doubled")(2) AS amount\n'
     ),
-    "functions/sql/udf__doubled.sql": (
+    "sql/functions/sql/udf__doubled.sql": (
         'FUNCTION (\n  description "Twice its argument",\n  arguments (value INTEGER),\n'
         "  returns INTEGER,\n  schema udfs,\n);\nvalue * 2\n"
     ),
-    "models/marts/slow_total.sql": (
+    "sql/models/marts/slow_total.sql": (
         "MODEL (description 'Runs past a one-second deadline.', materialized table);\n"
         "SELECT COUNT(*) AS total FROM range(100000000000)\n"
     ),
-    "models/archive/old_orders.sql": (
+    "sql/models/archive/old_orders.sql": (
         "MODEL (description 'A disabled model in its own schema.', materialized table,\n"
         "  enabled false, schema archive);\nSELECT 1 AS order_id\n"
     ),
-    "python/noop.py": (
+    "python/nodes/noop/asset.py": (
         '"""An asset that writes no relation."""\n\n'
         "from sqlbuild.assets import asset\n\n\n"
         "@asset()\n"
         "def noop(ctx):\n"
         '    """Do nothing."""\n'
     ),
-    "seeds/regions.csv": "region_id\n1\n",
-    "seeds/regions.yml": (
+    "sql/seeds/regions.csv": "region_id\n1\n",
+    "sql/seeds/regions.yml": (
         "seeds:\n  - name: regions\n    description: Regions.\n    columns:\n"
         "      - name: region_id\n        type: INTEGER\n"
     ),
@@ -1786,12 +1794,12 @@ def write_job_warehouse_project(*, project_dir: Path) -> None:
     write_project_files(
         project_dir=project_dir,
         files={
-            "models/stg.sql": _job_warehouse_model(""),
-            "models/orders.sql": _job_warehouse_model(' FROM __ref("stg")'),
-            "models/orders_daily.sql": _job_warehouse_model(' FROM __ref("orders")'),
-            "models/refunds.sql": _job_warehouse_model(' FROM __ref("orders_daily")'),
-            "models/summary.sql": _job_warehouse_model(' FROM __ref("refunds")'),
-            "python/assets.py": (
+            "sql/models/stg.sql": _job_warehouse_model(""),
+            "sql/models/orders.sql": _job_warehouse_model(' FROM __ref("stg")'),
+            "sql/models/orders_daily.sql": _job_warehouse_model(' FROM __ref("orders")'),
+            "sql/models/refunds.sql": _job_warehouse_model(' FROM __ref("orders_daily")'),
+            "sql/models/summary.sql": _job_warehouse_model(' FROM __ref("refunds")'),
+            "python/nodes/refresh_marker/asset.py": (
                 "from sqlbuild.assets import asset\n\n\n@asset\ndef refresh_marker(ctx):\n"
                 '    """Refresh."""\n    ctx.execute_sql("SELECT \'task marker\'")\n'
             ),
@@ -1891,15 +1899,15 @@ _PARITY_PROJECT_FILES: dict[str, str] = {
         'name = "demo"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
         '[connection]\ndatabase = "demo.duckdb"\n\n[targets.dev]\n'
     ),
-    "functions/sql/udf__band.sql": (
+    "sql/functions/sql/udf__band.sql": (
         "FUNCTION (description 'Band.', arguments (amount INT), returns VARCHAR);\n"
         "CASE WHEN amount >= 20 THEN 'large' ELSE 'small' END\n"
     ),
-    "models/parity_lookup.sql": (
+    "sql/models/parity_lookup.sql": (
         "MODEL (description 'Lookup.', materialized table, "
         "columns (id (type INTEGER, audits [not_null])));\nSELECT CAST(NULL AS INTEGER) AS id\n"
     ),
-    "models/parity_events.sql": (
+    "sql/models/parity_events.sql": (
         "MODEL (description 'Events.', materialized incremental, incremental_strategy append);\n"
         'SELECT 1 AS event_id, __udf("udf__band")(5) AS band\n'
     ),
@@ -1907,7 +1915,7 @@ _PARITY_PROJECT_FILES: dict[str, str] = {
         "TEST();\n\nWITH\n__ref__parity_lookup AS (SELECT 1 AS id),\n"
         "__expected__parity_events AS (SELECT 99 AS event_id, 'x' AS band)\nSELECT 1\n"
     ),
-    "audits/singular/events_have_lookups.sql": (
+    "sql/audits/singular/events_have_lookups.sql": (
         'AUDIT (name "events_have_lookups", severity error);\n'
         'SELECT e.event_id FROM __ref("parity_events") e '
         'LEFT JOIN __ref("parity_lookup") l ON e.event_id = l.id WHERE l.id IS NULL\n'
@@ -1967,7 +1975,7 @@ def unit_test_sql(*models: str) -> str:
 
 
 _DYNAMIC_FILES: dict[str, str] = {
-    "models/daily_orders.sql": (
+    "sql/models/daily_orders.sql": (
         "MODEL (description 'Daily orders.', materialized dynamic, refresh (lag 1h));\n"
         "SELECT 1 AS id\n"
     ),
@@ -1998,8 +2006,8 @@ _SINK_STEPS: str = """\
 import time
 from pathlib import Path
 
-from providers.gateway import GatewayProvider
-from providers.journal import JournalProvider
+from python.providers.gateway import GatewayProvider
+from python.providers.journal import JournalProvider
 from sqlbuild.assets import AssetContext, asset
 from sqlbuild.discovery import Discovered, Item, discover
 
@@ -2048,8 +2056,8 @@ class GatewayProvider(Provider):
         time.sleep(3600)
 """
 _SINK_FUNCTION: str = """\
-from providers.journal import JournalProvider
-from sqlbuild.sinks import LifecycleEvent, lifecycle_event_sink
+from python.providers.journal import JournalProvider
+from sqlbuild.event_sinks import LifecycleEvent, lifecycle_event_sink
 
 
 @lifecycle_event_sink
@@ -2070,12 +2078,13 @@ def sink_project(tmp_path: Path, *, parameters: str, body: str) -> Path:
         project_dir=project,
         files={
             "sqlbuild_project.toml": _SINK_PROJECT_TOML,
-            "python/steps.py": _SINK_STEPS.format(
-                directory=str(tmp_path), parameters=parameters, body=body
+            **node_module_files(
+                "python/nodes/steps.py",
+                _SINK_STEPS.format(directory=str(tmp_path), parameters=parameters, body=body),
             ),
-            "providers/journal.py": _SINK_JOURNAL.format(directory=str(tmp_path)),
-            "providers/gateway.py": _SINK_GATEWAY.format(directory=str(tmp_path)),
-            "sinks/journal.py": _SINK_FUNCTION,
+            "python/providers/journal.py": _SINK_JOURNAL.format(directory=str(tmp_path)),
+            "python/providers/gateway.py": _SINK_GATEWAY.format(directory=str(tmp_path)),
+            "python/event_sinks/journal.py": _SINK_FUNCTION,
         },
     )
     return project

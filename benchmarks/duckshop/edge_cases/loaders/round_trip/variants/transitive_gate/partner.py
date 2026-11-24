@@ -1,4 +1,4 @@
-from python.tasks.packaging import package_scores
+from python.nodes.tasks.packaging.asset import package_scores
 
 from sqlbuild.loaders import loader
 

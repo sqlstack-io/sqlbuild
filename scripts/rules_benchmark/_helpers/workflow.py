@@ -292,7 +292,7 @@ def _ci_five_thousand_invalidation_results(*, project_dir: Path) -> tuple[Benchm
             project_dir=project_dir,
             iterations=1,
             mutate=lambda iteration: _set_macro_offset(
-                path=project_dir / "macros" / "python" / "macro_00000.py",
+                path=project_dir / "sql" / "macros" / "python" / "macro_00000.py",
                 iteration=iteration,
             ),
         ),
@@ -722,7 +722,7 @@ def _run_scenarios(
             project_dir=project_dir,
             iterations=iterations,
             mutate=lambda iteration: _set_macro_offset(
-                path=project_dir / "macros" / "python" / "macro_00000.py",
+                path=project_dir / "sql" / "macros" / "python" / "macro_00000.py",
                 iteration=iteration,
             ),
         )
@@ -1156,21 +1156,22 @@ def _rules_cache_bytes(project_dir: Path) -> int:
 
 
 def _workload_counts(*, project_dir: Path) -> dict[str, int]:
-    model_paths: tuple[Path, ...] = tuple((project_dir / "models").rglob("*.sql"))
+    model_paths: tuple[Path, ...] = tuple((project_dir / "sql" / "models").rglob("*.sql"))
     test_paths: tuple[Path, ...] = tuple((project_dir / "tests").rglob("*.sql"))
     rule_paths: tuple[Path, ...] = tuple((project_dir / "rules").rglob("*.py"))
     sources_text: str = "\n".join(
-        path.read_text(encoding="utf-8") for path in (project_dir / "sources").rglob("*.yml")
+        path.read_text(encoding="utf-8")
+        for path in (project_dir / "sql" / "sources").rglob("*.yml")
     )
     return {
         "models": len(model_paths),
         "sources": sources_text.count("  - name: source_"),
-        "seeds": sum(1 for _ in (project_dir / "seeds").rglob("*.csv")),
-        "functions": sum(1 for _ in (project_dir / "functions").rglob("*.sql")),
-        "macros": sum(1 for _ in (project_dir / "macros").rglob("*.py")),
+        "seeds": sum(1 for _ in (project_dir / "sql" / "seeds").rglob("*.csv")),
+        "functions": sum(1 for _ in (project_dir / "sql" / "functions").rglob("*.sql")),
+        "macros": sum(1 for _ in (project_dir / "sql" / "macros").rglob("*.py")),
         "tests": sum(path.read_text(encoding="utf-8").count("TEST (") for path in test_paths),
         "audits": sum(path.read_text(encoding="utf-8").count("audits [") for path in model_paths),
-        "hooks": sum(1 for _ in (project_dir / "hooks").rglob("*.sql")),
+        "hooks": sum(1 for _ in (project_dir / "sql" / "hooks").rglob("*.sql")),
         "custom_rules": sum(
             path.read_text(encoding="utf-8").count("@rule(") for path in rule_paths
         ),
@@ -1182,7 +1183,9 @@ def _scaled_count(*, model_count: int, representative_count: int) -> int:
 
 
 def _generated_model_path(*, project_dir: Path, index: int) -> Path:
-    matches: tuple[Path, ...] = tuple((project_dir / "models").rglob(f"model_{index:05d}.sql"))
+    matches: tuple[Path, ...] = tuple(
+        (project_dir / "sql" / "models").rglob(f"model_{index:05d}.sql")
+    )
     if len(matches) != 1:
         raise RulesBenchmarkError(f"expected one generated model path for index {index}")
     return matches[0]

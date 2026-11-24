@@ -16,6 +16,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
     PythonHooksLifecycleMatrixBuildE2ETestCase,
     SnapshotPythonHooksBuildE2ETestCase,
 )
+from tests.e2e.src.sqlbuild.cli.commands.main.build.helpers import take_raw_data_sql
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     execute_duckdb,
     prepare_inline_project,
@@ -67,7 +68,7 @@ def test_given_python_pre_hook_returns_skip_when_building_then_model_and_downstr
                 """
             ).strip()
             + "\n",
-            "hooks/python/skips.py": dedent(
+            "sql/hooks/python/skips.py": dedent(
                 """
                 from sqlbuild.hooks import hook
 
@@ -79,7 +80,7 @@ def test_given_python_pre_hook_returns_skip_when_building_then_model_and_downstr
                 """
             ).strip()
             + "\n",
-            "models/upstream_orders.sql": dedent(
+            "sql/models/upstream_orders.sql": dedent(
                 """
                 MODEL (description "Test model upstream_orders.",
                   materialized table,
@@ -90,7 +91,7 @@ def test_given_python_pre_hook_returns_skip_when_building_then_model_and_downstr
                 """
             ).strip()
             + "\n",
-            "models/downstream_orders.sql": dedent(
+            "sql/models/downstream_orders.sql": dedent(
                 """
                 MODEL (description "Test model downstream_orders.", materialized table);
 
@@ -152,7 +153,7 @@ def test_given_python_post_hook_skip_when_building_then_keeps_relation_and_skips
                 """
             ).strip()
             + "\n",
-            "hooks/python/skips.py": dedent(
+            "sql/hooks/python/skips.py": dedent(
                 """
                 from sqlbuild.hooks import hook
 
@@ -164,7 +165,7 @@ def test_given_python_post_hook_skip_when_building_then_keeps_relation_and_skips
                 """
             ).strip()
             + "\n",
-            "models/upstream_orders.sql": dedent(
+            "sql/models/upstream_orders.sql": dedent(
                 """
                 MODEL (description "Test model upstream_orders.",
                   materialized table,
@@ -175,7 +176,7 @@ def test_given_python_post_hook_skip_when_building_then_keeps_relation_and_skips
                 """
             ).strip()
             + "\n",
-            "models/downstream_orders.sql": dedent(
+            "sql/models/downstream_orders.sql": dedent(
                 """
                 MODEL (description "Test model downstream_orders.", materialized table);
 
@@ -240,7 +241,7 @@ def test_given_project_with_python_hooks_when_building_then_hooks_execute(
                 """
             ).strip()
             + "\n",
-            "hooks/python/lifecycle.py": dedent(
+            "sql/hooks/python/lifecycle.py": dedent(
                 """
                 from sqlbuild.hooks import hook
 
@@ -265,7 +266,7 @@ def test_given_project_with_python_hooks_when_building_then_hooks_execute(
                 """
             ).strip()
             + "\n",
-            "hooks/sql/select_one.sql": dedent(
+            "sql/hooks/sql/select_one.sql": dedent(
                 """
                 HOOK (description "Execute a parameterized SQL payload");
 
@@ -274,7 +275,7 @@ def test_given_project_with_python_hooks_when_building_then_hooks_execute(
                 """
             ).strip()
             + "\n",
-            "models/orders.sql": dedent(
+            "sql/models/orders.sql": dedent(
                 """
                 MODEL (description "Test model orders.",
                   materialized table,
@@ -426,7 +427,7 @@ def test_given_python_hooks_lifecycle_matrix_when_building_then_all_materializat
                 """
             ).strip()
             + "\n",
-            "sources/raw.yml": dedent(
+            "sql/sources/raw.yml": dedent(
                 """
                 sources:
                   - name: raw_orders
@@ -440,7 +441,7 @@ def test_given_python_hooks_lifecycle_matrix_when_building_then_all_materializat
                 """
             ).strip()
             + "\n",
-            "hooks/python/lifecycle.py": dedent(
+            "sql/hooks/python/lifecycle.py": dedent(
                 """
                 from sqlbuild.hooks import hook
 
@@ -455,7 +456,7 @@ def test_given_python_hooks_lifecycle_matrix_when_building_then_all_materializat
                 """
             ).strip()
             + "\n",
-            "materializations/copy_table.py": dedent(
+            "python/materializations/copy_table.py": dedent(
                 """
                 from sqlbuild.executor.custom.models import (
                     MaterializationContext,
@@ -469,7 +470,7 @@ def test_given_python_hooks_lifecycle_matrix_when_building_then_all_materializat
                 """
             ).strip()
             + "\n",
-            "models/staging/stg_orders.sql": dedent(
+            "sql/models/staging/stg_orders.sql": dedent(
                 """
                 MODEL (description "Test model stg_orders.",
                   materialized view,
@@ -488,7 +489,7 @@ def test_given_python_hooks_lifecycle_matrix_when_building_then_all_materializat
                 """
             ).strip()
             + "\n",
-            "models/marts/fact_orders.sql": dedent(
+            "sql/models/marts/fact_orders.sql": dedent(
                 """
                 MODEL (description "Test model fact_orders.",
                   materialized table,
@@ -507,7 +508,7 @@ def test_given_python_hooks_lifecycle_matrix_when_building_then_all_materializat
                 """
             ).strip()
             + "\n",
-            "models/intermediate/order_status_index.sql": dedent(
+            "sql/models/intermediate/order_status_index.sql": dedent(
                 """
                 MODEL (description "Test model order_status_index.",
                   materialized incremental,
@@ -531,7 +532,7 @@ def test_given_python_hooks_lifecycle_matrix_when_building_then_all_materializat
                 """
             ).strip()
             + "\n",
-            "models/marts/hourly_order_activity.sql": dedent(
+            "sql/models/marts/hourly_order_activity.sql": dedent(
                 """
                 MODEL (description "Test model hourly_order_activity.",
                   materialized incremental,
@@ -560,7 +561,7 @@ def test_given_python_hooks_lifecycle_matrix_when_building_then_all_materializat
                 """
             ).strip()
             + "\n",
-            "models/snapshots/customer_snapshot.sql": dedent(
+            "sql/models/snapshots/customer_snapshot.sql": dedent(
                 """
                 MODEL (description "Test model customer_snapshot.",
                   materialized snapshot,
@@ -576,7 +577,7 @@ def test_given_python_hooks_lifecycle_matrix_when_building_then_all_materializat
                 """
             ).strip()
             + "\n",
-            "models/custom/custom_orders.sql": dedent(
+            "sql/models/custom/custom_orders.sql": dedent(
                 """
                 MODEL (description "Test model custom_orders.",
                   materialized copy_table,
@@ -594,7 +595,7 @@ def test_given_python_hooks_lifecycle_matrix_when_building_then_all_materializat
     db_path: Path = project_dir / "python_hooks_lifecycle_matrix_project.duckdb"
     execute_duckdb(
         db_path=db_path,
-        sql=(project_dir / "seed_raw_data.sql").read_text(encoding="utf-8"),
+        sql=take_raw_data_sql(project_dir),
     )
 
     result: subprocess.CompletedProcess[str] = run_sqb(
@@ -652,7 +653,7 @@ def test_given_python_post_hook_failure_when_building_graph_then_downstream_is_b
                 """
             ).strip()
             + "\n",
-            "hooks/python/lifecycle.py": dedent(
+            "sql/hooks/python/lifecycle.py": dedent(
                 """
                 from sqlbuild.hooks import hook
 
@@ -664,7 +665,7 @@ def test_given_python_post_hook_failure_when_building_graph_then_downstream_is_b
                 """
             ).strip()
             + "\n",
-            "models/orders.sql": dedent(
+            "sql/models/orders.sql": dedent(
                 """
                 MODEL (description "Test model orders.",
                   materialized table,
@@ -675,7 +676,7 @@ def test_given_python_post_hook_failure_when_building_graph_then_downstream_is_b
                 """
             ).strip()
             + "\n",
-            "models/downstream_orders.sql": dedent(
+            "sql/models/downstream_orders.sql": dedent(
                 """
                 MODEL (description "Test model downstream_orders.", materialized table);
 
@@ -724,7 +725,7 @@ def test_given_python_post_hook_failure_when_building_graph_then_downstream_is_b
             ),
             expected_present_tables=(),
             expected_absent_tables=("orders",),
-            hook_files={"hooks/python/lifecycle.py": _FAIL_HOOK_SOURCE},
+            hook_files={"sql/hooks/python/lifecycle.py": _FAIL_HOOK_SOURCE},
         ),
         PythonHookFailureBuildE2ETestCase(
             description="pre hook failure shows failing SQL hook row",
@@ -770,7 +771,7 @@ def test_given_pre_hook_failure_when_building_then_cli_shows_failing_hook_row(
             ).strip()
             + "\n",
             **test_case.hook_files,
-            "models/orders.sql": test_case.model_sql,
+            "sql/models/orders.sql": test_case.model_sql,
         },
     )
 
@@ -823,14 +824,14 @@ def test_given_long_python_hook_name_when_building_then_cli_truncates_label_at_c
                 """
             ).strip()
             + "\n",
-            "hooks/python/lifecycle.py": (
+            "sql/hooks/python/lifecycle.py": (
                 "from sqlbuild.hooks import hook\n\n\n"
                 "@hook\n"
                 "def publish_customer_metadata_to_external_catalog_after_successful_"
                 "materialization(ctx):\n"
                 '    """Test hook publish_customer_metadata_to_external_catalog_after_successful_materialization."""\n    ctx.log.info("long hook ran")\n'
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Test model orders.',\n"
                 "  materialized table,\n"
                 '  pre_hooks [python("publish_customer_metadata_to_external_catalog_after_'
@@ -883,7 +884,7 @@ def test_given_snapshot_with_python_hooks_when_building_then_hooks_execute(
                 """
             ).strip()
             + "\n",
-            "hooks/python/snapshot_hooks.py": dedent(
+            "sql/hooks/python/snapshot_hooks.py": dedent(
                 """
                 from sqlbuild.hooks import hook
 
@@ -908,7 +909,7 @@ def test_given_snapshot_with_python_hooks_when_building_then_hooks_execute(
                 """
             ).strip()
             + "\n",
-            "models/customer_snapshot.sql": dedent(
+            "sql/models/customer_snapshot.sql": dedent(
                 """
                 MODEL (description "Test model customer_snapshot.",
                   materialized snapshot,

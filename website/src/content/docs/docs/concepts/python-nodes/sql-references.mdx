@@ -74,7 +74,7 @@ with `P008`:
 
 ```
 error[P008]: asset:export_orders names model:fact_orders as 'fact_orders' in SQL passed to ctx.query()
-  --> python/exports/export.py:9
+  --> python/nodes/exports/export.py:9
   = help: declare it with depends_on=model("fact_orders") and use ctx.relation(model("fact_orders")) instead of the relation name
   = help: if 'fact_orders' is an external table that shares the name, qualify it with its schema
   = help: while migrating a project, allow hard-coded relation names with [references] enforce_explicit = false in sqlbuild_project.toml
@@ -118,7 +118,8 @@ set [`[references] enforce_explicit = false`](/docs/concepts/project-configurati
 ## Depending on a job or a tag
 
 Naming every upstream model ties a node to model names that change with each rename or split.
-`job()` and `tag()` from `sqlbuild.refs` depend on a whole set instead:
+`job()` and `tag()` from `sqlbuild.refs` depend on a whole set instead, in an asset's or a loader's
+`depends_on`:
 
 ```python
 from sqlbuild.refs import job, tag
@@ -167,7 +168,6 @@ Compile fails when:
   by job, so if the dependant's job waits for the job it depends on while that job reads a node of
   the dependant's job, neither can start. The error names the nodes that close the loop; move
   them to another job;
-- a loader declares one: loaders depend on loaders and assets named one by one;
 - the name has a code location prefix such as `job("billing:nightly_job")`, which is reserved for
   depending on other locations' jobs.
 

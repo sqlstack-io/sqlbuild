@@ -132,18 +132,17 @@ def discover_declaration_file(*, project_dir: Path, relative_path: str, contents
     file_path: Path = project_dir / relative_path
     file_path.parent.mkdir(parents=True, exist_ok=True)
     _ = file_path.write_text(contents, encoding="utf-8")
-    discovered: tuple[object, ...] = _DECLARATION_FILE_DISCOVERERS[relative_path.split("/")[0]](
-        project_dir=project_dir
-    )
+    role: str = relative_path.removeprefix("sql/").split("/")[0]
+    discovered: tuple[object, ...] = _DECLARATION_FILE_DISCOVERERS[role](project_dir=project_dir)
     return discovered[0]
 
 
 def discover_python_function_file(
     *, project_dir: Path, file_name: str, contents: str
 ) -> DiscoveredPythonFunctionFile:
-    """Write one ``functions/python`` file into a project and return its discovered record."""
+    """Write one ``sql/functions/python`` file into a project and return its discovered record."""
 
-    file_path: Path = project_dir / "functions" / "python" / file_name
+    file_path: Path = project_dir / "sql" / "functions" / "python" / file_name
     file_path.parent.mkdir(parents=True, exist_ok=True)
     _ = file_path.write_text(contents, encoding="utf-8")
     return discover_python_function_files(project_dir=project_dir)[0]
@@ -152,14 +151,14 @@ def discover_python_function_file(
 _STATEMENT_HEADER_PARSERS: dict[str, Callable[..., object]] = {
     "MODEL": parse_model_sql,
     "AUDIT": lambda *, contents, file_path: discover_declaration_file(
-        project_dir=file_path.parents[2],
-        relative_path=file_path.relative_to(file_path.parents[2]).as_posix(),
+        project_dir=file_path.parents[3],
+        relative_path=file_path.relative_to(file_path.parents[3]).as_posix(),
         contents=contents,
     ),
     "TEST": parse_sql_test_file,
     "HOOK": lambda *, contents, file_path: discover_declaration_file(
-        project_dir=file_path.parents[2],
-        relative_path=file_path.relative_to(file_path.parents[2]).as_posix(),
+        project_dir=file_path.parents[3],
+        relative_path=file_path.relative_to(file_path.parents[3]).as_posix(),
         contents=contents,
     ),
     "SCENARIO": lambda *, contents, file_path: parse_sql_scenario_file(
@@ -169,8 +168,8 @@ _STATEMENT_HEADER_PARSERS: dict[str, Callable[..., object]] = {
 
 
 _STATEMENT_FILE_PATHS: dict[str, Callable[[Path], Path]] = {
-    "AUDIT": lambda project_dir: project_dir / "audits" / "generic" / "orders.sql",
-    "HOOK": lambda project_dir: project_dir / "hooks" / "sql" / "orders.sql",
+    "AUDIT": lambda project_dir: project_dir / "sql" / "audits" / "generic" / "orders.sql",
+    "HOOK": lambda project_dir: project_dir / "sql" / "hooks" / "sql" / "orders.sql",
 }
 
 

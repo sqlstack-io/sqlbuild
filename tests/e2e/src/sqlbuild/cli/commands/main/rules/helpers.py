@@ -24,7 +24,7 @@ def write_unevaluated_rules_project(
     configuration: str = "",
     adapter: str = "duckdb",
     selected_rules: tuple[str, ...] = ("SQLCLEAN035",),
-    resource_path: str = "models/staging/orders.sql",
+    resource_path: str = "sql/models/staging/orders.sql",
     resource_template: str = (
         "MODEL (description 'Test model orders.', {options});\nSELECT {expression} AS order_id"
     ),
@@ -35,7 +35,7 @@ def write_unevaluated_rules_project(
         f'name = "orders"\nadapter = "{adapter}"\n[rules]\nselect = {json.dumps(selected_rules)}\n'
         + configuration
     )
-    models: Path = project_dir / "models/staging"
+    models: Path = project_dir / "sql/models/staging"
     models.mkdir(parents=True)
     (models / "orders.sql").write_text(
         "MODEL (description 'Test model orders.');\nSELECT 1 AS order_id\n"
@@ -86,7 +86,7 @@ def write_custom_rule_project(
         "\n[rules.thresholds]\nmin_custom_rule_test_cases = 0\n" + configuration,
         encoding="utf-8",
     )
-    orders: Path = project_dir / "models" / "orders.sql"
+    orders: Path = project_dir / "sql" / "models" / "orders.sql"
     orders.parent.mkdir(parents=True, exist_ok=True)
     orders.write_text('MODEL (description "Orders");\nSELECT 1 AS order_id\n', encoding="utf-8")
     relative_path: str
@@ -157,10 +157,13 @@ SPLIT_ORDER_TABLES: str = (
 
 
 def split_model_files(model_count: int) -> tuple[tuple[str, str], ...]:
-    """Return numbered order models beside the project's `models/orders.sql`."""
+    """Return numbered order models beside the project's `sql/models/orders.sql`."""
 
     return tuple(
-        (f"models/orders_{index:03d}.sql", 'MODEL (description "Orders");\nSELECT 1 AS order_id\n')
+        (
+            f"sql/models/orders_{index:03d}.sql",
+            'MODEL (description "Orders");\nSELECT 1 AS order_id\n',
+        )
         for index in range(model_count)
     )
 
@@ -169,12 +172,13 @@ def split_expected_findings(model_count: int) -> tuple[tuple[str, str], ...]:
     """Return what one host reports for the duplicate-parity and flagged-suffix order rules."""
 
     names: tuple[str, ...] = tuple(f"orders_{index:03d}" for index in range(model_count))
-    # `models/orders.sql` sorts first and is the first odd model; `orders_000` is the first even.
+    # `sql/models/orders.sql` sorts first and is the first odd model;
+    # `orders_000` is the first even.
     duplicates: tuple[tuple[str, str], ...] = tuple(
-        ("XSQBRSPLIT001", f"models/{name}.sql") for name in names[1:]
+        ("XSQBRSPLIT001", f"sql/models/{name}.sql") for name in names[1:]
     )
     suffixes: tuple[tuple[str, str], ...] = tuple(
-        ("XSQBRSPLIT002", f"models/{name}.sql")
+        ("XSQBRSPLIT002", f"sql/models/{name}.sql")
         for name in filter(lambda name: name.endswith(("3", "7")), names)
     )
     return tuple(sorted(duplicates + suffixes))
@@ -273,8 +277,8 @@ def write_quality_project(*, project_dir: Path, toml: str, upstream: str, summar
     """Write a two-model project: `raw_orders` and the `order_summary` model under test."""
 
     (project_dir / "sqlbuild_project.toml").write_text(toml, encoding="utf-8")
-    models: Path = project_dir / "models"
-    models.mkdir()
+    models: Path = project_dir / "sql" / "models"
+    models.mkdir(parents=True)
     (models / "raw_orders.sql").write_text(upstream, encoding="utf-8")
     (models / "order_summary.sql").write_text(summary, encoding="utf-8")
 
@@ -332,21 +336,21 @@ def long_literal_hints(result: subprocess.CompletedProcess[str]) -> dict[str, st
 
 INCREMENTAL_RULES_PROJECT: dict[str, str] = {
     "sqlbuild_project.toml": (
-        'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+        'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\nextra_paths = ["config"]\n\n'
         '[connection]\ndatabase = "warehouse.duckdb"\n\n'
         '[targets.dev]\nschema = "dev"\n\n[targets.prod]\nschema = "prod"\n\n'
         '[vars]\ndiscount_rate = "0.1"\n\n'
         '[rules]\nselect = ["SQBR", "SQLCLEAN", "XSQBR"]\n\n'
         "[rules.thresholds]\nmin_custom_rule_test_cases = 0\n"
     ),
-    "models/staging/stg_orders.sql": (
+    "sql/models/staging/stg_orders.sql": (
         "MODEL (description 'Test model stg_orders.',\n  materialized view,\n"
         "  contract enforced,\n  columns (\n"
         "    order_id (type INTEGER, nullable false, audits [not_null]),\n"
         "    amount (type DOUBLE),\n  ),\n);\n\n"
         "SELECT CAST(1 AS INTEGER) AS order_id, CAST(10.5 AS DOUBLE) AS amount\n"
     ),
-    "models/marts/order_totals.sql": (
+    "sql/models/marts/order_totals.sql": (
         "MODEL (description 'Test model order_totals.',\n  columns (\n"
         "    order_id (type INTEGER, nullable false, audits [not_null]),\n"
         "    net_amount (type DOUBLE),\n  ),\n);\n\n"
@@ -355,7 +359,7 @@ INCREMENTAL_RULES_PROJECT: dict[str, str] = {
         " AS net_amount\n"
         'FROM __ref("stg_orders") AS o\n'
     ),
-    "models/marts/_sqlbuild/_macros/python/amounts.py": (
+    "sql/models/marts/_sqlbuild/_macros/python/amounts.py": (
         'def discounted(amount: str) -> str:\n    return f"({amount}) * 0.9"\n'
     ),
     "tests/unit/test_order_totals.sql": (
@@ -435,18 +439,18 @@ BUILT_IN_RULES_PROJECT: dict[str, str] = {
         '[rules]\nselect = ["SQBR"]\ndomains = ["commerce"]\n\n'
         "[rules.thresholds]\nmin_tests_per_model = 1\n"
     ),
-    "models/commerce/staging/commerce__stg__orders.sql": (
+    "sql/models/commerce/staging/commerce__stg__orders.sql": (
         'MODEL (description "Staged orders");\n\n'
         "SELECT CAST(1 AS INTEGER) AS order_id, CAST(10.5 AS DOUBLE) AS amount, "
         "'paid' AS status\n"
     ),
-    "models/commerce/mart/commerce__mart__order_totals.sql": (
+    "sql/models/commerce/mart/commerce__mart__order_totals.sql": (
         'MODEL (description "Order totals");\n\n'
         'WITH orders AS (\n  SELECT * FROM __ref("commerce__stg__orders")\n)\n'
         "SELECT order_id, amount * 2 AS doubled_amount FROM orders "
         "WHERE status = 'paid' AND amount > 7\n"
     ),
-    "models/commerce/mart/commerce__mart__customers.sql": (
+    "sql/models/commerce/mart/commerce__mart__customers.sql": (
         'MODEL (description "Customers");\n\nSELECT customer_id FROM warehouse.raw.customers\n'
     ),
     "tests/unit/test_commerce__mart__order_totals.sql": (
@@ -466,7 +470,7 @@ CUSTOM_RULES_EDIT_PROJECT: dict[str, str] = {
         '[rules]\nselect = ["XSQBR"]\n\n'
         "[rules.thresholds]\nmin_custom_rule_test_cases = 0\n"
     ),
-    "sources/raw.yml": (
+    "sql/sources/raw.yml": (
         "sources:\n"
         "  - name: raw_orders\n    description: Raw orders.\n"
         '    expression: "(SELECT 1 AS id, CAST(10.5 AS DOUBLE) AS amount, 1 AS customer_id)"\n'
@@ -475,20 +479,20 @@ CUSTOM_RULES_EDIT_PROJECT: dict[str, str] = {
         "  - name: raw_products\n    description: Raw products.\n"
         '    expression: "(SELECT 1 AS product_id)"\n'
     ),
-    "models/staging/stg_orders.sql": (
+    "sql/models/staging/stg_orders.sql": (
         'MODEL (description "Staged orders");\n\n'
         'SELECT id AS order_id, amount, customer_id FROM __source("raw_orders")\n'
     ),
-    "models/staging/stg_customers.sql": (
+    "sql/models/staging/stg_customers.sql": (
         'MODEL (description "Staged customers");\n\n'
         'SELECT customer_id FROM __source("raw_customers")\n'
     ),
-    "models/marts/order_totals.sql": (
+    "sql/models/marts/order_totals.sql": (
         'MODEL (description "Order totals");\n\n'
         'SELECT order_id, amount * 2 AS doubled_amount FROM __ref("stg_orders") WHERE amount > 7\n'
     ),
     **{
-        f"models/intermediate/orders_{index:03d}.sql": (
+        f"sql/models/intermediate/orders_{index:03d}.sql": (
             f'MODEL (description "Order slice {index}");\n\n'
             'SELECT order_id FROM __ref("stg_orders")\n'
         )
@@ -524,7 +528,7 @@ def approved_sources(*, project: Project, ctx: RuleContext) -> list[Finding]:
     approved: set[str] = set(ctx.project.tree.read_text("rules/approved_sources.yaml").split())
     names: list[str] = sorted(str(getattr(source, "name")) for source in ctx.project.sources)
     return [
-        ctx.finding(subject="sources/raw.yml", message=f"Source {name} is not approved")
+        ctx.finding(subject="sql/sources/raw.yml", message=f"Source {name} is not approved")
         for name in names
         if name not in approved
     ]
@@ -557,7 +561,7 @@ ONE_MODEL_EDIT_PROJECT: dict[str, str] = {
         '    return [ctx.finding(subject=model)] if "SELECT 3 " in source else []\n'
     ),
     **{
-        f"models/orders_{index:03d}.sql": (
+        f"sql/models/orders_{index:03d}.sql": (
             f'MODEL (description "Orders {index}");\n\nSELECT {index} AS order_id\n'
         )
         for index in range(ONE_MODEL_EDIT_MODEL_COUNT)
@@ -653,7 +657,7 @@ def move_order_totals_description_to_path_defaults(root: Path) -> None:
 
     replace_project_text(
         root,
-        "models/marts/order_totals.sql",
+        "sql/models/marts/order_totals.sql",
         "MODEL (description 'Test model order_totals.',\n",
         "MODEL (\n",
     )
@@ -707,7 +711,7 @@ def write_one_row_cross_join_project(
         path: Path = project_dir / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
-    seed: Path = project_dir / "seeds" / "order_policy.csv"
+    seed: Path = project_dir / "sql" / "seeds" / "order_policy.csv"
     seed.write_text("max_amount\n" + "".join(f"{row}\n" for row in seed_rows), encoding="utf-8")
     return seed
 

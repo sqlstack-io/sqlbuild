@@ -55,7 +55,7 @@ contract = "enforced"
 time_travel_retention = "14d"
 """.strip()
             + "\n",
-            "models/customers.sql": """
+            "sql/models/customers.sql": """
 MODEL (description "Test model customers.",
   columns (customer_id (type INTEGER, nullable false, description "Customer id")),
 );
@@ -63,7 +63,7 @@ MODEL (description "Test model customers.",
 SELECT 1 AS customer_id
 """.strip()
             + "\n",
-            "models/orders.sql": """
+            "sql/models/orders.sql": """
 MODEL (description "Test model orders.",
   columns (order_id (type BIGINT, nullable true, description "Order id")),
 );
@@ -127,7 +127,7 @@ sql_validation = false
 identifier_type = "INTEGER"
 """.strip()
             + "\n",
-            "models/customers.sql": """
+            "sql/models/customers.sql": """
 MODEL (description "Test model customers.",
   columns (
     customer_id (
@@ -140,7 +140,7 @@ MODEL (description "Test model customers.",
 SELECT 1 AS customer_id
 """.strip()
             + "\n",
-            "models/orders.sql": """
+            "sql/models/orders.sql": """
 MODEL (description "Test model orders.",
   columns (
     order_id (

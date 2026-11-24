@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D016",
-     "message": "Invalid model audit definition identity 'NotNull' in models/staging/stg_orders.sql; use snake_case 'not_null'",
+     "message": "Invalid model audit definition identity 'NotNull' in sql/models/staging/stg_orders.sql; use snake_case 'not_null'",
      "help": "Rename the authored identity and update its references, selectors, and integration keys. SQLBuild does not silently normalize resource identities. Double underscores remain valid."
     }
    ]

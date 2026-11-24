@@ -21,6 +21,6 @@ pub(super) fn missing(name: &str, read_by: &[&str], role: Option<&str>) -> Missi
         read_by: read_by.iter().map(|reader| (*reader).to_owned()).collect(),
         unreadable: role.is_some(),
         role: role.map(str::to_owned),
-        location: format!("sources/{name}.yml:2"),
+        location: format!("sql/sources/{name}.yml:2"),
     }
 }

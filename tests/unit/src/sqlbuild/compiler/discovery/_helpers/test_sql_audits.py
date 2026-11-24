@@ -101,7 +101,7 @@ def test_given_sql_audit_file_variants_when_parsing_then_it_returns_expected_raw
         DiscoveredAuditFile,
         discover_declaration_file(
             project_dir=tmp_path,
-            relative_path="audits/generic/orders.sql",
+            relative_path="sql/audits/generic/orders.sql",
             contents=test_case.contents,
         ),
     ).blocks
@@ -231,7 +231,7 @@ def test_given_invalid_sql_audit_file_contents_when_parsing_then_it_raises_clear
     with pytest.raises(SqlAuditParseError, match=test_case.expected_error_fragment):
         discover_declaration_file(
             project_dir=tmp_path,
-            relative_path="audits/generic/orders.sql",
+            relative_path="sql/audits/generic/orders.sql",
             contents=test_case.contents,
         )
 
@@ -272,7 +272,7 @@ def test_given_measurement_audit_with_evidence_when_parsing_then_contract_and_qu
         DiscoveredAuditFile,
         discover_declaration_file(
             project_dir=tmp_path,
-            relative_path="audits/generic/rate.sql",
+            relative_path="sql/audits/generic/rate.sql",
             contents=test_case.contents,
         ),
     ).blocks
@@ -325,6 +325,6 @@ def test_given_invalid_evaluation_grammar_when_parsing_then_clear_error_is_raise
     with pytest.raises(SqlAuditParseError, match=test_case.expected_error_fragment):
         discover_declaration_file(
             project_dir=tmp_path,
-            relative_path="audits/generic/rate.sql",
+            relative_path="sql/audits/generic/rate.sql",
             contents=test_case.contents,
         )

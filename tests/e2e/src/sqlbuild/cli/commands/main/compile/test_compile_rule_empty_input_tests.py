@@ -41,7 +41,7 @@ _STALE_ENTRY: tuple[str, str, str] = (
 )
 _ORDERS_MINIMUM: tuple[str, str, str] = (
     "SQBRTEST202",
-    "models/orders.sql",
+    "sql/models/orders.sql",
     'model "orders" has 0 tests; 1 required (1 empty-input-only test not counted; see SQBRTEST203)',
 )
 

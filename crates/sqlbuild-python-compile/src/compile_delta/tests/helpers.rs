@@ -45,16 +45,16 @@ pub(crate) fn image() -> ProjectImage {
         models: vec![
             CapturedModel {
                 name: "orders".to_owned(),
-                relative_path: "models/orders.sql".to_owned(),
+                relative_path: "sql/models/orders.sql".to_owned(),
                 upstream: pairs(&[("source", "raw_orders"), ("model", "customers")]),
             },
             CapturedModel {
                 name: "customers".to_owned(),
-                relative_path: "models/customers.sql".to_owned(),
+                relative_path: "sql/models/customers.sql".to_owned(),
                 upstream: Vec::new(),
             },
         ],
-        usages: BTreeMap::from([("models/orders.sql".to_owned(), "digest-1".to_owned())]),
+        usages: BTreeMap::from([("sql/models/orders.sql".to_owned(), "digest-1".to_owned())]),
         tests: vec![CapturedTest {
             key: "orders_test".to_owned(),
             relative_path: "tests/unit/orders.sql".to_owned(),
@@ -86,12 +86,12 @@ pub(crate) fn image() -> ProjectImage {
         fact_digests: vec![(strings(&["model", "orders"]), "fact-digest".to_owned())],
         model_subjects: Some(vec![
             (
-                "models/orders.sql".to_owned(),
+                "sql/models/orders.sql".to_owned(),
                 "orders".to_owned(),
                 Some("table".to_owned()),
             ),
             (
-                "models/customers.sql".to_owned(),
+                "sql/models/customers.sql".to_owned(),
                 "customers".to_owned(),
                 None,
             ),
@@ -99,7 +99,7 @@ pub(crate) fn image() -> ProjectImage {
         diagnostics: vec![CapturedDiagnostic {
             json: "{\"code\": \"W1\"}".to_owned(),
             resource_name: Some("orders".to_owned()),
-            paths: strings(&["models/orders.sql"]),
+            paths: strings(&["sql/models/orders.sql"]),
             error: false,
         }],
         text_models: Some(vec![("orders".to_owned(), true, 3)]),
@@ -119,17 +119,20 @@ pub(crate) fn image() -> ProjectImage {
             blocked: true,
             partial: strings(&["open source: raw_orders"]),
         }]),
-        lint_model_keys: Some(pairs(&[("models/orders.sql", "lint-key")])),
+        lint_model_keys: Some(pairs(&[("sql/models/orders.sql", "lint-key")])),
         lint_file_keys: Some(vec![
-            ("models/orders.sql".to_owned(), Some("file-key".to_owned())),
-            ("models/customers.sql".to_owned(), None),
+            (
+                "sql/models/orders.sql".to_owned(),
+                Some("file-key".to_owned()),
+            ),
+            ("sql/models/customers.sql".to_owned(), None),
         ]),
         header_keys: BTreeMap::from([(
-            "models/orders.sql".to_owned(),
+            "sql/models/orders.sql".to_owned(),
             pairs(&[("description", "0123")]),
         )]),
         audit_references: BTreeMap::from([(
-            "models/orders.sql".to_owned(),
+            "sql/models/orders.sql".to_owned(),
             strings(&["order_quality"]),
         )]),
         rules: Some(ImageRules::Retained(RetainedRows {

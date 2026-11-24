@@ -171,11 +171,11 @@ def build_authored_cte_project_files() -> dict[str, str]:
             "[settings]\n"
             "sql_analysis = true\n"
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n    table: raw_orders\n"
         ),
-        "models/stg_orders.sql": (
+        "sql/models/stg_orders.sql": (
             "MODEL (description 'Test model stg_orders.', materialized table);\n\n"
             "WITH base AS (\n"
             "  -- a comment with an unmatched ) parenthesis\n"
@@ -185,7 +185,7 @@ def build_authored_cte_project_files() -> dict[str, str]:
             "tagged AS (SELECT order_id, amount, note, $$a ) b$$ AS tag FROM base)\n"
             "SELECT order_id, amount, note, tag FROM tagged\n"
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             "MODEL (description 'Test model orders.', materialized table);\n\n"
             "WITH totals AS (\n"
             '  WITH ranked AS (SELECT order_id, amount, tag FROM __ref("stg_orders"))\n'
@@ -256,16 +256,16 @@ def build_terminated_model_project_files() -> dict[str, str]:
             'name = "terminated"\nadapter = "duckdb"\n\n[connection]\n'
             'database = "terminated.duckdb"\n\n[settings]\nsql_analysis = true\n'
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n    table: raw_orders\n"
         ),
-        "models/m.sql": (
+        "sql/models/m.sql": (
             "MODEL (description 'Test model m.', materialized table);\n\n"
             'WITH a AS (SELECT id FROM __source("raw_orders"))\n'
             "SELECT id FROM a;\n"
         ),
-        "models/m_next.sql": (
+        "sql/models/m_next.sql": (
             "MODEL (description 'Test model m_next.', materialized table);\n\n"
             'SELECT id + 1 AS id FROM __ref("m")\n'
         ),

@@ -67,8 +67,8 @@ def test_given_standalone_load_mode_when_loader_enters_then_start_order_wraps_bl
             sources=(SourceEntry(name="ordered", loader="ordered_loader"),),
             loader_functions=(
                 DiscoveredLoaderFunction(
-                    file_path=Path("python/loaders/ordered.py"),
-                    relative_path=Path("python/loaders/ordered.py"),
+                    file_path=Path("python/nodes/loaders/ordered.py"),
+                    relative_path=Path("python/nodes/loaders/ordered.py"),
                     name="ordered_loader",
                     function=loader,
                 ),
@@ -161,27 +161,27 @@ def test_given_mixed_loader_skips_when_running_pipeline_then_fan_in_matches_mode
         ),
         loader_functions=(
             DiscoveredLoaderFunction(
-                file_path=Path("python/loaders/a.py"),
-                relative_path=Path("python/loaders/a.py"),
+                file_path=Path("python/nodes/loaders/a.py"),
+                relative_path=Path("python/nodes/loaders/a.py"),
                 name="a_loader",
                 function=a_loader,
             ),
             DiscoveredLoaderFunction(
-                file_path=Path("python/loaders/x.py"),
-                relative_path=Path("python/loaders/x.py"),
+                file_path=Path("python/nodes/loaders/x.py"),
+                relative_path=Path("python/nodes/loaders/x.py"),
                 name="x_loader",
                 function=x_loader,
             ),
             DiscoveredLoaderFunction(
-                file_path=Path("python/loaders/b.py"),
-                relative_path=Path("python/loaders/b.py"),
+                file_path=Path("python/nodes/loaders/b.py"),
+                relative_path=Path("python/nodes/loaders/b.py"),
                 name="b_loader",
                 function=b_loader,
                 depends_on=(a_loader,),
             ),
             DiscoveredLoaderFunction(
-                file_path=Path("python/loaders/c.py"),
-                relative_path=Path("python/loaders/c.py"),
+                file_path=Path("python/nodes/loaders/c.py"),
+                relative_path=Path("python/nodes/loaders/c.py"),
                 name="c_loader",
                 function=c_loader,
                 depends_on=(b_loader, x_loader),
@@ -254,14 +254,14 @@ def test_given_two_independent_loaders_when_run_concurrently_then_each_projects_
                 sources=sources,
                 loader_functions=(
                     DiscoveredLoaderFunction(
-                        file_path=Path("python/loaders/first.py"),
-                        relative_path=Path("python/loaders/first.py"),
+                        file_path=Path("python/nodes/loaders/first.py"),
+                        relative_path=Path("python/nodes/loaders/first.py"),
                         name="first_loader",
                         function=first_loader,
                     ),
                     DiscoveredLoaderFunction(
-                        file_path=Path("python/loaders/second.py"),
-                        relative_path=Path("python/loaders/second.py"),
+                        file_path=Path("python/nodes/loaders/second.py"),
+                        relative_path=Path("python/nodes/loaders/second.py"),
                         name="second_loader",
                         function=second_loader,
                     ),

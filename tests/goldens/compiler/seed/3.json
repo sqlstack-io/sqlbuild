@@ -17,26 +17,26 @@
   }
  ],
  "compiled": {
-  "audits/generic/audited_event_totals/amount_floor.sql": [
+  "sql/audits/generic/audited_event_totals/amount_floor.sql": [
    "SELECT *",
    "FROM __ref(\"audited_event_totals\")",
    "WHERE amount < -23",
    ""
   ],
-  "audits/generic/audited_events/accepted_values__id.sql": [
+  "sql/audits/generic/audited_events/accepted_values__id.sql": [
    "SELECT id",
    "FROM __source(\"audited_events\")",
    "WHERE id IS NOT NULL",
    "  AND id NOT IN (1, 2)",
    ""
   ],
-  "audits/generic/audited_events/not_null__id.sql": [
+  "sql/audits/generic/audited_events/not_null__id.sql": [
    "SELECT id",
    "FROM __source(\"audited_events\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/audited_events/unique__id.sql": [
+  "sql/audits/generic/audited_events/unique__id.sql": [
    "SELECT id, COUNT(*) AS duplicate_count",
    "FROM __source(\"audited_events\")",
    "WHERE id IS NOT NULL",
@@ -44,32 +44,32 @@
    "HAVING COUNT(*) > 1",
    ""
   ],
-  "audits/generic/billing_summary_1/not_null__id.sql": [
+  "sql/audits/generic/billing_summary_1/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"billing_summary_1\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/channel_codes/not_null__id.sql": [
+  "sql/audits/generic/channel_codes/not_null__id.sql": [
    "SELECT id",
    "FROM __seed(\"channel_codes\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/checked_stg_billing_1/accepted_values__status.sql": [
+  "sql/audits/generic/checked_stg_billing_1/accepted_values__status.sql": [
    "SELECT status",
    "FROM __ref(\"checked_stg_billing_1\")",
    "WHERE status IS NOT NULL",
    "  AND status NOT IN ('placed', 'expédié', '取消', 'returned ✓')",
    ""
   ],
-  "audits/generic/checked_stg_billing_1/expression_is_true.sql": [
+  "sql/audits/generic/checked_stg_billing_1/expression_is_true.sql": [
    "SELECT *",
    "FROM __ref(\"checked_stg_billing_1\")",
    "WHERE NOT (amount >= -1000)",
    ""
   ],
-  "audits/generic/checked_stg_billing_1/relationships__id.sql": [
+  "sql/audits/generic/checked_stg_billing_1/relationships__id.sql": [
    "SELECT id",
    "FROM __ref(\"checked_stg_billing_1\")",
    "WHERE id IS NOT NULL",
@@ -80,33 +80,33 @@
    "  )",
    ""
   ],
-  "audits/generic/configured_events/accepted_values__id.sql": [
+  "sql/audits/generic/configured_events/accepted_values__id.sql": [
    "SELECT id",
    "FROM __source(\"configured_events\")",
    "WHERE id IS NOT NULL",
    "  AND id NOT IN ('1')",
    ""
   ],
-  "audits/generic/configured_stg_billing_1/accepted_values__status.sql": [
+  "sql/audits/generic/configured_stg_billing_1/accepted_values__status.sql": [
    "SELECT status",
    "FROM __ref(\"configured_stg_billing_1\")",
    "WHERE status IS NOT NULL",
    "  AND status NOT IN ('placed', 'shipped')",
    ""
   ],
-  "audits/generic/configured_stg_billing_1/configured_amount_floor.sql": [
+  "sql/audits/generic/configured_stg_billing_1/configured_amount_floor.sql": [
    "SELECT *",
    "FROM __ref(\"configured_stg_billing_1\")",
    "WHERE amount < -25",
    ""
   ],
-  "audits/generic/configured_stg_billing_1/configured_id_present__id.sql": [
+  "sql/audits/generic/configured_stg_billing_1/configured_id_present__id.sql": [
    "SELECT id",
    "FROM __ref(\"configured_stg_billing_1\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/configured_stg_billing_1/unique__id.sql": [
+  "sql/audits/generic/configured_stg_billing_1/unique__id.sql": [
    "SELECT id, COUNT(*) AS duplicate_count",
    "FROM __ref(\"configured_stg_billing_1\")",
    "WHERE id IS NOT NULL",
@@ -114,52 +114,52 @@
    "HAVING COUNT(*) > 1",
    ""
   ],
-  "audits/generic/stg_billing_0/not_null__id.sql": [
+  "sql/audits/generic/stg_billing_0/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"stg_billing_0\")",
    "WHERE id IS NULL",
    ""
   ],
-  "functions/sql/configured_label.sql": [
+  "sql/functions/sql/configured_label.sql": [
    "CREATE OR REPLACE MACRO main.configured_label(raw_status) AS (",
    "UPPER(raw_status)",
    ")",
    ""
   ],
-  "functions/sql/scaled_amount.sql": [
+  "sql/functions/sql/scaled_amount.sql": [
    "CREATE OR REPLACE MACRO main.scaled_amount(p_amount, p_factor) AS (",
    "p_amount * p_factor",
    ")",
    ""
   ],
-  "functions/sql/table_fn__amount_bands.sql": [
+  "sql/functions/sql/table_fn__amount_bands.sql": [
    "CREATE OR REPLACE MACRO main.table_fn__amount_bands(p_floor) AS TABLE",
    "SELECT CAST(id AS INTEGER) AS id,",
    "  CASE WHEN amount > p_floor THEN 'high' ELSE 'low' END AS band",
    "FROM __ref(\"stg_billing_1\")",
    ""
   ],
-  "models/analysis/banded_amounts.sql": [
+  "sql/models/analysis/banded_amounts.sql": [
    "SELECT bands.id, bands.band",
    "FROM __table_fn(\"table_fn__amount_bands\")(8.5) AS bands",
    ""
   ],
-  "models/analysis/checked_stg_billing_1.sql": [
+  "sql/models/analysis/checked_stg_billing_1.sql": [
    "SELECT id, amount, status",
    "FROM __ref(\"stg_billing_1\")",
    ""
   ],
-  "models/analysis/regional_stg_billing_1.sql": [
+  "sql/models/analysis/regional_stg_billing_1.sql": [
    "SELECT id, amount, 'east' AS region",
    "FROM __ref(\"stg_billing_1\")",
    ""
   ],
-  "models/analysis/scaled_stg_billing_1.sql": [
+  "sql/models/analysis/scaled_stg_billing_1.sql": [
    "SELECT id, __udf(\"scaled_amount\")(amount, 8) AS scaled_amount",
    "FROM __ref(\"stg_billing_1\")",
    ""
   ],
-  "models/billing/marts/billing_summary_0.sql": [
+  "sql/models/billing/marts/billing_summary_0.sql": [
    "SELECT",
    "  t.id,",
    "  t.amount,",
@@ -171,7 +171,7 @@
    "LEFT JOIN __ref(\"stg_billing_0\") j1 ON t.id = j1.id",
    ""
   ],
-  "models/billing/marts/billing_summary_1.sql": [
+  "sql/models/billing/marts/billing_summary_1.sql": [
    "SELECT",
    "  t.id,",
    "  t.amount,",
@@ -181,7 +181,7 @@
    "FROM __ref(\"stg_billing_1\") t",
    ""
   ],
-  "models/billing/staging/stg_billing_0.sql": [
+  "sql/models/billing/staging/stg_billing_0.sql": [
    "SELECT",
    "  t.id,",
    "  t.amount,",
@@ -192,7 +192,7 @@
    "FROM __source(\"raw_events_2\") t",
    ""
   ],
-  "models/billing/staging/stg_billing_1.sql": [
+  "sql/models/billing/staging/stg_billing_1.sql": [
    "SELECT",
    "  t.id,",
    "  t.amount,",
@@ -205,37 +205,37 @@
    "WHERE t.status <> 'expédié'",
    ""
   ],
-  "models/features/batched_watermark_stg_billing_1.sql": [
+  "sql/models/features/batched_watermark_stg_billing_1.sql": [
    "SELECT CAST(created_at AS DATE) AS created_at, SUM(amount) AS amount",
    "FROM __ref(\"stg_billing_1\")",
    "GROUP BY CAST(created_at AS DATE)",
    ""
   ],
-  "models/features/hooked_stg_billing_1.sql": [
+  "sql/models/features/hooked_stg_billing_1.sql": [
    "SELECT id, amount",
    "FROM __ref(\"stg_billing_1\")",
    ""
   ],
-  "models/features/kept_stg_billing_1.sql": [
+  "sql/models/features/kept_stg_billing_1.sql": [
    "SELECT id, status, amount * 0.5 AS weighted",
    "FROM __ref(\"stg_billing_1\")",
    "WHERE status IN ('取消', 'expédié')",
    "  AND amount * 1.0 IN (0.5, 1.25, 2500.75) OR id > 0",
    ""
   ],
-  "models/rendering/audited_event_totals.sql": [
+  "sql/models/rendering/audited_event_totals.sql": [
    "SELECT c.label, SUM(e.amount) AS amount",
    "FROM __source(\"audited_events\") e",
    "JOIN __seed(\"channel_codes\") c ON e.id = c.id",
    "GROUP BY c.label",
    ""
   ],
-  "models/rendering/configured_stg_billing_1.sql": [
+  "sql/models/rendering/configured_stg_billing_1.sql": [
    "SELECT id, amount, status",
    "FROM __ref(\"stg_billing_1\")",
    ""
   ],
-  "models/rendering/interpolated_stg_billing_0.sql": [
+  "sql/models/rendering/interpolated_stg_billing_0.sql": [
    "SELECT id,",
    "  '東京 warehouse' AS site,",
    "  $$--東京 warehouse /* $$ AS site_note,",
@@ -244,12 +244,12 @@
    "FROM __ref(\"stg_billing_0\")",
    ""
   ],
-  "models/rendering/legacy_event_ids.sql": [
+  "sql/models/rendering/legacy_event_ids.sql": [
    "SELECT id",
    "FROM __ref(\"stg_billing_1\") AS legacy",
    ""
   ],
-  "models/rendering/policy_stg_billing_1.sql": [
+  "sql/models/rendering/policy_stg_billing_1.sql": [
    "SELECT id, amount, ('web' || '/dev/generated_duckdb/south' || '@web-orders') AS channel,",
    "  4 AS minimum_amount,",
    "  'store' AS fallback_channel",
@@ -257,7 +257,7 @@
    "WHERE amount >= 4",
    ""
   ],
-  "models/rendering/windowed_stg_billing_0.sql": [
+  "sql/models/rendering/windowed_stg_billing_0.sql": [
    "SELECT id, created_at",
    "FROM __ref(\"stg_billing_0\")",
    "WHERE CAST(created_at AS DATE) >= CAST(@@@window_start AS DATE)",
@@ -306,8 +306,8 @@
     "name": "banded_amounts",
     "resource_type": "model",
     "package_name": "generated_3",
-    "path": "models/analysis/banded_amounts.sql",
-    "original_file_path": "models/analysis/banded_amounts.sql",
+    "path": "sql/models/analysis/banded_amounts.sql",
+    "original_file_path": "sql/models/analysis/banded_amounts.sql",
     "unique_id": "model.generated_3.banded_amounts",
     "fqn": [
      "generated_3",
@@ -375,8 +375,8 @@
     "name": "checked_stg_billing_1",
     "resource_type": "model",
     "package_name": "generated_3",
-    "path": "models/analysis/checked_stg_billing_1.sql",
-    "original_file_path": "models/analysis/checked_stg_billing_1.sql",
+    "path": "sql/models/analysis/checked_stg_billing_1.sql",
+    "original_file_path": "sql/models/analysis/checked_stg_billing_1.sql",
     "unique_id": "model.generated_3.checked_stg_billing_1",
     "fqn": [
      "generated_3",
@@ -465,8 +465,8 @@
     "name": "regional_stg_billing_1",
     "resource_type": "model",
     "package_name": "generated_3",
-    "path": "models/analysis/regional_stg_billing_1.sql",
-    "original_file_path": "models/analysis/regional_stg_billing_1.sql",
+    "path": "sql/models/analysis/regional_stg_billing_1.sql",
+    "original_file_path": "sql/models/analysis/regional_stg_billing_1.sql",
     "unique_id": "model.generated_3.regional_stg_billing_1",
     "fqn": [
      "generated_3",
@@ -534,8 +534,8 @@
     "name": "scaled_stg_billing_1",
     "resource_type": "model",
     "package_name": "generated_3",
-    "path": "models/analysis/scaled_stg_billing_1.sql",
-    "original_file_path": "models/analysis/scaled_stg_billing_1.sql",
+    "path": "sql/models/analysis/scaled_stg_billing_1.sql",
+    "original_file_path": "sql/models/analysis/scaled_stg_billing_1.sql",
     "unique_id": "model.generated_3.scaled_stg_billing_1",
     "fqn": [
      "generated_3",
@@ -604,8 +604,8 @@
     "name": "billing_summary_0",
     "resource_type": "model",
     "package_name": "generated_3",
-    "path": "models/billing/marts/billing_summary_0.sql",
-    "original_file_path": "models/billing/marts/billing_summary_0.sql",
+    "path": "sql/models/billing/marts/billing_summary_0.sql",
+    "original_file_path": "sql/models/billing/marts/billing_summary_0.sql",
     "unique_id": "model.generated_3.billing_summary_0",
     "fqn": [
      "generated_3",
@@ -675,8 +675,8 @@
     "name": "billing_summary_1",
     "resource_type": "model",
     "package_name": "generated_3",
-    "path": "models/billing/marts/billing_summary_1.sql",
-    "original_file_path": "models/billing/marts/billing_summary_1.sql",
+    "path": "sql/models/billing/marts/billing_summary_1.sql",
+    "original_file_path": "sql/models/billing/marts/billing_summary_1.sql",
     "unique_id": "model.generated_3.billing_summary_1",
     "fqn": [
      "generated_3",
@@ -749,7 +749,7 @@
          "type": "sql",
          "statement": "SELECT 'main.billing_summary_1' AS refreshed_relation, 'Zürich – depot' AS refresh_label",
          "name": "record_refresh",
-         "relative_path": "models/billing/marts/_sqlbuild/_hooks/sql/record_refresh.sql",
+         "relative_path": "sql/models/billing/marts/_sqlbuild/_hooks/sql/record_refresh.sql",
          "definition_sql": "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label",
          "kwargs": {
           "relation": "@@CTX:destination.qualified",
@@ -789,8 +789,8 @@
     "name": "stg_billing_0",
     "resource_type": "model",
     "package_name": "generated_3",
-    "path": "models/billing/staging/stg_billing_0.sql",
-    "original_file_path": "models/billing/staging/stg_billing_0.sql",
+    "path": "sql/models/billing/staging/stg_billing_0.sql",
+    "original_file_path": "sql/models/billing/staging/stg_billing_0.sql",
     "unique_id": "model.generated_3.stg_billing_0",
     "fqn": [
      "generated_3",
@@ -873,8 +873,8 @@
     "name": "stg_billing_1",
     "resource_type": "model",
     "package_name": "generated_3",
-    "path": "models/billing/staging/stg_billing_1.sql",
-    "original_file_path": "models/billing/staging/stg_billing_1.sql",
+    "path": "sql/models/billing/staging/stg_billing_1.sql",
+    "original_file_path": "sql/models/billing/staging/stg_billing_1.sql",
     "unique_id": "model.generated_3.stg_billing_1",
     "fqn": [
      "generated_3",
@@ -947,8 +947,8 @@
     "name": "batched_watermark_stg_billing_1",
     "resource_type": "model",
     "package_name": "generated_3",
-    "path": "models/features/batched_watermark_stg_billing_1.sql",
-    "original_file_path": "models/features/batched_watermark_stg_billing_1.sql",
+    "path": "sql/models/features/batched_watermark_stg_billing_1.sql",
+    "original_file_path": "sql/models/features/batched_watermark_stg_billing_1.sql",
     "unique_id": "model.generated_3.batched_watermark_stg_billing_1",
     "fqn": [
      "generated_3",
@@ -1016,8 +1016,8 @@
     "name": "hooked_stg_billing_1",
     "resource_type": "model",
     "package_name": "generated_3",
-    "path": "models/features/hooked_stg_billing_1.sql",
-    "original_file_path": "models/features/hooked_stg_billing_1.sql",
+    "path": "sql/models/features/hooked_stg_billing_1.sql",
+    "original_file_path": "sql/models/features/hooked_stg_billing_1.sql",
     "unique_id": "model.generated_3.hooked_stg_billing_1",
     "fqn": [
      "generated_3",
@@ -1070,7 +1070,7 @@
          "kwargs": {
           "channel": "東京 warehouse"
          },
-         "relative_path": "models/features/_sqlbuild/_hooks/python/notify.py",
+         "relative_path": "sql/models/features/_sqlbuild/_hooks/python/notify.py",
          "definition_hash": "4669f6863eaccfebdb6aa5286a58eb944d8b0142ea2bc8e6678cce4efb35bf7e",
          "version_hash": "80b0b3a25244f0def68efcbecd29182bfa91d76b9272c4d2147d08ae88260fa2"
         }
@@ -1102,8 +1102,8 @@
     "name": "kept_stg_billing_1",
     "resource_type": "model",
     "package_name": "generated_3",
-    "path": "models/features/kept_stg_billing_1.sql",
-    "original_file_path": "models/features/kept_stg_billing_1.sql",
+    "path": "sql/models/features/kept_stg_billing_1.sql",
+    "original_file_path": "sql/models/features/kept_stg_billing_1.sql",
     "unique_id": "model.generated_3.kept_stg_billing_1",
     "fqn": [
      "generated_3",
@@ -1171,8 +1171,8 @@
     "name": "audited_event_totals",
     "resource_type": "model",
     "package_name": "generated_3",
-    "path": "models/rendering/audited_event_totals.sql",
-    "original_file_path": "models/rendering/audited_event_totals.sql",
+    "path": "sql/models/rendering/audited_event_totals.sql",
+    "original_file_path": "sql/models/rendering/audited_event_totals.sql",
     "unique_id": "model.generated_3.audited_event_totals",
     "fqn": [
      "generated_3",
@@ -1241,8 +1241,8 @@
     "name": "configured_stg_billing_1",
     "resource_type": "model",
     "package_name": "generated_3",
-    "path": "models/rendering/configured_stg_billing_1.sql",
-    "original_file_path": "models/rendering/configured_stg_billing_1.sql",
+    "path": "sql/models/rendering/configured_stg_billing_1.sql",
+    "original_file_path": "sql/models/rendering/configured_stg_billing_1.sql",
     "unique_id": "model.generated_3.configured_stg_billing_1",
     "fqn": [
      "generated_3",
@@ -1342,8 +1342,8 @@
     "name": "interpolated_stg_billing_0",
     "resource_type": "model",
     "package_name": "generated_3",
-    "path": "models/rendering/interpolated_stg_billing_0.sql",
-    "original_file_path": "models/rendering/interpolated_stg_billing_0.sql",
+    "path": "sql/models/rendering/interpolated_stg_billing_0.sql",
+    "original_file_path": "sql/models/rendering/interpolated_stg_billing_0.sql",
     "unique_id": "model.generated_3.interpolated_stg_billing_0",
     "fqn": [
      "generated_3",
@@ -1410,7 +1410,7 @@
          "type": "sql",
          "statement": "SELECT 'main.interpolated_stg_billing_0' AS refreshed_relation, 'Ελληνικά orders' AS refresh_label",
          "name": "announce_refresh",
-         "relative_path": "models/rendering/_sqlbuild/_hooks/sql/announce_refresh.sql",
+         "relative_path": "sql/models/rendering/_sqlbuild/_hooks/sql/announce_refresh.sql",
          "definition_sql": "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label",
          "kwargs": {
           "relation": "@@CTX:destination.qualified",
@@ -1454,8 +1454,8 @@
     "name": "legacy_event_ids",
     "resource_type": "model",
     "package_name": "generated_3",
-    "path": "models/rendering/legacy_event_ids.sql",
-    "original_file_path": "models/rendering/legacy_event_ids.sql",
+    "path": "sql/models/rendering/legacy_event_ids.sql",
+    "original_file_path": "sql/models/rendering/legacy_event_ids.sql",
     "unique_id": "model.generated_3.legacy_event_ids",
     "fqn": [
      "generated_3",
@@ -1523,8 +1523,8 @@
     "name": "policy_stg_billing_1",
     "resource_type": "model",
     "package_name": "generated_3",
-    "path": "models/rendering/policy_stg_billing_1.sql",
-    "original_file_path": "models/rendering/policy_stg_billing_1.sql",
+    "path": "sql/models/rendering/policy_stg_billing_1.sql",
+    "original_file_path": "sql/models/rendering/policy_stg_billing_1.sql",
     "unique_id": "model.generated_3.policy_stg_billing_1",
     "fqn": [
      "generated_3",
@@ -1592,8 +1592,8 @@
     "name": "windowed_stg_billing_0",
     "resource_type": "model",
     "package_name": "generated_3",
-    "path": "models/rendering/windowed_stg_billing_0.sql",
-    "original_file_path": "models/rendering/windowed_stg_billing_0.sql",
+    "path": "sql/models/rendering/windowed_stg_billing_0.sql",
+    "original_file_path": "sql/models/rendering/windowed_stg_billing_0.sql",
     "unique_id": "model.generated_3.windowed_stg_billing_0",
     "fqn": [
      "generated_3",
@@ -1661,8 +1661,8 @@
     "name": "channel_codes",
     "resource_type": "seed",
     "package_name": "generated_3",
-    "path": "seeds/channel_codes.csv",
-    "original_file_path": "seeds/channel_codes.csv",
+    "path": "sql/seeds/channel_codes.csv",
+    "original_file_path": "sql/seeds/channel_codes.csv",
     "unique_id": "seed.generated_3.channel_codes",
     "fqn": [
      "generated_3",
@@ -1748,8 +1748,8 @@
     "name": "audited_events",
     "resource_type": "source",
     "package_name": "generated_3",
-    "path": "sources/audited.yml",
-    "original_file_path": "sources/audited.yml",
+    "path": "sql/sources/audited.yml",
+    "original_file_path": "sql/sources/audited.yml",
     "unique_id": "source.generated_3.audited_events",
     "fqn": [
      "generated_3",
@@ -1798,8 +1798,8 @@
     "name": "configured_events",
     "resource_type": "source",
     "package_name": "generated_3",
-    "path": "sources/configured.yml",
-    "original_file_path": "sources/configured.yml",
+    "path": "sql/sources/configured.yml",
+    "original_file_path": "sql/sources/configured.yml",
     "unique_id": "source.generated_3.configured_events",
     "fqn": [
      "generated_3",
@@ -1850,8 +1850,8 @@
     "name": "raw_events_0",
     "resource_type": "source",
     "package_name": "generated_3",
-    "path": "sources/raw.yml",
-    "original_file_path": "sources/raw.yml",
+    "path": "sql/sources/raw.yml",
+    "original_file_path": "sql/sources/raw.yml",
     "unique_id": "source.generated_3.raw_events_0",
     "fqn": [
      "generated_3",
@@ -1918,8 +1918,8 @@
     "name": "raw_events_1",
     "resource_type": "source",
     "package_name": "generated_3",
-    "path": "sources/raw.yml",
-    "original_file_path": "sources/raw.yml",
+    "path": "sql/sources/raw.yml",
+    "original_file_path": "sql/sources/raw.yml",
     "unique_id": "source.generated_3.raw_events_1",
     "fqn": [
      "generated_3",
@@ -1986,8 +1986,8 @@
     "name": "raw_events_2",
     "resource_type": "source",
     "package_name": "generated_3",
-    "path": "sources/raw.yml",
-    "original_file_path": "sources/raw.yml",
+    "path": "sql/sources/raw.yml",
+    "original_file_path": "sql/sources/raw.yml",
     "unique_id": "source.generated_3.raw_events_2",
     "fqn": [
      "generated_3",
@@ -2054,8 +2054,8 @@
     "name": "analysis_region",
     "resource_type": "macro",
     "package_name": "generated_3",
-    "path": "models/analysis/_sqlbuild/_macros/python/regions.py",
-    "original_file_path": "models/analysis/_sqlbuild/_macros/python/regions.py",
+    "path": "sql/models/analysis/_sqlbuild/_macros/python/regions.py",
+    "original_file_path": "sql/models/analysis/_sqlbuild/_macros/python/regions.py",
     "unique_id": "macro.generated_3.analysis_region",
     "macro_sql": "def analysis_region() -> str:\n    \"\"\"Return the region rows are assigned to.\"\"\"\n    return \"'east'\"\n",
     "depends_on": {
@@ -2064,7 +2064,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "local",
-     "sqlbuild_scope_path": "models/analysis"
+     "sqlbuild_scope_path": "sql/models/analysis"
     },
     "docs": {
      "show": true,
@@ -2078,8 +2078,8 @@
     "name": "adjust_0",
     "resource_type": "macro",
     "package_name": "generated_3",
-    "path": "models/billing/marts/_sqlbuild/_macros/python/adjust_0.py",
-    "original_file_path": "models/billing/marts/_sqlbuild/_macros/python/adjust_0.py",
+    "path": "sql/models/billing/marts/_sqlbuild/_macros/python/adjust_0.py",
+    "original_file_path": "sql/models/billing/marts/_sqlbuild/_macros/python/adjust_0.py",
     "unique_id": "macro.generated_3.adjust_0",
     "macro_sql": "def adjust_0(expression: str) -> str:\n    \"\"\"Offset an amount.\"\"\"\n    return f\"({expression} + 0 + 1)\"\n",
     "depends_on": {
@@ -2088,7 +2088,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "local",
-     "sqlbuild_scope_path": "models/billing/marts"
+     "sqlbuild_scope_path": "sql/models/billing/marts"
     },
     "docs": {
      "show": true,
@@ -2102,8 +2102,8 @@
     "name": "adjust_1",
     "resource_type": "macro",
     "package_name": "generated_3",
-    "path": "models/billing/staging/_sqlbuild/_macros/python/adjust_1.py",
-    "original_file_path": "models/billing/staging/_sqlbuild/_macros/python/adjust_1.py",
+    "path": "sql/models/billing/staging/_sqlbuild/_macros/python/adjust_1.py",
+    "original_file_path": "sql/models/billing/staging/_sqlbuild/_macros/python/adjust_1.py",
     "unique_id": "macro.generated_3.adjust_1",
     "macro_sql": "def adjust_1(ctx, expression: str) -> str:\n    \"\"\"Scale an amount by the configured discount.\"\"\"\n    rate = ctx.vars[\"discount_rate\"]\n    return f\"({expression} * (1 - {rate}))\"\n",
     "depends_on": {
@@ -2112,7 +2112,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "local",
-     "sqlbuild_scope_path": "models/billing/staging"
+     "sqlbuild_scope_path": "sql/models/billing/staging"
     },
     "docs": {
      "show": true,
@@ -2126,8 +2126,8 @@
     "name": "legacy_events",
     "resource_type": "macro",
     "package_name": "generated_3",
-    "path": "models/rendering/_sqlbuild/_macros/python/legacy.py",
-    "original_file_path": "models/rendering/_sqlbuild/_macros/python/legacy.py",
+    "path": "sql/models/rendering/_sqlbuild/_macros/python/legacy.py",
+    "original_file_path": "sql/models/rendering/_sqlbuild/_macros/python/legacy.py",
     "unique_id": "macro.generated_3.legacy_events",
     "macro_sql": "def legacy_events() -> str:\n    \"\"\"Return a staged relation the way a migrated project wrote it.\"\"\"\n    return '__ref(\"stg_billing_1\")'\n",
     "depends_on": {
@@ -2136,7 +2136,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "local",
-     "sqlbuild_scope_path": "models/rendering"
+     "sqlbuild_scope_path": "sql/models/rendering"
     },
     "docs": {
      "show": true,
@@ -2150,8 +2150,8 @@
     "name": "refresh_note",
     "resource_type": "macro",
     "package_name": "generated_3",
-    "path": "models/rendering/_sqlbuild/_macros/python/notes.py",
-    "original_file_path": "models/rendering/_sqlbuild/_macros/python/notes.py",
+    "path": "sql/models/rendering/_sqlbuild/_macros/python/notes.py",
+    "original_file_path": "sql/models/rendering/_sqlbuild/_macros/python/notes.py",
     "unique_id": "macro.generated_3.refresh_note",
     "macro_sql": "def refresh_note(relation: str) -> str:\n    \"\"\"Describe one refreshed relation.\"\"\"\n    return f\"'refreshed ' || '{relation}'\"\n",
     "depends_on": {
@@ -2160,7 +2160,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "local",
-     "sqlbuild_scope_path": "models/rendering"
+     "sqlbuild_scope_path": "sql/models/rendering"
     },
     "docs": {
      "show": true,
@@ -2174,8 +2174,8 @@
     "name": "channel_label",
     "resource_type": "macro",
     "package_name": "generated_3",
-    "path": "models/rendering/_sqlbuild/_macros/python/policy.py",
-    "original_file_path": "models/rendering/_sqlbuild/_macros/python/policy.py",
+    "path": "sql/models/rendering/_sqlbuild/_macros/python/policy.py",
+    "original_file_path": "sql/models/rendering/_sqlbuild/_macros/python/policy.py",
     "unique_id": "macro.generated_3.channel_label",
     "macro_sql": "import os\n\n\ndef minimum_amount_filter(ctx, column: str) -> str:\n    \"\"\"Keep rows at or above the configured minimum amount.\"\"\"\n    if ctx.constants[\"minimum_render_amount\"] is None:\n        return \"TRUE\"\n    return f\"{column} >= {ctx.render_constant('minimum_render_amount')}\"\n\n\ndef channel_label(ctx) -> str:\n    \"\"\"Label rows with the web channel, target and adapter.\"\"\"\n    channel = ctx.render_enum_member(enum_name=\"render_channel\", member_name=\"WEB\")\n    region = ctx.vars[\"region\"]\n    return f\"{channel} || '/{ctx.target_name}/{ctx.adapter_name}/{region}'\"\n\n\ndef with_deployment(expression: str) -> str:\n    \"\"\"Suffix an expression with the deployment channel from the environment.\"\"\"\n    channel = os.environ.get(\"SQB_DIFFERENTIAL_CHANNEL\", \"none\")\n    return f\"({expression} || '@{channel}')\"\n",
     "depends_on": {
@@ -2184,7 +2184,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "local",
-     "sqlbuild_scope_path": "models/rendering"
+     "sqlbuild_scope_path": "sql/models/rendering"
     },
     "docs": {
      "show": true,
@@ -2198,8 +2198,8 @@
     "name": "minimum_amount_filter",
     "resource_type": "macro",
     "package_name": "generated_3",
-    "path": "models/rendering/_sqlbuild/_macros/python/policy.py",
-    "original_file_path": "models/rendering/_sqlbuild/_macros/python/policy.py",
+    "path": "sql/models/rendering/_sqlbuild/_macros/python/policy.py",
+    "original_file_path": "sql/models/rendering/_sqlbuild/_macros/python/policy.py",
     "unique_id": "macro.generated_3.minimum_amount_filter",
     "macro_sql": "import os\n\n\ndef minimum_amount_filter(ctx, column: str) -> str:\n    \"\"\"Keep rows at or above the configured minimum amount.\"\"\"\n    if ctx.constants[\"minimum_render_amount\"] is None:\n        return \"TRUE\"\n    return f\"{column} >= {ctx.render_constant('minimum_render_amount')}\"\n\n\ndef channel_label(ctx) -> str:\n    \"\"\"Label rows with the web channel, target and adapter.\"\"\"\n    channel = ctx.render_enum_member(enum_name=\"render_channel\", member_name=\"WEB\")\n    region = ctx.vars[\"region\"]\n    return f\"{channel} || '/{ctx.target_name}/{ctx.adapter_name}/{region}'\"\n\n\ndef with_deployment(expression: str) -> str:\n    \"\"\"Suffix an expression with the deployment channel from the environment.\"\"\"\n    channel = os.environ.get(\"SQB_DIFFERENTIAL_CHANNEL\", \"none\")\n    return f\"({expression} || '@{channel}')\"\n",
     "depends_on": {
@@ -2208,7 +2208,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "local",
-     "sqlbuild_scope_path": "models/rendering"
+     "sqlbuild_scope_path": "sql/models/rendering"
     },
     "docs": {
      "show": true,
@@ -2222,8 +2222,8 @@
     "name": "with_deployment",
     "resource_type": "macro",
     "package_name": "generated_3",
-    "path": "models/rendering/_sqlbuild/_macros/python/policy.py",
-    "original_file_path": "models/rendering/_sqlbuild/_macros/python/policy.py",
+    "path": "sql/models/rendering/_sqlbuild/_macros/python/policy.py",
+    "original_file_path": "sql/models/rendering/_sqlbuild/_macros/python/policy.py",
     "unique_id": "macro.generated_3.with_deployment",
     "macro_sql": "import os\n\n\ndef minimum_amount_filter(ctx, column: str) -> str:\n    \"\"\"Keep rows at or above the configured minimum amount.\"\"\"\n    if ctx.constants[\"minimum_render_amount\"] is None:\n        return \"TRUE\"\n    return f\"{column} >= {ctx.render_constant('minimum_render_amount')}\"\n\n\ndef channel_label(ctx) -> str:\n    \"\"\"Label rows with the web channel, target and adapter.\"\"\"\n    channel = ctx.render_enum_member(enum_name=\"render_channel\", member_name=\"WEB\")\n    region = ctx.vars[\"region\"]\n    return f\"{channel} || '/{ctx.target_name}/{ctx.adapter_name}/{region}'\"\n\n\ndef with_deployment(expression: str) -> str:\n    \"\"\"Suffix an expression with the deployment channel from the environment.\"\"\"\n    channel = os.environ.get(\"SQB_DIFFERENTIAL_CHANNEL\", \"none\")\n    return f\"({expression} || '@{channel}')\"\n",
     "depends_on": {
@@ -2232,7 +2232,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "local",
-     "sqlbuild_scope_path": "models/rendering"
+     "sqlbuild_scope_path": "sql/models/rendering"
     },
     "docs": {
      "show": true,
@@ -2270,8 +2270,8 @@
     "name": "record_refresh",
     "resource_type": "macro",
     "package_name": "generated_3__sqlbuild_hooks",
-    "path": "models/billing/marts/_sqlbuild/_hooks/sql/record_refresh.sql",
-    "original_file_path": "models/billing/marts/_sqlbuild/_hooks/sql/record_refresh.sql",
+    "path": "sql/models/billing/marts/_sqlbuild/_hooks/sql/record_refresh.sql",
+    "original_file_path": "sql/models/billing/marts/_sqlbuild/_hooks/sql/record_refresh.sql",
     "unique_id": "macro.generated_3__sqlbuild_hooks.record_refresh",
     "macro_sql": "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label",
     "depends_on": {
@@ -2294,8 +2294,8 @@
     "name": "announce_refresh",
     "resource_type": "macro",
     "package_name": "generated_3__sqlbuild_hooks",
-    "path": "models/rendering/_sqlbuild/_hooks/sql/announce_refresh.sql",
-    "original_file_path": "models/rendering/_sqlbuild/_hooks/sql/announce_refresh.sql",
+    "path": "sql/models/rendering/_sqlbuild/_hooks/sql/announce_refresh.sql",
+    "original_file_path": "sql/models/rendering/_sqlbuild/_hooks/sql/announce_refresh.sql",
     "unique_id": "macro.generated_3__sqlbuild_hooks.announce_refresh",
     "macro_sql": "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label",
     "depends_on": {

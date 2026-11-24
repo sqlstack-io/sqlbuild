@@ -22,7 +22,7 @@ _ENUM_DECLARATION: EnumDeclaration = EnumDeclaration(
     name="status",
     members=(EnumMember(name="ACTIVE", value="active"),),
     scalar_type="VARCHAR",
-    relative_path=Path("enums/status.sql"),
+    relative_path=Path("sql/enums/status.sql"),
     model_name=None,
 )
 

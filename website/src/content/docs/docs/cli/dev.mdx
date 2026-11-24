@@ -105,8 +105,8 @@ nodes that need the provider (the first five, then a count) and the fix, never a
 
 ```text
 ⚠ warn   1 provider has missing secrets                          missing secret
-  at     providers/region.py:9   region_token  ← REGION_TOKEN
-         providers/region.py:10  region_code   ← REGION_CODE
+  at     python/providers/region.py:9   region_token  ← REGION_TOKEN
+         python/providers/region.py:10  region_code   ← REGION_CODE
   why    runs that use it stop at the provider check, before the warehouse; 2
          nodes need it (raw_regions, stg_regions)
   fix    set them in .env and press r, or set them in the environment you
@@ -148,6 +148,20 @@ location reads warehouse history once the connection succeeds.
 | Ctrl+\\ | Stop at once, without cancelling runs |
 
 Ctrl+Z is not supported: `sqb dev` does not suspend. Stop it with `q` or Ctrl+C instead.
+
+## Republish from a script
+
+[`sqb location republish`](/docs/cli/location#republish) asks the location `sqb dev` serves to
+compile and publish again, the same as pressing `r`: every discover function runs. Use the
+address and the location ID from the ready box. `sqb dev` has no sign-in, so `SQLBUILD_API_KEY`
+can be any value; the command needs one to call over `http://`:
+
+```bash
+SQLBUILD_API_KEY=local sqb location republish --server http://127.0.0.1:8000 \
+  --location-id 01a1d7ff-0b3a-7631-ba35-e44d44d072f2 --target dev --wait
+```
+
+A `curl` request to the [republish endpoint](/docs/cli/location#republish) needs no key either.
 
 ## Stop
 

@@ -136,19 +136,19 @@ def test_given_context_value_when_naming_store_class_then_only_stable_values_are
     [
         MacroStoreTokenTestCase(
             description="same file and source",
-            relative_path=Path("macros/python/common.py"),
+            relative_path=Path("sql/macros/python/common.py"),
             raw_source="def cents(column): ...\n",
             expected_equal=True,
         ),
         MacroStoreTokenTestCase(
             description="source edited",
-            relative_path=Path("macros/python/common.py"),
+            relative_path=Path("sql/macros/python/common.py"),
             raw_source="def cents(column): return column\n",
             expected_equal=False,
         ),
         MacroStoreTokenTestCase(
             description="same source in a scoped file",
-            relative_path=Path("models/south/_sqlbuild/_macros/python/common.py"),
+            relative_path=Path("sql/models/south/_sqlbuild/_macros/python/common.py"),
             raw_source="def cents(column): ...\n",
             expected_equal=False,
         ),
@@ -160,7 +160,7 @@ def test_given_loaded_macro_change_when_naming_it_then_only_the_same_file_and_so
 ) -> None:
     original: str | None = macro_store_token(
         loaded=loaded_macro(
-            relative_path=Path("macros/python/common.py"), raw_source="def cents(column): ...\n"
+            relative_path=Path("sql/macros/python/common.py"), raw_source="def cents(column): ...\n"
         ),
         identity=None,
     )

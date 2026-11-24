@@ -69,8 +69,8 @@ def test_given_resolved_clone_connection_when_validating_loaders_then_origin_cre
         local_config=LocalConfig(),
         source_files=(
             DiscoveredSourceFile(
-                file_path=Path("sources/managed.yml"),
-                relative_path=Path("sources/managed.yml"),
+                file_path=Path("sql/sources/managed.yml"),
+                relative_path=Path("sql/sources/managed.yml"),
                 contents="",
                 source_entries=(SourceEntry(name="managed", managed=True),),
             ),

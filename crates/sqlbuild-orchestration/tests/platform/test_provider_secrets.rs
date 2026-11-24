@@ -14,15 +14,15 @@ fn given_providers_missing_secrets_when_a_location_reports_them_then_only_unallo
  {
     // A snapshot's providers document: settings carry `missing` and never a value.
     let document = json!({"providers": [
-        {"name": "orders_api", "path": "providers/orders_api.py", "nodes": ["source:raw_orders"],
+        {"name": "orders_api", "path": "python/providers/orders_api.py", "nodes": ["source:raw_orders"],
          "settings": [
             {"name": "base_url", "env": "ORDERS_API_BASE_URL", "missing": false, "line": 9},
             {"name": "api_key", "env": "ORDERS_API_KEY", "missing": true, "line": 12}]},
-        {"name": "export_bucket", "path": "providers/storage.py", "nodes": ["asset:export"],
+        {"name": "export_bucket", "path": "python/providers/storage.py", "nodes": ["asset:export"],
          "settings": [
             {"name": "region", "env": "BUCKET_REGION", "missing": true},
             {"name": "secret", "env": "BUCKET_SECRET", "missing": true, "line": 14}]},
-        {"name": "ready", "path": "providers/ready.py", "nodes": [],
+        {"name": "ready", "path": "python/providers/ready.py", "nodes": [],
          "settings": [{"name": "token", "env": "READY_TOKEN", "missing": false}]}
     ]});
     let test_cases = [

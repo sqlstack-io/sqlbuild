@@ -21,14 +21,14 @@ from tests.unit.src.sqlbuild.compiler.scopes.helpers import report_scope_lookup
 
 
 def orders_move_report() -> ScopeReport:
-    """Return the orders report with a move preview into models/marts."""
+    """Return the orders report with a move preview into sql/models/marts."""
 
     lookup: ScopeLookup = report_scope_lookup()
     report: ScopeReport = query_scope_report(
         lookup=lookup, target="model:orders", at=None, directory=False, filters=ScopeReportFilters()
     )
     move, diagnostics = preview_scope_move(
-        lookup=lookup, resource="model:orders", destination="models/marts/orders.sql"
+        lookup=lookup, resource="model:orders", destination="sql/models/marts/orders.sql"
     )
     return replace(report, move_preview=move, diagnostics=(*report.diagnostics, *diagnostics))
 
@@ -40,18 +40,18 @@ def bare_target_scope_lookup() -> ScopeLookup:
     extra: tuple[ResourceRecord, ...] = (
         ResourceRecord(
             ResourceIdentity(ResourceKind.SOURCE, "raw__orders"),
-            "sources/raw.yml",
+            "sql/sources/raw.yml",
             OwnershipRoot("sources", resource_kind=ResourceKind.SOURCE),
         ),
         ResourceRecord(
             ResourceIdentity(ResourceKind.SEED, "waffle_types"),
-            "seeds/waffle_types.csv",
+            "sql/seeds/waffle_types.csv",
             OwnershipRoot("seeds", resource_kind=ResourceKind.SEED),
         ),
         ResourceRecord(
             ResourceIdentity(ResourceKind.FUNCTION, "udf__is_completed_order"),
-            "functions/sql/udf__is_completed_order.sql",
-            OwnershipRoot("functions/sql", resource_kind=ResourceKind.FUNCTION),
+            "sql/functions/sql/udf__is_completed_order.sql",
+            OwnershipRoot("sql/functions/sql", resource_kind=ResourceKind.FUNCTION),
         ),
         ResourceRecord(
             ResourceIdentity(ResourceKind.TEST, "orders_are_unique"),
@@ -60,7 +60,7 @@ def bare_target_scope_lookup() -> ScopeLookup:
         ),
         ResourceRecord(
             ResourceIdentity(ResourceKind.MODEL, "normalize"),
-            "models/staging/normalize.sql",
+            "sql/models/staging/normalize.sql",
             OwnershipRoot("models", resource_kind=ResourceKind.MODEL),
         ),
     )

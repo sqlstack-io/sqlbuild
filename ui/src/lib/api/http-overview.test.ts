@@ -103,7 +103,6 @@ describe('overview from live reads', () => {
 	});
 
 	it('leaves parts without a server read empty instead of zero', () => {
-		expect(overview.metrics.cost).toBeNull();
 		const unknown = overviewOf({ runs: [], checks: [], nodes: [{ ...node('model:a', 'table', 'models/a.sql'), stale: null }], changes: [], events: [], triggers: [], acknowledgements: new Map(), conditions: { snoozeSeconds: 86_400, acknowledgements: [] }, scopeKey: 'loc-1:dev', now });
 		expect(unknown.groups).toBeNull();
 	});

@@ -50,9 +50,17 @@ pub(crate) fn selector_folder(value: &str) -> String {
     value.replace('\\', "/").trim_matches('/').to_owned()
 }
 
-/// The first segment of a selector folder.
+/// The path root a selector folder starts with: `sql/models`, `python/nodes`, or its first segment.
 pub(crate) fn folder_root(folder: &str) -> &str {
-    folder.split('/').next().unwrap_or_default()
+    [SQL_MODEL_PATH_ROOT, PYTHON_NODE_PATH_ROOT]
+        .into_iter()
+        .find(|root| {
+            folder == *root
+                || folder
+                    .strip_prefix(root)
+                    .is_some_and(|rest| rest.starts_with('/'))
+        })
+        .unwrap_or_else(|| folder.split('/').next().unwrap_or_default())
 }
 
 fn keyed(rows: &[(String, Vec<String>)]) -> HashMap<&str, &[String]> {

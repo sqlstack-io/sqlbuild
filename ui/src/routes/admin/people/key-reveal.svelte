@@ -1,18 +1,18 @@
 <script lang="ts">
-	import { copyText } from '$lib/browser/clipboard';
+	import { createCopyState } from '$lib/browser/copy-state.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 
 	// A key shown once in a dialog: the key, Copy, and the warning that it won't be shown again.
 	let { secret }: { secret: string } = $props();
 
-	let copied = $state(false);
+	const copier = createCopyState();
+	const copied = $derived(copier.copied);
 	// Copying can fail where the browser blocks it; the key is then selected to copy by hand.
-	let failed = $state(false);
+	const failed = $derived(copier.failed);
 	let shown = $state<HTMLElement>();
-	async function copy() {
-		copied = await copyText(secret);
-		failed = !copied;
-		if (failed && shown) getSelection()?.selectAllChildren(shown);
+	async function copy(e: MouseEvent) {
+		const done = await copier.copy(secret, e.currentTarget as Element);
+		if (!done && shown) getSelection()?.selectAllChildren(shown);
 	}
 </script>
 

@@ -30,8 +30,8 @@ def test_given_combined_sql_over_256k_when_testing_on_duckdb_then_passes(
                 'name = "large_sql_test"\nadapter = "duckdb"\n\n'
                 '[connection]\ndatabase = "orders.duckdb"\n'
             ),
-            "models/raw_orders.sql": "MODEL (description 'Test model raw_orders.');\nSELECT 'orders' AS details\n",
-            "models/orders.sql": 'MODEL (description "Test model orders.");\nSELECT details FROM __ref("raw_orders")\n',
+            "sql/models/raw_orders.sql": "MODEL (description 'Test model raw_orders.');\nSELECT 'orders' AS details\n",
+            "sql/models/orders.sql": 'MODEL (description "Test model orders.");\nSELECT details FROM __ref("raw_orders")\n',
             "tests/unit/test_orders.sql": (
                 'TEST (name "large_orders");\nWITH __ref__raw_orders AS (\n'
                 f"SELECT '{payload}' AS details\n), __expected__orders AS (\n"

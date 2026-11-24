@@ -78,17 +78,17 @@ _ISOLATED_DISCOVERERS: dict[str, Callable[..., tuple[object, ...]]] = {
 }
 _SCOPED_PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": 'name = "shop"\nadapter = "duckdb"\n',
-    "models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
-    "models/sales/daily.sql": "MODEL (description 'Daily.');\nSELECT 1 AS day_id\n",
-    "models/sales/schema.yml": "models: []\n",
-    "models/sales/enums/region.sql": "ENUM (name region, members [NORTH, SOUTH]);\n",
-    "models/sales/_sqlbuild/constants/limit.sql": "CONSTANT (name order_limit, value 10);\n",
-    "models/sales/_sqlbuild/audits/generic/positive.sql": (
+    "sql/models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
+    "sql/models/sales/daily.sql": "MODEL (description 'Daily.');\nSELECT 1 AS day_id\n",
+    "sql/models/sales/schema.yml": "models: []\n",
+    "sql/models/sales/enums/region.sql": "ENUM (name region, members [NORTH, SOUTH]);\n",
+    "sql/models/sales/_sqlbuild/constants/limit.sql": "CONSTANT (name order_limit, value 10);\n",
+    "sql/models/sales/_sqlbuild/audits/generic/positive.sql": (
         "AUDIT (name positive);\nSELECT 1 WHERE FALSE\n"
     ),
-    "macros/python/money.py": "def money(value):\n    return value\n",
-    "enums/status.sql": "ENUM (name status, members [OPEN, CLOSED]);\n",
-    "functions/sql/tax.sql": (
+    "sql/macros/python/money.py": "def money(value):\n    return value\n",
+    "sql/enums/status.sql": "ENUM (name status, members [OPEN, CLOSED]);\n",
+    "sql/functions/sql/tax.sql": (
         "FUNCTION (arguments (amount DOUBLE), returns DOUBLE);\namount * 0.2\n"
     ),
 }
@@ -218,7 +218,7 @@ def _random_model_file(rng: random.Random) -> str:
 
 def _add_directory(rng: random.Random, parent: Path, directories: list[Path]) -> None:
     path: Path = parent / rng.choice(_DIRECTORY_NAMES)
-    path.mkdir(exist_ok=True)
+    path.mkdir(parents=True, exist_ok=True)
     directories.append(path)
 
 

@@ -23,11 +23,11 @@ _PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": (
         'name = "demo"\nadapter = "duckdb"\n\n[connection]\ndatabase = "demo.duckdb"\n'
     ),
-    "models/customer_totals.sql": (
+    "sql/models/customer_totals.sql": (
         "MODEL (description 'Test model customer_totals.', materialized table);\n\n"
         "SELECT customer_id, SUM(amount) AS total FROM raw_orders GROUP BY customer_id"
     ),
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         "MODEL (description 'Test model orders.',\n"
         "  materialized incremental,\n"
         "  incremental_strategy append,\n"
@@ -37,7 +37,7 @@ _PROJECT_FILES: dict[str, str] = {
         ");\n\n"
         'SELECT id, customer_id, amount, updated_at FROM __source("raw_orders")'
     ),
-    "sources/raw.yml": (
+    "sql/sources/raw.yml": (
         "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
         "    schema: main\n    table: raw_orders\n"
     ),

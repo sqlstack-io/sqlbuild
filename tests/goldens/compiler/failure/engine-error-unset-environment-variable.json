@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "unknown environment variable '@@ENV:SQB_ENGINE_ERROR_UNSET_REGION' in '<project>/models/marts/customer_totals.sql'"
+     "message": "unknown environment variable '@@ENV:SQB_ENGINE_ERROR_UNSET_REGION' in '<project>/sql/models/marts/customer_totals.sql'"
     }
    ]
   }

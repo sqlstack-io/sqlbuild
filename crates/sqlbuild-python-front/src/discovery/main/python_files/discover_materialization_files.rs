@@ -8,6 +8,7 @@ use crate::discovery::main::python_files::provider_usages::provider_usages;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::PyDict;
+use sqlbuild_core::constants::MATERIALIZATIONS_PATH;
 use sqlbuild_host::entries::models::UserCodeHost;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
@@ -22,7 +23,7 @@ pub fn discover_materialization_files<'py>(
     let py: Python<'py> = project_dir.py();
     let project = ProjectDir { path: project_dir };
     if !project
-        .child("materializations")?
+        .child(MATERIALIZATIONS_PATH)?
         .call_method0("is_dir")?
         .is_truthy()?
     {
@@ -33,7 +34,7 @@ pub fn discover_materialization_files<'py>(
         None => PyDict::new(py),
     };
     let mut files: Vec<Bound<'py, PyAny>> = Vec::new();
-    for file_path in project.module_files("materializations", false)? {
+    for file_path in project.module_files(MATERIALIZATIONS_PATH, false)? {
         let materialize: Bound<'py, PyAny> =
             project.load(UserCodeHost::LoadMaterializeFunction, &file_path)?;
         let usages: Bound<'py, PyAny> = if materialize.is_none() {

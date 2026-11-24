@@ -102,7 +102,7 @@ def _build_model(
         key=key,
         deps=deps,
         name=key.name,
-        relative_path=Path(f"models/{key.name}.sql"),
+        relative_path=Path(f"sql/models/{key.name}.sql"),
         query_sql=query_sql,
         config=CompileModelConfig(),
         destination=CompiledRelationLocation(

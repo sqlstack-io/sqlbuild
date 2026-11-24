@@ -12,17 +12,18 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile._test_types import (
     NativeMacroErrorTestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
+    MACRO_CALL_LOG_CODE,
     CompileReuseRun,
     lifecycle_error_type,
+    macro_call_log,
     run_reuse_compile,
     write_project_file,
 )
 
-_CALL_LOG: str = "macro_calls.log"
 _MACROS: str = (
     "from pathlib import Path\n\n\n"
     "def _log(name: str) -> None:\n"
-    f"    with (Path(__file__).resolve().parents[2] / {_CALL_LOG!r}).open(\n"
+    f"    with {MACRO_CALL_LOG_CODE}.open(\n"
     '        "a", encoding="utf-8"\n'
     "    ) as log:\n"
     '        _ = log.write(f"{name}\\n")\n\n\n'
@@ -53,8 +54,8 @@ _CYCLIC_MACROS: str = (
     'def pong(expression: str) -> str:\n    """Call ping."""\n    return ping(expression)\n'
 )
 _COUNTED_MART: str = FAILURE_BASE_MART.replace("SUM(amount)", "SUM(@py.counted('amount'))")
-_STAGING_PATH: str = "models/staging/stg_orders.sql"
-_MART_PATH: str = "models/marts/customer_totals.sql"
+_STAGING_PATH: str = "sql/models/staging/stg_orders.sql"
+_MART_PATH: str = "sql/models/marts/customer_totals.sql"
 _STAGING_PREFIX: str = (
     'MODEL (\n  description "Staged orders",\n);\n\nSELECT order_id, customer_id, '
 )
@@ -104,15 +105,15 @@ _STAGING_SUFFIX: str = ' AS amount, status\nFROM __source("raw_orders")\n'
             description="macro_in_a_sibling_scope",
             project_files={
                 _STAGING_PATH: _STAGING_PREFIX + "@py.mart_only('amount')" + _STAGING_SUFFIX,
-                "models/marts/_sqlbuild/macros/python/local.py": _MART_MACROS,
+                "sql/models/marts/_sqlbuild/macros/python/local.py": _MART_MACROS,
             },
             expected_report_text="stg_orders.sql' is inaccessible",
             expected_macro_runs=["counted amount"],
         ),
         NativeMacroErrorTestCase(
             description="macro_call_cycle",
-            project_files={"macros/python/cyclic.py": _CYCLIC_MACROS},
-            expected_report_text="Macro call cycle in 'macros/python/cyclic.py': ping -> pong -> ping",
+            project_files={"sql/macros/python/cyclic.py": _CYCLIC_MACROS},
+            expected_report_text="Macro call cycle in 'sql/macros/python/cyclic.py': ping -> pong -> ping",
             expected_macro_runs=[],
         ),
         NativeMacroErrorTestCase(
@@ -143,15 +144,15 @@ def test_given_macro_error_when_compiling_then_error_matches_python_once(
     project_dir: Path = tmp_path / "orders"
     for relative_path, contents in {
         **FAILURE_BASE_FILES,
-        "macros/python/orders.py": _MACROS,
+        "sql/macros/python/orders.py": _MACROS,
         _MART_PATH: _COUNTED_MART,
-        _CALL_LOG: "",
         **test_case.project_files,
     }.items():
         write_project_file(project_dir, relative_path, contents)
 
+    _ = macro_call_log(project_dir).write_text("", encoding="utf-8")
     run: CompileReuseRun = run_reuse_compile(project_dir=project_dir)
-    macro_runs: list[str] = (project_dir / _CALL_LOG).read_text(encoding="utf-8").splitlines()
+    macro_runs: list[str] = macro_call_log(project_dir).read_text(encoding="utf-8").splitlines()
 
     assert (
         run.returncode,
@@ -186,9 +187,8 @@ def test_given_macro_error_when_compiling_then_lifecycle_error_type_matches(
     project_dir: Path = tmp_path / "orders"
     for relative_path, contents in {
         **FAILURE_BASE_FILES,
-        "macros/python/orders.py": _MACROS,
+        "sql/macros/python/orders.py": _MACROS,
         _MART_PATH: _COUNTED_MART,
-        _CALL_LOG: "",
         **test_case.project_files,
     }.items():
         write_project_file(project_dir, relative_path, contents)

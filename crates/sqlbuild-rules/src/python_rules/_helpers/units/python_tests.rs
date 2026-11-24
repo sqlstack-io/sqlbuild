@@ -1,10 +1,12 @@
-//! Where project Python tests sit: each mirrors an existing folder, and each test module a module, under `python/` or `providers/`.
+//! Where project Python tests sit: each mirrors an existing folder, and each test module a module, under `python/nodes/`, `python/providers/` or `orchestration/`.
 
 use std::collections::BTreeSet;
 
 use crate::models::{Fault, PythonSource};
 use crate::python_rules::_helpers::engine::faults::catalogue_fault;
-use crate::python_rules::constants::{PYTHON_TEST_PLACEMENT_CODE, TEST_FILE_PREFIX};
+use crate::python_rules::constants::{
+    MIRRORED_TEST_ROOTS, PYTHON_TEST_PLACEMENT_CODE, TEST_FILE_PREFIX,
+};
 
 /// A fault on each Python test whose mirrored folder, or for a test module whose module, is not in the project.
 pub(crate) fn python_test_faults(
@@ -33,10 +35,16 @@ pub(crate) fn python_test_faults(
         .collect()
 }
 
-/// What the test at `path`, such as `tests/python/orders/test_export.py`, mirrors that the project lacks.
+/// What the test at `path`, such as `tests/python/nodes/orders/test_export.py`, mirrors that the project lacks.
 fn missing_counterpart(path: &str, paths: &BTreeSet<&str>) -> Option<String> {
-    let parts: Vec<&str> = path.split('/').collect();
-    let [_, root, folders @ .., file] = parts.as_slice() else {
+    let below: &str = path.strip_prefix("tests/")?;
+    let root: &str = MIRRORED_TEST_ROOTS.iter().find(|root| {
+        below
+            .strip_prefix(**root)
+            .is_some_and(|rest| rest.starts_with('/'))
+    })?;
+    let parts: Vec<&str> = below[root.len() + 1..].split('/').collect();
+    let [folders @ .., file] = parts.as_slice() else {
         return None;
     };
     if folders.is_empty() {

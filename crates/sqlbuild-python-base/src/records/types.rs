@@ -618,6 +618,7 @@ pub enum ErrorId {
     OrchestrationDeclaration,
     ProjectCompile,
     ProjectConfig,
+    ProjectLayout,
     ProjectPath,
     ProjectPythonPath,
     ProviderDiscovery,

@@ -103,7 +103,7 @@ class LoaderDefinition:
     """Metadata attached to a decorated source loader function."""
 
     name: str
-    depends_on: tuple[Callable[..., object] | SqlResourceRef, ...] = ()
+    depends_on: tuple[Callable[..., object] | SqlResourceRef | NodeSetRef, ...] = ()
     destination: str | None = None
     write_strategy: SourceWriteStrategy | None = None
     cursor_column: str | None = None

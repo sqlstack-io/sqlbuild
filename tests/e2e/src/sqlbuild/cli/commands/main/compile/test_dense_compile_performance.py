@@ -63,28 +63,28 @@ _MAX_DELTA_ANALYSED_MODELS: int = 10
             1000,
             6.0 * _NATIVE_COLD_WALL_ALLOWANCE,
             800 * _MIB,
-            "de23b14d87e954a65c2da91918fce062d158419edd63cc8cf3dc938b3e47cd44",
+            "ab7743624da2bd0f8fc8ee79b27715fef28a99bfd3034a220bda8921fbb96e2e",
         ),
         DenseCompileGuardTestCase(
             "dense_models_3000_all_rules",
             3000,
             12.0 * _NATIVE_COLD_WALL_ALLOWANCE,
             3 * _GIB // 2,
-            "196fca3e87989eb3e89e443b7ca93bb094198538d5bde32b9d6fcca58ffc8eed",
+            "f7f04d2d90c5b4731672461cc1501c363aed2ab81124e46abaf65f4307e7e54e",
         ),
         DenseCompileGuardTestCase(
             "dense_models_5000_all_rules",
             5000,
             18.0 * _NATIVE_COLD_WALL_ALLOWANCE,
             9 * _GIB // 4,
-            "3477a472fa76d6236ebd0c9758d79c18f67f1bf55e9bbec05b002ba3744cfd22",
+            "1ef68545e95a6f25d012953ff8841bec0f337831c1f8e0780c29096f87754341",
         ),
         DenseCompileGuardTestCase(
             "dense_models_10000_all_rules",
             10000,
             35.0 * _NATIVE_COLD_WALL_ALLOWANCE,
             15 * _GIB // 4,
-            "f2a574af6e8068a0634fa3c078b168dff9a475ada5d71502482ad2926c90e1c3",
+            "8b2ca844331ed66f7d31e023f93c5d59d74105ce4c259140ad28e1427465c968",
         ),
     ),
     ids=lambda case: case.description,
@@ -154,7 +154,7 @@ def test_given_dense_project_when_compiling_cold_then_preserves_rules_semantics_
     # Each model misses in model rules and SQL lint, the custom rule once, and the Python rules
     # once per project Python file: the custom rule module and every Python macro.
     python_files: int = len(list(project_dir.glob("rules/*.py"))) + len(
-        list(project_dir.glob("models/**/macros/python/**/*.py"))
+        list(project_dir.glob("sql/models/**/macros/python/**/*.py"))
     )
     assert timings["rule_cache_misses"] == 2 * test_case.model_count + 1 + python_files
     assert timings["built_in_rules_ms"] > 0
@@ -177,8 +177,8 @@ def test_given_dense_project_when_compiling_cold_then_preserves_rules_semantics_
             6.0,
             6.0,
             3 * _GIB // 2,
-            "196fca3e87989eb3e89e443b7ca93bb094198538d5bde32b9d6fcca58ffc8eed",
-            "1afe754dd8c66bc36e38a40c66e9183ecbaf365fd8d87a784069cd615c3ce64a",
+            "f7f04d2d90c5b4731672461cc1501c363aed2ab81124e46abaf65f4307e7e54e",
+            "05ad37a618a558852b60ee4e8bcdf44b5e6c095e287458ccff706a4afbb2b71e",
             2,
         ),
         DenseWarmEditCompileGuardTestCase(
@@ -188,8 +188,8 @@ def test_given_dense_project_when_compiling_cold_then_preserves_rules_semantics_
             9.0,
             9.5,
             9 * _GIB // 4,
-            "3477a472fa76d6236ebd0c9758d79c18f67f1bf55e9bbec05b002ba3744cfd22",
-            "dfbada4c59a3ab8ec7733784890d74c7b64e9b0adcb03364baaabef5bdba5574",
+            "1ef68545e95a6f25d012953ff8841bec0f337831c1f8e0780c29096f87754341",
+            "83f7f06af1780a8110f3c56dd05265e4d0743aa3c21ed1bddd885f89d3b75f66",
             2,
         ),
     ),

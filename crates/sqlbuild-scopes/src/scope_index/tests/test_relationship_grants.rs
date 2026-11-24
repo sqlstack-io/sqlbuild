@@ -2,8 +2,8 @@ use crate::scope_index::tests::helpers::grant_texts;
 use crate::scope_index::tests::test_types::{DeclarationRow, GrantTestCase, ResourceRow};
 
 const RESOURCES: &[ResourceRow] = &[
-    ("model", "orders", "models/sales/orders.sql"),
-    ("model", "other", "models/other/other.sql"),
+    ("model", "orders", "sql/models/sales/orders.sql"),
+    ("model", "other", "sql/models/other/other.sql"),
     ("test", "t1", "tests/unit/t1.sql"),
     ("test", "t2", "tests/unit/t2.sql"),
 ];
@@ -11,35 +11,35 @@ const DECLARATIONS: &[DeclarationRow] = &[
     (
         "constant",
         "rate",
-        "models/sales/_sqlbuild/constants/r.sql",
+        "sql/models/sales/_sqlbuild/constants/r.sql",
         1,
         "inherited",
-        Some("models/sales"),
+        Some("sql/models/sales"),
     ),
     (
         "macro",
         "fmt",
-        "models/sales/_macros/m.py",
+        "sql/models/sales/_macros/m.py",
         3,
         "local",
-        Some("models/sales"),
+        Some("sql/models/sales"),
     ),
     (
         "macro",
         "unused",
-        "models/sales/_macros/m.py",
+        "sql/models/sales/_macros/m.py",
         9,
         "local",
-        Some("models/sales"),
+        Some("sql/models/sales"),
     ),
-    ("macro", "g", "macros/g.py", 1, "global", None),
+    ("macro", "g", "sql/macros/g.py", 1, "global", None),
     (
         "constant",
         "_own",
-        "models/sales/orders.sql",
+        "sql/models/sales/orders.sql",
         1,
         "private",
-        Some("models/sales"),
+        Some("sql/models/sales"),
     ),
 ];
 

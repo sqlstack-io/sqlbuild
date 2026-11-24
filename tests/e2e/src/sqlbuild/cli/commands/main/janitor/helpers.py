@@ -63,7 +63,7 @@ def prepare_janitor_project(
         project_name=project_name,
         repo_files={
             "sqlbuild_project.toml": project_config,
-            "models/orders.sql": dedent(
+            "sql/models/orders.sql": dedent(
                 """
                 MODEL (description "Test model orders.");
 
@@ -272,6 +272,14 @@ def create_direct_state_history(*, db_path: Path, schema: str = "main") -> None:
         connection.close()
 
 
+def janitor_files(project_dir: Path) -> Path:
+    """The folder beside the project where the test adapters read settings and write logs."""
+
+    folder: Path = project_dir.parent / f"{project_dir.name}_janitor"
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder
+
+
 AGED_JANITOR_ADAPTER_NAME: str = "aged_janitor_duckdb"
 JANITOR_TEST_SETTINGS_FILENAME: str = "janitor_test_settings.json"
 AGED_JANITOR_ADAPTER_SOURCE: str = """
@@ -285,7 +293,8 @@ from sqlbuild.adapter.contract.exceptions import AdapterUserError
 from sqlbuild.adapter.contract.models import RelationInfo
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 
-_SETTINGS_PATH = Path(__file__).resolve().parent.parent / "janitor_test_settings.json"
+_PROJECT = Path(__file__).resolve().parents[2]
+_SETTINGS_PATH = _PROJECT.parent / f"{_PROJECT.name}_janitor" / "janitor_test_settings.json"
 
 
 def _settings() -> dict[str, Any]:
@@ -353,11 +362,11 @@ def prepare_archive_janitor_project(
             'materialized = "table"\n'
         ),
         **{
-            f"models/{model_name}.sql": f"MODEL (description 'Test model.');\n\n"
+            f"sql/models/{model_name}.sql": f"MODEL (description 'Test model.');\n\n"
             f"SELECT 1 AS {model_name}_id\n"
             for model_name in model_names
         },
-        f"adapters/{AGED_JANITOR_ADAPTER_NAME}.py": AGED_JANITOR_ADAPTER_SOURCE,
+        f"python/adapters/{AGED_JANITOR_ADAPTER_NAME}.py": AGED_JANITOR_ADAPTER_SOURCE,
         **{
             False: {},
             True: {"sqlbuild_local.toml": f'adapter = "{AGED_JANITOR_ADAPTER_NAME}"\n'},
@@ -386,7 +395,9 @@ def write_janitor_test_settings(
         "identifier_limit": identifier_limit,
         "fail_janitor_event_insert": fail_janitor_event_insert,
     }
-    (project_dir / JANITOR_TEST_SETTINGS_FILENAME).write_text(json.dumps(payload), encoding="utf-8")
+    (janitor_files(project_dir) / JANITOR_TEST_SETTINGS_FILENAME).write_text(
+        json.dumps(payload), encoding="utf-8"
+    )
 
 
 def archive_timestamp_text(value: datetime) -> str:
@@ -462,7 +473,7 @@ def prepare_two_target_janitor_project(
                 'materialized = "table"\n'
             ),
             **{
-                f"models/{model_name}.sql": f"MODEL (description 'Test model.');\n\n"
+                f"sql/models/{model_name}.sql": f"MODEL (description 'Test model.');\n\n"
                 f"SELECT 1 AS {model_name}_id\n"
                 for model_name in model_names
             },
@@ -506,7 +517,7 @@ def prepare_cruft_in_both_targets(*, tmp_path: Path, project_name: str) -> Path:
             command=build_command, project_dir=project_dir
         )
         assert build_result.returncode == 0, build_result.stdout + build_result.stderr
-    (project_dir / "models" / "customers.sql").unlink()
+    (project_dir / "sql" / "models" / "customers.sql").unlink()
     db_path: Path = project_dir / "janitor.duckdb"
     for schema in ("dev", "prod"):
         execute_duckdb(
@@ -542,7 +553,8 @@ from typing import Any
 from sqlbuild.adapter.contract.exceptions import AdapterUserError
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 
-_ROOT = Path(__file__).resolve().parent.parent
+_PROJECT = Path(__file__).resolve().parents[2]
+_ROOT = _PROJECT.parent / f"{_PROJECT.name}_janitor"
 _LOG_LOCK = threading.Lock()
 
 
@@ -596,7 +608,7 @@ def prepare_probe_janitor_project(
     """Build a DuckDB project with stale tables and an expired archive in each schema."""
 
     models: dict[str, str] = {
-        f"models/{schema}_{name}.sql": _probe_model_sql(schema=schema, migrate_from="")
+        f"sql/models/{schema}_{name}.sql": _probe_model_sql(schema=schema, migrate_from="")
         for schema, name in product(stale_tables, ("orders", *renamed_models))
     }
     project_dir: Path = prepare_inline_project(
@@ -618,7 +630,7 @@ def prepare_probe_janitor_project(
                 "[defaults]\n"
                 'materialized = "table"\n'
             ),
-            f"adapters/{PROBE_JANITOR_ADAPTER_NAME}.py": PROBE_JANITOR_ADAPTER_SOURCE,
+            f"python/adapters/{PROBE_JANITOR_ADAPTER_NAME}.py": PROBE_JANITOR_ADAPTER_SOURCE,
             **models,
         },
     )
@@ -646,8 +658,8 @@ def rename_probe_models(
     schema: str
     name: str
     for schema, name in product(schemas, renamed_models):
-        (project_dir / "models" / f"{schema}_{name}.sql").unlink()
-        (project_dir / "models" / f"{schema}_{name}_v2.sql").write_text(
+        (project_dir / "sql" / "models" / f"{schema}_{name}.sql").unlink()
+        (project_dir / "sql" / "models" / f"{schema}_{name}_v2.sql").write_text(
             _probe_model_sql(schema=schema, migrate_from=f"{schema}.{schema}_{name}"),
             encoding="utf-8",
         )
@@ -673,8 +685,8 @@ def write_probe_settings(
     (project_dir / "sqlbuild_local.toml").write_text(
         f'adapter = "{PROBE_JANITOR_ADAPTER_NAME}"\n', encoding="utf-8"
     )
-    (project_dir / PROBE_STATEMENT_LOG_FILENAME).write_text("", encoding="utf-8")
-    (project_dir / PROBE_JANITOR_SETTINGS_FILENAME).write_text(
+    (janitor_files(project_dir) / PROBE_STATEMENT_LOG_FILENAME).write_text("", encoding="utf-8")
+    (janitor_files(project_dir) / PROBE_JANITOR_SETTINGS_FILENAME).write_text(
         json.dumps(
             {
                 "log": True,
@@ -691,7 +703,9 @@ def read_probe_statements(*, project_dir: Path) -> tuple[str, ...]:
     """Return every statement the probe adapter logged, in order."""
 
     return tuple(
-        (project_dir / PROBE_STATEMENT_LOG_FILENAME).read_text(encoding="utf-8").splitlines()
+        (janitor_files(project_dir) / PROBE_STATEMENT_LOG_FILENAME)
+        .read_text(encoding="utf-8")
+        .splitlines()
     )
 
 
@@ -778,7 +792,8 @@ from typing import Any
 from sqlbuild.adapter.contract.models import RelationInfo, RelationUsage, RelationUsageReport
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 
-_ROOT = Path(__file__).resolve().parent.parent
+_PROJECT = Path(__file__).resolve().parents[2]
+_ROOT = _PROJECT.parent / f"{_PROJECT.name}_janitor"
 
 
 def _settings() -> dict[str, Any]:
@@ -883,8 +898,8 @@ def prepare_usage_janitor_project(
                 "[defaults]\n"
                 'materialized = "table"\n'
             ),
-            "models/orders.sql": "MODEL (description 'Test model.');\n\nSELECT 1 AS order_id\n",
-            f"adapters/{USAGE_JANITOR_ADAPTER_NAME}.py": USAGE_JANITOR_ADAPTER_SOURCE,
+            "sql/models/orders.sql": "MODEL (description 'Test model.');\n\nSELECT 1 AS order_id\n",
+            f"python/adapters/{USAGE_JANITOR_ADAPTER_NAME}.py": USAGE_JANITOR_ADAPTER_SOURCE,
         },
     )
     _build(project_dir)
@@ -919,7 +934,7 @@ def write_usage_settings(
     (project_dir / "sqlbuild_local.toml").write_text(
         f'adapter = "{USAGE_JANITOR_ADAPTER_NAME}"\n', encoding="utf-8"
     )
-    (project_dir / USAGE_JANITOR_SETTINGS_FILENAME).write_text(
+    (janitor_files(project_dir) / USAGE_JANITOR_SETTINGS_FILENAME).write_text(
         json.dumps(
             {
                 "changed_at": "2026-09-01T08:00:00+00:00",
@@ -944,7 +959,9 @@ def write_usage_settings(
 def read_usage_calls(*, project_dir: Path) -> dict[str, object]:
     """The relations and window of the usage adapter's last `relation_usage` call."""
 
-    return json.loads((project_dir / USAGE_JANITOR_CALLS_FILENAME).read_text(encoding="utf-8"))
+    return json.loads(
+        (janitor_files(project_dir) / USAGE_JANITOR_CALLS_FILENAME).read_text(encoding="utf-8")
+    )
 
 
 def count_stale_archives(*, db_path: Path) -> int:

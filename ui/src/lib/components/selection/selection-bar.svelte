@@ -1,12 +1,11 @@
 <script lang="ts">
-	import { copyText } from '$lib/browser/clipboard';
+	import { createCopyState } from '$lib/browser/copy-state.svelte';
 	import type { Snippet } from 'svelte';
 	import { goto } from '$app/navigation';
 	import CopyIcon from '@lucide/svelte/icons/copy';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import HammerIcon from '@lucide/svelte/icons/hammer';
 	import MinusIcon from '@lucide/svelte/icons/minus';
-	import InfoIcon from '@lucide/svelte/icons/info';
 	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
 	import EyeIcon from '@lucide/svelte/icons/eye';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -16,16 +15,14 @@
 	import { app } from '$lib/state/app.svelte';
 	import { noun } from '$lib/format/plural';
 	import { buildHref, copyCommand, problemParts, problemText, problemToken } from '$lib/selection/command';
-	import { readSelection } from '$lib/selection/reading';
 	import { parseSelection } from '$lib/selection/syntax';
 	import type { NameEntry } from '$lib/selection/suggest';
 	import type { SelectionState } from '$lib/state/selection.svelte';
 	import SelectionField from './selection-field.svelte';
 
 	// The selection bar: what `sqb build -s … --exclude …` would select, typed in SQLBuild's syntax
-	// with chips and suggestions, the live node count, the selection in plain words, Copy and Build
-	// these. The except row appears once used. `view` holds view-only filters, drawn apart in a
-	// dashed group: they narrow what is shown and never join the command.
+	// with chips and suggestions, the live node count, Copy and Build these. The except row appears once used. `view` holds view-only filters, drawn at the end of the
+	// row in a dashed group: they narrow what is shown and never join the command.
 	let {
 		selection,
 		names,
@@ -52,8 +49,8 @@
 	} = $props();
 
 	let exceptOpen = $state(false);
-	let copied = $state(false);
-	let copyTimer: ReturnType<typeof setTimeout> | undefined;
+	const copier = createCopyState();
+	const copied = $derived(copier.copied);
 
 	const showExcept = $derived(exceptOpen || !!selection.exclude.trim());
 	const problem = $derived(selection.problem);
@@ -65,16 +62,13 @@
 	};
 	const selectProblem = $derived(shape('select'));
 	const exceptProblem = $derived(shape('exclude'));
-	const reading = $derived(readSelection(selection.select, selection.exclude));
 	const command = $derived(copyCommand({ select: selection.select, exclude: selection.exclude }));
 	const canBuild = $derived(app.client.supports('launchAdhocRun'));
 	const blocked = $derived(!!problem || !selection.select.trim());
 
-	async function copy() {
-		copied = await copyText(command);
+	async function copy(e: MouseEvent) {
+		await copier.copy(command, e.currentTarget as Element);
 		selection.remember();
-		clearTimeout(copyTimer);
-		copyTimer = setTimeout(() => (copied = false), 1200);
 	}
 	function buildThese() {
 		selection.remember();
@@ -127,19 +121,20 @@
 			<GatedButton requires="run.adhoc" variant="default" disabled={blocked} reason={problem ? 'Fix the selection first' : 'Select nodes first'} hint="Open the plan for {command}" onclick={buildThese}><HammerIcon />Build these</GatedButton>
 		{/if}
 		{@render trailing?.()}
+		{#if view}
+			<!-- View filters sit at the end of the one row: a second band for them alone left a near-empty strip. -->
+			<div class="sb-view" title="View filters only change what is drawn. They are not part of the selection, are not copied into the command and do not change what Build these runs.">
+				<span class="sb-view-label"><EyeIcon size={13} />View</span>
+				{@render view()}
+			</div>
+		{/if}
 	</div>
-	{#if showExcept || view}
+	{#if showExcept}
 		<div class="sb-row second">
 			{#if showExcept}
 				<span class="sb-lead">Except</span>
 				<SelectionField bind:value={selection.exclude} tone="except" label="Except" placeholder="Leave out: same syntax" vocabulary={selection.vocabulary} {names} problem={exceptProblem} />
 				<Button variant="ghost" size="icon-sm" onclick={clearExcept} aria-label="Remove the except row" title="Remove the except row"><XIcon /></Button>
-			{/if}
-			{#if view}
-				<div class="sb-view" title="View filters only change what is drawn. They are not part of the selection, are not copied into the command and do not change what Build these runs.">
-					<span class="sb-view-label"><EyeIcon size={13} />View</span>
-					{@render view()}
-				</div>
 			{/if}
 		</div>
 	{/if}
@@ -154,11 +149,6 @@
 		</div>
 	{:else if selection.failed}
 		<div class="sb-msg err" role="alert"><CircleAlertIcon size={14} /><span>{selection.failed}</span></div>
-	{:else if selection.active}
-		<div class="sb-msg">
-			<InfoIcon size={14} />
-			<span class="reads">Reads as: {#each reading as s, i (i)}{#if s.strong}<b>{s.text}</b>{:else}{s.text}{/if}{/each}</span>
-		</div>
 	{/if}
 </div>
 
@@ -210,9 +200,9 @@
 	}
 	.sb-view {
 		display: inline-flex;
+		flex: none;
 		align-items: center;
 		gap: 2px;
-		margin-left: auto;
 		padding: 0 4px 0 8px;
 		border: 1px dashed var(--border-strong);
 		border-radius: 3px;
@@ -233,10 +223,6 @@
 		padding: 0 12px 7px 14px;
 		color: var(--muted-foreground);
 		font-size: 12px;
-	}
-	.sb-msg b {
-		color: var(--foreground);
-		font-weight: 500;
 	}
 	.sb-msg.err {
 		color: var(--sb-error);

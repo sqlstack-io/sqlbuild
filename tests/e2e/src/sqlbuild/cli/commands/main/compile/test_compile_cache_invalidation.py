@@ -29,14 +29,17 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
         CompileCacheInvalidationTestCase(
             description="model_sql_body_edit",
             edit=lambda root: replace_project_text(
-                root, "models/staging/stg_orders.sql", "  quantity,", "  quantity + 0 AS quantity,"
+                root,
+                "sql/models/staging/stg_orders.sql",
+                "  quantity,",
+                "  quantity + 0 AS quantity,",
             ),
         ),
         CompileCacheInvalidationTestCase(
             description="model_header_metadata_edit",
             edit=lambda root: replace_project_text(
                 root,
-                "models/staging/stg_orders.sql",
+                "sql/models/staging/stg_orders.sql",
                 "customer_id (nullable false, audits [not_null]),",
                 'customer_id (nullable false, description "Buyer.", audits [not_null, unique]),',
             ),
@@ -44,7 +47,10 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
         CompileCacheInvalidationTestCase(
             description="model_header_syntax_error",
             edit=lambda root: replace_project_text(
-                root, "models/staging/stg_orders.sql", "materialized view,", "materialized view,,(("
+                root,
+                "sql/models/staging/stg_orders.sql",
+                "materialized view,",
+                "materialized view,,((",
             ),
             expected_failure=True,
         ),
@@ -52,26 +58,28 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
             description="model_added",
             edit=lambda root: write_project_file(
                 root,
-                "models/marts/order_quantities.sql",
+                "sql/models/marts/order_quantities.sql",
                 'MODEL (description "Test model order_quantities.");\n\nSELECT order_id, quantity FROM __ref("stg_orders")\n',
             ),
         ),
         CompileCacheInvalidationTestCase(
             description="model_deleted",
-            edit=lambda root: (root / "models/marts/channel_orders.sql").unlink(),
+            edit=lambda root: (root / "sql/models/marts/channel_orders.sql").unlink(),
             expected_failure=True,
         ),
         CompileCacheInvalidationTestCase(
             description="model_moved_between_folders",
             edit=lambda root: move_project_file(
-                root, "models/staging/stg_payments.sql", "models/staging/payments/stg_payments.sql"
+                root,
+                "sql/models/staging/stg_payments.sql",
+                "sql/models/staging/payments/stg_payments.sql",
             ),
         ),
         CompileCacheInvalidationTestCase(
             description="source_yaml_column_type_edit",
             edit=lambda root: replace_project_text(
                 root,
-                "sources/raw.yml",
+                "sql/sources/raw.yml",
                 "      - name: quantity\n        type: INTEGER",
                 "      - name: quantity\n        type: BIGINT",
             ),
@@ -81,7 +89,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
             description="source_yaml_column_rename",
             edit=lambda root: replace_project_text(
                 root,
-                "sources/raw.yml",
+                "sql/sources/raw.yml",
                 "      - name: quantity\n        type: INTEGER",
                 "      - name: item_count\n        type: INTEGER",
             ),
@@ -90,7 +98,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
         CompileCacheInvalidationTestCase(
             description="source_yaml_syntax_error",
             edit=lambda root: replace_project_text(
-                root, "sources/raw.yml", "sources:", "sources: [\n"
+                root, "sql/sources/raw.yml", "sources:", "sources: [\n"
             ),
             expected_failure=True,
         ),
@@ -123,7 +131,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
             description="project_macro_edit",
             edit=lambda root: replace_project_text(
                 root,
-                "macros/python/currency.py",
+                "sql/macros/python/currency.py",
                 'return f"{price_cents} * {quantity}"',
                 'return f"({price_cents}) * ({quantity})"',
             ),
@@ -132,7 +140,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
             description="scoped_macro_edit",
             edit=lambda root: replace_project_text(
                 root,
-                "models/marts/_sqlbuild/_macros/python/currency.py",
+                "sql/models/marts/_sqlbuild/_macros/python/currency.py",
                 'return f"ROUND(({column}) / 100.0, 2)"',
                 'return f"ROUND(({column}) / 100.0, 3)"',
             ),
@@ -140,13 +148,16 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
         CompileCacheInvalidationTestCase(
             description="enum_member_value_edit",
             edit=lambda root: replace_project_text(
-                root, "models/marts/_sqlbuild/_enums/order_channel.sql", 'WEB "web"', 'WEB "online"'
+                root,
+                "sql/models/marts/_sqlbuild/_enums/order_channel.sql",
+                'WEB "web"',
+                'WEB "online"',
             ),
         ),
         CompileCacheInvalidationTestCase(
             description="constant_value_edit",
             edit=lambda root: replace_project_text(
-                root, "models/marts/_sqlbuild/_constants/min_quantity.sql", "value 1", "value 3"
+                root, "sql/models/marts/_sqlbuild/_constants/min_quantity.sql", "value 1", "value 3"
             ),
         ),
         CompileCacheInvalidationTestCase(
@@ -172,7 +183,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
             description="python_loader_edit",
             edit=lambda root: replace_project_text(
                 root,
-                "python/loaders/waffle_sources.py",
+                "python/nodes/loaders/waffle_sources/loaders.py",
                 "from sqlbuild.loaders import loader\n",
                 "from sqlbuild.loaders import loader\n\nLOADER_REVISION: int = 2\n",
             ),

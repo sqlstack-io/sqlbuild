@@ -121,7 +121,7 @@ def test_given_concurrent_microbatch_when_sizing_workers_then_retains_batch_conc
     entry: ModelPlanEntry = ModelPlanEntry(
         key=key,
         name="orders",
-        relative_path=Path("models/orders.sql"),
+        relative_path=Path("sql/models/orders.sql"),
         materialization_type=MaterializationType.INCREMENTAL,
         action=PlanAction.INCREMENTAL_DELETE_INSERT,
         reason=PlanReason.NORMAL_INCREMENTAL,

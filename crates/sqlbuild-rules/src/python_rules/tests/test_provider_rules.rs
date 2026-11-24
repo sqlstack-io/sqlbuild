@@ -13,13 +13,13 @@ fn given_providers_when_evaluating_provider_rules_then_reports_each_broken_conve
         PythonRunTestCase {
             description: "capability folders with provider.py, role files and private folders report nothing",
             files: &[
-                ("providers/__init__.py", ""),
+                ("python/providers/__init__.py", ""),
                 (
-                    "providers/storefront_api/provider.py",
+                    "python/providers/storefront_api/provider.py",
                     r#""""Storefront client."""
 from sqlbuild.providers import Provider
 
-from python.utils.retries import ATTEMPTS
+from python.nodes.utils.retries import ATTEMPTS
 
 from ._classes.page_cursor import PageCursor
 
@@ -32,44 +32,57 @@ class StorefrontApi(Provider):
     base_url: str
 "#,
                 ),
-                ("providers/storefront_api/models.py", ""),
-                ("providers/storefront_api/_classes/page_cursor.py", ""),
-                ("providers/storefront_api/_helpers/paging.py", ""),
-                ("python/utils/retries.py", ""),
+                ("python/providers/storefront_api/models.py", ""),
                 (
-                    "python/orders/daily/main.py",
-                    "from providers.storefront_api.provider import StorefrontApi\n",
+                    "python/providers/storefront_api/_classes/page_cursor.py",
+                    "",
+                ),
+                ("python/providers/storefront_api/_helpers/paging.py", ""),
+                ("python/nodes/utils/retries.py", ""),
+                (
+                    "python/nodes/orders/daily/main.py",
+                    "from python.providers.storefront_api.provider import StorefrontApi\n",
                 ),
             ],
             config: json!({ "select": PROVIDER_RULES }),
             expected_faults: vec![],
         },
         PythonRunTestCase {
-            description: "layout: a module directly in providers/, a stray module, a missing provider.py and a stray folder",
+            description: "layout: a module directly in python/providers/, a stray module, a missing provider.py and a stray folder",
             files: &[
-                ("providers/storefront_api.py", ""),
-                ("providers/carrier_api/client.py", ""),
-                ("providers/partner_sftp/provider.py", ""),
-                ("providers/partner_sftp/sftp/connection.py", ""),
+                ("python/providers/storefront_api.py", ""),
+                ("python/providers/carrier_api/client.py", ""),
+                ("python/providers/partner_sftp/provider.py", ""),
+                ("python/providers/partner_sftp/sftp/connection.py", ""),
             ],
             config: json!({ "select": ["SQBRPYTHON013"] }),
             expected_faults: vec![
-                ("SQBRPYTHON013", "providers/carrier_api/client.py", 1, 1),
-                ("SQBRPYTHON013", "providers/carrier_api/client.py", 1, 1),
                 (
                     "SQBRPYTHON013",
-                    "providers/partner_sftp/sftp/connection.py",
+                    "python/providers/carrier_api/client.py",
                     1,
                     1,
                 ),
-                ("SQBRPYTHON013", "providers/storefront_api.py", 1, 1),
+                (
+                    "SQBRPYTHON013",
+                    "python/providers/carrier_api/client.py",
+                    1,
+                    1,
+                ),
+                (
+                    "SQBRPYTHON013",
+                    "python/providers/partner_sftp/sftp/connection.py",
+                    1,
+                    1,
+                ),
+                ("SQBRPYTHON013", "python/providers/storefront_api.py", 1, 1),
             ],
         },
         PythonRunTestCase {
             description: "provider.py: a public constant, a function, a private and a plain class, a second provider, and none at all",
             files: &[
                 (
-                    "providers/storefront_api/provider.py",
+                    "python/providers/storefront_api/provider.py",
                     r#""""Doc."""
 from sqlbuild.providers import Provider
 
@@ -97,38 +110,38 @@ class CarrierApi(Provider):
     """Second."""
 "#,
                 ),
-                ("providers/empty/provider.py", "import os\n"),
+                ("python/providers/empty/provider.py", "import os\n"),
             ],
             config: json!({ "select": ["SQBRPYTHON014"] }),
             expected_faults: vec![
-                ("SQBRPYTHON014", "providers/empty/provider.py", 1, 1),
+                ("SQBRPYTHON014", "python/providers/empty/provider.py", 1, 1),
                 (
                     "SQBRPYTHON014",
-                    "providers/storefront_api/provider.py",
+                    "python/providers/storefront_api/provider.py",
                     5,
                     1,
                 ),
                 (
                     "SQBRPYTHON014",
-                    "providers/storefront_api/provider.py",
+                    "python/providers/storefront_api/provider.py",
                     8,
                     5,
                 ),
                 (
                     "SQBRPYTHON014",
-                    "providers/storefront_api/provider.py",
+                    "python/providers/storefront_api/provider.py",
                     12,
                     7,
                 ),
                 (
                     "SQBRPYTHON014",
-                    "providers/storefront_api/provider.py",
+                    "python/providers/storefront_api/provider.py",
                     16,
                     7,
                 ),
                 (
                     "SQBRPYTHON014",
-                    "providers/storefront_api/provider.py",
+                    "python/providers/storefront_api/provider.py",
                     24,
                     7,
                 ),
@@ -138,7 +151,7 @@ class CarrierApi(Provider):
             description: "provider.py: Provider through an alias, a module attribute or _classes/ bases reached by relative imports; bases outside the parsed sources stay silent",
             files: &[
                 (
-                    "providers/storefront_api/provider.py",
+                    "python/providers/storefront_api/provider.py",
                     r#"from ._classes.paged import PagedApi
 
 
@@ -147,15 +160,15 @@ class StorefrontApi(PagedApi):
 "#,
                 ),
                 (
-                    "providers/storefront_api/_classes/paged.py",
+                    "python/providers/storefront_api/_classes/paged.py",
                     "from .base import BaseApi\n\n\nclass PagedApi(BaseApi):\n    pass\n",
                 ),
                 (
-                    "providers/storefront_api/_classes/base.py",
+                    "python/providers/storefront_api/_classes/base.py",
                     "from sqlbuild.providers import Provider\n\n\nclass BaseApi(Provider):\n    pass\n",
                 ),
                 (
-                    "providers/carrier_api/provider.py",
+                    "python/providers/carrier_api/provider.py",
                     r#"from sqlbuild.providers import Provider as SqbProvider
 
 
@@ -164,39 +177,39 @@ class CarrierApi(SqbProvider):
 "#,
                 ),
                 (
-                    "providers/billing_api/provider.py",
+                    "python/providers/billing_api/provider.py",
                     "from ._classes import paged\n\n\nclass BillingApi(paged.PagedApi):\n    \"\"\"Client.\"\"\"\n",
                 ),
                 (
-                    "providers/billing_api/_classes/paged.py",
+                    "python/providers/billing_api/_classes/paged.py",
                     "from sqlbuild.providers import Provider\n\n\nclass PagedApi(Provider):\n    pass\n",
                 ),
                 (
-                    "providers/ledger_api/provider.py",
+                    "python/providers/ledger_api/provider.py",
                     "from ._classes import LedgerBase\n\n\nclass LedgerApi(LedgerBase):\n    \"\"\"Client.\"\"\"\n",
                 ),
                 (
-                    "providers/ledger_api/_classes/__init__.py",
+                    "python/providers/ledger_api/_classes/__init__.py",
                     "from .base import LedgerBase\n",
                 ),
                 (
-                    "providers/ledger_api/_classes/base.py",
+                    "python/providers/ledger_api/_classes/base.py",
                     "from sqlbuild.providers import Provider\n\n\nclass LedgerBase(Provider):\n    pass\n",
                 ),
                 (
-                    "providers/catalog_api/provider.py",
-                    "from python.utils.clients import PagedClient\n\n\nclass CatalogApi(PagedClient):\n    \"\"\"Client.\"\"\"\n",
+                    "python/providers/catalog_api/provider.py",
+                    "from python.nodes.utils.clients import PagedClient\n\n\nclass CatalogApi(PagedClient):\n    \"\"\"Client.\"\"\"\n",
                 ),
                 (
-                    "python/utils/clients.py",
-                    "from python.utils.base import BaseClient\n\n\nclass PagedClient(BaseClient):\n    pass\n",
+                    "python/nodes/utils/clients.py",
+                    "from python.nodes.utils.base import BaseClient\n\n\nclass PagedClient(BaseClient):\n    pass\n",
                 ),
                 (
-                    "python/utils/base.py",
+                    "python/nodes/utils/base.py",
                     "from sqlbuild.providers import Provider\n\n\nclass BaseClient(Provider):\n    pass\n",
                 ),
                 (
-                    "providers/partner_api/provider.py",
+                    "python/providers/partner_api/provider.py",
                     "from vendor.clients import VendorProvider\n\n\nclass PartnerApi(VendorProvider):\n    \"\"\"Client.\"\"\"\n",
                 ),
             ],
@@ -207,7 +220,7 @@ class CarrierApi(SqbProvider):
             description: "provider.py: tuple, subscript, mixed and chained assignments, a builtin base and a module attribute naming a plain class",
             files: &[
                 (
-                    "providers/storefront_api/provider.py",
+                    "python/providers/storefront_api/provider.py",
                     r#"import os
 
 from sqlbuild.providers import Provider
@@ -224,99 +237,119 @@ class StorefrontApi(Provider):
 "#,
                 ),
                 (
-                    "providers/carrier_api/provider.py",
+                    "python/providers/carrier_api/provider.py",
                     "from ._classes import shapes\n\n\nclass CarrierApi(shapes.Parcel):\n    \"\"\"Client.\"\"\"\n",
                 ),
                 (
-                    "providers/carrier_api/_classes/shapes.py",
+                    "python/providers/carrier_api/_classes/shapes.py",
                     "class Parcel:\n    pass\n",
                 ),
                 (
-                    "providers/returns_api/provider.py",
+                    "python/providers/returns_api/provider.py",
                     "class ReturnsApi(Exception):\n    \"\"\"Client.\"\"\"\n",
                 ),
             ],
             config: json!({ "select": ["SQBRPYTHON014"] }),
             expected_faults: vec![
-                ("SQBRPYTHON014", "providers/carrier_api/provider.py", 1, 1),
-                ("SQBRPYTHON014", "providers/carrier_api/provider.py", 4, 7),
-                ("SQBRPYTHON014", "providers/returns_api/provider.py", 1, 1),
-                ("SQBRPYTHON014", "providers/returns_api/provider.py", 1, 7),
                 (
                     "SQBRPYTHON014",
-                    "providers/storefront_api/provider.py",
+                    "python/providers/carrier_api/provider.py",
+                    1,
+                    1,
+                ),
+                (
+                    "SQBRPYTHON014",
+                    "python/providers/carrier_api/provider.py",
+                    4,
+                    7,
+                ),
+                (
+                    "SQBRPYTHON014",
+                    "python/providers/returns_api/provider.py",
+                    1,
+                    1,
+                ),
+                (
+                    "SQBRPYTHON014",
+                    "python/providers/returns_api/provider.py",
+                    1,
+                    7,
+                ),
+                (
+                    "SQBRPYTHON014",
+                    "python/providers/storefront_api/provider.py",
                     6,
                     1,
                 ),
                 (
                     "SQBRPYTHON014",
-                    "providers/storefront_api/provider.py",
+                    "python/providers/storefront_api/provider.py",
                     7,
                     1,
                 ),
                 (
                     "SQBRPYTHON014",
-                    "providers/storefront_api/provider.py",
+                    "python/providers/storefront_api/provider.py",
                     8,
                     1,
                 ),
                 (
                     "SQBRPYTHON014",
-                    "providers/storefront_api/provider.py",
+                    "python/providers/storefront_api/provider.py",
                     9,
                     1,
                 ),
             ],
         },
         PythonRunTestCase {
-            description: "imports: another provider's private code from anywhere, and python/ outside utils/ or orchestration/ from a provider",
+            description: "imports: another provider's private code from anywhere, and python/nodes/ outside utils/ or orchestration/ from a provider",
             files: &[
                 (
-                    "providers/storefront_api/provider.py",
-                    r#"from python.utils.retries import ATTEMPTS
-from python.orders.daily.main import main
+                    "python/providers/storefront_api/provider.py",
+                    r#"from python.nodes.utils.retries import ATTEMPTS
+from python.nodes.orders.daily.main import main
 from orchestration.sensors.orders import on_orders
-from providers.carrier_api._helpers.auth import token
+from python.providers.carrier_api._helpers.auth import token
 from ._classes.cursor import Cursor
-from providers.carrier_api.provider import CarrierApi
+from python.providers.carrier_api.provider import CarrierApi
 "#,
                 ),
-                ("providers/storefront_api/_classes/cursor.py", ""),
-                ("providers/carrier_api/provider.py", ""),
-                ("providers/carrier_api/_helpers/auth.py", ""),
-                ("python/utils/retries.py", ""),
+                ("python/providers/storefront_api/_classes/cursor.py", ""),
+                ("python/providers/carrier_api/provider.py", ""),
+                ("python/providers/carrier_api/_helpers/auth.py", ""),
+                ("python/nodes/utils/retries.py", ""),
                 (
-                    "python/orders/daily/main.py",
-                    "from providers.storefront_api._classes.cursor import Cursor\n",
+                    "python/nodes/orders/daily/main.py",
+                    "from python.providers.storefront_api._classes.cursor import Cursor\n",
                 ),
                 ("orchestration/sensors/orders.py", ""),
                 (
-                    "hooks/python/notify.py",
-                    "import providers.carrier_api._helpers.auth\n",
+                    "sql/hooks/python/notify.py",
+                    "import python.providers.carrier_api._helpers.auth\n",
                 ),
             ],
             config: json!({ "select": ["SQBRPYTHON015"] }),
             expected_faults: vec![
-                ("SQBRPYTHON015", "hooks/python/notify.py", 1, 8),
+                ("SQBRPYTHON015", "python/nodes/orders/daily/main.py", 1, 61),
                 (
                     "SQBRPYTHON015",
-                    "providers/storefront_api/provider.py",
+                    "python/providers/storefront_api/provider.py",
                     2,
-                    38,
+                    44,
                 ),
                 (
                     "SQBRPYTHON015",
-                    "providers/storefront_api/provider.py",
+                    "python/providers/storefront_api/provider.py",
                     3,
                     42,
                 ),
                 (
                     "SQBRPYTHON015",
-                    "providers/storefront_api/provider.py",
+                    "python/providers/storefront_api/provider.py",
                     4,
-                    49,
+                    56,
                 ),
-                ("SQBRPYTHON015", "python/orders/daily/main.py", 1, 54),
+                ("SQBRPYTHON015", "sql/hooks/python/notify.py", 1, 8),
             ],
         },
     ];

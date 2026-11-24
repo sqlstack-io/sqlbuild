@@ -17,8 +17,9 @@ from sqlbuild.adapter.contract.models import (
 from sqlbuild.adapter.contract.types import TableFreshnessStatus
 from sqlbuild.adapter.relations.classes.inspection_catalog import InspectionCatalog
 from sqlbuild.adapter.relations.constants import INSPECTION_IN_LIST_LIMIT
+from sqlbuild.adapter.relations.main.inspection_query_sink import inspection_query_sink
 from sqlbuild.adapter.relations.main.open_inspection_catalog import open_inspection_catalog
-from sqlbuild.adapter.relations.models import SchemaColumnListing
+from sqlbuild.adapter.relations.models import InspectionQueryRecord, SchemaColumnListing
 from sqlbuild.adapters.snowflake.classes.snowflake_connection import _SnowflakeConnection
 from tests.unit.src.sqlbuild.adapters.snowflake.inspection._test_types import (
     CappedColumnFallbackTestCase,
@@ -578,6 +579,7 @@ def test_given_cap_sized_column_listing_when_reading_then_only_needed_relations_
             forbidden_schemas=frozenset(),
             expected_error_fragment="",
             expected_schema_checks=1,
+            expected_failed_reads=0,
         )
     ],
     ids=lambda case: case.description,
@@ -588,8 +590,12 @@ def test_given_missing_schema_when_listing_then_relations_and_columns_are_empty(
     adapter, connection, warehouse = build_offline_snowflake(
         relations=build_inspection_catalog_relations()
     )
+    reads: list[InspectionQueryRecord] = []
 
-    with open_inspection_catalog(adapter=adapter, connection=connection) as catalog:
+    with (
+        inspection_query_sink(reads.append),
+        open_inspection_catalog(adapter=adapter, connection=connection) as catalog,
+    ):
         relations: tuple[RelationInfo, ...] = catalog.list_relations(
             database="analytics", schemas=(test_case.schema,)
         )
@@ -603,6 +609,7 @@ def test_given_missing_schema_when_listing_then_relations_and_columns_are_empty(
     assert relations == ()
     assert listing.columns_by_stored_name == {}
     assert len(warehouse.queries_of_kind("show_schemas")) == test_case.expected_schema_checks
+    assert sum(read.error is not None for read in reads) == test_case.expected_failed_reads
 
 
 @pytest.mark.parametrize(
@@ -614,6 +621,7 @@ def test_given_missing_schema_when_listing_then_relations_and_columns_are_empty(
             forbidden_schemas=frozenset({"STAGING"}),
             expected_error_fragment="Object does not exist, or operation cannot be performed",
             expected_schema_checks=1,
+            expected_failed_reads=1,
         )
     ],
     ids=lambda case: case.description,
@@ -627,14 +635,17 @@ def test_given_existing_schema_when_show_reports_missing_then_original_error_is_
     )
     adapter: OfflineSnowflakeAdapter = OfflineSnowflakeAdapter(warehouse=warehouse)
     connection: _SnowflakeConnection = adapter.connect({})
+    reads: list[InspectionQueryRecord] = []
 
     with (
+        inspection_query_sink(reads.append),
         open_inspection_catalog(adapter=adapter, connection=connection) as catalog,
         pytest.raises(RuntimeError, match=test_case.expected_error_fragment),
     ):
         _ = catalog.list_relations(database="analytics", schemas=(test_case.schema,))
 
     assert len(warehouse.queries_of_kind("show_schemas")) == test_case.expected_schema_checks
+    assert sum(read.error is not None for read in reads) >= test_case.expected_failed_reads
 
 
 @pytest.mark.parametrize(

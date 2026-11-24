@@ -541,8 +541,12 @@ const R_PROJECT_CONFIG: RecordSpec = RecordSpec {
             FieldDefault::NativeCall(RecordId::ScenarioConfig),
         ),
         FieldSpec::new("dbt", FieldDefault::NativeCall(RecordId::DbtConfig)),
-        FieldSpec::new("sinks", FieldDefault::NativeCall(RecordId::SinksConfig)),
+        FieldSpec::new(
+            "event_sinks",
+            FieldDefault::NativeCall(RecordId::SinksConfig),
+        ),
         FieldSpec::new("env_file", FieldDefault::None),
+        FieldSpec::new("extra_paths", FieldDefault::EmptyTuple),
     ],
 };
 const R_LOCAL_CONFIG: RecordSpec = RecordSpec {
@@ -698,7 +702,7 @@ const R_SOURCE_FRESHNESS_CONFIG: RecordSpec = RecordSpec {
 };
 const R_SOURCE_COLUMN_ENTRY: RecordSpec = RecordSpec {
     name: "SourceColumnEntry",
-    doc: "One source column entry from sources/*.yml.",
+    doc: "One source column entry from sql/sources/*.yml.",
     fields: &[
         FieldSpec::required("name"),
         FieldSpec::new("type", FieldDefault::None),
@@ -710,7 +714,7 @@ const R_SOURCE_COLUMN_ENTRY: RecordSpec = RecordSpec {
 };
 const R_SOURCE_ENTRY: RecordSpec = RecordSpec {
     name: "SourceEntry",
-    doc: "One source declaration from sources/*.yml.",
+    doc: "One source declaration from sql/sources/*.yml.",
     fields: &[
         FieldSpec::required("name"),
         FieldSpec::new("database", FieldDefault::None),

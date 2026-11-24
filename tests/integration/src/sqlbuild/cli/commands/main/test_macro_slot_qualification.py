@@ -53,25 +53,25 @@ _PROJECT: str = (
             ),
             expected_exit_code=1,
             expected_fragments=(
-                "--> models/_macros/sql/weekly_rates.sql:8:5",
+                "--> sql/models/_macros/sql/weekly_rates.sql:8:5",
                 "to qualify it, read through an alias: `FROM @rel AS s`, then `s.@rel.column`",
             ),
-            absent_fragments=("--> models/refund_rates.sql",),
+            absent_fragments=("--> sql/models/refund_rates.sql",),
         ),
         MacroSlotQualificationTestCase(
             description="an expression macro's plain reads pass beside bare caller columns",
             files={
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     'MODEL (\n  description "One row per order",\n  materialized table,\n);\n\n'
                     "SELECT 1 AS order_id, CAST(10 AS DOUBLE) AS amount, "
                     "CAST(1 AS DOUBLE) AS discount\n"
                 ),
-                "models/_macros/sql/net_amount.sql": (
+                "sql/models/_macros/sql/net_amount.sql": (
                     'MACRO (\n  description "Order amount after discount",\n'
                     "  arguments (orders RELATION (amount DOUBLE, discount DOUBLE)),\n);\n\n"
                     "@orders.amount - @orders.discount\n"
                 ),
-                "models/order_totals.sql": (
+                "sql/models/order_totals.sql": (
                     'MODEL (\n  description "Net amount per order",\n  materialized table,\n);\n\n'
                     "SELECT order_id, @sql.net_amount(orders) AS net\n"
                     'FROM __ref("orders") AS orders\n'
@@ -84,17 +84,17 @@ _PROJECT: str = (
         MacroSlotQualificationTestCase(
             description="an expression macro's plain reads pass beside hand-qualified columns",
             files={
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     'MODEL (\n  description "One row per order",\n  materialized table,\n);\n\n'
                     "SELECT 1 AS order_id, CAST(10 AS DOUBLE) AS amount, "
                     "CAST(1 AS DOUBLE) AS discount\n"
                 ),
-                "models/_macros/sql/net_amount.sql": (
+                "sql/models/_macros/sql/net_amount.sql": (
                     'MACRO (\n  description "Order amount after discount",\n'
                     "  arguments (orders RELATION (amount DOUBLE, discount DOUBLE)),\n);\n\n"
                     "@orders.amount - @orders.discount\n"
                 ),
-                "models/order_totals.sql": (
+                "sql/models/order_totals.sql": (
                     'MODEL (\n  description "Net amount per order",\n  materialized table,\n);\n\n'
                     "SELECT o.order_id, @sql.net_amount(o) AS net\n"
                     'FROM __ref("orders") AS o\n'
@@ -107,55 +107,55 @@ _PROJECT: str = (
         MacroSlotQualificationTestCase(
             description="an expression macro's bare column beside a hand-qualified column fails",
             files={
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     'MODEL (\n  description "One row per order",\n  materialized table,\n);\n\n'
                     "SELECT 1 AS order_id, 'open' AS status\n"
                 ),
-                "models/_macros/sql/status_value.sql": (
+                "sql/models/_macros/sql/status_value.sql": (
                     'MACRO (\n  description "The order status",\n  returns VARCHAR,\n);\n\nstatus\n'
                 ),
-                "models/open_orders.sql": (
+                "sql/models/open_orders.sql": (
                     'MODEL (\n  description "Open orders",\n  materialized table,\n);\n\n'
                     'SELECT o.order_id, @sql.status_value() AS s FROM __ref("orders") AS o\n'
                 ),
             },
             expected_exit_code=1,
-            expected_fragments=("error[SQLCLEAN028]", "--> models/open_orders.sql"),
+            expected_fragments=("error[SQLCLEAN028]", "--> sql/models/open_orders.sql"),
             absent_fragments=(),
         ),
         MacroSlotQualificationTestCase(
             description="a column-list macro's bare output beside a hand-qualified column fails",
             files={
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     'MODEL (\n  description "One row per order",\n  materialized table,\n);\n\n'
                     "SELECT 1 AS order_id, 'open' AS status\n"
                 ),
-                "models/_macros/sql/order_status.sql": (
+                "sql/models/_macros/sql/order_status.sql": (
                     'MACRO (\n  description "The order status column",\n);\n\nSELECT status\n'
                 ),
-                "models/open_orders.sql": (
+                "sql/models/open_orders.sql": (
                     'MODEL (\n  description "Open orders",\n  materialized table,\n);\n\n'
                     'SELECT o.order_id, @sql.order_status() FROM __ref("orders") AS o\n'
                 ),
             },
             expected_exit_code=1,
-            expected_fragments=("error[SQLCLEAN028]", "--> models/open_orders.sql"),
+            expected_fragments=("error[SQLCLEAN028]", "--> sql/models/open_orders.sql"),
             absent_fragments=(),
         ),
         MacroSlotQualificationTestCase(
             description="a caller that mixes styles itself still fails",
             files={
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     'MODEL (\n  description "One row per order",\n  materialized table,\n);\n\n'
                     "SELECT 1 AS order_id, 'open' AS status\n"
                 ),
-                "models/open_orders.sql": (
+                "sql/models/open_orders.sql": (
                     'MODEL (\n  description "Open orders",\n  materialized table,\n);\n\n'
                     'SELECT o.order_id, status FROM __ref("orders") AS o\n'
                 ),
             },
             expected_exit_code=1,
-            expected_fragments=("error[SQLCLEAN028]", "--> models/open_orders.sql"),
+            expected_fragments=("error[SQLCLEAN028]", "--> sql/models/open_orders.sql"),
             absent_fragments=(),
         ),
     ],

@@ -26,12 +26,12 @@ pub(crate) fn project(model_name: &str) -> SubjectsInput {
         target_name: Some("dev".to_owned()),
         models: vec![
             ModelSubjectInput {
-                path: "models/orders.sql".to_owned(),
+                path: "sql/models/orders.sql".to_owned(),
                 name: model_name.to_owned(),
                 materialized: None,
             },
             ModelSubjectInput {
-                path: "models/customers.sql".to_owned(),
+                path: "sql/models/customers.sql".to_owned(),
                 name: "customers".to_owned(),
                 materialized: Some("table".to_owned()),
             },

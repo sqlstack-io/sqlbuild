@@ -14,13 +14,13 @@
   }
  ],
  "compiled": {
-  "models/marts/customer_totals.sql": [
+  "sql/models/marts/customer_totals.sql": [
    "SELECT customer_id, SUM(amount) AS total_amount",
    "FROM __ref(\"stg_orders\")",
    "GROUP BY customer_id",
    ""
   ],
-  "models/staging/stg_orders.sql": [
+  "sql/models/staging/stg_orders.sql": [
    "SELECT order_id, customer_id, amount, status",
    "FROM __source(\"raw_orders\")",
    ""

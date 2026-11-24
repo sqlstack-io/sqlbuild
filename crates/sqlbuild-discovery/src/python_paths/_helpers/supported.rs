@@ -1,23 +1,13 @@
 //! Whether one project Python file lives under a documented executable root.
 
 use crate::constants::{CANONICAL_AUTHORED_ROOTS, SCOPED_DECLARATION_DIRECTORIES};
-use crate::python_paths::constants::{
-    DIRECT_PYTHON_ROOTS, GROUPED_PYTHON_HOOK_ROLES, LANGUAGE_PYTHON_ROOTS, SUPPORTED_ROOT_FILES,
-};
+use crate::python_paths::constants::{GROUPED_PYTHON_HOOK_ROLES, PYTHON_ROOTS};
 
 /// Whether the file at relative `parts` is supported project Python.
 pub(crate) fn is_supported(parts: &[String]) -> bool {
-    let Some(first) = parts.first() else {
-        return false;
-    };
-    if parts.len() == 1 && SUPPORTED_ROOT_FILES.contains(&first.as_str()) {
-        return true;
-    }
-    if DIRECT_PYTHON_ROOTS.contains(&first.as_str()) {
-        return true;
-    }
-    if let [root, language, ..] = parts
-        && LANGUAGE_PYTHON_ROOTS.contains(&(root.as_str(), language.as_str()))
+    if PYTHON_ROOTS
+        .iter()
+        .any(|root| parts.len() > root.len() && starts_with(parts, root))
     {
         return true;
     }

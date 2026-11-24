@@ -200,8 +200,8 @@ def test_given_invalid_target_warehouses_when_discovering_then_config_error_expl
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(test_case.project_contents, encoding="utf-8")
     (tmp_path / "sqlbuild_local.toml").write_text(test_case.local_contents, encoding="utf-8")
-    (tmp_path / "adapters").mkdir()
-    (tmp_path / "adapters" / "custom.py").write_text(
+    (tmp_path / "python" / "adapters").mkdir(parents=True)
+    (tmp_path / "python" / "adapters" / "custom.py").write_text(
         test_case.adapter_file_contents, encoding="utf-8"
     )
 
@@ -238,8 +238,8 @@ def test_given_adapter_layers_when_discovering_target_warehouses_then_config_is_
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(test_case.project_contents, encoding="utf-8")
     (tmp_path / "sqlbuild_local.toml").write_text(test_case.local_contents, encoding="utf-8")
-    (tmp_path / "adapters").mkdir()
-    (tmp_path / "adapters" / "custom.py").write_text(
+    (tmp_path / "python" / "adapters").mkdir(parents=True)
+    (tmp_path / "python" / "adapters" / "custom.py").write_text(
         test_case.adapter_file_contents, encoding="utf-8"
     )
 

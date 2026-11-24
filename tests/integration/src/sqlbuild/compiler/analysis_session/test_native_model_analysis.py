@@ -87,48 +87,48 @@ _UNAPPLIED_RULES_WARNING: str = (
 )
 _CYCLIC_PROJECT: dict[str, str] = {
     "sqlbuild_project.toml": 'name = "orders_cycle"\nadapter = "duckdb"\n',
-    "sources/raw.yml": (
+    "sql/sources/raw.yml": (
         "sources:\n  - name: raw_orders\n    description: Raw orders.\n    columns:\n"
         "      - name: order_id\n        type: INTEGER\n"
         "      - name: amount\n        type: DOUBLE\n"
     ),
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         'MODEL (description "Orders");\n\nSELECT o.order_id, o.amount, r.refund\n'
         'FROM __source("raw_orders") AS o\n'
         'LEFT JOIN __ref("returns") AS r ON r.order_id = o.order_id\n'
     ),
-    "models/returns.sql": (
+    "sql/models/returns.sql": (
         'MODEL (description "Returns");\n\n'
         'SELECT order_id, amount * -1 AS refund FROM __ref("orders")\n'
     ),
-    "models/order_summary.sql": (
+    "sql/models/order_summary.sql": (
         'MODEL (description "Summary");\n\nSELECT * FROM __ref("returns")\n'
     ),
-    "models/order_audit.sql": (
+    "sql/models/order_audit.sql": (
         'MODEL (description "Audit");\n\n'
         'SELECT order_id, missing_column FROM __ref("order_audit")\n'
     ),
 }
 _ORDERS_PROJECT: dict[str, str] = {
     "sqlbuild_project.toml": 'name = "orders_cycle"\nadapter = "duckdb"\n',
-    "models/orders.sql": 'MODEL (description "Orders");\n\nSELECT order_id FROM __ref("returns")\n',
-    "models/returns.sql": 'MODEL (description "Returns");\n\nSELECT order_id FROM __ref("orders")\n',
+    "sql/models/orders.sql": 'MODEL (description "Orders");\n\nSELECT order_id FROM __ref("returns")\n',
+    "sql/models/returns.sql": 'MODEL (description "Returns");\n\nSELECT order_id FROM __ref("orders")\n',
 }
 
 _DECLARED_SOURCE_PROJECT: dict[str, str] = {
     "sqlbuild_project.toml": 'name = "orders_sources"\nadapter = "duckdb"\n',
-    "sources/raw.yml": (
+    "sql/sources/raw.yml": (
         "sources:\n  - name: raw_orders\n    description: Raw orders.\n    columns:\n"
         "      - name: order_id\n        type: INTEGER\n"
         "      - name: amount\n        type: DOUBLE\n"
     ),
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         'MODEL (description "Orders");\n\n'
         'SELECT order_id, amount * -1 AS refund FROM __source("raw_orders")\n'
     ),
 }
 _EXPRESSION_SOURCE_PROJECT: dict[str, str] = _DECLARED_SOURCE_PROJECT | {
-    "sources/raw.yml": _DECLARED_SOURCE_PROJECT["sources/raw.yml"].replace(
+    "sql/sources/raw.yml": _DECLARED_SOURCE_PROJECT["sql/sources/raw.yml"].replace(
         "    columns:\n",
         "    expression: >-\n      (SELECT 1 AS order_id, CAST(5 AS DOUBLE) AS amount)\n"
         "    columns:\n",
@@ -137,11 +137,11 @@ _EXPRESSION_SOURCE_PROJECT: dict[str, str] = _DECLARED_SOURCE_PROJECT | {
 
 _MIXED_CASE_SOURCE_PROJECT: dict[str, str] = {
     "sqlbuild_project.toml": 'name = "customers"\nadapter = "duckdb"\n',
-    "sources/raw.yml": (
+    "sql/sources/raw.yml": (
         "sources:\n  - name: raw_customers\n    description: Raw customers.\n"
         "    expression: >-\n      (SELECT 10 AS customer_id, 'Ada' AS Customer_Name)\n"
     ),
-    "models/customers.sql": (
+    "sql/models/customers.sql": (
         'MODEL (description "Customers");\n\nSELECT * FROM __source("raw_customers")\n'
     ),
 }
@@ -567,10 +567,10 @@ def test_given_pending_postgres_expression_source_when_analysing_then_star_lists
             files=_CYCLIC_PROJECT,
             expected_exit_code=1,
             expected_compiled=(
-                "models/order_audit.sql",
-                "models/order_summary.sql",
-                "models/orders.sql",
-                "models/returns.sql",
+                "sql/models/order_audit.sql",
+                "sql/models/order_summary.sql",
+                "sql/models/orders.sql",
+                "sql/models/returns.sql",
             ),
         )
     ],

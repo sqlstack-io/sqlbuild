@@ -31,7 +31,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                 "error[S405]",
                 "1 source table read by selected resources does not exist in the warehouse",
                 "source 'raw_payments' (raw.payments), read by payments",
-                "'raw_payments' at sources/raw.yml:18",
+                "'raw_payments' at sql/sources/raw.yml:18",
             ),
         )
     ],
@@ -86,7 +86,7 @@ def test_given_missing_source_reference_removed_when_building_then_other_sources
     tmp_path: Path,
 ) -> None:
     project_dir: Path = prepare_missing_source_tables_project(tmp_path=tmp_path)
-    (project_dir / "models" / "payments.sql").unlink()
+    (project_dir / "sql" / "models" / "payments.sql").unlink()
 
     build_result: subprocess.CompletedProcess[str] = run_sqb(
         command=("--no-color", "build"), project_dir=project_dir
@@ -176,7 +176,7 @@ def test_given_case_variant_source_declaration_when_planning_then_table_is_found
         sql="CREATE TABLE raw.payments AS SELECT 1 AS payment_id, "
         "TIMESTAMP '2026-01-03 00:00:00' AS updated_at",
     )
-    sources_path: Path = project_dir / "sources" / "raw.yml"
+    sources_path: Path = project_dir / "sql" / "sources" / "raw.yml"
     sources_path.write_text(
         sources_path.read_text(encoding="utf-8").replace(
             "schema: raw\n    table: orders", "schema: Raw\n    table: Orders"

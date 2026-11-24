@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Model file models/staging/stg_orders.sql references unknown source 'raw_payments'"
+     "message": "Model file sql/models/staging/stg_orders.sql references unknown source 'raw_payments'"
     }
    ]
   }

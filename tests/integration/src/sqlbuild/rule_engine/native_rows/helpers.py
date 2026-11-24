@@ -9,7 +9,7 @@ from sqlbuild._native import run_cli as main
 
 RULES_FIXTURE: Path = Path("tests/e2e/fixtures/waffle_shop")
 RULES_CONFIG: str = '\n[rules]\nselect = ["SQBR", "SQLCLEAN"]\n'
-EDITED_MODEL: str = "models/staging/stg_orders.sql"
+EDITED_MODEL: str = "sql/models/staging/stg_orders.sql"
 
 type FindingKey = tuple[str, str, int | None, int | None, str]
 
@@ -48,14 +48,14 @@ def struct_passthrough_files(*, declared_type: str) -> dict[str, str]:
             'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRCONTRACT105"]\n\n'
             '[defaults]\ncontract = "enforced"\n'
         ),
-        "models/stg_orders.sql": (
+        "sql/models/stg_orders.sql": (
             "MODEL (description 'Staged orders.',\n"
             "  columns (order_id (type INTEGER), detail (type 'STRUCT(\"café\" INTEGER)')),\n"
             ");\n\n"
             "SELECT CAST(1 AS INTEGER) AS order_id,\n"
             "  CAST({'café': 1} AS STRUCT(\"café\" INTEGER)) AS detail\n"
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             "MODEL (description 'Typed orders.',\n"
             f"  columns (order_id (type INTEGER), detail (type '{declared_type}')),\n"
             ");\n\n"
@@ -87,13 +87,13 @@ TYPE_PROOF_FILES: dict[str, str] = {
         'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRCONTRACT105"]\n\n'
         '[defaults]\ncontract = "enforced"\n'
     ),
-    "models/stg_orders.sql": (
+    "sql/models/stg_orders.sql": (
         "MODEL (description 'Staged orders.',\n"
         "  columns (order_id (type INTEGER), amount (type INTEGER)),\n"
         ");\n\n"
         "SELECT CAST(1 AS INTEGER) AS order_id, CAST(5 AS INTEGER) AS amount\n"
     ),
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         "MODEL (description 'Typed orders.',\n"
         "  columns (order_id (type INTEGER), amount (type BIGINT)),\n"
         ");\n\n"

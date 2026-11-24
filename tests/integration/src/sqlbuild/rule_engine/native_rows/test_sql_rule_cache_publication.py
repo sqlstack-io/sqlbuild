@@ -29,9 +29,9 @@ def test_given_increasing_findings_when_publishing_cache_then_findings_are_store
     started: float = monotonic()
     for size in test_case.sizes:
         project_dir: Path = tmp_path / str(size)
-        (project_dir / "models").mkdir(parents=True)
+        (project_dir / "sql" / "models").mkdir(parents=True)
         (project_dir / "sqlbuild_project.toml").write_text(_PROJECT_TOML, encoding="utf-8")
-        paths: list[Path] = [Path(f"models/orders_{index}.sql") for index in range(size)]
+        paths: list[Path] = [Path(f"sql/models/orders_{index}.sql") for index in range(size)]
         for index, path in enumerate(paths[:-1]):
             (project_dir / path).write_text(
                 f'MODEL (description "Orders {index}");\n'

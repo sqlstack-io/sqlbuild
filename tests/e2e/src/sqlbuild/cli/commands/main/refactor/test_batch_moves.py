@@ -27,21 +27,21 @@ from tests.e2e.src.sqlbuild.cli.commands.main.refactor.helpers import (
     write_orders_project,
 )
 
-_CENTS: str = "models/staging/_sqlbuild/_macros/python/cents.py"
+_CENTS: str = "sql/models/staging/_sqlbuild/_macros/python/cents.py"
 _COMPILE_STARTS: tuple[str, ...] = (
     "Compiling project...",
     "Verifying the edited project compiles...",
 )
 _BOTH_USERS: tuple[str, ...] = (
     "model:stg_order_cents",
-    "models/finance/",
+    "sql/models/finance/",
     "stg_order_refunds",
-    "models/finance/",
+    "sql/models/finance/",
 )
 _EXPECTED_MOVED: dict[str, str] = {
-    "models/staging/stg_order_cents.sql": "models/finance/stg_order_cents.sql",
-    "models/staging/stg_order_refunds.sql": "models/finance/stg_order_refunds.sql",
-    _CENTS: "models/finance/_sqlbuild/_macros/python/cents.py",
+    "sql/models/staging/stg_order_cents.sql": "sql/models/finance/stg_order_cents.sql",
+    "sql/models/staging/stg_order_refunds.sql": "sql/models/finance/stg_order_refunds.sql",
+    _CENTS: "sql/models/finance/_sqlbuild/_macros/python/cents.py",
 }
 
 
@@ -60,8 +60,8 @@ _EXPECTED_MOVED: dict[str, str] = {
             arguments=("--from-file", MOVE_FILE_PLACEHOLDER),
             move_file=(
                 "# move every cents user together\n\n"
-                "model:stg_order_cents\tmodels/finance/\n"
-                "  stg_order_refunds   models/finance/  \n"
+                "model:stg_order_cents\tsql/models/finance/\n"
+                "  stg_order_refunds   sql/models/finance/  \n"
             ),
             expected_moved=_EXPECTED_MOVED,
             expected_compiles=2,
@@ -104,9 +104,9 @@ def test_given_moves_invalid_one_at_a_time_when_moved_together_then_one_verifica
     [
         SingleMoveOfBatchE2ETestCase(
             description="moving one user alone needs a group in the top-level role",
-            move=("stg_order_cents", "models/finance/"),
+            move=("stg_order_cents", "sql/models/finance/"),
             expected_reason=(
-                "macro:to_cents must move to macros/python/, which keeps its files in group"
+                "macro:to_cents must move to sql/macros/python/, which keeps its files in group"
             ),
         ),
     ],
@@ -137,13 +137,13 @@ def test_given_one_move_of_the_batch_alone_when_moving_then_it_is_refused(
             description="two models moved to the same file",
             arguments=(
                 "stg_order_cents",
-                "models/finance/order_amounts.sql",
+                "sql/models/finance/order_amounts.sql",
                 "stg_order_refunds",
-                "models/finance/order_amounts.sql",
+                "sql/models/finance/order_amounts.sql",
             ),
             expected_reason=(
                 "model:stg_order_cents and model:stg_order_refunds both move to "
-                "models/finance/order_amounts.sql"
+                "sql/models/finance/order_amounts.sql"
             ),
         ),
         BatchMoveConflictE2ETestCase(
@@ -151,9 +151,9 @@ def test_given_one_move_of_the_batch_alone_when_moving_then_it_is_refused(
             description="one model moved twice",
             arguments=(
                 "stg_order_cents",
-                "models/finance/",
+                "sql/models/finance/",
                 "stg_order_cents",
-                "models/marts/",
+                "sql/models/marts/",
             ),
             expected_reason="model:stg_order_cents is moved more than once",
         ),
@@ -162,9 +162,9 @@ def test_given_one_move_of_the_batch_alone_when_moving_then_it_is_refused(
             description="a model taking the name another model gives up",
             arguments=(
                 "stg_order_refunds",
-                "models/staging/stg_order_returns.sql",
+                "sql/models/staging/stg_order_returns.sql",
                 "stg_order_cents",
-                "models/staging/stg_order_refunds.sql",
+                "sql/models/staging/stg_order_refunds.sql",
             ),
             expected_reason=(
                 "model:stg_order_cents would take the name model:stg_order_refunds gives up"
@@ -175,14 +175,14 @@ def test_given_one_move_of_the_batch_alone_when_moving_then_it_is_refused(
             files=same_named_local_macros(),
             arguments=(
                 "stg_order_cents",
-                "models/finance/",
+                "sql/models/finance/",
                 "order_labels",
-                "models/finance/",
+                "sql/models/finance/",
             ),
             expected_reason=(
-                "models/marts/_sqlbuild/_macros/python/helpers.py and "
-                "models/staging/_sqlbuild/_macros/python/helpers.py would both move to "
-                "models/finance/_sqlbuild/_macros/python/helpers.py; rename one of them first"
+                "sql/models/marts/_sqlbuild/_macros/python/helpers.py and "
+                "sql/models/staging/_sqlbuild/_macros/python/helpers.py would both move to "
+                "sql/models/finance/_sqlbuild/_macros/python/helpers.py; rename one of them first"
             ),
         ),
     ],
@@ -210,9 +210,9 @@ def test_given_conflicting_moves_when_moved_together_then_batch_is_refused_and_n
             arguments=_BOTH_USERS,
             expected_lines=(
                 "Move 2 models",
-                "├── stg_order_cents  ->  models/finance/stg_order_cents.sql",
-                "└── stg_order_refunds  ->  models/finance/stg_order_refunds.sql",
-                f"├── models/finance/_sqlbuild/_macros/python/cents.py  (moved from {_CENTS})",
+                "├── stg_order_cents  ->  sql/models/finance/stg_order_cents.sql",
+                "└── stg_order_refunds  ->  sql/models/finance/stg_order_refunds.sql",
+                f"├── sql/models/finance/_sqlbuild/_macros/python/cents.py  (moved from {_CENTS})",
                 "Dry run: compiles, 3 files would change; nothing written",
             ),
         ),

@@ -1,6 +1,6 @@
 //! Hand bytes a process stream accepted to this process's run output, under the node running on this thread.
 
-use crate::run_output::_helpers::upload::{OUTPUT_NODE, attached};
+use crate::run_output::_helpers::upload::{OUTPUT_NODE, attached, read_now};
 use crate::run_output::models::OutputStream;
 
 /// Never waits: call it under the lock that orders output, then `wait_for_output_room` outside it; a no-op outside a worker.
@@ -11,6 +11,10 @@ pub fn forward_output(stream: OutputStream, data: &[u8]) {
     let node: String = OUTPUT_NODE
         .with(|node| node.borrow().clone())
         .unwrap_or_default();
-    uploader.shared.locked().append((node, stream), data);
+    let read_at = read_now();
+    uploader
+        .shared
+        .locked()
+        .append((node, stream), (data, read_at));
     uploader.shared.wake.notify_all();
 }

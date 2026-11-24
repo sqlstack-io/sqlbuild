@@ -30,22 +30,22 @@ _PROJECT_FILES: dict[str, str] = {
         '[connection]\ndatabase = "demo.duckdb"\n\n[targets.dev]\n\n[targets.prod]\n\n'
         '[settings]\nconcurrency = 4\n\n[vars]\namount = "1"\n'
     ),
-    "models/stg_orders.sql": (
+    "sql/models/stg_orders.sql": (
         "MODEL (description 'Staged orders.', materialized table);\n"
         "SELECT CAST(@@amount AS INTEGER) AS order_id\n"
     ),
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         "MODEL (description 'Orders.', materialized table);\n"
         'SELECT order_id FROM __ref("stg_orders")\n'
     ),
-    "models/customers.sql": (
+    "sql/models/customers.sql": (
         "MODEL (description 'Customers.', materialized table);\nSELECT 7 AS customer_id\n"
     ),
-    "models/order_events.sql": (
+    "sql/models/order_events.sql": (
         "MODEL (description 'Order events.', materialized incremental, "
         "incremental_strategy append);\nSELECT 1 AS event_id\n"
     ),
-    "models/refund_events.sql": (
+    "sql/models/refund_events.sql": (
         "MODEL (description 'Refund events.', materialized incremental, "
         "incremental_strategy append);\nSELECT 1 AS event_id\n"
     ),
@@ -76,7 +76,7 @@ _PROJECT_FILES: dict[str, str] = {
         'name = "events_job_group"\ndescription = "Events."\n'
         'jobs = ["events_job", "refund_events_job"]\n'
     ),
-    "models/lenient_model.sql": (
+    "sql/models/lenient_model.sql": (
         "MODEL (description 'Lenient.', materialized table, "
         "columns (id (type INTEGER, audits [not_null])));\nSELECT CAST(NULL AS INTEGER) AS id\n"
     ),
@@ -89,7 +89,7 @@ _PROJECT_FILES: dict[str, str] = {
         "[settings]\nload_sources = false\n"
     ),
     **{
-        f"models/slow_{name}.sql": (
+        f"sql/models/slow_{name}.sql": (
             f"MODEL (description 'Slow {name}.', materialized table);\n"
             "SELECT sum(i * i % 7) AS total FROM range(25000000) AS t(i)\n"
         )
@@ -125,10 +125,10 @@ _GRACE_FILES: dict[str, str] = {
     ),
 }
 _LENIENT_PAIR_FILES: dict[str, str] = {
-    "models/lenient_peer.sql": (
+    "sql/models/lenient_peer.sql": (
         "MODEL (description 'Lenient peer.', materialized table);\nSELECT 1 AS id\n"
     ),
-    "audits/singular/lenient_pair.sql": (
+    "sql/audits/singular/lenient_pair.sql": (
         'AUDIT (name "lenient_pair", severity error);\n'
         'SELECT p.id FROM __ref("lenient_peer") p '
         'LEFT JOIN __ref("lenient_model") m ON p.id = m.id WHERE m.id IS NULL\n'

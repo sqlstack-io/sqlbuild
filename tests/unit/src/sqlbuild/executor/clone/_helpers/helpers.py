@@ -146,7 +146,7 @@ def build_clone_function_entry(
     return FunctionPlanEntry(
         key=CompiledObjectKey(resource_type=CompiledResourceType.UDF, name=name),
         name=name,
-        relative_path=Path("functions/sql") / f"{name}.sql",
+        relative_path=Path("sql/functions/sql") / f"{name}.sql",
         destination=destination,
         arguments=(),
         returns="INTEGER",
@@ -183,7 +183,7 @@ def _build_retention_model(*, name: str, schema: str) -> CompiledModelView:
         key=key,
         deps=(),
         name=name,
-        relative_path=Path(f"models/{name}.sql"),
+        relative_path=Path(f"sql/models/{name}.sql"),
         query_sql=f"SELECT 1 AS {name}_id",
         config=CompileModelConfig(
             time_travel_retention=ResolvedTimeTravelRetention(

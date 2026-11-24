@@ -137,7 +137,7 @@ def test_given_meta_only_change_when_rebuilding_then_outcomes_and_reruns_match_d
         )
         assert first.returncode == 0, first.stdout + first.stderr
         baselines[variant] = stored_audit_identities(project_dir)
-        model_path: Path = project_dir / "models" / "orders.sql"
+        model_path: Path = project_dir / "sql" / "models" / "orders.sql"
         model_path.write_text(
             model_path.read_text(encoding="utf-8").replace(
                 test_case.original_header_fragment, fragment
@@ -170,7 +170,7 @@ def test_given_meta_only_change_when_rebuilding_then_outcomes_and_reruns_match_d
     (
         InvalidAuditMetaE2ETestCase(
             "factory meta with a date",
-            "python/factories/order_quality.py",
+            "python/nodes/factories/order_quality.py",
             _INVALID_FACTORY,
             (
                 "AuditCase 'positive_amount' meta must map string keys to JSON values",
@@ -179,7 +179,7 @@ def test_given_meta_only_change_when_rebuilding_then_outcomes_and_reruns_match_d
         ),
         InvalidAuditMetaE2ETestCase(
             "header meta that is not a mapping",
-            "models/orders.sql",
+            "sql/models/orders.sql",
             _INVALID_HEADER,
             ("'meta' must be a mapping of JSON values",),
         ),

@@ -15,18 +15,19 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile._test_types import (
     ReferenceScanErrorTestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
+    MACRO_CALL_LOG_CODE,
     CompileReuseRun,
     lifecycle_error_type,
+    macro_call_log,
     run_reuse_compile,
     write_project_file,
 )
 
-_CALL_LOG: str = "macro_calls.log"
 _EMIT_MACRO: str = (
     "from pathlib import Path\n\n\n"
     "def emit(expression: str) -> str:\n"
     '    """Return the expression, logging each execution."""\n\n'
-    f"    with (Path(__file__).resolve().parents[2] / {_CALL_LOG!r}).open(\n"
+    f"    with {MACRO_CALL_LOG_CODE}.open(\n"
     '        "a", encoding="utf-8"\n'
     "    ) as log:\n"
     '        _ = log.write("call\\n")\n'
@@ -93,7 +94,7 @@ _NO_SQL_ANALYSIS_CONFIG: str = FAILURE_BASE_CONFIG + "\n[settings]\nsql_analysis
         ReferenceScanErrorTestCase(
             description="macro_output_fault_before_an_authored_fault_is_unlocated",
             project_files={
-                "macros/python/emit.py": _EMIT_MACRO,
+                "sql/macros/python/emit.py": _EMIT_MACRO,
                 FAILURE_MART_PATH: _MART_HEADER
                 + "SELECT customer_id, @py.emit('__ref(1') AS total_amount\n"
                 'FROM __ref("stg_orders"\n',
@@ -107,7 +108,7 @@ _NO_SQL_ANALYSIS_CONFIG: str = FAILURE_BASE_CONFIG + "\n[settings]\nsql_analysis
         ReferenceScanErrorTestCase(
             description="authored_fault_after_a_macro_is_located_natively",
             project_files={
-                "macros/python/emit.py": _EMIT_MACRO,
+                "sql/macros/python/emit.py": _EMIT_MACRO,
                 FAILURE_MART_PATH: _MART_HEADER
                 + "SELECT customer_id, @py.emit('1') AS total_amount\n"
                 'FROM __ref("stg_orders"\n',
@@ -141,7 +142,7 @@ _NO_SQL_ANALYSIS_CONFIG: str = FAILURE_BASE_CONFIG + "\n[settings]\nsql_analysis
         ReferenceScanErrorTestCase(
             description="audit_file_header_names_the_file",
             project_files={
-                "audits/generic/positive_total.sql": (
+                "sql/audits/generic/positive_total.sql": (
                     "AUDIT (\n  -- totals over 12\" boxes, by customer's orders\n"
                     "  severity warn\n);\n\n"
                     'SELECT * FROM __ref("@model") WHERE note = \'open\n'
@@ -151,7 +152,7 @@ _NO_SQL_ANALYSIS_CONFIG: str = FAILURE_BASE_CONFIG + "\n[settings]\nsql_analysis
                 ),
             },
             expected_message=(
-                "audits/generic/positive_total.sql: SQL reference contains an unclosed quoted string"
+                "sql/audits/generic/positive_total.sql: SQL reference contains an unclosed quoted string"
             ),
             expected_macro_calls=0,
             expected_error_type="CompileInputError",
@@ -160,14 +161,14 @@ _NO_SQL_ANALYSIS_CONFIG: str = FAILURE_BASE_CONFIG + "\n[settings]\nsql_analysis
             description="function_file_header_names_the_file",
             project_files={
                 "sqlbuild_project.toml": _NO_SQL_ANALYSIS_CONFIG,
-                "functions/sql/orders_for.sql": (
+                "sql/functions/sql/orders_for.sql": (
                     f'FUNCTION (\n  description """{_QUOTED_DESCRIPTION}""",\n'
                     "  arguments (p_customer_id INTEGER),\n  returns INTEGER\n);\n\n"
                     'SELECT COUNT(*) FROM __ref("stg_orders" WHERE customer_id = p_customer_id\n'
                 ),
             },
             expected_message=(
-                "functions/sql/orders_for.sql: SQL reference contains an unclosed parenthesis"
+                "sql/functions/sql/orders_for.sql: SQL reference contains an unclosed parenthesis"
             ),
             expected_macro_calls=0,
             expected_error_type="CompileInputError",
@@ -181,12 +182,12 @@ def test_given_reference_scan_error_when_compiling_then_it_is_located_and_typed(
     project_dir: Path = tmp_path / "orders"
     for relative_path, contents in {
         **FAILURE_BASE_FILES,
-        _CALL_LOG: "",
         **test_case.project_files,
     }.items():
         write_project_file(project_dir, relative_path, contents)
+    _ = macro_call_log(project_dir).write_text("", encoding="utf-8")
     run: CompileReuseRun = run_reuse_compile(project_dir=project_dir)
-    macro_calls: int = len((project_dir / _CALL_LOG).read_text(encoding="utf-8").splitlines())
+    macro_calls: int = len(macro_call_log(project_dir).read_text(encoding="utf-8").splitlines())
     error_type: str = lifecycle_error_type(project_dir=project_dir, monkeypatch=monkeypatch)
 
     assert (

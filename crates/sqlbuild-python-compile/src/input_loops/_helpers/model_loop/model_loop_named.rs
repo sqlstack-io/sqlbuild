@@ -188,7 +188,7 @@ fn report_inaccessible(
         "help",
         format!(
             "move '{record_path}' to a {role}/ role owned by '{folder}' or one of its parent \
-             folders, or to the project-wide {role}/ when consumers span resource trees"
+             folders, or to the project-wide sql/{role}/ when consumers span resource trees"
         ),
     )?;
     let diagnostic: Bound<'_, PyAny> = context

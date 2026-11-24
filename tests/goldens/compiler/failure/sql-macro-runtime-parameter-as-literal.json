@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P023",
-     "message": "n is used where a literal is required; declare it n INTEGER CONST\n  --> models/staging/_sqlbuild/_macros/sql/x.sql:3:49",
+     "message": "n is used where a literal is required; declare it n INTEGER CONST\n  --> sql/models/staging/_sqlbuild/_macros/sql/x.sql:3:49",
      "help": "macro x() uses @n as LIMIT, which SQL accepts only as a literal; a CONST argument takes only values known at compile time"
     }
    ]

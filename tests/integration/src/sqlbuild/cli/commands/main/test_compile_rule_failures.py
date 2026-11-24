@@ -47,7 +47,7 @@ _PASSING: str = 'SELECT o.order_id, o.status FROM __ref("orders") AS o'
 _FAILING: str = 'SELECT o.order_id, status FROM __ref("orders") AS o'
 _FAILED_OPEN_ORDERS: bytes = (
     b"-- sqb: compile failed for this model; not buildable\n"
-    b"-- SQLCLEAN028 at models/open_orders.sql:6:20: "
+    b"-- SQLCLEAN028 at sql/models/open_orders.sql:6:20: "
     b"Single-relation query mixes qualified and unqualified columns\n"
     b'SELECT o.order_id, status FROM __ref("orders") AS o\n'
 )
@@ -92,17 +92,17 @@ _AFTER_FAILURE_LINE: str = "delta compile fell back: the previous compile failed
             open_orders_sql=_FAILING,
             expected_exit_code=1,
             expected_compiled={
-                "models/open_orders.sql": _PASSING_OPEN_ORDERS,
-                "models/orders.sql": _ORDERS_SQL,
-                "models/retired_orders.sql": _ORDERS_SQL,
+                "sql/models/open_orders.sql": _PASSING_OPEN_ORDERS,
+                "sql/models/orders.sql": _ORDERS_SQL,
+                "sql/models/retired_orders.sql": _ORDERS_SQL,
             },
             expected_failed={
-                "models/open_orders.sql": _FAILED_OPEN_ORDERS,
-                "models/orders.sql": _ORDERS_SQL,
+                "sql/models/open_orders.sql": _FAILED_OPEN_ORDERS,
+                "sql/models/orders.sql": _ORDERS_SQL,
             },
             expected_manifest=False,
             expected_output_fragment=(
-                "Failed SQL: target/compiled-failed/models/open_orders.sql\n"
+                "Failed SQL: target/compiled-failed/sql/models/open_orders.sql\n"
                 "  Wrote: target/compiled-failed/\n"
             ),
         ),
@@ -111,10 +111,10 @@ _AFTER_FAILURE_LINE: str = "delta compile fell back: the previous compile failed
             open_orders_sql=_PASSING.replace("o.status", "o.status AS order_status"),
             expected_exit_code=0,
             expected_compiled={
-                "models/open_orders.sql": _PASSING_OPEN_ORDERS.replace(
+                "sql/models/open_orders.sql": _PASSING_OPEN_ORDERS.replace(
                     b"o.status", b"o.status AS order_status"
                 ),
-                "models/orders.sql": _ORDERS_SQL,
+                "sql/models/orders.sql": _ORDERS_SQL,
             },
             expected_failed={},
             expected_manifest=True,
@@ -132,9 +132,9 @@ def test_given_rule_findings_when_compiling_then_failed_sql_is_written_beside_co
         project_dir=tmp_path,
         files={
             "sqlbuild_project.toml": _PROJECT,
-            "models/orders.sql": _ORDERS,
-            "models/open_orders.sql": open_orders_model(_PASSING),
-            "models/retired_orders.sql": _ORDERS,
+            "sql/models/orders.sql": _ORDERS,
+            "sql/models/open_orders.sql": open_orders_model(_PASSING),
+            "sql/models/retired_orders.sql": _ORDERS,
         },
     )
     compile_args: list[str] = [
@@ -149,9 +149,9 @@ def test_given_rule_findings_when_compiling_then_failed_sql_is_written_beside_co
     assert (tmp_path / "target" / "manifest.json").exists()
     write_project_files(
         project_dir=tmp_path,
-        files={"models/open_orders.sql": open_orders_model(test_case.open_orders_sql)},
+        files={"sql/models/open_orders.sql": open_orders_model(test_case.open_orders_sql)},
     )
-    (tmp_path / "models" / "retired_orders.sql").unlink()
+    (tmp_path / "sql" / "models" / "retired_orders.sql").unlink()
 
     exit_code: int = main(compile_args)
 
@@ -176,7 +176,7 @@ def test_given_rule_findings_when_compiling_then_failed_sql_is_written_beside_co
             expected_artifacts={
                 "compiled_sql_dir": "target/compiled-failed/",
                 "manifest": None,
-                "failed_model_sql": ["target/compiled-failed/models/open_orders.sql"],
+                "failed_model_sql": ["target/compiled-failed/sql/models/open_orders.sql"],
             },
         ),
     ],
@@ -189,8 +189,8 @@ def test_given_manifest_requested_when_rules_fail_then_json_reports_no_manifest(
         project_dir=tmp_path,
         files={
             "sqlbuild_project.toml": _PROJECT,
-            "models/orders.sql": _ORDERS,
-            "models/open_orders.sql": open_orders_model(_FAILING),
+            "sql/models/orders.sql": _ORDERS,
+            "sql/models/open_orders.sql": open_orders_model(_FAILING),
         },
     )
 
@@ -241,9 +241,9 @@ def test_given_failing_and_passing_compiles_when_alternating_then_compiled_faile
         project_dir=tmp_path,
         files={
             "sqlbuild_project.toml": _PROJECT,
-            "models/customers.sql": _CUSTOMERS,
-            "models/orders.sql": _ORDERS,
-            "models/open_orders.sql": open_orders_model(_PASSING),
+            "sql/models/customers.sql": _CUSTOMERS,
+            "sql/models/orders.sql": _ORDERS,
+            "sql/models/open_orders.sql": open_orders_model(_PASSING),
         },
     )
     compiled: Path = tmp_path / "target" / "compiled"
@@ -274,59 +274,62 @@ def test_given_failing_and_passing_compiles_when_alternating_then_compiled_faile
     compiled_once(0)
     first_pass: dict[str, bytes] = artifact_tree(compiled)
     failing: dict[str, bytes] = {
-        "models/customers.sql": b"SELECT 1 AS customer_id\n",
-        "models/open_orders.sql": _FAILED_OPEN_ORDERS,
-        "models/orders.sql": _ORDERS_SQL,
+        "sql/models/customers.sql": b"SELECT 1 AS customer_id\n",
+        "sql/models/open_orders.sql": _FAILED_OPEN_ORDERS,
+        "sql/models/orders.sql": _ORDERS_SQL,
     }
     assert sorted(first_pass) == [
-        "models/customers.sql",
-        "models/open_orders.sql",
-        "models/orders.sql",
+        "sql/models/customers.sql",
+        "sql/models/open_orders.sql",
+        "sql/models/orders.sql",
     ]
     assert not failed.exists()
 
     edited(
-        {"models/open_orders.sql": open_orders_model(_FAILING), "models/new_orders.sql": _ORDERS}
+        {
+            "sql/models/open_orders.sql": open_orders_model(_FAILING),
+            "sql/models/new_orders.sql": _ORDERS,
+        }
     )
     compiled_once(1)
     assert artifact_tree(compiled) == first_pass
-    assert artifact_tree(failed) == {**failing, "models/new_orders.sql": _ORDERS_SQL}
+    assert artifact_tree(failed) == {**failing, "sql/models/new_orders.sql": _ORDERS_SQL}
 
-    (tmp_path / "models" / "new_orders.sql").unlink()
+    (tmp_path / "sql" / "models" / "new_orders.sql").unlink()
     compiled_once(1)
     rewarmed(1)
     assert artifact_tree(compiled) == first_pass
     assert artifact_tree(failed) == failing
 
-    edited({"models/open_orders.sql": open_orders_model(_PASSING)})
+    edited({"sql/models/open_orders.sql": open_orders_model(_PASSING)})
     compiled_once(0)
     assert not failed.exists()
     assert artifact_tree(compiled) == first_pass
 
-    edited({"models/open_orders.sql": open_orders_model(_FAILING)})
+    edited({"sql/models/open_orders.sql": open_orders_model(_FAILING)})
     compiled_once(1)
     assert artifact_tree(failed) == failing
     assert artifact_tree(compiled) == first_pass
 
-    edited({"models/customers.sql": _CUSTOMERS.replace("1 AS", "2 AS")})
+    edited({"sql/models/customers.sql": _CUSTOMERS.replace("1 AS", "2 AS")})
     compiled_once(1)
     rewarmed(1)
     assert artifact_tree(failed) == {
         **failing,
-        "models/customers.sql": b"SELECT 2 AS customer_id\n",
+        "sql/models/customers.sql": b"SELECT 2 AS customer_id\n",
     }
     assert artifact_tree(compiled) == first_pass
 
-    edited({"models/open_orders.sql": open_orders_model(_PASSING)})
+    edited({"sql/models/open_orders.sql": open_orders_model(_PASSING)})
     compiled_once(0)
     rewarmed(0)
     assert not failed.exists()
     assert artifact_tree(compiled) == {
         **first_pass,
-        "models/customers.sql": b"SELECT 2 AS customer_id\n",
+        "sql/models/customers.sql": b"SELECT 2 AS customer_id\n",
     }
 
-    edited({"models/customers.sql": _CUSTOMERS})
+    edited({"sql/models/customers.sql": _CUSTOMERS})
     compiled_once(0)
     rewarmed(0)
     assert not failed.exists()
@@ -369,12 +372,12 @@ def test_given_resources_edited_while_rules_fail_when_the_fix_passes_then_compil
     project_dir: Path = tmp_path / "project"
     files: dict[str, str] = {
         "sqlbuild_project.toml": _PROJECT,
-        "models/orders.sql": _ORDERS,
-        "models/order_totals.sql": _TOTALS,
-        "models/open_orders.sql": open_orders_model(_PASSING),
+        "sql/models/orders.sql": _ORDERS,
+        "sql/models/order_totals.sql": _TOTALS,
+        "sql/models/open_orders.sql": open_orders_model(_PASSING),
         "tests/unit/test_order_totals.sql": _TOTALS_TEST,
-        "functions/sql/is_large.sql": _LARGE_FUNCTION,
-        "audits/singular/positive_totals.sql": _TOTALS_AUDIT,
+        "sql/functions/sql/is_large.sql": _LARGE_FUNCTION,
+        "sql/audits/singular/positive_totals.sql": _TOTALS_AUDIT,
     }
     write_project_files(project_dir=project_dir, files=files)
     compile_args: list[str] = ["--project-dir", str(project_dir), "compile", *test_case.extra_args]
@@ -383,12 +386,13 @@ def test_given_resources_edited_while_rules_fail_when_the_fix_passes_then_compil
     def fixed_after_failing(name: str, edits: dict[str, str]) -> tuple[str, dict[str, bytes]]:
         write_project_files(
             project_dir=project_dir,
-            files={**edits, "models/open_orders.sql": open_orders_model(_FAILING)},
+            files={**edits, "sql/models/open_orders.sql": open_orders_model(_FAILING)},
         )
         assert main(compile_args) == 1
         _ = capsys.readouterr()
         write_project_files(
-            project_dir=project_dir, files={"models/open_orders.sql": open_orders_model(_PASSING)}
+            project_dir=project_dir,
+            files={"sql/models/open_orders.sql": open_orders_model(_PASSING)},
         )
         exit_code: int = main(compile_args)
         stdout, stderr = capsys.readouterr()
@@ -408,25 +412,25 @@ def test_given_resources_edited_while_rules_fail_when_the_fix_passes_then_compil
         "after_test_edit",
         {
             "tests/unit/test_order_totals.sql": _TOTALS_TEST.replace("10 AS total", "20 AS total"),
-            "functions/sql/is_large.sql": _LARGE_FUNCTION.replace("> 100", "> 200"),
+            "sql/functions/sql/is_large.sql": _LARGE_FUNCTION.replace("> 100", "> 200"),
         },
     )
     model_edit_stderr, after_model_edit = fixed_after_failing(
         "after_model_edit",
         {
-            "models/order_totals.sql": _TOTALS.replace("* 10", "* 20"),
-            "audits/singular/positive_totals.sql": _TOTALS_AUDIT.replace("< 0", "<= 0"),
+            "sql/models/order_totals.sql": _TOTALS.replace("* 10", "* 20"),
+            "sql/audits/singular/positive_totals.sql": _TOTALS_AUDIT.replace("< 0", "<= 0"),
         },
     )
 
     assert test_case.expected_after_failure_fragment in test_edit_stderr
     assert test_case.expected_after_failure_fragment in model_edit_stderr
     assert changed_artifacts(passing, after_test_edit) == [
-        "functions/sql/is_large.sql",
+        "sql/functions/sql/is_large.sql",
         "tests/order_totals/order_totals_case.sql",
     ]
     assert changed_artifacts(after_test_edit, after_model_edit) == [
-        "audits/singular/positive_totals.sql",
-        "models/order_totals.sql",
+        "sql/audits/singular/positive_totals.sql",
+        "sql/models/order_totals.sql",
         "tests/order_totals/order_totals_case.sql",
     ]

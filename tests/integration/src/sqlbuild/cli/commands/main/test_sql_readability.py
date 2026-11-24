@@ -63,8 +63,8 @@ def test_given_join_predicate_when_compiling_and_running_rules_then_expression_p
     test_case: SqlReadabilityTestCase, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(PROJECT_CONFIG)
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         'MODEL (description "Orders");\n'
         "WITH customers AS (SELECT 1 AS order_id, 'success' AS status),\n"
@@ -184,8 +184,8 @@ def test_given_cte_names_when_compiling_and_running_rules_then_final_name_policy
     test_case: SqlReadabilityTestCase, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(PROJECT_CONFIG)
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(f'MODEL (description "Orders");\n{test_case.sql}\n')
     assert main(["--project-dir", str(tmp_path), "compile", "--no-cache"]) == 0
     capsys.readouterr()
@@ -209,8 +209,8 @@ def test_given_family_selection_when_compiling_then_new_rules_are_enforced(
     (tmp_path / "sqlbuild_project.toml").write_text(
         f'name = "orders"\nadapter = "duckdb"\n[rules]\nselect = ["{test_case.sql}"]\n'
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         'MODEL (description "Orders");\n'
         "WITH customers AS (SELECT 1 AS order_id), "
@@ -246,8 +246,8 @@ def test_given_lateral_join_when_running_expression_rule_then_literals_pass_and_
     test_case: SqlReadabilityTestCase, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "snowflake"\n')
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         'MODEL (description "Orders", database warehouse, schema analytics);\n'
         "SELECT o.order_id FROM raw_orders AS o LEFT JOIN LATERAL FLATTEN(input => o.items) AS f "

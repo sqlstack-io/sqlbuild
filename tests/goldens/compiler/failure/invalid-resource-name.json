@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D016",
-     "message": "Invalid model identity 'order-totals' in models/marts/order-totals.sql; use snake_case 'order_totals'",
+     "message": "Invalid model identity 'order-totals' in sql/models/marts/order-totals.sql; use snake_case 'order_totals'",
      "help": "Rename the authored identity and update its references, selectors, and integration keys. SQLBuild does not silently normalize resource identities. Double underscores remain valid."
     }
    ]

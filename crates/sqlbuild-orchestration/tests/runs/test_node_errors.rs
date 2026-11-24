@@ -58,7 +58,8 @@ fn given_a_failed_node_when_people_read_its_error_then_only_evidence_on_that_nod
                 .nodes
                 .get_mut("orders")
                 .expect("orders node")
-                .definition = json!({"materialization": "table", "path": "models\\orders.sql"});
+                .definition =
+                json!({"materialization": "table", "path": "sql\\models\\orders.sql"});
             let published = publish_snapshot(store, &input).await.expect("publish");
             queue(
                 store,
@@ -125,7 +126,7 @@ fn given_a_failed_node_when_people_read_its_error_then_only_evidence_on_that_nod
                     error.path.as_deref(),
                     message.chars().count()
                 ),
-                (Some("T002"), Some("models/orders.sql"), 2000),
+                (Some("T002"), Some("sql/models/orders.sql"), 2000),
                 "{}: code, a portable path, and the bound",
                 test_case.description
             );

@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P002",
-     "message": "models/staging/stg_orders.sql column 'amount' cannot set nullable = true and audit not_null",
+     "message": "sql/models/staging/stg_orders.sql column 'amount' cannot set nullable = true and audit not_null",
      "help": "remove the not_null audit or set nullable = false"
     }
    ]

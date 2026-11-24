@@ -41,7 +41,7 @@ _ORDERS_SQL: str = 'MODEL (description "Orders");\nSELECT 1 AS order_id, 2 AS am
                 "SELECT order_id FROM totals\n"
             ),
             expected_exit_code=1,
-            expected_diagnostics=(("B002", "models/order_totals.sql", 4, 31),),
+            expected_diagnostics=(("B002", "sql/models/order_totals.sql", 4, 31),),
         ),
         EarlyLintCompileTestCase(
             description="clean graph reports every lint finding at its authored line",
@@ -59,9 +59,9 @@ _ORDERS_SQL: str = 'MODEL (description "Orders");\nSELECT 1 AS order_id, 2 AS am
             ),
             expected_exit_code=1,
             expected_diagnostics=(
-                ("SQLCLEAN005", "models/order_totals.sql", 3, 3),
-                ("SQLCLEAN005", "models/order_totals.sql", 6, 3),
-                ("SQLCLEAN005", "models/order_totals.sql", 9, 3),
+                ("SQLCLEAN005", "sql/models/order_totals.sql", 3, 3),
+                ("SQLCLEAN005", "sql/models/order_totals.sql", 6, 3),
+                ("SQLCLEAN005", "sql/models/order_totals.sql", 9, 3),
             ),
         ),
     ),
@@ -76,8 +76,8 @@ def test_given_rules_enabled_project_when_compiling_cold_and_warm_then_lint_wait
         project_name="commerce",
         repo_files={
             "sqlbuild_project.toml": _PROJECT_TOML,
-            "models/orders.sql": _ORDERS_SQL,
-            "models/order_totals.sql": test_case.order_totals_sql,
+            "sql/models/orders.sql": _ORDERS_SQL,
+            "sql/models/order_totals.sql": test_case.order_totals_sql,
         },
     )
 
@@ -118,7 +118,7 @@ def test_given_slow_background_lint_when_interrupted_then_compile_stops_promptly
         project_name="commerce",
         repo_files={
             "sqlbuild_project.toml": _PROJECT_TOML,
-            "models/orders.sql": _ORDERS_SQL,
+            "sql/models/orders.sql": _ORDERS_SQL,
             **slow_lint_model_files(model_count=test_case.model_count),
         },
     )

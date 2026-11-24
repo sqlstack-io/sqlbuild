@@ -10,16 +10,16 @@ use crate::run_output::main::read_person_output_index::read_person_output_index;
 use crate::run_output::main::read_person_output_page::read_person_output_page;
 use crate::run_output::main::search_person_output::search_person_output;
 use crate::run_output::models::{
-    OutputDownloadQuery, OutputLevel, OutputMark, OutputRow, OutputSearch, OutputSearchQuery,
-    OutputStream, SearchDirection,
+    OutputDownloadQuery, OutputLevel, OutputLine, OutputMark, OutputRow, OutputSearch,
+    OutputSearchQuery, OutputSegment, OutputStream, SearchDirection,
 };
 use crate::run_output::tests::helpers::{
-    batch, claimed_run, line, line_row, output_store, page_query, reader, segment, similar_row,
-    timeless,
+    batch, claimed_run, line, line_row, output_store, page_query, read_at, reader, segment,
+    similar_row, timeless,
 };
 use crate::run_output::tests::test_types::{
-    OutputFoldTestCase, OutputNulTestCase, OutputReadTestCase, OutputSearchTestCase, PageRead,
-    PageStart, SearchRead,
+    OutputFoldTestCase, OutputNulTestCase, OutputReadTestCase, OutputSearchTestCase,
+    OutputStoredReadTimeTestCase, PageRead, PageStart, SearchRead,
 };
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
@@ -655,6 +655,72 @@ fn given_a_node_output_when_searched_either_way_then_small_output_counts_and_wra
             }
             assert_eq!(
                 results, test_case.expected_results,
+                "{}",
+                test_case.description
+            );
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_lines_read_at_different_times_when_a_page_is_read_then_each_line_has_its_read_time() {
+    let out = OutputStream::Stdout;
+    let test_cases = [
+        OutputStoredReadTimeTestCase {
+            description: "SQLite",
+            backend: Backend::Sqlite,
+            expected_lines: [("one", 0), ("two", 0), ("loaded", 1_250)],
+        },
+        OutputStoredReadTimeTestCase {
+            description: "PostgreSQL",
+            backend: Backend::Postgres,
+            expected_lines: [("one", 0), ("two", 0), ("loaded", 1_250)],
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            let folder = tempfile::tempdir().expect("output folder");
+            let output = output_store(store, folder.path(), None);
+            let (location, claim) = claimed_run(store).await;
+            let later = OutputSegment {
+                read_at: read_at(1_250),
+                ..segment(Some(ORDERS), out, "loaded\n")
+            };
+            let sent = batch(0, vec![segment(Some(ORDERS), out, "one\ntwo\n"), later]);
+            publish_output_batch(store, &output, (claim.request.run_id, claim.claim_id), sent)
+                .await
+                .expect("batch");
+            let (context, admin) = reader(store).await;
+            let person = (
+                (&context, admin),
+                (location, "development", claim.request.run_id),
+                DefaultRole::None,
+            );
+            let start = PageStart {
+                from: Some(1),
+                ..PageStart::default()
+            };
+            let query = page_query((Some(ORDERS), None), start, (10, false, None));
+            let page = read_person_output_page(store, &output, person, &query)
+                .await
+                .expect("page")
+                .expect("run");
+            assert_eq!(
+                page.rows,
+                (1_i64..)
+                    .zip(test_case.expected_lines)
+                    .map(|(number, (text, millis))| OutputRow::Line {
+                        line: OutputLine {
+                            at: read_at(millis),
+                            ..line(number, ORDERS, out, text)
+                        },
+                    })
+                    .collect::<Vec<OutputRow>>(),
                 "{}",
                 test_case.description
             );

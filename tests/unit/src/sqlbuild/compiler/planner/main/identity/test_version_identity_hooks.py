@@ -17,7 +17,7 @@ from tests.unit.src.sqlbuild.compiler.planner.main.identity.helpers import (
 _RECORD_ACCESS: SqlHookEntry = SqlHookEntry(
     statement="INSERT INTO order_audit SELECT 'orders'",
     name="record_order_access",
-    relative_path=Path("hooks/sql/record_order_access.sql"),
+    relative_path=Path("sql/hooks/sql/record_order_access.sql"),
     definition_sql="INSERT INTO order_audit SELECT {{ table_name }}",
     kwargs={"table_name": "'orders'"},
     description="Record order table access",
@@ -42,7 +42,7 @@ _NOTIFY: PythonHookEntry = PythonHookEntry(name="notify_orders", kwargs={"channe
                 "pre_hooks": [
                     replace(
                         _RECORD_ACCESS,
-                        relative_path=Path("hooks/sql/audit/record_order_access.sql"),
+                        relative_path=Path("sql/hooks/sql/audit/record_order_access.sql"),
                     )
                 ]
             },
@@ -128,7 +128,7 @@ def test_given_hook_change_when_building_model_identity_then_tracks_only_executi
             ),
             forbidden_fragments=(
                 "Record order table access",
-                "hooks/sql/record_order_access.sql",
+                "sql/hooks/sql/record_order_access.sql",
                 '"description"',
                 '"relative_path"',
             ),

@@ -20,18 +20,18 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             description="sql udf header with a removed replay setting",
             repo_files={
                 "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
-                "functions/sql/normalize_status.sql": (
+                "sql/functions/sql/normalize_status.sql": (
                     "FUNCTION (description 'Test function normalize_status.',\n  arguments (status VARCHAR),\n  returns VARCHAR,\n"
                     "  replay_on_change full,\n);\n\nlower(status)\n"
                 ),
-                "models/order_statuses.sql": (
+                "sql/models/order_statuses.sql": (
                     "MODEL (description 'Test model order_statuses.', materialized table);\n\nSELECT __udf(\"normalize_status\")('OPEN') "
                     "AS status\n"
                 ),
             },
             expected_fragments=(
                 "error[D002]",
-                "functions/sql/normalize_status.sql:4' has unsupported keys: replay_on_change",
+                "sql/functions/sql/normalize_status.sql:4' has unsupported keys: replay_on_change",
             ),
         )
     ],

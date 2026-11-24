@@ -20,9 +20,9 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
 DATABASE_FILE: str = "review_orders.duckdb"
 DATABASE_NAME: str = "review_orders"
 REVIEW_SCHEMA_PREFIX: str = "review_"
-STAGING: str = "models/stg_orders.sql"
-ORDER_TOTALS: str = "models/order_totals.sql"
-CUSTOMER_ORDERS: str = "models/customer_orders.sql"
+STAGING: str = "sql/models/stg_orders.sql"
+ORDER_TOTALS: str = "sql/models/order_totals.sql"
+CUSTOMER_ORDERS: str = "sql/models/customer_orders.sql"
 DROP_FAILURE_PLUGIN: str = "sitecustomize.py"
 
 
@@ -66,7 +66,7 @@ def build_review_project_files() -> dict[str, str]:
             """
         ).lstrip(),
         ".gitignore": "target/\nlogs/\n*.duckdb\n*.duckdb.wal\n",
-        "sources/raw.yml": dedent(
+        "sql/sources/raw.yml": dedent(
             """
             sources:
               - name: raw_orders
@@ -89,11 +89,11 @@ def build_review_project_files() -> dict[str, str]:
             "SELECT order_id, amount_cents / 100.0 AS amount\n"
             'FROM __ref("stg_orders")\n'
         ),
-        "models/open_orders.sql": (
+        "sql/models/open_orders.sql": (
             "MODEL (description 'Open orders.', unique_key order_id);\n\n"
             "SELECT order_id FROM __ref(\"stg_orders\") WHERE status = 'open'\n"
         ),
-        "models/order_ledger.sql": (
+        "sql/models/order_ledger.sql": (
             "MODEL (\n"
             "  description 'Every order once.',\n"
             "  materialized incremental,\n"
@@ -143,8 +143,8 @@ def order_statuses_seed(*, rows: str) -> dict[str, str]:
     """A seed of order statuses and its column types."""
 
     return {
-        "seeds/order_statuses.csv": "status,label\n" + rows,
-        "seeds/order_statuses.yml": dedent(
+        "sql/seeds/order_statuses.csv": "status,label\n" + rows,
+        "sql/seeds/order_statuses.yml": dedent(
             """
             seeds:
               - name: order_statuses

@@ -331,7 +331,7 @@ def test_given_immediate_table_when_executing_then_fails(
             hook_functions=(
                 DiscoveredHookFunction(
                     file_path=Path(__file__),
-                    relative_path=Path("hooks/python/table.py"),
+                    relative_path=Path("sql/hooks/python/table.py"),
                     name="create_data",
                     function=create_python_hook_data,
                 ),
@@ -360,7 +360,7 @@ def test_given_immediate_table_when_executing_then_fails(
             hook_functions=(
                 DiscoveredHookFunction(
                     file_path=Path(__file__),
-                    relative_path=Path("hooks/python/table.py"),
+                    relative_path=Path("sql/hooks/python/table.py"),
                     name="insert_hook_log",
                     function=insert_table_hook_log,
                 ),
@@ -427,7 +427,7 @@ def test_given_hook_config_when_executing_table_then_succeeds(
             hook_functions=(
                 DiscoveredHookFunction(
                     file_path=Path(__file__),
-                    relative_path=Path("hooks/python/table.py"),
+                    relative_path=Path("sql/hooks/python/table.py"),
                     name="fail_hook",
                     function=fail_table_hook,
                 ),

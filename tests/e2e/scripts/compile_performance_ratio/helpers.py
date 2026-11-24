@@ -11,9 +11,11 @@ MARKER_GENERATOR: str = """from pathlib import Path
 
 def write_benchmark_project(*, kind: str, project_dir: Path, models: int) -> None:
     del models
-    (project_dir / "models").mkdir(parents=True)
-    (project_dir / "sqlbuild_project.toml").write_text('name = "orders"\\nadapter = "duckdb"\\n')
-    (project_dir / "models" / "base_marker.sql").write_text(
+    (project_dir / "sql" / "models").mkdir(parents=True)
+    (project_dir / "sqlbuild_project.toml").write_text(
+        'name = "orders"\\nadapter = "duckdb"\\nextra_paths = ["base_marker.txt"]\\n'
+    )
+    (project_dir / "sql" / "models" / "base_marker.sql").write_text(
         'MODEL (description "Base marker");\\n\\nSELECT 1 AS id\\n'
     )
     (project_dir / "base_marker.txt").write_text(kind)

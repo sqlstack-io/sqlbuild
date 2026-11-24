@@ -56,12 +56,12 @@ def test_given_real_dbt_manifest_when_compiling_sqlbuild_then_preserves_dbt_ref(
     assert compile_result.returncode == 0, compile_result.stderr or compile_result.stdout
 
     sqlbuild_project_dir: Path = tmp_path / "sqlbuild_project"
-    sqlbuild_project_dir.joinpath("models").mkdir(parents=True)
-    sqlbuild_project_dir.joinpath("target").mkdir()
+    sqlbuild_project_dir.joinpath("sql", "models").mkdir(parents=True)
+    sqlbuild_project_dir.joinpath("target").mkdir(parents=True)
     sqlbuild_project_dir.joinpath("sqlbuild_project.toml").write_text(
         'name = "demo"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    sqlbuild_project_dir.joinpath("models/downstream_orders.sql").write_text(
+    sqlbuild_project_dir.joinpath("sql/models/downstream_orders.sql").write_text(
         test_case.sqlbuild_model_sql, encoding="utf-8"
     )
     sqlbuild_project_dir.joinpath("target/manifest.json").write_text(

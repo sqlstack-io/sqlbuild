@@ -34,7 +34,7 @@ fn given_model_header_enums_when_validating_then_python_rules_apply() {
                 RawSqlValue::List(vec![RawSqlValue::Str("ACTIVE".to_owned())]),
             ),
             expected_scalar_types: Err(DeclarationFailure::Identity(
-                "Invalid model-local enum identity 'Status' in models/a.sql; use snake_case \
+                "Invalid model-local enum identity 'Status' in sql/models/a.sql; use snake_case \
                  '_status'"
                     .to_owned(),
                 crate::header_metadata::constants::IDENTITY_HELP.to_owned(),
@@ -47,7 +47,7 @@ fn given_model_header_enums_when_validating_then_python_rules_apply() {
                 RawSqlValue::List(vec![RawSqlValue::Str("active".to_owned())]),
             ),
             expected_scalar_types: Err(DeclarationFailure::Parse(
-                "models/a.sql enum '_status' member identifiers must be uppercase: 'active'"
+                "sql/models/a.sql enum '_status' member identifiers must be uppercase: 'active'"
                     .to_owned(),
             )),
         },
@@ -55,7 +55,7 @@ fn given_model_header_enums_when_validating_then_python_rules_apply() {
 
     for test_case in test_cases {
         let site = DeclarationSite {
-            file_path: "models/a.sql",
+            file_path: "sql/models/a.sql",
             model_name: Some("a"),
         };
 

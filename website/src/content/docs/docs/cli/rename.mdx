@@ -21,8 +21,8 @@ sqb rename <model>.<column> <new_name> [--cascade] [flags]
 
 ```bash
 sqb rename stg_orders stg_order_lines
-sqb mv fact_orders models/reporting/            # keeps the name
-sqb mv fact_orders models/reporting/order_facts.sql   # moves and renames
+sqb mv fact_orders sql/models/reporting/            # keeps the name
+sqb mv fact_orders sql/models/reporting/order_facts.sql   # moves and renames
 sqb rename stg_orders.amount revenue
 sqb rename stg_orders.amount revenue --cascade
 ```
@@ -34,14 +34,14 @@ Targets are written the way [`sqb lineage`](/docs/cli/lineage) reads them: a bar
 `sqb rename` changes names and never moves files: a model rename keeps the file in its folder and renames it to `<new_name>.sql`. `sqb mv` changes where a model lives and always takes a path: a new `.sql` file path, which also sets the model name, or a folder ending in `/`, which keeps it. Neither command picks a folder for you, because a folder can change the schema, materialization, tags, and declaration visibility the model gets from path defaults.
 
 ```bash
-# Name only: the file stays in models/orders/intermediate/clean/
+# Name only: the file stays in sql/models/orders/intermediate/clean/
 sqb rename orders__int_clean__order_lines orders__int_clean__order_items
 
 # Name and a specific folder, in one verified step
-sqb mv orders__int_clean__order_lines models/orders/intermediate/enriched/orders__int_enriched__order_lines.sql
+sqb mv orders__int_clean__order_lines sql/models/orders/intermediate/enriched/orders__int_enriched__order_lines.sql
 
 # Folder only: the name stays
-sqb mv orders__int_clean__order_lines models/orders/intermediate/clean/web/
+sqb mv orders__int_clean__order_lines sql/models/orders/intermediate/clean/web/
 ```
 
 ## Move several models at once
@@ -49,14 +49,14 @@ sqb mv orders__int_clean__order_lines models/orders/intermediate/clean/web/
 `sqb mv` takes several `<model> <destination>` pairs, or `--from-file` with one pair per line, separated by a tab or spaces. Blank lines and lines starting with `#` are ignored.
 
 ```bash
-sqb mv stg_order_cents models/finance/ stg_order_refunds models/finance/
+sqb mv stg_order_cents sql/models/finance/ stg_order_refunds sql/models/finance/
 sqb mv --from-file moves.tsv --dry-run
 ```
 
 ```text
 # moves.tsv
-stg_order_cents     models/finance/
-stg_order_refunds   models/finance/
+stg_order_cents     sql/models/finance/
+stg_order_refunds   sql/models/finance/
 ```
 
 The moves are checked together, as one change: nothing is written unless the project compiles after all of them. Declarations and unit tests go where the final state needs them, so a macro whose users all move goes straight to their new folder.
@@ -88,7 +88,7 @@ The model's own unit tests, the test files whose every `TEST` block targets only
 
 - a file named `test_<name>.sql` or `test_<name>__<behavior>.sql` is renamed to the new name;
 - `TEST (name "<name>__<behavior>")` takes the new name as its subject;
-- a test file in the folder that mirrors the model, `tests/unit/<folders>/` for `models/<folders>/`, moves to the folder that mirrors the destination. Test files kept elsewhere stay where they are.
+- a test file in the folder that mirrors the model, `tests/unit/<folders>/` for `sql/models/<folders>/`, moves to the folder that mirrors the destination. Test files kept elsewhere stay where they are.
 - a test file stays in its folder, still renamed, when a macro, enum, or constant it uses would resolve to a different declaration, or to none, from the destination folder, such as a test macro in `tests/unit/<folders>/_sqlbuild/_macros/`. The output's notes name the file and the declaration.
 
 Tests that also target other models keep their file and name; only their fixtures and references change.
@@ -96,8 +96,8 @@ Tests that also target other models keep their file and name; only their fixture
 Moving a model to another folder also moves the macros, enums, constants, reusable schemas, generic audits, and named hooks it uses when their [placement](/docs/concepts/declaration-scopes/placement) must change, following the same rules `sqb compile` enforces:
 
 - a declaration only the moved model uses moves with it, into the destination folder's matching role;
-- a declaration other resources still use moves to the lowest folder they share, for example `models/staging/_sqlbuild/macros/`;
-- when that folder would be an authored root such as `models/`, or the users span resource trees such as models and tests, it moves to the top-level role (`macros/`, `enums/`, `constants/`, `schemas/`, ...).
+- a declaration other resources still use moves to the lowest folder they share, for example `sql/models/staging/_sqlbuild/macros/`;
+- when that folder would be an authored root such as `sql/models/`, or the users span resource trees such as models and tests, it moves to the top-level role (`sql/macros/`, `sql/enums/`, `sql/constants/`, `sql/schemas/`, ...).
 
 A moved declaration file takes the shape of the role folder it lands in. In an empty role it keeps its group folder, such as `money/` in `_macros/money/cents.py`, or stays direct if it had none. In a role whose files all sit in group folders it keeps its group, and a file without a group is refused: move it into a group folder of its current role first. In a role whose files sit directly in it, the group folder is dropped.
 
@@ -138,7 +138,7 @@ A project that already fails some project rules, such as a folder holding more m
 
 A rule failure that the project already had, at the same place and with the same message, doesn't block the change. Neither does one whose numbers only went down, such as a folder that now holds 41 models instead of 44. A new or worse failure blocks the write. Rules stay enabled throughout.
 
-The output, including `--dry-run`, lists them under `Existing rule failures`, with how many the change resolved. Some rules report a failure at one sample file of a group, so moving part of the group can block the move even when it helps. Move the whole group in one batch instead: moving the direct models of a folder into a sub-folder at once, so that it turns from a leaf into a branch, is `sqb mv a models/entry/records/ b models/entry/records/ c models/entry/records/`.
+The output, including `--dry-run`, lists them under `Existing rule failures`, with how many the change resolved. Some rules report a failure at one sample file of a group, so moving part of the group can block the move even when it helps. Move the whole group in one batch instead: moving the direct models of a folder into a sub-folder at once, so that it turns from a leaf into a branch, is `sqb mv a sql/models/entry/records/ b sql/models/entry/records/ c sql/models/entry/records/`.
 
 ## Refusals
 
@@ -158,13 +158,13 @@ The command refuses, and writes nothing, when:
 A rename whose new name belongs to another layer's folder, under the layer-folder rules `SQBRPROJECT102` and `SQBRPROJECT105`, fails verification because `sqb rename` keeps the file where it is. When those rules are the only failures, the output says where the model belongs and prints the one-step [`sqb mv`](#rename-or-move) command, with that layer's folder and the current sub-folders filled in:
 
 ```text
-orders__int_enriched__order_lines__web belongs under models/orders/intermediate/enriched/
+orders__int_enriched__order_lines__web belongs under sql/models/orders/intermediate/enriched/
   Rename and move in one step:
-    sqb mv orders__int_clean__order_lines__web models/orders/intermediate/enriched/web/orders__int_enriched__order_lines__web.sql
+    sqb mv orders__int_clean__order_lines__web sql/models/orders/intermediate/enriched/web/orders__int_enriched__order_lines__web.sql
   (change the folder if you want it somewhere else)
 ```
 
-When the current path has no folder for the model's current layer to swap, or the new layer has no canonical folder, the destination is `models/<folder>/<new_name>.sql`, with a `<folder>` placeholder for you to fill in.
+When the current path has no folder for the model's current layer to swap, or the new layer has no canonical folder, the destination is `sql/models/<folder>/<new_name>.sql`, with a `<folder>` placeholder for you to fill in.
 
 Each location is listed with its file, line, and column, with the fix. Edit those locations, or pass the model or column to the macro as an argument, and run the command again. The command never applies part of a rename.
 
@@ -183,9 +183,9 @@ References produced by a macro are only possible when a project turns off explic
 
 ```text
 Rename model  stg_orders -> stg_order_lines
-├── models/marts/fact_orders.sql
+├── sql/models/marts/fact_orders.sql
 │   └── 24:13   reference __ref("stg_orders")  ->  __ref("stg_order_lines")
-├── models/staging/stg_order_lines.sql  (moved from models/staging/stg_orders.sql)
+├── sql/models/staging/stg_order_lines.sql  (moved from sql/models/staging/stg_orders.sql)
 │   └── 1:8     migration + migrate_from stg_orders
 └── tests/unit/test_fact_orders.sql
     └── 4:1     fixture   __ref__stg_orders  ->  __ref__stg_order_lines

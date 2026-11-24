@@ -1,29 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { capItems, capLines, ownerChip, selectionTokens } from './utils';
-
-describe('capLines', () => {
-	it('shows every item when they fit in the lines', () => {
-		expect(capLines(['orders_hourly', 'orders_daily'])).toEqual({ shown: ['orders_hourly', 'orders_daily'], hidden: [] });
-	});
-
-	it('keeps the last line for "+N more" when they do not fit', () => {
-		expect(capLines(['orders_hourly', 'orders_daily', 'inventory_sensor'])).toEqual({ shown: ['orders_hourly'], hidden: ['orders_daily', 'inventory_sensor'] });
-	});
-
-	it('handles an empty list', () => {
-		expect(capLines([])).toEqual({ shown: [], hidden: [] });
-	});
-});
-
-describe('capItems', () => {
-	it('keeps the first items and returns the rest', () => {
-		expect(capItems(['orders', 'customers', 'inventory', 'returns'], 3)).toEqual({ shown: ['orders', 'customers', 'inventory'], hidden: ['returns'] });
-	});
-
-	it('hides nothing when the list is short', () => {
-		expect(capItems(['orders'], 3)).toEqual({ shown: ['orders'], hidden: [] });
-	});
-});
+import { ownerChip, selectionTokens } from './utils';
 
 describe('selectionTokens', () => {
 	it('splits on whitespace and separates the method prefix', () => {
@@ -46,10 +22,8 @@ describe('selectionTokens', () => {
 		expect(selectionTokens(null)).toEqual([]);
 	});
 
-	it('caps at four pills with the rest hidden', () => {
-		const capped = capItems(selectionTokens('tag:a tag:b tag:c tag:d source:e'), 4);
-		expect(capped.shown.map((t) => t.token)).toEqual(['tag:a', 'tag:b', 'tag:c', 'tag:d']);
-		expect(capped.hidden.map((t) => t.token)).toEqual(['source:e']);
+	it('gives each comma-joined selector its own chip', () => {
+		expect(selectionTokens('tag:orders,tag:daily_orders customers').map((t) => t.token)).toEqual(['tag:orders', 'tag:daily_orders', 'customers']);
 	});
 });
 

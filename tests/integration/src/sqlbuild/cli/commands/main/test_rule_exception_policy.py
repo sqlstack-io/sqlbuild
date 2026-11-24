@@ -14,18 +14,18 @@ from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
 )
 
 _EXCEPTION: str = (
-    '[[rules.rule_exceptions]]\nrule = "SQLCLEAN004"\npath = "models/customers.sql"\n'
+    '[[rules.rule_exceptions]]\nrule = "SQLCLEAN004"\npath = "sql/models/customers.sql"\n'
     'reason = "The sample intentionally keeps one row."\n'
 )
 _IGNORE: str = (
-    '[[rules.rule_ignores]]\nrules = ["SQLCLEAN004"]\npaths = ["models/**"]\n'
+    '[[rules.rule_ignores]]\nrules = ["SQLCLEAN004"]\npaths = ["sql/models/**"]\n'
     'reason = "Samples intentionally keep one row."\n'
 )
 _DIRECTIVE: str = "-- sqb: ignore SQLCLEAN004 because the sample intentionally keeps one row\n"
 _PRINTED_ENTRY: str = (
     "[[rules.rule_exceptions]]\n"
     '            rule = "SQLCLEAN004"\n'
-    '            path = "models/customers.sql"\n'
+    '            path = "sql/models/customers.sql"\n'
     '            reason = "the sample intentionally keeps one row"'
 )
 _REMOVED: str = "sets [rules] allow_exceptions, which SQLBuild no longer supports"
@@ -91,8 +91,8 @@ def test_given_rule_exception_mechanism_when_compiling_then_only_configuration_a
         f"{test_case.rules_toml}",
         encoding="utf-8",
     )
-    models: Path = tmp_path / "models"
-    models.mkdir()
+    models: Path = tmp_path / "sql" / "models"
+    models.mkdir(parents=True)
     (models / "customers.sql").write_text(
         "MODEL (description 'Customer sample.');\n"
         "WITH customers AS (SELECT 1 AS customer_id)\n"
@@ -138,8 +138,8 @@ def test_given_exception_policy_when_formatting_then_it_is_validated_like_compil
         f"{test_case.setting}\n",
         encoding="utf-8",
     )
-    models: Path = tmp_path / "models"
-    models.mkdir()
+    models: Path = tmp_path / "sql" / "models"
+    models.mkdir(parents=True)
     (models / "customers.sql").write_text(
         "MODEL (description 'Customer sample.');\n"
         "WITH customers AS (\n  SELECT 1 AS customer_id\n)\n\n"

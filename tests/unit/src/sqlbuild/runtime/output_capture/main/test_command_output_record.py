@@ -4,7 +4,7 @@ import dataclasses
 
 import pytest
 
-from sqlbuild.sinks import CommandOutputRecord, CommandOutputValidationError
+from sqlbuild.event_sinks import CommandOutputRecord, CommandOutputValidationError
 from tests.unit.src.sqlbuild.runtime.output_capture.main._test_types import (
     InvalidReplacementRecordTestCase,
     ReplacementRecordTestCase,

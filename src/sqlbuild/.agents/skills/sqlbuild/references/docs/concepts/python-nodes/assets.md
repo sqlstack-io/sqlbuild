@@ -24,10 +24,10 @@ See [Python Nodes](overview.md) for the shared model and the SQL boundary rules.
 
 ## Defining an asset
 
-Place Python files under `python/` and decorate functions with `@asset`:
+Place Python files under `python/nodes/` and decorate functions with `@asset`:
 
 ```python
-# python/exports/orders_export.py
+# python/nodes/exports/orders_export.py
 from sqlbuild.assets import asset, AssetContext
 
 @asset

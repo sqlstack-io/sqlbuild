@@ -66,7 +66,7 @@ def write_norules(project: Path) -> Path:
     shutil.copytree(project, target)
     toml = target / "sqlbuild_project.toml"
     text = toml.read_text()
-    new = text.replace('select = ["SQBR", "SQLCLEAN", "XSQBR"]', "select = []")
+    new = re.sub(r"^select = \[.*\]$", "select = []", text, count=1, flags=re.MULTILINE)
     assert new != text
     toml.write_text(new)
     return target
@@ -163,7 +163,7 @@ def write_dbt(sqb: Path, out: Path, n: int) -> Path:
     # Seeds
     (dbt / "seeds").mkdir()
     seed_yml = ["seeds:"]
-    for csv in sorted((sqb / "seeds").glob("*.csv")):
+    for csv in sorted((sqb / "sql" / "seeds").glob("*.csv")):
         shutil.copy(csv, dbt / "seeds" / csv.name)
         seed_yml += [
             f"  - name: {csv.stem}",
@@ -178,7 +178,7 @@ def write_dbt(sqb: Path, out: Path, n: int) -> Path:
     # Functions (dbt UDF resources)
     (dbt / "functions").mkdir()
     fn_yml = ["functions:"]
-    for fn in sorted((sqb / "functions" / "sql").glob("*.sql")):
+    for fn in sorted((sqb / "sql" / "functions" / "sql").glob("*.sql")):
         body = fn.read_text().split(");\n", 1)[1].strip()
         (dbt / "functions" / fn.name).write_text(body + "\n")
         fn_yml += [
@@ -201,7 +201,7 @@ def write_dbt(sqb: Path, out: Path, n: int) -> Path:
     base_re = re.compile(
         r'def (base_offset_\d{3})\(expression: str\) -> str:\n    return f"\(\{expression\} \+ 1\)"'
     )
-    for macro in sorted(sqb.glob("models/*/intermediate/clean/_sqlbuild/macros/python/*/*.py")):
+    for macro in sorted(sqb.glob("sql/models/*/intermediate/clean/_sqlbuild/macros/python/*/*.py")):
         text = macro.read_text()
         name, ret = macro_def_re.search(text).groups()
         offset = offset_re.search(text)[1]
@@ -221,7 +221,7 @@ def write_dbt(sqb: Path, out: Path, n: int) -> Path:
             parts.append(
                 f"{{% macro {name}(expression) -%}}({{{{ expression }}}} + {offset}){{%- endmacro %}}"
             )
-        domain = macro.relative_to(sqb / "models").parts[0]
+        domain = macro.relative_to(sqb / "sql" / "models").parts[0]
         target = dbt / "macros" / domain / macro.parent.name / (macro.stem + ".sql")
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text("\n".join(parts) + "\n")
@@ -231,7 +231,7 @@ def write_dbt(sqb: Path, out: Path, n: int) -> Path:
         domain = f"sales{index // 1000:03d}"
         batch = f"batch{index // 5:05d}"
         rel = Path(domain) / "intermediate" / "clean" / batch
-        src = sqb / "models" / rel / f"{name}.sql"
+        src = sqb / "sql" / "models" / rel / f"{name}.sql"
         columns, body = model_header_and_body(src.read_text())
         out_dir = dbt / "models" / rel
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -282,7 +282,7 @@ MATERIALIZED_RE = re.compile(r"\bmaterialized (table|view)\b")
 def model_relations(sqb: Path) -> list[tuple[str, str, list[tuple[str, str, bool, str, bool]]]]:
     """Name, materialization and columns of every model, read from the SQLBuild headers."""
     relations = []
-    for path in sorted((sqb / "models").rglob("*.sql")):
+    for path in sorted((sqb / "sql" / "models").rglob("*.sql")):
         text = path.read_text()
         materialized = MATERIALIZED_RE.search(text.split("\n", 1)[0])
         assert materialized, path
@@ -351,7 +351,8 @@ def seed_error(out: Path, kind: str) -> None:
     name = dense_model_name(ERROR_MODEL_INDEX)
     upstream = dense_model_name(ERROR_MODEL_INDEX - 1)
     for tool in ("sqlbuild", "sqlbuild-norules", "dbt", "dbt-remote"):
-        for path in (out / tool / "models").rglob(f"{name}.sql"):
+        models = out / tool / ("models" if tool.startswith("dbt") else "sql/models")
+        for path in models.rglob(f"{name}.sql"):
             text = path.read_text()
             if kind == "column":
                 new = text.replace(

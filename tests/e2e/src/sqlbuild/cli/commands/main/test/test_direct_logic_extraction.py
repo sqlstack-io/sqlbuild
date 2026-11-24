@@ -25,7 +25,7 @@ _PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": (
         'name = "direct_logic"\nadapter = "duckdb"\n\n[connection]\ndatabase = "direct_logic.duckdb"\n'
     ),
-    "models/stg_orders.sql": (
+    "sql/models/stg_orders.sql": (
         "MODEL (description 'Staged orders.', materialized table);\n\n"
         "SELECT 1 AS order_id, 'Placed ' AS status\n"
     ),
@@ -34,11 +34,11 @@ _PROJECT_FILES: dict[str, str] = {
         '    """Trim and lower-case a label."""\n'
         '    return f"LOWER(TRIM({expression}))"\n'
     ),
-    "functions/sql/order_label.sql": (
+    "sql/functions/sql/order_label.sql": (
         'FUNCTION (\n  description "Label an order status.",\n'
         "  arguments (raw_status VARCHAR),\n  returns VARCHAR,\n);\n\nUPPER(raw_status)\n"
     ),
-    "functions/sql/order_rows.sql": (
+    "sql/functions/sql/order_rows.sql": (
         'FUNCTION (\n  description "Orders above an id.",\n'
         "  arguments (min_id INTEGER),\n  returns table (\n    order_id INTEGER\n  ),\n);\n\n"
         "SELECT order_id FROM (VALUES (1), (2)) AS t(order_id) WHERE order_id > min_id\n"
@@ -61,7 +61,7 @@ _PROJECT_FILES: dict[str, str] = {
         "  SELECT 'PLACED' AS label /* /* __udf(\"order_label\")('x') */ */\n"
         ")\n"
     ),
-    "models/order_summary.sql": (
+    "sql/models/order_summary.sql": (
         "MODEL (description 'Order summary.', materialized table);\n\n"
         'SELECT order_id, TRIM(status) AS status, order_id * 100 AS amount_cents FROM __ref("stg_orders")\n'
     ),
@@ -143,7 +143,7 @@ _OPERATOR_MODEL: str = (
     'FROM __ref("stg_orders")\n'
 )
 _ALIASED_OPERATORS: dict[str, str] = {
-    "models/order_summary.sql": _OPERATOR_MODEL,
+    "sql/models/order_summary.sql": _OPERATOR_MODEL,
     _MODEL_TEST: (
         "TEST ();\n\nWITH\n"
         "__ref__stg_orders AS (SELECT 1 AS order_id, 'placed' AS status),\n"
@@ -163,7 +163,7 @@ _ALIASED_OPERATORS: dict[str, str] = {
     ),
 }
 _UNALIASED_DISTINCT_FROM: dict[str, str] = {
-    "models/order_summary.sql": _OPERATOR_MODEL,
+    "sql/models/order_summary.sql": _OPERATOR_MODEL,
     _MODEL_TEST: (
         "TEST ();\n\nWITH\n"
         "__ref__stg_orders AS (SELECT 1 AS order_id, 'placed' AS status),\n"

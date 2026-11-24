@@ -106,7 +106,7 @@ def test_given_invalid_query_artifact_ttl_when_loading_project_then_error_is_act
         LoadProjectConfigErrorTestCase(
             description="audit lifecycle sink filter",
             project_file_contents=(
-                'name = "demo"\nadapter = "duckdb"\n[sinks.lifecycle]\nevent_kinds = ["audit"]\n'
+                'name = "demo"\nadapter = "duckdb"\n[event_sinks.lifecycle]\nevent_kinds = ["audit"]\n'
             ),
             expected_error_fragment="audit",
         )
@@ -122,7 +122,7 @@ def test_given_audit_lifecycle_sink_filter_when_loading_toml_then_kind_is_accept
 
     config: ProjectConfig = load_project_config(project_dir=tmp_path)
 
-    assert config.sinks.lifecycle.defaults.event_kinds == frozenset(
+    assert config.event_sinks.lifecycle.defaults.event_kinds == frozenset(
         {test_case.expected_error_fragment}
     )
     assert test_case.expected_error_fragment == LifecycleEventKind.AUDIT.value
@@ -1585,7 +1585,7 @@ tags = "nightly"
 name = "demo"
 adapter = "duckdb"
 
-[path_defaults."models/staging"]
+[path_defaults."sql/models/staging"]
 tags = "staging"
 """.strip(),
             expected_error_fragment="path_defaults.*tags must be a list",
@@ -1596,7 +1596,7 @@ tags = "staging"
 name = "demo"
 adapter = "duckdb"
 
-[path_defaults."models/staging"]
+[path_defaults."sql/models/staging"]
 tags = [123]
 """.strip(),
             expected_error_fragment="path_defaults.*tags.*must be strings",
@@ -1629,10 +1629,10 @@ schema = "staging"
 name = "demo"
 adapter = "duckdb"
 
-[path_defaults."models/staging"]
+[path_defaults."sql/models/staging"]
 schema = "staging"
 """.strip(),
-            expected_error_fragment="uses redundant 'models/' prefix",
+            expected_error_fragment="uses a redundant 'sql/models/' prefix",
         ),
         LoadProjectConfigErrorTestCase(
             description="raises when path defaults uses partial segment glob",
@@ -2165,7 +2165,7 @@ def test_given_connection_nested_past_the_limit_when_loading_project_then_error_
         ),
         OversizedDurationTestCase(
             description="lifecycle shutdown timeout",
-            section='[sinks.lifecycle]\nshutdown_timeout = "{digits}s"\n',
+            section='[event_sinks.lifecycle]\nshutdown_timeout = "{digits}s"\n',
             expected_error_fragment="value has 4301 digits",
         ),
     ],

@@ -52,7 +52,7 @@ def project_with_scope(*, index: ScopeIndex) -> CompiledProjectView:
 
     project: CompiledProjectView = build_project(
         name="orders",
-        relative_path="models/orders.sql",
+        relative_path="sql/models/orders.sql",
         sql="SELECT 1 AS id",
         config_values={},
     )
@@ -182,7 +182,7 @@ def write_rule(
                 f'    code="{code}",',
                 '    slug="test-rule",',
                 '    message="test rule fault",',
-                '    remediation="Fix this model at its models/<domain>/ path.",',
+                '    remediation="Fix this model at its sql/models/<domain>/ path.",',
                 f"    enabled_by_default={enabled_by_default},",
                 ")",
                 subject_signature,
@@ -229,7 +229,7 @@ def custom_rule_inputs(
     (tmp_path / "rules" / "input.json").write_text("{}", encoding="utf-8")
     project: CompiledProjectView = build_project(
         name="commerce__mart__orders",
-        relative_path="models/mart/commerce__mart__orders.sql",
+        relative_path="sql/models/mart/commerce__mart__orders.sql",
         sql=_MODEL_SQL,
         config_values={},
     )
@@ -266,13 +266,13 @@ def two_model_project(
 
     orders: CompiledProjectView = build_project(
         name="orders",
-        relative_path="models/orders.sql",
+        relative_path="sql/models/orders.sql",
         sql="SELECT 1 AS order_id",
         config_values={},
     )
     customers: CompiledProjectView = build_project(
         name="customers",
-        relative_path="models/customers.sql",
+        relative_path="sql/models/customers.sql",
         sql=customers_sql,
         config_values=customers_config,
     )
@@ -308,7 +308,7 @@ def evaluate_contract_rule(
     )
     project: CompiledProjectView = build_project(
         name="commerce__mart__orders",
-        relative_path="models/mart/commerce__mart__orders.sql",
+        relative_path="sql/models/mart/commerce__mart__orders.sql",
         sql="WITH orders AS (SELECT id FROM source_orders) SELECT id FROM orders",
         config_values=config_values,
     )

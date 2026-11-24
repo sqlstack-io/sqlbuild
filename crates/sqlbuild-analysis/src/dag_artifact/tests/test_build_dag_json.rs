@@ -31,7 +31,7 @@ const LOADED_JSON: &str = "{
         \"name\": \"orders\",
         \"qualified_name\": \"raw.orders\"
       },
-      \"path\": \"sources/raw.yml\",
+      \"path\": \"sql/sources/raw.yml\",
       \"meta\": {
         \"team\": \"ops\"
       },
@@ -54,7 +54,7 @@ const LOADED_JSON: &str = "{
         \"name\": \"__loader__load_customers\",
         \"qualified_name\": \"main.__loader__load_customers\"
       },
-      \"path\": \"python/loaders.py\",
+      \"path\": \"python/nodes/loaders.py\",
       \"meta\": {
         \"sqlbuild_loader_node\": true
       },
@@ -68,7 +68,7 @@ const LOADED_JSON: &str = "{
         \"check\",
         \"orders_check\"
       ],
-      \"path\": \"python/nodes.py\"
+      \"path\": \"python/nodes/nodes.py\"
     }
   ],
   \"edges\": [
@@ -89,7 +89,7 @@ const LOADED_JSON: &str = "{
       \"checked_asset_ids\": [
         \"source:orders\"
       ],
-      \"path\": \"python/nodes.py\",
+      \"path\": \"python/nodes/nodes.py\",
       \"severity\": \"error\"
     }
   ]

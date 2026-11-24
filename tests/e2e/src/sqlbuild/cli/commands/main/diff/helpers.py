@@ -46,7 +46,7 @@ def prepare_diff_project(tmp_path: Path) -> Path:
                 """
             ).strip()
             + "\n",
-            "sources/raw.yml": dedent(
+            "sql/sources/raw.yml": dedent(
                 """
                 sources:
                   - name: raw_orders
@@ -60,7 +60,7 @@ def prepare_diff_project(tmp_path: Path) -> Path:
                 """
             ).strip()
             + "\n",
-            "models/staging/stg_orders.sql": dedent(
+            "sql/models/staging/stg_orders.sql": dedent(
                 """
                 MODEL (description "Test model stg_orders.", materialized view);
 
@@ -74,7 +74,7 @@ def prepare_diff_project(tmp_path: Path) -> Path:
                 """
             ).strip()
             + "\n",
-            "models/intermediate/orders_snapshot.sql": dedent(
+            "sql/models/intermediate/orders_snapshot.sql": dedent(
                 """
                 MODEL (description "Test model orders_snapshot.",
                   materialized table,
@@ -101,7 +101,7 @@ def prepare_diff_project(tmp_path: Path) -> Path:
                 """
             ).strip()
             + "\n",
-            "models/intermediate/customer_totals.sql": dedent(
+            "sql/models/intermediate/customer_totals.sql": dedent(
                 """
                 MODEL (description "Test model customer_totals.",
                   materialized table,
@@ -117,7 +117,7 @@ def prepare_diff_project(tmp_path: Path) -> Path:
                 """
             ).strip()
             + "\n",
-            "models/intermediate/orders_sparse.sql": dedent(
+            "sql/models/intermediate/orders_sparse.sql": dedent(
                 """
                 MODEL (description "Test model orders_sparse.",
                   materialized table,
@@ -132,7 +132,7 @@ def prepare_diff_project(tmp_path: Path) -> Path:
                 """
             ).strip()
             + "\n",
-            "models/marts/daily_revenue.sql": dedent(
+            "sql/models/marts/daily_revenue.sql": dedent(
                 """
                 MODEL (description "Test model daily_revenue.", materialized table);
 

@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from sqlbuild.sinks import (
+from sqlbuild.event_sinks import (
     CommandOutputRecord,
     CommandOutputValidationError,
     command_output_from_json,

@@ -385,6 +385,7 @@ fn prepare_spawn(
                 }),
         )
         .envs(environment(claim, bearer))
+        .envs(location.written.iter().cloned())
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());

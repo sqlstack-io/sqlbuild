@@ -27,7 +27,7 @@ _PROJECT_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
-    "sources/raw.yml": dedent(
+    "sql/sources/raw.yml": dedent(
         """
         sources:
           - name: raw_events
@@ -42,7 +42,7 @@ _PROJECT_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
-    "models/events.sql": dedent(
+    "sql/models/events.sql": dedent(
         """
         MODEL (
           description "Events (web, store or phone); one row per event.",

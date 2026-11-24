@@ -23,9 +23,9 @@ def compile_models(
     """Write and compile the models."""
 
     (project_dir / "sqlbuild_project.toml").write_text(_PROJECT_TOML, encoding="utf-8")
-    (project_dir / "models").mkdir(exist_ok=True)
+    (project_dir / "sql" / "models").mkdir(parents=True, exist_ok=True)
     for name, sql in models:
-        (project_dir / "models" / name).write_text(sql, encoding="utf-8")
+        (project_dir / "sql" / "models" / name).write_text(sql, encoding="utf-8")
     return build_compiled_project(
         discovered_inputs=discover_project_inputs(project_dir=project_dir),
         adapter=DuckDbAdapter(),

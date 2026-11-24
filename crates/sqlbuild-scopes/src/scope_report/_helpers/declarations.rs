@@ -4,6 +4,7 @@ use std::collections::BTreeSet;
 
 use sqlbuild_core::json::models::{JsonInteger, JsonValue};
 
+use crate::scope_index::constants::GLOBAL_ROLE_PARENT;
 use crate::scope_index::main::format_identity::format_identity;
 use crate::scope_index::models::{
     DeclarationKind, DeclarationRecord, QualifiedIdentity, ScopeKind,
@@ -72,7 +73,7 @@ pub(crate) fn container(record: &DeclarationRecord) -> Container {
     let parts: Vec<&str> = safe.split(PATH_SEPARATOR).collect();
     let mut role_index: usize = match record.owning_path.as_deref() {
         Some(owning) if !owning.is_empty() => owning.split(PATH_SEPARATOR).count(),
-        _ => 0,
+        _ => usize::from(parts.first() == Some(&GLOBAL_ROLE_PARENT)),
     };
     if parts.get(role_index) == Some(&GROUP_DIRECTORY) {
         role_index += 1;

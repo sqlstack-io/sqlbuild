@@ -18,7 +18,7 @@ _TYPED_COLUMNS: str = (
     "  columns (\n    order_id (type INTEGER),\n    customer_id (type INTEGER),\n"
     "    amount (type DOUBLE),\n    status (type VARCHAR),\n  ),\n"
 )
-_NAMED_SCHEMA_PATH: str = "models/staging/_sqlbuild/_schemas/staged_order.sql"
+_NAMED_SCHEMA_PATH: str = "sql/models/staging/_sqlbuild/_schemas/staged_order.sql"
 _NAMED_SCHEMA: str = (
     'SCHEMA (\n  name staged_order,\n  description "Canonical staged order shape",\n'
     "  columns (\n    order_id (type INTEGER),\n    customer_id (type INTEGER),\n"
@@ -76,7 +76,7 @@ def contracts_failure_cases() -> tuple[FailureCase, ...]:
                     "SELECT customer_id, CAST(SUM(amount) AS VARCHAR) AS total_amount\n"
                     'FROM __ref("stg_orders")\nGROUP BY customer_id\n'
                 ),
-                "models/marts/typed_totals.sql": (
+                "sql/models/marts/typed_totals.sql": (
                     'MODEL (\n  description "Typed totals",\n'
                     "  columns (total_amount (type BIGINT)),\n);\n\n"
                     "SELECT CAST(1.5 AS DOUBLE) AS total_amount\n"

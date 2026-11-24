@@ -11,27 +11,27 @@
      "message": "model 'status_amounts' dynamic column contract is not proven: dynamic column contracts currently require exactly one pivot column",
      "resource_type": "model",
      "resource_name": "status_amounts",
-     "path": "models/marts/status_amounts.sql",
+     "path": "sql/models/marts/status_amounts.sql",
      "help": "project one supported runtime-dynamic pivot through a wildcard output boundary and declare every generated family"
     }
    ]
   }
  ],
  "compiled": {
-  "models/marts/customer_totals.sql": [
+  "sql/models/marts/customer_totals.sql": [
    "SELECT customer_id, SUM(amount) AS total_amount",
    "FROM __ref(\"stg_orders\")",
    "GROUP BY customer_id",
    ""
   ],
-  "models/marts/status_amounts.sql": [
+  "sql/models/marts/status_amounts.sql": [
    "PIVOT __source(\"raw_orders\")",
    "ON status IN ('placed')",
    "USING MAX(amount)",
    "GROUP BY customer_id",
    ""
   ],
-  "models/staging/stg_orders.sql": [
+  "sql/models/staging/stg_orders.sql": [
    "SELECT order_id, customer_id, amount, status",
    "FROM __source(\"raw_orders\")",
    ""
@@ -45,8 +45,8 @@
     "name": "customer_totals",
     "resource_type": "model",
     "package_name": "failure_corpus",
-    "path": "models/marts/customer_totals.sql",
-    "original_file_path": "models/marts/customer_totals.sql",
+    "path": "sql/models/marts/customer_totals.sql",
+    "original_file_path": "sql/models/marts/customer_totals.sql",
     "unique_id": "model.failure_corpus.customer_totals",
     "fqn": [
      "failure_corpus",
@@ -114,8 +114,8 @@
     "name": "status_amounts",
     "resource_type": "model",
     "package_name": "failure_corpus",
-    "path": "models/marts/status_amounts.sql",
-    "original_file_path": "models/marts/status_amounts.sql",
+    "path": "sql/models/marts/status_amounts.sql",
+    "original_file_path": "sql/models/marts/status_amounts.sql",
     "unique_id": "model.failure_corpus.status_amounts",
     "fqn": [
      "failure_corpus",
@@ -206,8 +206,8 @@
     "name": "stg_orders",
     "resource_type": "model",
     "package_name": "failure_corpus",
-    "path": "models/staging/stg_orders.sql",
-    "original_file_path": "models/staging/stg_orders.sql",
+    "path": "sql/models/staging/stg_orders.sql",
+    "original_file_path": "sql/models/staging/stg_orders.sql",
     "unique_id": "model.failure_corpus.stg_orders",
     "fqn": [
      "failure_corpus",
@@ -277,8 +277,8 @@
     "name": "raw_orders",
     "resource_type": "source",
     "package_name": "failure_corpus",
-    "path": "sources/raw.yml",
-    "original_file_path": "sources/raw.yml",
+    "path": "sql/sources/raw.yml",
+    "original_file_path": "sql/sources/raw.yml",
     "unique_id": "source.failure_corpus.raw_orders",
     "fqn": [
      "failure_corpus",

@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "unknown project variable '@@region' in '<project>/models/staging/stg_orders.sql'. Available vars: none"
+     "message": "unknown project variable '@@region' in '<project>/sql/models/staging/stg_orders.sql'. Available vars: none"
     }
    ]
   }

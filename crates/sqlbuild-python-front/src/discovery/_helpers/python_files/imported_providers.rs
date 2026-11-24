@@ -2,6 +2,7 @@
 
 use crate::discovery::main::python_files::provider_by_name::provider_by_name;
 use crate::discovery::main::python_files::provider_usages::provider_usages;
+use sqlbuild_core::constants::{EVENT_SINKS_PATH, PROVIDERS_PATH};
 use std::collections::HashSet;
 
 use pyo3::exceptions::PyRuntimeError;
@@ -204,7 +205,7 @@ pub(crate) fn discover_provider_classes<'py>(
         return Ok(providers);
     }
     if !project
-        .child("providers")?
+        .child(PROVIDERS_PATH)?
         .call_method0("is_dir")?
         .is_truthy()?
     {
@@ -212,7 +213,7 @@ pub(crate) fn discover_provider_classes<'py>(
     }
     let mut providers: Vec<Bound<'py, PyAny>> = Vec::new();
     let mut seen: Vec<(String, Bound<'py, PyAny>)> = Vec::new();
-    for file_path in project.module_files("providers", true)? {
+    for file_path in project.module_files(PROVIDERS_PATH, true)? {
         let module: Bound<'py, PyAny> =
             project.load(UserCodeHost::LoadProviderModule, &file_path)?;
         let classes: Bound<'py, PyAny> =
@@ -302,19 +303,8 @@ pub(crate) fn discover_event_exporter_declarations<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = project_dir.py();
     let project = ProjectDir { path: project_dir };
-    if project
-        .child("event_exporters")?
-        .call_method0("exists")?
-        .is_truthy()?
-    {
-        return Err(discovery_error(
-            py,
-            SINK_ERROR,
-            "event_exporters/ was replaced by sinks/ and @lifecycle_event_sink".to_owned(),
-        ));
-    }
     if !project
-        .child("sinks")?
+        .child(EVENT_SINKS_PATH)?
         .call_method0("is_dir")?
         .is_truthy()?
     {
@@ -323,8 +313,9 @@ pub(crate) fn discover_event_exporter_declarations<'py>(
     let read_definition: Bound<'py, PyAny> = host_entry(py, SINK_DEFINITION)?;
     let mut declarations: Vec<Bound<'py, PyAny>> = Vec::new();
     let mut seen: Vec<(String, Bound<'py, PyAny>)> = Vec::new();
-    for file_path in project.module_files("sinks", true)? {
-        let module: Bound<'py, PyAny> = project.load(UserCodeHost::LoadSinkModule, &file_path)?;
+    for file_path in project.module_files(EVENT_SINKS_PATH, true)? {
+        let module: Bound<'py, PyAny> =
+            project.load(UserCodeHost::LoadEventSinkModule, &file_path)?;
         let mut seen_functions: HashSet<usize> = HashSet::new();
         for function in module_functions(&module)? {
             if !seen_functions.insert(function.as_ptr() as usize) {

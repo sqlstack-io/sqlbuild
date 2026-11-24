@@ -29,7 +29,7 @@ _PROJECT_TOML: str = (
             description="resolved connection override becomes the effective connection",
             repo_files={
                 "sqlbuild_project.toml": _PROJECT_TOML,
-                "models/orders.sql": "MODEL (description 'Test model orders.', materialized table);\n\nSELECT 1 AS order_id",
+                "sql/models/orders.sql": "MODEL (description 'Test model orders.', materialized table);\n\nSELECT 1 AS order_id",
             },
             resolved_connection={"database": "/abs/warehouse.duckdb", "schema": "analytics"},
             expected_effective_connection={
@@ -41,7 +41,7 @@ _PROJECT_TOML: str = (
             description="without override the merged project connection is used",
             repo_files={
                 "sqlbuild_project.toml": _PROJECT_TOML,
-                "models/orders.sql": "MODEL (description 'Test model orders.', materialized table);\n\nSELECT 1 AS order_id",
+                "sql/models/orders.sql": "MODEL (description 'Test model orders.', materialized table);\n\nSELECT 1 AS order_id",
             },
             resolved_connection=None,
             expected_effective_connection={"database": "warehouse.duckdb"},

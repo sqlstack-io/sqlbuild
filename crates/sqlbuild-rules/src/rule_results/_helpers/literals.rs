@@ -7,6 +7,7 @@ use crate::rule_results::constants::{
     INHERITED_CONSTANTS, LISTED_PATHS, LOCAL_CONSTANTS, MIN_SCOPED_FOLDER_DEPTH, PROJECT_CONSTANTS,
     QUOTE,
 };
+use sqlbuild_core::constants::SQL_DIRECTORY;
 
 /// The single-quoted literal starting at a one-based position, quotes included.
 pub(crate) fn literal_at(lines: &[String], line: i64, column: i64) -> Option<String> {
@@ -47,7 +48,8 @@ pub(crate) fn hint(others: &[&Vec<String>], every: &BTreeSet<Vec<String>>) -> St
     };
     let owners: BTreeSet<Vec<String>> = every.iter().map(|path| owner(path)).collect();
     let common: Vec<String> = common_folder(&owners.iter().cloned().collect::<Vec<_>>());
-    let placement: String = if common.len() < MIN_SCOPED_FOLDER_DEPTH {
+    let roots: usize = usize::from(common.first().is_some_and(|part| part == SQL_DIRECTORY));
+    let placement: String = if common.len() < MIN_SCOPED_FOLDER_DEPTH + roots {
         format!(
             "no folder below the project roots holds every use, so declare it once in \
              top-level `{PROJECT_CONSTANTS}`"

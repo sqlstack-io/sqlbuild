@@ -35,9 +35,9 @@ class Shape:
 
 def _models(files: dict[str, str]) -> dict[str, tuple[str, str]]:
     return {
-        path.rsplit("/", 1)[1].removesuffix(".sql"): (path.split("/")[1], text)
+        path.rsplit("/", 1)[1].removesuffix(".sql"): (path.split("/")[2], text)
         for path, text in files.items()
-        if path.startswith("models/") and "/_sqlbuild/" not in path and path.endswith(".sql")
+        if path.startswith("sql/models/") and "/_sqlbuild/" not in path and path.endswith(".sql")
     }
 
 

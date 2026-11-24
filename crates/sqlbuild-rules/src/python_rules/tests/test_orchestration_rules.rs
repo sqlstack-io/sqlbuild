@@ -26,8 +26,8 @@ fn given_sensor_and_calendar_modules_when_evaluating_orchestration_rules_then_re
                     r#"from sqlbuild.orchestration import sensor
 
 from orchestration.sensors.inventory._constants import STALE_AFTER
-from python.utils.retries import ATTEMPTS
-from providers.carrier_api.provider import CarrierApi
+from python.nodes.utils.retries import ATTEMPTS
+from python.providers.carrier_api.provider import CarrierApi
 
 from ._helpers.feed_age import feed_age
 
@@ -54,8 +54,8 @@ def stock_feed_stale(ctx, carrier_api: CarrierApi):
 month_end = calendar("month_end_calendar", description="Month end.")
 "#,
                 ),
-                ("python/utils/retries.py", "ATTEMPTS = 2\n"),
-                ("providers/carrier_api/provider.py", ""),
+                ("python/nodes/utils/retries.py", "ATTEMPTS = 2\n"),
+                ("python/providers/carrier_api/provider.py", ""),
             ],
             config: json!({ "select": ORCHESTRATION_RULES }),
             expected_faults: vec![],
@@ -187,9 +187,9 @@ for row in []:
                 (
                     "orchestration/sensors/orders/refund_spike.py",
                     r#"from orchestration.sensors.inventory._helpers.feed_age import feed_age
-from python.orders.daily.main import main
-from python.utils.retries import ATTEMPTS
-from providers.carrier_api.provider import CarrierApi
+from python.nodes.orders.daily.main import main
+from python.nodes.utils.retries import ATTEMPTS
+from python.providers.carrier_api.provider import CarrierApi
 from ._helpers.window import window
 "#,
                 ),
@@ -197,30 +197,29 @@ from ._helpers.window import window
                 ("orchestration/sensors/inventory/_helpers/feed_age.py", ""),
                 (
                     "orchestration/sensors/inventory/_helpers/age.py",
-                    "from ...orders._helpers.window import window\nfrom python.orders.daily.main import main\n",
+                    "from ...orders._helpers.window import window\nfrom python.nodes.orders.daily.main import main\n",
                 ),
-                ("python/orders/weekly/node.py", ""),
+                ("python/nodes/orders/weekly/asset.py", ""),
                 (
-                    "python/orders/weekly/main.py",
+                    "python/nodes/orders/weekly/main.py",
                     "from orchestration.sensors.orders._helpers.window import window\n",
                 ),
                 (
-                    "python/orders/daily/main.py",
+                    "python/nodes/orders/daily/main.py",
                     "from orchestration.sensors.orders._helpers.window import window\n",
                 ),
-                ("python/utils/retries.py", ""),
+                ("python/nodes/utils/retries.py", ""),
                 (
-                    "providers/carrier_api/provider.py",
+                    "python/providers/carrier_api/provider.py",
                     "import orchestration.sensors.orders.refund_spike\n",
                 ),
                 (
-                    "hooks/python/notify.py",
+                    "sql/hooks/python/notify.py",
                     "import orchestration.sensors.orders.refund_spike\n",
                 ),
             ],
             config: json!({ "select": ["SQBRPYTHON008", "SQBRPYTHON017", "SQBRPYTHON019"] }),
             expected_faults: vec![
-                ("SQBRPYTHON019", "hooks/python/notify.py", 1, 8),
                 (
                     "SQBRPYTHON017",
                     "orchestration/sensors/inventory/_helpers/age.py",
@@ -231,7 +230,7 @@ from ._helpers.window import window
                     "SQBRPYTHON019",
                     "orchestration/sensors/inventory/_helpers/age.py",
                     2,
-                    38,
+                    44,
                 ),
                 (
                     "SQBRPYTHON017",
@@ -243,10 +242,11 @@ from ._helpers.window import window
                     "SQBRPYTHON019",
                     "orchestration/sensors/orders/refund_spike.py",
                     2,
-                    38,
+                    44,
                 ),
-                ("SQBRPYTHON019", "python/orders/daily/main.py", 1, 58),
-                ("SQBRPYTHON008", "python/orders/weekly/main.py", 1, 58),
+                ("SQBRPYTHON019", "python/nodes/orders/daily/main.py", 1, 58),
+                ("SQBRPYTHON008", "python/nodes/orders/weekly/main.py", 1, 58),
+                ("SQBRPYTHON019", "sql/hooks/python/notify.py", 1, 8),
             ],
         },
     ];

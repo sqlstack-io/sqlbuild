@@ -150,3 +150,18 @@ pub(crate) struct OutputDefaultTestCase {
     /// Absolute, or within the SQLite store's folder; `None` when there is no default.
     pub(crate) expected_folder: Option<&'static str>,
 }
+
+/// Writes read at given milliseconds, and the segments they make with their read times.
+pub(crate) struct OutputReadTimeTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) writes: Vec<(Vec<u8>, i64)>,
+    pub(crate) expected_segments: Vec<(&'static str, i64)>,
+}
+
+/// A store whose batch holds lines read at different times.
+pub(crate) struct OutputStoredReadTimeTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: crate::store::tests::store_test_types::Backend,
+    /// Each line read back: its text and the milliseconds it was read at.
+    pub(crate) expected_lines: [(&'static str, i64); 3],
+}

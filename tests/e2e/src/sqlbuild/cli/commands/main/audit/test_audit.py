@@ -142,7 +142,7 @@ def test_given_failing_audit_when_running_audit_then_exit_code_is_nonzero(
     tmp_path: Path,
 ) -> None:
     project_dir: Path = prepare_waffle_shop(tmp_path)
-    model_path: Path = project_dir / "models" / "marts" / "daily_order_partitioned.sql"
+    model_path: Path = project_dir / "sql" / "models" / "marts" / "daily_order_partitioned.sql"
     original_model: str = model_path.read_text(encoding="utf-8")
     assert 'expression "waffles_ordered > 0"' in original_model
     model_path.write_text(
@@ -183,7 +183,7 @@ def test_given_attached_audit_reads_sibling_model_when_building_and_auditing_the
     tmp_path: Path,
 ) -> None:
     project_dir: Path = prepare_waffle_shop(tmp_path)
-    model_path: Path = project_dir / "models" / "staging" / "stg_orders.sql"
+    model_path: Path = project_dir / "sql" / "models" / "staging" / "stg_orders.sql"
     model_sql: str = model_path.read_text(encoding="utf-8")
     model_path.write_text(
         model_sql.replace(
@@ -195,6 +195,7 @@ def test_given_attached_audit_reads_sibling_model_when_building_and_auditing_the
     )
     audit_path: Path = (
         project_dir
+        / "sql"
         / "models"
         / "staging"
         / "_sqlbuild"

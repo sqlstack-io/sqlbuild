@@ -45,8 +45,8 @@ sqb lineage fact_orders
 ### Try semantic compilation
 
 `sqb compile` checks the enforced source schemas offline. Change `o.quantity` to `o.qty` in
-`models/marts/fact_orders.sql` to see an unknown-column error (B002). Add
-`WHERE ordered_at > 5` to `models/staging/stg_orders.sql` to see DuckDB's timestamp/integer
+`sql/models/marts/fact_orders.sql` to see an unknown-column error (B002). Add
+`WHERE ordered_at > 5` to `sql/models/staging/stg_orders.sql` to see DuckDB's timestamp/integer
 comparison error (B217). Restore each edit after trying it; downstream models and SQL tests may
 also report the consequences of a changed output column.
 

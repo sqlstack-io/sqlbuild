@@ -6,6 +6,7 @@ pub(crate) mod dev_cancel;
 pub(crate) mod dev_exposure;
 pub(crate) mod dev_start;
 pub(crate) mod dev_supervision;
+pub(crate) mod development_written;
 pub(crate) mod discovery_state;
 pub(crate) mod dynamic_resume;
 pub(crate) mod env_reload;

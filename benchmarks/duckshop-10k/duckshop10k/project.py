@@ -77,7 +77,7 @@ def build(profile_name: str = "full") -> dict[str, str]:
     staging = Staging(tables={}, events={})
     for system, values in systems.items():
         for instance in values:
-            folder = f"models/staging/{_STAGING_FOLDER[system]}/{instance.code}"
+            folder = f"sql/models/staging/{_STAGING_FOLDER[system]}/{instance.code}"
             if system == "collector":
                 staging.events[instance.code] = stage_collector(project, instance, folder)
             else:
@@ -93,16 +93,16 @@ def build(profile_name: str = "full") -> dict[str, str]:
     build_workload(project)
     build_rules(project)
     _static_files(project)
-    project.write("seeds/source_instances.csv", instances_seed(systems))
+    project.write("sql/seeds/source_instances.csv", instances_seed(systems))
     return project.render()
 
 
 def _static_files(project: Project) -> None:
     project.write("sqlbuild_project.toml", project_toml())
     project.write(".gitignore", "sqlbuild_local.toml\ntarget/\nlogs/\n.sqlbuild/\n")
-    project.write("seeds/currencies.csv", currencies_seed())
+    project.write("sql/seeds/currencies.csv", currencies_seed())
     project.write(
-        "seeds/seeds.yml",
+        "sql/seeds/seeds.yml",
         "seeds:\n"
         "  - name: currencies\n"
         "    description: ISO currencies with the number of decimal places in their minor unit\n"

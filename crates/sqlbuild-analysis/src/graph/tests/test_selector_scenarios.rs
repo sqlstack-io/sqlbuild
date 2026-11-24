@@ -48,8 +48,8 @@ fn given_raw_selector_when_parsing_then_returns_kind_value_and_expansion() {
         },
         ParseSelectorTestCase {
             description: "path typed selector",
-            raw: "path:models/staging",
-            expected_selector: kind("path", "models/staging", false, false),
+            raw: "path:sql/models/staging",
+            expected_selector: kind("path", "sql/models/staging", false, false),
         },
         ParseSelectorTestCase {
             description: "typed selector with upstream expansion",
@@ -421,14 +421,14 @@ fn given_selectors_when_resolving_then_selects_expected_names() {
         SelectedNamesTestCase {
             description: "folder including nested folders",
             project: FOLDER_PROJECT,
-            select: &["path:models/staging"],
+            select: &["path:sql/models/staging"],
             exclude: &[],
             expected_names: &["stg_customers", "stg_deep", "stg_orders"],
         },
         SelectedNamesTestCase {
             description: "models root",
             project: FOLDER_PROJECT,
-            select: &["path:models"],
+            select: &["path:sql/models"],
             exclude: &[],
             expected_names: &[
                 "fact_orders",
@@ -441,28 +441,28 @@ fn given_selectors_when_resolving_then_selects_expected_names() {
         SelectedNamesTestCase {
             description: "trailing slash with explicit root",
             project: FOLDER_PROJECT,
-            select: &["models/staging/"],
+            select: &["sql/models/staging/"],
             exclude: &[],
             expected_names: &["stg_customers", "stg_deep", "stg_orders"],
         },
         SelectedNamesTestCase {
             description: "leading slash with explicit root",
             project: FOLDER_PROJECT,
-            select: &["/models/staging"],
+            select: &["/sql/models/staging"],
             exclude: &[],
             expected_names: &["stg_customers", "stg_deep", "stg_orders"],
         },
         SelectedNamesTestCase {
             description: "folder with one model",
             project: FOLDER_PROJECT,
-            select: &["path:models/marts"],
+            select: &["path:sql/models/marts"],
             exclude: &[],
             expected_names: &["fact_orders"],
         },
         SelectedNamesTestCase {
             description: "folder with downstream expansion",
             project: FOLDER_PROJECT,
-            select: &["path:models/staging+"],
+            select: &["path:sql/models/staging+"],
             exclude: &[],
             expected_names: &[
                 "fact_orders",
@@ -475,7 +475,7 @@ fn given_selectors_when_resolving_then_selects_expected_names() {
         SelectedNamesTestCase {
             description: "folder with upstream expansion",
             project: FOLDER_PROJECT,
-            select: &["+path:models/marts"],
+            select: &["+path:sql/models/marts"],
             exclude: &[],
             expected_names: &[
                 "fact_orders",
@@ -489,7 +489,7 @@ fn given_selectors_when_resolving_then_selects_expected_names() {
         SelectedNamesTestCase {
             description: "folder intersected with a name",
             project: FOLDER_PROJECT,
-            select: &["path:models/staging,stg_orders"],
+            select: &["path:sql/models/staging,stg_orders"],
             exclude: &[],
             expected_names: &["stg_orders"],
         },
@@ -497,20 +497,20 @@ fn given_selectors_when_resolving_then_selects_expected_names() {
             description: "folder excluded from selection",
             project: FOLDER_PROJECT,
             select: &["+fact_orders"],
-            exclude: &["path:models/staging"],
+            exclude: &["path:sql/models/staging"],
             expected_names: &["fact_orders", "int_enriched", "raw_customers", "raw_orders"],
         },
         SelectedNamesTestCase {
             description: "trailing slash selects a one-model folder",
             project: FOLDER_PROJECT,
-            select: &["models/intermediate/"],
+            select: &["sql/models/intermediate/"],
             exclude: &[],
             expected_names: &["int_enriched"],
         },
         SelectedNamesTestCase {
             description: "nested folder without its parent",
             project: FOLDER_PROJECT,
-            select: &["path:models/staging/raw"],
+            select: &["path:sql/models/staging/raw"],
             exclude: &[],
             expected_names: &["stg_deep"],
         },
@@ -567,7 +567,7 @@ fn given_unresolvable_selectors_when_resolving_then_fails_with_message() {
             select: &["path:nonexistent"],
             expected_error: (
                 "S012",
-                "path selectors require an explicit root: use 'models/' or 'python/'",
+                "path selectors require an explicit root: use 'sql/models/' or 'python/nodes/'",
                 None,
             ),
         },
@@ -577,17 +577,17 @@ fn given_unresolvable_selectors_when_resolving_then_fails_with_message() {
             select: &["nonexistent/"],
             expected_error: (
                 "S012",
-                "path selectors require an explicit root: use 'models/' or 'python/'",
+                "path selectors require an explicit root: use 'sql/models/' or 'python/nodes/'",
                 None,
             ),
         },
         ProjectSelectorErrorTestCase {
             description: "folder with no models",
             project: FOLDER_PROJECT,
-            select: &["path:models/nonexistent"],
+            select: &["path:sql/models/nonexistent"],
             expected_error: (
                 "S009",
-                "no models found under path 'models/nonexistent'.",
+                "no models found under path 'sql/models/nonexistent'.",
                 None,
             ),
         },

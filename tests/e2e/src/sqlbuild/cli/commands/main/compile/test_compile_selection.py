@@ -25,7 +25,7 @@ _PROJECT_TOML: str = (
     'schema = "dev"\n'
 )
 _SOURCE_FILES: dict[str, str] = {
-    "sources/raw.yml": (
+    "sql/sources/raw.yml": (
         "sources:\n"
         "  - name: raw__orders\n"
         "    description: Raw orders.\n"
@@ -35,7 +35,7 @@ _SOURCE_FILES: dict[str, str] = {
         "      - name: order_id\n"
         "        type: INTEGER\n"
     ),
-    "models/stg_orders.sql": (
+    "sql/models/stg_orders.sql": (
         "MODEL (description 'Staged orders.');\n\nSELECT order_id FROM __source(\"raw__orders\")\n"
     ),
 }
@@ -68,7 +68,7 @@ _SOURCE_FILES: dict[str, str] = {
         ),
         CompileSelectionTestCase(
             description="select file keeps upstream analysis while reporting its downstream",
-            selection_args=("--select-file", "selectors.txt"),
+            selection_args=("--select-file", "../selectors.txt"),
             expected_stdout_fragments=(
                 "Compile ready  1 model",
                 "result",
@@ -96,16 +96,16 @@ def test_given_model_selection_when_compiling_then_limits_offline_analysis_and_r
                 "[targets.dev]\n"
                 'schema = "dev"\n'
             ),
-            "models/order_record.sql": "MODEL (description 'Test model order_record.');\n\nSELECT 1 AS order_id\n",
-            "models/result.sql": (
+            "sql/models/order_record.sql": "MODEL (description 'Test model order_record.');\n\nSELECT 1 AS order_id\n",
+            "sql/models/result.sql": (
                 'MODEL (description "Test model result.", columns (order_id ()));\n\nSELECT order_id FROM __ref("order_record")\n'
             ),
-            "models/unrelated.sql": (
+            "sql/models/unrelated.sql": (
                 "MODEL (description 'Test model unrelated.', columns (missing_column ()));\n\nSELECT 1 AS present_column\n"
             ),
-            "selectors.txt": "result\n",
         },
     )
+    _ = (project_dir.parent / "selectors.txt").write_text("result\n", encoding="utf-8")
 
     result: subprocess.CompletedProcess[str] = run_sqb(
         command=(

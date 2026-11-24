@@ -1,8 +1,9 @@
 """Stable build feature alignment constants."""
 
 SQB_PACKAGE: str = "sqlbuild-cli"
+SQB_FEATURES: str = "ui"
 EXTENSION_PACKAGE: str = "sqlbuild-python"
-EXTENSION_FEATURES: str = "extension-module"
+EXTENSION_FEATURES: str = "extension-module,sqlbuild-cli/ui"
 WHEEL_TARGETS: tuple[str, ...] = (
     "x86_64-unknown-linux-gnu",
     "aarch64-unknown-linux-gnu",

@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "models/staging/stg_orders.sql audit 'floor' must not override implicit model from attached context"
+     "message": "sql/models/staging/stg_orders.sql audit 'floor' must not override implicit model from attached context"
     }
    ]
   }

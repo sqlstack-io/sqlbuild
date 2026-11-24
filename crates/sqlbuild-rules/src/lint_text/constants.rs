@@ -83,11 +83,11 @@ pub(crate) const MOVED_EXPRESSION_ALIAS: &str =
 pub(crate) const DECLARATION_GROUP_DIRECTORY: &str = "_sqlbuild";
 /// `GLOBAL_NAMED_DECLARATION_ROOTS`, in Python's dict order, with whether each holds audits.
 pub(crate) const GLOBAL_NAMED_ROOTS: [(&[&str], bool); 5] = [
-    (&["audits", "generic"], true),
-    (&["audits", "singular"], true),
-    (&["schemas"], false),
-    (&["hooks", "sql"], false),
-    (&["hooks", "python"], false),
+    (&["sql", "audits", "generic"], true),
+    (&["sql", "audits", "singular"], true),
+    (&["sql", "schemas"], false),
+    (&["sql", "hooks", "sql"], false),
+    (&["sql", "hooks", "python"], false),
 ];
 /// `GROUPED_NAMED_DECLARATION_ROLES`, in Python's dict order, with whether each holds audits.
 pub(crate) const GROUPED_NAMED_ROLES: [(&[&str], bool); 9] = [
@@ -178,7 +178,7 @@ pub(crate) const DEFAULT_DIALECT: &str = "generic";
 /// Adapter names whose SQL dialect has another name; other adapters name their dialect.
 pub(crate) const ADAPTER_DIALECT_TRANSLATIONS: [(&str, &str); 2] =
     [("motherduck", "duckdb"), ("sqlserver", "tsql")];
-pub(crate) const MODELS_DIRECTORY: &str = "models";
+pub(crate) const MODELS_DIRECTORY: [&str; 2] = ["sql", "models"];
 /// Inherited and local declaration folders, whose files declare several headers.
 pub(crate) const SCOPED_DECLARATION_DIRECTORIES: [&str; 6] = [
     "macros",
@@ -190,11 +190,11 @@ pub(crate) const SCOPED_DECLARATION_DIRECTORIES: [&str; 6] = [
 ];
 /// `GLOBAL_NAMED_DECLARATION_ROOTS`, in Python's dict order, with their declaration kinds.
 pub(crate) const GLOBAL_NAMED_ROOT_KINDS: [(&[&str], &str); 5] = [
-    (&["audits", "generic"], "audit"),
-    (&["audits", "singular"], "singular_audit"),
-    (&["schemas"], "schema"),
-    (&["hooks", "sql"], "sql_hook"),
-    (&["hooks", "python"], "python_hook"),
+    (&["sql", "audits", "generic"], "audit"),
+    (&["sql", "audits", "singular"], "singular_audit"),
+    (&["sql", "schemas"], "schema"),
+    (&["sql", "hooks", "sql"], "sql_hook"),
+    (&["sql", "hooks", "python"], "python_hook"),
 ];
 /// `GROUPED_NAMED_DECLARATION_ROLES`, in Python's dict order, with their declaration kinds.
 pub(crate) const GROUPED_NAMED_ROLE_KINDS: [(&[&str], &str); 9] = [

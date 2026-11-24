@@ -17,33 +17,33 @@
   }
  ],
  "compiled": {
-  "audits/generic/configured_events/accepted_values__id.sql": [
+  "sql/audits/generic/configured_events/accepted_values__id.sql": [
    "SELECT id",
    "FROM __source(\"configured_events\")",
    "WHERE id IS NOT NULL",
    "  AND id NOT IN ('1')",
    ""
   ],
-  "audits/generic/configured_stg_support_0/accepted_values__status.sql": [
+  "sql/audits/generic/configured_stg_support_0/accepted_values__status.sql": [
    "SELECT status",
    "FROM __ref(\"configured_stg_support_0\")",
    "WHERE status IS NOT NULL",
    "  AND status NOT IN ('placed', 'shipped')",
    ""
   ],
-  "audits/generic/configured_stg_support_0/configured_amount_floor.sql": [
+  "sql/audits/generic/configured_stg_support_0/configured_amount_floor.sql": [
    "SELECT *",
    "FROM __ref(\"configured_stg_support_0\")",
    "WHERE amount < -30",
    ""
   ],
-  "audits/generic/configured_stg_support_0/configured_id_present__id.sql": [
+  "sql/audits/generic/configured_stg_support_0/configured_id_present__id.sql": [
    "SELECT id",
    "FROM __ref(\"configured_stg_support_0\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/configured_stg_support_0/unique__id.sql": [
+  "sql/audits/generic/configured_stg_support_0/unique__id.sql": [
    "SELECT id, COUNT(*) AS duplicate_count",
    "FROM __ref(\"configured_stg_support_0\")",
    "WHERE id IS NOT NULL",
@@ -51,44 +51,44 @@
    "HAVING COUNT(*) > 1",
    ""
   ],
-  "audits/generic/guarded_stg_support_0/amount_at_least__amount.sql": [
+  "sql/audits/generic/guarded_stg_support_0/amount_at_least__amount.sql": [
    "SELECT *",
    "FROM __ref(\"guarded_stg_support_0\")",
    "WHERE amount < 0",
    ""
   ],
-  "audits/generic/shaped_stg_support_0/not_null__id.sql": [
+  "sql/audits/generic/shaped_stg_support_0/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"shaped_stg_support_0\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/stg_support_0/not_null__id.sql": [
+  "sql/audits/generic/stg_support_0/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"stg_support_0\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/support_summary_0/not_null__id.sql": [
+  "sql/audits/generic/support_summary_0/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"support_summary_0\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/singular/support_summary_1_matches.sql": [
+  "sql/audits/singular/support_summary_1_matches.sql": [
    "SELECT a.id",
    "FROM __ref(\"support_summary_1\") a",
    "LEFT JOIN __ref(\"support_summary_0\") b ON a.id = b.id",
    "WHERE b.id IS NULL",
    ""
   ],
-  "functions/sql/configured_label.sql": [
+  "sql/functions/sql/configured_label.sql": [
    "CREATE OR REPLACE MACRO ci_checks.configured_label(raw_status) AS (",
    "UPPER(raw_status)",
    ")",
    ""
   ],
-  "models/analysis/combined_stg_support_0.sql": [
+  "sql/models/analysis/combined_stg_support_0.sql": [
    "WITH recent AS (",
    "  SELECT id, created_at FROM __ref(\"stg_support_0\") WHERE amount > 0",
    "),",
@@ -100,22 +100,22 @@
    "SELECT id, created_at FROM older",
    ""
   ],
-  "models/analysis/every_open_event.sql": [
+  "sql/models/analysis/every_open_event.sql": [
    "SELECT *",
    "FROM __source(\"open_events\")",
    ""
   ],
-  "models/analysis/every_raw_events_0.sql": [
+  "sql/models/analysis/every_raw_events_0.sql": [
    "SELECT *",
    "FROM __source(\"raw_events_0\")",
    ""
   ],
-  "models/analysis/every_stg_support_0.sql": [
+  "sql/models/analysis/every_stg_support_0.sql": [
    "SELECT *",
    "FROM __ref(\"stg_support_0\")",
    ""
   ],
-  "models/analysis/passed_stg_support_0.sql": [
+  "sql/models/analysis/passed_stg_support_0.sql": [
    "WITH passthrough AS (",
    "  SELECT id, created_at FROM __ref(\"stg_support_0\")",
    ")",
@@ -123,89 +123,89 @@
    "FROM passthrough",
    ""
   ],
-  "models/analysis/pivot_input_stg_support_0.sql": [
+  "sql/models/analysis/pivot_input_stg_support_0.sql": [
    "SELECT CAST(id AS INTEGER) AS id, CAST(status AS VARCHAR) AS status, amount",
    "FROM __ref(\"stg_support_0\")",
    ""
   ],
-  "models/analysis/pivoted_stg_support_0.sql": [
+  "sql/models/analysis/pivoted_stg_support_0.sql": [
    "PIVOT __ref(\"pivot_input_stg_support_0\")",
    "ON status",
    "USING MAX(amount)",
    "GROUP BY id",
    ""
   ],
-  "models/analysis/quoted_stg_support_0.sql": [
+  "sql/models/analysis/quoted_stg_support_0.sql": [
    "SELECT \"ID\" AS \"OrderKey\", \"Amount\", \"Status\" AS \"Status\"",
    "FROM __ref(\"stg_support_0\")",
    ""
   ],
-  "models/analysis/regional_stg_support_0.sql": [
+  "sql/models/analysis/regional_stg_support_0.sql": [
    "SELECT id, amount, 'north' AS region",
    "FROM __ref(\"stg_support_0\")",
    ""
   ],
-  "models/analysis/typed_stg_support_0.sql": [
+  "sql/models/analysis/typed_stg_support_0.sql": [
    "SELECT id, amount * 2 AS doubled_amount, CAST(status AS VARCHAR) AS status_text,",
    "  created_at, NULL AS missing_note",
    "FROM __ref(\"stg_support_0\")",
    ""
   ],
-  "models/analysis/unanalysed_stg_support_0.sql": [
+  "sql/models/analysis/unanalysed_stg_support_0.sql": [
    "SELECT a.id, a.amount",
    "FROM __ref(\"stg_support_0\") AS a",
    "JOIN __ref(\"stg_support_0\") AS b NEAREST 1 BY DISTANCE abs(a.amount - b.amount)",
    ""
   ],
-  "models/features/append_stg_support_0.sql": [
+  "sql/models/features/append_stg_support_0.sql": [
    "SELECT id, amount, status, created_at",
    "FROM __ref(\"stg_support_0\")",
    ""
   ],
-  "models/features/batched_rolling_window_stg_support_0.sql": [
+  "sql/models/features/batched_rolling_window_stg_support_0.sql": [
    "SELECT CAST(created_at AS DATE) AS created_at, SUM(amount) AS amount",
    "FROM __ref(\"stg_support_0\")",
    "GROUP BY CAST(created_at AS DATE)",
    ""
   ],
-  "models/features/guarded_stg_support_0.sql": [
+  "sql/models/features/guarded_stg_support_0.sql": [
    "SELECT id, amount",
    "FROM __ref(\"stg_support_0\")",
    ""
   ],
-  "models/features/product_labels.sql": [
+  "sql/models/features/product_labels.sql": [
    "SELECT id, label",
    "FROM __source(\"loaded_products\")",
    ""
   ],
-  "models/features/shaped_stg_support_0.sql": [
+  "sql/models/features/shaped_stg_support_0.sql": [
    "SELECT CAST(id AS INTEGER) AS id, status",
    "FROM __ref(\"stg_support_0\")",
    ""
   ],
-  "models/features/timestamp_history_stg_support_0.sql": [
+  "sql/models/features/timestamp_history_stg_support_0.sql": [
    "SELECT id, status, created_at",
    "FROM __ref(\"stg_support_0\")",
    ""
   ],
-  "models/rendering/bounded_stg_support_0.sql": [
+  "sql/models/rendering/bounded_stg_support_0.sql": [
    "SELECT id, amount, created_at",
    "FROM __ref(\"stg_support_0\")",
    "WHERE created_at >= __cursor_start()",
    "  AND created_at < __cursor_end()",
    ""
   ],
-  "models/rendering/configured_stg_support_0.sql": [
+  "sql/models/rendering/configured_stg_support_0.sql": [
    "SELECT id, amount, status",
    "FROM __ref(\"stg_support_0\")",
    ""
   ],
-  "models/rendering/latest_raw_events_0.sql": [
+  "sql/models/rendering/latest_raw_events_0.sql": [
    "SELECT id, amount",
    "FROM (SELECT id, amount FROM __source(\"raw_events_0\") ORDER BY id DESC LIMIT 2) AS latest",
    ""
   ],
-  "models/rendering/policy_stg_support_0.sql": [
+  "sql/models/rendering/policy_stg_support_0.sql": [
    "SELECT id, amount, ('web' || '/ci/generated_duckdb/west' || '@web-orders') AS channel,",
    "  1 AS minimum_amount,",
    "  'store' AS fallback_channel",
@@ -213,12 +213,12 @@
    "WHERE amount >= 1",
    ""
   ],
-  "models/rendering/unioned_event_ids.sql": [
+  "sql/models/rendering/unioned_event_ids.sql": [
    "SELECT id",
    "FROM (SELECT id FROM __ref(\"stg_support_0\") UNION ALL SELECT id FROM __ref(\"stg_support_0\")) AS unioned",
    ""
   ],
-  "models/support/marts/support_summary_0.sql": [
+  "sql/models/support/marts/support_summary_0.sql": [
    "SELECT",
    "  t.id,",
    "  t.amount,",
@@ -230,7 +230,7 @@
    "LEFT JOIN __seed(\"lookup_1\") j1 ON t.id = j1.id",
    ""
   ],
-  "models/support/marts/support_summary_1.sql": [
+  "sql/models/support/marts/support_summary_1.sql": [
    "SELECT",
    "  t.id,",
    "  t.amount,",
@@ -246,7 +246,7 @@
    "WHERE t.status <> 'returned ✓'",
    ""
   ],
-  "models/support/marts/support_summary_2.sql": [
+  "sql/models/support/marts/support_summary_2.sql": [
    "SELECT",
    "  t.id,",
    "  t.amount,",
@@ -260,7 +260,7 @@
    "LEFT JOIN __seed(\"lookup_1\") j1 ON t.id = j1.id",
    ""
   ],
-  "models/support/staging/stg_support_0.sql": [
+  "sql/models/support/staging/stg_support_0.sql": [
    "SELECT",
    "  t.id,",
    "  t.amount,",
@@ -340,8 +340,8 @@
     "name": "combined_stg_support_0",
     "resource_type": "model",
     "package_name": "generated_4",
-    "path": "models/analysis/combined_stg_support_0.sql",
-    "original_file_path": "models/analysis/combined_stg_support_0.sql",
+    "path": "sql/models/analysis/combined_stg_support_0.sql",
+    "original_file_path": "sql/models/analysis/combined_stg_support_0.sql",
     "unique_id": "model.generated_4.combined_stg_support_0",
     "fqn": [
      "generated_4",
@@ -409,8 +409,8 @@
     "name": "every_open_event",
     "resource_type": "model",
     "package_name": "generated_4",
-    "path": "models/analysis/every_open_event.sql",
-    "original_file_path": "models/analysis/every_open_event.sql",
+    "path": "sql/models/analysis/every_open_event.sql",
+    "original_file_path": "sql/models/analysis/every_open_event.sql",
     "unique_id": "model.generated_4.every_open_event",
     "fqn": [
      "generated_4",
@@ -478,8 +478,8 @@
     "name": "every_raw_events_0",
     "resource_type": "model",
     "package_name": "generated_4",
-    "path": "models/analysis/every_raw_events_0.sql",
-    "original_file_path": "models/analysis/every_raw_events_0.sql",
+    "path": "sql/models/analysis/every_raw_events_0.sql",
+    "original_file_path": "sql/models/analysis/every_raw_events_0.sql",
     "unique_id": "model.generated_4.every_raw_events_0",
     "fqn": [
      "generated_4",
@@ -547,8 +547,8 @@
     "name": "every_stg_support_0",
     "resource_type": "model",
     "package_name": "generated_4",
-    "path": "models/analysis/every_stg_support_0.sql",
-    "original_file_path": "models/analysis/every_stg_support_0.sql",
+    "path": "sql/models/analysis/every_stg_support_0.sql",
+    "original_file_path": "sql/models/analysis/every_stg_support_0.sql",
     "unique_id": "model.generated_4.every_stg_support_0",
     "fqn": [
      "generated_4",
@@ -616,8 +616,8 @@
     "name": "passed_stg_support_0",
     "resource_type": "model",
     "package_name": "generated_4",
-    "path": "models/analysis/passed_stg_support_0.sql",
-    "original_file_path": "models/analysis/passed_stg_support_0.sql",
+    "path": "sql/models/analysis/passed_stg_support_0.sql",
+    "original_file_path": "sql/models/analysis/passed_stg_support_0.sql",
     "unique_id": "model.generated_4.passed_stg_support_0",
     "fqn": [
      "generated_4",
@@ -685,8 +685,8 @@
     "name": "pivot_input_stg_support_0",
     "resource_type": "model",
     "package_name": "generated_4",
-    "path": "models/analysis/pivot_input_stg_support_0.sql",
-    "original_file_path": "models/analysis/pivot_input_stg_support_0.sql",
+    "path": "sql/models/analysis/pivot_input_stg_support_0.sql",
+    "original_file_path": "sql/models/analysis/pivot_input_stg_support_0.sql",
     "unique_id": "model.generated_4.pivot_input_stg_support_0",
     "fqn": [
      "generated_4",
@@ -782,8 +782,8 @@
     "name": "pivoted_stg_support_0",
     "resource_type": "model",
     "package_name": "generated_4",
-    "path": "models/analysis/pivoted_stg_support_0.sql",
-    "original_file_path": "models/analysis/pivoted_stg_support_0.sql",
+    "path": "sql/models/analysis/pivoted_stg_support_0.sql",
+    "original_file_path": "sql/models/analysis/pivoted_stg_support_0.sql",
     "unique_id": "model.generated_4.pivoted_stg_support_0",
     "fqn": [
      "generated_4",
@@ -874,8 +874,8 @@
     "name": "quoted_stg_support_0",
     "resource_type": "model",
     "package_name": "generated_4",
-    "path": "models/analysis/quoted_stg_support_0.sql",
-    "original_file_path": "models/analysis/quoted_stg_support_0.sql",
+    "path": "sql/models/analysis/quoted_stg_support_0.sql",
+    "original_file_path": "sql/models/analysis/quoted_stg_support_0.sql",
     "unique_id": "model.generated_4.quoted_stg_support_0",
     "fqn": [
      "generated_4",
@@ -943,8 +943,8 @@
     "name": "regional_stg_support_0",
     "resource_type": "model",
     "package_name": "generated_4",
-    "path": "models/analysis/regional_stg_support_0.sql",
-    "original_file_path": "models/analysis/regional_stg_support_0.sql",
+    "path": "sql/models/analysis/regional_stg_support_0.sql",
+    "original_file_path": "sql/models/analysis/regional_stg_support_0.sql",
     "unique_id": "model.generated_4.regional_stg_support_0",
     "fqn": [
      "generated_4",
@@ -1012,8 +1012,8 @@
     "name": "typed_stg_support_0",
     "resource_type": "model",
     "package_name": "generated_4",
-    "path": "models/analysis/typed_stg_support_0.sql",
-    "original_file_path": "models/analysis/typed_stg_support_0.sql",
+    "path": "sql/models/analysis/typed_stg_support_0.sql",
+    "original_file_path": "sql/models/analysis/typed_stg_support_0.sql",
     "unique_id": "model.generated_4.typed_stg_support_0",
     "fqn": [
      "generated_4",
@@ -1081,8 +1081,8 @@
     "name": "unanalysed_stg_support_0",
     "resource_type": "model",
     "package_name": "generated_4",
-    "path": "models/analysis/unanalysed_stg_support_0.sql",
-    "original_file_path": "models/analysis/unanalysed_stg_support_0.sql",
+    "path": "sql/models/analysis/unanalysed_stg_support_0.sql",
+    "original_file_path": "sql/models/analysis/unanalysed_stg_support_0.sql",
     "unique_id": "model.generated_4.unanalysed_stg_support_0",
     "fqn": [
      "generated_4",
@@ -1150,8 +1150,8 @@
     "name": "append_stg_support_0",
     "resource_type": "model",
     "package_name": "generated_4",
-    "path": "models/features/append_stg_support_0.sql",
-    "original_file_path": "models/features/append_stg_support_0.sql",
+    "path": "sql/models/features/append_stg_support_0.sql",
+    "original_file_path": "sql/models/features/append_stg_support_0.sql",
     "unique_id": "model.generated_4.append_stg_support_0",
     "fqn": [
      "generated_4",
@@ -1219,8 +1219,8 @@
     "name": "batched_rolling_window_stg_support_0",
     "resource_type": "model",
     "package_name": "generated_4",
-    "path": "models/features/batched_rolling_window_stg_support_0.sql",
-    "original_file_path": "models/features/batched_rolling_window_stg_support_0.sql",
+    "path": "sql/models/features/batched_rolling_window_stg_support_0.sql",
+    "original_file_path": "sql/models/features/batched_rolling_window_stg_support_0.sql",
     "unique_id": "model.generated_4.batched_rolling_window_stg_support_0",
     "fqn": [
      "generated_4",
@@ -1288,8 +1288,8 @@
     "name": "guarded_stg_support_0",
     "resource_type": "model",
     "package_name": "generated_4",
-    "path": "models/features/guarded_stg_support_0.sql",
-    "original_file_path": "models/features/guarded_stg_support_0.sql",
+    "path": "sql/models/features/guarded_stg_support_0.sql",
+    "original_file_path": "sql/models/features/guarded_stg_support_0.sql",
     "unique_id": "model.generated_4.guarded_stg_support_0",
     "fqn": [
      "generated_4",
@@ -1367,8 +1367,8 @@
     "name": "product_labels",
     "resource_type": "model",
     "package_name": "generated_4",
-    "path": "models/features/product_labels.sql",
-    "original_file_path": "models/features/product_labels.sql",
+    "path": "sql/models/features/product_labels.sql",
+    "original_file_path": "sql/models/features/product_labels.sql",
     "unique_id": "model.generated_4.product_labels",
     "fqn": [
      "generated_4",
@@ -1436,8 +1436,8 @@
     "name": "shaped_stg_support_0",
     "resource_type": "model",
     "package_name": "generated_4",
-    "path": "models/features/shaped_stg_support_0.sql",
-    "original_file_path": "models/features/shaped_stg_support_0.sql",
+    "path": "sql/models/features/shaped_stg_support_0.sql",
+    "original_file_path": "sql/models/features/shaped_stg_support_0.sql",
     "unique_id": "model.generated_4.shaped_stg_support_0",
     "fqn": [
      "generated_4",
@@ -1524,8 +1524,8 @@
     "name": "timestamp_history_stg_support_0",
     "resource_type": "model",
     "package_name": "generated_4",
-    "path": "models/features/timestamp_history_stg_support_0.sql",
-    "original_file_path": "models/features/timestamp_history_stg_support_0.sql",
+    "path": "sql/models/features/timestamp_history_stg_support_0.sql",
+    "original_file_path": "sql/models/features/timestamp_history_stg_support_0.sql",
     "unique_id": "model.generated_4.timestamp_history_stg_support_0",
     "fqn": [
      "generated_4",
@@ -1595,8 +1595,8 @@
     "name": "bounded_stg_support_0",
     "resource_type": "model",
     "package_name": "generated_4",
-    "path": "models/rendering/bounded_stg_support_0.sql",
-    "original_file_path": "models/rendering/bounded_stg_support_0.sql",
+    "path": "sql/models/rendering/bounded_stg_support_0.sql",
+    "original_file_path": "sql/models/rendering/bounded_stg_support_0.sql",
     "unique_id": "model.generated_4.bounded_stg_support_0",
     "fqn": [
      "generated_4",
@@ -1666,8 +1666,8 @@
     "name": "configured_stg_support_0",
     "resource_type": "model",
     "package_name": "generated_4",
-    "path": "models/rendering/configured_stg_support_0.sql",
-    "original_file_path": "models/rendering/configured_stg_support_0.sql",
+    "path": "sql/models/rendering/configured_stg_support_0.sql",
+    "original_file_path": "sql/models/rendering/configured_stg_support_0.sql",
     "unique_id": "model.generated_4.configured_stg_support_0",
     "fqn": [
      "generated_4",
@@ -1767,8 +1767,8 @@
     "name": "latest_raw_events_0",
     "resource_type": "model",
     "package_name": "generated_4",
-    "path": "models/rendering/latest_raw_events_0.sql",
-    "original_file_path": "models/rendering/latest_raw_events_0.sql",
+    "path": "sql/models/rendering/latest_raw_events_0.sql",
+    "original_file_path": "sql/models/rendering/latest_raw_events_0.sql",
     "unique_id": "model.generated_4.latest_raw_events_0",
     "fqn": [
      "generated_4",
@@ -1836,8 +1836,8 @@
     "name": "policy_stg_support_0",
     "resource_type": "model",
     "package_name": "generated_4",
-    "path": "models/rendering/policy_stg_support_0.sql",
-    "original_file_path": "models/rendering/policy_stg_support_0.sql",
+    "path": "sql/models/rendering/policy_stg_support_0.sql",
+    "original_file_path": "sql/models/rendering/policy_stg_support_0.sql",
     "unique_id": "model.generated_4.policy_stg_support_0",
     "fqn": [
      "generated_4",
@@ -1905,8 +1905,8 @@
     "name": "unioned_event_ids",
     "resource_type": "model",
     "package_name": "generated_4",
-    "path": "models/rendering/unioned_event_ids.sql",
-    "original_file_path": "models/rendering/unioned_event_ids.sql",
+    "path": "sql/models/rendering/unioned_event_ids.sql",
+    "original_file_path": "sql/models/rendering/unioned_event_ids.sql",
     "unique_id": "model.generated_4.unioned_event_ids",
     "fqn": [
      "generated_4",
@@ -1974,8 +1974,8 @@
     "name": "support_summary_0",
     "resource_type": "model",
     "package_name": "generated_4",
-    "path": "models/support/marts/support_summary_0.sql",
-    "original_file_path": "models/support/marts/support_summary_0.sql",
+    "path": "sql/models/support/marts/support_summary_0.sql",
+    "original_file_path": "sql/models/support/marts/support_summary_0.sql",
     "unique_id": "model.generated_4.support_summary_0",
     "fqn": [
      "generated_4",
@@ -2061,8 +2061,8 @@
     "name": "support_summary_1",
     "resource_type": "model",
     "package_name": "generated_4",
-    "path": "models/support/marts/support_summary_1.sql",
-    "original_file_path": "models/support/marts/support_summary_1.sql",
+    "path": "sql/models/support/marts/support_summary_1.sql",
+    "original_file_path": "sql/models/support/marts/support_summary_1.sql",
     "unique_id": "model.generated_4.support_summary_1",
     "fqn": [
      "generated_4",
@@ -2138,8 +2138,8 @@
     "name": "support_summary_2",
     "resource_type": "model",
     "package_name": "generated_4",
-    "path": "models/support/marts/support_summary_2.sql",
-    "original_file_path": "models/support/marts/support_summary_2.sql",
+    "path": "sql/models/support/marts/support_summary_2.sql",
+    "original_file_path": "sql/models/support/marts/support_summary_2.sql",
     "unique_id": "model.generated_4.support_summary_2",
     "fqn": [
      "generated_4",
@@ -2215,8 +2215,8 @@
     "name": "stg_support_0",
     "resource_type": "model",
     "package_name": "generated_4",
-    "path": "models/support/staging/stg_support_0.sql",
-    "original_file_path": "models/support/staging/stg_support_0.sql",
+    "path": "sql/models/support/staging/stg_support_0.sql",
+    "original_file_path": "sql/models/support/staging/stg_support_0.sql",
     "unique_id": "model.generated_4.stg_support_0",
     "fqn": [
      "generated_4",
@@ -2299,8 +2299,8 @@
     "name": "lookup_0",
     "resource_type": "seed",
     "package_name": "generated_4",
-    "path": "seeds/lookup_0.csv",
-    "original_file_path": "seeds/lookup_0.csv",
+    "path": "sql/seeds/lookup_0.csv",
+    "original_file_path": "sql/seeds/lookup_0.csv",
     "unique_id": "seed.generated_4.lookup_0",
     "fqn": [
      "generated_4",
@@ -2384,8 +2384,8 @@
     "name": "lookup_1",
     "resource_type": "seed",
     "package_name": "generated_4",
-    "path": "seeds/lookup_1.csv",
-    "original_file_path": "seeds/lookup_1.csv",
+    "path": "sql/seeds/lookup_1.csv",
+    "original_file_path": "sql/seeds/lookup_1.csv",
     "unique_id": "seed.generated_4.lookup_1",
     "fqn": [
      "generated_4",
@@ -2471,8 +2471,8 @@
     "name": "configured_events",
     "resource_type": "source",
     "package_name": "generated_4",
-    "path": "sources/configured.yml",
-    "original_file_path": "sources/configured.yml",
+    "path": "sql/sources/configured.yml",
+    "original_file_path": "sql/sources/configured.yml",
     "unique_id": "source.generated_4.configured_events",
     "fqn": [
      "generated_4",
@@ -2523,8 +2523,8 @@
     "name": "loaded_products",
     "resource_type": "source",
     "package_name": "generated_4",
-    "path": "sources/managed.yml",
-    "original_file_path": "sources/managed.yml",
+    "path": "sql/sources/managed.yml",
+    "original_file_path": "sql/sources/managed.yml",
     "unique_id": "source.generated_4.loaded_products",
     "fqn": [
      "generated_4",
@@ -2579,8 +2579,8 @@
     "name": "open_events",
     "resource_type": "source",
     "package_name": "generated_4",
-    "path": "sources/open.yml",
-    "original_file_path": "sources/open.yml",
+    "path": "sql/sources/open.yml",
+    "original_file_path": "sql/sources/open.yml",
     "unique_id": "source.generated_4.open_events",
     "fqn": [
      "generated_4",
@@ -2610,8 +2610,8 @@
     "name": "raw_events_0",
     "resource_type": "source",
     "package_name": "generated_4",
-    "path": "sources/raw.yml",
-    "original_file_path": "sources/raw.yml",
+    "path": "sql/sources/raw.yml",
+    "original_file_path": "sql/sources/raw.yml",
     "unique_id": "source.generated_4.raw_events_0",
     "fqn": [
      "generated_4",
@@ -2678,8 +2678,8 @@
     "name": "analysis_region",
     "resource_type": "macro",
     "package_name": "generated_4",
-    "path": "models/analysis/_sqlbuild/_macros/python/regions.py",
-    "original_file_path": "models/analysis/_sqlbuild/_macros/python/regions.py",
+    "path": "sql/models/analysis/_sqlbuild/_macros/python/regions.py",
+    "original_file_path": "sql/models/analysis/_sqlbuild/_macros/python/regions.py",
     "unique_id": "macro.generated_4.analysis_region",
     "macro_sql": "def analysis_region() -> str:\n    \"\"\"Return the region rows are assigned to.\"\"\"\n    return \"'north'\"\n",
     "depends_on": {
@@ -2688,7 +2688,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "local",
-     "sqlbuild_scope_path": "models/analysis"
+     "sqlbuild_scope_path": "sql/models/analysis"
     },
     "docs": {
      "show": true,
@@ -2702,8 +2702,8 @@
     "name": "channel_label",
     "resource_type": "macro",
     "package_name": "generated_4",
-    "path": "models/rendering/_sqlbuild/_macros/python/policy.py",
-    "original_file_path": "models/rendering/_sqlbuild/_macros/python/policy.py",
+    "path": "sql/models/rendering/_sqlbuild/_macros/python/policy.py",
+    "original_file_path": "sql/models/rendering/_sqlbuild/_macros/python/policy.py",
     "unique_id": "macro.generated_4.channel_label",
     "macro_sql": "import os\n\n\ndef minimum_amount_filter(ctx, column: str) -> str:\n    \"\"\"Keep rows at or above the configured minimum amount.\"\"\"\n    if ctx.constants[\"minimum_render_amount\"] is None:\n        return \"TRUE\"\n    return f\"{column} >= {ctx.render_constant('minimum_render_amount')}\"\n\n\ndef channel_label(ctx) -> str:\n    \"\"\"Label rows with the web channel, target and adapter.\"\"\"\n    channel = ctx.render_enum_member(enum_name=\"render_channel\", member_name=\"WEB\")\n    region = ctx.vars[\"region\"]\n    return f\"{channel} || '/{ctx.target_name}/{ctx.adapter_name}/{region}'\"\n\n\ndef with_deployment(expression: str) -> str:\n    \"\"\"Suffix an expression with the deployment channel from the environment.\"\"\"\n    channel = os.environ.get(\"SQB_DIFFERENTIAL_CHANNEL\", \"none\")\n    return f\"({expression} || '@{channel}')\"\n",
     "depends_on": {
@@ -2712,7 +2712,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "local",
-     "sqlbuild_scope_path": "models/rendering"
+     "sqlbuild_scope_path": "sql/models/rendering"
     },
     "docs": {
      "show": true,
@@ -2726,8 +2726,8 @@
     "name": "minimum_amount_filter",
     "resource_type": "macro",
     "package_name": "generated_4",
-    "path": "models/rendering/_sqlbuild/_macros/python/policy.py",
-    "original_file_path": "models/rendering/_sqlbuild/_macros/python/policy.py",
+    "path": "sql/models/rendering/_sqlbuild/_macros/python/policy.py",
+    "original_file_path": "sql/models/rendering/_sqlbuild/_macros/python/policy.py",
     "unique_id": "macro.generated_4.minimum_amount_filter",
     "macro_sql": "import os\n\n\ndef minimum_amount_filter(ctx, column: str) -> str:\n    \"\"\"Keep rows at or above the configured minimum amount.\"\"\"\n    if ctx.constants[\"minimum_render_amount\"] is None:\n        return \"TRUE\"\n    return f\"{column} >= {ctx.render_constant('minimum_render_amount')}\"\n\n\ndef channel_label(ctx) -> str:\n    \"\"\"Label rows with the web channel, target and adapter.\"\"\"\n    channel = ctx.render_enum_member(enum_name=\"render_channel\", member_name=\"WEB\")\n    region = ctx.vars[\"region\"]\n    return f\"{channel} || '/{ctx.target_name}/{ctx.adapter_name}/{region}'\"\n\n\ndef with_deployment(expression: str) -> str:\n    \"\"\"Suffix an expression with the deployment channel from the environment.\"\"\"\n    channel = os.environ.get(\"SQB_DIFFERENTIAL_CHANNEL\", \"none\")\n    return f\"({expression} || '@{channel}')\"\n",
     "depends_on": {
@@ -2736,7 +2736,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "local",
-     "sqlbuild_scope_path": "models/rendering"
+     "sqlbuild_scope_path": "sql/models/rendering"
     },
     "docs": {
      "show": true,
@@ -2750,8 +2750,8 @@
     "name": "with_deployment",
     "resource_type": "macro",
     "package_name": "generated_4",
-    "path": "models/rendering/_sqlbuild/_macros/python/policy.py",
-    "original_file_path": "models/rendering/_sqlbuild/_macros/python/policy.py",
+    "path": "sql/models/rendering/_sqlbuild/_macros/python/policy.py",
+    "original_file_path": "sql/models/rendering/_sqlbuild/_macros/python/policy.py",
     "unique_id": "macro.generated_4.with_deployment",
     "macro_sql": "import os\n\n\ndef minimum_amount_filter(ctx, column: str) -> str:\n    \"\"\"Keep rows at or above the configured minimum amount.\"\"\"\n    if ctx.constants[\"minimum_render_amount\"] is None:\n        return \"TRUE\"\n    return f\"{column} >= {ctx.render_constant('minimum_render_amount')}\"\n\n\ndef channel_label(ctx) -> str:\n    \"\"\"Label rows with the web channel, target and adapter.\"\"\"\n    channel = ctx.render_enum_member(enum_name=\"render_channel\", member_name=\"WEB\")\n    region = ctx.vars[\"region\"]\n    return f\"{channel} || '/{ctx.target_name}/{ctx.adapter_name}/{region}'\"\n\n\ndef with_deployment(expression: str) -> str:\n    \"\"\"Suffix an expression with the deployment channel from the environment.\"\"\"\n    channel = os.environ.get(\"SQB_DIFFERENTIAL_CHANNEL\", \"none\")\n    return f\"({expression} || '@{channel}')\"\n",
     "depends_on": {
@@ -2760,7 +2760,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "local",
-     "sqlbuild_scope_path": "models/rendering"
+     "sqlbuild_scope_path": "sql/models/rendering"
     },
     "docs": {
      "show": true,
@@ -2774,8 +2774,8 @@
     "name": "latest_rows",
     "resource_type": "macro",
     "package_name": "generated_4",
-    "path": "models/rendering/_sqlbuild/_macros/python/relations.py",
-    "original_file_path": "models/rendering/_sqlbuild/_macros/python/relations.py",
+    "path": "sql/models/rendering/_sqlbuild/_macros/python/relations.py",
+    "original_file_path": "sql/models/rendering/_sqlbuild/_macros/python/relations.py",
     "unique_id": "macro.generated_4.latest_rows",
     "macro_sql": "from sqlbuild.refs import SqlResourceRef\n\n\ndef union_ids(relations: list[SqlResourceRef]) -> str:\n    \"\"\"Union the ids of several relations.\"\"\"\n    selects = [f\"SELECT id FROM {relation}\" for relation in relations]\n    return \" UNION ALL \".join(selects)\n\n\ndef latest_rows(relation: SqlResourceRef, limit: int = 2) -> str:\n    \"\"\"Return the newest rows of one relation.\"\"\"\n    return f\"(SELECT id, amount FROM {relation} ORDER BY id DESC LIMIT {limit})\"\n",
     "depends_on": {
@@ -2784,7 +2784,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "local",
-     "sqlbuild_scope_path": "models/rendering"
+     "sqlbuild_scope_path": "sql/models/rendering"
     },
     "docs": {
      "show": true,
@@ -2798,8 +2798,8 @@
     "name": "union_ids",
     "resource_type": "macro",
     "package_name": "generated_4",
-    "path": "models/rendering/_sqlbuild/_macros/python/relations.py",
-    "original_file_path": "models/rendering/_sqlbuild/_macros/python/relations.py",
+    "path": "sql/models/rendering/_sqlbuild/_macros/python/relations.py",
+    "original_file_path": "sql/models/rendering/_sqlbuild/_macros/python/relations.py",
     "unique_id": "macro.generated_4.union_ids",
     "macro_sql": "from sqlbuild.refs import SqlResourceRef\n\n\ndef union_ids(relations: list[SqlResourceRef]) -> str:\n    \"\"\"Union the ids of several relations.\"\"\"\n    selects = [f\"SELECT id FROM {relation}\" for relation in relations]\n    return \" UNION ALL \".join(selects)\n\n\ndef latest_rows(relation: SqlResourceRef, limit: int = 2) -> str:\n    \"\"\"Return the newest rows of one relation.\"\"\"\n    return f\"(SELECT id, amount FROM {relation} ORDER BY id DESC LIMIT {limit})\"\n",
     "depends_on": {
@@ -2808,7 +2808,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "local",
-     "sqlbuild_scope_path": "models/rendering"
+     "sqlbuild_scope_path": "sql/models/rendering"
     },
     "docs": {
      "show": true,
@@ -2822,8 +2822,8 @@
     "name": "adjust_2",
     "resource_type": "macro",
     "package_name": "generated_4",
-    "path": "models/support/_sqlbuild/macros/python/adjust_2.py",
-    "original_file_path": "models/support/_sqlbuild/macros/python/adjust_2.py",
+    "path": "sql/models/support/_sqlbuild/macros/python/adjust_2.py",
+    "original_file_path": "sql/models/support/_sqlbuild/macros/python/adjust_2.py",
     "unique_id": "macro.generated_4.adjust_2",
     "macro_sql": "def adjust_2_round(expression: str) -> str:\n    \"\"\"Round an amount to two places.\"\"\"\n    return f\"ROUND({expression}, 2)\"\n\n\ndef adjust_2(expression: str) -> str:\n    \"\"\"Double and round an amount.\"\"\"\n    return adjust_2_round(f\"({expression} * 2)\")\n",
     "depends_on": {
@@ -2834,7 +2834,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "inherited",
-     "sqlbuild_scope_path": "models/support"
+     "sqlbuild_scope_path": "sql/models/support"
     },
     "docs": {
      "show": true,
@@ -2848,8 +2848,8 @@
     "name": "adjust_2_round",
     "resource_type": "macro",
     "package_name": "generated_4",
-    "path": "models/support/_sqlbuild/macros/python/adjust_2.py",
-    "original_file_path": "models/support/_sqlbuild/macros/python/adjust_2.py",
+    "path": "sql/models/support/_sqlbuild/macros/python/adjust_2.py",
+    "original_file_path": "sql/models/support/_sqlbuild/macros/python/adjust_2.py",
     "unique_id": "macro.generated_4.adjust_2_round",
     "macro_sql": "def adjust_2_round(expression: str) -> str:\n    \"\"\"Round an amount to two places.\"\"\"\n    return f\"ROUND({expression}, 2)\"\n\n\ndef adjust_2(expression: str) -> str:\n    \"\"\"Double and round an amount.\"\"\"\n    return adjust_2_round(f\"({expression} * 2)\")\n",
     "depends_on": {
@@ -2858,7 +2858,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "inherited",
-     "sqlbuild_scope_path": "models/support"
+     "sqlbuild_scope_path": "sql/models/support"
     },
     "docs": {
      "show": true,
@@ -2872,8 +2872,8 @@
     "name": "adjust_0",
     "resource_type": "macro",
     "package_name": "generated_4",
-    "path": "models/support/marts/_sqlbuild/_macros/python/adjust_0.py",
-    "original_file_path": "models/support/marts/_sqlbuild/_macros/python/adjust_0.py",
+    "path": "sql/models/support/marts/_sqlbuild/_macros/python/adjust_0.py",
+    "original_file_path": "sql/models/support/marts/_sqlbuild/_macros/python/adjust_0.py",
     "unique_id": "macro.generated_4.adjust_0",
     "macro_sql": "def adjust_0_round(expression: str) -> str:\n    \"\"\"Round an amount to two places.\"\"\"\n    return f\"ROUND({expression}, 2)\"\n\n\ndef adjust_0(expression: str) -> str:\n    \"\"\"Double and round an amount.\"\"\"\n    return adjust_0_round(f\"({expression} * 2)\")\n",
     "depends_on": {
@@ -2884,7 +2884,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "local",
-     "sqlbuild_scope_path": "models/support/marts"
+     "sqlbuild_scope_path": "sql/models/support/marts"
     },
     "docs": {
      "show": true,
@@ -2898,8 +2898,8 @@
     "name": "adjust_0_round",
     "resource_type": "macro",
     "package_name": "generated_4",
-    "path": "models/support/marts/_sqlbuild/_macros/python/adjust_0.py",
-    "original_file_path": "models/support/marts/_sqlbuild/_macros/python/adjust_0.py",
+    "path": "sql/models/support/marts/_sqlbuild/_macros/python/adjust_0.py",
+    "original_file_path": "sql/models/support/marts/_sqlbuild/_macros/python/adjust_0.py",
     "unique_id": "macro.generated_4.adjust_0_round",
     "macro_sql": "def adjust_0_round(expression: str) -> str:\n    \"\"\"Round an amount to two places.\"\"\"\n    return f\"ROUND({expression}, 2)\"\n\n\ndef adjust_0(expression: str) -> str:\n    \"\"\"Double and round an amount.\"\"\"\n    return adjust_0_round(f\"({expression} * 2)\")\n",
     "depends_on": {
@@ -2908,7 +2908,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "local",
-     "sqlbuild_scope_path": "models/support/marts"
+     "sqlbuild_scope_path": "sql/models/support/marts"
     },
     "docs": {
      "show": true,
@@ -2922,8 +2922,8 @@
     "name": "adjust_1",
     "resource_type": "macro",
     "package_name": "generated_4",
-    "path": "models/support/marts/_sqlbuild/_macros/python/adjust_1.py",
-    "original_file_path": "models/support/marts/_sqlbuild/_macros/python/adjust_1.py",
+    "path": "sql/models/support/marts/_sqlbuild/_macros/python/adjust_1.py",
+    "original_file_path": "sql/models/support/marts/_sqlbuild/_macros/python/adjust_1.py",
     "unique_id": "macro.generated_4.adjust_1",
     "macro_sql": "def adjust_1_round(expression: str) -> str:\n    \"\"\"Round an amount to two places.\"\"\"\n    return f\"ROUND({expression}, 2)\"\n\n\ndef adjust_1(expression: str) -> str:\n    \"\"\"Double and round an amount.\"\"\"\n    return adjust_1_round(f\"({expression} * 2)\")\n",
     "depends_on": {
@@ -2934,7 +2934,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "local",
-     "sqlbuild_scope_path": "models/support/marts"
+     "sqlbuild_scope_path": "sql/models/support/marts"
     },
     "docs": {
      "show": true,
@@ -2948,8 +2948,8 @@
     "name": "adjust_1_round",
     "resource_type": "macro",
     "package_name": "generated_4",
-    "path": "models/support/marts/_sqlbuild/_macros/python/adjust_1.py",
-    "original_file_path": "models/support/marts/_sqlbuild/_macros/python/adjust_1.py",
+    "path": "sql/models/support/marts/_sqlbuild/_macros/python/adjust_1.py",
+    "original_file_path": "sql/models/support/marts/_sqlbuild/_macros/python/adjust_1.py",
     "unique_id": "macro.generated_4.adjust_1_round",
     "macro_sql": "def adjust_1_round(expression: str) -> str:\n    \"\"\"Round an amount to two places.\"\"\"\n    return f\"ROUND({expression}, 2)\"\n\n\ndef adjust_1(expression: str) -> str:\n    \"\"\"Double and round an amount.\"\"\"\n    return adjust_1_round(f\"({expression} * 2)\")\n",
     "depends_on": {
@@ -2958,7 +2958,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "local",
-     "sqlbuild_scope_path": "models/support/marts"
+     "sqlbuild_scope_path": "sql/models/support/marts"
     },
     "docs": {
      "show": true,

@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use chrono::{Duration, Utc};
+use chrono::{DateTime, Duration, Utc};
 use uuid::Uuid;
 
 use crate::authorization::main::decisions::authorize_listing::authorize_listing;
@@ -11,7 +11,7 @@ use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};
 use crate::store::models::{ControlStore, TransactionMode};
 use crate::warehouse_history::_helpers::costs::{
-    Accumulator, PENDING_STATUSES, TOTAL_RESOURCE_TYPE, latest_costs_in, ranked,
+    Accumulator, CostGroups, PENDING_STATUSES, TOTAL_RESOURCE_TYPE, latest_costs_in, ranked,
 };
 use crate::warehouse_history::models::{CostGroup, CostSummaryRecord};
 
@@ -58,15 +58,28 @@ pub async fn read_person_cost_summary(
             .or_default()
             .add(cost);
     }
+    Ok(summary_record(
+        (since, total, incomplete_runs),
+        (by_job, by_size, by_node),
+    ))
+}
+
+/// The summary of the window's total and its groups, most expensive first.
+fn summary_record(
+    (since, total, incomplete_runs): (DateTime<Utc>, Accumulator, i64),
+    (by_job, by_size, by_node): (CostGroups, CostGroups, CostGroups),
+) -> CostSummaryRecord {
+    let source: Option<String> = total.source();
     let total: CostGroup = total.group(None);
-    Ok(CostSummaryRecord {
+    CostSummaryRecord {
         since,
         credits: total.credits,
+        usd_per_credit_source: source,
         usd: total.usd,
         runs: total.runs,
         incomplete_runs,
         by_job: ranked(by_job),
         by_warehouse_size: ranked(by_size),
         by_node: ranked(by_node),
-    })
+    }
 }

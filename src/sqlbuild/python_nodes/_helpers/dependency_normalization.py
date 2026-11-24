@@ -18,6 +18,7 @@ def normalize_python_node_dependencies(
 
 
 def normalize_loader_dependencies(
-    value: tuple[Callable[..., object], ...] | list[Callable[..., object]],
-) -> tuple[Callable[..., object], ...]:
+    value: tuple[Callable[..., object] | NodeSetRef, ...]
+    | list[Callable[..., object] | NodeSetRef],
+) -> tuple[Callable[..., object] | NodeSetRef, ...]:
     return tuple(value)

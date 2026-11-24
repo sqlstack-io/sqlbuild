@@ -99,7 +99,7 @@ _REAPPEARING_KEY_OBSERVATIONS_SQL: str = (
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customers
@@ -109,7 +109,7 @@ _REAPPEARING_KEY_OBSERVATIONS_SQL: str = (
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -123,7 +123,7 @@ _REAPPEARING_KEY_OBSERVATIONS_SQL: str = (
                     """
                 ).strip()
                 + "\n",
-                "models/current_customer_plans.sql": dedent(
+                "sql/models/current_customer_plans.sql": dedent(
                     """
                     MODEL (description "Test model current_customer_plans.", materialized table);
 
@@ -286,7 +286,7 @@ def test_given_snapshot_selector_when_excluding_downstream_then_only_snapshot_bu
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customers
@@ -296,7 +296,7 @@ def test_given_snapshot_selector_when_excluding_downstream_then_only_snapshot_bu
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -387,7 +387,7 @@ def test_given_snapshot_hooks_when_building_then_hooks_execute_and_history_is_va
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_current_customers
@@ -409,7 +409,7 @@ def test_given_snapshot_hooks_when_building_then_hooks_execute_and_history_is_va
                     """
                 ).strip()
                 + "\n",
-                "models/current_hard_delete_snapshot.sql": dedent(
+                "sql/models/current_hard_delete_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model current_hard_delete_snapshot.",
                       materialized snapshot,
@@ -424,7 +424,7 @@ def test_given_snapshot_hooks_when_building_then_hooks_execute_and_history_is_va
                     """
                 ).strip()
                 + "\n",
-                "models/historical_out_of_order_snapshot.sql": dedent(
+                "sql/models/historical_out_of_order_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model historical_out_of_order_snapshot.",
                       materialized snapshot,
@@ -440,7 +440,7 @@ def test_given_snapshot_hooks_when_building_then_hooks_execute_and_history_is_va
                     """
                 ).strip()
                 + "\n",
-                "models/initial_updated_at_snapshot.sql": dedent(
+                "sql/models/initial_updated_at_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model initial_updated_at_snapshot.",
                       materialized snapshot,
@@ -455,7 +455,7 @@ def test_given_snapshot_hooks_when_building_then_hooks_execute_and_history_is_va
                     """
                 ).strip()
                 + "\n",
-                "models/audited_customer_snapshot.sql": dedent(
+                "sql/models/audited_customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model audited_customer_snapshot.",
                       materialized snapshot,
@@ -477,7 +477,7 @@ def test_given_snapshot_hooks_when_building_then_hooks_execute_and_history_is_va
                     """
                 ).strip()
                 + "\n",
-                "audits/generic/expression_is_true.sql": dedent(
+                "sql/audits/generic/expression_is_true.sql": dedent(
                     """
                     AUDIT ();
 
@@ -674,7 +674,7 @@ def test_given_advanced_snapshot_edges_when_building_then_history_remains_valid(
                 """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                 sources:
                   - name: raw_customers
@@ -684,7 +684,7 @@ def test_given_advanced_snapshot_edges_when_building_then_history_remains_valid(
                 """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                 MODEL (description "Test model customer_snapshot.",
                   materialized snapshot,
@@ -748,7 +748,7 @@ def test_given_advanced_snapshot_edges_when_building_then_history_remains_valid(
                 """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                 sources:
                   - name: raw_customers
@@ -758,7 +758,7 @@ def test_given_advanced_snapshot_edges_when_building_then_history_remains_valid(
                 """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                 MODEL (description "Test model customer_snapshot.",
                   materialized snapshot,
@@ -828,7 +828,7 @@ def test_given_advanced_snapshot_edges_when_building_then_history_remains_valid(
                 """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                 sources:
                   - name: raw_customers
@@ -838,7 +838,7 @@ def test_given_advanced_snapshot_edges_when_building_then_history_remains_valid(
                 """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                 MODEL (description "Test model customer_snapshot.",
                   materialized snapshot,
@@ -858,7 +858,7 @@ def test_given_advanced_snapshot_edges_when_building_then_history_remains_valid(
                 """
                 ).strip()
                 + "\n",
-                "audits/generic/expression_is_true.sql": dedent(
+                "sql/audits/generic/expression_is_true.sql": dedent(
                     """
                 AUDIT ();
 
@@ -923,7 +923,7 @@ def test_given_advanced_snapshot_edges_when_building_then_history_remains_valid(
                 """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                 sources:
                   - name: raw_customers
@@ -933,7 +933,7 @@ def test_given_advanced_snapshot_edges_when_building_then_history_remains_valid(
                 """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                 MODEL (description "Test model customer_snapshot.",
                   materialized snapshot,
@@ -955,7 +955,7 @@ def test_given_advanced_snapshot_edges_when_building_then_history_remains_valid(
                 """
                 ).strip()
                 + "\n",
-                "audits/generic/expression_is_true.sql": dedent(
+                "sql/audits/generic/expression_is_true.sql": dedent(
                     """
                 AUDIT ();
 
@@ -1098,7 +1098,7 @@ def test_given_snapshot_failure_when_building_then_history_remains_consistent(
                 """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                 sources:
                   - name: raw_current_timestamp_customers
@@ -1120,7 +1120,7 @@ def test_given_snapshot_failure_when_building_then_history_remains_consistent(
                 """
                 ).strip()
                 + "\n",
-                "models/customer_plan_timestamp_snapshot.sql": dedent(
+                "sql/models/customer_plan_timestamp_snapshot.sql": dedent(
                     """
                 MODEL (description "Test model customer_plan_timestamp_snapshot.",
                   materialized snapshot,
@@ -1134,7 +1134,7 @@ def test_given_snapshot_failure_when_building_then_history_remains_consistent(
                 """
                 ).strip()
                 + "\n",
-                "models/customer_status_check_snapshot.sql": dedent(
+                "sql/models/customer_status_check_snapshot.sql": dedent(
                     """
                 MODEL (description "Test model customer_status_check_snapshot.",
                   materialized snapshot,
@@ -1148,7 +1148,7 @@ def test_given_snapshot_failure_when_building_then_history_remains_consistent(
                 """
                 ).strip()
                 + "\n",
-                "models/customer_plan_historical_snapshot.sql": dedent(
+                "sql/models/customer_plan_historical_snapshot.sql": dedent(
                     """
                 MODEL (description "Test model customer_plan_historical_snapshot.",
                   materialized snapshot,
@@ -1164,7 +1164,7 @@ def test_given_snapshot_failure_when_building_then_history_remains_consistent(
                 """
                 ).strip()
                 + "\n",
-                "models/customer_plan_change_records_snapshot.sql": dedent(
+                "sql/models/customer_plan_change_records_snapshot.sql": dedent(
                     """
                 MODEL (description "Test model customer_plan_change_records_snapshot.",
                   materialized snapshot,
@@ -1524,10 +1524,15 @@ def test_given_shallow_waffle_shop_snapshots_when_sources_change_then_cli_reruns
         "customer_plan_change_records_snapshot",
     ):
         compiled_path: Path = (
-            project_dir / "target" / "compiled" / "models" / (f"{snapshot_artifact_name}.sql")
+            project_dir
+            / "target"
+            / "compiled"
+            / "sql"
+            / "models"
+            / (f"{snapshot_artifact_name}.sql")
         )
         run_path: Path = (
-            project_dir / "target" / "run" / "models" / (f"{snapshot_artifact_name}.sql")
+            project_dir / "target" / "run" / "sql" / "models" / (f"{snapshot_artifact_name}.sql")
         )
         assert compiled_path.exists(), f"expected compiled snapshot artifact: {compiled_path}"
         assert run_path.exists(), f"expected run snapshot artifact: {run_path}"
@@ -1570,7 +1575,7 @@ def test_given_shallow_waffle_shop_snapshots_when_sources_change_then_cli_reruns
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customer_regions
@@ -1592,7 +1597,7 @@ def test_given_shallow_waffle_shop_snapshots_when_sources_change_then_cli_reruns
                     """
                 ).strip()
                 + "\n",
-                "models/customer_region_custom_snapshot.sql": dedent(
+                "sql/models/customer_region_custom_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_region_custom_snapshot.",
                       materialized snapshot,
@@ -1608,7 +1613,7 @@ def test_given_shallow_waffle_shop_snapshots_when_sources_change_then_cli_reruns
                     """
                 ).strip()
                 + "\n",
-                "models/customer_hard_delete_snapshot.sql": dedent(
+                "sql/models/customer_hard_delete_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_hard_delete_snapshot.",
                       materialized snapshot,
@@ -1623,7 +1628,7 @@ def test_given_shallow_waffle_shop_snapshots_when_sources_change_then_cli_reruns
                     """
                 ).strip()
                 + "\n",
-                "models/customer_status_historical_check_snapshot.sql": dedent(
+                "sql/models/customer_status_historical_check_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_status_historical_check_snapshot.",
                       materialized snapshot,
@@ -1638,7 +1643,7 @@ def test_given_shallow_waffle_shop_snapshots_when_sources_change_then_cli_reruns
                     """
                 ).strip()
                 + "\n",
-                "models/customer_status_historical_check_hard_delete_snapshot.sql": dedent(
+                "sql/models/customer_status_historical_check_hard_delete_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_status_historical_check_hard_delete_snapshot.",
                       materialized snapshot,
@@ -2014,7 +2019,7 @@ def test_given_shallow_waffle_shop_snapshot_edges_when_sources_change_then_cli_t
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_membership_observations
@@ -2028,7 +2033,7 @@ def test_given_shallow_waffle_shop_snapshot_edges_when_sources_change_then_cli_t
                     """
                 ).strip()
                 + "\n",
-                "models/membership_incremental_snapshot.sql": dedent(
+                "sql/models/membership_incremental_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model membership_incremental_snapshot.",
                       materialized snapshot,
@@ -2044,7 +2049,7 @@ def test_given_shallow_waffle_shop_snapshot_edges_when_sources_change_then_cli_t
                     """
                 ).strip()
                 + "\n",
-                "models/membership_full_history_snapshot.sql": dedent(
+                "sql/models/membership_full_history_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model membership_full_history_snapshot.",
                       materialized snapshot,
@@ -2127,7 +2132,7 @@ def test_given_shallow_waffle_shop_snapshot_edges_when_sources_change_then_cli_t
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_membership_observations
@@ -2141,7 +2146,7 @@ def test_given_shallow_waffle_shop_snapshot_edges_when_sources_change_then_cli_t
                     """
                 ).strip()
                 + "\n",
-                "models/membership_incremental_snapshot.sql": dedent(
+                "sql/models/membership_incremental_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model membership_incremental_snapshot.",
                       materialized snapshot,
@@ -2158,7 +2163,7 @@ def test_given_shallow_waffle_shop_snapshot_edges_when_sources_change_then_cli_t
                     """
                 ).strip()
                 + "\n",
-                "models/membership_full_history_snapshot.sql": dedent(
+                "sql/models/membership_full_history_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model membership_full_history_snapshot.",
                       materialized snapshot,
@@ -2307,7 +2312,7 @@ def test_given_hard_deleted_key_when_it_reappears_unchanged_then_snapshot_opens_
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customers
@@ -2317,7 +2322,7 @@ def test_given_hard_deleted_key_when_it_reappears_unchanged_then_snapshot_opens_
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -2385,7 +2390,7 @@ def test_given_hard_deleted_key_when_it_reappears_unchanged_then_snapshot_opens_
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customers
@@ -2395,7 +2400,7 @@ def test_given_hard_deleted_key_when_it_reappears_unchanged_then_snapshot_opens_
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -2510,7 +2515,7 @@ def test_given_timestamp_snapshot_project_when_rerunning_build_then_tracks_histo
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customers
@@ -2520,7 +2525,7 @@ def test_given_timestamp_snapshot_project_when_rerunning_build_then_tracks_histo
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -2565,7 +2570,7 @@ def test_given_timestamp_snapshot_project_when_rerunning_build_then_tracks_histo
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customers
@@ -2575,7 +2580,7 @@ def test_given_timestamp_snapshot_project_when_rerunning_build_then_tracks_histo
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -2625,7 +2630,7 @@ def test_given_timestamp_snapshot_project_when_rerunning_build_then_tracks_histo
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customers
@@ -2635,7 +2640,7 @@ def test_given_timestamp_snapshot_project_when_rerunning_build_then_tracks_histo
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -2685,7 +2690,7 @@ def test_given_timestamp_snapshot_project_when_rerunning_build_then_tracks_histo
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customers
@@ -2695,7 +2700,7 @@ def test_given_timestamp_snapshot_project_when_rerunning_build_then_tracks_histo
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -2736,7 +2741,7 @@ def test_given_timestamp_snapshot_project_when_rerunning_build_then_tracks_histo
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customers
@@ -2746,7 +2751,7 @@ def test_given_timestamp_snapshot_project_when_rerunning_build_then_tracks_histo
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -2790,7 +2795,7 @@ def test_given_timestamp_snapshot_project_when_rerunning_build_then_tracks_histo
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customers
@@ -2800,7 +2805,7 @@ def test_given_timestamp_snapshot_project_when_rerunning_build_then_tracks_histo
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -2824,7 +2829,7 @@ def test_given_timestamp_snapshot_project_when_rerunning_build_then_tracks_histo
             command=("--no-color", "build"),
             expected_exit_code=1,
             expected_output_fragments=(
-                "error[B300]: [B300] models/customer_snapshot.sql:3:15:",
+                "error[B300]: [B300] sql/models/customer_snapshot.sql:3:15:",
                 "unique_key references unknown column 'customer_id'",
             ),
         ),
@@ -2873,7 +2878,7 @@ def test_given_duplicate_timestamp_snapshot_source_when_building_then_cli_report
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customers
@@ -2883,7 +2888,7 @@ def test_given_duplicate_timestamp_snapshot_source_when_building_then_cli_report
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -2992,7 +2997,7 @@ def test_given_snapshot_dml_failure_when_building_then_target_history_is_unchang
                 """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                 sources:
                   - name: raw_customers
@@ -3002,7 +3007,7 @@ def test_given_snapshot_dml_failure_when_building_then_target_history_is_unchang
                 """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                 MODEL (description "Test model customer_snapshot.",
                   materialized snapshot,
@@ -3067,7 +3072,7 @@ def test_given_snapshot_dml_failure_when_building_then_target_history_is_unchang
                 """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                 sources:
                   - name: raw_customers
@@ -3077,7 +3082,7 @@ def test_given_snapshot_dml_failure_when_building_then_target_history_is_unchang
                 """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                 MODEL (description "Test model customer_snapshot.",
                   materialized snapshot,
@@ -3131,7 +3136,7 @@ def test_given_snapshot_dml_failure_when_building_then_target_history_is_unchang
                 """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                 sources:
                   - name: raw_customers
@@ -3141,7 +3146,7 @@ def test_given_snapshot_dml_failure_when_building_then_target_history_is_unchang
                 """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                 MODEL (description "Test model customer_snapshot.",
                   materialized snapshot,
@@ -3195,7 +3200,7 @@ def test_given_snapshot_dml_failure_when_building_then_target_history_is_unchang
                 """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                 sources:
                   - name: raw_customers
@@ -3205,7 +3210,7 @@ def test_given_snapshot_dml_failure_when_building_then_target_history_is_unchang
                 """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                 MODEL (description "Test model customer_snapshot.",
                   materialized snapshot,
@@ -3319,7 +3324,7 @@ def test_given_check_snapshot_project_when_rerunning_build_then_tracks_checked_c
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customer_daily
@@ -3329,7 +3334,7 @@ def test_given_check_snapshot_project_when_rerunning_build_then_tracks_checked_c
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -3398,7 +3403,7 @@ def test_given_check_snapshot_project_when_rerunning_build_then_tracks_checked_c
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customer_daily
@@ -3408,7 +3413,7 @@ def test_given_check_snapshot_project_when_rerunning_build_then_tracks_checked_c
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -3476,7 +3481,7 @@ def test_given_check_snapshot_project_when_rerunning_build_then_tracks_checked_c
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customer_daily
@@ -3486,7 +3491,7 @@ def test_given_check_snapshot_project_when_rerunning_build_then_tracks_checked_c
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -3602,7 +3607,7 @@ def test_given_historical_check_snapshot_project_when_rerunning_build_then_track
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customer_extracts
@@ -3612,7 +3617,7 @@ def test_given_historical_check_snapshot_project_when_rerunning_build_then_track
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -3682,7 +3687,7 @@ def test_given_historical_check_snapshot_project_when_rerunning_build_then_track
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customer_extracts
@@ -3692,7 +3697,7 @@ def test_given_historical_check_snapshot_project_when_rerunning_build_then_track
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -3814,7 +3819,7 @@ def test_given_historical_timestamp_snapshot_project_when_rerunning_build_then_t
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customer_changes
@@ -3824,7 +3829,7 @@ def test_given_historical_timestamp_snapshot_project_when_rerunning_build_then_t
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -3941,7 +3946,7 @@ def test_given_historical_timestamp_changes_project_when_rerunning_build_then_tr
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customers
@@ -3951,7 +3956,7 @@ def test_given_historical_timestamp_changes_project_when_rerunning_build_then_tr
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -3992,7 +3997,7 @@ def test_given_historical_timestamp_changes_project_when_rerunning_build_then_tr
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customers
@@ -4002,7 +4007,7 @@ def test_given_historical_timestamp_changes_project_when_rerunning_build_then_tr
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -4075,7 +4080,7 @@ def test_given_missing_check_snapshot_output_column_when_building_then_cli_repor
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customers
@@ -4085,7 +4090,7 @@ def test_given_missing_check_snapshot_output_column_when_building_then_cli_repor
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -4128,7 +4133,7 @@ def test_given_missing_check_snapshot_output_column_when_building_then_cli_repor
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customers
@@ -4138,7 +4143,7 @@ def test_given_missing_check_snapshot_output_column_when_building_then_cli_repor
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -4225,7 +4230,7 @@ def test_given_snapshot_full_refresh_default_deny_when_building_then_cli_reports
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customers
@@ -4235,7 +4240,7 @@ def test_given_snapshot_full_refresh_default_deny_when_building_then_cli_reports
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -4291,7 +4296,7 @@ def test_given_snapshot_full_refresh_default_deny_when_building_then_cli_reports
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customers
@@ -4301,7 +4306,7 @@ def test_given_snapshot_full_refresh_default_deny_when_building_then_cli_reports
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -4353,7 +4358,7 @@ def test_given_snapshot_full_refresh_default_deny_when_building_then_cli_reports
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customer_daily
@@ -4363,7 +4368,7 @@ def test_given_snapshot_full_refresh_default_deny_when_building_then_cli_reports
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -4432,7 +4437,7 @@ def test_given_snapshot_full_refresh_default_deny_when_building_then_cli_reports
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customer_daily
@@ -4442,7 +4447,7 @@ def test_given_snapshot_full_refresh_default_deny_when_building_then_cli_reports
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -4511,7 +4516,7 @@ def test_given_snapshot_full_refresh_default_deny_when_building_then_cli_reports
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customer_extracts
@@ -4521,7 +4526,7 @@ def test_given_snapshot_full_refresh_default_deny_when_building_then_cli_reports
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -4596,7 +4601,7 @@ def test_given_snapshot_full_refresh_default_deny_when_building_then_cli_reports
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customer_extracts
@@ -4606,7 +4611,7 @@ def test_given_snapshot_full_refresh_default_deny_when_building_then_cli_reports
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -4680,7 +4685,7 @@ def test_given_snapshot_full_refresh_default_deny_when_building_then_cli_reports
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customer_changes
@@ -4690,7 +4695,7 @@ def test_given_snapshot_full_refresh_default_deny_when_building_then_cli_reports
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -4765,7 +4770,7 @@ def test_given_snapshot_full_refresh_default_deny_when_building_then_cli_reports
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customer_changes
@@ -4775,7 +4780,7 @@ def test_given_snapshot_full_refresh_default_deny_when_building_then_cli_reports
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -4849,7 +4854,7 @@ def test_given_snapshot_full_refresh_default_deny_when_building_then_cli_reports
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customer_daily
@@ -4859,7 +4864,7 @@ def test_given_snapshot_full_refresh_default_deny_when_building_then_cli_reports
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,
@@ -4934,7 +4939,7 @@ def test_given_snapshot_full_refresh_default_deny_when_building_then_cli_reports
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_customer_extracts
@@ -4944,7 +4949,7 @@ def test_given_snapshot_full_refresh_default_deny_when_building_then_cli_reports
                     """
                 ).strip()
                 + "\n",
-                "models/customer_snapshot.sql": dedent(
+                "sql/models/customer_snapshot.sql": dedent(
                     """
                     MODEL (description "Test model customer_snapshot.",
                       materialized snapshot,

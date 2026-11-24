@@ -107,7 +107,7 @@ def test_given_typed_planner_cursor_input_when_building_runtime_spec_then_preser
     entry: ModelPlanEntry = ModelPlanEntry(
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="events"),
         name="events",
-        relative_path=Path("models/events.sql"),
+        relative_path=Path("sql/models/events.sql"),
         materialization_type=MaterializationType.INCREMENTAL,
         action=PlanAction.INCREMENTAL_DELETE_INSERT,
         reason=PlanReason.NORMAL_INCREMENTAL,

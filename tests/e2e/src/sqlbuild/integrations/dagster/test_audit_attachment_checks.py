@@ -32,18 +32,18 @@ _SKIPPED_AUDIT_PROJECT_FILES: dict[str, str] = {
         'name = "skipped_audit_checks"\nadapter = "duckdb"\n\n'
         '[connection]\ndatabase = "warehouse.duckdb"\n\n[defaults]\nmaterialized = "table"\n'
     ),
-    "hooks/python/skips.py": (
+    "sql/hooks/python/skips.py": (
         "from sqlbuild.hooks import hook\n\n\n"
         "@hook\ndef skip_model(ctx):\n"
         "    '''Test hook skip_model.'''\n"
         "    return ctx.skip(reason='paused')\n"
     ),
-    "models/customers.sql": (
+    "sql/models/customers.sql": (
         "MODEL (description 'Test model customers.', pre_hooks [python(\"skip_model\")]);\n"
         "SELECT 1 AS customer_id\n"
     ),
-    "models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS order_id\n",
-    "audits/singular/orders_have_customers.sql": (
+    "sql/models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS order_id\n",
+    "sql/audits/singular/orders_have_customers.sql": (
         "AUDIT ();\n"
         'SELECT o.order_id FROM __ref("orders") AS o\n'
         'LEFT JOIN __ref("customers") AS c ON c.customer_id = o.order_id\n'

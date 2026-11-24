@@ -57,8 +57,8 @@ _DOUBLED_AMOUNTS_STAGING: str = edited_staging(
 _HOOKED_TOTALS: str = edited_order_totals(
     before="critical true);", after='critical true, post_hooks [inline_sql("SELECT 1")]);'
 )
-_EXPORT_TASK: str = "python/tasks/exports.py"
-_OWN_DATABASE_ORDERS: str = "models/own_database_orders.sql"
+_EXPORT_TASK: str = "python/nodes/export_totals/asset.py"
+_OWN_DATABASE_ORDERS: str = "sql/models/own_database_orders.sql"
 
 
 @pytest.mark.parametrize(

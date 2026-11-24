@@ -148,16 +148,16 @@ def write_models(snow: pathlib.Path, out: pathlib.Path, report: dict[str, Any]) 
         path = out / model["relative_path"]
         body = translate(model["query_sql"], model["name"])
         path.write_text(model_header(path.read_text()) + "\n" + body + "\n")
-    for path in (out / "functions" / "sql").glob("*.sql"):
+    for path in (out / "sql" / "functions" / "sql").glob("*.sql"):
         text = path.read_text()
         head = header(text, "FUNCTION")
-        compiled = snow / "target" / "compiled" / "functions" / path.name
+        compiled = snow / "target" / "compiled" / "sql" / "functions" / path.name
         body = compiled.read_text() if compiled.exists() else text[len(head) :]
         path.write_text(types(head) + "\n" + translate(body) + "\n")
 
 
 def write_sources(out: pathlib.Path) -> None:
-    for path in [*(out / "sources").glob("*.yml"), out / "seeds" / "seeds.yml"]:
+    for path in [*(out / "sql" / "sources").glob("*.yml"), out / "sql" / "seeds" / "seeds.yml"]:
         doc = yaml.safe_load(path.read_text())
         for entry in doc.get("sources", doc.get("seeds", [])):
             for column in entry.get("columns", []):
@@ -176,16 +176,16 @@ def write_sources(out: pathlib.Path) -> None:
     for path in out.rglob("*.py"):
         if "functions" not in path.parts:
             path.write_text(types(path.read_text()))
-    writer = out / "python" / "loaders" / "_writer.py"
+    writer = out / "python" / "nodes" / "loaders" / "_writer.py"
     text = writer.read_text()
     if WRITER_QUOTE[0] not in text:
-        raise SystemExit("python/loaders/_writer.py changed: update WRITER_QUOTE")
+        raise SystemExit("python/nodes/loaders/_writer.py changed: update WRITER_QUOTE")
     text = text.replace(*WRITER_QUOTE)
     text, count = re.subn(
         r"def insert_sql\(.*?\n\n\ndef statements", lambda _: WRITER_INSERT, text, flags=re.S
     )
     if count != 1:
-        raise SystemExit("python/loaders/_writer.py changed: update WRITER_INSERT")
+        raise SystemExit("python/nodes/loaders/_writer.py changed: update WRITER_INSERT")
     writer.write_text(text)
 
 
@@ -196,9 +196,9 @@ def write_declarations(out: pathlib.Path) -> None:
 
     for path in [p for p in out.rglob("*.sql") if "audits" in str(p.relative_to(out))]:
         path.write_text(audit_sql(path.read_text()))
-    for path in out.glob("models/**/_sqlbuild/_schemas/*.sql"):
+    for path in out.glob("sql/models/**/_sqlbuild/_schemas/*.sql"):
         path.write_text(types(path.read_text()))
-    models = [p for p in out.glob("models/**/*.sql") if "_sqlbuild" not in p.parts]
+    models = [p for p in out.glob("sql/models/**/*.sql") if "_sqlbuild" not in p.parts]
     enums = {path.stem: path for path in out.glob("**/enums/*.sql")}
     for name in [n for n, p in enums.items() if re.search(r"members \(\w+ \d", p.read_text())]:
         del enums[name]
@@ -211,12 +211,14 @@ def write_declarations(out: pathlib.Path) -> None:
                 owners.setdefault(name, set()).add(path.parent)
     keep: dict[pathlib.Path, str] = {}
     for name, folders in owners.items():
-        folder = folders.pop() / "_sqlbuild" / "_enums" if len(folders) == 1 else out / "enums"
+        folder = (
+            folders.pop() / "_sqlbuild" / "_enums" if len(folders) == 1 else out / "sql" / "enums"
+        )
         keep[folder / f"{name}.sql"] = types(enums[name].read_text())
     for gone in ("tests", "macros", "rules", "constants", "enums"):
         shutil.rmtree(out / gone, ignore_errors=True)
     for folder in ("_macros", "macros", "constants", "_constants", "enums", "_enums"):
-        for path in list(out.glob(f"models/**/_sqlbuild/{folder}")):
+        for path in list(out.glob(f"sql/models/**/_sqlbuild/{folder}")):
             shutil.rmtree(path)
     for path, text in keep.items():
         path.parent.mkdir(parents=True, exist_ok=True)

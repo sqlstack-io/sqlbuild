@@ -45,7 +45,7 @@ Exactly one of a positional target or `--select` is required.
 | `--mode` | Column lineage analysis mode: `rich` (default) or `fast`. |
 | `--no-sql-analysis` | Disable compile-time SQL analysis (`--no-sql-validation` is an alias). |
 | `--allow-missing-secrets` | Run without provider secrets; see [Secrets](../concepts/python-nodes/providers.md#secrets) |
-| `--select`, `-s` | Select resources using the same selector syntax as `sqb compile`, `sqb plan` and `sqb build`, for example `path:models/marts`, `tag:finance` or `stg_*`. |
+| `--select`, `-s` | Select resources using the same selector syntax as `sqb compile`, `sqb plan` and `sqb build`, for example `path:sql/models/marts`, `tag:finance` or `stg_*`. |
 | `--exclude` | Exclude resources from the selection. |
 
 ## Model lineage
@@ -61,7 +61,7 @@ sqb lineage fact_orders --direction both
 ```
 
 ```
-Lineage  model  fact_orders  models/marts/fact_orders.sql  both
+Lineage  model  fact_orders  sql/models/marts/fact_orders.sql  both
 upstream
 ├── model  stg_orders  models/staging/stg_orders.sql
 │   └── source  raw__orders  sources/raw.yml
@@ -113,14 +113,14 @@ sqb lineage fact_orders --json
       "id": "model:fact_orders",
       "name": "fact_orders",
       "resource_type": "model",
-      "relative_path": "models/marts/fact_orders.sql",
+      "relative_path": "sql/models/marts/fact_orders.sql",
       "qualified_name": "dev.fact_orders"
     },
     {
       "id": "source:raw__orders",
       "name": "raw__orders",
       "resource_type": "source",
-      "relative_path": "sources/raw.yml"
+      "relative_path": "sql/sources/raw.yml"
     }
   ],
   "edges": [
@@ -233,7 +233,7 @@ sqb lineage fact_orders.order_id --direction downstream
 sqb lineage fact_orders.total_cents --depth 1
 
 # Lineage for all models in a path
-sqb lineage --select path:models/marts
+sqb lineage --select path:sql/models/marts
 
 # Lineage between two models (path-between)
 sqb lineage --select "stg_orders~daily_activity_rollup"

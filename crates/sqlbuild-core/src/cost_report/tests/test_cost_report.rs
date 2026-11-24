@@ -1,7 +1,7 @@
 use crate::cost_report::main::format_cost_breakdown::format_cost_breakdown;
 use crate::cost_report::main::format_cost_history::format_cost_history;
 use crate::cost_report::models::BreakdownOptions;
-use crate::cost_report::tests::helpers::{resource, run};
+use crate::cost_report::tests::helpers::{priced, resource, run};
 use crate::cost_report::tests::test_types::{BreakdownTestCase, HistoryTestCase};
 
 #[test]
@@ -18,7 +18,7 @@ fn given_cost_runs_when_formatting_breakdown_then_table_matches_python_layout() 
             ),
             limit: None,
             terminal_width: 140,
-            expected_text: "Cost  $0.0206 estimated  |  0.006858 attributed credits  |  default $3.00/credit\nRun  run-1\n\nModel      Warehouse     Busy share  Scanned  Attributed credits  Est. cost\norders     TRANSFORM_WH      12.34s  5.0 TiB            0.003429    $0.0103\ncustomers  TRANSFORM_WH      12.34s  1.5 KiB            0.003429    $0.0000\nTOTAL                        24.69s  1.5 KiB            0.006858    $0.0206\nConfigure cost.usd_per_credit with your Snowflake contract rate.\nEstimate uses fair-share visible warehouse busy time; it is not Snowflake-billed credits or invoice reconciliation.",
+            expected_text: "Cost  $0.0206 estimated  |  0.006858 attributed credits  |  default $3.00/credit\nRun  run-1\n\nModel      Warehouse     Busy share  Scanned  Attributed credits  Est. cost\norders     TRANSFORM_WH      12.34s  5.0 TiB            0.003429    $0.0103\ncustomers  TRANSFORM_WH      12.34s  1.5 KiB            0.003429    $0.0000\nTOTAL                        24.69s  1.5 KiB            0.006858    $0.0206\nConfigure cost.usd_per_credit with your Snowflake contract rate, or let the connection's role read SNOWFLAKE.ORGANIZATION_USAGE.RATE_SHEET_DAILY.\nEstimate uses fair-share visible warehouse busy time; it is not Snowflake-billed credits or invoice reconciliation.",
         },
         BreakdownTestCase {
             description: "a narrow limited table notes the hidden resources",
@@ -31,7 +31,33 @@ fn given_cost_runs_when_formatting_breakdown_then_table_matches_python_layout() 
             ),
             limit: Some(1),
             terminal_width: 80,
-            expected_text: "Cost  $0.0206 estimated  |  0.006858 attributed credits  |  default $3.00/credit\nRun  run-1\n\nModel                             Attributed credits  Est. cost\norders_with_a_very_long_model...            0.003429    $2.5000\nTOTAL                                       0.006858    $0.0206\nShowing 1 of 2 by estimated cost; `sqb cost run-1` for all models (1 more).\nConfigure cost.usd_per_credit with your Snowflake contract rate.\nEstimate uses fair-share visible warehouse busy time; it is not Snowflake-billed credits or invoice reconciliation.",
+            expected_text: "Cost  $0.0206 estimated  |  0.006858 attributed credits  |  default $3.00/credit\nRun  run-1\n\nModel                             Attributed credits  Est. cost\norders_with_a_very_long_model...            0.003429    $2.5000\nTOTAL                                       0.006858    $0.0206\nShowing 1 of 2 by estimated cost; `sqb cost run-1` for all models (1 more).\nConfigure cost.usd_per_credit with your Snowflake contract rate, or let the connection's role read SNOWFLAKE.ORGANIZATION_USAGE.RATE_SHEET_DAILY.\nEstimate uses fair-share visible warehouse busy time; it is not Snowflake-billed credits or invoice reconciliation.",
+        },
+        BreakdownTestCase {
+            description: "a list price reads as an estimate and names its source",
+            run: priced(
+                run(
+                    "2026-09-01T10:05:00+02:00",
+                    vec![resource("orders", "0.5", 0)],
+                ),
+                "list_price",
+            ),
+            limit: None,
+            terminal_width: 80,
+            expected_text: "Cost  $0.0206 estimated  |  0.006858 attributed credits  |  $3.00/credit est. (list price)\nRun  run-1\n\nModel   Attributed credits  Est. cost\norders            0.003429    $0.5000\nTOTAL             0.006858    $0.0206\nConfigure cost.usd_per_credit with your Snowflake contract rate, or let the connection's role read SNOWFLAKE.ORGANIZATION_USAGE.RATE_SHEET_DAILY.\nEstimate uses fair-share visible warehouse busy time; it is not Snowflake-billed credits or invoice reconciliation.",
+        },
+        BreakdownTestCase {
+            description: "the rate sheet's price names its source, with no advice",
+            run: priced(
+                run(
+                    "2026-09-01T10:05:00+02:00",
+                    vec![resource("orders", "0.5", 0)],
+                ),
+                "rate_sheet",
+            ),
+            limit: None,
+            terminal_width: 80,
+            expected_text: "Cost  $0.0206 estimated  |  0.006858 attributed credits  |  $3.00/credit (rate sheet)\nRun  run-1\n\nModel   Attributed credits  Est. cost\norders            0.003429    $0.5000\nTOTAL             0.006858    $0.0206\nEstimate uses fair-share visible warehouse busy time; it is not Snowflake-billed credits or invoice reconciliation.",
         },
     ];
 

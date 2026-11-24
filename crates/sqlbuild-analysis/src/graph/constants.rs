@@ -12,8 +12,8 @@ pub(crate) const KIND_SEPARATOR: char = ':';
 pub(crate) const FOLDER_SEPARATOR: char = '/';
 pub(crate) const INTERSECTION_SEPARATOR: char = ',';
 pub(crate) const PATTERN_CHARACTERS: [char; 3] = ['*', '?', '['];
-pub(crate) const MODEL_ROOT: &str = "models";
-pub(crate) const MODEL_ROOT_PREFIX: &str = "models/";
+pub(crate) const MODEL_ROOT: &str = "sql/models";
+pub(crate) const MODEL_ROOT_PREFIX: &str = "sql/models/";
 pub(crate) const SQL_FILE_SUFFIX: &str = ".sql";
 pub(crate) const TAG_KIND: &str = "tag";
 pub(crate) const PATH_KIND: &str = "path";
@@ -44,7 +44,7 @@ pub(crate) const PATH_ROOT_CODE: &str = "S012";
 pub(crate) const UNIT_TEST_CODE: &str = "S013";
 pub const PLANNER_DEFAULT_CODE: &str = "S000";
 pub(crate) const PATH_ROOT_ERROR: &str =
-    "path selectors require an explicit root: use 'models/' or 'python/'";
+    "path selectors require an explicit root: use 'sql/models/' or 'python/nodes/'";
 pub(crate) const UNIT_TEST_ONLY_TEST_AND_BUILD: &str =
     "only `sqb test` and `sqb build` accept unit-test selectors";
 /// `difflib.SequenceMatcher` treats an element as popular only in sequences this long.

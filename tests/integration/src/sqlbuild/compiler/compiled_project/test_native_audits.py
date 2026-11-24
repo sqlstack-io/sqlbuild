@@ -105,7 +105,7 @@ def test_given_audit_when_compiling_then_native_project_holds_its_attachment(
         NativeAuditErrorTestCase(
             description="attachment of an unknown generic audit",
             files={
-                "models/customers.sql": (
+                "sql/models/customers.sql": (
                     "MODEL (description 'Customers.', columns (customer_id (type INTEGER,"
                     " audits [at_most(maximum 3)])));\nSELECT 1 AS customer_id\n"
                 ),
@@ -115,13 +115,13 @@ def test_given_audit_when_compiling_then_native_project_holds_its_attachment(
         NativeAuditErrorTestCase(
             description="singular audit reading an unknown model",
             files={
-                "audits/singular/orders_have_customers.sql": (
+                "sql/audits/singular/orders_have_customers.sql": (
                     "AUDIT (name orders_have_customers);\n"
                     'SELECT * FROM __ref("orders") JOIN __ref("missing_customers") ON TRUE\n'
                 ),
             },
             expected_message=(
-                "Audit file audits/singular/orders_have_customers.sql references unknown model"
+                "Audit file sql/audits/singular/orders_have_customers.sql references unknown model"
                 " 'missing_customers'"
             ),
         ),
@@ -140,7 +140,7 @@ def test_given_audit_when_compiling_then_native_project_holds_its_attachment(
         NativeAuditErrorTestCase(
             description="unknown singular audit run scope",
             files={
-                "audits/singular/orders_have_customers.sql": (
+                "sql/audits/singular/orders_have_customers.sql": (
                     "AUDIT (name orders_have_customers, run_scope always);\n"
                     'SELECT * FROM __ref("orders") JOIN __ref("customers") ON TRUE\n'
                 ),
@@ -150,19 +150,19 @@ def test_given_audit_when_compiling_then_native_project_holds_its_attachment(
         NativeAuditErrorTestCase(
             description="model-attached audit that does not read its model",
             files={
-                "audits/generic/at_least.sql": (
+                "sql/audits/generic/at_least.sql": (
                     'AUDIT (name at_least);\nSELECT * FROM __ref("customers") WHERE @minimum > 0\n'
                 ),
             },
             expected_message=(
-                "models/orders.sql audit 'at_least': model-attached audit must reference the"
+                "sql/models/orders.sql audit 'at_least': model-attached audit must reference the"
                 " attached model 'orders' via __ref()"
             ),
         ),
         NativeAuditErrorTestCase(
             description="singular audit reading a dbt model",
             files={
-                "audits/singular/orders_have_customers.sql": (
+                "sql/audits/singular/orders_have_customers.sql": (
                     "AUDIT (name orders_have_customers);\n"
                     'SELECT * FROM __ref("orders") JOIN __dbt_ref("customers") ON TRUE\n'
                 ),
@@ -174,7 +174,7 @@ def test_given_audit_when_compiling_then_native_project_holds_its_attachment(
         NativeAuditErrorTestCase(
             description="thresholds on a violation audit attachment",
             files={
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     "MODEL (description 'Orders.', columns (order_id (type INTEGER,"
                     " audits [at_least(minimum 1, thresholds (warn (above 1)))])));\n"
                     "SELECT 1 AS order_id\n"
@@ -185,43 +185,43 @@ def test_given_audit_when_compiling_then_native_project_holds_its_attachment(
         NativeAuditErrorTestCase(
             description="standalone measurement audit with a non-numeric threshold",
             files={
-                "audits/singular/coverage.sql": 'AUDIT (name coverage, evaluation measurement, value rate, thresholds (warn (above \'x\')));\nMEASURE (SELECT COUNT(*) AS rate FROM __ref("orders") JOIN __ref("customers") ON TRUE);\n'
+                "sql/audits/singular/coverage.sql": 'AUDIT (name coverage, evaluation measurement, value rate, thresholds (warn (above \'x\')));\nMEASURE (SELECT COUNT(*) AS rate FROM __ref("orders") JOIN __ref("customers") ON TRUE);\n'
             },
             expected_message=(
-                "audits/singular/coverage.sql standalone measurement audit invalid thresholds:"
+                "sql/audits/singular/coverage.sql standalone measurement audit invalid thresholds:"
                 " above threshold requires one numeric value"
             ),
         ),
         NativeAuditErrorTestCase(
             description="standalone measurement audit with negative minimum samples",
             files={
-                "audits/singular/coverage.sql": 'AUDIT (name coverage, evaluation measurement, value rate, thresholds (warn (above 1)), minimum_samples -1);\nMEASURE (SELECT COUNT(*) AS rate FROM __ref("orders") JOIN __ref("customers") ON TRUE);\n'
+                "sql/audits/singular/coverage.sql": 'AUDIT (name coverage, evaluation measurement, value rate, thresholds (warn (above 1)), minimum_samples -1);\nMEASURE (SELECT COUNT(*) AS rate FROM __ref("orders") JOIN __ref("customers") ON TRUE);\n'
             },
             expected_message=(
-                "audits/singular/coverage.sql standalone measurement audit 'minimum_samples'"
+                "sql/audits/singular/coverage.sql standalone measurement audit 'minimum_samples'"
                 " must be a non-negative integer"
             ),
         ),
         NativeAuditErrorTestCase(
             description="generic audit attachment missing an argument",
             files={
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     "MODEL (description 'Orders.', columns (order_id (type INTEGER, audits [at_least])));\n"
                     "SELECT 1 AS order_id\n"
                 )
             },
-            expected_message="models/orders.sql is missing argument 'minimum' for generic audit 'at_least'",
+            expected_message="sql/models/orders.sql is missing argument 'minimum' for generic audit 'at_least'",
         ),
         NativeAuditErrorTestCase(
             description="generic audit attachment overriding its implicit column",
             files={
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     "MODEL (description 'Orders.', columns (order_id (type INTEGER, audits [at_least(minimum 1, column other_id)])));\n"
                     "SELECT 1 AS order_id\n"
                 )
             },
             expected_message=(
-                "models/orders.sql audit 'at_least' must not override implicit column from"
+                "sql/models/orders.sql audit 'at_least' must not override implicit column from"
                 " attached context"
             ),
         ),
@@ -247,14 +247,14 @@ def test_given_invalid_audit_when_compiling_then_native_attachment_rejects_it(
         NativeMeasurementPolicyTestCase(
             description="error threshold makes the standalone audit an error",
             files={
-                "audits/singular/coverage.sql": 'AUDIT (name coverage, evaluation measurement, value rate, thresholds (warn (above 1), error (above 5)), minimum_samples 3);\nMEASURE (SELECT COUNT(*) AS rate FROM __ref("orders") JOIN __ref("customers") ON TRUE);\n'
+                "sql/audits/singular/coverage.sql": 'AUDIT (name coverage, evaluation measurement, value rate, thresholds (warn (above 1), error (above 5)), minimum_samples 3);\nMEASURE (SELECT COUNT(*) AS rate FROM __ref("orders") JOIN __ref("customers") ON TRUE);\n'
             },
             expected_policy=("above", 1.0, "above", 5.0, 3, "error"),
         ),
         NativeMeasurementPolicyTestCase(
             description="warn-only threshold keeps an unbounded authored sample count",
             files={
-                "audits/singular/coverage.sql": 'AUDIT (name coverage, evaluation measurement, value rate, thresholds (warn (above 1)), minimum_samples 99999999999999999999);\nMEASURE (SELECT COUNT(*) AS rate FROM __ref("orders") JOIN __ref("customers") ON TRUE);\n'
+                "sql/audits/singular/coverage.sql": 'AUDIT (name coverage, evaluation measurement, value rate, thresholds (warn (above 1)), minimum_samples 99999999999999999999);\nMEASURE (SELECT COUNT(*) AS rate FROM __ref("orders") JOIN __ref("customers") ON TRUE);\n'
             },
             expected_policy=("above", 1.0, None, None, 99999999999999999999, "warn"),
         ),

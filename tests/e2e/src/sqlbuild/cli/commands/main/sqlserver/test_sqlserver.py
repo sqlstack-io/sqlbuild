@@ -61,6 +61,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     run_sqb,
     stringify_warehouse_rows,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 
 @pytest.mark.parametrize(
@@ -114,13 +115,13 @@ def test_given_managed_source_when_cloning_sqlserver_then_source_precedes_depend
                 "[targets.prod.clone]\n"
                 "allow_as_clone_destination = true\n"
             ),
-            "python/loaders/raw.py": (
+            "python/nodes/loaders/raw/loader.py": (
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader\n"
                 "def raw_customers(ctx):\n"
                 "    '''Test loader raw_customers.'''\n    return []\n"
             ),
-            "sources/raw.yml": (
+            "sql/sources/raw.yml": (
                 "sources:\n"
                 "  - name: raw_customers\n    description: Test source raw_customers.\n"
                 "    managed: true\n"
@@ -131,7 +132,7 @@ def test_given_managed_source_when_cloning_sqlserver_then_source_precedes_depend
                 "      - name: first_name\n"
                 "        type: VARCHAR\n"
             ),
-            "models/stg_customers.sql": (
+            "sql/models/stg_customers.sql": (
                 "MODEL (description 'Test model stg_customers.', materialized view);\n\n"
                 'SELECT customer_id, first_name FROM __source("raw_customers")\n'
             ),
@@ -293,7 +294,7 @@ def test_given_sqlserver_targets_when_running_diff_then_all_modes_execute_end_to
                 "[targets.dev]\n"
                 f'schema = "{dev_schema}"\n'
             ),
-            "models/fact_orders.sql": (
+            "sql/models/fact_orders.sql": (
                 "MODEL (description 'Test model fact_orders.',\n"
                 "  materialized table,\n"
                 "  unique_key [order_id],\n"
@@ -432,15 +433,15 @@ def test_given_python_result_when_running_check_on_sqlserver_then_persists_node_
                 schema_name=schema_name,
                 config=config,
             ),
-            "python/tasks/results.py": (
+            "python/nodes/tasks/results/asset.py": (
                 "from sqlbuild.assets import asset\n\n"
                 "@asset\n"
                 "def produce_result(ctx):\n"
                 "    '''Test task produce_result.'''\n    return ctx.result(payload={'value': 42}, metadata={'source': 'sqlserver'})\n"
             ),
-            "python/checks/results.py": (
+            "python/nodes/checks/results/checks.py": (
                 "from sqlbuild.checks import check\n"
-                "from python.tasks.results import produce_result\n\n"
+                "from python.nodes.tasks.results.asset import produce_result\n\n"
                 "@check(depends_on=produce_result)\n"
                 "def check_produce_result(ctx):\n"
                 "    '''Test check check_produce_result.'''\n    return ctx.result_of(node_function=produce_result).payload['value'] == 42\n"
@@ -707,7 +708,7 @@ def test_given_source_loader_project_when_building_on_sqlserver_then_model_reads
                 schema_name=schema_name,
                 config=config,
             ),
-            "sources/raw.yml": (
+            "sql/sources/raw.yml": (
                 "sources:\n"
                 "  - name: raw_orders\n    description: Test source raw_orders.\n"
                 "    managed: true\n"
@@ -718,13 +719,13 @@ def test_given_source_loader_project_when_building_on_sqlserver_then_model_reads
                 "      - name: status\n"
                 "        type: NVARCHAR(100)\n"
             ),
-            "python/loaders/raw_orders.py": (
+            "python/nodes/loaders/raw_orders/loader.py": (
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader\n"
                 "def raw_orders(ctx):\n"
                 "    '''Test loader raw_orders.'''\n    return [{'order_id': 7, 'status': 'loaded-dev'}]\n"
             ),
-            "models/stg_orders.sql": (
+            "sql/models/stg_orders.sql": (
                 'MODEL (description "Test model stg_orders.", materialized table);\n\nSELECT order_id, status FROM __source("raw_orders")'
             ),
         },
@@ -779,7 +780,7 @@ def test_given_source_deferral_env_when_building_on_sqlserver_then_reads_prod_an
                 prod_schema_name=prod_schema_name,
                 config=config,
             ),
-            "sources/raw.yml": (
+            "sql/sources/raw.yml": (
                 "sources:\n"
                 "  - name: raw_orders\n    description: Test source raw_orders.\n"
                 "    managed: true\n"
@@ -790,13 +791,13 @@ def test_given_source_deferral_env_when_building_on_sqlserver_then_reads_prod_an
                 "      - name: status\n"
                 "        type: NVARCHAR(100)\n"
             ),
-            "python/loaders/raw_orders.py": (
+            "python/nodes/loaders/raw_orders/loader.py": (
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader\n"
                 "def raw_orders(ctx):\n"
                 "    '''Test loader raw_orders.'''\n    return [{'order_id': 7, 'status': 'loaded-dev'}]\n"
             ),
-            "models/stg_orders.sql": (
+            "sql/models/stg_orders.sql": (
                 'MODEL (description "Test model stg_orders.", materialized table);\n\nSELECT order_id, status FROM __source("raw_orders")'
             ),
         },
@@ -1040,22 +1041,25 @@ def test_given_chained_loader_project_when_loading_on_sqlserver_then_runs_loader
                 "      - name: status\n"
                 "        type: NVARCHAR(100)\n"
             ),
-            loader_py=(
-                "from sqlbuild.loaders import loader\n\n"
-                "@loader(write_strategy='table', columns=[\n"
-                "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                "])\n"
-                "def fetch_events(ctx):\n"
-                "    '''Test loader fetch_events.'''\n    return [{'event_id': 1}, {'event_id': 2}]\n\n"
-                "@loader(depends_on=[fetch_events])\n"
-                "def raw_events(ctx):\n"
-                "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
-                "    cursor = ctx.query(\n"
-                "        f'SELECT event_id FROM {events.destination} ORDER BY event_id'\n"
-                "    )\n"
-                "    rows = cursor.fetchall()\n"
-                "    return [{'event_id': row[0], 'status': 'loaded'} for row in rows]\n"
-            ),
+            node_files={
+                **node_module_files(
+                    "python/nodes/loaders/source_rows.py",
+                    "from sqlbuild.loaders import loader\n\n"
+                    "@loader(write_strategy='table', columns=[\n"
+                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
+                    "])\n"
+                    "def fetch_events(ctx):\n"
+                    "    '''Test loader fetch_events.'''\n    return [{'event_id': 1}, {'event_id': 2}]\n\n"
+                    "@loader(depends_on=[fetch_events])\n"
+                    "def raw_events(ctx):\n"
+                    "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
+                    "    cursor = ctx.query(\n"
+                    "        f'SELECT event_id FROM {events.destination} ORDER BY event_id'\n"
+                    "    )\n"
+                    "    rows = cursor.fetchall()\n"
+                    "    return [{'event_id': row[0], 'status': 'loaded'} for row in rows]\n",
+                )
+            },
         ),
     )
     (project_dir / "sqlbuild_project.toml").write_text(
@@ -1222,7 +1226,9 @@ def test_given_intermediate_strategy_project_when_loading_twice_on_sqlserver_the
                 "      - name: amount\n"
                 "        type: INTEGER\n"
             ),
-            loader_py=test_case.loader_py,
+            node_files={
+                **node_module_files("python/nodes/loaders/source_rows.py", test_case.loader_py)
+            },
         ),
     )
     (project_dir / "sqlbuild_project.toml").write_text(
@@ -1337,7 +1343,7 @@ def test_given_snapshot_project_when_building_on_sqlserver_then_scd2_history_is_
             expected_historical_check_rows=test_case.expected_historical_check_rows,
         )
 
-        (project_dir / "models" / "current_customers.sql").write_text(
+        (project_dir / "sql" / "models" / "current_customers.sql").write_text(
             adapt_sqlserver_sql(
                 build_current_customers_model_sql(plan="blocked", updated_at="2026-01-02 00:00:00")
             ),
@@ -1363,7 +1369,7 @@ def test_given_snapshot_project_when_building_on_sqlserver_then_scd2_history_is_
             expected_rows=test_case.expected_current_rows_after_initial_build,
         )
 
-        (project_dir / "models" / "current_customers.sql").write_text(
+        (project_dir / "sql" / "models" / "current_customers.sql").write_text(
             adapt_sqlserver_sql(
                 build_current_customers_model_sql(plan="pro", updated_at="2026-01-02 00:00:00")
             ),
@@ -1448,18 +1454,18 @@ def test_given_existing_snapshot_targets_when_building_on_sqlserver_then_apply_s
         )
         assert initial_result.returncode == 0, initial_result.stdout + initial_result.stderr
 
-        (project_dir / "models" / "current_check_customers.sql").write_text(
+        (project_dir / "sql" / "models" / "current_check_customers.sql").write_text(
             build_current_check_customers_model_sql(changed=True), encoding="utf-8"
         )
-        (project_dir / "models" / "current_delete_customers.sql").write_text(
+        (project_dir / "sql" / "models" / "current_delete_customers.sql").write_text(
             adapt_sqlserver_sql(build_current_delete_customers_model_sql(changed=True)),
             encoding="utf-8",
         )
-        (project_dir / "models" / "historical_timestamp_extracts.sql").write_text(
+        (project_dir / "sql" / "models" / "historical_timestamp_extracts.sql").write_text(
             adapt_sqlserver_sql(build_historical_timestamp_extracts_model_sql(changed=True)),
             encoding="utf-8",
         )
-        (project_dir / "models" / "historical_check_daily.sql").write_text(
+        (project_dir / "sql" / "models" / "historical_check_daily.sql").write_text(
             adapt_sqlserver_sql(build_historical_check_daily_model_sql(changed=True)),
             encoding="utf-8",
         )

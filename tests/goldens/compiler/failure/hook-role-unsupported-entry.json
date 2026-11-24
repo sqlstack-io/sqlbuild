@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D013",
-     "message": "Unsupported entries in models/marts/_sqlbuild/hooks/: models/marts/_sqlbuild/hooks/notes.sql; hooks/ accepts only python/, sql/"
+     "message": "Unsupported entries in sql/models/marts/_sqlbuild/hooks/: sql/models/marts/_sqlbuild/hooks/notes.sql; hooks/ accepts only python/, sql/"
     }
    ]
   }

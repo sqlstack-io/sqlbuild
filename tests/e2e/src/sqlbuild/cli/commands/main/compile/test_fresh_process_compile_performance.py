@@ -46,7 +46,7 @@ _NATIVE_COLD_WALL_ALLOWANCE: float = 1.42
             expected_max_wall_seconds=9.9 * _NATIVE_COLD_WALL_ALLOWANCE,
             expected_max_rss_bytes=1088 * _MIB,
             expected_semantic_fingerprint=(
-                "c9e4f4857b6879dbbde2f3ed28bc298124569817958512df4dd01170a537be90"
+                "5d8d4ea9cf91ad660e95fabf90f0e645bd90fc0fe0c6b82028e91fe82ea0ea1d"
             ),
         ),
         FreshProcessCompilePerformanceGuardTestCase(
@@ -62,7 +62,7 @@ _NATIVE_COLD_WALL_ALLOWANCE: float = 1.42
             expected_max_wall_seconds=15.4 * _NATIVE_COLD_WALL_ALLOWANCE,
             expected_max_rss_bytes=1664 * _MIB,
             expected_semantic_fingerprint=(
-                "c89d8d60e9655dcef4cd01c0fc270a9aa2343cb2d56aae2ab5ca476a9778ec39"
+                "4549894f456c85028882b142c98f63c2015df30c96bad18fe0148c3e9662e1f4"
             ),
         ),
         FreshProcessCompilePerformanceGuardTestCase(
@@ -78,7 +78,7 @@ _NATIVE_COLD_WALL_ALLOWANCE: float = 1.42
             expected_max_wall_seconds=28.8 * _NATIVE_COLD_WALL_ALLOWANCE,
             expected_max_rss_bytes=int(2.5 * _GIB),
             expected_semantic_fingerprint=(
-                "a5caf9a87baa70eb5f90cbd2d30cc86b41d6b160f6e5eadd23413b153878d9e8"
+                "e45034fe50c3907e4669ed4cc00bfd44ac9b1544cda2fad6d4bb06f77502c12e"
             ),
         ),
     ],

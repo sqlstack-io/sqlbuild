@@ -93,19 +93,19 @@ def test_given_sql_test_planning_running_when_interpreter_finalizes_then_process
     tmp_path: Path,
 ) -> None:
     project_dir: Path = tmp_path / "orders_project"
-    (project_dir / "models").mkdir(parents=True)
+    (project_dir / "sql" / "models").mkdir(parents=True)
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "orders_project"\nadapter = "duckdb"\n\n'
         '[connection]\ndatabase = "orders_project.duckdb"\n',
         encoding="utf-8",
     )
-    (project_dir / "sources").mkdir()
-    (project_dir / "sources" / "raw.yml").write_text(
+    (project_dir / "sql" / "sources").mkdir(parents=True)
+    (project_dir / "sql" / "sources" / "raw.yml").write_text(
         "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
         "    schema: raw\n    table: orders\n",
         encoding="utf-8",
     )
-    (project_dir / "models" / "orders.sql").write_text(
+    (project_dir / "sql" / "models" / "orders.sql").write_text(
         "MODEL (description 'Test model orders.', materialized table);\n\n"
         'SELECT * FROM __source("raw_orders")\n',
         encoding="utf-8",

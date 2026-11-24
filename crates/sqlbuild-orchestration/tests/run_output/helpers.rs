@@ -84,8 +84,14 @@ pub(crate) fn segment(node_key: Option<&str>, stream: OutputStream, text: &str) 
         node_key: node_key.map(str::to_owned),
         stream,
         text: text.into(),
+        read_at: read_at(0),
         dropped_bytes: 0,
     }
+}
+
+/// A read time `millis` milliseconds after a fixed moment.
+pub(crate) fn read_at(millis: i64) -> chrono::DateTime<chrono::Utc> {
+    chrono::DateTime::from_timestamp_millis(1_795_000_000_000 + millis).expect("read time")
 }
 
 pub(crate) fn batch(number: u64, segments: Vec<OutputSegment>) -> OutputBatch {

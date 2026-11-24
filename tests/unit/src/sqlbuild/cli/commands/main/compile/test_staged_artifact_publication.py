@@ -26,8 +26,8 @@ from tests.unit.src.sqlbuild.cli.commands.main.compile.helpers import (
     write_relative_files,
 )
 
-_MODEL_FILE: str = "compiled/models/staging/orders.sql"
-_FUNCTION_FILE: str = "compiled/functions/sql/is_completed_order.sql"
+_MODEL_FILE: str = "compiled/sql/models/staging/orders.sql"
+_FUNCTION_FILE: str = "compiled/sql/functions/sql/is_completed_order.sql"
 _PUBLISHED_FILES: dict[str, str] = {
     _MODEL_FILE: "SELECT 2 AS order_id\n",
     _FUNCTION_FILE: (
@@ -43,9 +43,9 @@ _PUBLISHED_FILES: dict[str, str] = {
     [
         StagedPublishTestCase(
             description="new files join an existing tree and replace its stale files",
-            existing_files={"compiled/models/obsolete.sql": "SELECT 0\n"},
+            existing_files={"compiled/sql/models/obsolete.sql": "SELECT 0\n"},
             expected_files=_PUBLISHED_FILES,
-            expected_removed=("compiled/models/obsolete.sql",),
+            expected_removed=("compiled/sql/models/obsolete.sql",),
         ),
         StagedPublishTestCase(
             description="a cold tree is published whole",
@@ -77,9 +77,9 @@ def test_given_staged_artifacts_when_publishing_then_target_holds_exactly_the_st
     [
         TamperedStagedPublishTestCase(
             description="a staged file deleted after preparation",
-            existing_files={"compiled/models/obsolete.sql": "SELECT 0\n"},
+            existing_files={"compiled/sql/models/obsolete.sql": "SELECT 0\n"},
             removed_staged_files=(_MODEL_FILE,),
-            expected_kept_files={"compiled/models/obsolete.sql": "SELECT 0\n"},
+            expected_kept_files={"compiled/sql/models/obsolete.sql": "SELECT 0\n"},
         )
     ],
     ids=lambda case: case.description,
@@ -110,8 +110,8 @@ def test_given_changed_staging_tree_when_publishing_then_nothing_stale_is_delete
         StagingInterleavingTestCase(
             description="cleanup during staging creation keeps the live compile's tree",
             existing_files={
-                ".sqlbuild-staging-abandoned/compiled/models/orders.sql": "SELECT 0\n",
-                "compiled/models/obsolete.sql": "SELECT 0\n",
+                ".sqlbuild-staging-abandoned/compiled/sql/models/orders.sql": "SELECT 0\n",
+                "compiled/sql/models/obsolete.sql": "SELECT 0\n",
             },
             expected_files=_PUBLISHED_FILES,
         )
@@ -154,7 +154,7 @@ def test_given_cleanup_interleaved_with_staging_when_compiling_then_live_staging
     assert survived == [True]
     assert written is not None
     assert read_target_files(target, test_case.expected_files) == test_case.expected_files
-    assert not (target / "compiled" / "models" / "obsolete.sql").exists()
+    assert not (target / "compiled" / "sql" / "models" / "obsolete.sql").exists()
     assert sorted(path.name for path in target.glob(".sqlbuild-staging-*")) == []
 
 
@@ -163,9 +163,9 @@ def test_given_cleanup_interleaved_with_staging_when_compiling_then_live_staging
     [
         TamperedStagedPublishTestCase(
             description="the owner marker removed from a live staging tree",
-            existing_files={"compiled/models/obsolete.sql": "SELECT 0\n"},
+            existing_files={"compiled/sql/models/obsolete.sql": "SELECT 0\n"},
             removed_staged_files=(".owner",),
-            expected_kept_files={"compiled/models/obsolete.sql": "SELECT 0\n"},
+            expected_kept_files={"compiled/sql/models/obsolete.sql": "SELECT 0\n"},
         )
     ],
     ids=lambda case: case.description,

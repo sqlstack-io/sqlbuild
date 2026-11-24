@@ -84,7 +84,7 @@ def dynamic_context(
     entry: ModelPlanEntry = ModelPlanEntry(
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="daily_totals"),
         name="daily_totals",
-        relative_path=Path("models/daily_totals.sql"),
+        relative_path=Path("sql/models/daily_totals.sql"),
         materialization_type=MaterializationType.DYNAMIC,
         action=action,
         reason=PlanReason.FIRST_RUN,

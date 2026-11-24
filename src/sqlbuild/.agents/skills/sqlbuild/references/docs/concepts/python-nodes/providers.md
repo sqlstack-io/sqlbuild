@@ -25,10 +25,10 @@ Providers are shared runtime services that SQLBuild discovers, configures, and i
 
 ## Defining a provider
 
-Create a `provider.py` in a capability folder under `providers/` (see [Project layout](#project-layout)). A provider is a class that subclasses `Provider` from `sqlbuild.providers`:
+Create a `provider.py` in a capability folder under `python/providers/` (see [Project layout](#project-layout)). A provider is a class that subclasses `Provider` from `sqlbuild.providers`:
 
 ```python
-# providers/warehouse_client/provider.py
+# python/providers/warehouse_client/provider.py
 from sqlbuild.providers import Provider
 
 class WarehouseClient(Provider):
@@ -84,7 +84,7 @@ You can also type-annotate the parameter for IDE support and compile-time valida
 
 ```python
 from sqlbuild.assets import asset
-from providers.warehouse_client.provider import WarehouseClient
+from python.providers.warehouse_client.provider import WarehouseClient
 
 @asset
 def export_orders(ctx, warehouse_client: WarehouseClient):
@@ -105,7 +105,7 @@ Provider injection works in all Python node types:
 Python lifecycle hooks also support provider injection by parameter name:
 
 ```python
-# hooks/python/notify.py
+# sql/hooks/python/notify.py
 from sqlbuild.hooks import hook
 
 @hook
@@ -150,7 +150,7 @@ Both approaches (parameter injection and `ctx.providers`) are equivalent. Parame
 
 Providers follow a lazy setup, reverse-teardown lifecycle scoped to the command invocation:
 
-1. **Discovery** - on compile, SQLBuild discovers all `Provider` subclasses under `providers/` and validates their settings (from environment variables or field defaults). Missing [secrets](#secrets) follow the command's rules.
+1. **Discovery** - on compile, SQLBuild discovers all `Provider` subclasses under `python/providers/` and validates their settings (from environment variables or field defaults). Missing [secrets](#secrets) follow the command's rules.
 2. **Lazy setup** - the first time a provider is accessed during a build, SQLBuild reads its settings and calls `setup(ctx)`. Providers that are never used are never set up.
 3. **Teardown** - after the command completes, `teardown()` is called on all providers that were set up, in reverse setup order. Teardown runs even if the build failed. The exception is a cancel that leaves a step with `max_parallel` running after 5 seconds: providers are then not torn down, as that step may still use them (see [Running items in parallel](discovered-nodes.md#running-items-in-parallel)).
 
@@ -252,7 +252,7 @@ SQLBuild looks for each variable in the environment and then in the project's
 
 ```text
 $ sqb compile
-error[D012]: provider 'slack_alerts' (providers/slack_alerts/provider.py) is missing secret SLACK_WEBHOOK_URL
+error[D012]: provider 'slack_alerts' (python/providers/slack_alerts/provider.py) is missing secret SLACK_WEBHOOK_URL
   = help: set SLACK_WEBHOOK_URL in this shell or in .env, or pass --allow-missing-secrets where secrets aren't available
 ```
 
@@ -314,7 +314,7 @@ In the web UI, the plan page lists these nodes under **Can't run**, leaves them 
 run** count, and disables **Run** until the secret is set. **Plan without these nodes** excludes them
 and plans the rest.
 
-A [sink](../observability/sinks.md) runs with every command, so when its provider is missing
+A [sink](../observability/event-sinks.md) runs with every command, so when its provider is missing
 a secret nothing can run: the plan says `sink <name> needs <VARIABLE>; every run uses sinks`, `sqb
 build` lists the same line in its `D012` error, and there is no selection that leaves the sink out.
 In `--json`, `cant_run` names the sink under `sinks`.
@@ -332,7 +332,7 @@ location.
 
 ## Discovery rules
 
-- Provider classes are discovered from `.py` files under `providers/` recursively
+- Provider classes are discovered from `.py` files under `python/providers/` recursively
 - Files named `__init__.py` or starting with `_` are skipped
 - Each concrete (non-abstract) subclass of `Provider` is registered
 - Provider names must be globally unique across project resources
@@ -364,30 +364,32 @@ Setting values, defaults included, are never published.
 
 ## Project layout
 
-Give each provider its own folder under `providers/`, named for the capability it provides:
+Give each provider its own folder under `python/providers/`, named for the capability it provides:
 
 ```
 my-project/
-  providers/
-    warehouse_client/
-      provider.py        # the Provider subclass
-      constants.py
-      _helpers/          # private to warehouse_client
-    slack_notifier/
-      provider.py
-  hooks/
-    sql/
-      record_notification.sql
-    python/
-      notify.py
   python/
-    orders/
-      load_orders/
-        node.py
-        main.py
+    providers/
+      warehouse_client/
+        provider.py      # the Provider subclass
+        constants.py
+        _helpers/        # private to warehouse_client
+      slack_notifier/
+        provider.py
+    nodes/
+      orders/
+        load_orders/
+          loader.py
+          main.py
+  sql/
+    hooks/
+      sql/
+        record_notification.sql
+      python/
+        notify.py
 ```
 
-Discovery also accepts `.py` files directly in `providers/`. A project that selects the
+Discovery also accepts `.py` files directly in `python/providers/`. A project that selects the
 [Python Rules](../rules/python-rules.md#laying-out-providers) reports them, along with
 anything else in a provider folder besides `provider.py`, its role files, `_helpers/` and
 `_classes/`.

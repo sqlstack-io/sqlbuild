@@ -10,6 +10,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any, cast
 
+from sqlbuild._native import ADAPTERS_PATH
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.classes.strict_adapter import StrictAdapter
 from sqlbuild.adapter.contract.constants import PYTHON_IDENTIFIER_REPLACEMENT, PYTHON_INIT_FILE_NAME
@@ -23,9 +24,9 @@ def discover_project_adapters(
     project_dir: Path,
     reserved_names: frozenset[str] = frozenset(),
 ) -> dict[str, type[StrictAdapter]]:
-    """Discover adapter classes from a project's adapters directory."""
+    """Discover adapter classes from a project's python/adapters directory."""
 
-    adapters_dir: Path = project_dir / "adapters"
+    adapters_dir: Path = project_dir / ADAPTERS_PATH
     if not adapters_dir.is_dir():
         return {}
 

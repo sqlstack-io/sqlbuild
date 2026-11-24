@@ -19,12 +19,8 @@
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { isActiveRun, isProblemRun, runStatusLabel, runStatusTone } from '$lib/status';
 	import { jobPolicyText, overlapHelp } from '$lib/operate/labels';
-	import { capItems, capLines, ownerChip, selectionTokens } from './utils';
-
-	/** Group members drawn on the first line; the rest fold into "+N more" on the second. */
-	const MEMBERS_SHOWN = 3;
-	/** Selection tokens drawn as pills; the rest fold into "+N more". */
-	const TOKENS_SHOWN = 4;
+	import FittingItems from '$lib/components/list/fitting-items.svelte';
+	import { ownerChip, selectionTokens } from './utils';
 
 	const jobs = createResource((client, scope) => client.listJobs(scope), ['jobs', 'runs', 'snapshot']);
 	const triggers = createResource((client, scope) => client.listTriggers(scope), ['triggers', 'ticks']);
@@ -132,21 +128,13 @@
 					{#if showSelection}
 						<td>
 							{#if j.kind === 'group'}
-								{@const members = capItems(j.members ?? [], MEMBERS_SHOWN)}
-								<div class="muted one-line" title={j.members?.join(', ')}>Group{#if members.shown.length} · {members.shown.join(', ')}{/if}</div>
-								{#if members.hidden.length}
-									<a class="more" href={to(`/jobs/${j.key}`)} title={members.hidden.join(', ')} onclick={(e) => e.stopPropagation()}>+{members.hidden.length} more</a>
-								{/if}
+								<FittingItems items={j.members ?? []} label="members">
+									{#snippet item(member)}<span class="sb-tag pill" title={member}>{member}</span>{/snippet}
+								</FittingItems>
 							{:else}
-								{@const tokens = capItems(selectionTokens(j.select), TOKENS_SHOWN)}
-								<div class="pills">
-									{#each tokens.shown as tok, i (i)}
-										<span class="sb-tag pill" title={tok.token}>{#if tok.prefix}<span class="pfx">{tok.prefix}</span>{/if}{tok.name}</span>
-									{/each}
-									{#if tokens.hidden.length}
-										<span class="more" title={tokens.hidden.map((t) => t.token).join('\n')}>+{tokens.hidden.length} more</span>
-									{/if}
-								</div>
+								<FittingItems items={selectionTokens(j.select)} label="selectors">
+									{#snippet item(tok)}<span class="sb-tag pill" title={tok.token}>{#if tok.prefix}<span class="pfx">{tok.prefix}</span>{/if}{tok.name}</span>{/snippet}
+								</FittingItems>
 							{/if}
 						</td>
 					{/if}
@@ -156,10 +144,9 @@
 						{#if jobTriggers.length === 0}
 							<span class="muted nowrap" title="No schedule or sensor starts it; start it from its page">Manual</span>
 						{:else}
-							{@const capped = capLines(jobTriggers)}
-							<div class="flex flex-col gap-1">
-								{#each capped.shown as t (t.id)}
-									<div class="flex items-center gap-2.5">
+							<FittingItems items={jobTriggers} label="schedules and sensors">
+								{#snippet item(t)}
+									<span class="trigger">
 										<span title={canToggle ? (t.state === 'running' ? `Pause ${t.name}: it stops starting runs` : `Turn ${t.name} on`) : "You don't have permission to pause or turn on schedules and sensors (trigger.toggle)"}>
 											<button
 												class="sb-toggle"
@@ -173,12 +160,9 @@
 											></button>
 										</span>
 										<a class:muted={t.state === 'paused'} class="one-line" href={to(`/triggers/${t.id}`)} title="{t.name} · {t.cadence}">{t.name}</a>
-									</div>
-								{/each}
-								{#if capped.hidden.length}
-									<a class="more" href={to(`/jobs/${j.key}`)} title={capped.hidden.map((t) => `${t.name}${t.state === 'paused' ? ' (paused)' : ''}`).join('\n')} onclick={(e) => e.stopPropagation()}>+{capped.hidden.length} more</a>
-								{/if}
-							</div>
+									</span>
+								{/snippet}
+							</FittingItems>
 						{/if}
 					</td>
 					{#if showOwner}
@@ -213,12 +197,12 @@
 	.job-name {
 		max-width: 420px;
 	}
-	.pills {
-		display: flex;
-		max-width: 460px;
-		flex-wrap: wrap;
+	.trigger {
+		display: inline-flex;
+		min-width: 0;
 		align-items: center;
-		gap: 4px;
+		gap: 10px;
+		margin-right: 8px;
 	}
 	/* The shared tag, in mono, with the name standing out from its dimmed `tag:` prefix. */
 	.pill {
@@ -228,10 +212,6 @@
 		color: var(--foreground);
 		font-family: var(--font-mono);
 		text-overflow: ellipsis;
-	}
-	.pills .more:hover {
-		color: var(--muted-foreground);
-		text-decoration: none;
 	}
 	.pill .pfx {
 		color: var(--sb-text-faint);
@@ -266,14 +246,6 @@
 		max-width: 360px;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-	}
-	.more {
-		color: var(--muted-foreground);
-		font-size: 12px;
-	}
-	.more:hover {
-		color: var(--primary);
-		text-decoration: underline;
 	}
 	.nowrap {
 		white-space: nowrap;

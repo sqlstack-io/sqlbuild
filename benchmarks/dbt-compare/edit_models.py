@@ -28,9 +28,11 @@ def main() -> None:
     step = args.models // args.count
     for k in range(args.count):
         index = k * step + step // 2
+        models = args.project / "sql" / "models"
+        if not models.is_dir():
+            models = args.project / "models"
         path = (
-            args.project
-            / "models"
+            models
             / f"sales{index // 1000:03d}"
             / "intermediate"
             / "clean"

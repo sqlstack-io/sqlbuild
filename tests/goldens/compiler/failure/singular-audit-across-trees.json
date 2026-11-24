@@ -8,14 +8,14 @@
      "phase": "compile",
      "severity": "error",
      "code": "S009",
-     "message": "Declaration 'singular_audit:totals_have_orders' is currently descendant-public at 'models/marts' (models/marts/_sqlbuild/audits/singular/totals_have_orders.sql); required project at 'top-level root'. References: model:customer_totals, source:raw_orders. Move it to 'top-level audits/singular/'",
+     "message": "Declaration 'singular_audit:totals_have_orders' is currently descendant-public at 'sql/models/marts' (sql/models/marts/_sqlbuild/audits/singular/totals_have_orders.sql); required project at 'top-level root'. References: model:customer_totals, source:raw_orders. Move it to 'top-level sql/audits/singular/'",
      "resource_type": "audit",
      "resource_name": "totals_have_orders",
-     "path": "models/marts/_sqlbuild/audits/singular/totals_have_orders.sql",
+     "path": "sql/models/marts/_sqlbuild/audits/singular/totals_have_orders.sql",
      "line": 1,
      "column": 1,
      "location": {
-      "path": "models/marts/_sqlbuild/audits/singular/totals_have_orders.sql",
+      "path": "sql/models/marts/_sqlbuild/audits/singular/totals_have_orders.sql",
       "line": 1,
       "column": 1
      }
@@ -24,20 +24,20 @@
   }
  ],
  "compiled": {
-  "audits/singular/totals_have_orders.sql": [
+  "sql/audits/singular/totals_have_orders.sql": [
    "SELECT t.customer_id",
    "FROM __ref(\"customer_totals\") t",
    "LEFT JOIN __source(\"raw_orders\") o ON t.customer_id = o.customer_id",
    "WHERE o.customer_id IS NULL",
    ""
   ],
-  "models/marts/customer_totals.sql": [
+  "sql/models/marts/customer_totals.sql": [
    "SELECT customer_id, SUM(amount) AS total_amount",
    "FROM __ref(\"stg_orders\")",
    "GROUP BY customer_id",
    ""
   ],
-  "models/staging/stg_orders.sql": [
+  "sql/models/staging/stg_orders.sql": [
    "SELECT order_id, customer_id, amount, status",
    "FROM __source(\"raw_orders\")",
    ""
@@ -51,8 +51,8 @@
     "name": "customer_totals",
     "resource_type": "model",
     "package_name": "failure_corpus",
-    "path": "models/marts/customer_totals.sql",
-    "original_file_path": "models/marts/customer_totals.sql",
+    "path": "sql/models/marts/customer_totals.sql",
+    "original_file_path": "sql/models/marts/customer_totals.sql",
     "unique_id": "model.failure_corpus.customer_totals",
     "fqn": [
      "failure_corpus",
@@ -120,8 +120,8 @@
     "name": "stg_orders",
     "resource_type": "model",
     "package_name": "failure_corpus",
-    "path": "models/staging/stg_orders.sql",
-    "original_file_path": "models/staging/stg_orders.sql",
+    "path": "sql/models/staging/stg_orders.sql",
+    "original_file_path": "sql/models/staging/stg_orders.sql",
     "unique_id": "model.failure_corpus.stg_orders",
     "fqn": [
      "failure_corpus",
@@ -191,8 +191,8 @@
     "name": "raw_orders",
     "resource_type": "source",
     "package_name": "failure_corpus",
-    "path": "sources/raw.yml",
-    "original_file_path": "sources/raw.yml",
+    "path": "sql/sources/raw.yml",
+    "original_file_path": "sql/sources/raw.yml",
     "unique_id": "source.failure_corpus.raw_orders",
     "fqn": [
      "failure_corpus",

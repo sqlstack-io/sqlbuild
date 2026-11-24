@@ -102,14 +102,17 @@ _CONTRACT_ERROR_MODEL: str = (
         CompileReuseInvalidationTestCase(
             description="model_sql_edit",
             edit=lambda root: replace_project_text(
-                root, "models/staging/stg_orders.sql", "  quantity,", "  quantity + 0 AS quantity,"
+                root,
+                "sql/models/staging/stg_orders.sql",
+                "  quantity,",
+                "  quantity + 0 AS quantity,",
             ),
         ),
         CompileReuseInvalidationTestCase(
             description="model_reference_edit",
             edit=lambda root: replace_project_text(
                 root,
-                "models/marts/referenced_orders.sql",
+                "sql/models/marts/referenced_orders.sql",
                 '__ref("stg_orders")',
                 '__ref("regional_orders")',
             ),
@@ -118,7 +121,7 @@ _CONTRACT_ERROR_MODEL: str = (
             description="macro_built_reference_edit",
             edit=lambda root: replace_project_text(
                 root,
-                "models/marts/_sqlbuild/_macros/python/order_source.py",
+                "sql/models/marts/_sqlbuild/_macros/python/order_source.py",
                 '"stg_orders"',
                 '"regional_orders"',
             ),
@@ -131,20 +134,20 @@ _CONTRACT_ERROR_MODEL: str = (
             description="model_added",
             edit=lambda root: write_project_file(
                 root,
-                "models/marts/order_quantities.sql",
+                "sql/models/marts/order_quantities.sql",
                 "MODEL (description 'Order quantities.');\n\n"
                 'SELECT order_id, quantity FROM __ref("stg_orders")\n',
             ),
         ),
         CompileReuseInvalidationTestCase(
             description="model_deleted",
-            edit=lambda root: (root / "models/marts/regional_orders.sql").unlink(),
+            edit=lambda root: (root / "sql/models/marts/regional_orders.sql").unlink(),
         ),
         CompileReuseInvalidationTestCase(
             description="source_yaml_edit",
             edit=lambda root: replace_project_text(
                 root,
-                "sources/raw.yml",
+                "sql/sources/raw.yml",
                 "      - name: quantity\n        type: INTEGER",
                 "      - name: quantity\n        type: BIGINT",
             ),
@@ -152,14 +155,14 @@ _CONTRACT_ERROR_MODEL: str = (
         CompileReuseInvalidationTestCase(
             description="seed_csv_edit",
             edit=lambda root: replace_project_text(
-                root, "seeds/waffle_types.csv", "Classic Belgian", "Classic Brussels"
+                root, "sql/seeds/waffle_types.csv", "Classic Belgian", "Classic Brussels"
             ),
         ),
         CompileReuseInvalidationTestCase(
             description="macro_file_edit",
             edit=lambda root: replace_project_text(
                 root,
-                "macros/python/currency.py",
+                "sql/macros/python/currency.py",
                 "{price_cents} * {quantity}",
                 "{quantity} * {price_cents}",
             ),
@@ -167,14 +170,14 @@ _CONTRACT_ERROR_MODEL: str = (
         CompileReuseInvalidationTestCase(
             description="module_imported_by_macro_edit",
             edit=lambda root: replace_project_text(
-                root, "macros/python/_rounding.py", "_SCALE: int = 2", "_SCALE: int = 3"
+                root, "sql/macros/python/_rounding.py", "_SCALE: int = 2", "_SCALE: int = 3"
             ),
         ),
         CompileReuseInvalidationTestCase(
             description="scoped_macro_edit",
             edit=lambda root: replace_project_text(
                 root,
-                "models/marts/_sqlbuild/_macros/python/currency.py",
+                "sql/models/marts/_sqlbuild/_macros/python/currency.py",
                 'return f"ROUND(({column}) / 100.0, 2)"',
                 'return f"ROUND(({column}) / 100.0, 3)"',
             ),
@@ -182,7 +185,10 @@ _CONTRACT_ERROR_MODEL: str = (
         CompileReuseInvalidationTestCase(
             description="enum_declaration_edit",
             edit=lambda root: replace_project_text(
-                root, "models/marts/_sqlbuild/_enums/order_channel.sql", 'WEB "web"', 'WEB "online"'
+                root,
+                "sql/models/marts/_sqlbuild/_enums/order_channel.sql",
+                'WEB "web"',
+                'WEB "online"',
             ),
         ),
         CompileReuseInvalidationTestCase(
@@ -234,14 +240,17 @@ _CONTRACT_ERROR_MODEL: str = (
         CompileReuseInvalidationTestCase(
             description="contract_error_replayed_as_failure",
             edit=lambda root: write_project_file(
-                root, "models/marts/order_contract.sql", _CONTRACT_ERROR_MODEL
+                root, "sql/models/marts/order_contract.sql", _CONTRACT_ERROR_MODEL
             ),
             expected_returncode=1,
         ),
         CompileReuseInvalidationTestCase(
             description="stopped_compile_is_never_replayed",
             edit=lambda root: replace_project_text(
-                root, "models/staging/stg_orders.sql", "materialized view,", "materialized view,,(("
+                root,
+                "sql/models/staging/stg_orders.sql",
+                "materialized view,",
+                "materialized view,,((",
             ),
             expected_returncode=1,
             expected_rewarm_hit=False,
@@ -404,7 +413,7 @@ def test_given_timestamp_only_change_when_it_repeats_then_the_known_content_is_r
             description="model_reads_run_id",
             edit=lambda root: write_project_file(
                 root,
-                "models/marts/stamped_orders.sql",
+                "sql/models/marts/stamped_orders.sql",
                 "MODEL (description 'Orders stamped by run ${CTX:run.id}.');\n\n"
                 'SELECT order_id FROM __ref("stg_orders")\n',
             ),
@@ -627,7 +636,7 @@ def test_given_deprecated_setting_alias_when_compile_is_reused_then_the_warning_
     "test_case",
     [
         CompileReuseRedirectTestCase(
-            description="json_report_redirected_into_project_root",
+            description="json_report_redirected_into_a_gitignored_project_file",
             report_name="compile-report.json",
             expected_hit_counts=(0, 1),
         )
@@ -639,6 +648,8 @@ def test_given_stdout_redirected_into_project_when_rerun_then_it_reuses_the_comp
 ) -> None:
     project_dir: Path = compile_reuse_project
     report_path: Path = project_dir / test_case.report_name
+    # A file outside the project layout is allowed only when the project ignores it.
+    _ = (project_dir / ".gitignore").write_text(f"{test_case.report_name}\n", encoding="utf-8")
 
     first: subprocess.CompletedProcess[str] = run_reuse_compile_into_file(
         project_dir=project_dir, report_path=report_path
@@ -888,6 +899,13 @@ def test_given_large_data_file_when_storing_and_reusing_then_it_is_read_only_aft
     test_case: CompileReuseLargeFileTestCase,
 ) -> None:
     project_dir: Path = compile_reuse_project
+    project_file: Path = project_dir / "sqlbuild_project.toml"
+    # A data folder at the top level is part of the project only when the project lists it.
+    _ = project_file.write_text(
+        f'extra_paths = ["{test_case.relative_path.split("/")[0]}/"]\n'
+        + project_file.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
     data_file: Path = write_large_file(
         project_dir=project_dir,
         relative_path=test_case.relative_path,
@@ -1014,12 +1032,12 @@ if __name__ == "__main__":
         CompiledTreeStampTestCase(
             description="stale_file_beside_compiled_models",
             edit=add_stale_compiled_file_beside_models,
-            expected_removed_path="target/compiled/models/marts/stale_mart.sql",
+            expected_removed_path="target/compiled/sql/models/marts/stale_mart.sql",
         ),
         CompiledTreeStampTestCase(
             description="stale_file_in_compiled_models_root",
             edit=add_stale_compiled_file,
-            expected_removed_path="target/compiled/models/stale_model.sql",
+            expected_removed_path="target/compiled/sql/models/stale_model.sql",
         ),
         CompiledTreeStampTestCase(
             description="stale_file_in_linked_compiled_root",

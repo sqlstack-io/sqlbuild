@@ -21,6 +21,7 @@ use crate::project::errors::ConfigFailure;
 use crate::project::models::{Built, ConfigFile};
 use crate::project::types::{Entries, Fields, Loaded};
 use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
+use sqlbuild_core::constants::SQL_DIRECTORY;
 use sqlbuild_core::constants::ZERO_DAY_DURATION;
 
 /// A retention or table-type field: where it lives and whether `'inherit'` is accepted.
@@ -228,12 +229,14 @@ fn normalize_path_key(path_key: &str, file: ConfigFile) -> Loaded<String> {
             "is invalid. Path defaults cannot contain empty path segments.",
         ));
     }
-    if parts[0] == MODELS_DIRECTORY_NAME {
+    if parts[0] == MODELS_DIRECTORY_NAME
+        || (parts[0] == SQL_DIRECTORY && parts.get(1) == Some(&MODELS_DIRECTORY_NAME))
+    {
         return Err(invalid_path_key(
             file,
             path_key,
-            "uses redundant 'models/' prefix. Use a model-relative path such as 'staging' or \
-             'staging/nested'.",
+            "uses a redundant 'sql/models/' prefix. Use a model-relative path such as 'staging' \
+             or 'staging/nested'.",
         ));
     }
     let unsupported: Vec<&str> = parts
@@ -317,7 +320,7 @@ pub(crate) fn load_path_defaults(payload: Option<&ConfigValue>, file: ConfigFile
                 format!(
                     "path_defaults defines both '{path_key}' and another key that normalize to \
                      '{normalized}'. Use only the canonical model-relative form without a \
-                     leading 'models/' prefix."
+                     leading 'sql/models/' prefix."
                 ),
             ));
         }

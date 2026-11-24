@@ -72,7 +72,7 @@ CONTRACT_MODEL: str = (
                 "c_orders": MACRO_COLUMN_MODEL,
             },
             expected_message=(
-                "models/b_orders.sql model has duplicate column 'ID' "
+                "sql/models/b_orders.sql model has duplicate column 'ID' "
                 "(column names are case-insensitive)"
             ),
         ),
@@ -80,7 +80,7 @@ CONTRACT_MODEL: str = (
             description="a nullable not_null column stops before a later duplicate column",
             models={"b_orders": NULLABLE_NOT_NULL_MODEL, "c_orders": DUPLICATE_COLUMN_MODEL},
             expected_message=(
-                "models/b_orders.sql column 'id' cannot set nullable = true and audit not_null"
+                "sql/models/b_orders.sql column 'id' cannot set nullable = true and audit not_null"
             ),
         ),
         FirstModelErrorTestCase(
@@ -110,7 +110,7 @@ def test_given_several_failing_models_when_compiling_then_the_first_in_model_ord
             amount_type="VARCHAR",
             amount_description="'${label}'",
             expected_location={
-                "path": "models/a_orders.sql",
+                "path": "sql/models/a_orders.sql",
                 "line": 3,
                 "column": 3,
                 "end_line": 3,
@@ -122,7 +122,7 @@ def test_given_several_failing_models_when_compiling_then_the_first_in_model_ord
             amount_type="'${amount_type}'",
             amount_description="'Order amount'",
             expected_location={
-                "path": "models/a_orders.sql",
+                "path": "sql/models/a_orders.sql",
                 "line": 3,
                 "column": 3,
                 "end_line": 3,

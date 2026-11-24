@@ -23,7 +23,6 @@ pub(crate) const OLD_NAME_VIEWS_KEY: &str = "old_name_views";
 pub(crate) const USD_PER_CREDIT_KEY: &str = "usd_per_credit";
 pub(crate) const RUN_NAMESPACE_KEY: &str = "run_namespace";
 pub(crate) const SHUTDOWN_TIMEOUT_KEY: &str = "shutdown_timeout";
-pub(crate) const LEGACY_EVENT_EXPORTERS_KEY: &str = "event_exporters";
 pub(crate) const MAX_FULL_ROWS_KEY: &str = "max_full_rows";
 pub(crate) const DBT_DEFER_CLONE_KEY: &str = "defer_clone_from";
 pub(crate) const DBT_REUSE_KEYS: [&str; 2] = ["reuse_from", "production_ref"];
@@ -59,6 +58,10 @@ pub(crate) const IGNORE_AUDIT_FAILURES_KEY: &str = "ignore_audit_failures";
 pub(crate) const PAUSE_DYNAMIC_KEY: &str = "pause_dynamic";
 /// The env file a project or target loads into the environment at start-up; `""` turns it off.
 pub(crate) const ENV_FILE_KEY: &str = "env_file";
+/// Project entries the layout check allows beside the expected folders.
+pub(crate) const EXTRA_PATHS_KEY: &str = "extra_paths";
+/// The path segment that would lead an `extra_paths` entry out of the project.
+pub(crate) const PARENT_SEGMENT: &str = "..";
 /// Whether each run records the machine it ran on in the runs state table.
 pub(crate) const RECORD_RUN_HOST_KEY: &str = "record_run_host";
 pub(crate) const DEFAULT_TEST_TIMEOUT: &str = "30s";
@@ -335,3 +338,8 @@ pub(crate) const MICROBATCH_CONCURRENCY_KEY: &str = "microbatch_concurrency";
 pub(crate) const REFERENCES_SECTION: &str = "references";
 pub(crate) const ENFORCE_EXPLICIT_KEY: &str = "enforce_explicit";
 pub(crate) const MICROBATCH_CONCURRENCY_PURPOSE: &str = "to run microbatches concurrently";
+/// Top-level sections an earlier release read, and what replaced each.
+pub(crate) const RENAMED_SECTIONS: [(&str, &str); 2] = [
+    ("event_exporters", "was replaced by event_sinks.lifecycle"),
+    ("sinks", "was renamed event_sinks"),
+];

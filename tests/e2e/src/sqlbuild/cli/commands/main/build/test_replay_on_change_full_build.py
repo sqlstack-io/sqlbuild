@@ -37,7 +37,7 @@ _BASE_FILES: dict[str, str] = {
         database = "replay.duckdb"
         """
     ).lstrip(),
-    "sources/raw.yml": dedent(
+    "sql/sources/raw.yml": dedent(
         """
         sources:
           - name: raw_orders
@@ -46,8 +46,8 @@ _BASE_FILES: dict[str, str] = {
             table: raw_orders
         """
     ).lstrip(),
-    "models/order_regions.sql": "MODEL (description 'Test model order_regions.', materialized table);\n\nSELECT 1 AS region_id\n",
-    "models/stg_orders.sql": dedent(
+    "sql/models/order_regions.sql": "MODEL (description 'Test model order_regions.', materialized table);\n\nSELECT 1 AS region_id\n",
+    "sql/models/stg_orders.sql": dedent(
         """
         MODEL (description "Test model stg_orders.",
           materialized incremental,
@@ -172,7 +172,7 @@ _FULL_HISTORY_RANGE: str = "range  2026-01-01 \u2192 2026-03-01"
         ReplayFullRebuildE2ETestCase(
             description="planner_resolved_model_backed_input_with_added_unlisted_ref",
             target_table="daily_orders",
-            changed_model_path="models/daily_orders.sql",
+            changed_model_path="sql/models/daily_orders.sql",
             changed_model_sql=_DAILY_ORDERS_WITH_UNLISTED_REF_SQL,
             rebuild_command=("--select", "daily_orders"),
             expected_plan_fragments=(
@@ -186,7 +186,7 @@ _FULL_HISTORY_RANGE: str = "range  2026-01-01 \u2192 2026-03-01"
         ReplayFullRebuildE2ETestCase(
             description="runtime_owned_bounds_when_upstream_incremental_runs_in_same_build",
             target_table="daily_orders",
-            changed_model_path="models/daily_orders.sql",
+            changed_model_path="sql/models/daily_orders.sql",
             changed_model_sql=_DAILY_ORDERS_WITH_UNLISTED_REF_SQL,
             rebuild_command=(),
             expected_plan_fragments=(
@@ -198,7 +198,7 @@ _FULL_HISTORY_RANGE: str = "range  2026-01-01 \u2192 2026-03-01"
         ReplayFullRebuildE2ETestCase(
             description="query_change_without_cursor_inputs",
             target_table="source_orders",
-            changed_model_path="models/source_orders.sql",
+            changed_model_path="sql/models/source_orders.sql",
             changed_model_sql=_SOURCE_ORDERS_SQL.format(revision=2),
             rebuild_command=("--select", "source_orders"),
             expected_plan_fragments=(
@@ -210,7 +210,7 @@ _FULL_HISTORY_RANGE: str = "range  2026-01-01 \u2192 2026-03-01"
         ReplayFullRebuildE2ETestCase(
             description="microbatch_model",
             target_table="microbatch_orders",
-            changed_model_path="models/microbatch_orders.sql",
+            changed_model_path="sql/models/microbatch_orders.sql",
             changed_model_sql=_MICROBATCH_ORDERS_SQL.format(revision=2),
             rebuild_command=("--select", "microbatch_orders"),
             expected_plan_fragments=(
@@ -231,9 +231,9 @@ def test_given_existing_incremental_when_replay_on_change_full_rebuilds_then_his
         project_name="replay_full_project",
         repo_files={
             **_BASE_FILES,
-            "models/daily_orders.sql": _DAILY_ORDERS_SQL,
-            "models/source_orders.sql": _SOURCE_ORDERS_SQL.format(revision=1),
-            "models/microbatch_orders.sql": _MICROBATCH_ORDERS_SQL.format(revision=1),
+            "sql/models/daily_orders.sql": _DAILY_ORDERS_SQL,
+            "sql/models/source_orders.sql": _SOURCE_ORDERS_SQL.format(revision=1),
+            "sql/models/microbatch_orders.sql": _MICROBATCH_ORDERS_SQL.format(revision=1),
         },
     )
     db_path: Path = project_dir / "replay.duckdb"
@@ -263,9 +263,9 @@ def test_given_existing_incremental_when_replay_on_change_full_rebuilds_then_his
         project_name="fresh_replay_project",
         repo_files={
             **_BASE_FILES,
-            "models/daily_orders.sql": _DAILY_ORDERS_SQL,
-            "models/source_orders.sql": _SOURCE_ORDERS_SQL.format(revision=1),
-            "models/microbatch_orders.sql": _MICROBATCH_ORDERS_SQL.format(revision=1),
+            "sql/models/daily_orders.sql": _DAILY_ORDERS_SQL,
+            "sql/models/source_orders.sql": _SOURCE_ORDERS_SQL.format(revision=1),
+            "sql/models/microbatch_orders.sql": _MICROBATCH_ORDERS_SQL.format(revision=1),
             test_case.changed_model_path: test_case.changed_model_sql,
         },
     )
@@ -323,14 +323,14 @@ def test_given_window_limited_run_when_building_existing_incremental_then_only_w
         project_name="replay_window_project",
         repo_files={
             **_BASE_FILES,
-            "models/windowed_orders.sql": _WINDOWED_ORDERS_SQL.format(revision=1),
+            "sql/models/windowed_orders.sql": _WINDOWED_ORDERS_SQL.format(revision=1),
         },
     )
     db_path: Path = project_dir / "replay.duckdb"
     execute_duckdb(db_path=db_path, sql=_SOURCE_ROWS_SQL)
     run_replay_command(command=("build",), project_dir=project_dir)
 
-    (project_dir / "models" / "windowed_orders.sql").write_text(
+    (project_dir / "sql" / "models" / "windowed_orders.sql").write_text(
         test_case.changed_model_sql, encoding="utf-8"
     )
     execute_duckdb(db_path=db_path, sql=test_case.source_mutation_sql)

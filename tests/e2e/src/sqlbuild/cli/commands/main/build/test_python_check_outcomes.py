@@ -11,6 +11,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
     PythonCheckBuildE2ETestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 
 @pytest.mark.parametrize(
@@ -58,15 +59,16 @@ def test_given_python_check_when_building_then_completion_line_reports_its_outco
                 'name = "python_check_outcomes"\nadapter = "duckdb"\n\n'
                 '[connection]\ndatabase = "warehouse.duckdb"\n\n[defaults]\nmaterialized = "table"\n'
             ),
-            "models/fact_orders.sql": (
+            "sql/models/fact_orders.sql": (
                 "MODEL (description 'Test model fact_orders.');\nSELECT 1 AS order_id\n"
             ),
-            "python/checks/orders.py": (
+            **node_module_files(
+                "python/nodes/checks/orders.py",
                 "from sqlbuild.checks import check\nfrom sqlbuild.refs import model\n\n\n"
                 f"{test_case.check_decorator}\n"
                 "def orders_checked(ctx):\n"
                 "    '''Test check orders_checked.'''\n"
-                f"    {test_case.check_body}\n"
+                f"    {test_case.check_body}\n",
             ),
         },
     )

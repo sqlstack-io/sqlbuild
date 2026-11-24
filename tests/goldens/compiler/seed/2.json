@@ -229,70 +229,70 @@
       "id": "model:check_history_stg_sales_2",
       "name": "check_history_stg_sales_2",
       "resource_type": "model",
-      "relative_path": "models/features/check_history_stg_sales_2.sql",
+      "relative_path": "sql/models/features/check_history_stg_sales_2.sql",
       "qualified_name": "analytics.check_history_stg_sales_2"
      },
      {
       "id": "model:checked_stg_sales_2",
       "name": "checked_stg_sales_2",
       "resource_type": "model",
-      "relative_path": "models/analysis/checked_stg_sales_2.sql",
+      "relative_path": "sql/models/analysis/checked_stg_sales_2.sql",
       "qualified_name": "analytics.checked_stg_sales_2"
      },
      {
       "id": "model:combined_stg_sales_2",
       "name": "combined_stg_sales_2",
       "resource_type": "model",
-      "relative_path": "models/analysis/combined_stg_sales_2.sql",
+      "relative_path": "sql/models/analysis/combined_stg_sales_2.sql",
       "qualified_name": "analytics.combined_stg_sales_2"
      },
      {
       "id": "model:cte_facts_stg_sales_2",
       "name": "cte_facts_stg_sales_2",
       "resource_type": "model",
-      "relative_path": "models/analysis/cte_facts_stg_sales_2.sql",
+      "relative_path": "sql/models/analysis/cte_facts_stg_sales_2.sql",
       "qualified_name": "analytics.cte_facts_stg_sales_2"
      },
      {
       "id": "model:every_stg_sales_2",
       "name": "every_stg_sales_2",
       "resource_type": "model",
-      "relative_path": "models/analysis/every_stg_sales_2.sql",
+      "relative_path": "sql/models/analysis/every_stg_sales_2.sql",
       "qualified_name": "analytics.every_stg_sales_2"
      },
      {
       "id": "model:passed_stg_sales_2",
       "name": "passed_stg_sales_2",
       "resource_type": "model",
-      "relative_path": "models/analysis/passed_stg_sales_2.sql",
+      "relative_path": "sql/models/analysis/passed_stg_sales_2.sql",
       "qualified_name": "analytics.passed_stg_sales_2"
      },
      {
       "id": "model:sales_summary_1",
       "name": "sales_summary_1",
       "resource_type": "model",
-      "relative_path": "models/sales/marts/sales_summary_1.sql",
+      "relative_path": "sql/models/sales/marts/sales_summary_1.sql",
       "qualified_name": "analytics.sales_summary_1"
      },
      {
       "id": "model:stg_sales_2",
       "name": "stg_sales_2",
       "resource_type": "model",
-      "relative_path": "models/sales/staging/stg_sales_2.sql",
+      "relative_path": "sql/models/sales/staging/stg_sales_2.sql",
       "qualified_name": "analytics.stg_sales_2"
      },
      {
       "id": "model:typed_stg_sales_2",
       "name": "typed_stg_sales_2",
       "resource_type": "model",
-      "relative_path": "models/analysis/typed_stg_sales_2.sql",
+      "relative_path": "sql/models/analysis/typed_stg_sales_2.sql",
       "qualified_name": "analytics.typed_stg_sales_2"
      },
      {
       "id": "source:raw_events_0",
       "name": "raw_events_0",
       "resource_type": "source",
-      "relative_path": "sources/raw.yml"
+      "relative_path": "sql/sources/raw.yml"
      }
     ],
     "edges": [
@@ -341,26 +341,26 @@
   }
  ],
  "compiled": {
-  "audits/generic/audited_stg_sales_0/id_present__id.sql": [
+  "sql/audits/generic/audited_stg_sales_0/id_present__id.sql": [
    "SELECT id",
    "FROM __ref(\"audited_stg_sales_0\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/checked_stg_sales_2/accepted_values__status.sql": [
+  "sql/audits/generic/checked_stg_sales_2/accepted_values__status.sql": [
    "SELECT status",
    "FROM __ref(\"checked_stg_sales_2\")",
    "WHERE status IS NOT NULL",
    "  AND status NOT IN ('placed', 'expédié', '取消', 'returned ✓')",
    ""
   ],
-  "audits/generic/checked_stg_sales_2/expression_is_true.sql": [
+  "sql/audits/generic/checked_stg_sales_2/expression_is_true.sql": [
    "SELECT *",
    "FROM __ref(\"checked_stg_sales_2\")",
    "WHERE NOT (amount >= -1000)",
    ""
   ],
-  "audits/generic/checked_stg_sales_2/relationships__id.sql": [
+  "sql/audits/generic/checked_stg_sales_2/relationships__id.sql": [
    "SELECT id",
    "FROM __ref(\"checked_stg_sales_2\")",
    "WHERE id IS NOT NULL",
@@ -371,75 +371,75 @@
    "  )",
    ""
   ],
-  "audits/generic/sales_summary_0/not_null__id.sql": [
+  "sql/audits/generic/sales_summary_0/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"sales_summary_0\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/sales_summary_1/not_null__id.sql": [
+  "sql/audits/generic/sales_summary_1/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"sales_summary_1\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/stated_stg_sales_1/accepted_values__status.sql": [
+  "sql/audits/generic/stated_stg_sales_1/accepted_values__status.sql": [
    "SELECT status",
    "FROM __ref(\"stated_stg_sales_1\")",
    "WHERE status IS NOT NULL",
    "  AND status NOT IN ('placed', 'expédié', '取消', 'returned ✓')",
    ""
   ],
-  "audits/generic/stg_sales_1/not_null__id.sql": [
+  "sql/audits/generic/stg_sales_1/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"stg_sales_1\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/stg_sales_2/not_null__id.sql": [
+  "sql/audits/generic/stg_sales_2/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"stg_sales_2\")",
    "WHERE id IS NULL",
    ""
   ],
-  "functions/python/is_large.sql": [
+  "sql/functions/python/is_large.sql": [
    "REGISTER PYTHON FUNCTION is_large(DOUBLE) RETURNS BOOLEAN",
    ""
   ],
-  "functions/sql/is_placed.sql": [
+  "sql/functions/sql/is_placed.sql": [
    "CREATE OR REPLACE MACRO analytics.is_placed(event_status) AS (",
    "event_status = 'placed'",
    ")",
    ""
   ],
-  "functions/sql/table_fn__events_above.sql": [
+  "sql/functions/sql/table_fn__events_above.sql": [
    "CREATE OR REPLACE MACRO analytics.table_fn__events_above(p_minimum) AS TABLE",
    "SELECT id, amount",
    "FROM __ref(\"stg_sales_1\")",
    "WHERE amount > p_minimum",
    ""
   ],
-  "models/analysis/chain_1_stg_sales_1.sql": [
+  "sql/models/analysis/chain_1_stg_sales_1.sql": [
    "SELECT id, label, amount",
    "FROM __ref(\"contracted_stg_sales_1\")",
    ""
   ],
-  "models/analysis/chain_2_stg_sales_1.sql": [
+  "sql/models/analysis/chain_2_stg_sales_1.sql": [
    "SELECT id, UPPER(label) AS label, amount",
    "FROM __ref(\"chain_1_stg_sales_1\")",
    ""
   ],
-  "models/analysis/chain_3_stg_sales_1.sql": [
+  "sql/models/analysis/chain_3_stg_sales_1.sql": [
    "SELECT id, label, amount",
    "FROM __ref(\"chain_2_stg_sales_1\")",
    ""
   ],
-  "models/analysis/checked_stg_sales_2.sql": [
+  "sql/models/analysis/checked_stg_sales_2.sql": [
    "SELECT id, amount, status",
    "FROM __ref(\"stg_sales_2\")",
    ""
   ],
-  "models/analysis/combined_stg_sales_2.sql": [
+  "sql/models/analysis/combined_stg_sales_2.sql": [
    "WITH recent AS (",
    "  SELECT id, created_at FROM __ref(\"stg_sales_2\") WHERE amount > 0",
    "),",
@@ -451,13 +451,13 @@
    "SELECT id, created_at FROM older",
    ""
   ],
-  "models/analysis/contracted_stg_sales_1.sql": [
+  "sql/models/analysis/contracted_stg_sales_1.sql": [
    "SELECT CAST(id AS INTEGER) AS id, CAST(status AS VARCHAR(40)) AS label,",
    "  amount",
    "FROM __source(\"raw_events_0\")",
    ""
   ],
-  "models/analysis/cte_facts_stg_sales_2.sql": [
+  "sql/models/analysis/cte_facts_stg_sales_2.sql": [
    "WITH base AS (",
    "  SELECT id, CAST(amount AS DECIMAL(12, 2)) AS amount, 'event' AS kind,",
    "    COALESCE(status, 'unknown') AS status",
@@ -468,22 +468,22 @@
    "FROM base",
    ""
   ],
-  "models/analysis/every_open_event.sql": [
+  "sql/models/analysis/every_open_event.sql": [
    "SELECT *",
    "FROM __source(\"open_events\")",
    ""
   ],
-  "models/analysis/every_raw_events_0.sql": [
+  "sql/models/analysis/every_raw_events_0.sql": [
    "SELECT *",
    "FROM __source(\"raw_events_0\")",
    ""
   ],
-  "models/analysis/every_stg_sales_2.sql": [
+  "sql/models/analysis/every_stg_sales_2.sql": [
    "SELECT *",
    "FROM __ref(\"stg_sales_2\")",
    ""
   ],
-  "models/analysis/passed_stg_sales_2.sql": [
+  "sql/models/analysis/passed_stg_sales_2.sql": [
    "WITH passthrough AS (",
    "  SELECT id, created_at FROM __ref(\"stg_sales_2\")",
    ")",
@@ -491,51 +491,51 @@
    "FROM passthrough",
    ""
   ],
-  "models/analysis/pivot_input_stg_sales_1.sql": [
+  "sql/models/analysis/pivot_input_stg_sales_1.sql": [
    "SELECT CAST(id AS INTEGER) AS id, CAST(status AS VARCHAR) AS status, amount",
    "FROM __ref(\"stg_sales_1\")",
    ""
   ],
-  "models/analysis/pivoted_stg_sales_1.sql": [
+  "sql/models/analysis/pivoted_stg_sales_1.sql": [
    "PIVOT __ref(\"pivot_input_stg_sales_1\")",
    "ON status",
    "USING MAX(amount)",
    "GROUP BY id",
    ""
   ],
-  "models/analysis/typed_stg_sales_2.sql": [
+  "sql/models/analysis/typed_stg_sales_2.sql": [
    "SELECT id, amount * 2 AS doubled_amount, CAST(status AS VARCHAR) AS status_text,",
    "  created_at, NULL AS missing_note",
    "FROM __ref(\"stg_sales_2\")",
    ""
   ],
-  "models/features/audited_stg_sales_0.sql": [
+  "sql/models/features/audited_stg_sales_0.sql": [
    "SELECT id, amount",
    "FROM __ref(\"stg_sales_0\")",
    ""
   ],
-  "models/features/check_history_stg_sales_2.sql": [
+  "sql/models/features/check_history_stg_sales_2.sql": [
    "SELECT id, status, amount",
    "FROM __ref(\"stg_sales_2\")",
    ""
   ],
-  "models/features/copied_stg_sales_0.sql": [
+  "sql/models/features/copied_stg_sales_0.sql": [
    "SELECT id, status",
    "FROM __ref(\"stg_sales_0\")",
    ""
   ],
-  "models/features/flagged_stg_sales_0.sql": [
+  "sql/models/features/flagged_stg_sales_0.sql": [
    "SELECT id, __udf(\"is_placed\")(status) AS is_placed,",
    "  __udf(\"is_large\")(amount) AS is_large",
    "FROM __ref(\"stg_sales_0\")",
    ""
   ],
-  "models/features/merge_stg_sales_1.sql": [
+  "sql/models/features/merge_stg_sales_1.sql": [
    "SELECT id, amount, status, created_at",
    "FROM __ref(\"stg_sales_1\")",
    ""
   ],
-  "models/features/spaced_stg_sales_1.sql": [
+  "sql/models/features/spaced_stg_sales_1.sql": [
    "-- Généré pour Zürich – depot",
    "SELECT",
    "\tid,",
@@ -544,31 +544,31 @@
    "FROM __ref(\"stg_sales_1\")",
    ""
   ],
-  "models/features/taxed_stg_sales_0.sql": [
+  "sql/models/features/taxed_stg_sales_0.sql": [
    "SELECT id, ROUND(amount * 1.2, 2) AS taxed, ROUND(amount, 1) AS rounded",
    "FROM __ref(\"stg_sales_0\")",
    ""
   ],
-  "models/rendering/bounded_stg_sales_0.sql": [
+  "sql/models/rendering/bounded_stg_sales_0.sql": [
    "SELECT id, amount, created_at",
    "FROM __ref(\"stg_sales_0\")",
    "WHERE created_at >= __cursor_start()",
    "  AND created_at < __cursor_end()",
    ""
   ],
-  "models/rendering/large_events.sql": [
+  "sql/models/rendering/large_events.sql": [
    "SELECT id, amount",
    "FROM __table_fn(\"table_fn__events_above\")(4)",
    ""
   ],
-  "models/rendering/stated_stg_sales_1.sql": [
+  "sql/models/rendering/stated_stg_sales_1.sql": [
    "SELECT CAST(id AS INTEGER) AS id, status,",
    "  CASE WHEN amount >= 8 THEN 'HIGH'",
    "    ELSE 'LOW' END AS tier",
    "FROM __ref(\"stg_sales_1\")",
    ""
   ],
-  "models/sales/marts/sales_summary_0.sql": [
+  "sql/models/sales/marts/sales_summary_0.sql": [
    "SELECT",
    "  t.id,",
    "  t.amount,",
@@ -581,7 +581,7 @@
    "FROM __ref(\"stg_sales_1\") t",
    ""
   ],
-  "models/sales/marts/sales_summary_1.sql": [
+  "sql/models/sales/marts/sales_summary_1.sql": [
    "SELECT",
    "  t.id,",
    "  t.amount,",
@@ -596,7 +596,7 @@
    "LEFT JOIN __seed(\"lookup_0\") j2 ON t.id = j2.id",
    ""
   ],
-  "models/sales/marts/sales_summary_2.sql": [
+  "sql/models/sales/marts/sales_summary_2.sql": [
    "SELECT",
    "  t.id,",
    "  t.amount,",
@@ -610,7 +610,7 @@
    "LEFT JOIN __seed(\"lookup_0\") j1 ON t.id = j1.id",
    ""
   ],
-  "models/sales/staging/stg_sales_0.sql": [
+  "sql/models/sales/staging/stg_sales_0.sql": [
    "SELECT",
    "  t.id,",
    "  t.amount,",
@@ -620,7 +620,7 @@
    "FROM __source(\"raw_events_0\") t",
    ""
   ],
-  "models/sales/staging/stg_sales_1.sql": [
+  "sql/models/sales/staging/stg_sales_1.sql": [
    "SELECT",
    "  t.id,",
    "  t.amount,",
@@ -631,7 +631,7 @@
    "WHERE t.status <> 'placed'",
    ""
   ],
-  "models/sales/staging/stg_sales_2.sql": [
+  "sql/models/sales/staging/stg_sales_2.sql": [
    "SELECT",
    "  t.id,",
    "  t.amount,",
@@ -687,8 +687,8 @@
     "name": "chain_1_stg_sales_1",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/analysis/chain_1_stg_sales_1.sql",
-    "original_file_path": "models/analysis/chain_1_stg_sales_1.sql",
+    "path": "sql/models/analysis/chain_1_stg_sales_1.sql",
+    "original_file_path": "sql/models/analysis/chain_1_stg_sales_1.sql",
     "unique_id": "model.generated_2.chain_1_stg_sales_1",
     "fqn": [
      "generated_2",
@@ -756,8 +756,8 @@
     "name": "chain_2_stg_sales_1",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/analysis/chain_2_stg_sales_1.sql",
-    "original_file_path": "models/analysis/chain_2_stg_sales_1.sql",
+    "path": "sql/models/analysis/chain_2_stg_sales_1.sql",
+    "original_file_path": "sql/models/analysis/chain_2_stg_sales_1.sql",
     "unique_id": "model.generated_2.chain_2_stg_sales_1",
     "fqn": [
      "generated_2",
@@ -825,8 +825,8 @@
     "name": "chain_3_stg_sales_1",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/analysis/chain_3_stg_sales_1.sql",
-    "original_file_path": "models/analysis/chain_3_stg_sales_1.sql",
+    "path": "sql/models/analysis/chain_3_stg_sales_1.sql",
+    "original_file_path": "sql/models/analysis/chain_3_stg_sales_1.sql",
     "unique_id": "model.generated_2.chain_3_stg_sales_1",
     "fqn": [
      "generated_2",
@@ -894,8 +894,8 @@
     "name": "checked_stg_sales_2",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/analysis/checked_stg_sales_2.sql",
-    "original_file_path": "models/analysis/checked_stg_sales_2.sql",
+    "path": "sql/models/analysis/checked_stg_sales_2.sql",
+    "original_file_path": "sql/models/analysis/checked_stg_sales_2.sql",
     "unique_id": "model.generated_2.checked_stg_sales_2",
     "fqn": [
      "generated_2",
@@ -984,8 +984,8 @@
     "name": "combined_stg_sales_2",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/analysis/combined_stg_sales_2.sql",
-    "original_file_path": "models/analysis/combined_stg_sales_2.sql",
+    "path": "sql/models/analysis/combined_stg_sales_2.sql",
+    "original_file_path": "sql/models/analysis/combined_stg_sales_2.sql",
     "unique_id": "model.generated_2.combined_stg_sales_2",
     "fqn": [
      "generated_2",
@@ -1053,8 +1053,8 @@
     "name": "contracted_stg_sales_1",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/analysis/contracted_stg_sales_1.sql",
-    "original_file_path": "models/analysis/contracted_stg_sales_1.sql",
+    "path": "sql/models/analysis/contracted_stg_sales_1.sql",
+    "original_file_path": "sql/models/analysis/contracted_stg_sales_1.sql",
     "unique_id": "model.generated_2.contracted_stg_sales_1",
     "fqn": [
      "generated_2",
@@ -1150,8 +1150,8 @@
     "name": "cte_facts_stg_sales_2",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/analysis/cte_facts_stg_sales_2.sql",
-    "original_file_path": "models/analysis/cte_facts_stg_sales_2.sql",
+    "path": "sql/models/analysis/cte_facts_stg_sales_2.sql",
+    "original_file_path": "sql/models/analysis/cte_facts_stg_sales_2.sql",
     "unique_id": "model.generated_2.cte_facts_stg_sales_2",
     "fqn": [
      "generated_2",
@@ -1256,8 +1256,8 @@
     "name": "every_open_event",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/analysis/every_open_event.sql",
-    "original_file_path": "models/analysis/every_open_event.sql",
+    "path": "sql/models/analysis/every_open_event.sql",
+    "original_file_path": "sql/models/analysis/every_open_event.sql",
     "unique_id": "model.generated_2.every_open_event",
     "fqn": [
      "generated_2",
@@ -1325,8 +1325,8 @@
     "name": "every_raw_events_0",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/analysis/every_raw_events_0.sql",
-    "original_file_path": "models/analysis/every_raw_events_0.sql",
+    "path": "sql/models/analysis/every_raw_events_0.sql",
+    "original_file_path": "sql/models/analysis/every_raw_events_0.sql",
     "unique_id": "model.generated_2.every_raw_events_0",
     "fqn": [
      "generated_2",
@@ -1394,8 +1394,8 @@
     "name": "every_stg_sales_2",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/analysis/every_stg_sales_2.sql",
-    "original_file_path": "models/analysis/every_stg_sales_2.sql",
+    "path": "sql/models/analysis/every_stg_sales_2.sql",
+    "original_file_path": "sql/models/analysis/every_stg_sales_2.sql",
     "unique_id": "model.generated_2.every_stg_sales_2",
     "fqn": [
      "generated_2",
@@ -1463,8 +1463,8 @@
     "name": "passed_stg_sales_2",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/analysis/passed_stg_sales_2.sql",
-    "original_file_path": "models/analysis/passed_stg_sales_2.sql",
+    "path": "sql/models/analysis/passed_stg_sales_2.sql",
+    "original_file_path": "sql/models/analysis/passed_stg_sales_2.sql",
     "unique_id": "model.generated_2.passed_stg_sales_2",
     "fqn": [
      "generated_2",
@@ -1532,8 +1532,8 @@
     "name": "pivot_input_stg_sales_1",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/analysis/pivot_input_stg_sales_1.sql",
-    "original_file_path": "models/analysis/pivot_input_stg_sales_1.sql",
+    "path": "sql/models/analysis/pivot_input_stg_sales_1.sql",
+    "original_file_path": "sql/models/analysis/pivot_input_stg_sales_1.sql",
     "unique_id": "model.generated_2.pivot_input_stg_sales_1",
     "fqn": [
      "generated_2",
@@ -1629,8 +1629,8 @@
     "name": "pivoted_stg_sales_1",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/analysis/pivoted_stg_sales_1.sql",
-    "original_file_path": "models/analysis/pivoted_stg_sales_1.sql",
+    "path": "sql/models/analysis/pivoted_stg_sales_1.sql",
+    "original_file_path": "sql/models/analysis/pivoted_stg_sales_1.sql",
     "unique_id": "model.generated_2.pivoted_stg_sales_1",
     "fqn": [
      "generated_2",
@@ -1721,8 +1721,8 @@
     "name": "typed_stg_sales_2",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/analysis/typed_stg_sales_2.sql",
-    "original_file_path": "models/analysis/typed_stg_sales_2.sql",
+    "path": "sql/models/analysis/typed_stg_sales_2.sql",
+    "original_file_path": "sql/models/analysis/typed_stg_sales_2.sql",
     "unique_id": "model.generated_2.typed_stg_sales_2",
     "fqn": [
      "generated_2",
@@ -1790,8 +1790,8 @@
     "name": "audited_stg_sales_0",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/features/audited_stg_sales_0.sql",
-    "original_file_path": "models/features/audited_stg_sales_0.sql",
+    "path": "sql/models/features/audited_stg_sales_0.sql",
+    "original_file_path": "sql/models/features/audited_stg_sales_0.sql",
     "unique_id": "model.generated_2.audited_stg_sales_0",
     "fqn": [
      "generated_2",
@@ -1859,8 +1859,8 @@
     "name": "check_history_stg_sales_2",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/features/check_history_stg_sales_2.sql",
-    "original_file_path": "models/features/check_history_stg_sales_2.sql",
+    "path": "sql/models/features/check_history_stg_sales_2.sql",
+    "original_file_path": "sql/models/features/check_history_stg_sales_2.sql",
     "unique_id": "model.generated_2.check_history_stg_sales_2",
     "fqn": [
      "generated_2",
@@ -1930,8 +1930,8 @@
     "name": "copied_stg_sales_0",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/features/copied_stg_sales_0.sql",
-    "original_file_path": "models/features/copied_stg_sales_0.sql",
+    "path": "sql/models/features/copied_stg_sales_0.sql",
+    "original_file_path": "sql/models/features/copied_stg_sales_0.sql",
     "unique_id": "model.generated_2.copied_stg_sales_0",
     "fqn": [
      "generated_2",
@@ -1999,8 +1999,8 @@
     "name": "flagged_stg_sales_0",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/features/flagged_stg_sales_0.sql",
-    "original_file_path": "models/features/flagged_stg_sales_0.sql",
+    "path": "sql/models/features/flagged_stg_sales_0.sql",
+    "original_file_path": "sql/models/features/flagged_stg_sales_0.sql",
     "unique_id": "model.generated_2.flagged_stg_sales_0",
     "fqn": [
      "generated_2",
@@ -2070,8 +2070,8 @@
     "name": "merge_stg_sales_1",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/features/merge_stg_sales_1.sql",
-    "original_file_path": "models/features/merge_stg_sales_1.sql",
+    "path": "sql/models/features/merge_stg_sales_1.sql",
+    "original_file_path": "sql/models/features/merge_stg_sales_1.sql",
     "unique_id": "model.generated_2.merge_stg_sales_1",
     "fqn": [
      "generated_2",
@@ -2141,8 +2141,8 @@
     "name": "spaced_stg_sales_1",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/features/spaced_stg_sales_1.sql",
-    "original_file_path": "models/features/spaced_stg_sales_1.sql",
+    "path": "sql/models/features/spaced_stg_sales_1.sql",
+    "original_file_path": "sql/models/features/spaced_stg_sales_1.sql",
     "unique_id": "model.generated_2.spaced_stg_sales_1",
     "fqn": [
      "generated_2",
@@ -2216,8 +2216,8 @@
     "name": "taxed_stg_sales_0",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/features/taxed_stg_sales_0.sql",
-    "original_file_path": "models/features/taxed_stg_sales_0.sql",
+    "path": "sql/models/features/taxed_stg_sales_0.sql",
+    "original_file_path": "sql/models/features/taxed_stg_sales_0.sql",
     "unique_id": "model.generated_2.taxed_stg_sales_0",
     "fqn": [
      "generated_2",
@@ -2285,8 +2285,8 @@
     "name": "bounded_stg_sales_0",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/rendering/bounded_stg_sales_0.sql",
-    "original_file_path": "models/rendering/bounded_stg_sales_0.sql",
+    "path": "sql/models/rendering/bounded_stg_sales_0.sql",
+    "original_file_path": "sql/models/rendering/bounded_stg_sales_0.sql",
     "unique_id": "model.generated_2.bounded_stg_sales_0",
     "fqn": [
      "generated_2",
@@ -2356,8 +2356,8 @@
     "name": "large_events",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/rendering/large_events.sql",
-    "original_file_path": "models/rendering/large_events.sql",
+    "path": "sql/models/rendering/large_events.sql",
+    "original_file_path": "sql/models/rendering/large_events.sql",
     "unique_id": "model.generated_2.large_events",
     "fqn": [
      "generated_2",
@@ -2425,8 +2425,8 @@
     "name": "stated_stg_sales_1",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/rendering/stated_stg_sales_1.sql",
-    "original_file_path": "models/rendering/stated_stg_sales_1.sql",
+    "path": "sql/models/rendering/stated_stg_sales_1.sql",
+    "original_file_path": "sql/models/rendering/stated_stg_sales_1.sql",
     "unique_id": "model.generated_2.stated_stg_sales_1",
     "fqn": [
      "generated_2",
@@ -2522,8 +2522,8 @@
     "name": "sales_summary_0",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/sales/marts/sales_summary_0.sql",
-    "original_file_path": "models/sales/marts/sales_summary_0.sql",
+    "path": "sql/models/sales/marts/sales_summary_0.sql",
+    "original_file_path": "sql/models/sales/marts/sales_summary_0.sql",
     "unique_id": "model.generated_2.sales_summary_0",
     "fqn": [
      "generated_2",
@@ -2602,7 +2602,7 @@
          "type": "sql",
          "statement": "SELECT 'analytics.sales_summary_0' AS refreshed_relation, '東京 warehouse' AS refresh_label",
          "name": "record_refresh",
-         "relative_path": "models/sales/marts/_sqlbuild/_hooks/sql/record_refresh.sql",
+         "relative_path": "sql/models/sales/marts/_sqlbuild/_hooks/sql/record_refresh.sql",
          "definition_sql": "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label",
          "kwargs": {
           "relation": "@@CTX:destination.qualified",
@@ -2642,8 +2642,8 @@
     "name": "sales_summary_1",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/sales/marts/sales_summary_1.sql",
-    "original_file_path": "models/sales/marts/sales_summary_1.sql",
+    "path": "sql/models/sales/marts/sales_summary_1.sql",
+    "original_file_path": "sql/models/sales/marts/sales_summary_1.sql",
     "unique_id": "model.generated_2.sales_summary_1",
     "fqn": [
      "generated_2",
@@ -2722,7 +2722,7 @@
          "type": "sql",
          "statement": "SELECT 'analytics.sales_summary_1' AS refreshed_relation, 'Zürich – depot' AS refresh_label",
          "name": "record_refresh",
-         "relative_path": "models/sales/marts/_sqlbuild/_hooks/sql/record_refresh.sql",
+         "relative_path": "sql/models/sales/marts/_sqlbuild/_hooks/sql/record_refresh.sql",
          "definition_sql": "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label",
          "kwargs": {
           "relation": "@@CTX:destination.qualified",
@@ -2764,8 +2764,8 @@
     "name": "sales_summary_2",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/sales/marts/sales_summary_2.sql",
-    "original_file_path": "models/sales/marts/sales_summary_2.sql",
+    "path": "sql/models/sales/marts/sales_summary_2.sql",
+    "original_file_path": "sql/models/sales/marts/sales_summary_2.sql",
     "unique_id": "model.generated_2.sales_summary_2",
     "fqn": [
      "generated_2",
@@ -2834,7 +2834,7 @@
          "type": "sql",
          "statement": "SELECT 'analytics.sales_summary_2' AS refreshed_relation, 'café ☕ counter' AS refresh_label",
          "name": "record_refresh",
-         "relative_path": "models/sales/marts/_sqlbuild/_hooks/sql/record_refresh.sql",
+         "relative_path": "sql/models/sales/marts/_sqlbuild/_hooks/sql/record_refresh.sql",
          "definition_sql": "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label",
          "kwargs": {
           "relation": "@@CTX:destination.qualified",
@@ -2875,8 +2875,8 @@
     "name": "stg_sales_0",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/sales/staging/stg_sales_0.sql",
-    "original_file_path": "models/sales/staging/stg_sales_0.sql",
+    "path": "sql/models/sales/staging/stg_sales_0.sql",
+    "original_file_path": "sql/models/sales/staging/stg_sales_0.sql",
     "unique_id": "model.generated_2.stg_sales_0",
     "fqn": [
      "generated_2",
@@ -2949,8 +2949,8 @@
     "name": "stg_sales_1",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/sales/staging/stg_sales_1.sql",
-    "original_file_path": "models/sales/staging/stg_sales_1.sql",
+    "path": "sql/models/sales/staging/stg_sales_1.sql",
+    "original_file_path": "sql/models/sales/staging/stg_sales_1.sql",
     "unique_id": "model.generated_2.stg_sales_1",
     "fqn": [
      "generated_2",
@@ -3033,8 +3033,8 @@
     "name": "stg_sales_2",
     "resource_type": "model",
     "package_name": "generated_2",
-    "path": "models/sales/staging/stg_sales_2.sql",
-    "original_file_path": "models/sales/staging/stg_sales_2.sql",
+    "path": "sql/models/sales/staging/stg_sales_2.sql",
+    "original_file_path": "sql/models/sales/staging/stg_sales_2.sql",
     "unique_id": "model.generated_2.stg_sales_2",
     "fqn": [
      "generated_2",
@@ -3117,8 +3117,8 @@
     "name": "lookup_0",
     "resource_type": "seed",
     "package_name": "generated_2",
-    "path": "seeds/lookup_0.csv",
-    "original_file_path": "seeds/lookup_0.csv",
+    "path": "sql/seeds/lookup_0.csv",
+    "original_file_path": "sql/seeds/lookup_0.csv",
     "unique_id": "seed.generated_2.lookup_0",
     "fqn": [
      "generated_2",
@@ -3204,8 +3204,8 @@
     "name": "open_events",
     "resource_type": "source",
     "package_name": "generated_2",
-    "path": "sources/open.yml",
-    "original_file_path": "sources/open.yml",
+    "path": "sql/sources/open.yml",
+    "original_file_path": "sql/sources/open.yml",
     "unique_id": "source.generated_2.open_events",
     "fqn": [
      "generated_2",
@@ -3235,8 +3235,8 @@
     "name": "raw_events_0",
     "resource_type": "source",
     "package_name": "generated_2",
-    "path": "sources/raw.yml",
-    "original_file_path": "sources/raw.yml",
+    "path": "sql/sources/raw.yml",
+    "original_file_path": "sql/sources/raw.yml",
     "unique_id": "source.generated_2.raw_events_0",
     "fqn": [
      "generated_2",
@@ -3303,8 +3303,8 @@
     "name": "round_amount",
     "resource_type": "macro",
     "package_name": "generated_2",
-    "path": "macros/python/rounding.py",
-    "original_file_path": "macros/python/rounding.py",
+    "path": "sql/macros/python/rounding.py",
+    "original_file_path": "sql/macros/python/rounding.py",
     "unique_id": "macro.generated_2.round_amount",
     "macro_sql": "def round_amount(expression: str, places: int = 2) -> str:\n    \"\"\"Round an amount.\"\"\"\n    return f\"ROUND({expression}, {places})\"\n",
     "depends_on": {
@@ -3327,10 +3327,10 @@
     "name": "taxed",
     "resource_type": "macro",
     "package_name": "generated_2",
-    "path": "macros/python/tax.py",
-    "original_file_path": "macros/python/tax.py",
+    "path": "sql/macros/python/tax.py",
+    "original_file_path": "sql/macros/python/tax.py",
     "unique_id": "macro.generated_2.taxed",
-    "macro_sql": "from macros.python.rounding import round_amount\n\n\ndef taxed(expression: str) -> str:\n    \"\"\"Add tax to an amount, rounded.\"\"\"\n    return round_amount(f\"{expression} * 1.2\")\n",
+    "macro_sql": "from sql.macros.python.rounding import round_amount\n\n\ndef taxed(expression: str) -> str:\n    \"\"\"Add tax to an amount, rounded.\"\"\"\n    return round_amount(f\"{expression} * 1.2\")\n",
     "depends_on": {
      "macros": [
       "macro.generated_2.round_amount"
@@ -3353,8 +3353,8 @@
     "name": "adjust_0",
     "resource_type": "macro",
     "package_name": "generated_2",
-    "path": "models/sales/_sqlbuild/macros/python/adjust_0.py",
-    "original_file_path": "models/sales/_sqlbuild/macros/python/adjust_0.py",
+    "path": "sql/models/sales/_sqlbuild/macros/python/adjust_0.py",
+    "original_file_path": "sql/models/sales/_sqlbuild/macros/python/adjust_0.py",
     "unique_id": "macro.generated_2.adjust_0",
     "macro_sql": "import os\n\n\ndef adjust_0(expression: str) -> str:\n    \"\"\"Tag an amount with the deployment region.\"\"\"\n    region = os.environ.get(\"SQB_DIFFERENTIAL_REGION\", \"east\")\n    return f\"({expression} + LENGTH('{region}'))\"\n",
     "depends_on": {
@@ -3363,7 +3363,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "inherited",
-     "sqlbuild_scope_path": "models/sales"
+     "sqlbuild_scope_path": "sql/models/sales"
     },
     "docs": {
      "show": true,
@@ -3377,8 +3377,8 @@
     "name": "adjust_1",
     "resource_type": "macro",
     "package_name": "generated_2",
-    "path": "models/sales/_sqlbuild/macros/python/adjust_1.py",
-    "original_file_path": "models/sales/_sqlbuild/macros/python/adjust_1.py",
+    "path": "sql/models/sales/_sqlbuild/macros/python/adjust_1.py",
+    "original_file_path": "sql/models/sales/_sqlbuild/macros/python/adjust_1.py",
     "unique_id": "macro.generated_2.adjust_1",
     "macro_sql": "def adjust_1_round(expression: str) -> str:\n    \"\"\"Round an amount to two places.\"\"\"\n    return f\"ROUND({expression}, 2)\"\n\n\ndef adjust_1(expression: str) -> str:\n    \"\"\"Double and round an amount.\"\"\"\n    return adjust_1_round(f\"({expression} * 2)\")\n",
     "depends_on": {
@@ -3389,7 +3389,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "inherited",
-     "sqlbuild_scope_path": "models/sales"
+     "sqlbuild_scope_path": "sql/models/sales"
     },
     "docs": {
      "show": true,
@@ -3403,8 +3403,8 @@
     "name": "adjust_1_round",
     "resource_type": "macro",
     "package_name": "generated_2",
-    "path": "models/sales/_sqlbuild/macros/python/adjust_1.py",
-    "original_file_path": "models/sales/_sqlbuild/macros/python/adjust_1.py",
+    "path": "sql/models/sales/_sqlbuild/macros/python/adjust_1.py",
+    "original_file_path": "sql/models/sales/_sqlbuild/macros/python/adjust_1.py",
     "unique_id": "macro.generated_2.adjust_1_round",
     "macro_sql": "def adjust_1_round(expression: str) -> str:\n    \"\"\"Round an amount to two places.\"\"\"\n    return f\"ROUND({expression}, 2)\"\n\n\ndef adjust_1(expression: str) -> str:\n    \"\"\"Double and round an amount.\"\"\"\n    return adjust_1_round(f\"({expression} * 2)\")\n",
     "depends_on": {
@@ -3413,7 +3413,7 @@
     "description": "",
     "meta": {
      "sqlbuild_visibility": "inherited",
-     "sqlbuild_scope_path": "models/sales"
+     "sqlbuild_scope_path": "sql/models/sales"
     },
     "docs": {
      "show": true,
@@ -3427,8 +3427,8 @@
     "name": "record_refresh",
     "resource_type": "macro",
     "package_name": "generated_2__sqlbuild_hooks",
-    "path": "models/sales/marts/_sqlbuild/_hooks/sql/record_refresh.sql",
-    "original_file_path": "models/sales/marts/_sqlbuild/_hooks/sql/record_refresh.sql",
+    "path": "sql/models/sales/marts/_sqlbuild/_hooks/sql/record_refresh.sql",
+    "original_file_path": "sql/models/sales/marts/_sqlbuild/_hooks/sql/record_refresh.sql",
     "unique_id": "macro.generated_2__sqlbuild_hooks.record_refresh",
     "macro_sql": "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label",
     "depends_on": {

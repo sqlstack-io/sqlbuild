@@ -6,13 +6,15 @@ from pathlib import Path
 
 ORDERS_PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
-    "models/staging/stg_orders.sql": (
+    "sql/models/staging/stg_orders.sql": (
         "MODEL (description 'Staged orders.', tags [daily]);\nSELECT 1 AS order_id\n"
     ),
-    "models/marts/orders.sql": (
+    "sql/models/marts/orders.sql": (
         "MODEL (description 'Orders.');\nSELECT order_id FROM __ref(\"stg_orders\")\n"
     ),
-    "models/marts/customers.sql": "MODEL (description 'Customers.');\nSELECT 1 AS customer_id\n",
+    "sql/models/marts/customers.sql": (
+        "MODEL (description 'Customers.');\nSELECT 1 AS customer_id\n"
+    ),
 }
 MODEL_NAMES: frozenset[str] = frozenset({"stg_orders", "orders", "customers"})
 

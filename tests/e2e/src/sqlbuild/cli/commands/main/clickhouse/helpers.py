@@ -148,7 +148,7 @@ def build_orders_project_files(*, schema_name: str, config: dict[str, object]) -
             config=config,
             extra="\n[settings]\nconcurrency = 4\nmicrobatch_concurrency = true\n",
         ),
-        "sources/raw.yml": dedent(
+        "sql/sources/raw.yml": dedent(
             f"""
             sources:
               - name: raw_events
@@ -162,8 +162,8 @@ def build_orders_project_files(*, schema_name: str, config: dict[str, object]) -
                 final: true
             """
         ).lstrip(),
-        "seeds/regions.csv": "customer_id,region_name\n1,north\n2,south\n3,east\n",
-        "seeds/regions.yml": dedent(
+        "sql/seeds/regions.csv": "customer_id,region_name\n1,north\n2,south\n3,east\n",
+        "sql/seeds/regions.yml": dedent(
             """
             seeds:
               - name: regions
@@ -175,16 +175,16 @@ def build_orders_project_files(*, schema_name: str, config: dict[str, object]) -
                     type: String
             """
         ).lstrip(),
-        "functions/sql/half_amount.sql": (
+        "sql/functions/sql/half_amount.sql": (
             'FUNCTION (\n  description "Half of an amount",\n'
             "  arguments (amount Int64),\n  returns Float64,\n);\n\namount / 2\n"
         ),
-        "models/stg_events.sql": (
+        "sql/models/stg_events.sql": (
             "MODEL (description 'Staged events.', materialized view);\n\n"
             "SELECT event_id, customer_id, amount, event_time\n"
             'FROM __source("raw_events")\n'
         ),
-        "models/customer_totals.sql": (
+        "sql/models/customer_totals.sql": (
             "MODEL (description 'One row per customer.');\n\n"
             "SELECT e.customer_id AS customer_id, r.region_name AS region_name,\n"
             "  sum(e.amount) AS total_amount,\n"
@@ -193,11 +193,11 @@ def build_orders_project_files(*, schema_name: str, config: dict[str, object]) -
             'JOIN __seed("regions") AS r ON e.customer_id = r.customer_id\n'
             "GROUP BY e.customer_id, r.region_name\n"
         ),
-        "models/customer_names.sql": (
+        "sql/models/customer_names.sql": (
             "MODEL (description 'One row per customer name.');\n\n"
             'SELECT customer_id, customer_name FROM __source("raw_customers")\n'
         ),
-        "models/customer_latest.sql": (
+        "sql/models/customer_latest.sql": (
             "MODEL (description 'Latest activity per customer.',\n"
             "  materialized incremental,\n"
             "  incremental_strategy merge,\n"
@@ -207,7 +207,7 @@ def build_orders_project_files(*, schema_name: str, config: dict[str, object]) -
             'FROM __ref("stg_events")\n'
             "GROUP BY customer_id\n"
         ),
-        "models/daily_events.sql": (
+        "sql/models/daily_events.sql": (
             "MODEL (description 'Events by day.',\n"
             "  materialized incremental,\n"
             "  incremental_strategy delete_insert,\n"
@@ -237,7 +237,7 @@ def build_partitioned_events_project_files(
         "sqlbuild_project.toml": build_clickhouse_project_toml(
             project_name="clickhouse_layout", schema_name=schema_name, config=config
         ),
-        "sources/raw.yml": dedent(
+        "sql/sources/raw.yml": dedent(
             f"""
             sources:
               - name: raw_events
@@ -246,7 +246,7 @@ def build_partitioned_events_project_files(
                 table: raw_events
             """
         ).lstrip(),
-        "models/events.sql": (
+        "sql/models/events.sql": (
             "MODEL (description 'One row per event.',\n"
             "  materialized incremental,\n"
             "  incremental_strategy delete_insert,\n"
@@ -291,10 +291,10 @@ def prepare_clickhouse_waffle_shop(
 
     schema_name: str = build_unique_schema_name(prefix="sqb_waffle")
     project_dir: Path = prepare_waffle_shop(tmp_path)
-    (project_dir / "functions" / "sql" / "customer_orders.sql").unlink()
+    (project_dir / "sql" / "functions" / "sql" / "customer_orders.sql").unlink()
     (project_dir / "tests" / "unit" / "test_customer_orders_table_fn.sql").unlink()
-    (project_dir / "functions" / "python" / "is_completed_order_py.py").unlink()
-    fact_orders_path: Path = project_dir / "models" / "marts" / "fact_orders.sql"
+    (project_dir / "sql" / "functions" / "python" / "is_completed_order_py.py").unlink()
+    fact_orders_path: Path = project_dir / "sql" / "models" / "marts" / "fact_orders.sql"
     fact_orders_path.write_text(
         fact_orders_path.read_text(encoding="utf-8").replace(
             '__udf("is_completed_order_py")(o.status) AS is_completed_order_py,',
@@ -303,15 +303,19 @@ def prepare_clickhouse_waffle_shop(
         encoding="utf-8",
     )
     for model_name in ("dim_customers", "fact_orders", "scenario_order_prices"):
-        _alias_qualified_columns(project_dir / "models" / "marts" / f"{model_name}.sql")
-    materialization_path: Path = project_dir / "materializations" / "partition_tracked.py"
+        _alias_qualified_columns(project_dir / "sql" / "models" / "marts" / f"{model_name}.sql")
+    materialization_path: Path = (
+        project_dir / "python" / "materializations" / "partition_tracked.py"
+    )
     materialization_path.write_text(
         materialization_path.read_text(encoding="utf-8").replace(
             "CURRENT_TIMESTAMP", "CURRENT_TIMESTAMP()"
         ),
         encoding="utf-8",
     )
-    time_macros_path: Path = project_dir / "models" / "marts" / "_macros" / "python" / "time.py"
+    time_macros_path: Path = (
+        project_dir / "sql" / "models" / "marts" / "_macros" / "python" / "time.py"
+    )
     time_macros_path.write_text(
         time_macros_path.read_text(encoding="utf-8").replace(
             "return f\"DATE_TRUNC('{grain}', {expression})\"",
@@ -1066,7 +1070,7 @@ def representative_store(project_dir: Path) -> subprocess.Popen[bytes]:
     """A completed, a failed, an abandoned and a heartbeat-only invocation, and a running one."""
 
     assert run(project_dir, "build").returncode == 0
-    failing: Path = project_dir / "models" / "unparsed_orders.sql"
+    failing: Path = project_dir / "sql" / "models" / "unparsed_orders.sql"
     _ = failing.write_text(_FAILING_MODEL, encoding="utf-8")
     assert run(project_dir, "build").returncode != 0
     failing.unlink()
@@ -1125,7 +1129,7 @@ def prepare_janitor_usage_project(
                 config=config,
                 extra=JANITOR_SETTINGS,
             ).replace("\n[targets.dev]", connection_settings + "\n[targets.dev]"),
-            "models/orders.sql": "MODEL (description 'Orders.');\n\nSELECT toInt64(1) AS id\n",
+            "sql/models/orders.sql": "MODEL (description 'Orders.');\n\nSELECT toInt64(1) AS id\n",
         },
     )
     built: subprocess.CompletedProcess[str] = run_sqb(

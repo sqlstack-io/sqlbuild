@@ -54,7 +54,7 @@
           "warehouse_type": "TIMESTAMP_NTZ(9)"
         }
       ],
-      "file": "sources/edge__delivery_updates.jsonl",
+      "file": "sql/sources/edge__delivery_updates.jsonl",
       "kind": "source",
       "logical_name": "edge__delivery_updates",
       "row_count": 5

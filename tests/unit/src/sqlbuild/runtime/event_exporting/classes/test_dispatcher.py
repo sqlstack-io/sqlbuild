@@ -19,13 +19,13 @@ from sqlbuild._native import (
     EventExportSeverity,
     EventExportSummary,
 )
+from sqlbuild.event_sinks import CommandOutputRecord, CommandOutputStream
 from sqlbuild.observability import LifecycleEvent
 from sqlbuild.runtime.event_exporting.exceptions import EventExporterInputError
 from sqlbuild.runtime.event_exporting.main._invoke_lifecycle_event_sink import (
     invoke_lifecycle_event_sink,
 )
 from sqlbuild.runtime.output_capture.models import BoundCommandOutputSink
-from sqlbuild.sinks import CommandOutputRecord, CommandOutputStream
 from tests.unit.src.sqlbuild.runtime.event_exporting.classes._test_types import (
     EventExporterDispatcherTestCase,
     HealthIntervalTestCase,
@@ -143,7 +143,6 @@ def test_given_idle_dispatcher_when_waiting_then_it_does_not_poll_and_still_deli
 ) -> None:
     delivered: list[threading.Event] = [threading.Event(), threading.Event()]
     published: list[int] = []
-    caller_thread: int = threading.get_ident()
     waits: list[tuple[int, float | None]] = []
     condition_wait: Callable[[threading.Condition, float | None], bool] = threading.Condition.wait
 
@@ -158,17 +157,23 @@ def test_given_idle_dispatcher_when_waiting_then_it_does_not_poll_and_still_deli
         delivered[len(published)].set()
         published.append(1)
 
+    existing_threads: set[int | None] = {thread.ident for thread in threading.enumerate()}
     dispatcher: EventExporterDispatcher = EventExporterDispatcher(
         exporters=(BoundEventExporter("publish", publish, {}),),
     )
     dispatcher.enqueue(lifecycle_event())
     assert delivered[0].wait(timeout=2.0)
     time.sleep(0.05)
+    # Threads left by earlier tests wait too, so count only the threads this dispatcher started.
+    dispatcher_threads: set[int | None] = {
+        thread.ident for thread in threading.enumerate()
+    } - existing_threads
+    assert dispatcher_threads
     waits.clear()
     time.sleep(test_case.idle_seconds)
-    # Other threads of a busy process wait too; only waits shorter than the idle safety timeout poll.
+    # Only waits shorter than the idle safety timeout poll.
     idle_waits: int = sum(
-        thread != caller_thread and timeout is not None and timeout < test_case.polling_seconds
+        thread in dispatcher_threads and timeout is not None and timeout < test_case.polling_seconds
         for thread, timeout in waits
     )
     started: float = time.monotonic()

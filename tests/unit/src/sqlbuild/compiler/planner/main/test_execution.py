@@ -92,7 +92,7 @@ def test_given_project_with_hook_functions_when_building_execution_plan_then_pla
                 hook_functions=(
                     DiscoveredHookFunction(
                         file_path=Path(__file__),
-                        relative_path=Path("hooks/python/notify.py"),
+                        relative_path=Path("sql/hooks/python/notify.py"),
                         name="notify",
                         function=notify,
                     ),

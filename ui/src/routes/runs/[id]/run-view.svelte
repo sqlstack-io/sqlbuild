@@ -23,6 +23,7 @@
 	import RunTabs from './run-tabs.svelte';
 	import { createRunDetailState } from './state.svelte';
 	import { bottomTabs } from './utils';
+	import { preparingSpan } from './utils/preparing';
 
 	let { runId }: { runId: string } = $props();
 
@@ -56,8 +57,11 @@
 	const planCount = $derived(view.selection.evaluation?.count ?? 0);
 	const hasBottom = $derived(bottomTabs(app.client, (c) => app.can(c)).length > 0);
 
-	/** The axis starts at the first node start, not at queue time. */
+	/** The worker's preparation before its first node; a group run's members each have their own, so it has none. */
+	const preparing = $derived(detail && !detail.children.length ? preparingSpan(view.events, runId, nodes, app.now) : null);
+	/** The axis starts when the worker launched, or at the first node start, not at queue time. */
 	const origin = $derived.by(() => {
+		if (preparing) return preparing.start;
 		const starts = nodes.map((n) => (n.startedAt ? Date.parse(n.startedAt) : Infinity));
 		const first = Math.min(...starts);
 		if (Number.isFinite(first)) return first;
@@ -147,7 +151,7 @@
 						{#if !nodes.length}
 							<div class="empty">{detail.children.length ? 'No nodes yet.' : 'Not started.'}</div>
 						{:else if topView === 'timeline' || !hasGraph}
-							<RunGantt nodes={view.shownNodes} {origin} now={app.now} active={view.active} selected={view.selected} excluded={view.excluded} tag={detail.children.length ? (n) => memberOf(n.runId) : undefined} skipText={causeOf} onselect={(key) => view.selectNode(key)} onopen={(key) => view.clickNode(key)} />
+							<RunGantt nodes={view.shownNodes} {origin} {preparing} now={app.now} active={view.active} selected={view.selected} excluded={view.excluded} tag={detail.children.length ? (n) => memberOf(n.runId) : undefined} skipText={causeOf} onselect={(key) => view.selectNode(key)} onopen={(key) => view.clickNode(key)} />
 						{:else}
 							<RunLineage {view} />
 						{/if}

@@ -64,7 +64,7 @@ def test_given_type_findings_without_native_spans_when_compiling_then_each_is_lo
         project_name="orders",
         repo_files={
             "sqlbuild_project.toml": f'name = "orders"\nadapter = "{test_case.adapter}"\n',
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 'MODEL (description "Order epochs", database warehouse, schema analytics);\n\n'
                 + test_case.query_sql
             ),

@@ -70,7 +70,7 @@
 				{:else if failure}
 					<p class="faint">{failure}</p>
 				{:else if loaded}
-					<p class="faint">No error text was recorded for this node.</p>
+					<p class="faint">No error text recorded.</p>
 				{:else if view.errorsReadable}
 					<p class="faint">Loading the error…</p>
 				{/if}

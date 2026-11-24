@@ -29,6 +29,22 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     run_sqb,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import duckshop_orchestration
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
+
+RAW_DATA_SCRIPT: str = "seed_raw_data.sql"
+
+
+def take_raw_data_sql(project_dir: Path) -> str:
+    """Remove the fixture's raw data script from the project and return its SQL.
+
+    The script loads source rows before the first build; it is not part of the project, so it
+    leaves the project before SQLBuild reads it.
+    """
+
+    script: Path = project_dir / RAW_DATA_SCRIPT
+    sql: str = script.read_text(encoding="utf-8")
+    script.unlink()
+    return sql
 
 
 def run_replay_command(
@@ -66,7 +82,7 @@ def capped_microbatch_project_files(
             """
         ).strip()
         + "\n",
-        "sources/raw.yml": dedent(
+        "sql/sources/raw.yml": dedent(
             """
             sources:
               - name: raw_events
@@ -76,7 +92,7 @@ def capped_microbatch_project_files(
             """
         ).strip()
         + "\n",
-        "models/capped_events.sql": dedent(
+        "sql/models/capped_events.sql": dedent(
             f"""
             MODEL (description "Test model capped_events.",
               materialized incremental,
@@ -104,7 +120,7 @@ def capped_microbatch_project_files(
             """
         ).strip()
         + "\n",
-        "models/downstream_events.sql": dedent(
+        "sql/models/downstream_events.sql": dedent(
             """
             MODEL (description "Test model downstream_events.", materialized view);
             SELECT id, event_time
@@ -119,7 +135,7 @@ def capped_watermark_consumer_project_files(*, limit_action: str) -> dict[str, s
     """Build an invalid project whose watermark consumer reads a capped producer."""
 
     repo_files: dict[str, str] = capped_microbatch_project_files(limit_action=limit_action)
-    repo_files["models/downstream_events.sql"] = (
+    repo_files["sql/models/downstream_events.sql"] = (
         dedent(
             """
             MODEL (description "Test model downstream_events.",
@@ -151,7 +167,7 @@ def capped_filter_join_consumer_project_files(*, limit_action: str) -> dict[str,
     """Build a project whose microbatch consumer filters a capped producer and joins its source."""
 
     repo_files: dict[str, str] = capped_microbatch_project_files(limit_action=limit_action)
-    repo_files["models/downstream_events.sql"] = (
+    repo_files["sql/models/downstream_events.sql"] = (
         dedent(
             """
             MODEL (description "Test model downstream_events.",
@@ -216,8 +232,8 @@ def prepare_defer_clone_project(
                 """
             ).strip()
             + "\n",
-            "models/upstream.sql": upstream_sql,
-            "models/downstream.sql": downstream_sql,
+            "sql/models/upstream.sql": upstream_sql,
+            "sql/models/downstream.sql": downstream_sql,
         },
     )
 
@@ -245,7 +261,7 @@ def assert_defer_clone_build_case(*, tmp_path: Path, test_case: DeferCloneBuildE
         ),
         encoding="utf-8",
     )
-    (project_dir / "models" / "upstream.sql").write_text(
+    (project_dir / "sql" / "models" / "upstream.sql").write_text(
         test_case.changed_upstream_sql,
         encoding="utf-8",
     )
@@ -299,7 +315,7 @@ def prepare_build_test_audit_flag_project(*, tmp_path: Path, project_name: str) 
                 """
             ).strip()
             + "\n",
-            "models/orders.sql": dedent(
+            "sql/models/orders.sql": dedent(
                 """
                 MODEL (description "Test model orders.",
                   materialized table,
@@ -321,8 +337,10 @@ def prepare_build_test_audit_flag_project(*, tmp_path: Path, project_name: str) 
                 """
             ).strip()
             + "\n",
-            "python/checks/orders.py": dedent(
-                """
+            **node_module_files(
+                "python/nodes/checks/orders.py",
+                dedent(
+                    """
                 from sqlbuild.checks import check
                 from sqlbuild.refs import model
 
@@ -332,7 +350,8 @@ def prepare_build_test_audit_flag_project(*, tmp_path: Path, project_name: str) 
                     '''Test check check_orders_exist.'''
                     return ctx.pass_()
                 """
-            ).lstrip(),
+                ).lstrip(),
+            ),
         },
     )
 
@@ -482,8 +501,8 @@ def prepare_replay_microbatch_project(
                 database_name=database_name,
                 settings_toml=("\n[settings]\nconcurrency = 3\nmicrobatch_concurrency = true\n"),
             ),
-            "sources/raw.yml": raw_events_source_yml(),
-            "models/orders.sql": timestamp_microbatch_model_sql(
+            "sql/sources/raw.yml": raw_events_source_yml(),
+            "sql/models/orders.sql": timestamp_microbatch_model_sql(
                 value_expression="CAST(payload AS INTEGER)",
                 batch_concurrency=3,
                 replay_policy=replay_policy,
@@ -501,11 +520,11 @@ def dropped_incremental_project_files(*, incremental_strategy: str) -> dict[str,
             'name = "dropped_orders"\nadapter = "duckdb"\n\n'
             '[connection]\ndatabase = "dropped_orders.duckdb"\n'
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n    table: raw_orders\n"
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             "MODEL (description 'Test model orders.',\n"
             "  materialized incremental,\n"
             f"  incremental_strategy {incremental_strategy},\n"
@@ -529,35 +548,35 @@ _GATE_AUDIT_TEMPLATE: str = (
 )
 _GATE_TARGET_FILES: dict[str, dict[str, str]] = {
     "model": {
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             "MODEL (description 'Test model orders.', "
             "materialized table, audits [code_check (severity error)]);\n\n"
             "SELECT '{code}' AS code\n"
         ),
-        "models/order_summary.sql": (
+        "sql/models/order_summary.sql": (
             'MODEL (description "Test model order_summary.", '
             'materialized table);\n\nSELECT code FROM __ref("orders")\n'
         ),
     },
     "source": {
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n    table: raw_orders\n"
             "    audits:\n      - code_check:\n          severity: error\n"
         ),
-        "models/staged_orders.sql": (
+        "sql/models/staged_orders.sql": (
             'MODEL (description "Test model staged_orders.", '
             'materialized table);\n\nSELECT code FROM __source("raw_orders")\n'
         ),
     },
     "seed": {
-        "seeds/order_codes.yml": (
+        "sql/seeds/order_codes.yml": (
             "seeds:\n  - name: order_codes\n    description: Test seed order_codes.\n"
             "    columns:\n      - name: code\n"
             "        type: VARCHAR\n    audits:\n      - code_check:\n          severity: error\n"
         ),
-        "seeds/order_codes.csv": "code\n{code}\n",
-        "models/coded_orders.sql": (
+        "sql/seeds/order_codes.csv": "code\n{code}\n",
+        "sql/models/coded_orders.sql": (
             'MODEL (description "Test model coded_orders.", '
             'materialized table);\n\nSELECT code FROM __seed("order_codes")\n'
         ),
@@ -580,8 +599,8 @@ def prepare_attached_audit_gate_project(
             'name = "gate_shop"\nadapter = "duckdb"\n\n'
             f'[connection]\ndatabase = "{ATTACHED_AUDIT_GATE_DATABASE}"\n'
         ),
-        "audits/generic/code_check.sql": _GATE_AUDIT_TEMPLATE.format(read=read),
-        "models/valid_codes.sql": (
+        "sql/audits/generic/code_check.sql": _GATE_AUDIT_TEMPLATE.format(read=read),
+        "sql/models/valid_codes.sql": (
             "MODEL (description 'Test model valid_codes.', "
             "materialized table);\n\n"
             "WITH valid(code) AS (VALUES ('A'), ('B'))\nSELECT code FROM valid\n"
@@ -616,23 +635,23 @@ def prepare_nested_source_gate_project(*, tmp_path: Path, raw_code: str) -> Path
                 'name = "gate_shop"\nadapter = "duckdb"\n\n'
                 f'[connection]\ndatabase = "{ATTACHED_AUDIT_GATE_DATABASE}"\n'
             ),
-            "sources/raw.yml": (
+            "sql/sources/raw.yml": (
                 "sources:\n  - name: raw_codes\n    description: Test source raw_codes.\n"
                 "    schema: main\n    table: raw_codes\n"
                 "    audits:\n      - source_check:\n          severity: error\n"
             ),
-            "audits/generic/source_check.sql": _GATE_AUDIT_TEMPLATE.format(
+            "sql/audits/generic/source_check.sql": _GATE_AUDIT_TEMPLATE.format(
                 read='__ref("valid_codes")'
             ),
-            "audits/generic/order_check.sql": _GATE_AUDIT_TEMPLATE.format(
+            "sql/audits/generic/order_check.sql": _GATE_AUDIT_TEMPLATE.format(
                 read='__source("raw_codes")'
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Test model orders.', "
                 "materialized table, audits [order_check (severity error)]);\n\n"
                 "SELECT 'A' AS code\n"
             ),
-            "models/valid_codes.sql": (
+            "sql/models/valid_codes.sql": (
                 "MODEL (description 'Test model valid_codes.', materialized table);\n\n"
                 "WITH valid(code) AS (VALUES ('A'), ('B'))\nSELECT code FROM valid\n"
             ),
@@ -675,37 +694,37 @@ _BROKEN_AUDIT: str = (
 )
 _AUDIT_ERROR_TARGET_FILES: dict[str, dict[str, str]] = {
     "source": {
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n    table: raw_orders\n"
             "    audits:\n      - broken_check:\n          severity: {severity}\n"
         ),
-        "audits/generic/broken_check.sql": _BROKEN_AUDIT,
-        "models/staged_orders.sql": (
+        "sql/audits/generic/broken_check.sql": _BROKEN_AUDIT,
+        "sql/models/staged_orders.sql": (
             'MODEL (description "Test model staged_orders.", '
             'materialized table);\n\nSELECT code FROM __source("raw_orders")\n'
         ),
     },
     "seed": {
-        "seeds/order_codes.yml": (
+        "sql/seeds/order_codes.yml": (
             "seeds:\n  - name: order_codes\n    description: Test seed order_codes.\n"
             "    columns:\n      - name: code\n"
             "        type: VARCHAR\n    audits:\n      - broken_check:\n"
             "          severity: {severity}\n"
         ),
-        "seeds/order_codes.csv": "code\nA\n",
-        "audits/generic/broken_check.sql": _BROKEN_AUDIT,
-        "models/coded_orders.sql": (
+        "sql/seeds/order_codes.csv": "code\nA\n",
+        "sql/audits/generic/broken_check.sql": _BROKEN_AUDIT,
+        "sql/models/coded_orders.sql": (
             'MODEL (description "Test model coded_orders.", '
             'materialized table);\n\nSELECT code FROM __seed("order_codes")\n'
         ),
     },
     "end": {
-        "models/orders.sql": "MODEL (description 'Test model orders.', "
+        "sql/models/orders.sql": "MODEL (description 'Test model orders.', "
         "materialized table);\n\nSELECT 'A' AS code\n",
-        "models/customers.sql": "MODEL (description 'Test model customers.', "
+        "sql/models/customers.sql": "MODEL (description 'Test model customers.', "
         "materialized table);\n\nSELECT 'A' AS code\n",
-        "audits/singular/broken_check.sql": (
+        "sql/audits/singular/broken_check.sql": (
             "AUDIT (severity {severity});\n\n"
             'SELECT o.code FROM __ref("orders") o JOIN __ref("customers") c USING (code)\n'
             "JOIN main.missing_lookup m USING (code)\n"
@@ -762,13 +781,13 @@ def prepare_audit_read_plan_project(*, tmp_path: Path) -> Path:
                 'name = "plan_shop"\nadapter = "duckdb"\n\n'
                 '[connection]\ndatabase = "plan_shop.duckdb"\n'
             ),
-            "seeds/waffle_types.yml": (
+            "sql/seeds/waffle_types.yml": (
                 "seeds:\n  - name: waffle_types\n    description: Test seed waffle_types.\n"
                 "    columns:\n"
                 "      - name: waffle_type_id\n        type: INTEGER\n"
             ),
-            "seeds/waffle_types.csv": "waffle_type_id\n1\n",
-            "models/stg_orders.sql": (
+            "sql/seeds/waffle_types.csv": "waffle_type_id\n1\n",
+            "sql/models/stg_orders.sql": (
                 "MODEL (description 'Test model stg_orders.',"
                 "\n  materialized table,\n  columns (\n    waffle_type_id (\n"
                 '      audits [relationships (to __seed("waffle_types"), field waffle_type_id)],\n'
@@ -778,9 +797,9 @@ def prepare_audit_read_plan_project(*, tmp_path: Path) -> Path:
     )
 
 
-EXPLICIT_REFERENCE_MODELS: str = "models/sales"
-EXPLICIT_REFERENCE_MACRO_PATH: str = "models/sales/_sqlbuild/_macros/python/unions.py"
-EXPLICIT_REFERENCE_HOOK_PATH: str = "models/sales/_sqlbuild/_hooks/python/lookups.py"
+EXPLICIT_REFERENCE_MODELS: str = "sql/models/sales"
+EXPLICIT_REFERENCE_MACRO_PATH: str = "sql/models/sales/_sqlbuild/_macros/python/unions.py"
+EXPLICIT_REFERENCE_HOOK_PATH: str = "sql/models/sales/_sqlbuild/_hooks/python/lookups.py"
 EXPLICIT_REFERENCE_MACROS: str = (
     "def union_all(relations):\n"
     "    return ' UNION ALL '.join(\n"
@@ -892,7 +911,7 @@ def python_node_selection_project_files(*, orders_sql: str) -> dict[str, str]:
             'name = "order_nodes"\nadapter = "duckdb"\n\n'
             f'[connection]\ndatabase = "{PYTHON_NODE_SELECTION_DATABASE}"\n'
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n"
             "  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n    table: raw_orders\n"
@@ -900,28 +919,31 @@ def python_node_selection_project_files(*, orders_sql: str) -> dict[str, str]:
             "    managed: true\n    write_strategy: table\n"
             "    columns:\n      - name: customer_id\n        type: INTEGER\n"
         ),
-        "python/loaders/customers.py": (
+        "python/nodes/loaders/customers/loader.py": (
             "from sqlbuild.loaders import loader\n\n\n"
             "@loader\ndef raw_customers(ctx):\n"
             "    '''Test loader raw_customers.'''\n"
             "    return [{'customer_id': 99}]\n"
         ),
-        "python/tasks/counts.py": (
+        **node_module_files(
+            "python/nodes/tasks/counts.py",
             "from sqlbuild.refs import model, source\nfrom sqlbuild.assets import asset\n\n\n"
-            + task_nodes
+            + task_nodes,
         ),
-        "python/assets/extracts.py": (
+        **node_module_files(
+            "python/nodes/assets/extracts.py",
             "from sqlbuild.assets import asset\nfrom sqlbuild.refs import model, source\n\n\n"
-            + asset_nodes
+            + asset_nodes,
         ),
-        "models/orders.sql": orders_sql,
-        "models/order_summary.sql": (
+        "sql/models/orders.sql": orders_sql,
+        "sql/models/order_summary.sql": (
             'MODEL (description "Test model order_summary.", '
             'materialized table);\nSELECT count(*) AS order_count FROM __ref("orders")\n'
         ),
         **duckshop_orchestration("python_node_jobs"),
-        "python/tasks/reports.py": (
-            "from python.tasks.counts import count_orders\nfrom sqlbuild.assets import asset\n\n\n"
+        "python/nodes/tasks/reports/asset.py": (
+            "from python.nodes.tasks.counts import count_orders\n"
+            "from sqlbuild.assets import asset\n\n\n"
             "@asset(depends_on=count_orders)\n"
             "def report_order_count(ctx):\n"
             "    '''Test task report_order_count.'''\n"
@@ -968,7 +990,7 @@ def prepare_empty_cursor_inputs_project(*, tmp_path: Path, models: dict[str, str
         project_name="empty_cursor_inputs",
         repo_files={
             "sqlbuild_project.toml": _EMPTY_CURSOR_PROJECT_TOML,
-            "sources/raw.yml": _EMPTY_CURSOR_SOURCES_YML,
+            "sql/sources/raw.yml": _EMPTY_CURSOR_SOURCES_YML,
             **models,
         },
     )
@@ -1011,12 +1033,14 @@ def prepare_emptied_cursor_project(
     """Build a model over loaded payments, then empty the source and write the next model SQL."""
 
     project_dir: Path = prepare_empty_cursor_inputs_project(
-        tmp_path=tmp_path, models={"models/daily_revenue.sql": model_sql}
+        tmp_path=tmp_path, models={"sql/models/daily_revenue.sql": model_sql}
     )
     load_empty_cursor_payments(project_dir=project_dir)
     build_empty_cursor_project(project_dir=project_dir)
     execute_empty_cursor_sql(project_dir=project_dir, sql="DELETE FROM main.raw_payments")
-    (project_dir / "models" / "daily_revenue.sql").write_text(changed_model_sql, encoding="utf-8")
+    (project_dir / "sql" / "models" / "daily_revenue.sql").write_text(
+        changed_model_sql, encoding="utf-8"
+    )
     return project_dir
 
 
@@ -1024,7 +1048,7 @@ def prepare_waiting_on_empty_input_project(*, tmp_path: Path, model_sql: str) ->
     """Build over payments and refunds, then empty refunds while new payments arrive."""
 
     project_dir: Path = prepare_empty_cursor_inputs_project(
-        tmp_path=tmp_path, models={"models/daily_revenue.sql": model_sql}
+        tmp_path=tmp_path, models={"sql/models/daily_revenue.sql": model_sql}
     )
     execute_empty_cursor_sql(
         project_dir=project_dir,
@@ -1060,7 +1084,7 @@ def prepare_same_run_empty_inputs_project(
     build_empty_cursor_project(project_dir=project_dir)
     execute_empty_cursor_sql(project_dir=project_dir, sql=emptying_sql)
     view_path: Path
-    for view_path in sorted((project_dir / "models").glob("stg_*.sql")):
+    for view_path in sorted((project_dir / "sql" / "models").glob("stg_*.sql")):
         view_path.write_text(
             view_path.read_text(encoding="utf-8").replace(
                 "amount_cents FROM", "amount_cents * 1 AS amount_cents FROM"
@@ -1122,7 +1146,7 @@ def dynamic_category_project(*, tmp_path: Path, name_pattern_entry: str) -> Path
                 'select = ["SQBRMODEL102", "SQBRCONTRACT101", "SQBRCONTRACT105", '
                 '"SQBRCONTRACT106"]\n'
             ),
-            "models/stg_order_amounts.sql": (
+            "sql/models/stg_order_amounts.sql": (
                 "MODEL (description 'Test model stg_order_amounts.',\n"
                 "  materialized table,\n"
                 "  columns (\n"
@@ -1141,7 +1165,7 @@ def dynamic_category_project(*, tmp_path: Path, name_pattern_entry: str) -> Path
                 "SELECT CAST(2 AS INTEGER), CAST('books' AS VARCHAR), "
                 "CAST(7.00 AS DECIMAL(12,2))\n"
             ),
-            "models/customer_category_amounts.sql": (
+            "sql/models/customer_category_amounts.sql": (
                 "MODEL (description 'Test model customer_category_amounts.',\n"
                 "  materialized table,\n"
                 "  columns (customer_id (type INTEGER)),\n"
@@ -1171,8 +1195,8 @@ def seed_audit_files(status_values: tuple[str, ...]) -> dict[str, str]:
             'name = "seed_audit_rows"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
             '[connection]\ndatabase = "seed_audits.duckdb"\n\n[targets.dev]\nschema = "dev"\n'
         ),
-        "seeds/order_statuses.csv": "status_id,status\n1,placed\n2,shipped\n",
-        "seeds/order_statuses.yml": (
+        "sql/seeds/order_statuses.csv": "status_id,status\n1,placed\n2,shipped\n",
+        "sql/seeds/order_statuses.yml": (
             "seeds:\n"
             "  - name: order_statuses\n"
             "    description: Order statuses.\n"
@@ -1220,8 +1244,8 @@ def target_concurrency_project_files(
             f"{target_concurrency}"
         ),
         "sqlbuild_local.toml": local_settings,
-        "seeds/products.csv": "product_id\n1\n2\n",
-        "seeds/products.yml": (
+        "sql/seeds/products.csv": "product_id\n1\n2\n",
+        "sql/seeds/products.yml": (
             "seeds:\n"
             "  - name: products\n"
             "    description: Products.\n"
@@ -1229,7 +1253,7 @@ def target_concurrency_project_files(
             "      - name: product_id\n"
             "        type: INTEGER\n"
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             "MODEL (description 'Orders.', materialized table);\n\nSELECT 1 AS order_id\n"
         ),
     }
@@ -1254,14 +1278,14 @@ def target_concurrency_microbatch_files() -> dict[str, str]:
             'schema = "main"\n'
             "concurrency = 3\n"
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n"
             "  - name: raw_events\n"
             "    description: Raw events.\n"
             "    schema: main\n"
             "    table: raw_events\n"
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             'MODEL (description "Orders.",\n'
             "  materialized incremental,\n"
             "  incremental_strategy delete_insert,\n"
@@ -1362,8 +1386,8 @@ def prepare_changed_project(*, tmp_path: Path, warehouse: ChangedWarehouse) -> P
     """The DuckShop changed-builds edge case on `warehouse`, with its raw tables loaded."""
 
     files: dict[str, str] = {
-        str(path.relative_to(CHANGED_BUILDS_FIXTURE)): path.read_text(encoding="utf-8")
-        for path in sorted(CHANGED_BUILDS_FIXTURE.glob("*/*"))
+        path.relative_to(CHANGED_BUILDS_FIXTURE).as_posix(): path.read_text(encoding="utf-8")
+        for path in sorted(CHANGED_BUILDS_FIXTURE.glob("sql/*/*"))
     }
     project_dir: Path = prepare_inline_project(
         tmp_path=tmp_path,
@@ -1419,7 +1443,7 @@ def kill_changed_build_mid_write(
 ) -> tuple[frozenset[str], list[tuple[object, ...]]]:
     """Kill a build while a slow model writes; return what it finished and the slow model's rows."""
 
-    slow_model: Path = project_dir / "models/order_weights.sql"
+    slow_model: Path = project_dir / "sql/models/order_weights.sql"
     slow_model.write_text(
         _CHANGED_SLOW_MODEL.format(scan=warehouse.slow_scan_cte), encoding="utf-8"
     )
@@ -1470,7 +1494,7 @@ def changed_build_steps(warehouse: ChangedWarehouse) -> tuple[ChangedBuildStep, 
             "a definition change",
             (),
             {
-                "models/stg_customers.sql": (
+                "sql/models/stg_customers.sql": (
                     'MODEL (description "Staged customers.", materialized table);\n'
                     'SELECT customer_id FROM __source("raw_customers") WHERE customer_id > 0\n'
                 )
@@ -1505,8 +1529,8 @@ FAILING_SCORING_TASK: str = '    raise RuntimeError("partner service unavailable
 ROUND_TRIP_FIXTURE: Path = Path("benchmarks/duckshop/edge_cases/loaders/round_trip")
 _TWO_GATE_LOADER: str = (
     "from sqlbuild.loaders import loader\n\n"
-    "from python.tasks.ranking import rank_orders\n"
-    "from python.tasks.scoring import score_orders\n\n\n"
+    "from python.nodes.tasks.ranking import rank_orders\n"
+    "from python.nodes.tasks.scoring.asset import score_orders\n\n\n"
     "@loader(depends_on=[score_orders, rank_orders])\n"
     "def partner_scores(ctx):\n"
     '    """Load the scores the partner returned."""\n'
@@ -1525,10 +1549,10 @@ def round_trip_project_files(*, project_settings: str, task_body: str) -> dict[s
             [*project.rglob("*.py"), *project.rglob("*.sql"), *project.rglob("*.yml")]
         )
     }
-    assert SCORING_TASK in files["python/tasks/scoring.py"]
-    files["python/tasks/scoring.py"] = files["python/tasks/scoring.py"].replace(
-        SCORING_TASK, task_body
-    )
+    assert SCORING_TASK in files["python/nodes/tasks/scoring/asset.py"]
+    files["python/nodes/tasks/scoring/asset.py"] = files[
+        "python/nodes/tasks/scoring/asset.py"
+    ].replace(SCORING_TASK, task_body)
     return {
         "sqlbuild_project.toml": (
             'name = "partner_scoring"\n'
@@ -1562,7 +1586,7 @@ def round_trip_variant(variant: str, files: dict[str, str]) -> dict[str, str]:
 def scoring_task_files(body: str) -> dict[str, str]:
     """The round trip's score task with `body`, keyed by where it goes in the project."""
 
-    path: str = "python/tasks/scoring.py"
+    path: str = "python/nodes/tasks/scoring/asset.py"
     return {
         path: round_trip_project_files(project_settings=ALLOW_ROUND_TRIPS, task_body=body)[path]
     }
@@ -1572,14 +1596,15 @@ def ranking_task_files(body: str) -> dict[str, str]:
     """A second task gating the partner loader, with `body`, and the loader depending on both."""
 
     return {
-        "python/tasks/ranking.py": (
+        **node_module_files(
+            "python/nodes/tasks/ranking.py",
             "from sqlbuild.refs import model\n"
             "from sqlbuild.assets import asset\n\n\n"
             '@asset(depends_on=model("orders"))\n'
             "def rank_orders(ctx):\n"
-            '    """Rank the orders for the partner."""\n' + body
+            '    """Rank the orders for the partner."""\n' + body,
         ),
-        "python/loaders/partner.py": _TWO_GATE_LOADER,
+        "python/nodes/loaders/partner/loader.py": _TWO_GATE_LOADER,
     }
 
 
@@ -1620,25 +1645,25 @@ _RAW_ORDERS_SQL: str = (
 )
 # A table whose final audit fails, and a model that reads it.
 STAGED_AUDIT_FILES: dict[str, str] = {
-    "audits/generic/expression_is_true.sql": _EXPRESSION_AUDIT,
-    "models/daily.sql": (
+    "sql/audits/generic/expression_is_true.sql": _EXPRESSION_AUDIT,
+    "sql/models/daily.sql": (
         "MODEL (description 'Daily totals.', materialized table, audits [expression_is_true "
         '(name "total_is_negative", expression "total_cents < 0", severity error)]);\n\n'
         "SELECT 1 AS day, 300 AS total_cents\n"
     ),
-    "models/daily_summary.sql": (
+    "sql/models/daily_summary.sql": (
         "MODEL (description 'Reads daily.', materialized table);\n\n"
         'SELECT day FROM __ref("daily")\n'
     ),
 }
 # An incremental model whose delta audit fails, over one row it already holds.
 INCREMENTAL_AUDIT_FILES: dict[str, str] = {
-    "audits/generic/expression_is_true.sql": _EXPRESSION_AUDIT,
-    "sources/raw.yml": (
+    "sql/audits/generic/expression_is_true.sql": _EXPRESSION_AUDIT,
+    "sql/sources/raw.yml": (
         "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
         "    schema: main\n    table: raw_orders\n"
     ),
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         "MODEL (description 'Orders.', materialized incremental, incremental_strategy merge, "
         'unique_key [id], audits [expression_is_true (name "amount_is_negative", '
         'expression "amount_cents < 0", severity error, run_scope delta_and_final)]);\n\n'
@@ -1650,14 +1675,14 @@ INCREMENTAL_AUDIT_SEED_SQL: str = (
 )
 # A source whose audit fails, and a model that reads it.
 SOURCE_AUDIT_FILES: dict[str, str] = {
-    "audits/generic/expression_is_true.sql": _EXPRESSION_AUDIT,
-    "sources/raw.yml": (
+    "sql/audits/generic/expression_is_true.sql": _EXPRESSION_AUDIT,
+    "sql/sources/raw.yml": (
         "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
         "    schema: main\n    table: raw_orders\n    audits:\n"
         "      - expression_is_true:\n          name: raw_amount_is_negative\n"
         '          expression: "amount_cents < 0"\n          severity: error\n'
     ),
-    "models/order_count.sql": (
+    "sql/models/order_count.sql": (
         "MODEL (description 'Reads raw orders.', materialized table);\n\n"
         'SELECT count(*) AS order_count FROM __source("raw_orders")\n'
     ),
@@ -1728,7 +1753,7 @@ def node_result_project(*, tmp_path: Path, target_lines: str, files: dict[str, s
                 '[connection]\ndatabase = "dev.duckdb"\n\n'
                 f'[defaults]\ndatabase = "dev"\nschema = "mart"\n\n[targets.dev]\n{target_lines}'
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Orders.', materialized table);\n\n"
                 'SELECT order_id FROM __source("raw_orders")\n'
             ),

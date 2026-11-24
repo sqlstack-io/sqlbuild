@@ -29,7 +29,7 @@ def semantic_playground(tmp_path_factory: pytest.TempPathFactory) -> Path:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     typed: Path = Path(__file__).parent / "fixtures" / "semantic" / "typed_orders.sql"
-    (project / "models" / "staging" / "stg_orders_typed.sql").write_text(
+    (project / "sql" / "models" / "staging" / "stg_orders_typed.sql").write_text(
         typed.read_text(encoding="utf-8"), encoding="utf-8"
     )
     return project

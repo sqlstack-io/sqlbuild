@@ -11,6 +11,7 @@ pub(crate) mod location_health;
 pub(crate) mod location_work;
 pub(crate) mod person_bootstrap;
 pub(crate) mod person_checks;
+pub(crate) mod person_cost;
 pub(crate) mod person_location_work;
 pub(crate) mod person_maintenance;
 pub(crate) mod person_node_sql;

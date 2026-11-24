@@ -76,7 +76,7 @@ def build_view_plan_entry(
     return ModelPlanEntry(
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name=name),
         name=name,
-        relative_path=Path(f"models/{name}.sql"),
+        relative_path=Path(f"sql/models/{name}.sql"),
         materialization_type=MaterializationType.VIEW,
         action=PlanAction.CREATE_VIEW,
         reason=PlanReason.FIRST_RUN,

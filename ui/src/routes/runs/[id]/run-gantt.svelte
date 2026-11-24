@@ -8,12 +8,14 @@
 	import type { RunNode } from '$lib/api';
 	import { nodeLabel, nodeStatusTone } from '$lib/operate/labels';
 	import { axisTicks as ticksFor, formatSpan, formatTick, rowsText, tickStep as stepFor } from './utils';
+	import type { PreparingSpan } from './utils/preparing';
 
 	export type GanttGroup = { runId: string; label: string; tone: string; href: string };
 
 	let {
 		nodes,
 		origin,
+		preparing = null,
 		now,
 		selected = [],
 		excluded = [],
@@ -25,8 +27,10 @@
 		onopen
 	}: {
 		nodes: RunNode[];
-		/** Time zero of the axis (ms): the first node's start. */
+		/** Time zero of the axis (ms): the worker's launch, else the first node's start. */
 		origin: number;
+		/** The worker's preparation before its first node, drawn as the first row. */
+		preparing?: PreparingSpan | null;
 		now: number;
 		selected?: string[];
 		/** Nodes the selection leaves out (`--exclude`): struck through, faintly. */
@@ -47,7 +51,7 @@
 
 	const startOf = (n: RunNode) => (n.startedAt ? (Date.parse(n.startedAt) - origin) / 1000 : null);
 	const endOf = (n: RunNode) => (n.startedAt ? ((n.endedAt ? Date.parse(n.endedAt) : now) - origin) / 1000 : null);
-	const total = $derived(Math.max(1, ...nodes.map((n) => endOf(n) ?? 0)));
+	const total = $derived(Math.max(1, preparing ? (preparing.end - origin) / 1000 : 0, ...nodes.map((n) => endOf(n) ?? 0)));
 
 	// Pixels-per-second with zoom and horizontal scroll; zoom 1 fits the run to the width.
 	let zoom = $state(1);
@@ -183,6 +187,19 @@
 				aria-label="Resize the node column (double-click to fit)"
 				tabindex="-1"
 			></div>
+			{#if preparing}
+				{@const s = (preparing.start - origin) / 1000}
+				{@const e = (preparing.end - origin) / 1000}
+				{@const dur = `${formatSpan(e - s)}${preparing.live ? ' so far' : ''}`}
+				<!-- The worker's start, compile, connection and plan before its first node runs; its steps are in the log. -->
+				<div class="row prep" title={preparing.steps.length ? preparing.steps.join('\n') : 'Starting the worker, compiling and planning'}>
+					<span class="gutter cell faint" class:shadow={scrolledX} style:width="{gutterW}px">Preparing</span>
+					<span class="track">
+						<span class="bar prep-bar" class:live={preparing.live} style:--s={s} style:--e={e}></span>
+						<span class="dur" style:--s={s} style:--e={e} class:flip={durFlips(dur, s, e)}>{dur}</span>
+					</span>
+				</div>
+			{/if}
 			{#each rows as row (row.type === 'group' ? `g-${row.group.runId}` : `${row.node.runId}-${row.node.nodeKey}`)}
 				{#if row.type === 'group'}
 					<div class="row group-row">
@@ -487,6 +504,11 @@
 		transform: translateY(-50%);
 		border-radius: 2px;
 		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+	}
+	/* The worker's preparation: quiet, so the nodes stay the chart's subject. */
+	.prep-bar {
+		background: var(--sb-text-faint);
+		opacity: 0.55;
 	}
 	/* A running bar's stripes move by transform, which the compositor animates without repainting. */
 	.bar.live {

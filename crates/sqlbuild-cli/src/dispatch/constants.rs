@@ -840,4 +840,4 @@ pub(crate) const SCENARIO_CAPTURE_ROUTE: Route = routed(
 );
 
 /// The setting a user raises when lifecycle event export runs out of time at exit.
-pub(crate) const SHUTDOWN_TIMEOUT_SETTING: &str = "sinks.lifecycle.shutdown_timeout";
+pub(crate) const SHUTDOWN_TIMEOUT_SETTING: &str = "event_sinks.lifecycle.shutdown_timeout";

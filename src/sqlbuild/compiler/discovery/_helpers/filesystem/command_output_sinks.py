@@ -19,21 +19,24 @@ from sqlbuild._native import (
     RecallWriter,
 )
 from sqlbuild.compiler.discovery._helpers.filesystem.project_modules import (
-    load_sink_module,
+    load_event_sink_module,
     provider_usages,
 )
 from sqlbuild.compiler.discovery._helpers.filesystem.recall_sinks import split_recall_sinks
-from sqlbuild.runtime.event_exporting.main.get_command_output_sink_definition import (
-    get_command_output_sink_definition,
+from sqlbuild.runtime.event_exporting.main.get_command_output_event_sink_definition import (
+    get_command_output_event_sink_definition,
 )
 from sqlbuild.runtime.output_capture.constants import COMMAND_OUTPUT_SINK_RECORD_PARAMETER_NAME
-from sqlbuild.runtime.output_capture.models import CommandOutputRecord, CommandOutputSinkDefinition
+from sqlbuild.runtime.output_capture.models import (
+    CommandOutputEventSinkDefinition,
+    CommandOutputRecord,
+)
 
 
 def discover_command_output_sink_functions(
     *, project_dir: Path, providers: tuple[DiscoveredProvider, ...] = ()
 ) -> tuple[DiscoveredCommandOutputSink, ...]:
-    """Discover validated command-output sink declarations under sinks/, without Recall's."""
+    """Discover validated python/event_sinks/ command-output event sinks, without Recall's."""
 
     cached: (
         tuple[
@@ -62,17 +65,17 @@ def discover_command_output_sink_functions(
 def discover_command_output_sink_declarations(
     *, project_dir: Path
 ) -> tuple[DiscoveredCommandOutputSinkDeclaration, ...]:
-    """Import sink modules and collect command-output declarations."""
+    """Import event sink modules and collect command-output declarations."""
 
-    sinks_root: Path = project_dir / "sinks"
+    sinks_root: Path = project_dir / _native.EVENT_SINKS_PATH
     if not sinks_root.is_dir():
         return ()
     discovered: list[DiscoveredCommandOutputSinkDeclaration] = []
     seen_names: dict[str, Path] = {}
     for file_path in _native.discover_python_module_files(
-        project_dir=project_dir, root="sinks", public_only=True
+        project_dir=project_dir, root=_native.EVENT_SINKS_PATH, public_only=True
     ):
-        module: ModuleType = load_sink_module(file_path=file_path, project_dir=project_dir)
+        module: ModuleType = load_event_sink_module(file_path=file_path, project_dir=project_dir)
         seen_function_ids: set[int] = set()
         for _, value in inspect.getmembers(module, inspect.isfunction):
             if value.__module__ != module.__name__:
@@ -81,8 +84,8 @@ def discover_command_output_sink_declarations(
             if function_id in seen_function_ids:
                 continue
             seen_function_ids.add(function_id)
-            definition: CommandOutputSinkDefinition | None = get_command_output_sink_definition(
-                value
+            definition: CommandOutputEventSinkDefinition | None = (
+                get_command_output_event_sink_definition(value)
             )
             if definition is None:
                 continue

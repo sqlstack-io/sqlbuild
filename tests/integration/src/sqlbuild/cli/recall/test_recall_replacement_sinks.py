@@ -215,7 +215,7 @@ def test_given_a_lifecycle_sink_slower_than_the_budget_when_building_then_nothin
     )
     elapsed: float = time.monotonic() - started
 
-    logged: list[str] = (project_dir / "events.log").read_text(encoding="utf-8").splitlines()
+    logged: list[str] = (project_dir / ".events.log").read_text(encoding="utf-8").splitlines()
     assert built.returncode == 0, built.stderr
     assert elapsed < test_case.expected_max_seconds
     assert logged[-1] == "invocation_completed"

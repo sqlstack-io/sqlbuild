@@ -17,7 +17,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.postgres.helpers import (
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
 
-_FUNCTION_PATH: str = "functions/sql/is_completed_order.sql"
+_FUNCTION_PATH: str = "sql/functions/sql/is_completed_order.sql"
 _FUNCTION_HEADER: str = (
     "FUNCTION (description 'Whether an order status counts as completed.', "
     "arguments (order_status VARCHAR), returns BOOLEAN);\n"
@@ -63,11 +63,11 @@ def test_given_edited_function_when_testing_then_option_chooses_the_definition(
         project_name="orders_temporary_functions",
         repo_files={
             "sqlbuild_project.toml": project_toml,
-            "models/order_statuses.sql": (
+            "sql/models/order_statuses.sql": (
                 "MODEL (description 'Test model order_statuses.', materialized table);\n"
                 "SELECT 'completed' AS order_status\n"
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Test model orders.', materialized table);\n"
                 'SELECT order_status, __udf("is_completed_order")(order_status) AS is_completed '
                 'FROM __ref("order_statuses")\n'

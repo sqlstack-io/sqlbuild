@@ -30,8 +30,8 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
             expected_status="success",
             expected_rows=[],
             files={
-                "models/customers.sql": "MODEL (description 'Customers.', materialized table);\nSELECT 7 AS customer_id\n",
-                "models/products.sql": "MODEL (description 'Products.', materialized table);\nSELECT 3 AS product_id\n",
+                "sql/models/customers.sql": "MODEL (description 'Customers.', materialized table);\nSELECT 7 AS customer_id\n",
+                "sql/models/products.sql": "MODEL (description 'Products.', materialized table);\nSELECT 3 AS product_id\n",
                 "orchestration/jobs/nightly_job.toml": (
                     'name = "nightly_job"\n'
                     'description = "Orders and customers."\n'

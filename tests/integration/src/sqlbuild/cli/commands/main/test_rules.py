@@ -82,7 +82,7 @@ _CUSTOM_CACHE_RULE: str = """from sqlbuild.rules import Finding, Model, RuleCont
 @rule(
     code="XSQBRCACHE001",
     message="Models must live in the final directory",
-    remediation="Move this model beneath models/final/.",
+    remediation="Move this model beneath sql/models/final/.",
 )
 def final_directory(*, model: Model, ctx: RuleContext) -> list[Finding]:
     return [] if "final" in model.path.parts else [ctx.finding(subject=model)]
@@ -92,7 +92,7 @@ _PYTHON_RULES_EXPECTED: dict[str, Any] = json.loads(
     (PYTHON_RULES_FIXTURES / "expected_findings.json").read_text(encoding="utf-8")
 )
 _PYTHON_RULES_SELECT: str = f"select = {json.dumps(_PYTHON_RULES_EXPECTED['select'])}\n"
-_PYTHON_ALERT_PATH: str = "hooks/python/alert.py"
+_PYTHON_ALERT_PATH: str = "sql/hooks/python/alert.py"
 _PYTHON_ALERT: str = (PYTHON_RULES_FIXTURES / "violations" / _PYTHON_ALERT_PATH).read_text(
     encoding="utf-8"
 )
@@ -166,7 +166,7 @@ def project_facts(*, project: Project, ctx: RuleContext) -> list[Finding]:
         ",".join(item.name for item in ctx.declarations.public_constants),
         str(len(ctx.declarations.enums)),
         str(len(ctx.declarations.constants)),
-        _names(facts.tree.resources_under("models/marts")),
+        _names(facts.tree.resources_under("sql/models/marts")),
     )
     return [ctx.finding(subject=facts.models[0], message="|".join(parts))]
 """
@@ -176,22 +176,22 @@ _SURFACE_FILES: dict[str, str] = {
         "[rules.thresholds]\nmin_custom_rule_test_cases = 0\n"
     ),
     "rules/surface.py": _SURFACE_RULES,
-    "sources/raw.yml": (
+    "sql/sources/raw.yml": (
         "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
         '    expression: "(SELECT 1 AS id, CAST(10.5 AS DOUBLE) AS amount)"\n'
     ),
-    "seeds/regions.csv": "region_id,name\n1,north\n",
-    "seeds/regions.yml": (
+    "sql/seeds/regions.csv": "region_id,name\n1,north\n",
+    "sql/seeds/regions.yml": (
         "seeds:\n  - name: regions\n    description: Regions.\n    columns:\n"
         "      - name: region_id\n        type: INTEGER\n      - name: name\n        type: VARCHAR\n"
     ),
-    "models/staging/_sqlbuild/_constants/policy.sql": (
+    "sql/models/staging/_sqlbuild/_constants/policy.sql": (
         "CONSTANT (name minimum_amount, value 7);\n"
     ),
-    "models/staging/_sqlbuild/_enums/order_status.sql": (
+    "sql/models/staging/_sqlbuild/_enums/order_status.sql": (
         "ENUM (name order_status, members [PAID, OPEN]);\n"
     ),
-    "models/staging/stg_orders.sql": (
+    "sql/models/staging/stg_orders.sql": (
         "MODEL (description 'Staged orders.', contract enforced, columns (\n"
         "  order_id (type INTEGER, nullable false, description 'Order key',\n"
         "    audits [not_null, accepted_values (values [1, 2], severity warn)]),\n"
@@ -199,7 +199,7 @@ _SURFACE_FILES: dict[str, str] = {
         'SELECT CAST(id AS INTEGER) AS order_id, amount, @enum("order_status").PAID AS status\n'
         'FROM __source("raw_orders") WHERE amount > @const("minimum_amount")\n'
     ),
-    "models/marts/order_totals.sql": (
+    "sql/models/marts/order_totals.sql": (
         'MODEL (description "Order totals", materialized table);\n\n'
         'SELECT o.order_id, o.amount * 2 AS doubled_amount FROM __ref("stg_orders") AS o\n'
     ),
@@ -210,16 +210,16 @@ _SURFACE_FILES: dict[str, str] = {
     ),
 }
 _SURFACE_STAGING_EDIT: dict[str, str] = {
-    "models/staging/stg_orders.sql": _SURFACE_FILES["models/staging/stg_orders.sql"].replace(
-        "AS order_id, amount,", "AS order_id,\n  amount,"
-    )
+    "sql/models/staging/stg_orders.sql": _SURFACE_FILES[
+        "sql/models/staging/stg_orders.sql"
+    ].replace("AS order_id, amount,", "AS order_id,\n  amount,")
 }
 
 _EARLY_LINT_SLOW_HOOKS: int = 8
 _EARLY_LINT_SLOW_EXPANSION_S: float = 0.5
 _EARLY_LINT_EXPANSION_DELAYS_S: dict[str, float] = {"orders": 0.0}
 _EARLY_LINT_FINDINGS: tuple[tuple[str, str, int | None, int | None], ...] = (
-    ("SQLCLEAN005", "models/order_cents.sql", 2, 119),
+    ("SQLCLEAN005", "sql/models/order_cents.sql", 2, 119),
 )
 
 
@@ -263,7 +263,7 @@ def test_given_conflicting_model_layer_metadata_when_compiling_then_rules_report
         '"SQBRPROJECT104", "SQBRPROJECT105", "SQBRPROJECT106"]\n',
         encoding="utf-8",
     )
-    model_dir: Path = tmp_path / "models" / "commerce" / "intermediate" / "enriched"
+    model_dir: Path = tmp_path / "sql" / "models" / "commerce" / "intermediate" / "enriched"
     model_dir.mkdir(parents=True)
     (model_dir / "commerce__mart_v__int_v_orders.sql").write_text(
         "MODEL (\n"
@@ -274,8 +274,8 @@ def test_given_conflicting_model_layer_metadata_when_compiling_then_rules_report
         'SELECT order_id FROM __ref("commerce__mart__stg_orders")\n',
         encoding="utf-8",
     )
-    published_dir: Path = tmp_path / "models" / "commerce" / "mart"
-    published_dir.mkdir()
+    published_dir: Path = tmp_path / "sql" / "models" / "commerce" / "mart"
+    published_dir.mkdir(parents=True)
     (published_dir / "commerce__mart__stg_orders.sql").write_text(
         'MODEL (description "Orders");\nSELECT 1 AS order_id\n', encoding="utf-8"
     )
@@ -315,8 +315,8 @@ def test_given_exact_internal_edge_exception_when_compiling_then_live_edge_passe
         'reason = "Tracked cleanup"\n'
     )
     project_file.write_text(base_config + live_exception, encoding="utf-8")
-    models: Path = tmp_path / "models"
-    models.mkdir()
+    models: Path = tmp_path / "sql" / "models"
+    models.mkdir(parents=True)
     (models / "commerce__stg__orders.sql").write_text(
         'MODEL (description "Test model commerce__stg__orders.");\nSELECT order_id FROM __ref("commerce__int_enriched__orders")\n',
         encoding="utf-8",
@@ -422,8 +422,8 @@ def test_given_numeric_range_or_value_list_when_compiling_then_literal_decisions
         'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRDECLARATION102"]\n',
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         "MODEL (\n"
         '  description "Orders",\n' + test_case.constants + ");\n\n"
@@ -457,8 +457,8 @@ def test_given_constant_backed_decision_and_numeric_alias_when_compiling_then_ru
         'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRDECLARATION102"]\n',
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         """MODEL (description "Test model orders.",
   constants (_large_batch 7),
@@ -646,8 +646,8 @@ def test_given_enforced_contract_when_compiling_explicit_output_rule_then_enforc
         'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRCONTRACT105"]\n',
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         "MODEL (description 'Test model orders.',\n"
         "  contract enforced,\n"
@@ -692,8 +692,8 @@ def test_given_proven_dynamic_pivot_when_compiling_contract_rules_then_wildcard_
         'contract = "enforced"\n',
         encoding="utf-8",
     )
-    models_dir: Path = tmp_path / "models"
-    models_dir.mkdir()
+    models_dir: Path = tmp_path / "sql" / "models"
+    models_dir.mkdir(parents=True)
     (models_dir / "stg_order_amounts.sql").write_text(
         "MODEL (description 'Test model stg_order_amounts.', database analytics, schema analytics, columns (customer_id (type INTEGER), "
         "category (type VARCHAR), "
@@ -782,8 +782,8 @@ def test_given_contract_rules_when_compiling_then_contract_is_enforced_typed_and
         '[defaults]\ncontract = "enforced"\n',
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         "MODEL (description 'Test model orders.',\n"
         f"  columns ({test_case.columns_sql}),\n"
@@ -817,8 +817,8 @@ def test_given_selected_sql_rule_when_compiling_then_authored_diagnostic_blocks_
         'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN004"]\n',
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         'MODEL (description "Orders");\nSELECT order_id FROM orders LIMIT 1\n',
         encoding="utf-8",
@@ -839,7 +839,7 @@ def test_given_selected_sql_rule_when_compiling_then_authored_diagnostic_blocks_
     diagnostics: object = first["diagnostics"]
     assert isinstance(diagnostics, list)
     assert diagnostics[0]["code"] == test_case.expected_code
-    assert diagnostics[0]["path"] == "models/orders.sql"
+    assert diagnostics[0]["path"] == "sql/models/orders.sql"
     assert second["compile_timings"]["rule_cache_hits"] == 1
     assert third_exit == 0
     assert third["compile_timings"]["rule_cache_misses"] == 1
@@ -861,8 +861,8 @@ def test_given_sql_rule_cache_from_another_native_build_when_compiling_then_rule
         f'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["{test_case.expected_code}"]\n',
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         'MODEL (description "Orders");\nSELECT order_id FROM orders LIMIT 1\n',
         encoding="utf-8",
@@ -905,8 +905,8 @@ def test_given_cached_sql_test_rules_when_test_or_macro_changes_then_findings_ar
         f'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["{test_case.expected_code}"]\n',
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text('MODEL (description "Orders");\nSELECT 1 AS order_id\n', encoding="utf-8")
     tests_dir: Path = tmp_path / "tests" / "unit"
     macro: Path = tests_dir / "_macros" / "python" / "row_limit.py"
@@ -956,8 +956,8 @@ def test_given_warm_scoped_macro_sql_test_when_compiling_then_rules_reuse_compil
         f'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["{test_case.expected_code}"]\n',
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text('MODEL (description "Orders");\nSELECT 1 AS order_id\n', encoding="utf-8")
     tests_dir: Path = tmp_path / "tests" / "unit"
     macro: Path = tests_dir / "_macros" / "python" / "row_limit.py"
@@ -995,8 +995,8 @@ def test_given_cold_scoped_macro_sql_test_when_compiling_then_early_lint_uses_pr
         f'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["{test_case.expected_code}"]\n',
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text('MODEL (description "Orders");\nSELECT 1 AS order_id\n', encoding="utf-8")
     tests_dir: Path = tmp_path / "tests" / "unit"
     macro: Path = tests_dir / "_macros" / "python" / "row_limit.py"
@@ -1041,8 +1041,8 @@ def test_given_cold_non_model_sql_finding_when_compiling_twice_then_warm_finding
         f'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["{test_case.expected_code}"]\n',
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text('MODEL (description "Orders");\nSELECT 1 AS order_id\n', encoding="utf-8")
     test_file: Path = tmp_path / "tests" / "unit" / "test_orders.sql"
     test_file.parent.mkdir(parents=True)
@@ -1130,8 +1130,8 @@ def test_given_graph_error_when_compiling_then_early_lint_is_stopped_instead_of_
         'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN005"]\n',
         encoding="utf-8",
     )
-    models_dir: Path = tmp_path / "models"
-    models_dir.mkdir()
+    models_dir: Path = tmp_path / "sql" / "models"
+    models_dir.mkdir(parents=True)
     (models_dir / "orders.sql").write_text(
         'MODEL (description "Orders");\nSELECT @py.slow_total("orders") AS order_id\n',
         encoding="utf-8",
@@ -1142,9 +1142,9 @@ def test_given_graph_error_when_compiling_then_early_lint_is_stopped_instead_of_
         'SELECT order_id, missing_column FROM __ref("orders")\n',
         encoding="utf-8",
     )
-    macros_dir: Path = tmp_path / "macros" / "python"
+    macros_dir: Path = tmp_path / "sql" / "macros" / "python"
     macros_dir.mkdir(parents=True)
-    (tmp_path / "hooks").mkdir()
+    (tmp_path / "sql" / "hooks").mkdir(parents=True)
     (macros_dir / "slow_total.py").write_text(
         "import orders_lint_probe\n\n\n"
         "def slow_total(name: str) -> str:\n"
@@ -1153,7 +1153,7 @@ def test_given_graph_error_when_compiling_then_early_lint_is_stopped_instead_of_
         encoding="utf-8",
     )
     for index in range(_EARLY_LINT_SLOW_HOOKS):
-        (tmp_path / "hooks" / f"total_{index:02d}.sql").write_text(
+        (tmp_path / "sql" / "hooks" / f"total_{index:02d}.sql").write_text(
             f'SELECT @py.slow_total("total_{index:02d}") AS order_total\n', encoding="utf-8"
         )
     expanded: list[str] = []
@@ -1193,8 +1193,8 @@ def test_given_sql_and_custom_rules_when_compiling_twice_then_custom_host_runs_o
         "[rules.thresholds]\nmin_custom_rule_test_cases = 0\n",
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text('MODEL (description "Orders");\nSELECT 1 AS order_id\n', encoding="utf-8")
     test_file: Path = tmp_path / "tests" / "unit" / "test_orders.sql"
     test_file.parent.mkdir(parents=True)
@@ -1205,14 +1205,14 @@ def test_given_sql_and_custom_rules_when_compiling_twice_then_custom_host_runs_o
         encoding="utf-8",
     )
     rule_file: Path = tmp_path / "rules" / "architecture.py"
-    rule_file.parent.mkdir()
+    rule_file.parent.mkdir(parents=True)
     rule_file.write_text(
         """from sqlbuild.rules import Finding, Model, RuleContext, rule
 
 @rule(
     code="XSQBRARCH001",
     message="Final models must use the final directory",
-    remediation="Move this model beneath models/final/.",
+    remediation="Move this model beneath sql/models/final/.",
 )
 def final_directory(*, model: Model, ctx: RuleContext) -> list[Finding]:
     return [] if "final" in model.path.parts else [ctx.finding(subject=model)]
@@ -1228,7 +1228,7 @@ def final_directory(*, model: Model, ctx: RuleContext) -> list[Finding]:
     assert len(hosts.launches()) == 1
     assert warm == cold
     assert {
-        f"models/orders.sql:{test_case.expected_code}",
+        f"sql/models/orders.sql:{test_case.expected_code}",
         "tests/unit/test_orders.sql:SQLCLEAN004",
     } <= cold
 
@@ -1239,13 +1239,13 @@ def final_directory(*, model: Model, ctx: RuleContext) -> list[Finding]:
         ProjectRuleScratchStateTestCase(
             description="one host runs the project rules in order",
             hosts=1,
-            expected_findings=(("XSQBRSCR002", "models/customers.sql"),),
+            expected_findings=(("XSQBRSCR002", "sql/models/customers.sql"),),
             expected_launches=1,
         ),
         ProjectRuleScratchStateTestCase(
             description="split project rules rerun in one host after the scratch list fills",
             hosts=2,
-            expected_findings=(("XSQBRSCR002", "models/customers.sql"),),
+            expected_findings=(("XSQBRSCR002", "sql/models/customers.sql"),),
             expected_launches=3,
         ),
     ],
@@ -1287,21 +1287,21 @@ def test_given_custom_rules_split_across_hosts_when_compiling_then_output_matche
     )
     for index in range(test_case.model_count):
         folder: str = ("final", "staging", "staging")[index % 3]
-        model: Path = tmp_path / "models" / folder / f"orders_{index:02d}.sql"
+        model: Path = tmp_path / "sql" / "models" / folder / f"orders_{index:02d}.sql"
         model.parent.mkdir(parents=True, exist_ok=True)
         model.write_text(
             f'MODEL (description "Orders {index}");\nSELECT {index} AS order_id\n',
             encoding="utf-8",
         )
     rule_file: Path = tmp_path / "rules" / "architecture.py"
-    rule_file.parent.mkdir()
+    rule_file.parent.mkdir(parents=True)
     rule_file.write_text(
         """from sqlbuild.rules import Finding, Model, RuleContext, rule
 
 @rule(
     code="XSQBRARCH001",
     message="Final models must use the final directory",
-    remediation="Move this model beneath models/final/.",
+    remediation="Move this model beneath sql/models/final/.",
 )
 def final_directory(*, model: Model, ctx: RuleContext) -> list[Finding]:
     return [] if "final" in model.path.parts else [ctx.finding(subject=model)]
@@ -1318,7 +1318,7 @@ def final_directory(*, model: Model, ctx: RuleContext) -> list[Finding]:
     single_hosts: CustomHostObserver = observe_hosts(monkeypatch=monkeypatch, cores=1)
     single: dict[str, Any] = compile_payload()
     rules_bulk_cache_path(project_dir=tmp_path, file_name="custom-rules.json").parent.parent.rename(
-        tmp_path / "single-rules-cache"
+        tmp_path / "target" / "single-rules-cache"
     )
     split_hosts: CustomHostObserver = observe_hosts(monkeypatch=monkeypatch, cores=test_case.hosts)
     split: dict[str, Any] = compile_payload()
@@ -1334,7 +1334,9 @@ def final_directory(*, model: Model, ctx: RuleContext) -> list[Finding]:
     assert len(split["diagnostics"]) == test_case.model_count - test_case.model_count // 3
     assert warm["diagnostics"] == single["diagnostics"]
     assert warm["compile_timings"]["rule_cache_hits"] >= test_case.model_count
-    assert (tmp_path / "single-rules-cache" / "bulk" / "custom-rules.json").read_bytes() == (
+    assert (
+        tmp_path / "target" / "single-rules-cache" / "bulk" / "custom-rules.json"
+    ).read_bytes() == (
         rules_bulk_cache_path(project_dir=tmp_path, file_name="custom-rules.json").read_bytes()
     )
 
@@ -1402,15 +1404,15 @@ def test_given_busy_split_hosts_when_compile_is_interrupted_then_hosts_stop_and_
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     project_dir: Path = tmp_path / "orders"
-    project_dir.mkdir()
+    project_dir.mkdir(parents=True)
     started: Path = tmp_path / "started"
-    started.mkdir()
+    started.mkdir(parents=True)
     write_custom_host_project(
         project_dir=project_dir,
         model_count=test_case.model_count,
         rule_body=(
             "from pathlib import Path\n"
-            f"(Path({str(started)!r}) / model.name).mkdir()\n"
+            f"(Path({str(started)!r}) / model.name).mkdir(parents=True)\n"
             "total = 0\nfor index in range(10_000_000):\n    total += index\nreturn []"
         ),
     )
@@ -1447,18 +1449,18 @@ def test_given_typed_custom_rule_when_compiling_then_same_rule_is_enforced_and_c
         "[rules.thresholds]\nmin_custom_rule_test_cases = 0\n",
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text('MODEL (description "Orders");\nSELECT 1 AS order_id\n', encoding="utf-8")
     rule_file: Path = tmp_path / "rules" / "architecture.py"
-    rule_file.parent.mkdir()
+    rule_file.parent.mkdir(parents=True)
     rule_file.write_text(
         """from sqlbuild.rules import Finding, Model, RuleContext, rule
 
 @rule(
     code="XSQBRARCH001",
     message="Final models must use the final directory",
-    remediation="Move this model beneath models/final/.",
+    remediation="Move this model beneath sql/models/final/.",
 )
 def final_directory(*, model: Model, ctx: RuleContext) -> list[Finding]:
     return [] if "final" in model.path.parts else [ctx.finding(subject=model)]
@@ -1488,7 +1490,7 @@ def final_directory(*, model: Model, ctx: RuleContext) -> list[Finding]:
     assert cold["compile_timings"]["rule_cache_hits"] == 0
     assert warm["compile_timings"]["rule_cache_hits"] >= 1
     assert (
-        (tmp_path / "target" / "compiled-failed" / "models" / "orders.sql")
+        (tmp_path / "target" / "compiled-failed" / "sql" / "models" / "orders.sql")
         .read_text(encoding="utf-8")
         .startswith("-- sqb: compile failed for this model; not buildable\n-- XSQBRARCH001 at ")
     )
@@ -1509,8 +1511,8 @@ def test_given_project_when_running_focused_rule_family_then_only_that_family_ru
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         'MODEL (description "Orders");\nSELECT order_id FROM orders LIMIT 1\n',
         encoding="utf-8",
@@ -1547,8 +1549,8 @@ def test_given_inline_query_relation_when_running_readability_rule_then_finding_
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         """MODEL (description "Orders");
 WITH actual_orders AS (
@@ -1596,8 +1598,8 @@ def test_given_scalar_query_with_derived_relation_when_running_readability_rule_
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    model: Path = tmp_path / "models" / "order_summary.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "order_summary.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         """MODEL (description "Order summary");
 SELECT (
@@ -1641,7 +1643,7 @@ def test_given_sql_function_argument_when_running_qualification_rule_then_argume
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    function: Path = tmp_path / "functions" / "sql" / "orders_by_date.sql"
+    function: Path = tmp_path / "sql" / "functions" / "sql" / "orders_by_date.sql"
     function.parent.mkdir(parents=True)
     function.write_text(
         """FUNCTION (description "Test function orders_by_date.",
@@ -1687,7 +1689,7 @@ def test_given_table_function_argument_when_running_alias_rule_then_left_alias_i
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    function: Path = tmp_path / "functions" / "sql" / "expand_order.sql"
+    function: Path = tmp_path / "sql" / "functions" / "sql" / "expand_order.sql"
     function.parent.mkdir(parents=True)
     function.write_text(
         """FUNCTION (description "Test function expand_order.",
@@ -1699,8 +1701,8 @@ SELECT order_id
 """,
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "expanded_orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "expanded_orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         """MODEL (description "Expanded orders");
 SELECT expanded.order_id
@@ -1783,8 +1785,8 @@ def test_given_implicit_table_alias_when_running_alias_rule_then_usage_decides_f
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    models: Path = tmp_path / "models"
-    models.mkdir()
+    models: Path = tmp_path / "sql" / "models"
+    models.mkdir(parents=True)
     (models / "orders.sql").write_text(
         'MODEL (description "Orders");\nSELECT 1 AS order_id, 2 AS customer_id\n',
         encoding="utf-8",
@@ -1804,7 +1806,7 @@ def test_given_implicit_table_alias_when_running_alias_rule_then_usage_decides_f
     assert tuple((finding["line"], finding["column"]) for finding in findings) == (
         test_case.expected_locations
     )
-    assert {finding["path"] for finding in findings} <= {"models/order_customers.sql"}
+    assert {finding["path"] for finding in findings} <= {"sql/models/order_customers.sql"}
 
 
 @pytest.mark.parametrize(
@@ -1821,8 +1823,8 @@ def test_given_ceremonial_sql_test_when_compiling_with_rule_035_then_project_is_
         'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN035"]\n',
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         """MODEL (description "Orders");
 WITH final AS (SELECT 1 AS order_id)
@@ -1862,8 +1864,8 @@ def test_given_keyword_named_columns_when_running_terminal_rule_then_projection_
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         """MODEL (description "Orders with contextual column names");
 WITH final AS (
@@ -1922,8 +1924,8 @@ def test_given_assertion_expected_dependency_when_compiling_then_compiler_reject
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text('MODEL (description "Orders");\nSELECT 1 AS order_id\n', encoding="utf-8")
     test: Path = tmp_path / "tests" / "unit" / "test_orders.sql"
     test.parent.mkdir(parents=True)
@@ -1963,10 +1965,10 @@ def test_given_seed_and_function_references_when_running_source_rule_then_they_a
         'name = "orders"\nadapter = "duckdb"\n\n[rules]\napproved_source_tokens = ["partner"]\n',
         encoding="utf-8",
     )
-    seed: Path = tmp_path / "seeds" / "order_statuses.csv"
-    seed.parent.mkdir()
+    seed: Path = tmp_path / "sql" / "seeds" / "order_statuses.csv"
+    seed.parent.mkdir(parents=True)
     seed.write_text("status\nopen\n", encoding="utf-8")
-    (tmp_path / "seeds" / "schema.yml").write_text(
+    (tmp_path / "sql" / "seeds" / "schema.yml").write_text(
         """seeds:
   - name: order_statuses
     description: Supported order statuses.
@@ -1976,7 +1978,7 @@ def test_given_seed_and_function_references_when_running_source_rule_then_they_a
 """,
         encoding="utf-8",
     )
-    function: Path = tmp_path / "functions" / "sql" / "normalize_quantity.sql"
+    function: Path = tmp_path / "sql" / "functions" / "sql" / "normalize_quantity.sql"
     function.parent.mkdir(parents=True)
     function.write_text(
         """FUNCTION (description "Test function normalize_quantity.",
@@ -1988,8 +1990,8 @@ quantity
 """,
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "sales__stg__orders__partner.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "sales__stg__orders__partner.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         """MODEL (description "Partner orders");
 SELECT __udf("normalize_quantity")(1) AS quantity
@@ -2033,13 +2035,13 @@ def test_given_dependency_import_star_when_running_output_shape_rule_then_import
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    staging: Path = tmp_path / "models" / "stg_orders.sql"
-    staging.parent.mkdir()
+    staging: Path = tmp_path / "sql" / "models" / "stg_orders.sql"
+    staging.parent.mkdir(parents=True)
     staging.write_text(
         'MODEL (description "Staged orders");\nSELECT 1 AS order_id\n',
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "orders.sql"
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
     model.write_text(
         """MODEL (description "Orders");
 WITH imported_orders AS (
@@ -2085,8 +2087,8 @@ def test_given_invocation_dependent_shapes_when_running_output_shape_rule_then_s
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "snowflake"\n', encoding="utf-8"
     )
-    model: Path = tmp_path / "models" / "order_totals.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "order_totals.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         """MODEL (
   description "Dynamic order totals",
@@ -2101,7 +2103,7 @@ FROM (
 """,
         encoding="utf-8",
     )
-    audit: Path = tmp_path / "audits" / "generic" / "recent_orders.sql"
+    audit: Path = tmp_path / "sql" / "audits" / "generic" / "recent_orders.sql"
     audit.parent.mkdir(parents=True)
     audit.write_text(
         """AUDIT ();
@@ -2144,13 +2146,13 @@ def test_given_commented_dependency_call_when_running_import_rule_then_comment_i
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    staging: Path = tmp_path / "models" / "stg_orders.sql"
-    staging.parent.mkdir()
+    staging: Path = tmp_path / "sql" / "models" / "stg_orders.sql"
+    staging.parent.mkdir(parents=True)
     staging.write_text(
         'MODEL (description "Staged orders");\nSELECT 1 AS order_id\n',
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "orders.sql"
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
     model.write_text(
         """MODEL (description "Orders");
 WITH imported_orders AS (
@@ -2204,14 +2206,14 @@ def test_given_bigquery_quoted_comment_marker_when_running_import_rule_then_repo
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "bigquery"\n', encoding="utf-8"
     )
-    staging: Path = tmp_path / "models" / "stg_orders.sql"
-    staging.parent.mkdir()
+    staging: Path = tmp_path / "sql" / "models" / "stg_orders.sql"
+    staging.parent.mkdir(parents=True)
     staging.write_text(
         'MODEL (description "Staged orders", database warehouse, schema analytics);\n'
         "SELECT 1 AS order_id\n",
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "orders.sql"
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
     model.write_text(
         """MODEL (description "Orders", database warehouse, schema analytics);
 WITH imported_orders AS (
@@ -2263,18 +2265,18 @@ def test_given_postgres_nested_comment_when_running_import_rule_then_comment_is_
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "postgres"\n', encoding="utf-8"
     )
-    staging: Path = tmp_path / "models" / "stg_orders.sql"
-    staging.parent.mkdir()
+    staging: Path = tmp_path / "sql" / "models" / "stg_orders.sql"
+    staging.parent.mkdir(parents=True)
     staging.write_text(
         'MODEL (description "Staged orders", schema analytics);\nSELECT 1 AS order_id\n',
         encoding="utf-8",
     )
-    retired: Path = tmp_path / "models" / "retired_orders.sql"
+    retired: Path = tmp_path / "sql" / "models" / "retired_orders.sql"
     retired.write_text(
         'MODEL (description "Retired orders", schema analytics);\nSELECT 1 AS order_id\n',
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "orders.sql"
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
     model.write_text(
         """MODEL (description "Orders", schema analytics);
 WITH imported_orders AS (
@@ -2321,8 +2323,8 @@ def test_given_cross_join_used_by_filter_when_running_unused_join_rule_then_no_f
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    model: Path = tmp_path / "models" / "recent_orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "recent_orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         """MODEL (description "Recent orders");
 SELECT orders.order_id
@@ -2363,8 +2365,8 @@ def test_given_ceremonial_test_select_when_running_alias_rule_then_control_proje
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text('MODEL (description "Orders");\nSELECT 1 AS order_id\n', encoding="utf-8")
     test: Path = tmp_path / "tests" / "unit" / "orders_test.sql"
     test.parent.mkdir(parents=True)
@@ -2408,8 +2410,8 @@ def test_given_direct_ceremonial_select_when_running_terminal_rule_then_test_is_
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text('MODEL (description "Orders");\nSELECT 1 AS order_id\n', encoding="utf-8")
     test: Path = tmp_path / "tests" / "unit" / "orders_test.sql"
     test.parent.mkdir(parents=True)
@@ -2449,8 +2451,8 @@ def test_given_prior_cte_when_scalar_subquery_is_aliased_then_inner_aggregate_is
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "support"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    model: Path = tmp_path / "models" / "ticket_totals.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "ticket_totals.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         """MODEL (description "Support ticket totals");
 WITH products_used AS (
@@ -2497,8 +2499,8 @@ def test_given_cast_and_relation_aliases_when_running_self_alias_rule_then_no_fi
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         """MODEL (description "Orders");
 SELECT CAST(orders.order_id::INTEGER AS INTEGER) AS order_id
@@ -2542,8 +2544,8 @@ def test_given_graph_scoped_rule_ignore_when_running_rules_then_only_matched_res
         'reason = "Reviewed upstream interface boundary"\n',
         encoding="utf-8",
     )
-    models: Path = tmp_path / "models"
-    models.mkdir()
+    models: Path = tmp_path / "sql" / "models"
+    models.mkdir(parents=True)
     (models / "base_orders.sql").write_text(
         'MODEL (description "Base orders");\nSELECT 1 AS order_id\n',
         encoding="utf-8",
@@ -2573,7 +2575,7 @@ def test_given_graph_scoped_rule_ignore_when_running_rules_then_only_matched_res
     payload: dict[str, object] = json.loads(captured.out)
     findings: list[dict[str, object]] = cast(list[dict[str, object]], payload["findings"])
     finding_paths: list[object] = [finding.get("path") for finding in findings]
-    assert finding_paths == ["models/customer_orders.sql"]
+    assert finding_paths == ["sql/models/customer_orders.sql"]
 
 
 @pytest.mark.parametrize(
@@ -2595,11 +2597,11 @@ def test_given_default_off_custom_rule_when_running_exact_and_prefix_then_both_s
         "[rules.thresholds]\nmin_custom_rule_test_cases = 0\n",
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text('MODEL (description "Orders");\nSELECT 1 AS order_id\n', encoding="utf-8")
     rule_file: Path = tmp_path / "rules" / "architecture.py"
-    rule_file.parent.mkdir()
+    rule_file.parent.mkdir(parents=True)
     rule_file.write_text(
         """from sqlbuild.rules import Finding, Model, RuleContext, rule
 
@@ -2636,11 +2638,11 @@ def test_given_sql_rule_exception_when_compiling_then_unified_suppression_is_app
         'name = "orders"\nadapter = "duckdb"\n\n'
         '[rules]\nselect = ["SQLCLEAN004"]\n\n'
         '[[rules.rule_exceptions]]\nrule = "SQLCLEAN004"\n'
-        'path = "models/orders.sql"\nreason = "The fixture intentionally selects one row."\n',
+        'path = "sql/models/orders.sql"\nreason = "The fixture intentionally selects one row."\n',
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         'MODEL (description "Orders");\nSELECT order_id FROM orders LIMIT 1\n',
         encoding="utf-8",
@@ -2669,13 +2671,13 @@ def test_given_custom_rule_module_constant_edit_when_compiling_then_cached_resul
         "[rules.thresholds]\nmin_custom_rule_test_cases = 0\n",
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         "MODEL (description 'Test model orders.');\nSELECT 1 AS order_id\n", encoding="utf-8"
     )
     rule_file: Path = tmp_path / "rules" / "architecture.py"
-    rule_file.parent.mkdir()
+    rule_file.parent.mkdir(parents=True)
     rule_source: str = """from sqlbuild.rules import Finding, Model, RuleContext, rule
 
 FORBIDDEN, UNUSED = ("orders", "unused")
@@ -2720,8 +2722,8 @@ def test_given_focused_project_rule_result_when_compiling_full_project_then_subs
         "[rules.thresholds]\nmin_custom_rule_test_cases = 0\n",
         encoding="utf-8",
     )
-    models: Path = tmp_path / "models"
-    models.mkdir()
+    models: Path = tmp_path / "sql" / "models"
+    models.mkdir(parents=True)
     (models / "orders.sql").write_text(
         "MODEL (description 'Test model orders.');\nSELECT 1 AS order_id\n", encoding="utf-8"
     )
@@ -2729,7 +2731,7 @@ def test_given_focused_project_rule_result_when_compiling_full_project_then_subs
         "MODEL (description 'Test model customers.');\nSELECT 1 AS customer_id\n", encoding="utf-8"
     )
     rule_file: Path = tmp_path / "rules" / "architecture.py"
-    rule_file.parent.mkdir()
+    rule_file.parent.mkdir(parents=True)
     rule_file.write_text(
         """from sqlbuild.rules import Finding, Project, RuleContext, rule
 
@@ -2767,15 +2769,15 @@ def test_given_non_model_sql_violation_when_compiling_then_compile_is_authoritat
         'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN004"]\n',
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         "MODEL (description 'Test model orders.');\nSELECT 1 AS order_id\n", encoding="utf-8"
     )
-    (tmp_path / "models" / "customers.sql").write_text(
+    (tmp_path / "sql" / "models" / "customers.sql").write_text(
         "MODEL (description 'Test model customers.');\nSELECT 1 AS order_id\n", encoding="utf-8"
     )
-    audit: Path = tmp_path / "audits" / "singular" / "order_sample.sql"
+    audit: Path = tmp_path / "sql" / "audits" / "singular" / "order_sample.sql"
     audit.parent.mkdir(parents=True)
     audit.write_text(
         'AUDIT ();\nSELECT * FROM __ref("orders") JOIN __ref("customers") USING (order_id) LIMIT 1\n',
@@ -2787,7 +2789,7 @@ def test_given_non_model_sql_violation_when_compiling_then_compile_is_authoritat
 
     assert exit_code == test_case.expected_exit_code
     assert payload["diagnostics"][0]["code"] == test_case.expected_code
-    assert payload["diagnostics"][0]["path"] == "audits/singular/order_sample.sql"
+    assert payload["diagnostics"][0]["path"] == "sql/audits/singular/order_sample.sql"
 
 
 @pytest.mark.parametrize(
@@ -2802,12 +2804,12 @@ def test_given_exception_for_other_model_when_compiling_selection_then_exception
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN004"]\n\n'
-        '[[rules.rule_exceptions]]\nrule = "SQLCLEAN004"\npath = "models/customers.sql"\n'
+        '[[rules.rule_exceptions]]\nrule = "SQLCLEAN004"\npath = "sql/models/customers.sql"\n'
         'reason = "The fixture intentionally selects one row."\n',
         encoding="utf-8",
     )
-    models: Path = tmp_path / "models"
-    models.mkdir()
+    models: Path = tmp_path / "sql" / "models"
+    models.mkdir(parents=True)
     (models / "orders.sql").write_text(
         "MODEL (description 'Test model orders.');\nSELECT 1 AS order_id\n", encoding="utf-8"
     )
@@ -2840,8 +2842,8 @@ def test_given_typed_unselected_model_when_planning_selection_then_rules_use_sel
         '[rules]\nselect = ["SQBRCONTRACT105"]\n',
         encoding="utf-8",
     )
-    sources: Path = tmp_path / "sources"
-    sources.mkdir()
+    sources: Path = tmp_path / "sql" / "sources"
+    sources.mkdir(parents=True)
     (sources / "customers.yml").write_text(
         """sources:
   - name: raw_customers
@@ -2854,8 +2856,8 @@ def test_given_typed_unselected_model_when_planning_selection_then_rules_use_sel
 """,
         encoding="utf-8",
     )
-    models: Path = tmp_path / "models"
-    models.mkdir()
+    models: Path = tmp_path / "sql" / "models"
+    models.mkdir(parents=True)
     (models / "orders.sql").write_text(
         "MODEL (description 'Test model orders.', contract enforced, columns (order_id (type INTEGER)));\n"
         "SELECT CAST(1 AS INTEGER) AS order_id\n",
@@ -2902,6 +2904,7 @@ def test_given_subject_before_layer_when_running_folder_rule_then_canonical_move
     )
     model: Path = (
         tmp_path
+        / "sql"
         / "models"
         / "commerce"
         / "intermediate"
@@ -2933,7 +2936,7 @@ def test_given_subject_before_layer_when_running_folder_rule_then_canonical_move
         '"intermediate/clean" contiguous'
     ]
     assert [finding["remediation"] for finding in findings] == [
-        'Move the model to "models/commerce/intermediate/clean/payments/'
+        'Move the model to "sql/models/commerce/intermediate/clean/payments/'
         'commerce__int_clean__orders.sql"; preserve subject folders outside '
         '"intermediate/clean". Use rules.layout with SQBRPROJECT201-204 to enforce '
         "domain and subdomain ordering."
@@ -2956,13 +2959,13 @@ def test_given_relative_project_path_when_compiling_twice_then_sql_finding_remai
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     project_dir: Path = tmp_path / "project"
-    project_dir.mkdir()
+    project_dir.mkdir(parents=True)
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN004"]\n',
         encoding="utf-8",
     )
-    model: Path = project_dir / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = project_dir / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         "MODEL (description 'Test model orders.');\nSELECT order_id FROM orders LIMIT 1\n",
         encoding="utf-8",
@@ -2993,8 +2996,8 @@ def test_given_inline_directive_without_finding_when_compiling_then_directive_is
         'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN004"]\n',
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         "MODEL (description 'Test model orders.');\n-- sqb: ignore SQLCLEAN004 because this fixture checks stale directives\n"
         "SELECT 1 AS order_id\n",
@@ -3023,13 +3026,13 @@ def test_given_unselected_custom_rule_options_when_compiling_then_configuration_
         '[rules.rule_options.XSQBRARCH001]\nrequired_prefix = "order"\n',
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         "MODEL (description 'Test model orders.');\nSELECT 1 AS order_id\n", encoding="utf-8"
     )
     rule_file: Path = tmp_path / "rules" / "architecture.py"
-    rule_file.parent.mkdir()
+    rule_file.parent.mkdir(parents=True)
     rule_file.write_text(
         """from sqlbuild.rules import Finding, Model, RuleContext, RuleOption, rule
 
@@ -3062,41 +3065,41 @@ def required_prefix(*, model: Model, ctx: RuleContext) -> list[Finding]:
         EmptyRuleSelectionTestCase(
             "valid exception for an unevaluated rule compiles",
             "[[rules.rule_exceptions]]\n"
-            'rule = "SQBRCONTRACT101"\npath = "models/orders.sql"\nreason = "Legacy."\n',
+            'rule = "SQBRCONTRACT101"\npath = "sql/models/orders.sql"\nreason = "Legacy."\n',
             0,
             (),
         ),
         EmptyRuleSelectionTestCase(
             "unknown exception rule is rejected",
-            '[[rules.rule_exceptions]]\nrule = "SQBRNOPE999"\npath = "models/orders.sql"\n'
+            '[[rules.rule_exceptions]]\nrule = "SQBRNOPE999"\npath = "sql/models/orders.sql"\n'
             'reason = "Legacy."\n',
             1,
             ("rule exceptions target unknown rules: SQBRNOPE999",),
         ),
         EmptyRuleSelectionTestCase(
             "missing exception path is rejected",
-            '[[rules.rule_exceptions]]\nrule = "SQBRCONTRACT101"\npath = "models/missing.sql"\n'
+            '[[rules.rule_exceptions]]\nrule = "SQBRCONTRACT101"\npath = "sql/models/missing.sql"\n'
             'reason = "Legacy."\n',
             1,
-            ("rule exception path does not exist: models/missing.sql",),
+            ("rule exception path does not exist: sql/models/missing.sql",),
         ),
         EmptyRuleSelectionTestCase(
             "ignore selector matching no rule is rejected",
-            '[[rules.rule_ignores]]\nrules = ["SQBRZZZ"]\npaths = ["models/orders.sql"]\n'
+            '[[rules.rule_ignores]]\nrules = ["SQBRZZZ"]\npaths = ["sql/models/orders.sql"]\n'
             'reason = "Legacy."\n',
             1,
             ("rule-ignore selector matches no rules: SQBRZZZ",),
         ),
         EmptyRuleSelectionTestCase(
             "missing literal ignore path is rejected",
-            '[[rules.rule_ignores]]\nrules = ["SQLCLEAN"]\npaths = ["models/orders.sql", "models/gone.sql"]\n'
+            '[[rules.rule_ignores]]\nrules = ["SQLCLEAN"]\npaths = ["sql/models/orders.sql", "sql/models/gone.sql"]\n'
             'reason = "Legacy."\n',
             1,
-            ("rule ignore path does not exist: models/gone.sql",),
+            ("rule ignore path does not exist: sql/models/gone.sql",),
         ),
         EmptyRuleSelectionTestCase(
             "ignore paths naming a folder or a glob that matches nothing compile",
-            '[[rules.rule_ignores]]\nrules = ["SQLCLEAN"]\npaths = ["models", "models/legacy/**"]\n'
+            '[[rules.rule_ignores]]\nrules = ["SQLCLEAN"]\npaths = ["sql/models", "sql/models/legacy/**"]\n'
             'reason = "Legacy."\n',
             0,
             (),
@@ -3119,8 +3122,8 @@ def test_given_empty_rule_selection_when_compiling_then_only_configuration_is_va
         f'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = []\n\n{test_case.configuration}',
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     model.write_text(
         "MODEL (description 'Test model orders.');\nSELECT 1 AS order_id\n", encoding="utf-8"
     )
@@ -3171,8 +3174,8 @@ def test_given_sql_rule_cache_when_inputs_change_then_only_unchanged_runs_hit(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     observed: list[tuple[int, int]] = []
     for project_toml, model_sql in test_case.steps:
         (tmp_path / "sqlbuild_project.toml").write_text(project_toml, encoding="utf-8")
@@ -3213,10 +3216,10 @@ def test_given_custom_rule_cache_when_inputs_change_then_only_unchanged_runs_hit
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(_CUSTOM_CACHE_TOML, encoding="utf-8")
-    model: Path = tmp_path / "models" / "orders.sql"
-    model.parent.mkdir()
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
+    model.parent.mkdir(parents=True)
     rule_file: Path = tmp_path / "rules" / "layout.py"
-    rule_file.parent.mkdir()
+    rule_file.parent.mkdir(parents=True)
     observed: list[tuple[int, int]] = []
     for rule_source, model_sql in test_case.steps:
         rule_file.write_text(rule_source, encoding="utf-8")
@@ -3244,15 +3247,15 @@ def test_given_custom_rule_cache_when_inputs_change_then_only_unchanged_runs_hit
                 "2|None|order_totals,stg_orders|raw_orders|regions||test_order_totals|"
                 "not_null,accepted_values,accepted_values|1|3|order_status|minimum_amount|1|1|"
                 "order_totals",
-                "order_totals|models/marts/order_totals.sql|table|137|79|stg_orders|||"
+                "order_totals|sql/models/marts/order_totals.sql|table|137|79|stg_orders|||"
                 "order_id:INTEGER:non_null;doubled_amount:DOUBLE:unknown|order_id,doubled_amount|"
                 "False||test_order_totals|",
-                "stg_orders|models/staging/stg_orders.sql|None|417|109||order_totals|"
+                "stg_orders|sql/models/staging/stg_orders.sql|None|417|109||order_totals|"
                 "order_id:INTEGER:False:Order key:not_null:[]:None/accepted_values:"
-                "[('values', [1, 2])]:warn:models/staging/stg_orders.sql:2;"
-                "amount:DOUBLE:None:None::models/staging/stg_orders.sql:4;"
+                "[('values', [1, 2])]:warn:sql/models/staging/stg_orders.sql:2;"
+                "amount:DOUBLE:None:None::sql/models/staging/stg_orders.sql:4;"
                 "status:VARCHAR:None:None:accepted_values:[('values', ('PAID', 'OPEN'))]:None:"
-                "models/staging/stg_orders.sql:5|"
+                "sql/models/staging/stg_orders.sql:5|"
                 "order_id:INTEGER:unknown;amount:DOUBLE:unknown;status:VARCHAR:non_null|"
                 "order_id,amount,status|True|||not_null,accepted_values,accepted_values",
             ),
@@ -3303,7 +3306,7 @@ def test_given_rules_reading_every_fact_when_compiling_then_values_and_cache_reu
             expected_exit_code=1,
             expected_messages=(
                 "invalid rules lifecycle: custom host failed: rule XSQBRHOST001 failed for "
-                "models/orders_001.sql: cannot inspect order_id",
+                "sql/models/orders_001.sql: cannot inspect order_id",
             ),
         ),
         CustomHostOutcomeTestCase(
@@ -3376,12 +3379,14 @@ def test_given_star_in_set_operation_branches_when_compiling_then_each_branch_is
         'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRMODEL102"]\n',
         encoding="utf-8",
     )
-    (tmp_path / "models").mkdir()
-    (tmp_path / "models" / "orders.sql").write_text(
+    (tmp_path / "sql" / "models").mkdir(parents=True)
+    (tmp_path / "sql" / "models" / "orders.sql").write_text(
         "MODEL (description 'Test model orders.', materialized view);\nSELECT 1 AS order_id\n",
         encoding="utf-8",
     )
-    (tmp_path / "models" / "order_ids.sql").write_text(test_case.model_sql, encoding="utf-8")
+    (tmp_path / "sql" / "models" / "order_ids.sql").write_text(
+        test_case.model_sql, encoding="utf-8"
+    )
 
     exit_code: int = main(["--project-dir", str(tmp_path), "compile", "--json", "--no-cache"])
     result: dict[str, object] = json.loads(capsys.readouterr().out)
@@ -3417,7 +3422,7 @@ def test_given_star_in_set_operation_branches_when_compiling_then_each_branch_is
             fixture="violations",
             rules_toml=(
                 'select = ["SQBR"]\n\n[[rules.rule_ignores]]\nrules = ["SQBR"]\n'
-                'paths = ["models/orders.sql"]\nreason = "Only Python findings matter here."\n'
+                'paths = ["sql/models/orders.sql"]\nreason = "Only Python findings matter here."\n'
             ),
             expected_exit_code=0,
             expected_findings=(),
@@ -3427,7 +3432,7 @@ def test_given_star_in_set_operation_branches_when_compiling_then_each_branch_is
             fixture="violations",
             rules_toml=(
                 'select = ["SQBRPYTHON101"]\n\n[[rules.rule_exceptions]]\n'
-                'rule = "SQBRPYTHON101"\npath = "hooks/python/alert.py"\n'
+                'rule = "SQBRPYTHON101"\npath = "sql/hooks/python/alert.py"\n'
                 'reason = "The alert hook keeps its documented signature."\n'
             ),
             expected_exit_code=0,
@@ -3438,12 +3443,12 @@ def test_given_star_in_set_operation_branches_when_compiling_then_each_branch_is
             fixture="violations",
             rules_toml=(
                 'select = ["SQBRPYTHON101"]\n\n[[rules.rule_exceptions]]\n'
-                'rule = "SQBRPYTHON101"\npath = "python/report.py"\nreason = "Legacy."\n'
+                'rule = "SQBRPYTHON101"\npath = "python/nodes/report.py"\nreason = "Legacy."\n'
             ),
             expected_exit_code=1,
             expected_findings=(("C000", None, None, None),),
             expected_text=(
-                "stale rule exception suppresses no finding: SQBRPYTHON101 at python/report.py"
+                "stale rule exception suppresses no finding: SQBRPYTHON101 at python/nodes/report.py"
             ),
         ),
         PythonRulesIntegrationTestCase(
@@ -3452,7 +3457,7 @@ def test_given_star_in_set_operation_branches_when_compiling_then_each_branch_is
             rules_toml=(
                 'select = ["SQBRPYTHON022"]\n\n[rules.rule_options.SQBRPYTHON022]\n'
                 "approved_loader_boundaries = "
-                '["python.inventory.restock._helpers.thresholds.load_thresholds"]\n'
+                '["python.nodes.inventory.restock._helpers.thresholds.load_thresholds"]\n'
             ),
             expected_exit_code=0,
             expected_findings=(),
@@ -3462,7 +3467,7 @@ def test_given_star_in_set_operation_branches_when_compiling_then_each_branch_is
             fixture="violations",
             rules_toml=(
                 'select = ["SQBRPYTHON022"]\n\n[rules.rule_options.SQBRPYTHON022]\n'
-                'approved_loader_boundaries = ["python.inventory.*"]\n'
+                'approved_loader_boundaries = ["python.nodes.inventory.*"]\n'
             ),
             expected_exit_code=1,
             expected_findings=(("C000", None, None, None),),
@@ -3476,7 +3481,7 @@ def test_given_star_in_set_operation_branches_when_compiling_then_each_branch_is
                 "[rules.rule_options.SQBRPYTHON504]\nmax_arguments = 1\n"
             ),
             expected_exit_code=1,
-            expected_findings=(("SQBRPYTHON504", "hooks/python/alert.py", 4, 1),),
+            expected_findings=(("SQBRPYTHON504", "sql/hooks/python/alert.py", 4, 1),),
             expected_text="function has 2 parameters",
         ),
     ],
@@ -3726,7 +3731,7 @@ def test_given_orchestration_selections_when_compiling_then_named_selector_limit
         PerformanceRulesIntegrationTestCase(
             description="a second reader ends the published-view exemption",
             extra_models={
-                "models/order_line_counts.sql": (
+                "sql/models/order_line_counts.sql": (
                     'MODEL (description "Lines per order.");\n'
                     "SELECT order_id, COUNT(*) AS line_count\n"
                     'FROM __ref("shop__mart__order_lines")\nGROUP BY order_id\n'
@@ -3734,7 +3739,7 @@ def test_given_orchestration_selections_when_compiling_then_named_selector_limit
             },
             expected_findings=(
                 *_PERFORMANCE_FINDINGS,
-                ("SQBRPERFORMANCE102", "models/shop__mart__order_lines.sql", 11, 3),
+                ("SQBRPERFORMANCE102", "sql/models/shop__mart__order_lines.sql", 11, 3),
             ),
         ),
     ],
