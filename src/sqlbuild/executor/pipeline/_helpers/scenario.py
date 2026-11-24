@@ -38,12 +38,12 @@ from sqlbuild.adapter.relations.main.relation_metadata_cache_scope import (
     relation_metadata_cache_scope,
 )
 from sqlbuild.diagnostics.main.log_debug_event import log_debug_event
-from sqlbuild.executor.local._helpers.session import session_time_zone
 from sqlbuild.executor.local.constants import (
     RUN_ON_LOCAL,
     RUN_ON_WAREHOUSE,
     STATEMENT_CONSTRUCT,
 )
+from sqlbuild.executor.local.main._convert_local_sql import session_time_zone
 from sqlbuild.executor.pipeline._helpers.connections import (
     close_connections,
     open_worker_connections,
@@ -67,10 +67,8 @@ from sqlbuild.executor.scenario.main._capture_steps import (
     execute_scenario_snapshot_capture_run,
 )
 from sqlbuild.executor.scenario.main._cleanup_interrupted import cleanup_interrupted_scenarios
-from sqlbuild.executor.scenario.main._local import (
-    execute_local_scenario_load_only_run,
-    local_scenario_refusals,
-)
+from sqlbuild.executor.scenario.main._local import execute_local_scenario_load_only_run
+from sqlbuild.executor.scenario.main._local_refusals import local_scenario_refusals
 from sqlbuild.executor.scenario.main._run import execute_scenario_run
 from sqlbuild.executor.scenario.main._snapshots import classify_scenario_snapshot_state
 from sqlbuild.executor.scenario.models import (

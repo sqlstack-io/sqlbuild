@@ -499,7 +499,7 @@ impl RenderCteState {
 }
 
 /// One CTE body's character range in a rendered comparison, and what it stands for.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ComparisonSegment {
     pub(crate) start: usize,
     pub(crate) end: usize,
@@ -507,7 +507,7 @@ pub(crate) struct ComparisonSegment {
 }
 
 /// The comparison SQL of one planned test and where each CTE body sits in it.
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub(crate) struct PlacedComparison {
     pub(crate) sql: String,
     pub(crate) segments: Vec<ComparisonSegment>,
@@ -538,7 +538,9 @@ fn placed_statement(definitions: &[(String, String, String)], rest: &str) -> Pla
 }
 
 /// Render one planned test's comparison query with the place of each CTE body in it.
-pub(crate) fn render_placed_comparison(request: &RenderRequest) -> Result<PlacedComparison, String> {
+pub(crate) fn render_placed_comparison(
+    request: &RenderRequest,
+) -> Result<PlacedComparison, String> {
     let plain: RenderRequest = RenderRequest {
         chain: request.chain.clone(),
         assertions: request.assertions.clone(),
@@ -549,8 +551,7 @@ pub(crate) fn render_placed_comparison(request: &RenderRequest) -> Result<Placed
         actual_relations: HashMap::new(),
         output_step_index: None,
     };
-    let mut placed: Option<PlacedComparison> = None;
-    let sql: String = render_comparison(&plain, &mut placed)?;
+    let (sql, placed): (String, Option<PlacedComparison>) = render_comparison(&plain)?;
     Ok(placed.unwrap_or(PlacedComparison {
         sql,
         segments: Vec::new(),
@@ -651,11 +652,19 @@ pub(crate) fn rendered_chain_steps(
         .collect()
 }
 
-/// One planned test's comparison SQL and the place of each CTE body in it, as JSON.
-pub(crate) fn render_placed_json(request_json: &str) -> Result<String, String> {
+/// One planned test's comparison SQL and each CTE body's start, end and origin in it.
+pub(crate) fn render_placed_request(
+    request_json: &str,
+) -> Result<(String, Vec<(usize, usize, String)>), String> {
     let request: RenderRequest =
         serde_json::from_str(request_json).map_err(|error| error.to_string())?;
-    serde_json::to_string(&render_placed_comparison(&request)?).map_err(|error| error.to_string())
+    let placed: PlacedComparison = render_placed_comparison(&request)?;
+    let segments: Vec<(usize, usize, String)> = placed
+        .segments
+        .into_iter()
+        .map(|segment| (segment.start, segment.end, segment.origin))
+        .collect();
+    Ok((placed.sql, segments))
 }
 
 pub(crate) fn render_json(request_json: &str) -> Result<String, String> {
@@ -803,15 +812,15 @@ pub(crate) fn comparison_counts_sql(
 
 /// Render one planned test's comparison query, lifting authored CTE text verbatim.
 pub(crate) fn render_comparison_sql(request: &RenderRequest) -> Result<String, String> {
-    render_comparison(request, &mut None)
+    render_comparison(request).map(|(sql, _placed)| sql)
 }
 
+/// The comparison SQL, and the placed comparison with each CTE body's range when it has one.
 fn render_comparison(
     request: &RenderRequest,
-    placed: &mut Option<PlacedComparison>,
-) -> Result<String, String> {
+) -> Result<(String, Option<PlacedComparison>), String> {
     if request.chain.is_empty() && request.assertions.is_empty() {
-        return Ok(String::new());
+        return Ok((String::new(), None));
     }
     let enabled = request.sql_analysis_enabled;
     let model_test = !request.assertions.is_empty()
@@ -876,7 +885,7 @@ fn render_comparison(
 
     if request.output_step_index.is_some() {
         let Some(actual_cte) = output_actual_cte else {
-            return Ok(String::new());
+            return Ok((String::new(), None));
         };
         cte_state.verify_isolated_names(&comparison_ctes)?;
         cte_state.substitute(&substitutions);
@@ -887,7 +896,7 @@ fn render_comparison(
                 .map(|(name, sql)| cte_definition_sql(name, sql)),
         );
         let statement = format!("WITH {}\nSELECT * FROM {actual_cte}", cte_parts.join(",\n"));
-        return Ok(pruned_statement(&statement, cte_state.dialect));
+        return Ok((pruned_statement(&statement, cte_state.dialect), None));
     }
 
     for (assertion_index, assertion) in request
@@ -912,7 +921,7 @@ fn render_comparison(
     }
 
     if select_parts.is_empty() {
-        return Ok(String::new());
+        return Ok((String::new(), None));
     }
     cte_state.verify_isolated_names(&comparison_ctes)?;
     cte_state.substitute(&substitutions);
@@ -922,7 +931,9 @@ fn render_comparison(
         comparison_ctes
             .iter()
             .zip(&comparison_origins)
-            .map(|((name, sql), origin)| (cte_definition_sql(name, sql), sql.clone(), origin.clone())),
+            .map(|((name, sql), origin)| {
+                (cte_definition_sql(name, sql), sql.clone(), origin.clone())
+            }),
     );
     let cte_parts: Vec<String> = placed_parts
         .iter()
@@ -930,33 +941,32 @@ fn render_comparison(
         .collect();
     let single_read = !request.actual_relations.is_empty();
     if request.probe_step_index.is_some() {
-        return Ok(probe_actual_cte.map_or_else(String::new, |actual_cte| {
-            let statement = format!(
-                "WITH {}\nSELECT * FROM {actual_cte} WHERE 1 = 0",
-                cte_parts.join(",\n")
-            );
-            if single_read {
-                pruned_statement(&statement, dialect)
-            } else {
-                statement
-            }
-        }));
+        return Ok((
+            probe_actual_cte.map_or_else(String::new, |actual_cte| {
+                let statement = format!(
+                    "WITH {}\nSELECT * FROM {actual_cte} WHERE 1 = 0",
+                    cte_parts.join(",\n")
+                );
+                if single_read {
+                    pruned_statement(&statement, dialect)
+                } else {
+                    statement
+                }
+            }),
+            None,
+        ));
     }
     let statement = format!(
         "WITH {}\n{}",
         cte_parts.join(",\n"),
         select_parts.join("\nUNION ALL\n")
     );
-    if !single_read {
-        let rendered: PlacedComparison =
-            placed_statement(&placed_parts, &select_parts.join("\nUNION ALL\n"));
-        debug_assert_eq!(rendered.sql, statement);
-        *placed = Some(rendered);
-    }
     if single_read {
-        return Ok(pruned_statement(&statement, dialect));
+        return Ok((pruned_statement(&statement, dialect), None));
     }
-    Ok(statement)
+    let placed: PlacedComparison =
+        placed_statement(&placed_parts, &select_parts.join("\nUNION ALL\n"));
+    Ok((statement, Some(placed)))
 }
 
 fn sanitize_cte_suffix(model_name: &str) -> String {

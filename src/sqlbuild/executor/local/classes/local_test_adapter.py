@@ -17,7 +17,6 @@ from sqlbuild.executor.local.constants import (
 )
 
 _UTC_SESSION_SQL: str = f"SET TimeZone = '{UTC_TIME_ZONE}'"
-# DuckDB invalidates a database after an internal or fatal error; every later statement fails.
 _INVALIDATED_MARKER: str = "database has been invalidated"
 _FATAL_ERRORS: frozenset[str] = frozenset({"FatalException", "InternalException"})
 

@@ -22,7 +22,11 @@ pub fn render_warehouse_census(
     }
     let mut counts: BTreeMap<String, usize> = BTreeMap::new();
     for decision in &refused {
-        let mut titles: Vec<String> = decision.refusals.iter().map(|refusal| refusal.title()).collect();
+        let mut titles: Vec<String> = decision
+            .refusals
+            .iter()
+            .map(|refusal| refusal.title())
+            .collect();
         titles.sort();
         titles.dedup();
         for title in titles {
@@ -33,7 +37,11 @@ pub fn render_warehouse_census(
     rows.sort_by(|(left_title, left), (right_title, right)| {
         right.cmp(left).then_with(|| left_title.cmp(right_title))
     });
-    let width: usize = rows.iter().map(|(title, _)| title.chars().count()).max().unwrap_or(0);
+    let width: usize = rows
+        .iter()
+        .map(|(title, _)| title.chars().count())
+        .max()
+        .unwrap_or(0);
     let noun = |count: usize| if count == 1 { singular } else { plural };
     let mut text: String = format!(
         "\n{} ({} {})\n",

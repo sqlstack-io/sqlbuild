@@ -9,8 +9,6 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::definition_changes::models::{ExecutedItem, SelectedItem};
 use sqlbuild_core::cli_text::main::format_summary_footer::format_summary_footer;
 use sqlbuild_core::cli_text::models::{CliStyle, SummaryCount};
-use sqlbuild_core::scenario_command::main::render_scenario_failures::render_scenario_failures;
-use sqlbuild_core::scenario_command::main::validate_scenario_test_flags::validate_scenario_test_flags;
 use sqlbuild_core::progress::models::StatementSummary;
 use sqlbuild_core::run_on::main::read_run_on_decisions::read_run_on_decisions;
 use sqlbuild_core::run_on::main::render_local_refusals::render_local_refusals;
@@ -18,6 +16,8 @@ use sqlbuild_core::run_on::main::render_warehouse_census::render_warehouse_censu
 use sqlbuild_core::run_on::main::run_on_split::run_on_split;
 use sqlbuild_core::run_on::main::with_run_on_json::with_run_on_json;
 use sqlbuild_core::run_on::models::{RunOn, RunOnDecision};
+use sqlbuild_core::scenario_command::main::render_scenario_failures::render_scenario_failures;
+use sqlbuild_core::scenario_command::main::validate_scenario_test_flags::validate_scenario_test_flags;
 use sqlbuild_core::scenario_command::models::{
     ScenarioNamespace, ScenarioResultRow, ScenarioTestFlags, SqlAnalysisCommand,
 };
@@ -47,11 +47,11 @@ use crate::bindings::_helpers::sql_test_command::test_command::timeout_record;
 use crate::bindings::_helpers::sql_test_command::timeouts::{TimeoutKind, resolve_run_timeout};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::main::value_error::value_error;
+use sqlbuild_python_base::build_progress::main::progress::current_projector::current_projector;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::native_host::types::ReadResult;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::boundary::main::value_error::value_error;
-use sqlbuild_python_base::build_progress::main::progress::current_projector::current_projector;
 use sqlbuild_python_front::command_runtime::main::resolve_concurrency::resolve_concurrency;
 use sqlbuild_python_front::command_runtime::main::resolve_run_on::resolve_run_on;
 use sqlbuild_python_output::result_output::main::results::format_scenario_execution_json_with::format_scenario_execution_json_with;
@@ -465,13 +465,13 @@ fn select_changed<'py>(
     ))
 }
 
-/// A compiled, selected and `--since`-narrowed set of scenarios for one run setup.
+/// A compiled, selected and `--since`-narrowed set of scenarios, and the `--since` JSON.
 fn compiled<'py>(
     request: &Bound<'py, PyAny>,
-    run: &mut TestRun<'py>,
+    run: &TestRun<'py>,
     planning: &Bound<'py, PyAny>,
     base: Option<BaseComparison>,
-) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyTuple>)> {
+) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyTuple>, Option<String>)> {
     let py: Python<'py> = request.py();
     let no_sql_validation: bool = run.local || flag(request, "no_sql_validation")?;
     let compiled: PyResult<Bound<'_, PyAny>> = compile(
@@ -497,13 +497,14 @@ fn compiled<'py>(
     let exclude: Vec<String> = run.project.exclude.extract()?;
     let mut scenarios: Bound<'_, PyTuple> =
         selected_scenarios(&pipeline, (&selectors, &exclude, &run.project.project_dir))?;
+    let mut since_json: Option<String> = None;
     if let Some(base) = base {
-        let since_json: String;
-        (scenarios, since_json) =
+        let changed_json: String;
+        (scenarios, changed_json) =
             select_changed(run, (&pipeline, scenarios), base, flag(request, "explain")?)?;
-        run.since_json = Some(since_json);
+        since_json = Some(changed_json);
     }
-    Ok((pipeline, scenarios))
+    Ok((pipeline, scenarios, since_json))
 }
 
 /// The `--since` base of a run, when the request names one.
@@ -571,7 +572,8 @@ pub(crate) fn run_scenario_test_command(
         ),
     )?;
     let base: Option<BaseComparison> = since_base(request, &run)?;
-    let (pipeline, scenarios) = compiled(request, &mut run, &planning, base)?;
+    let (pipeline, scenarios, since_json) = compiled(request, &run, &planning, base)?;
+    run.since_json = since_json;
     if run.local && (flag(request, "sync_snapshots")? || flag(request, "refresh")?) {
         let synced: LocalSync<'_> = sync_local_snapshots(request, &run, (&pipeline, &scenarios))?;
         if synced.exit_code != 0 {
@@ -646,13 +648,16 @@ pub(crate) fn run_scenario_test_command(
         )?
         .into_any();
         let remote_base: Option<BaseComparison> = since_base(request, &remote)?;
-        let (remote_pipeline, remote_scenarios) =
-            compiled(request, &mut remote, &quiet, remote_base)?;
+        let (remote_pipeline, remote_scenarios, _remote_since_json) =
+            compiled(request, &remote, &quiet, remote_base)?;
         remote.since_json = run.since_json.clone();
         results.extend(execute_batch(
             request,
             &remote,
-            (&remote_pipeline, &named(&remote_scenarios, &warehouse_names)?),
+            (
+                &remote_pipeline,
+                &named(&remote_scenarios, &warehouse_names)?,
+            ),
             &section,
         )?);
         remote

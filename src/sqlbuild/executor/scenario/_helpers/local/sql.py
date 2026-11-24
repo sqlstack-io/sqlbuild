@@ -5,23 +5,17 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from sqlbuild.errors.contracts.exceptions import ExecutorInputError
-from sqlbuild.executor.local._helpers.conversion import converted
-from sqlbuild.executor.local._helpers.positions import file_placed_refusal
-from sqlbuild.executor.local.constants import CONVERTED_DIALECT, LOCAL_DIALECT
-from sqlbuild.executor.scenario.constants import SCENARIO_LOCAL_SQL_TRANSPILE_FAILED
-
-
-class LocalSqlRefusedError(ExecutorInputError):
-    """SQLQuack refused SQL a local scenario run needs; `refusals` are its JSON refusals."""
-
-    def __init__(self, message: str, *, refusals: tuple[Mapping[str, Any], ...]) -> None:
-        super().__init__(
-            message,
-            code=SCENARIO_LOCAL_SQL_TRANSPILE_FAILED,
-            help="Run this scenario on the warehouse with --run-on warehouse or --run-on auto.",
-        )
-        self.refusals: tuple[Mapping[str, Any], ...] = refusals
+from sqlbuild.executor.local.constants import (
+    CONVERTED_DIALECT,
+    DIALECT_REASON_CATEGORY,
+    LOCAL_DIALECT,
+)
+from sqlbuild.executor.local.main._convert_local_sql import (
+    convert_local_sql,
+    file_placed_refusal,
+)
+from sqlbuild.executor.scenario.exceptions import LocalSqlRefusedError
+from sqlbuild.executor.scenario.models import LocalSql
 
 
 def convert_sql_for_local_duckdb(
@@ -31,30 +25,26 @@ def convert_sql_for_local_duckdb(
     schema: Mapping[str, Any] | None,
     time_zone: str | None,
     resource: tuple[str, str, str],
-    macros: list[str],
     file: tuple[str, str] | None = None,
-) -> str:
-    """DuckDB SQL for `sql`; SQLQuack converts Snowflake SQL and DuckDB SQL runs as authored.
-
-    `file` is the path and text of the file that holds `sql`, where refusals are placed.
-    """
+) -> LocalSql:
+    """DuckDB SQL for `sql`, refusals placed in `file` (path, text): converted or as authored."""
 
     scenario_name, resource_kind, resource_name = resource
     if source_dialect == LOCAL_DIALECT:
-        return sql
+        return LocalSql(sql=sql)
     if source_dialect != CONVERTED_DIALECT:
         raise LocalSqlRefusedError(
             f"Scenario '{scenario_name}' cannot run locally: SQLQuack converts Snowflake SQL "
             f"only, not {source_dialect}",
             refusals=(
                 {
-                    "category": "dialect",
+                    "category": DIALECT_REASON_CATEGORY,
                     "construct": str(source_dialect),
                     "reason": f"SQLQuack converts Snowflake SQL only, not {source_dialect}",
                 },
             ),
         )
-    conversion: Any = converted(
+    conversion: Any = convert_local_sql(
         sql=sql,
         schema=schema,
         time_zone=time_zone,
@@ -69,10 +59,7 @@ def convert_sql_for_local_duckdb(
                 for refusal in conversion.report["refusals"]
             ),
         )
-    for macro in conversion.macros:
-        if macro not in macros:
-            macros.append(macro)
-    return conversion.sql
+    return LocalSql(sql=conversion.sql, macros=tuple(conversion.macros))
 
 
 def replace_local_relations(*, sql: str, relation_replacements: dict[str, str]) -> str:

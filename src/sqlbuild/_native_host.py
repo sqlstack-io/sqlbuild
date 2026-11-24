@@ -474,15 +474,15 @@ _TARGETS: dict[str, tuple[str, str]] = {
     "run_seed_pipeline": ("sqlbuild.executor.pipeline.main.run", "run_seed_pipeline"),
     "run_test_pipeline": ("sqlbuild.executor.pipeline.main.run", "run_test_pipeline"),
     "decide_sql_test_run_on": (
-        "sqlbuild.executor.local.main.decide_sql_test_run_on",
+        "sqlbuild.executor.local.main._decide_sql_test_run_on",
         "decide_sql_test_run_on",
     ),
     "local_test_adapter": (
-        "sqlbuild.executor.local.main.local_test_adapter",
+        "sqlbuild.executor.local.main._local_test_adapter",
         "local_test_adapter",
     ),
     "report_unplaced_sql_tests": (
-        "sqlbuild.executor.local.main.report_unplaced_sql_tests",
+        "sqlbuild.executor.local.main._report_unplaced_sql_tests",
         "report_unplaced_sql_tests",
     ),
     "decide_scenario_run_on": ("sqlbuild.executor.pipeline.main.run", "decide_scenario_run_on"),

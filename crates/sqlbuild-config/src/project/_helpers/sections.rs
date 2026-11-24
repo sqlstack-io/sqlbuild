@@ -13,11 +13,10 @@ use crate::project::_helpers::keys::{Place, reject_removed_virtual_keys, validat
 use crate::project::_helpers::targets::seconds_value;
 use crate::project::_helpers::values::{int_below, python_equal};
 use crate::project::constants::{
-    ALLOW_MISSING_SECRETS_KEY, ALLOW_WAREHOUSE_ROUND_TRIPS_KEY, DEFAULT_TEST_TIMEOUT,
-    DEFAULT_UNIT_TEST_MAX_REAL_MODELS, DELTA_COMPILE_KEY, DISABLED_VALUE,
-    DEFAULT_RUN_ON, IGNORE_AUDIT_FAILURES_KEY, RECORD_RUN_HOST_KEY, RUN_ON_CHOICES,
-    SCENARIO_RUN_ON_KEY, SCENARIO_TIMEOUT_KEY, TEST_RUN_ON_KEY, TEST_TIMEOUT_KEY,
-    UNIT_TEST_MAX_REAL_MODELS_KEY,
+    ALLOW_MISSING_SECRETS_KEY, ALLOW_WAREHOUSE_ROUND_TRIPS_KEY, DEFAULT_RUN_ON,
+    DEFAULT_TEST_TIMEOUT, DEFAULT_UNIT_TEST_MAX_REAL_MODELS, DELTA_COMPILE_KEY, DISABLED_VALUE,
+    IGNORE_AUDIT_FAILURES_KEY, RECORD_RUN_HOST_KEY, RUN_ON_CHOICES, SCENARIO_RUN_ON_KEY,
+    SCENARIO_TIMEOUT_KEY, TEST_RUN_ON_KEY, TEST_TIMEOUT_KEY, UNIT_TEST_MAX_REAL_MODELS_KEY,
 };
 use crate::project::constants::{
     AUDIT_SEVERITIES, CHECK_DECLARED_COLUMNS_KEY, COLLECTION_RENDERINGS, COLUMN_CONTRACT_MODES,
@@ -333,7 +332,8 @@ pub(crate) fn load_settings(payload: Option<&ConfigValue>, file: ConfigFile) -> 
     ];
     let mut fields = fields;
     for key in [TEST_RUN_ON_KEY, SCENARIO_RUN_ON_KEY] {
-        let value: String = run_on(mapping, key, "settings")?.unwrap_or_else(|| DEFAULT_RUN_ON.to_owned());
+        let value: String =
+            run_on(mapping, key, "settings")?.unwrap_or_else(|| DEFAULT_RUN_ON.to_owned());
         fields.push((key, Built::Value(ConfigValue::String(value))));
     }
     for (key, seconds_key, default) in [

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import difflib
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
@@ -16,35 +16,12 @@ from sqlbuild.executor.local.constants import (
     SQLQUACK_SOURCES_HELP,
     STATEMENT_CONSTRUCT,
 )
-from sqlbuild.executor.local.models import LocalRefusal
+from sqlbuild.executor.local.models import LocalRefusal, Segment, TestSources
 
 _MODEL_ORIGIN: re.Pattern[str] = re.compile(r"^model '(?P<name>.+)'$")
 _SIMILAR_LINE_RATIO: float = 0.6
+_EQUAL_OPCODE: str = "equal"
 _MACRO_CALL: re.Pattern[str] = re.compile(r"@(?:py|sql)\.[A-Za-z_][A-Za-z0-9_.]*")
-
-
-@dataclass(frozen=True)
-class Segment:
-    """Where one CTE body sits in the comparison SQL, and what it stands for."""
-
-    start: int
-    end: int
-    origin: str
-
-
-@dataclass(frozen=True)
-class TestSources:
-    """What a unit test's comparison SQL was built from: its test file, models and compiled file."""
-
-    sql: str
-    segments: Sequence[Segment]
-    test_path: str | None
-    test_text: str | None
-    compiled_path: str
-    mocked_models: frozenset[str]
-    models: Mapping[str, Any]
-    chain_sql: Mapping[str, str]
-    dialect: str
 
 
 @dataclass(frozen=True)
@@ -107,11 +84,13 @@ def file_placed_refusal(
     start: int = int(span["start"])
     end: int = max(int(span["end"]), start + 1)
     refused: str = sql[start:end].split("\n", 1)[0]
-    line, column = _line_column(sql, start)
+    line, column = _line_column(text=sql, offset=start)
     path, text = file
     place: _Place | None = _token_place(
         path=path, text=text, token=refused, near=line
-    ) or _similar_line_place(path=path, text=text, line_text=_line_text(sql, line), column=column)
+    ) or _similar_line_place(
+        path=path, text=text, line_text=_line_text(text=sql, line=line), column=column
+    )
     if place is None:
         return placed
     placed.update(
@@ -144,17 +123,17 @@ def _place(*, start: int, refused: str, sources: TestSources) -> _Place:
             ) or _similar_line_place(
                 path=sources.test_path,
                 text=sources.test_text,
-                line_text=_line_text(body, _line_column(body, offset)[0]),
-                column=_line_column(body, offset)[1],
+                line_text=_line_text(text=body, line=_line_column(text=body, offset=offset)[0]),
+                column=_line_column(text=body, offset=offset)[1],
             )
             if placed is not None:
                 return placed
-    line, column = _line_column(sources.sql, start)
+    line, column = _line_column(text=sources.sql, offset=start)
     return _Place(
         path=sources.compiled_path,
         line=line,
         column=column,
-        snippet=_line_text(sources.sql, line),
+        snippet=_line_text(text=sources.sql, line=line),
     )
 
 
@@ -166,11 +145,11 @@ def _model_place(
     model: Any = sources.models.get(name)
     if model is None:
         return None
-    body_line, column = _line_column(body, offset)
-    line_text: str = _line_text(body, body_line)
+    body_line, column = _line_column(text=body, offset=offset)
+    line_text: str = _line_text(text=body, line=body_line)
     resolved: str = sources.chain_sql.get(name) or ""
     at: int = resolved.find(body)
-    line: int = _line_column(resolved, at + offset)[0] if at >= 0 else body_line
+    line: int = _line_column(text=resolved, offset=at + offset)[0] if at >= 0 else body_line
     authored: str = model.authored_sql
     path: str = Path(model.relative_path).as_posix()
     token: str = refused.split("\n", 1)[0]
@@ -215,7 +194,7 @@ def _expanded_place(
         return None
     call_line, call_column = int(mapped[0]), int(mapped[1])
     call: re.Match[str] | None = _MACRO_CALL.match(
-        _line_text(model.authored_sql, call_line)[call_column - 1 :]
+        _line_text(text=model.authored_sql, line=call_line)[call_column - 1 :]
     )
     return _Place(
         path=path,
@@ -238,9 +217,9 @@ def _token_place(*, path: str, text: str, token: str, near: int) -> _Place | Non
     starts: list[int] = [match.start() for match in re.finditer(re.escape(token), text)]
     if not starts:
         return None
-    placed: list[tuple[int, int]] = [_line_column(text, start) for start in starts]
+    placed: list[tuple[int, int]] = [_line_column(text=text, offset=start) for start in starts]
     line, column = min(placed, key=lambda position: abs(position[0] - near))
-    return _Place(path=path, line=line, column=column, snippet=_line_text(text, line))
+    return _Place(path=path, line=line, column=column, snippet=_line_text(text=text, line=line))
 
 
 def _similar_line_place(*, path: str, text: str, line_text: str, column: int) -> _Place | None:
@@ -256,12 +235,12 @@ def _similar_line_place(*, path: str, text: str, line_text: str, column: int) ->
             best = (ratio, index)
     if best[0] < _SIMILAR_LINE_RATIO:
         return None
-    target: str = _line_text(text, best[1])
+    target: str = _line_text(text=text, line=best[1])
     matcher: difflib.SequenceMatcher[str] = difflib.SequenceMatcher(None, line_text, target)
     mapped: int = column - 1
     for tag, start, end, target_start, target_end in matcher.get_opcodes():
         if start <= column - 1 < end or (start == end == column - 1):
-            mapped = target_start + (column - 1 - start) if tag == "equal" else target_start
+            mapped = target_start + (column - 1 - start) if tag == _EQUAL_OPCODE else target_start
             mapped = min(mapped, max(target_end - 1, target_start))
             break
     return _Place(path=path, line=best[1], column=mapped + 1, snippet=target)
@@ -274,17 +253,17 @@ def _text_place(*, path: str, text: str, body: str, offset: int) -> _Place | Non
     if at < 0:
         return None
     at += offset - (len(body) - len(body.lstrip()))
-    line, column = _line_column(text, max(at, 0))
-    return _Place(path=path, line=line, column=column, snippet=_line_text(text, line))
+    line, column = _line_column(text=text, offset=max(at, 0))
+    return _Place(path=path, line=line, column=column, snippet=_line_text(text=text, line=line))
 
 
-def _line_column(text: str, offset: int) -> tuple[int, int]:
+def _line_column(*, text: str, offset: int) -> tuple[int, int]:
     before: str = text[:offset]
     line: int = before.count("\n") + 1
     column: int = offset - (before.rfind("\n") + 1) + 1
     return line, column
 
 
-def _line_text(text: str, line: int) -> str:
+def _line_text(*, text: str, line: int) -> str:
     lines: list[str] = text.split("\n")
     return lines[line - 1] if 0 < line <= len(lines) else ""

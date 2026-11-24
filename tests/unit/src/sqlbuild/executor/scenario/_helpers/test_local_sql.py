@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from sqlbuild.executor.scenario._helpers.local.sql import (
-    LocalSqlRefusedError,
-    convert_sql_for_local_duckdb,
-)
+from sqlbuild.executor.scenario._helpers.local.sql import convert_sql_for_local_duckdb
+from sqlbuild.executor.scenario.exceptions import LocalSqlRefusedError
 from tests.unit.src.sqlbuild.executor.scenario._helpers._test_types import (
+    LocalScenarioRefusalTestCase,
     LocalScenarioSqlTestCase,
 )
 
@@ -43,28 +42,38 @@ def test_given_captured_dialect_when_preparing_local_scenario_sql_then_only_conv
         schema=_SCHEMA,
         time_zone=None,
         resource=("order_totals", "model", "order_totals"),
-        macros=[],
-    )
+    ).sql
 
     assert result == test_case.expected_sql
 
 
-def test_given_other_captured_dialect_when_preparing_local_scenario_sql_then_refuses_with_reason() -> (
-    None
-):
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        LocalScenarioRefusalTestCase(
+            description="another adapter's SQL is refused with a dialect reason",
+            source_dialect="postgres",
+            expected_reasons=(("dialect", "postgres"),),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_other_captured_dialect_when_preparing_local_scenario_sql_then_refuses_with_reason(
+    test_case: LocalScenarioRefusalTestCase,
+) -> None:
     with pytest.raises(LocalSqlRefusedError) as raised:
         convert_sql_for_local_duckdb(
             sql="select 1",
-            source_dialect="postgres",
+            source_dialect=test_case.source_dialect,
             schema=None,
             time_zone=None,
             resource=("order_totals", "model", "order_totals"),
-            macros=[],
         )
 
-    assert [(refusal["category"], refusal["construct"]) for refusal in raised.value.refusals] == [
-        ("dialect", "postgres")
-    ]
+    assert (
+        tuple((refusal["category"], refusal["construct"]) for refusal in raised.value.refusals)
+        == test_case.expected_reasons
+    )
 
 
 if __name__ == "__main__":

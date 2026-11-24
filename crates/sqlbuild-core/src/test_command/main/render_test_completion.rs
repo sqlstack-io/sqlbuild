@@ -45,8 +45,7 @@ fn failure_lines(failure: &TestFailure, style: CliStyle) -> Vec<String> {
     lines
 }
 
-/// A blank line, PASS, FAIL and TOTAL counts with the local and warehouse split when given, then
-/// the failures when any, and a newline.
+/// PASS, FAIL and TOTAL counts with any local and warehouse split, then any failures.
 #[must_use]
 pub fn render_test_completion(
     (passed, total): (usize, usize),

@@ -9,7 +9,8 @@ use serde_json::{Value, json};
 use sqlbuild_analysis::compiler::main::missing_expected_columns::missing_expected_columns;
 use sqlbuild_analysis::compiler::main::scenario_expected_comparison_sql::scenario_expected_comparison_sql;
 use sqlbuild_analysis::compiler::main::sql_test_difference_sampling::render_difference_sample_json;
-use sqlbuild_analysis::compiler::main::sql_test_rendering::{render_json, render_placed_json};
+use sqlbuild_analysis::compiler::main::sql_test_placed_rendering::render_placed_comparison;
+use sqlbuild_analysis::compiler::main::sql_test_rendering::render_json;
 
 use sqlbuild_python_base::boundary::main::value_error::value_error;
 use sqlbuild_python_base::boundary::models::Request;
@@ -175,32 +176,8 @@ pub(crate) fn render_sql_test_comparison_segments(
         settings.sql_analysis_dialect.as_deref(),
     )?)
     .map_err(value_error)?;
-    let response: String = py
-        .compiler_detach(|| render_placed_json(&request))
-        .map_err(value_error)?;
-    let placed: Value = serde_json::from_str(&response).map_err(value_error)?;
-    let sql: String = placed
-        .get("sql")
-        .and_then(Value::as_str)
-        .map(str::to_owned)
-        .ok_or_else(|| value_error("native SQL-test rendering returned an invalid result"))?;
-    let segments: Vec<(usize, usize, String)> = placed
-        .get("segments")
-        .and_then(Value::as_array)
-        .map(|items| {
-            items
-                .iter()
-                .filter_map(|item| {
-                    Some((
-                        usize::try_from(item.get("start")?.as_u64()?).ok()?,
-                        usize::try_from(item.get("end")?.as_u64()?).ok()?,
-                        item.get("origin")?.as_str()?.to_owned(),
-                    ))
-                })
-                .collect()
-        })
-        .unwrap_or_default();
-    Ok((sql, segments))
+    py.compiler_detach(|| render_placed_comparison(&request))
+        .map_err(value_error)
 }
 
 /// A bounded query for one direction of an expected-output difference of one chain step.

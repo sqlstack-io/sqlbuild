@@ -10,9 +10,6 @@ from sqlbuild.adapter.contract.types import TablePromotionMode
 from sqlbuild.executor.scenario._helpers.local.execution import (
     execute_local_scenario_load_only_run as _execute_local_scenario_load_only_run,
 )
-from sqlbuild.executor.scenario._helpers.local.execution import (
-    local_scenario_refusals as _local_scenario_refusals,
-)
 from sqlbuild.executor.scenario.classes.running_scenarios import RunningScenarios
 from sqlbuild.executor.scenario.models import LocalConversion, ScenarioRunResult
 
@@ -38,24 +35,5 @@ def execute_local_scenario_load_only_run(
         capture_adapter=capture_adapter,
         capture_dialect=capture_dialect,
         running=running,
-        conversion=conversion,
-    )
-
-
-def local_scenario_refusals(
-    *,
-    project_dir: Path,
-    scenario_plan: ScenarioExecutionPlan,
-    capture_adapter: str | None,
-    capture_dialect: str | None,
-    conversion: LocalConversion,
-) -> tuple[dict[str, object], ...]:
-    """Why a scenario cannot replay locally; empty when it can."""
-
-    return _local_scenario_refusals(
-        project_dir=project_dir,
-        scenario_plan=scenario_plan,
-        capture_adapter=capture_adapter,
-        capture_dialect=capture_dialect,
         conversion=conversion,
     )

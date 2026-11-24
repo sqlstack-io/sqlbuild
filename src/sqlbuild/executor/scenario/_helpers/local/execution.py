@@ -45,7 +45,6 @@ from sqlbuild.executor.scenario._helpers.local.snapshots import (
     local_snapshot_table_name,
 )
 from sqlbuild.executor.scenario._helpers.local.sql import (
-    LocalSqlRefusedError,
     convert_sql_for_local_duckdb,
     replace_local_relations,
 )
@@ -56,6 +55,7 @@ from sqlbuild.executor.scenario._helpers.snapshots.core import (
 )
 from sqlbuild.executor.scenario.classes.running_scenarios import RunningScenarios
 from sqlbuild.executor.scenario.constants import (
+    MODEL_RESOURCE_KIND,
     SCENARIO_EXEC_ASSERTION_ERRORED,
     SCENARIO_EXEC_ASSERTION_FAILED,
     SCENARIO_EXEC_EXPECTED_ERRORED,
@@ -67,8 +67,10 @@ from sqlbuild.executor.scenario.constants import (
     SCENARIO_LOCAL_SNAPSHOT_MISSING,
     SCENARIO_LOCAL_SNAPSHOT_STALE,
 )
+from sqlbuild.executor.scenario.exceptions import LocalSqlRefusedError
 from sqlbuild.executor.scenario.models import (
     LocalConversion,
+    LocalSql,
     ScenarioAssertionExpectationExecutionResult,
     ScenarioExpectedExpectationExecutionResult,
     ScenarioFailureDetails,
@@ -169,13 +171,11 @@ def execute_local_scenario_load_only_run(
             current_input_fingerprint=input_fingerprint,
             connection=connection,
         )
-        macros: list[str] = []
-        local_plan: ScenarioExecutionPlan = _build_local_execution_plan(
+        local_plan, macros = _build_local_execution_plan(
             scenario_plan=scenario_plan,
             load_result=load_result,
             source_dialect=load_result.manifest.capture_dialect,
             conversion=resolved_conversion,
-            macros=macros,
         )
         _ = adapter.execute(connection=connection, sql=_UTC_SESSION_SQL)
         for macro in macros:
@@ -264,7 +264,6 @@ def local_scenario_refusals(
             load_result=load_result,
             source_dialect=manifest.capture_dialect,
             conversion=conversion,
-            macros=[],
         )
     except LocalSqlRefusedError as refused:
         return tuple(dict(refusal) for refusal in refused.refusals)
@@ -312,8 +311,8 @@ def _build_local_execution_plan(
     load_result: ScenarioLocalSnapshotLoadResult,
     source_dialect: str | None,
     conversion: LocalConversion,
-    macros: list[str],
-) -> ScenarioExecutionPlan:
+) -> tuple[ScenarioExecutionPlan, tuple[str, ...]]:
+    """The scenario plan over the local snapshot tables, and the DuckDB macros its SQL calls."""
     relation_replacements: dict[str, str] = _build_relation_replacements(
         scenario_plan=scenario_plan,
         load_result=load_result,
@@ -326,15 +325,18 @@ def _build_local_execution_plan(
         load_result=load_result, scenario_plan=scenario_plan, conversion=conversion
     )
 
-    def convert(*, sql: str, resource_kind: str, resource_name: str) -> str:
+    macros: list[str] = []
+
+    def convert(*, sql: str, resource_kind: str, resource_name: str) -> LocalSql:
         return convert_sql_for_local_duckdb(
             sql=sql,
             source_dialect=source_dialect,
             schema=schema,
             time_zone=conversion.time_zone,
             resource=(scenario_plan.name, resource_kind, resource_name),
-            macros=macros,
-            file=conversion.model_files.get(resource_name) if resource_kind == "model" else None,
+            file=conversion.model_files.get(resource_name)
+            if resource_kind == MODEL_RESOURCE_KIND
+            else None,
         )
 
     function_entries: list[FunctionPlanEntry] = []
@@ -345,11 +347,13 @@ def _build_local_execution_plan(
             relation_replacements=relation_replacements,
         )
         if function_entry.language == FunctionLanguage.SQL:
-            function_sql = convert(
+            function_local: LocalSql = convert(
                 sql=function_sql,
                 resource_kind=str(function_entry.key.resource_type),
                 resource_name=function_entry.name,
             )
+            function_sql = function_local.sql
+            macros.extend(function_local.macros)
         function_entries.append(replace(function_entry, body_sql=function_sql))
 
     model_entries: list[ModelPlanEntry] = []
@@ -359,7 +363,11 @@ def _build_local_execution_plan(
             sql=entry.resolved_sql,
             relation_replacements=relation_replacements,
         )
-        local_sql = convert(sql=local_sql, resource_kind="model", resource_name=entry.name)
+        model_local: LocalSql = convert(
+            sql=local_sql, resource_kind=MODEL_RESOURCE_KIND, resource_name=entry.name
+        )
+        local_sql = model_local.sql
+        macros.extend(model_local.macros)
         model_entries.append(
             replace(
                 entry,
@@ -378,11 +386,13 @@ def _build_local_execution_plan(
             sql=expected_expectation.expected_sql,
             relation_replacements=relation_replacements,
         )
-        expected_sql = convert(
+        expected_local: LocalSql = convert(
             sql=expected_sql,
             resource_kind="expected comparison",
             resource_name=expected_expectation.model_name,
         )
+        expected_sql = expected_local.sql
+        macros.extend(expected_local.macros)
         expected_expectations.append(
             replace(
                 expected_expectation,
@@ -398,14 +408,16 @@ def _build_local_execution_plan(
             sql=assertion_expectation.sql,
             relation_replacements=relation_replacements,
         )
-        assertion_sql = convert(
+        assertion_local: LocalSql = convert(
             sql=assertion_sql,
             resource_kind="assertion",
             resource_name=assertion_expectation.name,
         )
+        assertion_sql = assertion_local.sql
+        macros.extend(assertion_local.macros)
         assertion_expectations.append(replace(assertion_expectation, sql=assertion_sql))
 
-    return replace(
+    local_plan: ScenarioExecutionPlan = replace(
         scenario_plan,
         relation_plan=relation_plan,
         fixture_plans=(),
@@ -415,6 +427,7 @@ def _build_local_execution_plan(
         expected_expectations=tuple(expected_expectations),
         assertion_expectations=tuple(assertion_expectations),
     )
+    return local_plan, tuple(dict.fromkeys(macros))
 
 
 def _execute_local_plan(

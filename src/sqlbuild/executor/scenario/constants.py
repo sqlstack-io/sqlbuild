@@ -225,11 +225,10 @@ TYPE_ARGUMENT_CLOSE_TOKENS: frozenset[str] = frozenset({")", ">"})
 TYPE_ARGUMENT_SEPARATOR: str = ","
 TYPE_PATTERN_WILDCARD: str = "*"
 JSONL_BLANK_LINE: str = ""
-LOCAL_SCENARIO_DIALECT: str = "duckdb"
 
 LOCAL_CAPTURE_ADAPTER: str = "duckdb"
-# Converted SQL reads a captured VARIANT as the JSON text Snowflake writes.
 JSON_FROM_TEXT_PLACEHOLDER: str = "CAST(? AS JSON)"
+MODEL_RESOURCE_KIND: str = "model"
 CANONICAL_JSON_FUNCTION: str = "sqb_canonical_json"
 SEMI_STRUCTURED_COMPARISON_TEMPLATE: str = (
     CANONICAL_JSON_FUNCTION + "(CAST({column} AS JSON)) AS {column}"

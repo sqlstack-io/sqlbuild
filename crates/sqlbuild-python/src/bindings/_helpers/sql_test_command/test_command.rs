@@ -56,9 +56,11 @@ use crate::bindings::_helpers::sql_test_command::timeouts::TimeoutKind;
 use crate::bindings::_helpers::sql_test_command::timeouts::resolve_run_timeout;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::main::value_error::value_error;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::build_command::main::emit::emit;
 use sqlbuild_python_base::build_progress::main::progress::current_native_progress_projector::current_native_progress_projector;
+use sqlbuild_python_base::build_progress::main::progress::current_projector::current_projector;
 use sqlbuild_python_base::build_progress::main::transient_status::status_reporter::status_reporter;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::native_host::types::ReadResult;
@@ -70,10 +72,8 @@ use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_compile::compile_driver::main::setup::build_static_pipeline_result::build_static_pipeline_result;
-use sqlbuild_python_compile::compile_outputs::main::write_test_runtime_target::write_test_runtime_target;
-use sqlbuild_python_base::boundary::main::value_error::value_error;
-use sqlbuild_python_base::build_progress::main::progress::current_projector::current_projector;
 use sqlbuild_python_compile::compile_outputs::main::planned_sql_test_path::planned_sql_test_path;
+use sqlbuild_python_compile::compile_outputs::main::write_test_runtime_target::write_test_runtime_target;
 use sqlbuild_python_front::command_runtime::main::resolve_concurrency::resolve_concurrency;
 use sqlbuild_python_front::command_runtime::main::resolve_run_on::resolve_run_on;
 use sqlbuild_python_output::build_progress::main::format_expectation_detail::format_expectation_detail;
@@ -487,6 +487,10 @@ fn inspect(
     plan_output: &Bound<'_, PyAny>,
     (reasons, decisions): (&HashMap<String, Vec<String>>, &[RunOnDecision]),
 ) -> PyResult<i32> {
+    let by_name: HashMap<&str, &RunOnDecision> = decisions
+        .iter()
+        .map(|decision| (decision.name.as_str(), decision))
+        .collect();
     let entries: Vec<TestInspectionEntry> = native_field(plan_output, "test_entries")?
         .try_iter()?
         .map(|entry| {
@@ -494,7 +498,7 @@ fn inspect(
             let name: String = entry.getattr("name")?.extract()?;
             let mut entry: TestInspectionEntry = inspection_entry(&entry)?;
             entry.selection_reasons = reasons.get(&entry.label).cloned().unwrap_or_default();
-            entry.run_on = decisions.iter().find(|decision| decision.name == name).cloned();
+            entry.run_on = by_name.get(name.as_str()).copied().cloned();
             Ok(entry)
         })
         .collect::<PyResult<_>>()?;
@@ -570,14 +574,16 @@ pub(crate) struct TestPlacement<'py> {
     warehouse_optional: bool,
 }
 
-/// Write the ready header and run the tests with nested progress; returns the results in plan order
-/// and the statements the local batch ran, which the warehouse statement summary leaves out.
+/// Run the tests with nested progress; the results in plan order and the local batch's statements.
 fn run_tests<'py>(
     invocation: &Bound<'py, PyAny>,
     pipeline: &Bound<'py, PyAny>,
     (concurrency, timeout, worker): (i64, &RunTimeout, Option<Arc<WorkerBuild>>),
     placement: TestPlacement<'py>,
-) -> PyResult<(Vec<SqlTestExecutionResult<Bound<'py, PyAny>>>, StatementSummary)> {
+) -> PyResult<(
+    Vec<SqlTestExecutionResult<Bound<'py, PyAny>>>,
+    StatementSummary,
+)> {
     let py: Python<'py> = invocation.py();
     let stream: Bound<'py, PyAny> = invocation.getattr("progress_stream")?;
     let use_color: Bound<'py, PyAny> = invocation.getattr("use_color")?;
@@ -677,7 +683,12 @@ fn run_tests<'py>(
                 .filter(|(_, unplaced_code, _)| *unplaced_code == code)
                 .map(|(entry, _, _)| entry.clone())
                 .collect();
-            results.extend(report_unplaced(&relay, pipeline, &entries, (code, message))?);
+            results.extend(report_unplaced(
+                &relay,
+                pipeline,
+                &entries,
+                (code, message),
+            )?);
         }
         let callbacks = |reporting_connection: bool| -> PyResult<Bound<'py, PyAny>> {
             let mut hooks: Vec<(&str, Bound<'py, PyAny>)> = vec![
@@ -701,7 +712,10 @@ fn run_tests<'py>(
                     ("on_connection_error", relay.getattr("on_connection_error")?),
                 ]);
             }
-            call_with(&host_entry(py, ExecutorHost::TestPipelineCallbacks)?, &hooks)
+            call_with(
+                &host_entry(py, ExecutorHost::TestPipelineCallbacks)?,
+                &hooks,
+            )
         };
         let run = |batch: &[Bound<'py, PyAny>],
                    (adapter, connection_config): (Bound<'py, PyAny>, Bound<'py, PyAny>),
@@ -898,12 +912,8 @@ fn complete(
     let style: CliStyle = CliStyle {
         use_color: invocation.getattr("use_color")?.is_truthy()?,
     };
-    let completion: String = render_test_completion(
-        (passed, results.len()),
-        &failures,
-        Some(split),
-        style,
-    );
+    let completion: String =
+        render_test_completion((passed, results.len()), &failures, Some(split), style);
     emit(&stream, &completion)?;
     let statements: Option<StatementReport> =
         StatementReport::of_invocation(invocation, started, &report.local_statements)?;
@@ -986,7 +996,9 @@ pub(crate) fn run_test<'py>(
         ));
     }
     let wants_connection: bool = !inspect_only
-        && native_field(request, "run_on")?.extract::<Option<String>>()?.as_deref()
+        && native_field(request, "run_on")?
+            .extract::<Option<String>>()?
+            .as_deref()
             != Some(LOCAL_RUN_ON);
     let invocation_class: Bound<'_, PyAny> = record_class(py, RecordId::TestInvocation)?;
     let (invocation, connection_error): (Bound<'_, PyAny>, Option<PyErr>) =
@@ -1189,7 +1201,12 @@ fn run_sql_tests<'py>(
         connection_error.is_some(),
     )?;
     let (results, local_statements): (Vec<SqlTestExecutionResult<Bound<'_, PyAny>>>, _) =
-        run_tests(invocation, &pipeline, (concurrency, &timeout, worker), placement)?;
+        run_tests(
+            invocation,
+            &pipeline,
+            (concurrency, &timeout, worker),
+            placement,
+        )?;
     write_test_runtime_target(
         (
             &native_field(invocation, "effective_project_dir")?
@@ -1236,7 +1253,10 @@ fn decide(
             ("project", native_field(pipeline, "project")?),
             ("test_entries", entries),
             ("adapter", invocation.getattr("adapter")?),
-            ("project_dir", native_field(invocation, "effective_project_dir")?),
+            (
+                "project_dir",
+                native_field(invocation, "effective_project_dir")?,
+            ),
             ("compiled_paths", paths.into_any()),
             ("run_on", text(py, mode.as_str())),
         ],
@@ -1285,11 +1305,11 @@ fn place_tests<'py>(
                     CANNOT_RUN_LOCALLY_MESSAGE,
                 ));
             }
-            RunOn::Auto if no_connection => placement.unplaced.push((
-                entry,
-                NEEDS_WAREHOUSE_CODE,
-                NEEDS_WAREHOUSE_MESSAGE,
-            )),
+            RunOn::Auto if no_connection => {
+                placement
+                    .unplaced
+                    .push((entry, NEEDS_WAREHOUSE_CODE, NEEDS_WAREHOUSE_MESSAGE))
+            }
             RunOn::Auto => placement.warehouse.push(entry),
         }
         placement.run_on.insert(name, decision.run_on.clone());

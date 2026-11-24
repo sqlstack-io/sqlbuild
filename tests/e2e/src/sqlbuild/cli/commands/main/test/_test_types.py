@@ -676,12 +676,11 @@ class RunOnPrecedenceE2ETestCase:
     """Where `test_run_on` set in each place sends a DuckDB project's tests."""
 
     description: str
-    settings: str | None
-    local_settings: str | None
-    target: str | None
-    flag: str | None
+    settings_toml: str
+    target_line: str
+    local_toml: str
+    run_on_args: tuple[str, ...]
     expected_counts: tuple[int, int]
-    local_target: str | None = None
 
 
 @dataclass(frozen=True)
@@ -701,3 +700,16 @@ class ScenarioRunOnFlagsE2ETestCase:
     description: str
     command: tuple[str, ...]
     expected_fragment: str
+
+
+@dataclass(frozen=True)
+class RunOnLocalJsonE2ETestCase:
+    """A `sqb test --run-on local --json` run and where each test ran and why."""
+
+    description: str
+    project: str
+    expected_exit_code: int
+    expected_placements: Mapping[str, tuple[object, ...]]
+    expected_counts: tuple[int, int] | None
+    expected_refusal_places: frozenset[tuple[object, ...]]
+    expected_refused_tests: tuple[str, ...]

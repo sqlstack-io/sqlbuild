@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -45,3 +48,43 @@ class RunOnDecision:
         """The first refusal's label; `None` for a test that runs locally."""
 
         return self.refusals[0].title if self.refusals else None
+
+
+@dataclass(frozen=True)
+class Segment:
+    """Where one CTE body sits in the comparison SQL, and what it stands for."""
+
+    start: int
+    end: int
+    origin: str
+
+
+@dataclass(frozen=True)
+class TestSources:
+    """What a unit test's comparison SQL was built from: its test file, models and compiled file."""
+
+    sql: str
+    segments: Sequence[Segment]
+    test_path: str | None
+    test_text: str | None
+    compiled_path: str
+    mocked_models: frozenset[str]
+    models: Mapping[str, Any]
+    chain_sql: Mapping[str, str]
+    dialect: str
+
+
+@dataclass(frozen=True)
+class DecisionContext:
+    """What deciding where each unit test runs reads: the project, its dialect and converted SQL."""
+
+    project: Any
+    dialect: str | None
+    run_on: str
+    set_difference_operator: str
+    functions: Mapping[str, Any]
+    schema: Mapping[str, Any]
+    time_zone: str | None
+    rendered: Mapping[str, tuple[str, list[tuple[int, int, str]]]]
+    project_dir: Path
+    compiled_paths: Mapping[str, str]

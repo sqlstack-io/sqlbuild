@@ -11,3 +11,5 @@ pub(crate) const RUNS_ON_LABEL: &str = "runs on";
 pub(crate) const TESTS_NOTE: &str = "= tests:";
 pub(crate) const NOTE_LABEL: &str = "= note:";
 pub(crate) const EXPANDED_LABEL: &str = "= expanded from";
+/// The caret line's index in a located block: header, `-->`, gutter, source, caret.
+pub(crate) const CARET_LINE: usize = 4;

@@ -1,4 +1,4 @@
-"""Whether a local test's SQL reads a relation only the warehouse has."""
+"""An empty in-memory DuckDB that finds the first relation a test's SQL reads and lacks."""
 
 from __future__ import annotations
 
@@ -6,7 +6,6 @@ import re
 from collections.abc import Sequence
 from typing import Any
 
-# DuckDB's binder names the first relation it cannot find.
 _MISSING_TABLE: re.Pattern[str] = re.compile(r"Table with name (\S+) does not exist")
 
 

@@ -41,5 +41,7 @@ pub fn format_statement_summary(
         StatementTiming::NotReported(adapter) => format!("compile time not reported by {adapter}"),
         StatementTiming::Failed(reason) => format!("compile time unavailable ({reason})"),
     };
-    Some(format!("Statements: {total} on the warehouse ({kinds}); {time}"))
+    Some(format!(
+        "Statements: {total} on the warehouse ({kinds}); {time}"
+    ))
 }

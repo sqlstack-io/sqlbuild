@@ -93,3 +93,20 @@ impl RunOnDecision {
         self.run_on == LOCAL
     }
 }
+
+/// Where one refusal sits, to show each refused construct and place once.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct RefusalPlace {
+    pub(crate) path: String,
+    pub(crate) construct: String,
+    pub(crate) line: i64,
+    pub(crate) column: i64,
+    pub(crate) code: String,
+}
+
+/// One refusal and every item it blocks.
+#[derive(Clone, Debug)]
+pub(crate) struct GroupedRefusal {
+    pub(crate) refusal: LocalRefusal,
+    pub(crate) names: Vec<String>,
+}
