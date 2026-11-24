@@ -351,15 +351,15 @@ def declare_all(project: Project) -> None:
     for rule, name, reason in MACRO_EXCEPTIONS:
         project.exceptions.append((rule, ("macro", name), reason))
     for name, content in SQL_MACROS.items():
-        project.declare(Declaration(name, "sql/macros/sql", content))
+        project.declare(Declaration(name, "macros/sql", content))
     for name, (file_name, content) in PY_MACROS.items():
-        project.declare(Declaration(name, "sql/macros/python", content, file_name))
+        project.declare(Declaration(name, "macros/python", content, file_name))
     for name, content in ENUMS.items():
         project.declare(Declaration(name, "enums", content))
     for name, content in CONSTANTS.items():
         project.declare(Declaration(name, "constants", content))
     for name, content in AUDITS.items():
-        project.declare(Declaration(name, "sql/audits/generic", content))
+        project.declare(Declaration(name, "audits/generic", content))
 
 
 def currencies_seed() -> str:
