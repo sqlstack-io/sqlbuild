@@ -8,13 +8,12 @@ from sqlbuild.executor.build.models import BuildIndexes
 
 
 def build_execution_indexes(plan: PlanOutput) -> BuildIndexes:
-    """Build all lookup indexes from a plan output."""
+    """Build lookup indexes from a plan; a named audit on an unbuilt target runs at the end."""
 
     source_audits: dict[str, list[AuditPlanEntry]] = {}
     seed_audits: dict[str, list[AuditPlanEntry]] = {}
     model_audits: dict[str, list[AuditPlanEntry]] = {}
     end_audits: list[AuditPlanEntry] = []
-    # An audit selected by name whose target isn't built runs at the end, on the target as it is.
     by_name: frozenset[str] = frozenset(plan.selected_audit_names)
     built_models: frozenset[str] = frozenset(entry.name for entry in plan.model_entries)
     built_seeds: frozenset[str] = frozenset(entry.name for entry in plan.seed_entries)

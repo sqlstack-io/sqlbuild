@@ -1681,4 +1681,11 @@ class RunSelectorPlanTestCase:
     selectors: tuple[str, ...]
     expected_models: list[str]
     expected_audits: list[str]
-    expected_error: str | None = None
+
+
+@dataclass(frozen=True)
+class RunSelectorRefusalTestCase:
+    description: str
+    # The plan's selectors; `{short}` is the failed run's first 7 characters.
+    selectors: tuple[str, ...]
+    expected_error: str
