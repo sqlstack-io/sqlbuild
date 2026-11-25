@@ -323,7 +323,7 @@ def test_given_wrong_slot_mappings_when_compiling_then_the_error_names_the_slot(
             command=("compile",),
             expected_returncode=1,
             expected_fragments=(
-                "SQLCLEAN016]: Expression is aliased to its existing name",
+                "SQLCLEAN016]: Expression is aliased to an exact copy of its name",
                 "--> sql/macros/sql/order_columns.sql:6:",
             ),
         ),
