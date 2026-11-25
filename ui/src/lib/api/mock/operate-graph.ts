@@ -137,6 +137,19 @@ export function sortTopologically(keys: Iterable<string>): string[] {
 }
 
 function matchTerm(term: string): Set<string> | null {
+	// An intersection (`job:core_build,fact_orders`, as the plan page narrows a job run) and the job and run
+	// selectors read as the server reads them: each part on its own, then what they share.
+	if (term.includes(',')) {
+		let hits: Set<string> | null = null;
+		for (const part of term.split(',')) {
+			const found: Set<string> | null = matchTerm(part);
+			if (!found) return null;
+			const prev: Set<string> | null = hits;
+			hits = prev ? new Set([...prev].filter((k: string) => found.has(k))) : found;
+		}
+		return hits;
+	}
+	if (/^\+?(job|run|failed|skipped):/.test(term)) return matchPart(term);
 	const up = term.startsWith('+');
 	const down = term.endsWith('+') && term.length > 1;
 	const body = term.replace(/^\+/, '').replace(/\+$/, '');
