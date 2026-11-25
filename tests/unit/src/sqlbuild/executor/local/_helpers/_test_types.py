@@ -1,0 +1,34 @@
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class ConversionWorkTestCase:
+    """Statements checked for a run, and the work each kind of step may take."""
+
+    description: str
+    statements: tuple[str, ...]
+    repeats: int
+    expected_conversions: int
+    expected_schema_keys: int
+    expected_relations: frozenset[str]
+
+
+@dataclass(frozen=True)
+class PooledConversionWorkTestCase:
+    """Enough statements to convert in worker processes, then read again for each test."""
+
+    description: str
+    statement_count: int
+    expected_conversions: int
+    expected_schema_keys: int
+
+
+@dataclass(frozen=True)
+class BindingWorkTestCase:
+    """DuckDB statements bound once each against an empty database."""
+
+    description: str
+    statements: tuple[str, ...]
+    repeats: int
+    expected_bindings: int
+    expected_missing: tuple[str | None, ...]

@@ -88,3 +88,21 @@ class DecisionContext:
     rendered: Mapping[str, tuple[str, list[tuple[int, int, str]]]]
     project_dir: Path
     compiled_paths: Mapping[str, str]
+
+
+@dataclass(frozen=True)
+class LocalSqlCheck:
+    """One statement's SQLQuack conversion, when asked for, and the relation DuckDB lacks for it."""
+
+    conversion: Any
+    missing: str | None
+    bound: bool = True
+
+
+@dataclass(frozen=True)
+class LocalWorkCounts:
+    """Work done to decide where tests run: conversions, DuckDB bindings, schema serialisations."""
+
+    conversions: int
+    bindings: int
+    schema_keys: int

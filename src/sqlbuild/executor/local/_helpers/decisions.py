@@ -10,11 +10,10 @@ from typing import Any
 
 from sqlbuild._native import SqlTestPlanEntry, render_sql_test_comparison_segments
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
-from sqlbuild.executor.local._helpers.conversion import convert_all, converted
+from sqlbuild.executor.local._helpers.conversion import check_all, local_check
 from sqlbuild.executor.local._helpers.positions import placed_refusal
 from sqlbuild.executor.local._helpers.schema import project_schema
 from sqlbuild.executor.local._helpers.session import session_time_zone
-from sqlbuild.executor.local.classes.empty_duckdb import EmptyDuckDb
 from sqlbuild.executor.local.constants import (
     CONVERTED_DIALECT,
     DIALECT_REASON_CATEGORY,
@@ -27,6 +26,7 @@ from sqlbuild.executor.local.constants import (
 from sqlbuild.executor.local.models import (
     DecisionContext,
     LocalRefusal,
+    LocalSqlCheck,
     RunOnDecision,
     Segment,
     TestSources,
@@ -56,18 +56,19 @@ def decision_context(
         project_dir=location[0],
         compiled_paths=location[1],
     )
-    if run_on == RUN_ON_WAREHOUSE or dialect != CONVERTED_DIALECT:
+    if run_on == RUN_ON_WAREHOUSE or dialect not in (CONVERTED_DIALECT, LOCAL_DIALECT):
         return context
     rendered: dict[str, tuple[str, list[tuple[int, int, str]]]] = {
         entry.name: _rendered(entry=entry, context=context)
         for entry in test_entries
         if not _blocking_functions(entry=entry, context=context)
     }
-    schema: dict[str, Any] = project_schema(project)
-    _ = convert_all(
+    schema: dict[str, Any] = project_schema(project) if dialect == CONVERTED_DIALECT else {}
+    _ = check_all(
         sqls=[sql for sql, _segments in rendered.values()],
         schema=schema,
         time_zone=context.time_zone,
+        convert=dialect == CONVERTED_DIALECT,
     )
     return replace(context, schema=schema, rendered=rendered)
 
@@ -75,13 +76,9 @@ def decision_context(
 def decide_each(
     *, context: DecisionContext, test_entries: Sequence[SqlTestPlanEntry]
 ) -> tuple[RunOnDecision, ...]:
-    """Every test's decision, binding local SQL against an empty DuckDB to find warehouse reads."""
+    """Every test's decision from its checked SQL: converted, and bound in an empty DuckDB."""
 
-    empty: EmptyDuckDb = EmptyDuckDb()
-    try:
-        return tuple(_decision(entry=entry, context=context, empty=empty) for entry in test_entries)
-    finally:
-        empty.close()
+    return tuple(_decision(entry=entry, context=context) for entry in test_entries)
 
 
 def decisions_json(decisions: Sequence[RunOnDecision]) -> str:
@@ -90,20 +87,21 @@ def decisions_json(decisions: Sequence[RunOnDecision]) -> str:
     return json.dumps({"decisions": [_decision_payload(decision) for decision in decisions]})
 
 
-def _decision(
-    *, entry: SqlTestPlanEntry, context: DecisionContext, empty: EmptyDuckDb
-) -> RunOnDecision:
+def _decision(*, entry: SqlTestPlanEntry, context: DecisionContext) -> RunOnDecision:
     blocking: list[str] = _blocking_functions(entry=entry, context=context)
     if context.run_on == RUN_ON_WAREHOUSE:
         return RunOnDecision(name=entry.name, run_on=RUN_ON_WAREHOUSE)
     if blocking:
         return _function_decision(name=entry.name, blocking=blocking)
     if context.dialect == LOCAL_DIALECT:
-        sql: str = _rendered(entry=entry, context=context)[0]
-        return _bound_decision(name=entry.name, missing=empty.missing_relation(sql=sql, macros=()))
+        sql: str = context.rendered[entry.name][0]
+        missing: str | None = local_check(
+            sql=sql, schema=None, time_zone=context.time_zone, path="", convert=False
+        ).missing
+        return _bound_decision(name=entry.name, missing=missing)
     if context.dialect != CONVERTED_DIALECT:
         return _dialect_decision(name=entry.name, dialect=context.dialect)
-    return _converted_decision(entry=entry, context=context, empty=empty)
+    return _converted_decision(entry=entry, context=context)
 
 
 def _blocking_functions(*, entry: SqlTestPlanEntry, context: DecisionContext) -> list[str]:
@@ -160,19 +158,17 @@ def _dialect_decision(*, name: str, dialect: str | None) -> RunOnDecision:
     )
 
 
-def _converted_decision(
-    *, entry: SqlTestPlanEntry, context: DecisionContext, empty: EmptyDuckDb
-) -> RunOnDecision:
+def _converted_decision(*, entry: SqlTestPlanEntry, context: DecisionContext) -> RunOnDecision:
     sql: str = context.rendered[entry.name][0]
-    compiled_path: str = context.compiled_paths.get(entry.name, "")
-    conversion: Any = converted(
-        sql=sql, schema=context.schema, time_zone=context.time_zone, path=compiled_path
+    check: LocalSqlCheck = local_check(
+        sql=sql,
+        schema=context.schema,
+        time_zone=context.time_zone,
+        path=context.compiled_paths.get(entry.name, ""),
     )
+    conversion: Any = check.conversion
     if conversion.converted:
-        return _bound_decision(
-            name=entry.name,
-            missing=empty.missing_relation(sql=conversion.sql, macros=conversion.macros),
-        )
+        return _bound_decision(name=entry.name, missing=check.missing)
     sources: TestSources = _test_sources(entry=entry, context=context)
     return RunOnDecision(
         name=entry.name,

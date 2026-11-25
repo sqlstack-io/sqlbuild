@@ -464,8 +464,12 @@ How SQLBuild decides, at compile time, before anything runs:
 - **Project functions.** A local run makes temporary copies of the functions a test calls. A
   function whose body reads a table or view, or any function in a project that isn't DuckDB, needs
   the warehouse (reason `project function: <name>`).
-- **Unmocked relations.** A test whose SQL still reads a relation the local database doesn't have
-  needs the warehouse (reason `warehouse relation: <name>`).
+- **Unmocked relations.** In a DuckDB project, a test whose SQL still reads a relation the local
+  database doesn't have needs the warehouse (reason `warehouse relation: <name>`). In a Snowflake
+  project, SQLQuack refuses names the project doesn't declare; a test that reads a declared but
+  unmocked relation fails when it runs locally.
+- **Work per run.** Each distinct test statement is converted once per run, in worker processes,
+  and the test run reuses those conversions.
 - **Other adapters.** SQLQuack converts Snowflake SQL only, so tests run on the warehouse (reason
   `dialect: <adapter>`).
 - **Time zone.** Local runs use a UTC session. When the target's connection sets another
