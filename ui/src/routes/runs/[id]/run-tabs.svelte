@@ -9,7 +9,7 @@
 	import StatementsTab from './statements-tab.svelte';
 	import CostTab from './cost-tab.svelte';
 	import type { BottomTab } from './types';
-	import { bottomTabs, logEntries } from './utils';
+	import { bottomTabs, logEntries, markExpectedLookups } from './utils';
 	import { tick } from 'svelte';
 	import { plural } from '$lib/format/plural';
 	import { skipCause } from './utils';
@@ -35,7 +35,7 @@
 	const filtering = $derived(sel.size > 0);
 	// One line per node outcome, with its checks folded in; `app.now` keeps a building node's line current.
 	const edges = $derived(view.detail?.edges ?? []);
-	const entries = $derived(logEntries(view.events, view.outputRes.data ?? [], { nodes: view.nodes, skipCause: (n) => skipCause(n, view.nodes, edges), now: app.now }));
+	const entries = $derived(markExpectedLookups(logEntries(view.events, view.outputRes.data ?? [], { nodes: view.nodes, skipCause: (n) => skipCause(n, view.nodes, edges), now: app.now }), view.statements));
 	const statements = $derived(filtering ? view.statements.filter((s) => sel.has(s.nodeKey)) : view.statements);
 	// Printed lines carry their node when sqb printed them for one; others are kept when they mention it.
 	const shownEntries = $derived(filtering ? entries.filter((e) => (e.nodeKey ? sel.has(e.nodeKey) : filterKeys.some((k) => e.text.includes(k)))) : entries);
@@ -46,7 +46,7 @@
 	$effect(() => {
 		mem.printed = printed;
 	});
-	const logCount = $derived(shownEntries.filter((e) => (printed ? e.category === 'output' : e.category !== 'output')).length);
+	const logCount = $derived(shownEntries.filter((e) => !e.expected && (printed ? e.category === 'output' : e.category !== 'output')).length);
 
 	const TABS = $derived(bottomTabs(app.client, (c) => app.can(c), !!view.cost && view.cost.status !== 'none'));
 	$effect(() => {
@@ -134,7 +134,7 @@
 			<p class="err">Couldn't load this run's cost: {view.costRes.error}</p>
 		{/if}
 	{:else}
-		<LogTab entries={shownEntries} {grouped} memory={mem} statements={view.statements} onquery={(id, key) => view.showStatement(id, key)} onframe={(key, line) => view.openCode(key, line)} memberOf={(id) => view.detail?.children.find((c) => c.id === id)?.jobKey ?? null} bind:printed runId={view.run?.id ?? ''} filteredBy={filterKeys} onnode={(key) => view.focusNode(key, 'log')} onstatement={app.client.supports('listRunStatements') ? (key) => view.focusNode(key, 'statements') : undefined} />
+		<LogTab request={view.logRequest} entries={shownEntries} {grouped} memory={mem} statements={view.statements} onquery={(id, key) => view.showStatement(id, key)} onframe={(key, line) => view.openCode(key, line)} memberOf={(id) => view.detail?.children.find((c) => c.id === id)?.jobKey ?? null} bind:printed runId={view.run?.id ?? ''} filteredBy={filterKeys} onnode={(key) => view.focusNode(key, 'log')} onstatement={app.client.supports('listRunStatements') ? (key) => view.focusNode(key, 'statements') : undefined} />
 	{/if}
 </PageBody>
 {#if view.tab === 'log' && !atBottom && fresh > 0}

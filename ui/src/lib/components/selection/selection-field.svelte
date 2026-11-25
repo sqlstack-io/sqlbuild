@@ -1,6 +1,8 @@
 <script lang="ts">
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import MinusIcon from '@lucide/svelte/icons/minus';
+	import XIcon from '@lucide/svelte/icons/x';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import type { SelectionVocabulary } from '$lib/api';
 	import type { ChoiceOption } from '$lib/list/choice';
 	import { backspace, choose, comma, commit, draftToken, fieldOf, finished, type FieldState } from '$lib/selection/field';
@@ -55,6 +57,12 @@
 		field = next;
 		value = finished(next);
 	}
+	/** Whether the field holds anything to clear: finished tokens or text being typed. */
+	const holds = $derived(field.tokens.length > 0 || field.parts.length > 0 || field.text.length > 0);
+	function clear() {
+		update(fieldOf(''));
+		input?.focus();
+	}
 	/** A change made by a chip: the finished tokens, keeping what is being typed. */
 	const setTokens = (tokens: string[]) => update({ ...field, tokens });
 
@@ -90,10 +98,15 @@
 			e.preventDefault();
 			active = (active + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
 		} else if (e.key === 'Escape') {
-			if (focused && items.length) {
+			// Esc closes the suggestions first; with none open, it clears the field.
+			if (focused && items.length && text) {
 				e.preventDefault();
 				e.stopPropagation();
 				input?.blur();
+			} else if (holds) {
+				e.preventDefault();
+				e.stopPropagation();
+				clear();
 			}
 		} else if (e.key === 'Tab') {
 			if (!text && problem?.fix && !e.shiftKey) {
@@ -188,6 +201,7 @@
 			class="syntax"
 		/>
 	</span>
+	{#if holds}<Button variant="ghost" size="icon-xs" class="clear-field" onmousedown={(e: MouseEvent) => e.preventDefault()} onclick={clear} aria-label="Clear {label.toLowerCase()}" title="Clear (Esc)"><XIcon /></Button>{/if}
 	{#if focused && groups.length}
 		<div class="sel-suggest" role="listbox" aria-label="{label} suggestions" tabindex="-1" onmousedown={(e) => e.preventDefault()}>
 			{#each groups as g (g.name)}
@@ -222,6 +236,11 @@
 </div>
 
 <style>
+	.sel-field :global(.clear-field) {
+		flex: none;
+		align-self: center;
+		margin-left: auto;
+	}
 	.sel-field {
 		position: relative;
 		display: flex;

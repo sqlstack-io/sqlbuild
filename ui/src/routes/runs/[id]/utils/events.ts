@@ -6,6 +6,8 @@ import { fullStamp } from './stamps';
 import { CHECK_FAILED_CODE } from './failures';
 import { checksOf, checksText, worstCheck, type CheckResult } from './checks';
 import type { EventCategory } from '../types';
+import type { RunStatement } from '$lib/api';
+import { sqlState } from './run-failures';
 
 export const EVENT_CATEGORIES: { value: EventCategory; label: string }[] = [
 	{ value: 'run', label: 'Run' },
@@ -138,6 +140,8 @@ export type LogEntry = {
 	checks?: CheckResult[];
 	/** A capped live view's marker: this many earlier lines of the node's output are in the viewer. */
 	omitted?: number;
+	/** A failed lookup the run expects, such as a schema it hasn't created yet: hidden until asked for. */
+	expected?: boolean;
 	/** Structured details the row opens to in place, as key and value; `long` is text behind "show more". */
 	details?: [string, string][];
 	long?: string;
@@ -419,4 +423,22 @@ function withOutcomes(events: readonly RunEvent[], output: readonly (RunOutputLi
 		})
 	);
 	return [...runLines, ...nodeLines, ...failedQueries, ...fromOutput].sort((a, b) => a.at.localeCompare(b.at));
+}
+
+/**
+ * The log with its expected lookups marked and muted: a schema the inspection found not created yet
+ * (02000) is an info line, not a failed query. A failed query that is a failed check's own query goes:
+ * the check's line says it, one failure, one line.
+ */
+export function markExpectedLookups(entries: readonly LogEntry[], statements: readonly RunStatement[]): LogEntry[] {
+	const byId = new Map(statements.map((s) => [s.id, s]));
+	const checked = new Set(entries.filter((e) => e.category === 'checks' && e.statementId).map((e) => e.statementId));
+	return entries.flatMap((e): LogEntry[] => {
+		if (e.category !== 'queries' || !e.statementId) return [e];
+		if (checked.has(e.statementId)) return [];
+		const st = byId.get(e.statementId);
+		if (st?.kind !== 'inspect' || sqlState(st.error) !== '02000') return [e];
+		const schema = st.error?.match(/Schema '([^']+)'/)?.[1] ?? 'schema';
+		return [{ ...e, level: 'info', tone: 'var(--sb-text-faint)', text: `Schema not created yet · ${schema}`, tag: { text: 'lookup', tone: 'var(--sb-text-faint)' }, expected: true }];
+	});
 }

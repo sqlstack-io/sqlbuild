@@ -2,6 +2,7 @@
 // its claims, jobs, triggers and sensors. A small loop advances live runs so
 // cancels, launches and claims behave like they do on the server.
 
+import { seedAuditSql } from './seed-audit-run';
 import { bigAvailable, bigDownloadUrl, bigIndex, bigPage, bigSearch } from './big-output';
 import { parseCommand } from '$lib/run/command';
 import { isUnfinishedNode } from '$lib/status';
@@ -541,7 +542,7 @@ export class MockOperate {
 		const statement = execution(rec, this.#nodesOf(rec, now), now).statements.find((st) => st.id === statementId);
 		if (!statement) throw new ApiError(`Unknown statement ${statementId}`, 404);
 		const target = this.#ctx.target(scope);
-		const sql = statement.kind === 'audit' ? auditSql(statement.nodeKey, statementId, target) : sqlFor(statement.nodeKey, statement.kind, target);
+		const sql = seedAuditSql(statement) ?? (statement.kind === 'audit' ? auditSql(statement.nodeKey, statementId, target) : sqlFor(statement.nodeKey, statement.kind, target));
 		return this.#ctx.reply({ statementId, sql: statement.sqlRecorded ? sql : null });
 	}
 

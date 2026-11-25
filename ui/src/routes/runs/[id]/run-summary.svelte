@@ -10,7 +10,7 @@
 
 	const s = $derived(view.summary);
 	const rows = (n: number) => n.toLocaleString('en-GB');
-	type Fig = { key: NodeGroupKey; text: string; tone?: 'err' | 'warn' | 'run'; note?: string };
+	type Fig = { key: NodeGroupKey | 'checks_failed'; text: string; tone?: 'err' | 'warn' | 'run'; note?: string };
 	const figs = $derived.by((): Fig[] => {
 		const out: (Fig | null)[] = [
 			s.failed ? { key: 'failed', text: `${s.failed} failed`, tone: 'err' } : null,
@@ -20,7 +20,9 @@
 			s.waiting ? { key: 'waiting', text: `${s.waiting} waiting` } : null,
 			// The note sits only after its figure: no parenthesis without the count it explains.
 			s.built ? { key: 'succeeded', text: `${s.built} built`, note: s.incremental ? `(${s.incremental} incremental, +${rows(s.incrementalRows)} rows)` : undefined } : null,
-			s.warned ? { key: 'warned', text: plural(s.warned, 'warning'), tone: 'warn' } : null
+			s.warned ? { key: 'warned', text: plural(s.warned, 'warning'), tone: 'warn' } : null,
+			// Failed checks count with the nodes: a run can fail on a check after every node built.
+			s.checksFailed ? { key: 'checks_failed', text: `${plural(s.checksFailed, 'check')} failed`, tone: 'err' } : null
 		];
 		return out.filter((f): f is Fig => !!f);
 	});
@@ -38,7 +40,8 @@
 				href="?show={f.key}"
 				onclick={(ev) => {
 					ev.preventDefault();
-					view.focusGroup(f.key, f.text.replace(/^\d+ /, ''));
+					if (f.key === 'checks_failed') view.showInLog('kind:check level:error');
+					else view.focusGroup(f.key, f.text.replace(/^\d+ /, ''));
 				}}
 				title="Show only these on the timeline and in the log">{f.text}</a
 			>{#if f.note}<span class="faint">{` ${f.note}`}</span>{/if}</span
@@ -50,7 +53,7 @@
 
 <style>
 	.summary {
-		display: flex;
+		display: inline-flex;
 		flex-wrap: wrap;
 		align-items: baseline;
 		gap: 0;

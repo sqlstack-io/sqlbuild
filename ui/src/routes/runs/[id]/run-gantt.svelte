@@ -156,7 +156,7 @@
 		<input type="range" min={ZOOM_MIN} max={ZOOM_MAX} step="0.1" bind:value={zoom} title="Zoom" />
 		<Button variant="ghost" size="icon-sm" onclick={() => zoomBy(1.5)} disabled={zoom >= ZOOM_MAX} title="Zoom in" aria-label="Zoom in"><PlusIcon /></Button>
 	</div>
-	<Button size="sm" onclick={() => ((zoom = 1), ganttEl && (ganttEl.scrollLeft = 0))} disabled={zoom === 1}>Fit</Button>
+	<Button size="sm" onclick={() => ((zoom = 1), ganttEl && (ganttEl.scrollLeft = 0))} disabled={zoom === 1} title="Back to the whole run, from its start">Reset view</Button>
 </div>
 
 <div class="pane">

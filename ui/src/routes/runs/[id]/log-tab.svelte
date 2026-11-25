@@ -19,6 +19,7 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import LogFilter, { type FilterOption } from './log-filter.svelte';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
+	import XIcon from '@lucide/svelte/icons/x';
 	import { cn } from '$lib/utils';
 	import { buttonVariants } from '$lib/components/ui/button/button.svelte';
 
@@ -34,8 +35,11 @@
 		onquery,
 		onframe,
 		onnode,
-		onstatement
+		onstatement,
+		request = null
 	}: {
+		/** A filter set from outside the log, such as the failure summary's Show in log. */
+		request?: { query: string; seq: number } | null;
 		entries: LogEntry[];
 		grouped: boolean;
 		runId: string;
@@ -83,7 +87,11 @@
 	// Events | Output: the run's events, or what sqb and the nodes printed (`printed`).
 	const hasOutput = $derived(entries.some((e) => e.category === 'output'));
 	const inMode = (e: LogEntry) => (printed ? e.category === 'output' : e.category !== 'output');
-	const modeEntries = $derived(entries.filter(inMode));
+	// Expected lookups (a schema not created yet) stay out of the log until asked for.
+	// svelte-ignore state_referenced_locally
+	let showExpected = $state(mem('logExpected', false));
+	const expectedCount = $derived(entries.filter((e) => e.expected && inMode(e)).length);
+	const modeEntries = $derived(entries.filter((e) => inMode(e) && (showExpected || !e.expected)));
 	// svelte-ignore state_referenced_locally
 	let stream = $state<'all' | 'stdout' | 'stderr'>(mem('logStream', 'all'));
 	const kindOf = (e: LogEntry) => e.tag?.text.replace(/ /g, '-') ?? null;
@@ -102,7 +110,8 @@
 		if (!t.value) return true;
 		if (t.key === 'node') return !!e.nodeKey && nodeLabel(e.nodeKey).toLowerCase() === t.value;
 		if (t.key === 'kind') return kindOf(e) === t.value;
-		if (t.key === 'level') return e.level === (t.value === 'warning' ? 'warn' : t.value);
+		// Errors are failures: a failed node, check or query, not the run's own summary line.
+		if (t.key === 'level') return e.level === (t.value === 'warning' ? 'warn' : t.value) && (t.value !== 'error' || e.category !== 'run');
 		if (t.key === 'job') return memberOf(e.runId)?.toLowerCase() === t.value;
 		if (t.key === 'stream') return e.stream === t.value;
 		return [e.nodeKey ?? '', e.text, e.title, ...e.queries.map((x) => x.text)].join(' ').toLowerCase().includes(t.value);
@@ -127,7 +136,7 @@
 		{ prefix: 'stream', hint: 'stdout or stderr', values: printed ? uniq(entries.map((e) => e.stream)) : [] }
 	]);
 	// Counts for each menu choice: what the rest of the filter leaves, by level or by kind.
-	const levelCounts = $derived(countBy(modeEntries.filter((e) => matchesExcept(e, 'level')), (e) => e.level));
+	const levelCounts = $derived(countBy(modeEntries.filter((e) => matchesExcept(e, 'level') && !(e.level === 'error' && e.category === 'run')), (e) => e.level));
 	const kindCounts = $derived(countBy(modeEntries.filter((e) => matchesExcept(e, 'kind')), (e) => kindOf(e) ?? ''));
 	// A count shows only when it matters: errors and warnings in what the switch shows, none when zero.
 	const errors = $derived(levelCounts.get('error') ?? 0);
@@ -140,8 +149,14 @@
 	let detailOpen = $state<Set<string>>(new Set(mem<string[]>('logDetails', [])));
 	// svelte-ignore state_referenced_locally
 	let longOpen = $state<Set<string>>(new Set(mem<string[]>('logLong', [])));
+	let applied = 0;
 	$effect(() => {
-		if (memory) Object.assign(memory, { logQuery: query, logStream: stream, logFolded: [...open], logQueries: [...expanded], logDetails: [...detailOpen], logLong: [...longOpen] });
+		if (!request || request.seq === applied) return;
+		applied = request.seq;
+		query = `${request.query} `;
+	});
+	$effect(() => {
+		if (memory) Object.assign(memory, { logExpected: showExpected, logQuery: query, logStream: stream, logFolded: [...open], logQueries: [...expanded], logDetails: [...detailOpen], logLong: [...longOpen] });
 	});
 
 	/** A node line's queries (its build statements, not its checks'), or a query row's own statement. */
@@ -221,11 +236,19 @@
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>
 	{/if}
-	{#if errors}<Button variant="link" size="inline" class="count err" onclick={() => setTerm('level', level === 'error' ? null : 'error')} title="Show only errors">Errors {errors}</Button>{/if}
+	{#if errors || level === 'error'}<Button variant={level === 'error' ? 'outline' : 'ghost'} size="sm" class={level === 'error' ? 'count err on' : 'count err'} aria-pressed={level === 'error'} onclick={() => setTerm('level', level === 'error' ? null : 'error')} title={level === 'error' ? 'Show every event' : 'Show only failures'}>Errors {errors}</Button>{/if}
 	{#if warnings}<Button variant="link" size="inline" class="count warn" onclick={() => setTerm('level', level === 'warn' ? null : 'warn')} title="Show only warnings">Warnings {warnings}</Button>{/if}
+	{#if expectedCount && !printed}<Button variant="link" size="inline" class="expected" aria-pressed={showExpected} onclick={() => (showExpected = !showExpected)} title="Failed lookups the run expects, such as a schema not created yet">{showExpected ? 'Hide' : 'Show'} {plural(expectedCount, 'expected lookup')}</Button>{/if}
 	<span class="grow"></span>
 	<Button variant="ghost" size="sm" onclick={download} disabled={!shown.length} title="Download the rows shown as a text file"><DownloadIcon />Download</Button>
 </div>
+
+{#if level === 'error'}
+	<div class="only" data-testid="errors-only">
+		Showing errors only · {shown.length} of {plural(modeEntries.length, 'event')}
+		<Button variant="ghost" size="icon-xs" onclick={() => setTerm('level', null)} aria-label="Show every event" title="Show every event"><XIcon /></Button>
+	</div>
+{/if}
 
 <DataTable class="static compact log" embedded columns={logColumns} rows={shown} key={(e) => e.id} empty={entries.length ? 'Nothing in the log matches these filters.' : 'Nothing logged yet.'}>
 	{#snippet row(e)}
@@ -361,6 +384,27 @@
 	}
 	.filters :global(.count.err) {
 		color: var(--sb-error);
+	}
+	/* Pressed: the filter is on. Tinted and bordered in the error colour, so it reads as held down. */
+	.filters :global(.count.err.on) {
+		border-color: color-mix(in srgb, var(--sb-error) 55%, var(--border));
+		background: color-mix(in srgb, var(--sb-error) 20%, transparent);
+		box-shadow: inset 0 1px 3px color-mix(in srgb, black 35%, transparent);
+		font-weight: 600;
+	}
+	.filters :global(.expected.expected) {
+		color: var(--sb-text-faint);
+		font-size: 12px;
+	}
+	.only {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 3px 24px;
+		border-block: 1px solid color-mix(in srgb, var(--sb-error) 25%, var(--border-subtle));
+		background: color-mix(in srgb, var(--sb-error) 5%, var(--background));
+		color: var(--muted-foreground);
+		font-size: 12px;
 	}
 	.filters :global(.count.warn) {
 		color: var(--sb-warning);

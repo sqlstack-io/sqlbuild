@@ -9,7 +9,7 @@ import { createSelection } from '$lib/state/selection.svelte';
 import { nodeLabel } from '$lib/operate/labels';
 import { planHref } from '$lib/run/command';
 import { pageMemory } from './utils/page-memory';
-import { quickPickText, summaryOf, withNameToggled, type QuickPick } from './utils';
+import { quickPickText, runFailures, summaryOf, withNameToggled, type QuickPick } from './utils';
 import { isActiveRun } from '$lib/status';
 import type { BottomTab, NodeGroupKey } from './types';
 import { bannersFor, groupNodes, progressOf, runCostOf } from './utils';
@@ -83,7 +83,14 @@ export function createRunDetailState(runId: string) {
 		return group ? group.nodes : nodes;
 	});
 	const cause = $derived(outputRes.data?.find((l) => l.error)?.text ?? null);
-	const banners = $derived(detail ? bannersFor(detail, app.now, cause) : []);
+	// The failure summary leads when it knows what failed; the worker's own end line is never a reason.
+	const housekeeping = (text: string | null) => !!text && /worker executor completed|closed its connections/.test(text);
+	const failureCount = $derived(runFailures(nodes, events, statementsRes.data ?? [], run?.target ?? '').length);
+	const banners = $derived(
+		detail
+			? bannersFor(housekeeping(detail.run.statusReason) ? { ...detail, run: { ...detail.run, statusReason: null } } : detail, app.now, housekeeping(cause) ? null : cause).filter((b) => b.key !== 'failed' || !failureCount)
+			: []
+	);
 	const statements = $derived(statementsRes.data ?? []);
 	const cost = $derived(costRes.data ? runCostOf(costRes.data) : null);
 	// Progress reported by a run with no signal is stale, so the live card only shows while it's running.
@@ -130,6 +137,15 @@ export function createRunDetailState(runId: string) {
 	// A jump's filter belongs to the tab it opened (`tab`); leaving that tab drops it, so the tab left
 	// behind shows what it did before. A summary figure's filter has no tab: it applies everywhere.
 	let focus = $state<{ label: string; keys: string[]; tab?: BottomTab } | null>(remembered('focus', null));
+
+	/** A filter for the log, set from outside it (the failure summary's Show in log); `seq` makes a repeat apply again. */
+	let logRequest = $state<{ query: string; seq: number } | null>(null);
+	function showInLog(query: string) {
+		focus = null;
+		statusFilter = null;
+		tab = 'log';
+		logRequest = { query, seq: (logRequest?.seq ?? 0) + 1 };
+	}
 
 	function focusNode(key: string, nextTab: BottomTab) {
 		focus = { label: nodeLabel(key), keys: [key], tab: nextTab };
@@ -275,6 +291,10 @@ export function createRunDetailState(runId: string) {
 			statusFilter = null;
 		},
 		focusGroup,
+		showInLog,
+		get logRequest() {
+			return logRequest;
+		},
 		get errorsReadable() {
 			return errorsReadable;
 		},

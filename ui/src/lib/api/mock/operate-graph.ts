@@ -2,6 +2,7 @@
 // resolves selectors against the real snapshot; this stands in for it.
 
 import type { NodeKind, SnapshotNode } from '../types';
+import { REFERENCE_SEEDS } from './seed-audit-run';
 import { DISCOVERED_NODES } from './discovered';
 import type { SelectionProblem, SelectionVocabulary, VocabularyEntry } from '../types/operate';
 import { MODELS_ROOT, PATH_SELECTOR_ROOTS, PYTHON_NODES_ROOT, SQL_ROOT } from '$lib/project-layout';
@@ -76,7 +77,11 @@ export const SNAPSHOT_NODES: SnapshotNode[] = [
 	// A notebook runner that prints about 2 million lines (CHI-1597).
 	node('notebook_runner', 'asset', 'ml', ['fact_orders'], { path: 'python/nodes/ml/notebook_runner.py' }),
 	// Discovered steps of two forecast plans (discovered.ts).
-	...DISCOVERED_NODES
+	...DISCOVERED_NODES,
+	// The run-page failure mock-up (seed-audit-run.ts): 92 reference seeds, and two models no run builds.
+	...REFERENCE_SEEDS.map((key) => node(key, 'seed', 'reference', [], { path: `${SQL_ROOT}/seeds/reference/${key}.csv` })),
+	node('fct_order_payments', 'table', 'reconciliation', ['fact_orders', 'stg_payments']),
+	node('fct_payment_totals', 'table', 'reconciliation', ['stg_payments'])
 ];
 
 const BY_KEY = new Map(SNAPSHOT_NODES.map((n) => [n.key, n]));

@@ -60,15 +60,14 @@ describe('why a node was skipped', () => {
 });
 
 describe('quick picks', () => {
-	const nodes = [node('model:orders', 'failed'), node('model:report', 'skipped'), node('model:customers', 'success')];
+	const nodes = [node('model:orders', 'failed'), node('model:refunds', 'not_run'), node('model:report', 'skipped'), node('model:customers', 'success')];
 
-	it('fill the selection with the failed, their downstream, the skipped, or the whole job', () => {
-		expect([quickPickText('failed', nodes, 'shop_daily'), quickPickText('downstream', nodes, 'shop_daily'), quickPickText('skipped', nodes, 'shop_daily'), quickPickText('all', nodes, 'shop_daily'), quickPickText('all', nodes, null)]).toEqual([
-			'orders',
-			'orders+',
+	it("fill the selection with what didn't succeed, the skipped, or the whole job", () => {
+		expect([quickPickText('unfinished', nodes, 'shop_daily'), quickPickText('skipped', nodes, 'shop_daily'), quickPickText('all', nodes, 'shop_daily'), quickPickText('all', nodes, null)]).toEqual([
+			'orders refunds',
 			'report',
 			'job:shop_daily',
-			'orders report customers'
+			'orders refunds report customers'
 		]);
 	});
 

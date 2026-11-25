@@ -27,6 +27,7 @@
 		setViewport = $bindable(),
 		readable = true,
 		fitFloor = READABLE_ZOOM,
+		minFitZoom,
 		controls = 'fit',
 		showLock = false,
 		framed = false,
@@ -48,6 +49,8 @@
 		readable?: boolean;
 		/** The lowest zoom an automatic fit goes to: the readable zoom, unless a page draws a very large graph whole. */
 		fitFloor?: number;
+		/** The lowest zoom the readable fit (first view and Reset view) opens at, whatever the graph's size. */
+		minFitZoom?: number;
 		/** `fit`: zoom buttons with a readable fit; `full`: the library's own controls, for a very large graph drawn whole. */
 		controls?: 'fit' | 'full' | 'none';
 		showLock?: boolean;
@@ -144,7 +147,7 @@
 
 <div class="graph-canvas sb-flow" class:framed class:compact class:moving class:unfitted={!fitted && nodes.length > 0} data-compact={level || undefined} data-stage={stage} style:--sb-inv={1 / settledZoom} style:--sb-title-unzoom={titleUnzoom} style:--sb-unzoom={controlScale} bind:this={element} onpointerdowncapture={onpointerdown} onpointermovecapture={onpointermove} onclickcapture={onclick}>
 	<SvelteFlow bind:nodes bind:edges edgeTypes={allEdgeTypes} fitView={fitOnInit || undefined} elevateEdgesOnSelect={false} minZoom={0.1} proOptions={{ hideAttribution: true }} {...flow}>
-		<FlowController bind:fitView={fit} bind:fitted bind:viewport bind:setViewport {fitFloor} {readable} />
+		<FlowController bind:fitView={fit} bind:fitted bind:viewport bind:setViewport {fitFloor} {readable} {minFitZoom} />
 		<!-- The dot grid lives in the viewport, so it moves and scales with the graph's layer. -->
 		<ViewportPortal target="back">
 			<div class="grid" style:transform="translate({gridArea.x}px, {gridArea.y}px)" style:width="{gridArea.width}px" style:height="{gridArea.height}px"></div>
@@ -176,8 +179,11 @@
 	.graph-canvas :global(.svelte-flow__controls-button svg) {
 		fill: var(--muted-foreground);
 	}
-	/* Compact cards: the card's lines keep their room, hidden, under its compact face. */
-	.compact :global(:is(.svelte-flow__node-asset, .svelte-flow__node-folder, .svelte-flow__node-member) > * > :not(.cface)) {
+	/* Compact cards: the card's lines keep their room, hidden, under its compact face. At the name-only
+	   stage a node card shows its own enlarged name instead, so only folders and member jobs go compact;
+	   hiding a node card's lines there left it blank (the run graph opened on blank cards). */
+	.compact:not([data-stage='name']) :global(:is(.svelte-flow__node-asset, .svelte-flow__node-folder, .svelte-flow__node-member) > * > :not(.cface)),
+	.compact[data-stage='name'] :global(:is(.svelte-flow__node-folder, .svelte-flow__node-member) > * > :not(.cface)) {
 		visibility: hidden;
 	}
 	/* Edges, plain, highlighted or selected, are drawn beneath every card, so they never take a card's

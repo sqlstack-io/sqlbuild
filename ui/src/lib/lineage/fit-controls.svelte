@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { ControlButton, Controls } from '@xyflow/svelte';
-	import MaximizeIcon from '@lucide/svelte/icons/maximize';
+	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 
 	// Svelte Flow's zoom controls, with a fit button that fits as the page's own fits do: no further out
 	// than a readable zoom, so a large graph opens on its cards rather than as dots.
@@ -8,7 +8,8 @@
 </script>
 
 <Controls {showLock} showFitView={false}>
-	<ControlButton onclick={onfit} title="Fit view" aria-label="Fit view" class="fit-control"><MaximizeIcon /></ControlButton>
+	<!-- The view the graph opened at: the readable fit every page's first fit uses. -->
+	<ControlButton onclick={onfit} title="Reset view" aria-label="Reset view" class="fit-control"><RotateCcwIcon /></ControlButton>
 </Controls>
 
 <style>

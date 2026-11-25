@@ -5,7 +5,7 @@
 	import Loading from '$lib/components/loading.svelte';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import { app } from '$lib/state/app.svelte';
-	import FailuresPanel from './failures-panel.svelte';
+	import FailureSummary from './failure-summary.svelte';
 	import CantRunProblem from '$lib/run/cant-run-problem.svelte';
 	import { runDetailCantRun } from '$lib/run/cant-run';
 	import IgnoredAuditsPanel from './ignored-audits-panel.svelte';
@@ -104,13 +104,13 @@
 	<RunHeader {view} {runId} />
 
 	{#if detail}
+		<FailureSummary {view} />
 		<RunBanners banners={view.banners} />
 		{#if cantRun.length}
 			<div class="cant-run" data-testid="run-cant-run">
 				{#each cantRun as entry (`${entry.provider}:${entry.variables}`)}<CantRunProblem {entry} title="Couldn't run:" then="the next run works" />{/each}
 			</div>
 		{/if}
-		<FailuresPanel {view} />
 		<IgnoredAuditsPanel {view} />
 		<RelatedRuns {view} />
 
