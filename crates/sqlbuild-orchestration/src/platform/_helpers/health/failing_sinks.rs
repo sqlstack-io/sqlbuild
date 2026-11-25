@@ -5,8 +5,13 @@ use std::collections::BTreeMap;
 use chrono::TimeDelta;
 use uuid::Uuid;
 
-use crate::platform::constants::{SINK_PROVIDERS, SINK_REPORT_LIMIT, SINK_REPORT_WINDOW_DAYS};
-use crate::platform::models::{FailingSink, SinkReport, SinkReportRow, SinkStreak};
+use crate::platform::constants::{
+    LOCATION_SINK_KIND, SINK_PROVIDERS, SINK_REPORT_LIMIT, SINK_REPORT_WINDOW_DAYS,
+};
+use crate::platform::models::{
+    ActiveLocation, FailingSink, LocationHealth, LocationSinkRow, SinkReport, SinkReportRow,
+    SinkStreak,
+};
 use crate::runs::constants::SINK_DELIVERIES_EVENT;
 use crate::runs::models::{RunChange, SinkDelivery};
 use crate::store::errors::ControlError;
@@ -34,10 +39,67 @@ pub(crate) async fn sink_reports(
     )
     .await?;
     let rows: Vec<SinkReportRow> = rows.into_iter().map(decode_row).collect::<Result<_, _>>()?;
+    let (transaction, located) = location_sink_reports(transaction, since).await?;
+    let mut reports: Vec<SinkReport> = rows.into_iter().filter_map(sink_report).collect();
+    reports.extend(located);
+    reports.sort_by_key(|report| std::cmp::Reverse(report.at));
+    Ok((transaction, reports))
+}
+
+/// The sink delivery reports of the active locations' own interpreters since `since`, newest first.
+async fn location_sink_reports(
+    transaction: ControlTransaction,
+    since: chrono::DateTime<chrono::Utc>,
+) -> Result<(ControlTransaction, Vec<SinkReport>), ControlError> {
+    let (transaction, rows) = query(
+        transaction,
+        "SELECT occurred_at, payload FROM recall_events WHERE event_type='location_health' \
+         AND occurred_at>=$1 AND payload->'report'->'health'->>'kind'=$2 \
+         ORDER BY storage_id DESC LIMIT $3",
+        vec![
+            Parameter::Time(since),
+            Parameter::Text(LOCATION_SINK_KIND.to_owned()),
+            Parameter::Integer(SINK_REPORT_LIMIT),
+        ],
+    )
+    .await?;
+    let (transaction, locations) = query(
+        transaction,
+        "SELECT location_id, name FROM sqb_locations WHERE archived_at IS NULL",
+        vec![],
+    )
+    .await?;
+    let mut names: BTreeMap<Uuid, String> = BTreeMap::new();
+    for location in locations {
+        let location: ActiveLocation = decode_row(location)?;
+        names.insert(location.location_id, location.name);
+    }
+    let rows: Vec<LocationSinkRow> = rows.into_iter().map(decode_row).collect::<Result<_, _>>()?;
     Ok((
         transaction,
-        rows.into_iter().filter_map(sink_report).collect(),
+        rows.into_iter()
+            .filter_map(|row| location_sink_report(row, &names))
+            .collect(),
     ))
+}
+
+/// A location's report as a sink report; another kind, or an archived location's, is none.
+fn location_sink_report(
+    row: LocationSinkRow,
+    names: &BTreeMap<Uuid, String>,
+) -> Option<SinkReport> {
+    let LocationHealth::SinkDeliveries { sinks } = row.payload.report.health else {
+        return None;
+    };
+    Some(SinkReport {
+        location_id: row.payload.location_id,
+        location_name: names.get(&row.payload.location_id)?.clone(),
+        target: row.payload.report.target,
+        run_id: None,
+        at: row.occurred_at,
+        sinks,
+        teardown_failures: Vec::new(),
+    })
 }
 
 /// A row as a report; a stored change that isn't a sink delivery report is none.
@@ -53,7 +115,7 @@ fn sink_report(row: SinkReportRow) -> Option<SinkReport> {
         location_id: row.location_id,
         location_name: row.location_name,
         target: row.target,
-        run_id: row.payload.change.run_id,
+        run_id: Some(row.payload.change.run_id),
         at: row.occurred_at,
         sinks,
         teardown_failures,

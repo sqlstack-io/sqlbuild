@@ -300,3 +300,9 @@ pub(crate) const LOOKUP_FAILURES_REPORTED: u32 = 3;
 
 /// The most characters of a failed load's error a location reports; the server refuses more.
 pub(crate) const MAX_LOAD_ERROR_CHARS: usize = 4000;
+
+/// How often a location asks each idle interpreter what its event sinks delivered.
+pub(crate) const SINK_CHECK_SECONDS: u64 = 60;
+
+/// How long an interpreter may take to say what its event sinks delivered.
+pub(crate) const SINK_CHECK_TIMEOUT_SECONDS: u64 = 10;

@@ -373,6 +373,15 @@ pub(crate) struct LocationCompiler {
     pub(crate) stdin: tokio::process::ChildStdin,
     pub(crate) stdout: tokio::io::BufReader<tokio::process::ChildStdout>,
     pub(crate) python_sources: Vec<PathStamp>,
+    /// What this interpreter's sinks had delivered at its last check.
+    pub(crate) sinks: SinkTally,
+}
+
+/// An interpreter's sink totals at its last check, and when that was; `None` before the first.
+#[derive(Debug, Default)]
+pub(crate) struct SinkTally {
+    pub(crate) totals: Vec<sqlbuild_orchestration::runs::models::SinkDelivery>,
+    pub(crate) checked_at: Option<tokio::time::Instant>,
 }
 
 /// A delivered source page remains frozen until the API acknowledges it.

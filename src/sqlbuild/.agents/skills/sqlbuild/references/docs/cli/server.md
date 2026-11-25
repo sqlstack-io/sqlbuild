@@ -482,12 +482,21 @@ platform history.
 ## See lost lifecycle events
 
 A worker counts what each of the project's lifecycle event sinks delivered when its run's command
-closes, and reports it with the run. A sink that dropped or failed events in the newest run of a
-location and target is an item on that target's attention list, such as `event sink kafka losing
-events since 17:42: 8 of 8 events not delivered (8 failed)`, from its first run in a row that lost
-events. A sink provider whose teardown raised is listed as `sink providers`, because events it
-still held may not have been delivered. The item clears once a run delivers every event. Runs from
-the last 7 days count.
+closes, and reports it with the run. A location's own interpreters, which compile, read run history
+and evaluate sensors, run the same sinks: once a minute, each idle one says what its sinks
+delivered, and the location reports what changed since the last report.
+
+A sink that dropped or failed events in the newest run or location report of a location and target
+is an item on that target's attention list, such as `event sink kafka losing events since 17:42:
+116 of 116 events not delivered (116 failed)`, from its first lossy run or report in a row. A sink
+provider whose teardown raised at the end of a run is listed as `sink providers`, because events it
+still held may not have been delivered. The item clears once a run, or a minute in which the sink
+took events, delivers every event. Reports from the last 7 days count.
+
+SQLBuild counts what a sink function does: an event it raised on is failed, and one it never got
+is dropped. A sink that hands events to a client which sends them later, such as a Kafka producer,
+reports a send that fails afterwards only if it raises, from a later call or when its provider
+closes.
 
 ## Acknowledge attention items
 

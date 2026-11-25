@@ -532,3 +532,20 @@ pub(super) struct ServerRecoveryTestCase {
     pub(super) expected_failing: Vec<bool>,
     pub(super) expected_line: &'static str,
 }
+
+pub(super) struct SinkCheckTestCase {
+    pub(super) description: &'static str,
+    /// A shell script answering the sink requests in turn.
+    pub(super) script: &'static str,
+    /// Minutes that pass before each check.
+    pub(super) minutes_passed: Vec<u64>,
+    pub(super) expected_reports:
+        Vec<Option<sqlbuild_orchestration::platform::models::LocationHealth>>,
+}
+
+pub(super) struct SinkReportTestCase {
+    pub(super) description: &'static str,
+    pub(super) script: &'static str,
+    /// Whether the interpreter is kept, and how many reports the server got.
+    pub(super) expected_outcome: (bool, usize),
+}

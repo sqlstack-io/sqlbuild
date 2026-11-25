@@ -445,7 +445,9 @@ pub(crate) fn report(
         location_id: uuid::Uuid::nil(),
         location_name: "orders".into(),
         target: "prod".into(),
-        run_id: uuid::Uuid::from_u128(u128::try_from(minutes).unwrap_or_default()),
+        run_id: Some(uuid::Uuid::from_u128(
+            u128::try_from(minutes).unwrap_or_default(),
+        )),
         at: at(minutes),
         sinks,
         teardown_failures,
@@ -461,7 +463,7 @@ pub(crate) fn failing_sink_of(sink: &str, reason: &str) -> crate::platform::mode
         sink: sink.into(),
         since: at(3),
         reason: reason.into(),
-        run_id: uuid::Uuid::from_u128(3),
+        run_id: Some(uuid::Uuid::from_u128(3)),
         last_success_at: None,
     }
 }

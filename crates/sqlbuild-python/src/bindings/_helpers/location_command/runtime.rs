@@ -2,7 +2,6 @@
 
 use std::io::{self, Write};
 
-use pyo3::PyErr;
 use pyo3::exceptions::{PyMemoryError, PyValueError};
 use pyo3::prelude::{Bound, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods};
@@ -33,13 +32,16 @@ use sqlbuild_orchestration::discovered_sets::constants::{CHECK_DISCOVERED_KEY, G
 use sqlbuild_orchestration::discovered_sets::models::{
     DiscoveredSetCheck, DiscoveryPublishRequest,
 };
+use sqlbuild_orchestration::platform::constants::SINK_DELIVERIES_REQUEST;
 use sqlbuild_python_base::boundary::main::error_text_fields::error_text_fields;
+use sqlbuild_python_base::boundary::main::failure_reason::failure_reason;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::native_host::main::redirect_stdout_to_stderr::redirect_stdout_to_stderr;
 use sqlbuild_python_front::discovered_sets::main::checked_set::checked_set;
 use sqlbuild_python_front::discovered_sets::main::discover_for_publication::discover_for_publication;
 use sqlbuild_python_front::discovered_sets::main::published_sets::published_sets;
 use sqlbuild_python_front::discovered_sets::main::with_set_retries::with_set_retries;
+use sqlbuild_python_output::event_exporting::main::sink_delivery_totals::sink_delivery_totals;
 use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
 
 pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResult<i32> {
@@ -109,6 +111,8 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                         "discover_files": discover_files,
                         "error": error_text,
                     }))
+                } else if request.get(SINK_DELIVERIES_REQUEST).is_some() {
+                    serde_json::to_string(&sink_delivery_totals(py)?)
                 } else if request.get(CHECK_DISCOVERED_KEY).is_some() {
                     let check: DiscoveredSetCheck = serde_json::from_value(request.clone())
                         .map_err(|_| {
@@ -287,12 +291,4 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
         }
         result
     })
-}
-
-/// The driver's class and message on one line, redacted as warehouse error text.
-fn failure_reason(error: &PyErr) -> String {
-    redact_error_text(&error.to_string())
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
 }

@@ -142,3 +142,12 @@ pub(crate) struct StoredSinkTestCase {
     /// Each failing sink with its reason.
     pub(crate) expected_sinks: Vec<(String, String)>,
 }
+
+pub(crate) struct LocationSinkTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: crate::store::tests::store_test_types::Backend,
+    /// Each reported interval's accepted, dropped and failed events, oldest first.
+    pub(crate) intervals: Vec<(u64, u64, u64)>,
+    /// Each failing sink with its reason and run.
+    pub(crate) expected_sinks: Vec<(String, String, Option<uuid::Uuid>)>,
+}

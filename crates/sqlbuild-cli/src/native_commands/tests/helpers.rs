@@ -326,6 +326,7 @@ pub(super) fn scripted_compiler(script: &str) -> crate::native_commands::models:
         stdout: tokio::io::BufReader::new(child.stdout.take().expect("interpreter output")),
         child,
         python_sources: Vec::new(),
+        sinks: crate::native_commands::models::SinkTally::default(),
     }
 }
 
@@ -364,4 +365,19 @@ pub(super) async fn answering_server(
         axum::serve(listener, application).await
     }));
     (url, answered)
+}
+
+/// `kafka`'s interval with `accepted`, `delivered` and `failed` events.
+pub(super) fn kafka(
+    (accepted, delivered, failed): (u64, u64, u64),
+) -> sqlbuild_orchestration::platform::models::LocationHealth {
+    sqlbuild_orchestration::platform::models::LocationHealth::SinkDeliveries {
+        sinks: vec![sqlbuild_orchestration::runs::models::SinkDelivery {
+            name: "kafka".into(),
+            accepted,
+            delivered,
+            dropped: 0,
+            failed,
+        }],
+    }
 }

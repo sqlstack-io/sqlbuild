@@ -9,7 +9,7 @@ use crate::platform::_helpers::location::published_generation::require_published
 use crate::platform::_helpers::location::reported_generation::reported_generation;
 use crate::platform::_helpers::location::rule_findings::check_rule_findings;
 use crate::platform::_helpers::plans::load_failure::fail_plans_on_failed_load;
-use crate::platform::models::LocationHealthReport;
+use crate::platform::models::{LocationHealth, LocationHealthReport};
 use crate::store::errors::ControlError;
 use crate::store::main::append_control_event::append_control_event;
 use crate::store::main::begin::begin;
@@ -22,10 +22,10 @@ pub async fn report_location_health(
     location_id: Uuid,
     report: &LocationHealthReport,
 ) -> Result<bool, ControlError> {
-    let generation = reported_generation(report)?;
+    reported_generation(report)?;
     check_rule_findings(report)?;
     let transaction = begin(store, TransactionMode::Write).await?;
-    if generation.is_none() {
+    if matches!(report.health, LocationHealth::Heartbeat {}) {
         let (transaction, applied) = location_heartbeat(transaction, location_id, report).await?;
         commit(transaction).await?;
         return Ok(applied);

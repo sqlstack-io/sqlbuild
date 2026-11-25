@@ -1057,3 +1057,13 @@ class ServerOutageTestCase:
     database_url: str
     expected_reason: str
     expected_case: str
+
+
+@dataclass(frozen=True)
+class RuntimeSinkTestCase:
+    """A location interpreter's sinks and what it says each delivered."""
+
+    description: str
+    sink_source: str
+    # Each sink's name, and whether it failed every event it accepted.
+    expected_sinks: tuple[tuple[str, bool], ...]

@@ -16,6 +16,7 @@ use crate::native_commands::_helpers::location::execution::{
 use crate::native_commands::_helpers::location::sync_outcomes::{
     deliver_metadata_page, failed_read, retry_metadata,
 };
+use crate::native_commands::_helpers::location::sync_report::report_reader_sinks;
 use crate::native_commands::_helpers::location::sync_report::{metadata_health, resumed_line};
 use crate::native_commands::constants::METADATA_PAGE_SECONDS;
 use crate::native_commands::models::{LocationMetadataSync, LocationServe, LocationWatch};
@@ -91,6 +92,7 @@ pub(crate) async fn sync_location_metadata(
                     .await;
             }
         };
+        state = report_reader_sinks(state, (client, poll)).await?;
         if location_files(
             &options.project_dir,
             &watch.rules,

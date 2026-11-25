@@ -26,6 +26,8 @@ mod project_facts;
 mod provider_secrets;
 #[path = "tests/test_rules.rs"]
 mod rules;
+#[path = "tests/test_sink_checks.rs"]
+mod sink_checks;
 #[path = "tests/test_sync_recovery.rs"]
 mod sync_recovery;
 #[path = "tests/test_sync_schedule.rs"]

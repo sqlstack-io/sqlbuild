@@ -69,7 +69,8 @@ use crate::native_commands::models::AdminDone;
 use crate::native_commands::models::{
     CommandOutput, DevControlState, InstalledPackage, LocationCompileRequest, LocationCompiler,
     LocationMetadataPage, LocationMetadataSync, LocationServe, LocationWatch, LostStdout,
-    MetadataReply, NativeCommand, NativeInvocation, ProjectLocation, ScanToken, SyncStreak,
+    MetadataReply, NativeCommand, NativeInvocation, ProjectLocation, ScanToken, SinkTally,
+    SyncStreak,
 };
 use crate::native_commands::models::{LoadedGeneration, PendingRepublish};
 use crate::native_commands::models::{
@@ -1313,6 +1314,7 @@ pub(crate) fn open_location_runtime(
         stdin,
         stdout: BufReader::new(stdout),
         python_sources,
+        sinks: SinkTally::default(),
     })
 }
 

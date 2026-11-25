@@ -82,6 +82,10 @@ pub enum LocationHealth {
         generation: i64,
         reason: String,
     },
+    /// What each lifecycle event sink of one of the location's interpreters delivered since its last report.
+    SinkDeliveries {
+        sinks: Vec<crate::runs::models::SinkDelivery>,
+    },
     /// Jobs and groups this server's `pool_caps` clamp, derived by the server, never reported by a location.
     PoolCapped {
         generation: i64,
@@ -898,8 +902,8 @@ pub struct FailingSink {
     pub since: DateTime<Utc>,
     /// What it lost, such as `8 of 8 events not delivered (8 failed)`.
     pub reason: String,
-    /// The newest run whose events it lost.
-    pub run_id: Uuid,
+    /// The newest run whose events it lost; `None` when the location's own interpreter lost them.
+    pub run_id: Option<Uuid>,
     /// The newest run before that whose events it all delivered.
     pub last_success_at: Option<DateTime<Utc>>,
 }
@@ -910,7 +914,7 @@ pub(crate) struct SinkReport {
     pub(crate) location_id: Uuid,
     pub(crate) location_name: String,
     pub(crate) target: String,
-    pub(crate) run_id: Uuid,
+    pub(crate) run_id: Option<Uuid>,
     pub(crate) at: DateTime<Utc>,
     pub(crate) sinks: Vec<crate::runs::models::SinkDelivery>,
     pub(crate) teardown_failures: Vec<String>,
@@ -924,6 +928,33 @@ pub(crate) struct SinkReportRow {
     pub(crate) location_id: Uuid,
     pub(crate) location_name: String,
     pub(crate) target: String,
+}
+
+/// A location's stored sink delivery report and its location.
+#[derive(Debug, Deserialize)]
+pub(crate) struct LocationSinkRow {
+    pub(crate) occurred_at: DateTime<Utc>,
+    pub(crate) payload: LocationSinkPayload,
+}
+
+/// A stored location health event's payload.
+#[derive(Debug, Deserialize)]
+pub(crate) struct LocationSinkPayload {
+    pub(crate) location_id: Uuid,
+    pub(crate) report: LocationHealthReport,
+}
+
+/// An active location's ID and name.
+#[derive(Debug, Deserialize)]
+pub(crate) struct ActiveLocation {
+    pub(crate) location_id: Uuid,
+    pub(crate) name: String,
+}
+
+/// A location interpreter's reply to `sink_deliveries`: each sink's totals since the interpreter started.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SinkDeliveryTotals {
+    pub sinks: Vec<crate::runs::models::SinkDelivery>,
 }
 
 /// A stored run change's payload.

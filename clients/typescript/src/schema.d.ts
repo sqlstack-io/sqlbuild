@@ -2667,9 +2667,9 @@ export interface components {
             reason: string;
             /**
              * Format: uuid
-             * @description The newest run whose events it lost.
+             * @description The newest run whose events it lost; `None` when the location's own interpreter lost them.
              */
-            run_id: string;
+            run_id?: string | null;
             /**
              * Format: date-time
              * @description The first run in a row whose events it lost.
@@ -2952,6 +2952,10 @@ export interface components {
             /** @enum {string} */
             kind: "change_plan_failed";
             reason: string;
+        } | {
+            /** @enum {string} */
+            kind: "sink_deliveries";
+            sinks: components["schemas"]["SinkDelivery"][];
         } | {
             /** Format: int64 */
             generation: number;

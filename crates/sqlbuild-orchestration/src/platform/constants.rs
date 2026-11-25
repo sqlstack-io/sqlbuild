@@ -83,3 +83,9 @@ pub(crate) const SINK_REPORT_LIMIT: i64 = 1000;
 
 /// What a failing sink's attention names the sink providers whose teardown failed.
 pub(crate) const SINK_PROVIDERS: &str = "sink providers";
+
+/// The request a location asks its interpreter for its sinks' delivery totals with.
+pub const SINK_DELIVERIES_REQUEST: &str = "sink_deliveries";
+
+/// The kind a location's sink delivery health report is stored under.
+pub(crate) const LOCATION_SINK_KIND: &str = "sink_deliveries";

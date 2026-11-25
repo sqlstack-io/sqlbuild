@@ -2644,3 +2644,45 @@ def forwarded_port(port: int, target: tuple[str, int]) -> Iterator[None]:
         stop.set()
         acceptor.join(timeout=2)
         listener.close()
+
+
+def runtime_sink_totals(
+    project: Path, settled: Callable[[dict[str, Any]], bool], seconds: float
+) -> dict[str, Any]:
+    """The location interpreter's sink totals, asked every half second until `settled`."""
+    child: subprocess.Popen[str] = subprocess.Popen(
+        [
+            str(Path(sys.executable).with_name("sqb")),
+            "--project-dir",
+            str(project),
+            "location",
+            "runtime",
+            "--server",
+            "http://127.0.0.1:9",
+            "--location-id",
+            str(uuid4()),
+            "--target",
+            "development",
+        ],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+        cwd=project,
+    )
+    stdin, stdout = cast(Any, child.stdin), cast(Any, child.stdout)
+
+    def ask() -> dict[str, Any]:
+        stdin.write('{"sink_deliveries": {}}\n')
+        stdin.flush()
+        reply: dict[str, Any] = json.loads(stdout.readline())
+        return reply
+
+    deadline: float = time.monotonic() + seconds
+    totals: dict[str, Any] = ask()
+    while not settled(totals) and time.monotonic() < deadline:
+        time.sleep(0.5)
+        totals = ask()
+    stdin.close()
+    child.wait(timeout=60)
+    return totals
