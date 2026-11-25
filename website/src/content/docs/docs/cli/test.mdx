@@ -71,7 +71,9 @@ Statements: 5 on the warehouse (CREATE 2, DROP 2, WITH 1); compile 0.4s, executi
 ```
 
 A test that does not run is an `ERROR` row with a short reason: `can't run locally` (`T007`, with
-`--run-on local`) or `needs the warehouse (no connection)` (`T008`, in `auto`).
+`--run-on local`) or `needs the warehouse (no connection)` (`T008`, in `auto`). A local test whose
+converted SQL hits a SQLQuack guard or a DuckDB internal error while it runs is also `T007` with
+`--run-on local`; in `auto` it runs again on the warehouse.
 
 After the summary:
 
