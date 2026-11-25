@@ -18,6 +18,8 @@ from sqlbuild.executor.local.constants import (
     UTC_TIME_ZONE,
 )
 from sqlbuild.executor.local.models import ConvertedSql
+from sqlbuild.runtime.observability.classes.statement_lifecycle import StatementLifecycle
+from sqlbuild.runtime.observability.constants import LOCAL_RUN_ON
 
 _UTC_SESSION_SQL: str = f"SET TimeZone = '{UTC_TIME_ZONE}'"
 _INVALIDATED_MARKER: str = "database has been invalidated"
@@ -56,12 +58,14 @@ class LocalTestAdapter(DuckDbAdapter):
 
     def connect(self, config: dict[str, Any]) -> Any:
         connection: Any = super().connect(config)
-        _ = super().execute(connection=connection, sql=_UTC_SESSION_SQL)
+        with StatementLifecycle.run_on_scope(LOCAL_RUN_ON):
+            _ = super().execute(connection=connection, sql=_UTC_SESSION_SQL)
         return connection
 
     def execute(self, *, connection: Any, sql: str) -> Any:
         try:
-            return self._converted_execute(connection=connection, sql=sql)
+            with StatementLifecycle.run_on_scope(LOCAL_RUN_ON):
+                return self._converted_execute(connection=connection, sql=sql)
         except Exception as error:
             fatal: bool = _INVALIDATED_MARKER in str(error) or type(error).__name__ in _FATAL_ERRORS
             if fatal:
@@ -83,7 +87,8 @@ class LocalTestAdapter(DuckDbAdapter):
         object.__setattr__(connection, "raw_connection", duckdb.connect(database=":memory:"))
         with self._macros_lock:
             self._macros.pop(id(connection), None)
-        _ = super().execute(connection=connection, sql=_UTC_SESSION_SQL)
+        with StatementLifecycle.run_on_scope(LOCAL_RUN_ON):
+            _ = super().execute(connection=connection, sql=_UTC_SESSION_SQL)
 
     def _converted_execute(self, *, connection: Any, sql: str) -> Any:
         if self._dialect != CONVERTED_DIALECT or sql == _UTC_SESSION_SQL:

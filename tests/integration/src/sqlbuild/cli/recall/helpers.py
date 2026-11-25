@@ -749,3 +749,27 @@ def selected_columns(*, result: dict[str, Any], columns: tuple[str, ...]) -> lis
     for row in result["rows"]:
         rows.append([row[position] for position in positions])
     return rows
+
+
+def write_tested_project(project_dir: Path) -> Path:
+    """The Recall project with a model reading `orders` and a unit test of it."""
+
+    _ = write_project(project_dir)
+    files: dict[str, str] = {
+        "sql/models/order_dates.sql": (
+            'MODEL (description "Each order\'s date");\n\n'
+            'SELECT order_id, ordered_on FROM __ref("orders")\n'
+        ),
+        "tests/unit/test_order_dates.sql": (
+            "TEST();\n\nWITH\n"
+            "__ref__orders AS (SELECT 1 AS order_id, CAST('2026-04-01' AS DATE) AS ordered_on),\n"
+            "__expected__order_dates AS ("
+            "SELECT 1 AS order_id, CAST('2026-04-01' AS DATE) AS ordered_on)\n"
+            "SELECT 1\n"
+        ),
+    }
+    for relative, contents in files.items():
+        path: Path = project_dir / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _ = path.write_text(contents, encoding="utf-8")
+    return project_dir

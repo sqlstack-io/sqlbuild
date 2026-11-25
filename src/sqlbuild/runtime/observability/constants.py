@@ -11,6 +11,7 @@ STATEMENT_HEARTBEAT_THRESHOLD_SECONDS: float = 30.0
 MODEL_BUILD_PURPOSE: str = "model_build"
 AUDIT_PURPOSE: str = "audit"
 COST_TELEMETRY_PURPOSE: str = "cost_telemetry"
+LOCAL_RUN_ON: str = "local"
 LIFECYCLE_ENVELOPE_FIELDS_V1: frozenset[str] = frozenset(
     {
         "event_id",
