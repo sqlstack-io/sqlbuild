@@ -29,7 +29,7 @@
 	import DataTable from '$lib/components/list/data-table.svelte';
 	import type { TableColumn } from '$lib/components/list/table-columns';
 	import { formatAgo, formatStamp } from '$lib/format/time';
-	import { nodeOutcomeLabel, nodeOutcomeTone } from '$lib/status';
+	import { statusLabel } from '$lib/build-area/node-status';
 	import { KIND_TABS, kindLine, kindTabLabel, kindTabOf, nodeIcon, nodeIconKey, parseKindTab, shortName, shortRunId, type KindTab } from '$lib/build-area/labels';
 
 	type StatusFilter = 'stale' | 'changed' | 'behind' | 'failed' | 'warn';
@@ -81,10 +81,10 @@
 	}
 
 	const matchesStatus = (n: CatalogNode, f: StatusFilter) =>
-		(f === 'stale' && !!n.stale?.length) ||
-		(f === 'changed' && !!n.stale?.some((s) => s.reason !== 'behind')) ||
-		(f === 'behind' && !!n.stale?.some((s) => s.reason === 'behind')) ||
-		(f === 'failed' && n.lastOutcome === 'failed') ||
+		(f === 'stale' && (n.status === 'changed' || n.status === 'behind')) ||
+		(f === 'changed' && n.status === 'changed') ||
+		(f === 'behind' && n.status === 'behind') ||
+		(f === 'failed' && n.status === 'failed') ||
 		(f === 'warn' && n.lastOutcome === 'warn');
 
 	const kinds = $derived(KIND_TABS.filter((k) => all.some((n) => kindTabOf(n.kind) === k)));
@@ -107,7 +107,7 @@
 	);
 
 	const counts = $derived({
-		failed: all.filter((n) => n.lastOutcome === 'failed').length,
+		failed: all.filter((n) => n.status === 'failed').length,
 		warn: all.filter((n) => n.lastOutcome === 'warn').length,
 		changed: all.filter((n) => matchesStatus(n, 'changed')).length,
 		behind: all.filter((n) => matchesStatus(n, 'behind')).length
@@ -190,9 +190,10 @@
 						{#if n.kind === 'source'}
 							{#if n.sourceFreshness}<StatusLabel tone={n.sourceFreshness.status === 'pass' ? 'var(--sb-success)' : n.sourceFreshness.status === 'warn' ? 'var(--sb-warning)' : 'var(--sb-error)'} label="Freshness {n.sourceFreshness.status}" />
 							{:else}<span class="muted">External</span>{/if}
-						{:else if n.lastOutcome}
-							<StatusLabel tone={nodeOutcomeTone[n.lastOutcome]} label={nodeOutcomeLabel[n.lastOutcome]} />
-						{:else}<span class="muted">Not built</span>{/if}
+						{:else if statusLabel(n)}
+							{@const s = statusLabel(n)!}
+							<StatusLabel tone={s.tone} label={s.label} />
+						{:else}<span class="muted">—</span>{/if}
 					</td>
 					<td><StaleBadges reasons={n.stale ?? []} empty="—" /></td>
 					{/if}
@@ -206,6 +207,9 @@
 							<RelativeTime value={n.sourceFreshness?.loadedAt ? `loaded ${formatAgo(n.sourceFreshness.loadedAt, app.now)}` : '—'} exact={formatStamp(n.sourceFreshness?.loadedAt)} />
 						{:else if n.lastBuild}
 							<RelativeTime value={formatAgo(n.lastBuild.builtAt, app.now)} exact="{formatStamp(n.lastBuild.builtAt)} · {n.lastBuild.runId ? `run ${shortRunId(n.lastBuild.runId)}` : `sqb run ${shortRunId(n.lastBuild.fingerprintRunId)}`}" />
+						{:else if n.statusAt}
+							<!-- A node without a table: when its last run ended. -->
+							<RelativeTime value={formatAgo(n.statusAt, app.now)} exact={formatStamp(n.statusAt)} />
 						{:else}<span class="muted">Never</span>{/if}
 					</td>
 				</tr>

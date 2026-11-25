@@ -102,6 +102,7 @@ pub fn format_plan_json(py: Python<'_>, options: Option<Bound<'_, PyDict>>) -> P
                 "warnings",
                 mapped(&native_field(&plan, "warnings")?, warning_json)?,
             ),
+            ("has_errors", any(py, plan_has_errors(&plan)?)?),
             ("retention", retention_json(&plan)?),
             ("table_type_conversions", table_type_json(&plan)?),
             ("migrations", migrations_json(&plan)?),
@@ -195,4 +196,14 @@ fn mark_renames(result: &Bound<'_, PyDict>) -> PyResult<()> {
         }
     }
     Ok(())
+}
+
+/// Whether any plan finding has error severity, such as a model that can't be planned.
+fn plan_has_errors(plan: &Bound<'_, PyAny>) -> PyResult<bool> {
+    for warning in native_field(plan, "warnings")?.try_iter()? {
+        if native_field(&native_field(&warning?, "severity")?, "value")?.eq("error")? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }

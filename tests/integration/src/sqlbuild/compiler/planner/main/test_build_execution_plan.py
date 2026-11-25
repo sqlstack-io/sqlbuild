@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import replace
 from typing import Any
 
@@ -14,7 +15,6 @@ from sqlbuild._native import (
     LocalConfig,
     ModelPlanEntry,
     PlanAction,
-    PlannerInputError,
     PlanOutput,
     PlanReason,
     PlanWarning,
@@ -555,7 +555,7 @@ def test_given_view_and_table_with_target_default_when_assembling_plan_then_only
     ],
     ids=lambda case: case.description,
 )
-def test_given_missing_source_cursor_input_column_when_building_plan_then_raises_planner_error(
+def test_given_missing_source_cursor_input_column_when_building_plan_then_reports_planner_error(
     test_case: SourceCursorInputPlanErrorTestCase,
     adapter: DuckDbAdapter,
     connection: Any,
@@ -566,13 +566,18 @@ def test_given_missing_source_cursor_input_column_when_building_plan_then_raises
 
     project: Any = build_project_from_source_cursor_input_test_case(test_case)
 
-    with pytest.raises(PlannerInputError, match=test_case.expected_error_fragment):
-        build_execution_plan_from_kwargs(
-            project=project,
-            adapter=adapter,
-            connection=connection,
-            full_refresh=False,
-        )
+    plan: PlanOutput = build_execution_plan_from_kwargs(
+        project=project,
+        adapter=adapter,
+        connection=connection,
+        full_refresh=False,
+    )
+
+    errors: list[PlanWarning] = list(
+        filter(None, (entry.planning_error for entry in plan.model_entries))
+    )
+    assert [error.model_name for error in errors] == [test_case.model_name]
+    assert test_case.expected_error_fragment in errors[0].message
 
 
 @pytest.mark.parametrize(
@@ -994,14 +999,18 @@ def test_given_future_upstream_and_error_policy_when_building_real_plan_then_fai
     connection.execute("CREATE TABLE raw.events (occurred_at TIMESTAMP)")
     connection.execute("INSERT INTO raw.events VALUES (TIMESTAMP '2500-01-01')")
 
-    with pytest.raises(PlannerInputError, match=test_case.expected_error_fragment):
-        build_execution_plan_from_kwargs(
-            project=project,
-            adapter=adapter,
-            connection=connection,
-            project_config=ProjectConfig(
-                name="future_cursor",
-                adapter="duckdb",
-                cursors=CursorsConfig(future=FutureCursorsConfig("1d", FutureCursorAction.ERROR)),
-            ),
-        )
+    plan: PlanOutput = build_execution_plan_from_kwargs(
+        project=project,
+        adapter=adapter,
+        connection=connection,
+        project_config=ProjectConfig(
+            name="future_cursor",
+            adapter="duckdb",
+            cursors=CursorsConfig(future=FutureCursorsConfig("1d", FutureCursorAction.ERROR)),
+        ),
+    )
+
+    errors: list[PlanWarning] = list(
+        filter(None, (entry.planning_error for entry in plan.model_entries))
+    )
+    assert re.search(test_case.expected_error_fragment, errors[0].message), errors

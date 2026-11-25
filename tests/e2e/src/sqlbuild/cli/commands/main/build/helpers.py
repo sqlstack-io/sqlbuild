@@ -1772,3 +1772,17 @@ def node_results_in(*, db_path: Path, schema: str, node_type: str) -> list[tuple
             f"WHERE node_type = '{node_type}' ORDER BY node_name"
         ),
     )
+
+
+def picked_plan_fields(row: dict[str, Any], keys: tuple[str, ...]) -> dict[str, Any]:
+    """The given keys of one plan JSON row."""
+    return {key: row.get(key) for key in keys}
+
+
+def window_floor_event_dates(project_dir: Path, model: str) -> tuple[str, ...]:
+    """The event dates a model holds, in order."""
+    rows: list[tuple[Any, ...]] = query_duckdb(
+        db_path=project_dir / "events.duckdb",
+        sql=f"SELECT event_date FROM main.{model} ORDER BY event_date",
+    )
+    return tuple(str(row[0]) for row in rows)

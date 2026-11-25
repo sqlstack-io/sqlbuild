@@ -29,6 +29,10 @@ const CHANGED_IDENTITY: &str = "changed";
 /// The plan document field saying audit failures hold nothing back; present only when they do.
 pub(crate) const IGNORE_AUDIT_FAILURES_KEY: &str = "ignore_audit_failures";
 
+/// The row action and reason of a model that can't be planned.
+pub(crate) const ERROR_ACTION: &str = "error";
+pub(crate) const PLANNING_ERROR_REASON: &str = "planning_error";
+
 fn token<'py>(bound: Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     Ok(PyString::new(bound.py(), &sentinel_to_token(&bound)?).into_any())
 }
@@ -288,6 +292,26 @@ pub(crate) fn model_json<'py>(entry: &Bound<'py, PyAny>) -> PyResult<Bound<'py, 
             })?,
         )?;
     }
+    let skip_reason: Bound<'py, PyAny> = native_field(entry, "skip_reason")?;
+    if !skip_reason.is_none() {
+        model.set_item("skip_reason", skip_reason)?;
+    }
+    let planning_error: Bound<'py, PyAny> = native_field(entry, "planning_error")?;
+    if !planning_error.is_none() {
+        model.set_item("action", ERROR_ACTION)?;
+        model.set_item("reason", PLANNING_ERROR_REASON)?;
+        model.set_item(
+            "error",
+            dict(
+                py,
+                vec![
+                    ("code", native_field(&planning_error, "code")?),
+                    ("message", native_field(&planning_error, "message")?),
+                    ("help", native_field(&planning_error, "help")?),
+                ],
+            )?,
+        )?;
+    }
     Ok(model.into_any())
 }
 
@@ -397,7 +421,7 @@ pub(crate) fn warning_json<'py>(warning: &Bound<'py, PyAny>) -> PyResult<Bound<'
             ("message", native_field(warning, "message")?),
         ],
     )?;
-    for key in ["model_name", "code"] {
+    for key in ["model_name", "code", "help"] {
         let value: Bound<'py, PyAny> = native_field(warning, key)?;
         if !value.is_none() {
             item.set_item(key, value)?;

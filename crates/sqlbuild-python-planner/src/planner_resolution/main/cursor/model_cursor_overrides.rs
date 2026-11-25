@@ -7,18 +7,20 @@ use crate::planner_resolution::_helpers::cursor::cursor_ranges::config_bound;
 use crate::planner_resolution::_helpers::cursor::cursor_ranges::order;
 use crate::planner_resolution::_helpers::cursor::cursor_ranges::token;
 use crate::planner_resolution::main::cursor::config_str::config_str;
+use crate::planner_resolution::models::WindowFit;
+use crate::planner_resolution::types::CursorBounds;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::cursor::models::CursorSession;
 use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 use std::cmp::Ordering;
 
-/// Resolve typed cursor overrides to generic start/end for one model.
+/// Resolve typed cursor overrides to generic start/end for one model, fitted to its `cursor_start` floor: a window that starts before the floor starts at it, and one that ends at or before it builds nothing.
 pub fn model_cursor_overrides<'py>(
     model: &Bound<'py, PyAny>,
     cursor_overrides: &Bound<'py, PyAny>,
     (start, end): (Bound<'py, PyAny>, Bound<'py, PyAny>),
-) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
+) -> PyResult<(CursorBounds<'py>, WindowFit)> {
     let py = model.py();
     let cursor_type = config_str(model, "cursor_type")?;
     let (mut resolved_start, mut resolved_end) = (start, end);
@@ -45,18 +47,36 @@ pub fn model_cursor_overrides<'py>(
     let name = name_object(model)?.str()?;
     let cursor_start = config_bound(model, "cursor_start")?;
     let cursor_end = config_bound(model, "cursor_end")?;
-    if !resolved_start.is_none()
-        && !cursor_start.is_none()
-        && order(&session, (&resolved_start, &cursor_start), &cursor_type)? == Ordering::Less
-    {
-        return Err(compile_input_error(
-            py,
-            format!(
-                "model '{name}': explicit start {} is before cursor_start {}",
-                resolved_start.str()?,
-                cursor_start.str()?
-            ),
-        ));
+    let mut fit = WindowFit::Inside;
+    if !cursor_start.is_none() {
+        let floor = cursor_start.clone();
+        let before = |value: &Bound<'py, PyAny>, ending: bool| -> PyResult<bool> {
+            Ok(!value.is_none()
+                && match order(&session, (value, &floor), &cursor_type)? {
+                    Ordering::Less => true,
+                    Ordering::Equal => ending,
+                    Ordering::Greater => false,
+                })
+        };
+        if before(&resolved_end, true)? {
+            let shown = |value: &Bound<'py, PyAny>| -> PyResult<String> {
+                Ok(if value.is_none() {
+                    "the start".to_owned()
+                } else {
+                    value.str()?.to_string()
+                })
+            };
+            fit = WindowFit::BeforeFloor {
+                floor: floor.str()?.to_string(),
+                window: format!("{} to {}", shown(&resolved_start)?, shown(&resolved_end)?),
+            };
+        } else if before(&resolved_start, false)? {
+            fit = WindowFit::Clamped {
+                requested: resolved_start.str()?.to_string(),
+                floor: floor.str()?.to_string(),
+            };
+            resolved_start = floor;
+        }
     }
     if !cursor_end.is_none() {
         for (value, label) in [(&resolved_start, "start"), (&resolved_end, "end")] {
@@ -74,5 +94,5 @@ pub fn model_cursor_overrides<'py>(
             }
         }
     }
-    Ok((resolved_start, resolved_end))
+    Ok(((resolved_start, resolved_end), fit))
 }

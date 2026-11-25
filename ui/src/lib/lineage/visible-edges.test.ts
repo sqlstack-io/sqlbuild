@@ -9,13 +9,13 @@ function node(key: string, path: string, upstream: string[] = []): CatalogNode {
 
 // Three staging models feed four marts models; inventory reads one mart.
 const nodes = [
-	node('model:stg_orders', 'models/staging/stg_orders.sql'),
-	node('model:stg_customers', 'models/staging/stg_customers.sql'),
-	node('model:stg_items', 'models/staging/stg_items.sql'),
-	node('model:orders', 'models/marts/orders.sql', ['model:stg_orders', 'model:stg_items']),
-	node('model:customers', 'models/marts/customers.sql', ['model:stg_customers']),
-	node('model:order_totals', 'models/marts/order_totals.sql', ['model:orders', 'model:stg_orders']),
-	node('model:inventory', 'models/inventory/inventory.sql', ['model:orders'])
+	node('model:stg_orders', 'sql/models/staging/stg_orders.sql'),
+	node('model:stg_customers', 'sql/models/staging/stg_customers.sql'),
+	node('model:stg_items', 'sql/models/staging/stg_items.sql'),
+	node('model:orders', 'sql/models/marts/orders.sql', ['model:stg_orders', 'model:stg_items']),
+	node('model:customers', 'sql/models/marts/customers.sql', ['model:stg_customers']),
+	node('model:order_totals', 'sql/models/marts/order_totals.sql', ['model:orders', 'model:stg_orders']),
+	node('model:inventory', 'sql/models/inventory/inventory.sql', ['model:orders'])
 ];
 const tree = folderTree(nodes);
 

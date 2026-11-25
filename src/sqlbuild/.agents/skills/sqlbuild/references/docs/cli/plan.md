@@ -14,6 +14,7 @@ Online: https://sqlbuild.com/docs/cli/plan/
 - Nodes that can't run
 - Timings
 - Exit codes
+- Models that can't be planned
 - Missing upstream dependencies
 - Missing source tables
 
@@ -176,7 +177,7 @@ Plan timings                   seconds  share
 
 `sqb plan` exits `0` when the plan is ready, including plans that only have warnings. It exits `1`
 when the plan has an error-severity finding that `sqb build` would refuse, such as an `M114` name
-claim; the final line then reads `✗ Plan failed with errors`. `sqb plan --json` uses the same exit
+claim or a model that can't be planned; the final line then reads `✗ Plan failed with errors`. `sqb plan --json` uses the same exit
 codes, so CI can gate on either form.
 
 When `sqb plan --json` fails before it can produce a plan, for example on an unknown selector, it
@@ -184,6 +185,19 @@ still exits `1` and prints its coded error on stderr, and prints the error as JS
 `{"error": {"code": "S007", "message": "...", "help": null}}`.
 
 Release note: earlier versions printed `Plan complete with errors` and exited `0` for such plans.
+
+## Models that can't be planned
+
+A model whose planning fails, for example a `full_refresh false` model the plan would rebuild
+(`S203`), doesn't stop the rest of the plan. Its row is listed under **Planning failed** with the
+action `error`, the `Errors` section prints its error as `error[CODE]: message` with its help, and
+every other model plans as usual. In `sqb plan --json` the model's row has `"action": "error"`,
+`"reason": "planning_error"` and an `error` object with `code`, `message` and `help`, and the
+plan has `"has_errors": true`; the plan exits `1`.
+
+`sqb build` refuses a selection that contains a model that can't be planned, with that model's
+error; select around it or fix it. A location's plan of what changed keeps the models it could
+plan and reports the others, so the location's health is `change_plan_failed`, naming them.
 
 ## Missing upstream dependencies
 

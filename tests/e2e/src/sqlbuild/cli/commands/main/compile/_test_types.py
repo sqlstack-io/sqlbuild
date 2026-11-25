@@ -1464,6 +1464,16 @@ class JobGroupCyclesCase:
 
 
 @dataclass(frozen=True)
+class OrchestrationSelectorCompileTestCase:
+    """Orchestration files whose selectors publication would refuse, the errors, and their fix."""
+
+    description: str
+    files: dict[str, str]
+    expected_messages: tuple[str, ...]
+    fixed_files: dict[str, str]
+
+
+@dataclass(frozen=True)
 class DynamicCompileE2ETestCase:
     """A project with dynamic models, its exit code and text its compile output contains."""
 

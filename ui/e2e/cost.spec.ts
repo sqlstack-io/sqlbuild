@@ -8,11 +8,6 @@ test.use({ viewport: { width: 1600, height: 1000 } });
 
 const crumbs = (page: Page) => page.getByRole('navigation', { name: 'Breadcrumb' });
 const rows = (page: Page) => page.locator('.drill tbody tr[data-kind]');
-/**
- * A drill's URL is first a shallow entry (pushState), then made a real one by the selection's
- * replacing navigation. Back before that lands is overwritten by it, so wait for the real entry.
- */
-const settled = (page: Page) => page.waitForFunction(() => !history.state?.['sveltekit:pageurl']);
 
 async function open(page: Page, path: string) {
 	await page.goto(path);
@@ -41,7 +36,6 @@ test('a job’s name drills in by selecting it, and the breadcrumb and Back go u
 	// A folder narrows the selection to the job's models in it.
 	await rows(page).first().locator('.row-name').click();
 	await expect(page).toHaveURL(/path%3Asql%2Fmodels%2F/);
-	await settled(page);
 	await page.goBack();
 	await expect(crumbs(page).getByRole('link')).toHaveCount(1);
 	await crumbs(page).getByRole('link', { name: 'All' }).click();

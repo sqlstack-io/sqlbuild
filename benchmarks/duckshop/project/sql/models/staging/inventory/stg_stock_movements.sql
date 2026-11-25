@@ -57,8 +57,7 @@ final AS (
     d.moved_at_local,
     @sql.json_text(d.metadata:operator) AS operator_id
   FROM deduplicated AS d
-  INNER JOIN effective_ids AS e
-    ON d.movement_id = e.movement_id
+  WHERE d.movement_id IN (SELECT e.movement_id FROM effective_ids AS e)
 )
 
 SELECT *

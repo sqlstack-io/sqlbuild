@@ -15,13 +15,38 @@ use crate::warehouse_metadata::models::{
     CatalogNodeBuild, CatalogNodeChecks, CatalogNodeOutcome, CatalogNodeRecord,
 };
 
-/// The state fields of a `CatalogNodeRecord`, with the same meaning.
+/// The state fields of a `CatalogNodeRecord`, with the same meaning, and the status every page shows.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct NodeState {
     pub last_build: Option<CatalogNodeBuild>,
     pub last_outcome: Option<CatalogNodeOutcome>,
     pub definition_changed: bool,
     pub checks: CatalogNodeChecks,
+    /// The node's one build status, which pages show as it is.
+    #[serde(default)]
+    pub status: NodeBuildStatus,
+    /// When the status was reached: the last build, or the last run for a node without a table.
+    #[serde(default)]
+    pub status_at: Option<DateTime<Utc>>,
+}
+
+/// Where a node stands: built and current, or why not.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum NodeBuildStatus {
+    /// Built, or run successfully for a node without a table, and up to date.
+    Current,
+    /// Its definition changed since its last build.
+    Changed,
+    /// An upstream node has newer data than its last build.
+    Behind,
+    /// Its last attempt failed.
+    Failed,
+    /// Never built, or never run for a node without a table.
+    #[default]
+    NotBuilt,
+    /// A source, which SQLBuild reads but never builds.
+    Source,
 }
 
 /// Every current node's state at one version; `snapshot_id` is null before the first publication.
@@ -46,7 +71,7 @@ pub struct ChangedBuild {
     pub changed: Vec<String>,
     /// Nodes that run only because an upstream they read runs.
     pub downstream: Vec<String>,
-    /// Why the location's plan failed, with both lists empty; absent when it planned.
+    /// Why the location's plan failed or which models it couldn't plan, with the nodes it did plan; absent when every model planned.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub failing: Option<String>,
 }
@@ -68,7 +93,7 @@ pub struct ChangedBuildReport {
     pub generation: i64,
     pub changed: Vec<String>,
     pub downstream: Vec<String>,
-    /// Why the plan failed, sent with empty lists.
+    /// Why the plan failed (empty lists) or which models it couldn't plan (the lists of the rest).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub failing: Option<String>,
 }

@@ -51,7 +51,7 @@ const keyName = (key: string) => key.slice(key.indexOf(':') + 1);
 
 /** The models the run builds: none the planner skips, and under `--changed` only those it runs. */
 export function builtModels(plan: PlanDocument): PlanModel[] {
-	return plan.models.filter((m) => m.action !== 'skip' && runsUnderChanged(plan, `model:${m.name}`));
+	return plan.models.filter((m) => !m.error && m.action !== 'skip' && runsUnderChanged(plan, `model:${m.name}`));
 }
 
 /** Rows of a paged section the plan holds so far, which is the offset of its next page. */
@@ -131,6 +131,7 @@ const SCHEMA_SIGNS: Record<string, { sign: '+' | '-' | '~'; label: string }> = {
 };
 
 function changedEntry(m: PlanModel, reason: string, windowStart?: string): PlanEntry {
+	if (m.error) return { name: m.name, value: 'error', detail: [m.error.code ? `error[${m.error.code}]: ${m.error.message}` : m.error.message, ...(m.error.help ? [`help: ${m.error.help}`] : [])] };
 	if (reason === 'first_run') return { name: m.name, value: materializationLabel(m), detail: cursorLines(m, true, windowStart) };
 	return {
 		name: m.name,
@@ -179,6 +180,8 @@ export function planSections(plan: PlanDocument): PlanSection[] {
 	}
 	const functionEntry = (f: PlanDocument['functions'][number]) => ({ name: f.name, value: f.language, detail: [] });
 	add('Changed functions', plan.functions.filter((f) => f.reason && f.reason !== 'no_change').map(functionEntry), true, 'changed_functions');
+	add('Planning failed', plan.models.filter((m) => m.error).map((m) => changedEntry(m, 'planning_error')), true, 'planning_error');
+	add('Window before cursor_start', plan.models.filter((m) => m.skip_reason).map((m) => ({ name: m.name, value: m.skip_reason ?? '', detail: [] })), false, 'window_before_cursor_start');
 	if (isFullRefresh(plan)) {
 		const counts = new Map<string, number>();
 		for (const m of active) counts.set(m.materialization_type, (counts.get(m.materialization_type) ?? 0) + 1);

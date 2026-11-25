@@ -274,3 +274,12 @@ pub(crate) const DEVELOPMENT_OUTPUT_FOLDER: &str =
 /// How `sqb dev` hands its location the SQLite control store file, which the watch leaves out.
 pub(crate) const DEVELOPMENT_CONTROL_FILE: &str =
     sqlbuild_core::constants::DEVELOPMENT_CONTROL_FILE_ENV;
+
+/// `sqb location health` while the newest location instance has not finished its first load.
+pub(crate) const STARTING_EXIT_CODE: i32 = 3;
+
+/// Failed generation lookups in a row, while the location still checks in, after which it reports a failed load.
+pub(crate) const LOOKUP_FAILURES_REPORTED: u32 = 3;
+
+/// The most characters of a failed load's error a location reports; the server refuses more.
+pub(crate) const MAX_LOAD_ERROR_CHARS: usize = 4000;

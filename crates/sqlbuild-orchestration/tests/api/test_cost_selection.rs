@@ -256,9 +256,29 @@ fn given_published_paths_when_costs_are_grouped_then_each_node_is_in_its_folder(
             expected_folder: "",
         },
         CostFolderTestCase {
-            description: "a Python node keeps its root",
+            description: "a Python node under python/ in place of python/nodes",
             path: Some("python/nodes/exports/asset.py"),
-            expected_folder: "python/nodes/exports",
+            expected_folder: "python/exports",
+        },
+        CostFolderTestCase {
+            description: "a Python node at the top of python/nodes",
+            path: Some("python/nodes/asset.py"),
+            expected_folder: "python",
+        },
+        CostFolderTestCase {
+            description: "a seed by its path below sql",
+            path: Some("sql/seeds/geo/countries.csv"),
+            expected_folder: "seeds/geo",
+        },
+        CostFolderTestCase {
+            description: "a scoped declaration stays in its owner's folder",
+            path: Some("sql/models/staging/_sqlbuild/functions/clean.sql"),
+            expected_folder: "staging/_sqlbuild/functions",
+        },
+        CostFolderTestCase {
+            description: "a path outside the layout's roots as published",
+            path: Some("legacy/orders.sql"),
+            expected_folder: "legacy",
         },
         CostFolderTestCase {
             description: "a node no longer published",

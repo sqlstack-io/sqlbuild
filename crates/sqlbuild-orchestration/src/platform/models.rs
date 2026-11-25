@@ -4,6 +4,7 @@ use crate::api::models::ControlClient;
 use crate::credentials::models::AuditRetention;
 use crate::declarations::models::TriggerDefinition;
 use crate::discovered_sets::models::DiscoveredSetStatus;
+use crate::platform::_helpers::health::current_instance::{CurrentInstance, current_instance};
 use crate::runs::models::{RunKind, RunLogRetention, RunNodeFailure, RunOutcome};
 use crate::sensors::models::{SensorEvaluationRequest, SensorFunctionOutcome};
 use crate::snapshots::models::{SnapshotRecord, SnapshotRetention};
@@ -46,6 +47,9 @@ pub enum LocationHealth {
         /// The configured rules' findings when they failed the load; absent for other failures and from older locations.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         rules: Option<LocationRuleFailure>,
+        /// Why the load failed, redacted and bounded; absent from older locations.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
     },
     Connection {
         generation: i64,
@@ -69,6 +73,11 @@ pub enum LocationHealth {
     Discovery {
         generation: i64,
         sets: Vec<DiscoveryHealth>,
+    },
+    /// The location's plan of what changed on the current snapshot failed, derived by the server from that plan, never reported by a location.
+    ChangePlanFailed {
+        generation: i64,
+        reason: String,
     },
     /// Jobs and groups this server's `pool_caps` clamp, derived by the server, never reported by a location.
     PoolCapped {
@@ -189,15 +198,27 @@ pub struct LocationHealthObservation {
     pub report: LocationHealthReport,
 }
 
+/// A target's health as people read it: its state, computed only here, and the newest observations it was computed from.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PersonLocationHealth {
+    pub state: LocationState,
+    /// Newest first, with this server's pool-cap warning on the current snapshot.
+    pub observations: Vec<LocationHealthObservation>,
+}
+
 /// One target's state from its newest health observations, as the web UI shows it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum LocationState {
+    /// The newest instance has not finished its first load; it reports nothing yet, and earlier instances don't count.
+    Starting,
     Healthy,
     /// The warehouse connection check after the last load failed.
     Degraded,
     /// The last load failed, so runs use the previous snapshot.
     FallingBack,
+    /// The plan of what changed on the current snapshot failed, so what needs building is unknown.
+    ChangePlanFailed,
     /// A provider secret is unset in the location's environment, so runs that use the provider fail.
     MissingSecrets,
     /// A discover function failed at the last publication, so its set serves its last good items or none.
@@ -207,7 +228,7 @@ pub enum LocationState {
 }
 
 impl LocationState {
-    /// `target`'s state at `now` from observations that may cover several targets: down without a recent check-in, then a failed load, then missing provider secrets, then a failed discover function, then a failed connection.
+    /// `target`'s state at `now`: down without a recent check-in, starting until the newest instance's first load finishes, then from that instance's reports a failed load (the newest load report by arrival decides, as failed loads keep the generation they tried), missing secrets, the server's record of a failed plan of what changed, a failed discover function, then a failed connection.
     #[must_use]
     pub fn of(
         observations: &[LocationHealthObservation],
@@ -225,24 +246,34 @@ impl LocationState {
         }) {
             return Self::Broken;
         }
-        let mut failed: Option<(DateTime<Utc>, i64)> = None;
-        let mut connection: Option<(DateTime<Utc>, i64, bool)> = None;
+        let change_plan_failed: bool = own.iter().any(|observation| {
+            matches!(
+                observation.report.health,
+                LocationHealth::ChangePlanFailed { .. }
+            )
+        });
+        let own: Vec<&LocationHealthObservation> =
+            match current_instance((&own, observations.len()), (silence, now)) {
+                CurrentInstance::Starting => return Self::Starting,
+                CurrentInstance::Loaded(session) => own
+                    .into_iter()
+                    .filter(|observation| observation.report.session_id == session)
+                    .collect(),
+                CurrentInstance::Unknown => own,
+            };
+        let mut load: Option<(DateTime<Utc>, LoadReport)> = None;
         let mut secrets: Option<(DateTime<Utc>, u64)> = None;
         let mut discovery: Option<(DateTime<Utc>, bool)> = None;
         for observation in own {
             let seen = observation.received_at;
             match observation.report.health {
-                LocationHealth::CompileFailed { generation, .. }
-                    if failed.is_none_or(|(at, _)| seen > at) =>
-                {
-                    failed = Some((seen, generation));
+                LocationHealth::CompileFailed { .. } if load.is_none_or(|(at, _)| seen > at) => {
+                    load = Some((seen, LoadReport::Failed));
                 }
-                LocationHealth::Connection {
-                    generation,
-                    healthy,
-                    ..
-                } if connection.is_none_or(|(at, _, _)| seen > at) => {
-                    connection = Some((seen, generation, healthy));
+                LocationHealth::Connection { healthy, .. }
+                    if load.is_none_or(|(at, _)| seen > at) =>
+                {
+                    load = Some((seen, LoadReport::Published { connected: healthy }));
                 }
                 LocationHealth::ProviderSecrets { missing, .. }
                     if secrets.is_none_or(|(at, _)| seen > at) =>
@@ -260,17 +291,22 @@ impl LocationState {
                 _ => {}
             }
         }
-        match (failed, connection, secrets) {
-            (Some((_, failed)), Some((_, connected, _)), _) if failed >= connected => {
-                Self::FallingBack
-            }
-            (Some(_), None, _) => Self::FallingBack,
-            (_, _, Some((_, missing))) if missing > 0 => Self::MissingSecrets,
+        match (load.map(|(_, report)| report), secrets) {
+            (Some(LoadReport::Failed), _) => Self::FallingBack,
+            (_, Some((_, missing))) if missing > 0 => Self::MissingSecrets,
+            _ if change_plan_failed => Self::ChangePlanFailed,
             _ if discovery.is_some_and(|(_, failing)| failing) => Self::DiscoveryFailed,
-            (_, Some((_, _, false)), _) => Self::Degraded,
+            (Some(LoadReport::Published { connected: false }), _) => Self::Degraded,
             _ => Self::Healthy,
         }
     }
+}
+
+/// How the newest load a location reported ended.
+#[derive(Clone, Copy)]
+enum LoadReport {
+    Failed,
+    Published { connected: bool },
 }
 
 /// Only named location operations cross this boundary, never arbitrary SQL or Python.
@@ -445,6 +481,7 @@ pub enum PlatformEventKind {
     TickOverdue,
     CalendarHorizonLow,
     LocationBroken,
+    LocationFailing,
     LaunchFailed,
     RunFailed,
     TriggerSkipped,
@@ -461,6 +498,7 @@ impl PlatformEventKind {
             Self::TickOverdue => "tick_overdue",
             Self::CalendarHorizonLow => "calendar_horizon_low",
             Self::LocationBroken => "location_broken",
+            Self::LocationFailing => "location_failing",
             Self::LaunchFailed => "launch_failed",
             Self::RunFailed => "run_failed",
             Self::TriggerSkipped => "trigger_skipped",
@@ -493,6 +531,15 @@ pub enum PlatformEvent {
         location_id: Uuid,
         target: String,
         last_seen_at: DateTime<Utc>,
+    },
+    /// A checking-in location's latest load, plan of what changed, discovery or connection check failed; `serving_generation` is what runs use instead.
+    LocationFailing {
+        location_id: Uuid,
+        target: String,
+        state: LocationState,
+        failed_at: DateTime<Utc>,
+        error: Option<String>,
+        serving_generation: Option<i64>,
     },
     /// A launch attempt or its response failed; the worker may still start or finish.
     LaunchFailed {
@@ -541,6 +588,7 @@ impl PlatformEvent {
             Self::TickOverdue { .. } => PlatformEventKind::TickOverdue,
             Self::CalendarHorizonLow { .. } => PlatformEventKind::CalendarHorizonLow,
             Self::LocationBroken { .. } => PlatformEventKind::LocationBroken,
+            Self::LocationFailing { .. } => PlatformEventKind::LocationFailing,
             Self::LaunchFailed { .. } => PlatformEventKind::LaunchFailed,
             Self::RunFailed { .. } => PlatformEventKind::RunFailed,
             Self::TriggerSkipped { .. } => PlatformEventKind::TriggerSkipped,
@@ -557,6 +605,7 @@ impl PlatformEvent {
             Self::TickOverdue { .. } => "platform_tick_overdue",
             Self::CalendarHorizonLow { .. } => "platform_calendar_horizon_low",
             Self::LocationBroken { .. } => "platform_location_broken",
+            Self::LocationFailing { .. } => "platform_location_failing",
             Self::LaunchFailed { .. } => "platform_launch_failed",
             Self::RunFailed { .. } => "platform_run_failed",
             Self::TriggerSkipped { .. } => "platform_trigger_skipped",
@@ -636,6 +685,9 @@ pub struct PlatformProblems {
     /// When the last scheduler lease ran out, or will run out; absent until a server first leads.
     pub scheduler_lease_expires_at: Option<DateTime<Utc>>,
     pub broken_locations: Vec<BrokenLocation>,
+    /// Checking-in locations whose latest load, plan of what changed, discovery or connection check failed.
+    #[serde(default)]
+    pub failing_locations: Vec<FailingLocation>,
     pub overdue_ticks: Vec<OverdueTick>,
     /// Running calendar schedules whose dates run out within a day.
     #[serde(default)]
@@ -741,6 +793,22 @@ pub struct BrokenLocation {
     pub last_seen_at: DateTime<Utc>,
 }
 
+/// A checking-in location whose latest load, plan of what changed, discovery or connection check failed, and what it serves instead.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct FailingLocation {
+    pub location_id: Uuid,
+    pub location_name: String,
+    pub target: String,
+    /// `falling_back`, `change_plan_failed`, `discovery_failed` or `degraded`.
+    pub state: LocationState,
+    /// When the failure was reported.
+    pub failed_at: DateTime<Utc>,
+    /// What failed, redacted; absent when an older location reported no text.
+    pub error: Option<String>,
+    /// The snapshot the target serves; absent before its first publication.
+    pub serving: Option<SnapshotRecord>,
+}
+
 /// A running schedule whose next tick is more than 30 seconds late.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct OverdueTick {
@@ -769,6 +837,7 @@ pub(crate) struct ProblemScan {
     pub(crate) now: DateTime<Utc>,
     pub(crate) lease: Option<SchedulerLease>,
     pub(crate) broken: Vec<BrokenLocation>,
+    pub(crate) failing: Vec<FailingLocation>,
     pub(crate) late_targets: std::collections::BTreeSet<(Uuid, String)>,
     pub(crate) low_calendars: Vec<LowCalendar>,
     pub(crate) skipped_triggers: Vec<SkippedTrigger>,
@@ -881,6 +950,10 @@ pub struct LocationRuleFinding {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum PlanRowSection {
+    /// Models that couldn't be planned, with their errors.
+    PlanningError,
+    /// Models an explicit cursor window skips, as it ends before their `cursor_start`.
+    WindowBeforeCursorStart,
     /// Built models the plan rebuilds in full.
     FullRefresh,
     QueryChanged,

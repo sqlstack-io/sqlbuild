@@ -3,7 +3,6 @@
 use sqlbuild_orchestration::platform::models::LocationWorkScope;
 use std::future::Future;
 use std::path::Path;
-use std::time::Duration;
 
 use sqlbuild_cache::project_snapshot::models::PathStamp;
 use sqlbuild_orchestration::platform::main::work::connect_location_work::connect_location_work;
@@ -19,9 +18,8 @@ use crate::native_commands::_helpers::command::paths::{
     exclude_location_databases, location_watch, observe_location_inputs,
 };
 use crate::native_commands::_helpers::command::terminal::write_output;
-use crate::native_commands::_helpers::location::execution::{
-    apply_dev_controls, compile_next_generation, finish_compile,
-};
+use crate::native_commands::_helpers::location::compile_turn::compile_turn;
+use crate::native_commands::_helpers::location::execution::apply_dev_controls;
 use crate::native_commands::_helpers::location::execution::{
     dev_controls, location_clock, location_heartbeats, next_turn,
 };
@@ -36,7 +34,6 @@ use crate::native_commands::main::_location_work::run_location_work;
 use crate::native_commands::models::{
     DevControlState, LocationMetadataSync, LocationRuntimeRequest, LocationServe, LocationWatch,
 };
-use crate::native_commands::types::LoadOutcome;
 
 pub(super) async fn run_location(
     options: LocationServe,
@@ -133,37 +130,19 @@ async fn watch_location(
             (watch, work_at, metadata) = idle;
             continue;
         }
-        published_generation = None;
-        let Some(next) = compile_next_generation(
-            (options, bearer, &requests),
-            (metadata, compiled_inputs, &watch.observed.0),
-            stopped.as_mut(),
-        )
-        .await?
-        else {
-            return Ok(());
-        };
-        let next_compile: Option<(LoadOutcome, i64)>;
-        (next_compile, metadata, compiled_inputs) = next;
-        let Some((load, generation)) = next_compile else {
-            watch.retry_at = Some(Instant::now() + Duration::from_secs(5));
-            continue;
-        };
-        published_generation = match &load {
-            Ok(_) => Some(generation),
-            Err(_) => None,
-        };
-        let Some(settled) = finish_compile(
-            (options, script, ((bearer, poll.session_id), client)),
-            (load, generation),
-            (watch, metadata, deferred_sync),
+        let Some(turn) = compile_turn(
+            ((options, script), (bearer, client, poll), &requests),
+            ((watch, metadata, deferred_sync), compiled_inputs),
             (&mut controls, stopped.as_mut()),
         )
         .await?
         else {
             return Ok(());
         };
-        (watch, metadata, deferred_sync) = settled;
+        (
+            ((watch, metadata, deferred_sync), compiled_inputs),
+            published_generation,
+        ) = turn;
     }
 }
 

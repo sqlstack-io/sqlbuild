@@ -22,14 +22,14 @@ function node(key: string, path: string, upstream: string[] = [], extra: Partial
 }
 
 const nodes = [
-	node('source:shop__orders', 'sources/shop.yml'),
-	node('source:shop__customers', 'sources/shop.yml'),
-	node('model:stg_orders', 'models/staging/shop/stg_orders.sql', ['source:shop__orders']),
-	node('model:stg_customers', 'models/staging/crm/stg_customers.sql', ['source:shop__customers']),
-	node('model:orders', 'models/marts/orders.sql', ['model:stg_orders', 'model:stg_customers'], { stale: [{ reason: 'behind', upstream: [], detail: '', since: '' }] as CatalogNode['stale'] }),
-	node('model:order_totals', 'models/marts/order_totals.sql', ['model:orders']),
-	node('model:inventory', 'models/inventory/inventory.sql', ['model:orders']),
-	node('model:inventory_daily', 'models/inventory/inventory_daily.sql', ['model:inventory'])
+	node('source:shop__orders', 'sql/sources/shop.yml'),
+	node('source:shop__customers', 'sql/sources/shop.yml'),
+	node('model:stg_orders', 'sql/models/staging/shop/stg_orders.sql', ['source:shop__orders']),
+	node('model:stg_customers', 'sql/models/staging/crm/stg_customers.sql', ['source:shop__customers']),
+	node('model:orders', 'sql/models/marts/orders.sql', ['model:stg_orders', 'model:stg_customers'], { stale: [{ reason: 'behind', upstream: [], detail: '', since: '' }] as CatalogNode['stale'] }),
+	node('model:order_totals', 'sql/models/marts/order_totals.sql', ['model:orders']),
+	node('model:inventory', 'sql/models/inventory/inventory.sql', ['model:orders']),
+	node('model:inventory_daily', 'sql/models/inventory/inventory_daily.sql', ['model:inventory'])
 ];
 const tree = folderTree(nodes);
 
@@ -127,10 +127,10 @@ describe('picked nodes', () => {
 });
 
 describe('one rule at every scope', () => {
-	const flat = (n: number, folder: string) => Array.from({ length: n }, (_, i) => node(`model:${folder.replace(/\//g, '_')}_${i}`, `models/${folder}/m${i}.sql`));
+	const flat = (n: number, folder: string) => Array.from({ length: n }, (_, i) => node(`model:${folder.replace(/\//g, '_')}_${i}`, `sql/models/${folder}/m${i}.sql`));
 	// The same shape twice: once as a whole project, once inside a `marts` folder of a larger project.
 	const shape = (prefix: string) => [...flat(90, `${prefix}core`), ...flat(70, `${prefix}finance`)];
-	const project = [...shape('marts/'), node('model:marts_top', 'models/marts/top.sql'), ...flat(40, 'staging')];
+	const project = [...shape('marts/'), node('model:marts_top', 'sql/models/marts/top.sql'), ...flat(40, 'staging')];
 	const ids = (g: { nodes: { id: string; type?: string; parentId?: string }[] }) =>
 		g.nodes.filter((n) => n.type !== 'stub').map((n) => `${n.type}:${n.id.replace('marts/', '').replace('model:marts_', 'model:').replace('model:martstop', 'model:top')}`).sort();
 

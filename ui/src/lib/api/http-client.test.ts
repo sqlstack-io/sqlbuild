@@ -197,7 +197,7 @@ describe('HttpChangeFeed', () => {
 		const signals: ChangedSignal[] = [];
 		changes.subscribe((signal) => signals.push(signal));
 		changes.follow(ORDERS);
-		const state = { last_build: { observed_at: '2026-01-02T00:00:00Z', run_id: 'r2', version_hash: 'h2' }, last_outcome: { at: '2026-01-02T00:00:00Z', status: 'failed' }, definition_changed: false, checks: { total: 1, passing: 0, warning: 0, failing: 1 } };
+		const state = { last_build: { observed_at: '2026-01-02T00:00:00Z', run_id: 'r2', version_hash: 'h2' }, last_outcome: { at: '2026-01-02T00:00:00Z', status: 'failed' }, definition_changed: false, checks: { total: 1, passing: 0, warning: 0, failing: 1 }, status: 'failed', status_at: '2026-01-02T00:00:00Z' };
 		const send = (notice: unknown) => latest().listeners.get('changed')!(new MessageEvent('changed', { data: JSON.stringify(notice) }));
 		send({ topic: 'node_status:development', version: 8, previous_version: 7, states: { 'model:orders': state } });
 		send({ topic: 'node_status:development', version: 9, previous_version: 8, full: true });
@@ -211,7 +211,9 @@ describe('HttpChangeFeed', () => {
 						lastBuild: { fingerprintRunId: 'r2', runId: null, jobKey: null, builtAt: '2026-01-02T00:00:00Z', fingerprint: 'h2' },
 						lastOutcome: 'failed',
 						definitionChanged: false,
-						checks: { total: 1, passing: 0, warning: 0, failing: 1 }
+						checks: { total: 1, passing: 0, warning: 0, failing: 1 },
+						status: 'failed',
+						statusAt: '2026-01-02T00:00:00Z'
 					}
 				}
 			},
@@ -369,7 +371,7 @@ describe('node listing and states', () => {
 			vi.fn(async (request: Request) => {
 				const path = new URL(request.url).pathname;
 				if (path.endsWith('/node-states')) {
-					return Response.json({ snapshot_id: record.snapshot_id, version: 3, states: { 'model:orders': { definition_changed: false, checks: record.checks, last_outcome: { at: '2026-01-02T00:00:00Z', status: 'failed' } } } });
+					return Response.json({ snapshot_id: record.snapshot_id, version: 3, states: { 'model:orders': { definition_changed: false, checks: record.checks, last_outcome: { at: '2026-01-02T00:00:00Z', status: 'failed' }, status: 'failed', status_at: '2026-01-02T00:00:00Z' } } });
 				}
 				if (path.endsWith('/column-lineage')) {
 					return Response.json({ nodes: [{ node_key: 'model:orders', columns: [] }], edges: [{ source_key: 'model:orders', source_column: 'id', target_key: 'model:orders', target_column: 'order_id', transform: 'direct' }] });
@@ -581,7 +583,7 @@ describe('locations', () => {
 						overdue_ticks: []
 					});
 				if (path.includes('/targets/preview/')) return Response.json({ error: 'refused' }, { status: 403 });
-				if (path.endsWith('/health')) return Response.json([report('s-2', 10), report('s-1', 400), report('s-2', 20)]);
+				if (path.endsWith('/health')) return Response.json({ state: 'healthy', observations: [report('s-2', 10), report('s-1', 400), report('s-2', 20)] });
 				return Response.json([]);
 			})
 		);
@@ -606,7 +608,7 @@ describe('locations', () => {
 		expect(paths.some((p) => p.endsWith('/health'))).toBe(false);
 	});
 
-	it('counts open problems per location target', async () => {
+	it("counts open problems per location target, with the server's state of each", async () => {
 		const listed = await server().client.listLocations();
 		expect(listed.map((l) => [l.id, l.activeProblems, l.health])).toEqual([
 			['0191f0aa-orders:development', 1, 'healthy'],
@@ -1091,7 +1093,7 @@ describe('listWarehouseConnections', () => {
 				if (path.endsWith('/bootstrap')) return Response.json({ login_mode: 'password', access: { name: 'ada', principal_id: 'p', actions: [], locations: [access('development'), access('preview')] } });
 				if (path.endsWith('/health')) {
 					health.push(path);
-					return path.includes('/targets/preview/') ? Response.json({ error: 'refused' }, { status: 403 }) : Response.json([]);
+					return path.includes('/targets/preview/') ? Response.json({ error: 'refused' }, { status: 403 }) : Response.json({ state: 'healthy', observations: [] });
 				}
 				return Response.json([]);
 			})

@@ -24,6 +24,11 @@ pub(crate) fn reported_generation(
                 "the server derives pool_capped health; a location cannot report it".into(),
             ));
         }
+        LocationHealth::ChangePlanFailed { .. } => {
+            return Err(ControlError::Invalid(
+                "the server derives change_plan_failed health; a location cannot report it".into(),
+            ));
+        }
     };
     if generation.is_some_and(|generation| generation < 1) {
         return Err(ControlError::Invalid(

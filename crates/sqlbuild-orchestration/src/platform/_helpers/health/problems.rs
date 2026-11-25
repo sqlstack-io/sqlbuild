@@ -4,6 +4,7 @@ use chrono::{DateTime, TimeDelta, Utc};
 use uuid::Uuid;
 
 use crate::declarations::models::Schedule;
+use crate::platform::_helpers::health::failing_locations::failing_locations;
 use crate::platform::constants::LOCATION_SILENCE_SECONDS;
 use std::collections::BTreeSet;
 
@@ -59,6 +60,7 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
     )
     .await?;
     let (transaction, problems) = trigger_problems(transaction).await?;
+    let (transaction, failing) = failing_locations(transaction).await?;
     commit(transaction).await?;
     let schedules: Vec<RunningSchedule> = schedules
         .into_iter()
@@ -90,6 +92,7 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
             .into_iter()
             .map(decode_row)
             .collect::<Result<_, _>>()?,
+        failing,
         late_targets: late_targets
             .into_iter()
             .map(|row| {

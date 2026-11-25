@@ -493,9 +493,10 @@ pub(crate) fn resolve_cursor_overrides<'py>(
     start_cursor_override: Bound<'py, PyAny>,
     end_cursor_override: Bound<'py, PyAny>,
 ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
-    model_cursor_overrides(
+    let (window, _) = model_cursor_overrides(
         model,
         cursor_overrides,
         (start_cursor_override, end_cursor_override),
-    )
+    )?;
+    Ok(window)
 }

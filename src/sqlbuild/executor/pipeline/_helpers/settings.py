@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from sqlbuild._native import SettingsConfig
+from sqlbuild._native import PlannerInputError, PlanOutput, PlanWarning, SettingsConfig
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.types import TablePromotionMode
 from sqlbuild.executor.build.models import (
@@ -57,3 +57,13 @@ def resolve_build_inputs(
         customizations=customizations if customizations is not None else BuildCustomizations(),
         initial_state=initial_state if initial_state is not None else BuildInitialState(),
     )
+
+
+def plannable_plan(plan: PlanOutput) -> PlanOutput:
+    """The plan, or the first model's planning error, so no run silently skips that model."""
+
+    for entry in plan.model_entries:
+        error: PlanWarning | None = entry.planning_error
+        if error is not None:
+            raise PlannerInputError(error.message, code=error.code, help=error.help)
+    return plan

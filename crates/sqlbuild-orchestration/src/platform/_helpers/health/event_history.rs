@@ -62,6 +62,11 @@ fn person_event(
             location_id,
             target,
             ..
+        }
+        | PlatformEvent::LocationFailing {
+            location_id,
+            target,
+            ..
         } => Some((*location_id, target.clone())),
         PlatformEvent::TickOverdue { trigger_id, .. }
         | PlatformEvent::CalendarHorizonLow { trigger_id, .. }

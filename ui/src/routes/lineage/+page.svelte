@@ -60,6 +60,7 @@
 	import { catalogNodes as sharedCatalog, useCatalogNodes } from '$lib/state/catalog.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { checkOutcomeTone, nodeOutcomeLabel, nodeOutcomeTone, staleReasonDetail, staleReasonLabel } from '$lib/status';
+	import { statusLabel } from '$lib/build-area/node-status';
 	import { formatCredits, formatMs, formatNumber, kindLine, relationName, runScopePhaseHelp, runScopePhaseLabel, shortName, shortRunId, sqlVersions } from '$lib/build-area/labels';
 	import { GROUPED_ABOVE, cardData, cardStatus, folderOf } from '$lib/lineage/catalog-graph';
 	import { MAX_DRAWN, expandAll, folderBoxId, folderCardId, opensByFolder, tooManyToDraw, folderTree, layoutFolderGraph, withFolderClosed, withFoldersOpen, type FolderTree } from '$lib/lineage/folder-graph';
@@ -578,10 +579,10 @@
 		return !statusFilter.length || statusFilter.some((f) => matchesFilterStatus(c, f));
 	}
 	function matchesFilterStatus(c: CatalogNode, f: StatusFilter): boolean {
-		if (f === 'stale') return (c.stale?.length ?? 0) > 0;
-		if (f === 'changed') return !!c.stale?.some((r) => r.reason !== 'behind');
-		if (f === 'behind') return !!c.stale?.some((r) => r.reason === 'behind');
-		return c.lastOutcome === 'failed';
+		if (f === 'stale') return c.status === 'changed' || c.status === 'behind';
+		if (f === 'changed') return c.status === 'changed';
+		if (f === 'behind') return c.status === 'behind';
+		return c.status === 'failed';
 	}
 	const catalogNodes = $derived<CatalogNode[]>(catalog.data ?? []);
 	/** Nodes whose own definition changed, which `sqb build --changed` starts from. */
@@ -1102,7 +1103,7 @@
 					<dl class="kv">
 						<div><dt>Kind</dt><dd>{kindLine(listed)}</dd></div>
 						{#if listed.relation}<div><dt>Relation</dt><dd class="mono">{relationName(listed.relation)}</dd></div>{/if}
-						{#if listed.kind !== 'source'}<div><dt>Last built</dt><dd>{#if listed.lastBuild}<BuildSource build={listed.lastBuild} />{:else}No build recorded{/if}</dd></div>{/if}
+						{#if listed.kind !== 'source'}<div><dt>Last built</dt><dd>{#if listed.lastBuild}<BuildSource build={listed.lastBuild} />{:else if listed.statusAt}{formatStamp(listed.statusAt)}{:else}No build recorded{/if}</dd></div>{/if}
 						{#if listed.tags.length}<div><dt>Tags</dt><dd>{listed.tags.join(', ')}</dd></div>{/if}
 						{#if listed.path}<div><dt>File</dt><dd class="mono">{listed.path}</dd></div>{/if}
 					</dl>
@@ -1137,7 +1138,7 @@
 				<InspectorSection title="Last build">
 					{#snippet meta()}{#if d.lastBuild?.runId}<a class="section-link" href={to(`/runs/${d.lastBuild.runId}`)}>View run →</a>{/if}{/snippet}
 					<div class="status-top">
-						{#if d.lastOutcome}<StatusLabel tone={nodeOutcomeTone[d.lastOutcome]} label={nodeOutcomeLabel[d.lastOutcome]} />{:else if !d.lastBuild}<StatusLabel tone="var(--sb-text-faint)" label="Not built" muted />{/if}
+						{#if statusLabel(d)}{@const s = statusLabel(d)!}<StatusLabel tone={s.tone} label={s.label} muted={d.status === 'not_built'} />{/if}
 						<StaleBadges reasons={d.stale} />
 					</div>
 					<div class="status-stats">

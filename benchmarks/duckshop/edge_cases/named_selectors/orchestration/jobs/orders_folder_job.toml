@@ -1,4 +1,4 @@
-# A folder, an expansion, a glob, an intersection's name, a job name and a repeated name: one named node.
+# A folder, an expansion, a glob, an intersection's name and a repeated name: one named node.
 name = "orders_folder_job"
 description = "Selects the orders pipeline without listing it."
-select = "sql/models/orders +order_totals stg_* order_totals,tag:orders orders_listed_job order_totals"
+select = "sql/models/orders +order_totals stg_* order_totals,tag:orders order_totals"

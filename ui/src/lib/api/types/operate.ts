@@ -415,7 +415,7 @@ export type CostFact = {
 	/** Null for builds no server run started (by hand or from the command line). */
 	job: string | null;
 	nodeKey: string;
-	/** The node's folder: without `sql/models/` for SQL models (empty at its top), other roots as published, `other` when unknown. */
+	/** The node's folder as the catalog groups it: below `sql/models/` for SQL models (empty at its top), below `sql/` for other SQL resources, `python/<below python/nodes/>` for Python nodes, `other` when unknown. */
 	folder: string;
 	credits: number;
 	previousCredits: number;
@@ -755,7 +755,7 @@ export type VocabularyEntry = { value: string; count: number };
 export type SelectionVocabulary = {
 	snapshotId: string | null;
 	tags: VocabularyEntry[];
-	/** Folders such as `models/staging`, counting the nodes below each at any depth. */
+	/** Folders a `path:` selector accepts, such as `sql/models/staging`, counting the nodes below each at any depth. */
 	paths: VocabularyEntry[];
 	jobs: VocabularyEntry[];
 	sources: VocabularyEntry[];
@@ -825,6 +825,10 @@ export type PlanModel = {
 	old_name?: PlanOldName | null;
 	/** A paged row's diff counts in place of its diff text, which `planDiff` reads on demand. */
 	diff_stats?: { query?: PlanDiffStats; config?: PlanDiffStats };
+	/** Why a skipped model is listed anyway, such as `window ends before cursor_start 2021-01-01`. */
+	skip_reason?: string;
+	/** Why the model couldn't be planned, on a row whose action is `error`; a build of it is refused. */
+	error?: { code: string | null; message: string; help: string | null };
 };
 
 /** A diff's changed lines; `whitespace_only` when they read the same with all whitespace taken out (a case change is a change). */
@@ -902,6 +906,8 @@ type PlanFields = {
 	functions: { name: string; language: string; reason?: string }[];
 	python_nodes: { name: string; kind: string; phase: string; identity_status: string }[];
 	warnings: PlanWarning[];
+	/** Whether any finding is an error, such as a model that couldn't be planned; a build of the plan is refused. */
+	has_errors?: boolean;
 	migrations: PlanMigration[];
 	column_migrations: PlanColumnMigration[];
 	table_type_conversions: PlanTableTypeConversion[];
@@ -944,6 +950,8 @@ export type PlanCantRun = {
 
 /** Every plan section a server summary counts and pages, in plan order. */
 export type PlanPageSection =
+	| 'planning_error'
+	| 'window_before_cursor_start'
 	| 'full_refresh'
 	| 'query_changed'
 	| 'function_changed'

@@ -196,7 +196,7 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
 
 export const PYTHON_SOURCE: Record<string, { file: string; source: string }> = {
 	score_customers_v2: {
-		file: 'models/ml/score_customers_v2.py',
+		file: 'python/nodes/ml/score_customers_v2.py',
 		source: `import numpy as np
 import pandas as pd
 from sqlbuild.tasks import task
@@ -241,7 +241,7 @@ def score_customers_v2(ctx):
     ctx.write("customer_scores_v2", model.predict(features))`
 	},
 	notebook_runner: {
-		file: 'models/ml/notebook_runner.py',
+		file: 'python/nodes/ml/notebook_runner.py',
 		source: `from sqlbuild.tasks import task
 
 from shop.notebooks import run_notebook
@@ -255,7 +255,7 @@ def notebook_runner(ctx):
     ctx.log.info(f"Notebook finished: {result.cells} cells, {result.rows_written:,} rows written")`
 	},
 	raw_events: {
-		file: 'models/ingest/raw_events.py',
+		file: 'python/nodes/ingest/raw_events.py',
 		source: `import logging
 
 from sqlbuild.loaders import loader
@@ -279,7 +279,7 @@ def raw_events(ctx: LoaderContext):
         page += 1`
 	},
 	score_customers: {
-		file: 'models/ml/score_customers.py',
+		file: 'python/nodes/ml/score_customers.py',
 		source: `import pandas as pd
 from sqlbuild.tasks import task
 
@@ -296,7 +296,7 @@ def score_customers(ctx):
     print(f"Scored {len(customers):,} customers")`
 	},
 	raw__orders: {
-		file: 'python/raw__orders.py',
+		file: 'python/nodes/raw__orders.py',
 		source: `from sqlbuild.loaders import loader
 from sqlbuild.executor.load.models import LoaderContext
 
@@ -309,7 +309,7 @@ def raw__orders(ctx: LoaderContext):
     return fetch_since(ctx.current_cursor_value)`
 	},
 	export_revenue_csv: {
-		file: 'python/export_revenue_csv.py',
+		file: 'python/nodes/export_revenue_csv.py',
 		source: `from sqlbuild.assets import asset
 
 from shop.file_drop import upload_csv

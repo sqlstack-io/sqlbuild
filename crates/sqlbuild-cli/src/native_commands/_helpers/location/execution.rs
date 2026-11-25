@@ -59,7 +59,7 @@ use crate::native_commands::constants::{
 use crate::native_commands::constants::{
     DEVELOPMENT_CONTROL_FILE, DEVELOPMENT_OUTPUT_FOLDER, PLAN_NOT_PRODUCED,
 };
-use crate::native_commands::constants::{OPENING_STORE, STORE_READY};
+use crate::native_commands::constants::{MAX_LOAD_ERROR_CHARS, OPENING_STORE, STORE_READY};
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_admin::run_admin;
 use crate::native_commands::main::_run_control::run_control;
@@ -439,8 +439,6 @@ pub(crate) async fn compile_generation(
         dev_event_line(&DevEvent::Published {
             generation,
             snapshot_id: record.snapshot_id.to_string(),
-            record: serde_json::to_value(&record)
-                .map_err(|error| ControlError::Invalid(error.to_string()))?,
         })
     } else {
         let mut output: String = serde_json::to_string(&record)
@@ -970,11 +968,11 @@ pub(crate) fn location_options(namespace: &Namespace) -> Result<LocationServe, C
     })
 }
 
-/// Reconcile from the server after restarts or lost acknowledgements; transient outages retry.
+/// Reconcile from the server after restarts or lost acknowledgements; a transient outage is its error text, and retries.
 pub(crate) async fn location_generation(
     options: &LocationServe,
     bearer: &str,
-) -> Result<Option<i64>, ControlError> {
+) -> Result<Result<i64, String>, ControlError> {
     match next_remote_generation(
         &options.server_url,
         bearer,
@@ -983,7 +981,7 @@ pub(crate) async fn location_generation(
     )
     .await
     {
-        Ok(generation) => Ok(Some(generation)),
+        Ok(generation) => Ok(Ok(generation)),
         Err(error) => {
             if matches!(&error, ClientError::Configuration(_))
                 || matches!(&error, ClientError::Rejected(status) if matches!(status.as_u16(), 401 | 403))
@@ -996,7 +994,7 @@ pub(crate) async fn location_generation(
                     "Location generation lookup failed; retaining last good snapshot and retrying: {error}\n"
                 ),
             )]));
-            Ok(None)
+            Ok(Err(error.to_string()))
         }
     }
 }
@@ -1872,11 +1870,20 @@ pub(crate) async fn finish_compile(
         ..
     } = match load {
         Ok(published) => published,
-        Err((rules, _)) => {
+        Err((rules, error)) => {
             watch.retry_at = Some(Instant::now() + Duration::from_secs(30));
+            let error: String = redact_error_text(&error)
+                .chars()
+                .take(MAX_LOAD_ERROR_CHARS)
+                .collect();
+            let failed = LocationHealth::CompileFailed {
+                generation,
+                rules,
+                error: Some(error),
+            };
             tokio::select! {
                 result = &mut stopped => { result?; return Ok(None); },
-                () = report_location_health(options, session.0, session.1, LocationHealth::CompileFailed { generation, rules }) => {},
+                () = report_location_health(options, session.0, session.1, failed) => {},
             }
             drop(write_output(&[(
                 Stream::Stderr,
@@ -1926,12 +1933,13 @@ pub(crate) async fn compile_next_generation(
         Some(state) => Some(close_metadata_reader(state).await?),
         None => None,
     };
-    let generation: Option<i64> = tokio::select! {
+    let generation: Result<i64, String> = tokio::select! {
         result = &mut stopped => { result?; return Ok(None); },
         generation = location_generation(options, bearer) => generation?,
     };
-    let Some(generation) = generation else {
-        return Ok(Some((None, metadata, compiled_inputs)));
+    let generation: i64 = match generation {
+        Ok(generation) => generation,
+        Err(error) => return Ok(Some((Err(error), metadata, compiled_inputs))),
     };
     drop(write_output(&[(
         Stream::Stderr,
@@ -1945,7 +1953,7 @@ pub(crate) async fn compile_next_generation(
         stopped.as_mut(),
     )
     .await?;
-    Ok(load.map(|load| (Some((load, generation)), metadata, compiled_inputs)))
+    Ok(load.map(|load| (Ok((load, generation)), metadata, compiled_inputs)))
 }
 
 /// The safety sync interval from the flag, then the environment, then the project; `None` when unset.

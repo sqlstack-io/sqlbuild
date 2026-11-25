@@ -6,7 +6,9 @@ use uuid::Uuid;
 
 use crate::platform::_helpers::health::observations::observe;
 use crate::platform::_helpers::health::problems::calendar_low;
-use crate::platform::_helpers::location::liveness::scan_location_page;
+use crate::platform::_helpers::location::liveness::{
+    observe_failing_locations, scan_location_page,
+};
 use crate::platform::models::{InstallationHealth, PlatformEvent, WatchdogTrigger};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
@@ -50,6 +52,9 @@ pub(crate) async fn scan_health(
             break;
         }
         tokio::task::yield_now().await;
+    }
+    if !*shutdown.borrow() {
+        observe_failing_locations(store, health.installation_id).await?;
     }
     let mut after = None;
     while !*shutdown.borrow() {

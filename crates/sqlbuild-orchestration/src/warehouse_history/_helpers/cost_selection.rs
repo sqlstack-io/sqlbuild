@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use chrono::{DateTime, Duration, NaiveDate, Utc};
+use sqlbuild_core::constants::{MODELS_PATH, PYTHON_NODE_ROOT, SQL_DIRECTORY};
 use uuid::Uuid;
 
 use crate::credentials::models::{AuditContext, DefaultRole};
@@ -19,8 +20,8 @@ use crate::warehouse_history::_helpers::costs::{
 
 /// The folder of nodes whose path the publication doesn't give, such as nodes no longer deployed.
 pub(crate) const OTHER_FOLDER: &str = "other";
-/// The layout root of SQL models, which folders leave out.
-const MODELS_ROOT: &str = "sql/models";
+/// The folder Python nodes group under, in place of their `python/nodes` root.
+const PYTHON_FOLDER: &str = "python";
 
 /// A period of whole UTC days ending today, and the one before it.
 pub(crate) struct CostPeriod {
@@ -91,20 +92,34 @@ pub(crate) struct SelectionCosts {
     pub(crate) pending_runs: BTreeSet<String>,
 }
 
-/// A node's folder: its directory, without `sql/models/` (empty at its top); other roots as published.
+/// A node's folder as the catalog groups it: below `sql/models/`, below `sql/`, or `python/<below nodes>`.
 pub(crate) fn cost_folder(path: Option<&str>) -> String {
     let Some(path) = path else {
         return OTHER_FOLDER.to_owned();
     };
     let directory: &str = path.rsplit_once('/').map_or("", |(directory, _)| directory);
-    if directory == MODELS_ROOT {
-        return String::new();
+    if let Some(folder) = below(directory, MODELS_PATH) {
+        return folder.to_owned();
     }
-    directory
-        .strip_prefix(MODELS_ROOT)
-        .and_then(|rest| rest.strip_prefix('/'))
+    if let Some(folder) = below(directory, PYTHON_NODE_ROOT) {
+        return if folder.is_empty() {
+            PYTHON_FOLDER.to_owned()
+        } else {
+            format!("{PYTHON_FOLDER}/{folder}")
+        };
+    }
+    below(directory, SQL_DIRECTORY)
+        .filter(|folder| !folder.is_empty())
         .unwrap_or(directory)
         .to_owned()
+}
+
+/// `directory` below `root`: empty when it is the root, `None` outside it.
+fn below<'a>(directory: &'a str, root: &str) -> Option<&'a str> {
+    if directory == root {
+        return Some("");
+    }
+    directory.strip_prefix(root)?.strip_prefix('/')
 }
 
 /// The period of the last `days` whole UTC days to now, and the selection's cost rows over it.
