@@ -11,7 +11,7 @@ use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
 use crate::result_output::main::events::sql_test_identity::sql_test_identity;
 use crate::result_output::main::results::audit_check_id::audit_check_id;
 
-/// Record the outcome of every audit and SQL unit test in `executor_result`, the build's result, so check sensors and run events see them; a check the snapshot doesn't record is skipped.
+/// Record the outcome of every audit and SQL unit test in `executor_result`, the build's result, so check sensors and run events see them; a singular audit reports under its own `audit:<name>`, and a check the snapshot doesn't record is skipped.
 pub fn report_build_checks(
     py: Python<'_>,
     worker: &WorkerBuild,
@@ -40,7 +40,13 @@ pub fn report_build_checks(
             AuditOutcome::NotRun => NodeOutcome::NotRun,
             AuditOutcome::Error => NodeOutcome::Failed,
         };
-        worker.report_attached(py, &audit_check_id(&audit)?, outcome)?;
+        let attached: String = audit_check_id(&audit)?;
+        let key: String = if worker.records_check(&attached) {
+            attached
+        } else {
+            format!("audit:{}", field(&audit, "audit_name")?.str()?)
+        };
+        worker.report_attached(py, &key, outcome)?;
     }
     for test in field(executor_result, "test_results")?.try_iter()? {
         let test = test?;

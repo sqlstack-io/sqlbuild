@@ -31,6 +31,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     CheckExecutionTestCase,
+    CheckResultsTestCase,
     ClaimedLoadTestCase,
     ClaimedWorker,
     ForcedWorkerStopTestCase,
@@ -2378,3 +2379,48 @@ def test_given_a_worker_build_when_it_finishes_then_each_node_reports_what_it_di
                 )
             )
         assert nodes == test_case.expected_node_results, f"{nodes}\n{worker.log.read_text()}"
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        CheckResultsTestCase(
+            "a singular audit reading a model the target doesn't have is not run, and the job succeeds",
+            "SELECT 11 AS amount",
+            "SELECT count(*) FROM orders",
+            "success",
+            [(1,)],
+            files={
+                "sql/models/payments.sql": (
+                    "MODEL (description 'Payments.', materialized table);\nSELECT 11 AS amount\n"
+                ),
+                "sql/audits/singular/orders_have_payments.sql": (
+                    'AUDIT (name "orders_have_payments", severity error);\n'
+                    'SELECT o.amount FROM __ref("orders") o '
+                    'LEFT JOIN __ref("payments") p ON o.amount = p.amount WHERE p.amount IS NULL\n'
+                ),
+            },
+            expected_checks=[("audit:orders_have_payments", "not_run")],
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_worker_build_when_an_audit_read_is_missing_then_the_audit_is_not_run(
+    test_case: CheckResultsTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
+        run: dict[str, Any] = wait_for_run(
+            worker.api, worker.process, worker.log, job_key="annual_orders_job"
+        )
+        with sqlite3.connect(worker.control_store) as control:
+            checks: list[tuple[str, str]] = list(
+                control.execute(
+                    "SELECT node_key, status FROM sqb_run_nodes "
+                    "WHERE run_id=? AND kind='check' ORDER BY node_key",
+                    (run["run_id"],),
+                )
+            )
+        assert (run["status"], checks) == (
+            test_case.expected_status,
+            test_case.expected_checks,
+        ), worker.log.read_text()

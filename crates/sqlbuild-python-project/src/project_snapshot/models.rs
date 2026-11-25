@@ -631,6 +631,12 @@ impl WorkerBuild {
         Ok(())
     }
 
+    /// Whether the snapshot records `key` as a check, so its result is reported.
+    #[must_use]
+    pub fn records_check(&self, key: &str) -> bool {
+        self.attached.contains_key(key)
+    }
+
     /// A test or audit finished; a check the snapshot does not record is not reported.
     pub fn finish_attached(&self, py: Python<'_>, key: &str, outcome: NodeOutcome) -> PyResult<()> {
         if !matches!(outcome, NodeOutcome::Skipped | NodeOutcome::NotRun)

@@ -159,6 +159,13 @@ class NodeResultsTestCase(WorkerExecutionTestCase):
 
 
 @dataclass(frozen=True)
+class CheckResultsTestCase(WorkerExecutionTestCase):
+    description: str
+    # Each attached check the run reported, as (key, status).
+    expected_checks: list[tuple[str, str]] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class ClaimedLoadTestCase(WorkerExecutionTestCase):
     description: str
     expected_write_set: frozenset[str] = frozenset()
