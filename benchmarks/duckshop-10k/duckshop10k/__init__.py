@@ -4,6 +4,6 @@ The same generator version always writes byte-identical output. Bump GENERATOR_V
 regenerate checksum.txt, whenever a change alters any generated file.
 """
 
-GENERATOR_VERSION = "4"
+GENERATOR_VERSION = "5"
 SEED = 20261024
 PROJECT_NAME = "duckshop_10k"

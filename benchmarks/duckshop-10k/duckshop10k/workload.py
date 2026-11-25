@@ -4,7 +4,7 @@ A live plan of a real project reads a cursor bound for every incremental model, 
 migration for every renamed model and discovers every Python node. The layers above build
 few of each, so this module adds them in proportions such projects have: about one model in
 twenty kept incrementally, a hundred of those renamed from an older name, and a few hundred
-Python exports of published marts, spread over many modules that share helper code.
+Python exports of published marts, each in its own `asset.py`, sharing helper code.
 """
 
 from __future__ import annotations
@@ -19,8 +19,6 @@ MAX_AHEAD_EVERY = 5
 RENAMED_EVERY = 5
 #: Every this-many published mart gets a Python export asset.
 EXPORT_STRIDE = 5
-#: Export assets per Python module, so discovery walks many modules.
-EXPORTS_PER_MODULE = 6
 _TIMESTAMP = "TIMESTAMP_NTZ"
 _INCREMENT_FOLDER = "sql/models/intermediate/increments"
 _EXPORT_PACKAGE = "python/nodes/exports"
@@ -130,24 +128,23 @@ def _exports(project: Project) -> None:
         by_folder.setdefault(model.folder.rsplit("/", 1)[-1], []).append(model)
     project.write(_SHARED_MODULE, SHARED_EXPORT_HELPERS)
     for folder, models in sorted(by_folder.items()):
-        for start in range(0, len(models), EXPORTS_PER_MODULE):
-            chunk: list[Model] = models[start : start + EXPORTS_PER_MODULE]
-            module: str = f"{folder}_{start // EXPORTS_PER_MODULE + 1:02d}"
-            project.write(f"{_EXPORT_PACKAGE}/{module}.py", _export_module(folder, chunk))
+        for mart in models:
+            project.write(
+                f"{_EXPORT_PACKAGE}/{folder}/export_{mart.name}/asset.py",
+                _export_module(folder, mart),
+            )
 
 
-def _export_module(folder: str, models: list[Model]) -> str:
-    assets: list[str] = [
-        f'@asset(depends_on=model("{model.name}"))\n'
-        f"def export_{model.name}(ctx: AssetContext):\n"
-        f'    """Send {model.name} to the {folder} partner feed."""\n'
-        f'    metadata = feed_metadata(ctx, model("{model.name}"), "{folder}")\n'
-        "    return ctx.result(metadata=metadata, materialized=True)\n"
-        for model in models
-    ]
+def _export_module(folder: str, mart: Model) -> str:
+    """One export asset in its own `asset.py`, as the project layout requires."""
     return (
-        f'"""Exports of the {folder} marts to partner feeds."""\n\n'
+        f'"""Export of {mart.name} to the {folder} partner feed."""\n\n'
         "from sqlbuild.assets import AssetContext, asset\n"
         "from sqlbuild.refs import model\n\n"
-        "from python.nodes.shared.export_feed import feed_metadata\n\n\n" + "\n\n".join(assets)
+        "from python.nodes.shared.export_feed import feed_metadata\n\n\n"
+        f'@asset(depends_on=model("{mart.name}"))\n'
+        f"def export_{mart.name}(ctx: AssetContext):\n"
+        f'    """Send {mart.name} to the {folder} partner feed."""\n'
+        f'    metadata = feed_metadata(ctx, model("{mart.name}"), "{folder}")\n'
+        "    return ctx.result(metadata=metadata, materialized=True)\n"
     )

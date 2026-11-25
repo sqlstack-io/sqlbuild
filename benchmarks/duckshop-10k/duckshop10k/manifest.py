@@ -7,7 +7,8 @@ from pathlib import Path
 
 from duckshop10k import GENERATOR_VERSION
 
-MANIFEST_NAME = "MANIFEST.sha256"
+# Under the project's local build output, so the project root holds only SQLBuild project files.
+MANIFEST_PATH = "target/MANIFEST.sha256"
 
 
 def manifest(files: dict[str, str]) -> str:
@@ -36,16 +37,17 @@ def write_project(files: dict[str, str], out: Path) -> None:
         target = out / path
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(content.encode("utf-8"))
-    (out / MANIFEST_NAME).write_bytes(manifest(files).encode("utf-8"))
+    manifest_file = out / MANIFEST_PATH
+    manifest_file.parent.mkdir(parents=True, exist_ok=True)
+    manifest_file.write_bytes(manifest(files).encode("utf-8"))
 
 
 def read_project(out: Path) -> dict[str, str]:
-    """Every generated file below `out`, skipping the manifest and local build output."""
-    skipped = {MANIFEST_NAME}
+    """Every generated file below `out`, skipping local build output, which holds the manifest."""
     local = ("target/", "logs/", ".sqlbuild/", "sqlbuild_local.toml")
     files: dict[str, str] = {}
     for path in sorted(out.rglob("*")):
         relative = path.relative_to(out).as_posix()
-        if path.is_file() and relative not in skipped and not relative.startswith(local):
+        if path.is_file() and not relative.startswith(local):
             files[relative] = path.read_bytes().decode("utf-8")
     return files
