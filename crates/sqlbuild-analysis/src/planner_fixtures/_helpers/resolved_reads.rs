@@ -22,6 +22,18 @@ pub(crate) fn resolved_reads(
         let reads = reads.clone();
         return (cache, Ok(reads));
     }
+    cache.misses += 1;
+    let reads = match uncached_reads(key) {
+        Ok(reads) => reads,
+        Err(error) => return (cache, Err(error)),
+    };
+    (stored(cache, key, reads.clone()), Ok(reads))
+}
+
+/// Resolve one key's reads without the cache.
+pub(crate) fn uncached_reads(
+    key: &FixtureReadKey,
+) -> Result<Vec<ColumnRead>, RequiredColumnsError> {
     let references: Vec<ReferenceInput> = key
         .references
         .iter()
@@ -30,11 +42,15 @@ pub(crate) fn resolved_reads(
             name: reference.name.clone(),
         })
         .collect();
-    cache.misses += 1;
-    let reads = match resolve_required_columns(&key.sql, &references, key.dialect.as_deref()) {
-        Ok(reads) => reads,
-        Err(error) => return (cache, Err(error)),
-    };
+    resolve_required_columns(&key.sql, &references, key.dialect.as_deref())
+}
+
+/// Keep one key's successful reads, evicting the least recently used entry at capacity.
+pub(crate) fn stored(
+    mut cache: FixtureReadCache,
+    key: &FixtureReadKey,
+    reads: Vec<ColumnRead>,
+) -> FixtureReadCache {
     if cache.entries.len() >= crate::planner_fixtures::constants::READ_CACHE_CAPACITY
         && let Some((_, oldest)) = cache.recency.pop_first()
     {
@@ -43,6 +59,6 @@ pub(crate) fn resolved_reads(
     cache.clock += 1;
     let clock = cache.clock;
     cache.recency.insert(clock, key.clone());
-    cache.entries.insert(key.clone(), (clock, reads.clone()));
-    (cache, Ok(reads))
+    cache.entries.insert(key.clone(), (clock, reads));
+    cache
 }

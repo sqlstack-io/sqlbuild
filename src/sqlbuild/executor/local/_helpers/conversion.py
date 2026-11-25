@@ -41,6 +41,7 @@ class _LocalWork:
         self._checks: dict[_CheckKey, LocalSqlCheck] = {}
         self._schema_keys: dict[int, tuple[Mapping[str, Any], str]] = {}
         self._relation_names: dict[int, tuple[Mapping[str, Any], dict[str, list[str]]]] = {}
+        self._slices: dict[int, dict[str, dict[str, Any]]] = {}
         self._counts: dict[str, int] = {
             "conversions": 0,
             "bindings": 0,
@@ -91,13 +92,21 @@ class _LocalWork:
             known = (schema, by_name)
             with self._lock:
                 self._relation_names[id(schema)] = known
+                self._slices[id(schema)] = {}
+        with self._lock:
+            sliced: dict[str, Any] | None = self._slices.get(id(schema), {}).get(sql)
+        if sliced is not None:
+            return sliced
         relations: Mapping[str, Any] = schema.get("relations", {})
         mentioned: set[str] = {token.upper() for token in _IDENTIFIER.findall(sql)}
         read: dict[str, Any] = {}
         for name in mentioned & known[1].keys():
             for relation in known[1][name]:
                 read[relation] = relations[relation]
-        return {**schema, "relations": read}
+        sliced = {**schema, "relations": read}
+        with self._lock:
+            self._slices.setdefault(id(schema), {})[sql] = sliced
+        return sliced
 
     def get(self, key: _CheckKey) -> LocalSqlCheck | None:
         with self._lock:
