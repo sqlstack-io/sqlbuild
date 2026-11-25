@@ -710,6 +710,8 @@ pub struct BuildExecutionResult<V> {
     pub warning_count: i64,
     pub insufficient_count: i64,
     pub ignored_audit_failure_count: i64,
+    /// End-of-build audits not run because the target lacks a read; in no other count.
+    pub not_run_count: i64,
     pub audit_result_projection_attempted_count: i64,
     pub audit_result_projection_written_count: i64,
     pub audit_result_projection_failed_count: i64,

@@ -316,7 +316,7 @@ pub(crate) fn build_json<'py>(
     )?);
     assets.extend(load_assets(&projection, &retained.loads)?);
     assets.extend(python_node_assets(&projection, &nodes)?);
-    let counted: [usize; 5] = if partial {
+    let counted: [usize; 6] = if partial {
         let counts = retained.counts();
         [
             counts.success,
@@ -324,6 +324,7 @@ pub(crate) fn build_json<'py>(
             counts.timeout,
             counts.skipped,
             counts.warning,
+            counts.not_run,
         ]
     } else {
         [
@@ -332,6 +333,7 @@ pub(crate) fn build_json<'py>(
             count(result.timeout_count)?,
             count(result.skipped_count)?,
             count(result.warning_count)?,
+            count(result.not_run_count)?,
         ]
     };
     let summary: Bound<'py, PyDict> = summary(
@@ -342,6 +344,7 @@ pub(crate) fn build_json<'py>(
             ("timeout_count", counted[2]),
             ("skipped_count", counted[3] + python_skipped),
             ("warning_count", counted[4] + check_warn + python_warnings),
+            ("not_run_count", counted[5]),
             ("python_check_pass_count", check_pass),
             ("python_check_warn_count", check_warn),
             ("python_check_fail_count", check_fail),

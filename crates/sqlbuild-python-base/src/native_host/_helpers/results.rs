@@ -237,7 +237,7 @@ record!(SqlTestExecutionResult<V> {
 record!(BuildExecutionResult<V> {
     status, model_results, seed_results, function_results, load_results, test_results,
     source_audit_results, end_audit_results, success_count, failure_count, timeout_count,
-    skipped_count, warning_count, insufficient_count, ignored_audit_failure_count,
+    skipped_count, warning_count, insufficient_count, ignored_audit_failure_count, not_run_count,
     audit_result_projection_attempted_count,
     audit_result_projection_written_count, audit_result_projection_failed_count, timings,
 });

@@ -119,3 +119,35 @@ def test_given_a_singular_audit_reading_an_unbuilt_model_when_planning_json_then
         test_case.expected_exit_code,
         [{"name": "orders_have_payments", "missing": ["payments"]}],
     ), test_case.description
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        NotRunAuditTestCase(
+            description="the build JSON counts the audit as not run, apart from skipped and failed",
+            setup=(),
+            command=("build", "--json", "orders"),
+            expected_exit_code=0,
+            expected_texts=(),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_singular_audit_reading_an_unbuilt_model_when_building_json_then_it_counts_as_not_run(
+    test_case: NotRunAuditTestCase,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    write_not_run_audit_project(tmp_path)
+
+    exit_code: int = main(["--project-dir", str(tmp_path), "--no-color", *test_case.command])
+    captured: CaptureResult[str] = capsys.readouterr()
+    summary: dict[str, Any] = json.loads(captured.out)["summary"]
+
+    assert (
+        exit_code,
+        summary["not_run_count"],
+        summary["skipped_count"],
+        summary["failure_count"],
+    ) == (test_case.expected_exit_code, 1, 0, 0), test_case.description
