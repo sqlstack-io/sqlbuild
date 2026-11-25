@@ -8,6 +8,7 @@ from typing import Any
 from sqlbuild._native import SqlTestPlanEntry, render_sql_test_comparison_sql
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.compiler.compile.exceptions import CompileInputError
+from sqlbuild.errors.contracts.exceptions import LocalRunRefusedError
 from sqlbuild.executor.testing._helpers.comparison import compare_actual_outputs
 from sqlbuild.executor.testing._helpers.expected_column_probe import (
     missing_expected_columns_message,
@@ -150,8 +151,13 @@ def _execute_sql_test(
                 )
         if failure is not None:
             error, expected_columns_message = failure
+            refused: LocalRunRefusedError | None = (
+                error if isinstance(error, LocalRunRefusedError) else None
+            )
             error_code: str = (
-                SQL_TEST_EXECUTION_ERROR_CODE
+                refused.code
+                if refused is not None
+                else SQL_TEST_EXECUTION_ERROR_CODE
                 if expected_columns_message is None
                 else SQL_TEST_EXPECTED_COLUMNS_CODE
             )
@@ -176,11 +182,20 @@ def _execute_sql_test(
                         model_name=error_model_name,
                         outcome=SqlTestOutcome.ERROR,
                         error_code=error_code,
+                        error_help=None if refused is None else refused.help,
                         error_message=error_message,
                     ),
                 ),
                 error_code=error_code,
+                error_help=None if refused is None else refused.help,
                 error_message=error_message,
+                local_refusal=None
+                if refused is None
+                else {
+                    "category": refused.category,
+                    "construct": refused.construct,
+                    "reason": refused.message,
+                },
             )
 
         overall_outcome: SqlTestOutcome = SqlTestOutcome.PASS

@@ -52,3 +52,14 @@ class WarehouseRelationsTestCase:
     description: str
     sql: str
     expected_relations: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class LocalRunRefusalTestCase:
+    """A DuckDB failure of converted SQL, and the refusal title it gives, if any."""
+
+    description: str
+    error_type: str
+    message: str
+    fatal: bool
+    expected_title: str | None

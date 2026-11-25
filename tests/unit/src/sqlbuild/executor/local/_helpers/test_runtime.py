@@ -1,0 +1,62 @@
+"""Which DuckDB failures of converted SQL mean the test belongs on the warehouse."""
+
+import pytest
+
+from sqlbuild.errors.contracts.exceptions import LocalRunRefusedError
+from sqlbuild.executor.local._helpers.runtime import local_run_refusal
+from tests.unit.src.sqlbuild.executor.local._helpers._test_types import LocalRunRefusalTestCase
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        LocalRunRefusalTestCase(
+            description="a guard's raise names the guard",
+            error_type="ConversionException",
+            message=(
+                "Conversion Error: Could not convert string 'array_agg_order#0123456789ab: "
+                "ARRAY_AGG of several values in no defined order' to INT32"
+            ),
+            fatal=False,
+            expected_title="SQLQuack guard: array_agg_order",
+        ),
+        LocalRunRefusalTestCase(
+            description="an emulated Snowflake error is the test's own result",
+            error_type="ConversionException",
+            message=(
+                "Conversion Error: Could not convert string 'sqlquack:100038#0123456789ab: "
+                "Numeric value is not recognized' to INT32"
+            ),
+            fatal=False,
+            expected_title=None,
+        ),
+        LocalRunRefusalTestCase(
+            description="a DuckDB internal error names its first line",
+            error_type="InternalException",
+            message="INTERNAL Error: an expression should not be used here yet!\n\nStack Trace:",
+            fatal=True,
+            expected_title="DuckDB internal error: an expression should not be used here yet!",
+        ),
+        LocalRunRefusalTestCase(
+            description="any other DuckDB error is the test's own result",
+            error_type="BinderException",
+            message="Binder Error: Referenced column a not found",
+            fatal=False,
+            expected_title=None,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_duckdb_failure_when_classifying_then_only_guards_and_engine_bugs_refuse(
+    test_case: LocalRunRefusalTestCase,
+) -> None:
+    error: Exception = type(test_case.error_type, (Exception,), {})(test_case.message)
+
+    refused: LocalRunRefusedError | None = local_run_refusal(error=error, fatal=test_case.fatal)
+
+    title: str | None = None if refused is None else f"{refused.category}: {refused.construct}"
+    assert title == test_case.expected_title
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-vv"])

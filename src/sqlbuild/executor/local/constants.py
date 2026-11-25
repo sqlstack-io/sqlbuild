@@ -27,3 +27,6 @@ STATEMENT_CONSTRUCT: str = "statement"
 CONVERSION_CACHE_DIR: str = "target/sqlquack-cache"
 
 CANNOT_RUN_LOCALLY_CODE: str = "T007"
+CANNOT_RUN_LOCALLY_HELP: str = "Run this test on the warehouse with --run-on warehouse."
+GUARD_CATEGORY: str = "SQLQuack guard"
+DUCKDB_ERROR_CATEGORY: str = "DuckDB internal error"

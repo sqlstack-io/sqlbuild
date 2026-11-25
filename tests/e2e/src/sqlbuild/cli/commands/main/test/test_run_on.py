@@ -17,6 +17,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.test._test_types import (
     ScenarioRunOnFlagsE2ETestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.test.helpers import (
+    GUARDED_FILES,
     SNOWFLAKE_FILES,
     UNMOCKED_SOURCE_FILES,
     check_placements,
@@ -253,6 +254,53 @@ def test_given_snowflake_test_reading_an_unmocked_source_when_testing_then_it_ne
         tmp_path=tmp_path,
         project_name="run_on_snowflake_unmocked",
         repo_files={**SNOWFLAKE_FILES, **UNMOCKED_SOURCE_FILES},
+    )
+
+    result: CompletedProcess[str] = run_sqb(
+        command=("--no-color", *test_case.command), project_dir=project
+    )
+
+    output: str = _DURATION.sub("", result.stdout + result.stderr)
+    assert result.returncode == test_case.expected_exit_code, output
+    assert test_case.expected_text in output, output
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    (
+        RunOnTextE2ETestCase(
+            description="auto sends a test whose guard raises in DuckDB to the warehouse",
+            command=("test", "--sql", "--select", "test_order_statuses"),
+            expected_exit_code=1,
+            expected_text=(
+                "[T008] needs the warehouse (no connection)\n\n"
+                "PASS=0  FAIL=1  TOTAL=1  (0 local, 1 warehouse)\n\n"
+                "On the warehouse (1 test)\n"
+                "  SQLQuack guard: array_agg_order  1 test\n"
+            ),
+        ),
+        RunOnTextE2ETestCase(
+            description="--run-on local makes a test whose guard raises an error naming the guard",
+            command=("test", "--sql", "--run-on", "local", "--select", "test_order_statuses"),
+            expected_exit_code=1,
+            expected_text=(
+                "Can't run locally (1 test)\n\n"
+                "error: SQLQuack guard: array_agg_order\n"
+                "  = note: SQLQuack's guard array_agg_order raised in DuckDB: ARRAY_AGG of several"
+                " values in no defined order\n"
+                "  = tests: test_order_statuses\n"
+            ),
+        ),
+    ),
+    ids=lambda case: case.description,
+)
+def test_given_snowflake_test_whose_guard_raises_when_testing_then_it_needs_the_warehouse(
+    tmp_path: Path, test_case: RunOnTextE2ETestCase
+) -> None:
+    project: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="run_on_snowflake_guarded",
+        repo_files={**SNOWFLAKE_FILES, **GUARDED_FILES},
     )
 
     result: CompletedProcess[str] = run_sqb(

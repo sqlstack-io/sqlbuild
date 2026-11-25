@@ -2650,6 +2650,23 @@ UNMOCKED_SOURCE_FILES: dict[str, str] = {
 }
 
 
+GUARDED_FILES: dict[str, str] = {
+    "sql/models/marts/order_statuses.sql": (
+        "MODEL (description 'Every order status.');\n\n"
+        "SELECT ARRAY_AGG(status) AS statuses\n"
+        'FROM __source("raw_orders")\n'
+    ),
+    "tests/unit/test_order_statuses.sql": (
+        "TEST();\n\nWITH\n"
+        "__source__raw_orders AS (\n"
+        "  SELECT 1 AS order_id, 'completed' AS status UNION ALL SELECT 2, 'open'\n"
+        "),\n"
+        "__expected__order_statuses AS (SELECT ARRAY_CONSTRUCT('completed', 'open') AS statuses)\n"
+        "SELECT 1\n"
+    ),
+}
+
+
 def run_on_precedence_files(test_case: RunOnPrecedenceE2ETestCase) -> dict[str, str]:
     """The DuckDB project with `test_run_on` set where the case sets it."""
 

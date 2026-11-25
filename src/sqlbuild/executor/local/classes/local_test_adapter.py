@@ -8,10 +8,12 @@ from typing import Any
 
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
-from sqlbuild.errors.contracts.exceptions import ExecutorInputError
+from sqlbuild.errors.contracts.exceptions import ExecutorInputError, LocalRunRefusedError
 from sqlbuild.executor.local._helpers.conversion import converted
+from sqlbuild.executor.local._helpers.runtime import local_run_refusal
 from sqlbuild.executor.local.constants import (
     CANNOT_RUN_LOCALLY_CODE,
+    CANNOT_RUN_LOCALLY_HELP,
     CONVERTED_DIALECT,
     UTC_TIME_ZONE,
 )
@@ -61,8 +63,16 @@ class LocalTestAdapter(DuckDbAdapter):
         try:
             return self._converted_execute(connection=connection, sql=sql)
         except Exception as error:
-            if _INVALIDATED_MARKER in str(error) or type(error).__name__ in _FATAL_ERRORS:
+            fatal: bool = _INVALIDATED_MARKER in str(error) or type(error).__name__ in _FATAL_ERRORS
+            if fatal:
                 self._reopen(connection)
+            refused: LocalRunRefusedError | None = (
+                local_run_refusal(error=error, fatal=fatal)
+                if self._dialect == CONVERTED_DIALECT
+                else None
+            )
+            if refused is not None:
+                raise refused from error
             raise
 
     def _reopen(self, connection: Any) -> None:
@@ -89,7 +99,7 @@ class LocalTestAdapter(DuckDbAdapter):
                     for refusal in conversion.refusals
                 ),
                 code=CANNOT_RUN_LOCALLY_CODE,
-                help="Run this test on the warehouse with --run-on warehouse.",
+                help=CANNOT_RUN_LOCALLY_HELP,
             )
         self._install_macros(connection=connection, macros=conversion.macros)
         return super().execute(connection=connection, sql=conversion.sql)
