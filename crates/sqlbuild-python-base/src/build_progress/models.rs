@@ -194,6 +194,13 @@ impl NativeProgressProjector {
         Ok(())
     }
 
+    /// Declare that this resource never starts, so it shows only its terminal row.
+    #[pyo3(signature = (*, resource_name))]
+    pub(crate) fn expect_no_start(&self, resource_name: &str) -> PyResult<()> {
+        self.locked()?.expect_no_start(resource_name);
+        Ok(())
+    }
+
     /// Record how one audit attempt ended, so its terminal row shows the outcome.
     #[pyo3(signature = (*, resource_attempt_id, outcome))]
     pub(crate) fn record_audit_outcome(

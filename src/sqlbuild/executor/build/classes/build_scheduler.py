@@ -25,6 +25,7 @@ from sqlbuild._native import (
     IncrementalMode,
     IncrementalStrategy,
     ModelPlanEntry,
+    NativeProgressProjector,
     PlanAction,
     PlanOutput,
     SeedPlanEntry,
@@ -33,6 +34,7 @@ from sqlbuild._native import (
     SqlTestPlanEntry,
     TableTypePlanEntry,
     audit_resource_id,
+    current_native_progress_projector,
     output_node_scope,
     sql_test_resource_id,
 )
@@ -960,6 +962,9 @@ class BuildScheduler:
             audit_meta=audit.meta,
             skip_reason=self._skip_reason(audit=audit),
         )
+        projector: NativeProgressProjector | None = current_native_progress_projector()
+        if not_run and projector is not None:
+            projector.expect_no_start(resource_name=audit.name)
         with ResourceAttemptLifecycle(
             resource_id=audit_resource_id(
                 audit_name=audit.name,

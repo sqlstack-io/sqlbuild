@@ -90,6 +90,9 @@ pub(crate) fn consume_resource_start(
         .insert(resource_id.clone(), resource_name.clone());
     let (projection, mut lines) = render_prior_attempts(projection, (resource_id, resource_name));
     let projection: ProgressProjection = store_attempt(projection, attempt_id, event);
+    if projection.unstarted_resource_names.contains(resource_name) {
+        return (projection, lines);
+    }
     if projection.settings.is_tty
         && (projection.enriched_resource_names.contains(resource_name)
             || !projection.settings.debug)

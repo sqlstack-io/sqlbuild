@@ -27,7 +27,7 @@ from tests.integration.src.sqlbuild.cli.commands.main.helpers import write_not_r
                 "NOT_RUN=1",
                 "orders_have_payments  (audit) reads payments, which doesn't exist in the target",
             ),
-            expected_absent=("SKIP=1", "FAIL=1"),
+            expected_absent=("SKIP=1", "FAIL=1", "orders_have_payments START"),
         ),
         NotRunAuditTestCase(
             description="when every read exists the audit runs against what is there",

@@ -78,6 +78,8 @@ pub struct ProgressProjection {
     pub(crate) operation_starts: HashMap<String, ProgressEvent>,
     pub(crate) quiet_operation_ids: HashSet<String>,
     pub(crate) enriched_resource_names: HashSet<String>,
+    /// Resources that never start, such as an audit not run, so they show only their terminal row.
+    pub(crate) unstarted_resource_names: HashSet<String>,
     /// Audit outcomes by attempt, which the audit's own terminal row shows.
     pub(crate) audit_outcomes: HashMap<String, String>,
     pub(crate) resource_names: HashMap<String, String>,
@@ -134,6 +136,12 @@ impl ProgressProjection {
     /// Declare that a result callback will enrich this resource's terminal.
     pub fn expect_resource_enrichment(&mut self, resource_name: &str) {
         self.enriched_resource_names
+            .insert(resource_name.to_owned());
+    }
+
+    /// Declare that this resource never starts, so its terminal row is its only row.
+    pub fn expect_no_start(&mut self, resource_name: &str) {
+        self.unstarted_resource_names
             .insert(resource_name.to_owned());
     }
 
