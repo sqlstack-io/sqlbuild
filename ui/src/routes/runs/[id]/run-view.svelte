@@ -5,7 +5,7 @@
 	import Loading from '$lib/components/loading.svelte';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import { app } from '$lib/state/app.svelte';
-	import FailuresPanel from './failures-panel.svelte';
+	import FailureSummary from './failure-summary.svelte';
 	import CantRunProblem from '$lib/run/cant-run-problem.svelte';
 	import { runDetailCantRun } from '$lib/run/cant-run';
 	import IgnoredAuditsPanel from './ignored-audits-panel.svelte';
@@ -15,8 +15,8 @@
 	import SelectionBar from '$lib/components/selection/selection-bar.svelte';
 	import { to } from '$lib/paths';
 	import { nodeLabel, shortRunId } from '$lib/operate/labels';
-	import { skipCause, QUICK_PICKS } from './utils';
-	import RelatedRuns from './related-runs.svelte';
+	import { skipCause } from './utils';
+	import DetailsDrawer from './details-drawer.svelte';
 	import RunBanners from './run-banners.svelte';
 	import RunGantt from './run-gantt.svelte';
 	import RunHeader from './run-header.svelte';
@@ -104,32 +104,25 @@
 	<RunHeader {view} {runId} />
 
 	{#if detail}
+		<FailureSummary {view} />
 		<RunBanners banners={view.banners} />
 		{#if cantRun.length}
 			<div class="cant-run" data-testid="run-cant-run">
 				{#each cantRun as entry (`${entry.provider}:${entry.variables}`)}<CantRunProblem {entry} title="Couldn't run:" then="the next run works" />{/each}
 			</div>
 		{/if}
-		<FailuresPanel {view} />
 		<IgnoredAuditsPanel {view} />
-		<RelatedRuns {view} />
 
 		<div bind:this={splitEl} class="flex min-h-0 flex-1 flex-col" class:select-none={dragging}>
 			<div class="flex min-h-0 flex-col" style:flex={hasBottom ? topFrac : 1}>
 				{#if nodes.length}
-					<!-- One toolbar row above the chart: the view, the selection to plan with its quick picks, and Plan these. -->
+					<!-- One toolbar row above the chart: the view, the selection to plan, and Plan these. -->
 					<div class="pick">
 						<SelectionBar selection={view.selection} {names} total={nodes.length} build={false} copy={false}>
 							{#snippet leading()}
 								<SegmentedFilter label="View" bind:value={topView} options={[{ value: 'timeline', label: 'Timeline' }, { value: 'graph', label: 'Graph' }]} />
 							{/snippet}
 							{#snippet trailing()}
-								<span class="picks">
-									<span class="faint">Pick</span>
-									{#each QUICK_PICKS as q (q.value)}
-										<Button variant="link" size="inline" class="text-[12.5px]" onclick={() => view.pick(q.value)}>{q.label}</Button>
-									{/each}
-								</span>
 								{#if view.planLink && planCount}
 									<a class="plan" href={to(view.planLink)} data-testid="plan-these" title="Open the plan page for this selection{view.run?.jobKey && view.run.kind !== 'group' ? ` as ${view.run.jobKey} builds it` : ''}">Plan these {planCount} →</a>
 								{:else}
@@ -138,13 +131,6 @@
 							{/snippet}
 						</SelectionBar>
 					</div>
-					{#if view.statusFilter}
-						{@const g = view.nodeGroups.find((x) => x.key === view.statusFilter)}
-						<div class="filtered" data-testid="timeline-filter">
-							Showing {g?.label.toLowerCase()} only · {g?.nodes.length} of {nodes.length}
-							<Button variant="link" size="inline" class="text-[12px]" onclick={() => view.clearFocus()}>Show all</Button>
-						</div>
-					{/if}
 				{/if}
 				<div class="flex min-h-0 flex-1">
 					<div class="relative flex min-h-0 flex-1 flex-col">
@@ -194,6 +180,7 @@
 	{/if}
 </div>
 <NodeDrawer {view} />
+<DetailsDrawer {view} />
 </div>
 
 <style>
@@ -210,9 +197,6 @@
 	}
 	.cant-run > :global(*) {
 		flex: none;
-	}
-	.faint {
-		color: var(--sb-text-faint);
 	}
 	.pick {
 		padding: 4px 14px;
@@ -234,22 +218,8 @@
 		min-width: 260px;
 		flex: 1;
 	}
-	.picks {
-		display: inline-flex;
-		flex: none;
-		align-items: center;
-		gap: 10px;
-		margin: 0 6px 0 8px;
-		font-size: 12.5px;
-	}
 	.plan {
 		flex: none;
-	}
-	.filtered {
-		padding: 4px 24px;
-		border-bottom: 1px solid var(--border);
-		color: var(--sb-text-faint);
-		font-size: 12px;
 	}
 	.plan {
 		padding: 3px 10px;

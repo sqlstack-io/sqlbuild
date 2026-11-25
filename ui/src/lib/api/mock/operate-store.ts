@@ -2,6 +2,7 @@
 // its claims, jobs, triggers and sensors. A small loop advances live runs so
 // cancels, launches and claims behave like they do on the server.
 
+import { SEED_AUDIT_CHECK, SEED_AUDIT_RUN_ID, seedAuditSql } from './seed-audit-run';
 import { bigAvailable, bigDownloadUrl, bigIndex, bigPage, bigSearch } from './big-output';
 import { parseCommand } from '$lib/run/command';
 import { isUnfinishedNode } from '$lib/status';
@@ -96,6 +97,7 @@ import {
 } from './operate';
 import { SCHEDULER } from './principals';
 import { costFolder, costPeriod, costSelectionOf, costSeriesOf, type CostRowIn } from './cost-rows';
+import { setRunResolver } from './operate-graph';
 import { ancestors, evaluateMockSelection, isWritable, mockVocabulary, resolveSelection, SNAPSHOT_NODES, snapshotNode, sortTopologically, edgesWithin, writeSetOf } from './operate-graph';
 import {
 	commandOf,
@@ -189,6 +191,17 @@ export class MockOperate {
 		this.#fx = createOperateFixtures(now);
 		this.#records = this.#fx.records;
 		for (const rec of this.#records) this.#settle(rec, now);
+		// `run:`, `failed:` and `skipped:` read a run's results from this store, as the server reads its own.
+		setRunResolver(
+			() => this.#records.map((r) => r.run.id),
+			(id) => {
+				const rec = this.#byId(id);
+				if (!rec) return null;
+				const nodes = this.#nodesOf(rec, Date.now());
+				const of = (s: string[]) => nodes.filter((n) => s.includes(n.status)).map((n) => n.nodeKey);
+				return { selected: nodes.map((n) => n.nodeKey), failed: of(['failed', 'cancelled', 'not_run']), skipped: of(['skipped']), failedAudits: id === SEED_AUDIT_RUN_ID ? [SEED_AUDIT_CHECK] : [] };
+			}
+		);
 		if (typeof window !== 'undefined' && !ctx.still) setInterval(() => this.#advance(), 1500);
 	}
 
@@ -541,7 +554,7 @@ export class MockOperate {
 		const statement = execution(rec, this.#nodesOf(rec, now), now).statements.find((st) => st.id === statementId);
 		if (!statement) throw new ApiError(`Unknown statement ${statementId}`, 404);
 		const target = this.#ctx.target(scope);
-		const sql = statement.kind === 'audit' ? auditSql(statement.nodeKey, statementId, target) : sqlFor(statement.nodeKey, statement.kind, target);
+		const sql = seedAuditSql(statement) ?? (statement.kind === 'audit' ? auditSql(statement.nodeKey, statementId, target) : sqlFor(statement.nodeKey, statement.kind, target));
 		return this.#ctx.reply({ statementId, sql: statement.sqlRecorded ? sql : null });
 	}
 

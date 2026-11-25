@@ -68,12 +68,22 @@ export function popularTags(tags: readonly VocabularyEntry[], limit = 4): Vocabu
  * Suggestions for `typed`, the part in the input. A leading `+` stays on what is inserted. With
  * nothing typed: recent selections, the selector types and the popular tags; after `type:`, that
  * type's values; otherwise matching types, the values of a type whose name the fragment starts,
- * matching values of every other type and node names.
+ * matching values of every other type and node names. `runs` are run selectors a page offers, such as
+ * the rerun plan's `failed:<id>+`, listed first while they match.
  */
-export function suggest(typed: string, vocabulary: SelectionVocabulary | null, names: readonly NameEntry[], recent: readonly { select: string; count: number | null }[] = []): SuggestionGroup[] {
+export function suggest(
+	typed: string,
+	vocabulary: SelectionVocabulary | null,
+	names: readonly NameEntry[],
+	recent: readonly { select: string; count: number | null }[] = [],
+	runs: readonly SuggestionItem[] = []
+): SuggestionGroup[] {
 	const plus = typed.startsWith('+') ? '+' : '';
 	const rest = typed.slice(plus.length);
 	const groups: SuggestionGroup[] = [];
+	// Run selectors the page offers (`failed:<id>+`, `run:<id>`, …), first, while what is typed could start one.
+	const runItems = rest ? runs.filter((r) => r.insert.toLowerCase().startsWith(rest.toLowerCase()) || r.insert.slice(r.insert.indexOf(':') + 1).toLowerCase().startsWith(rest.toLowerCase())) : runs;
+	if (!plus && runItems.length) groups.push({ name: 'Runs', items: [...runItems] });
 	const values = (type: string, query: string, limit: number): SuggestionItem[] => {
 		const list = vocabulary?.[VALUES_OF[type]] ?? [];
 		return firstMatches(list, query, limit).map((e) => ({ insert: `${plus}${type}:${e.value}`, type, label: e.value, count: e.count, complete: true }));

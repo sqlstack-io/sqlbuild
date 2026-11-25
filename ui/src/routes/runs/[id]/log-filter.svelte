@@ -1,5 +1,6 @@
 <script lang="ts">
 	import SearchIcon from '@lucide/svelte/icons/search';
+	import ClearInputButton from '$lib/components/clear-input-button.svelte';
 
 	// The log's filter, read like the selector syntax: `node:`, `kind:`, `level:`, `job:` and
 	// `stream:` narrow the log, anything else is a free search. Typing lists the options that fit the
@@ -37,7 +38,21 @@
 		input?.focus();
 	}
 
+	/** Empties the filter and keeps the caret in it. */
+	function clear() {
+		value = '';
+		open = false;
+		input?.focus();
+	}
+
 	function onkeydown(e: KeyboardEvent) {
+		// Esc clears the filter and keeps focus; an empty filter's Esc closes its options.
+		if (e.key === 'Escape') {
+			if (value) clear();
+			else open = false;
+			e.preventDefault();
+			return;
+		}
 		if (!open || !suggestions.length) {
 			if (e.key === 'ArrowDown') open = true;
 			return;
@@ -48,8 +63,6 @@
 		} else if ((e.key === 'Enter' || e.key === 'Tab') && word) {
 			e.preventDefault();
 			choose(suggestions[active]);
-		} else if (e.key === 'Escape') {
-			open = false;
 		}
 	}
 </script>
@@ -69,6 +82,7 @@
 			onblur={() => setTimeout(() => (open = false), 120)}
 			{onkeydown}
 		/>
+		{#if value}<ClearInputButton label="Clear the log filter" onclear={clear} />{/if}
 	</label>
 	{#if open && suggestions.length}
 		<ul class="menu" role="listbox" aria-label="Filter options">
@@ -86,7 +100,10 @@
 	.log-filter {
 		position: relative;
 	}
+	/* A fixed width: the text scrolls inside, and the ✕ appearing never resizes the box. */
 	.field {
+		box-sizing: border-box;
+		width: 300px;
 		display: flex;
 		align-items: center;
 		gap: 6px;
@@ -96,7 +113,8 @@
 		color: var(--sb-text-faint);
 	}
 	input {
-		width: 260px;
+		flex: 1;
+		min-width: 0;
 		border: 0;
 		outline: 0;
 		background: transparent;

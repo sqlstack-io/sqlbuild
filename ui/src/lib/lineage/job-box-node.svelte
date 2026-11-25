@@ -38,6 +38,11 @@
 			<span class="name" title={folder.folder}>{folder.label}</span>
 			<span class="faint">· {plural(folder.nodeCount, folder.noun ?? 'node')}{#if folder.stale} · <span class="stale">{folder.stale} stale</span>{/if}{#if folder.failed} · <span class="failed">{folder.failed} failed</span>{/if}</span>
 		</button>
+		<!-- Shown in place of the cards by a page that collapses folders when zoomed out (the run graph). -->
+		<div class="zoomed-out" aria-hidden="true">
+			<span class="name">{folder.label}</span>
+			<span>{plural(folder.nodeCount, folder.noun ?? 'node')}{#if folder.failed} · <span class="failed">{folder.failed} failed</span>{/if}</span>
+		</div>
 	{:else if d.discovered}
 		{@const set = d.discovered}
 		<!-- A discovered set's header; the whole header collapses or expands the set. -->
@@ -76,6 +81,23 @@
 </div>
 
 <style>
+	.zoomed-out {
+		position: absolute;
+		inset: 0;
+		display: none;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: calc(4px * var(--sb-inv, 1));
+		color: var(--muted-foreground);
+		font-size: calc(13px * var(--sb-inv, 1));
+		pointer-events: none;
+	}
+	.zoomed-out .name {
+		color: var(--foreground);
+		font-size: calc(15px * var(--sb-inv, 1));
+		font-weight: 600;
+	}
 	.box {
 		position: relative;
 		width: 100%;

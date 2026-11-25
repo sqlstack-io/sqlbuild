@@ -2,6 +2,7 @@
 // output) from its record and the clock, the way the server projects it from
 // facts. Pure: the same record and clock always give the same detail.
 
+import { SEED_AUDIT_RUN_ID, seedAuditExecution } from './seed-audit-run';
 import type {
 	RunEventCheck,
 	CancelProgress,
@@ -41,7 +42,8 @@ const finishedRows = (key: string, ms: number): number | null => {
 };
 
 /** `crashed`: the worker stopped before building anything, as when its plan is refused; `crashError` says why. */
-export type RunEnd = 'complete' | 'cancelled' | 'presumed_failed' | 'never_started' | 'crashed';
+/** `check_failed`: every node built, then an end-of-build check failed the run. */
+export type RunEnd = 'complete' | 'cancelled' | 'presumed_failed' | 'never_started' | 'crashed' | 'check_failed';
 
 export type RunScript = {
 	verb: LaunchVerb;
@@ -187,7 +189,7 @@ export function computeNodes(record: RunRecord, siblings: RunRecord[], now: numb
 				...(fails ? (CHECK_FAILS.has(key) ? checkFailureDetail(key) : python ? pythonFailureDetail() : failureDetail(key, run, message ?? '')) : {})
 			};
 		};
-		if (terminal && script.end === 'complete') return finish();
+		if (terminal && (script.end === 'complete' || script.end === 'check_failed')) return finish();
 		if (e <= clock) return finish();
 		if (s <= clock) {
 			// A prototype run reports rows so far while a node builds, for the timeline bar and the drawer.
@@ -310,20 +312,20 @@ export function countNodes(nodes: RunNode[]): NodeCounts {
 	return c;
 }
 
-/** Terminal status from node outcomes: partial when something failed and everything else completed. */
+/** Terminal status from node outcomes: failed whenever anything failed; the counts say how much built. */
 export function deriveTerminalStatus(end: RunEnd, nodes: RunNode[]): RunStatus {
-	if (end === 'never_started' || end === 'crashed') return 'failed';
+	if (end === 'never_started' || end === 'crashed' || end === 'check_failed') return 'failed';
 	if (end === 'cancelled') return 'cancelled';
 	if (end === 'presumed_failed') return 'presumed_failed';
 	const c = countNodes(nodes);
 	const blocked = c.failed + nodes.filter((n) => n.skippedBecauseOf).length;
-	if (blocked) return c.success + c.warn > 0 ? 'partial' : 'failed';
+	if (blocked) return 'failed';
 	return c.warn ? 'warn' : 'success';
 }
 
 export function statusReason(status: RunStatus, nodes: RunNode[]): string | null {
 	const c = countNodes(nodes);
-	if (status === 'partial')
+	if ((status === 'partial' || status === 'failed') && c.success + c.warn > 0 && (c.failed || nodes.some((n) => n.skippedBecauseOf)))
 		return c.failed
 			? `${c.failed} node${c.failed === 1 ? '' : 's'} failed and ${c.skipped} that depend on ${c.failed === 1 ? 'it' : 'them'} were skipped; the other ${c.success + c.warn} finished`
 			: `${c.skipped} node${c.skipped === 1 ? '' : 's'} skipped because something they depend on failed; the other ${c.success + c.warn} finished`;
@@ -435,7 +437,7 @@ export function sqlRecorded(statementId: string): boolean {
 
 export function execution(record: RunRecord, nodes: RunNode[], now?: number): RunExecution {
 	const { run, script } = record;
-	type Draft = Omit<RunEvent, 'id' | 'storageId' | 'level' | 'runId' | 'producer'> & { producer?: RunEvent['producer'] };
+	type Draft = Omit<RunEvent, 'id' | 'storageId' | 'level' | 'runId' | 'producer'> & { producer?: RunEvent['producer']; level?: RunEventLevel; check?: RunEventCheck };
 	const drafts: Draft[] = [];
 	const statements: RunStatement[] = [];
 	const output: RunOutputLine[] = [];
@@ -457,7 +459,9 @@ export function execution(record: RunRecord, nodes: RunNode[], now?: number): Ru
 	}
 	if (script.cancel) fact('cancel_requested', script.cancel.requestedAt, `Cancel requested by ${script.cancel.requestedBy.displayName}`);
 
-	if (inv && run.startedAt && PROTO.test(run.id)) {
+	if (inv && run.startedAt && run.endedAt && run.id === SEED_AUDIT_RUN_ID) {
+		seedAuditExecution(Date.parse(run.startedAt), Date.parse(run.endedAt), nodes, { push: (d) => drafts.push(d), statements, output, inv, runId: run.id, command: commandOf(record) });
+	} else if (inv && run.startedAt && PROTO.test(run.id)) {
 		protoExecution(record, nodes, now ?? Date.now(), { ev, out, statements, inv });
 	} else if (inv && run.startedAt) {
 		const start = Date.parse(run.startedAt);
@@ -549,18 +553,19 @@ export function execution(record: RunRecord, nodes: RunNode[], now?: number): Ru
 			producer: d.producer ?? 'sqb',
 			type: d.type,
 			occurredAt: d.occurredAt,
-			level:
-				d.type === 'audit_completed' && /\(severity error\)$/.test(d.message)
+			level: d.level ??
+				(d.type === 'audit_completed' && /\(severity error\)$/.test(d.message)
 					? 'error'
 					: (d.type === 'audit_completed' && /\(severity warn\)$/.test(d.message)) || (d.type === 'node_log' && d.message.startsWith('[warning] '))
 						? 'warn'
-						: LEVEL[d.type],
+						: LEVEL[d.type]),
 			invocationId: d.invocationId,
 			nodeKey: d.nodeKey,
 			statementId: d.statementId,
 			attempt: d.attempt,
 			message: d.message,
-			...(d.type === 'audit_completed' ? { check: mockCheck(d.message) } : {})
+			...(d.type === 'audit_completed' ? { check: d.check ?? mockCheck(d.message) } : {}),
+			...(d.phase ? { phase: d.phase } : {})
 		}));
 	return { events, statements, output: output.sort((a, b) => a.at.localeCompare(b.at)) };
 }

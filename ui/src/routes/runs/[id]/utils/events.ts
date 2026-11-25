@@ -104,12 +104,31 @@ export function eventSummary(e: RunEvent, loadMs?: number): string {
 		case 'statement_failed':
 			return `Query failed: ${e.message}`;
 		case 'audit_completed':
-			return `Checks: ${e.message}`;
+			return auditSummary(e);
 		case 'member_retrying':
 		case 'member_recovered':
 			return e.message;
 	}
 }
+
+/**
+ * An audit's row: its name, how it ended, and the warehouse's own error when its query couldn't run
+ * (`Audit orders_match_payments failed · 002003 (42S02): … does not exist or not authorized.`).
+ */
+function auditSummary(e: RunEvent): string {
+	if (!e.check) return `Audit: ${e.message}`;
+	const rest = e.message.replace(new RegExp(`^${e.check.name}:\\s*`), '').trim();
+	const rows = e.check.rows ? `${e.check.rows.toLocaleString('en-GB')} failing rows` : null;
+	return [`Audit ${e.check.name} ${e.check.outcome}`, rest || rows].filter(Boolean).join(' · ');
+}
+
+const EVENT_OUTCOME: Partial<Record<RunEvent['type'], string>> = {
+	resource_attempt_completed: 'built',
+	resource_attempt_failed: 'failed',
+	resource_attempt_skipped: 'skipped',
+	statement_failed: 'failed',
+	invocation_failed: 'failed'
+};
 
 /** One row of the run log: an event, or a block the run printed. */
 export type LogEntry = {
@@ -138,6 +157,8 @@ export type LogEntry = {
 	checks?: CheckResult[];
 	/** A capped live view's marker: this many earlier lines of the node's output are in the viewer. */
 	omitted?: number;
+	/** How an event row ended, for `outcome:` (a node row reads its node's status instead). */
+	outcome?: string;
 	/** Structured details the row opens to in place, as key and value; `long` is text behind "show more". */
 	details?: [string, string][];
 	long?: string;
@@ -168,7 +189,7 @@ function eventTag(e: RunEvent): LogEntry['tag'] {
 	if (e.type === 'resource_attempt_completed') return { text: 'built', tone: TAG_TONE.ok };
 	if (e.type === 'resource_attempt_failed' || e.type === 'statement_failed' || e.type === 'invocation_failed') return { text: 'failed', tone: TAG_TONE.err };
 	if (e.type === 'resource_attempt_skipped') return { text: 'skipped', tone: TAG_TONE.quiet };
-	if (e.type === 'audit_completed') return { text: 'check', tone: e.level === 'info' ? TAG_TONE.ok : TAG_TONE.warn };
+	if (e.type === 'audit_completed') return { text: 'audit', tone: e.level === 'error' ? TAG_TONE.err : e.level === 'info' ? TAG_TONE.ok : TAG_TONE.warn };
 	if (e.type === 'node_log') return { text: 'log', tone: e.level === 'info' ? TAG_TONE.quiet : TAG_TONE.warn };
 	return undefined;
 }
@@ -211,6 +232,7 @@ function entryOf(e: RunEvent, loads?: ReadonlyMap<string, number>): LogEntry {
 		queries: [],
 		pinned: false,
 		tag: tag && { ...tag, repeats: repeats(tag, text, e.nodeKey) },
+		outcome: e.type === 'audit_completed' ? (e.check?.outcome ?? (e.level === 'error' ? 'failed' : e.level === 'warn' ? 'warned' : 'passed')) : EVENT_OUTCOME[e.type],
 		details: e.phase ? phaseDetails(e.phase) : e.message && e.message !== text ? [[e.type === 'invocation_started' ? 'Command' : 'Message', e.message]] : undefined
 	};
 }
@@ -419,4 +441,10 @@ function withOutcomes(events: readonly RunEvent[], output: readonly (RunOutputLi
 		})
 	);
 	return [...runLines, ...nodeLines, ...failedQueries, ...fromOutput].sort((a, b) => a.at.localeCompare(b.at));
+}
+
+/** The log without a failed query that is a failed audit's own query: the audit's line says it, one failure, one line. */
+export function withoutAuditQueries(entries: readonly LogEntry[]): LogEntry[] {
+	const audited = new Set(entries.filter((e) => e.category === 'checks' && e.statementId).map((e) => e.statementId));
+	return entries.filter((e) => e.category !== 'queries' || !e.statementId || !audited.has(e.statementId));
 }

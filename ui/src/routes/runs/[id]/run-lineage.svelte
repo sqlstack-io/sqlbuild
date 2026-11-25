@@ -12,6 +12,7 @@
 	import { folderTree, layoutFolderGraph, withFolderClosed } from '$lib/lineage/folder-graph';
 	import { lineageGraph } from '$lib/lineage/folder-selection';
 	import { folderOf } from '$lib/lineage/catalog-graph';
+	import { LABEL_MIN_ZOOM, NAME_ZOOM } from '$lib/lineage/fit';
 	import type { CatalogNode, RunNode } from '$lib/api';
 	import { useCatalogNodes } from '$lib/state/catalog.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
@@ -55,7 +56,10 @@
 		const graph = lineageGraph(data, { grouped: true, open: opened, selected: [], tree: folderTree(data), onclose: (f) => setOpen(withFolderClosed(opened, f)), onadd: () => {} });
 		const selected = new Set(view.selected);
 		const excluded = new Set(view.excluded);
-		return { nodes: graph.nodes.map((n) => ({ ...n, selected: selected.has(n.id), class: excluded.has(n.id) ? 'excluded' : undefined })), edges: graph.edges };
+		// A folder box holding open folder boxes is marked, so zoomed out only the innermost ones show counts.
+		const outer = new Set(graph.nodes.filter((n) => n.type === 'folderBox' && n.parentId).map((n) => n.parentId));
+		const classOf = (n: Node) => [excluded.has(n.id) ? 'excluded' : '', outer.has(n.id) ? 'has-boxes' : ''].filter(Boolean).join(' ') || undefined;
+		return { nodes: graph.nodes.map((n) => ({ ...n, selected: selected.has(n.id), class: classOf(n) })), edges: graph.edges };
 	}
 	function setOpen(next: ReadonlySet<string>) {
 		open = next;
@@ -127,9 +131,11 @@
 		{/if}
 	</div>
 {:else}
-	<div class="sb-flow relative flex-1" style="background: var(--sb-inset)">
-		<!-- Opens zoomed to fit the whole run, compact cards and all; zoom in to read them. -->
-		<GraphCanvas bind:nodes bind:edges bind:fit fitOnInit readable={false} fitFloor={0.1} controls="fit" {nodeTypes} elementsSelectable nodesDraggable {onnodeclick} fitViewOptions={{ padding: 0.06, maxZoom: 1, minZoom: 0.1 }} minZoom={0.05} />
+	<div class="run-graph sb-flow relative flex-1" style="background: var(--sb-inset)">
+		<!-- Opens at a zoom where the cards' names read (the shared readable fit); Reset view returns there.
+		     Pan and zoom only: cards and folders stay where the layout put them. Zoomed out past the
+		     point where cards are dots, an open folder shows its count instead of blank cards. -->
+		<GraphCanvas bind:nodes bind:edges bind:fit fitOnInit minFitZoom={NAME_ZOOM} fitLabel="Reset view" controls="fit" {nodeTypes} elementsSelectable nodesDraggable={false} {onnodeclick} fitViewOptions={{ padding: 0.06, maxZoom: 1, minZoom: LABEL_MIN_ZOOM }} minZoom={0.05} />
 	</div>
 {/if}
 
@@ -138,6 +144,15 @@
 	:global(.svelte-flow__node.excluded) {
 		opacity: 0.5;
 		text-decoration: line-through;
+	}
+	/* Zoomed out to dots: a folder's cards give way to its count, in a size that stays readable. */
+	/* The library sets each node's own visibility inline, so the cards' contents are hidden, not the nodes. */
+	.run-graph :global(.graph-canvas[data-stage='dot'] .svelte-flow__node-asset > *) {
+		visibility: hidden;
+	}
+	/* Only the innermost open folders show a count; an outer box keeps its header, so counts never overlap. */
+	.run-graph :global(.graph-canvas[data-stage='dot'] .svelte-flow__node-folderBox:not(.has-boxes) .zoomed-out) {
+		display: flex;
 	}
 	.wait {
 		padding: 32px;
