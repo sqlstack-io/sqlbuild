@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { noun, plural } from '$lib/format/plural';
 	import HelpTip from '$lib/components/help-tip.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
 	import PageBody from '$lib/components/page-body.svelte';
 	import DataTable from '$lib/components/list/data-table.svelte';
 	import type { TableColumn } from '$lib/components/list/table-columns';
@@ -31,6 +30,7 @@
 	import { rerunRows, type RerunRow } from '../../runs/[id]/utils/rerun-rows';
 	import SelectionBar from '$lib/components/selection/selection-bar.svelte';
 	import { createSelection } from '$lib/state/selection.svelte';
+	import type { SuggestionItem } from '$lib/selection/suggest';
 	import { nodeLabel } from '$lib/operate/labels';
 	import { namesRun, presetText, rerunItems, runsNamed, type RerunItem } from './utils/rerun-plan';
 
@@ -132,11 +132,12 @@
 	}
 
 	const what = (d: RunDetail) => d.run.jobKey ?? 'ad-hoc run';
-	/** A suggestion's short name: "What didn't succeed", "Failed audit only", "Whole run". */
-	const presetLabel = (r: RerunRow) => {
-		const text = r.label.replace(/^Rerun /, '').replace(/^the /, '');
-		return text.charAt(0).toUpperCase() + text.slice(1);
-	};
+	/** The run selectors the box suggests, beside the usual ones, as every other suggestion looks. */
+	const runSuggestions = (id: string): SuggestionItem[] => [
+		{ insert: `failed:${id}+`, type: 'failed', label: `${id}+`, hint: `what didn't succeed in run ${shortRunId(id)}`, complete: true },
+		{ insert: `run:${id}`, type: 'run', label: id, hint: 'the whole run', complete: true },
+		{ insert: `skipped:${id}`, type: 'skipped', label: id, hint: `what run ${shortRunId(id)} skipped`, complete: true }
+	];
 	const nodeColumns: TableColumn[] = [
 		{ id: 'node', label: 'Node or audit', minWidth: 200 },
 		{ id: 'kind', label: 'Kind', width: '30%' },
@@ -155,18 +156,7 @@
 	{#if single && first}
 		<!-- The box is the whole plan: Rerun opens it on failed:<run>+, and the suggestions only rewrite its text. -->
 		<div class="pick">
-			<SelectionBar {selection} names={first.nodes.map((n) => ({ value: nodeLabel(n.nodeKey), hint: n.kind ?? '' }))} total={first.nodes.length} build={false} />
-			{#if presets.length}
-				<div class="suggest" data-testid="rerun-suggestions">
-					<span class="faint">Suggestions</span>
-					{#each presets as r (r.key)}
-						{@const text = textOf(r)}
-						<Button variant="link" size="inline" class={activePreset?.key === r.key ? 'sb-pressed text-[12.5px]' : 'text-[12.5px]'} aria-pressed={activePreset?.key === r.key} title={r.description} onclick={() => (selection.select = text)}>
-							{presetLabel(r)} <code class="mono faint">{text}</code>
-						</Button>
-					{/each}
-				</div>
-			{/if}
+			<SelectionBar {selection} names={first.nodes.map((n) => ({ value: nodeLabel(n.nodeKey), hint: n.kind ?? '' }))} total={first.nodes.length} build={false} runs={runSuggestions(first.run.id)} />
 		</div>
 	{:else}
 	<div class="cmd">
@@ -259,14 +249,6 @@
 	.pick {
 		padding: 4px 14px;
 		border-bottom: 1px solid var(--border-subtle);
-	}
-	.suggest {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: baseline;
-		gap: 4px 14px;
-		padding: 2px 10px 8px;
-		font-size: 12.5px;
 	}
 	.pick :global(.selection-bar) {
 		border-bottom: none;

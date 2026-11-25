@@ -24,6 +24,7 @@
 		vocabulary,
 		names,
 		recent = [],
+		runs = [],
 		problem = null,
 		onrecent,
 		onleave
@@ -35,6 +36,8 @@
 		vocabulary: SelectionVocabulary | null;
 		names: NameEntry[];
 		recent?: RecentSelection[];
+		/** Run selectors to offer first, such as `failed:<id>+` on the rerun plan. */
+		runs?: SuggestionItem[];
 		/** The token and parts `sqb` refuses, and its first fix. */
 		problem?: { token: number; parts: number[]; fix: string | null } | null;
 		onrecent?: (r: RecentSelection) => void;
@@ -67,7 +70,7 @@
 
 	const tokens = $derived(field.tokens.map((t) => parseToken(t)));
 	const draftParts = $derived(field.parts.map(parsePart));
-	const groups = $derived<SuggestionGroup[]>(focused ? suggest(field.text, vocabulary, names, field.tokens.length || field.parts.length || tone === 'except' ? [] : recent.map((r) => ({ select: r.exclude ? `${r.select} --exclude ${r.exclude}` : r.select, count: r.count }))) : []);
+	const groups = $derived<SuggestionGroup[]>(focused ? suggest(field.text, vocabulary, names, field.tokens.length || field.parts.length || tone === 'except' ? [] : recent.map((r) => ({ select: r.exclude ? `${r.select} --exclude ${r.exclude}` : r.select, count: r.count })), tone === 'except' ? [] : runs) : []);
 	const items = $derived(groups.flatMap((g) => g.items));
 	const typed = $derived(field.text.replace(/^\+/, '').replace(/^[a-z_]+:/, '').toLowerCase());
 

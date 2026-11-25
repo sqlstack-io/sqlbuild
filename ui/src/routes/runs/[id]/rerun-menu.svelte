@@ -37,7 +37,7 @@
 {#if failures.length || detail?.rerunFromFailureNodes.length}
 	<span title={blocked ?? undefined}>
 		<DropdownMenu.Root>
-			<DropdownMenu.Trigger class={cn(buttonVariants({ variant: 'outline', size: 'sm' }), ACTION_CLASS.rerun[look])} disabled={!!blocked} data-testid="rerun-menu">{#if look === '2' || look === '3'}<RotateCcwIcon />{/if}Rerun <ChevronDownIcon /></DropdownMenu.Trigger>
+			<DropdownMenu.Trigger class={cn(buttonVariants({ variant: 'outline', size: 'sm' }), ACTION_CLASS.rerun[look])} disabled={!!blocked} data-testid="rerun-menu">{#if look === '2' || look === '3' || look === '4'}<RotateCcwIcon />{/if}Rerun <ChevronDownIcon /></DropdownMenu.Trigger>
 			<DropdownMenu.Content class="w-80 p-1.5" align="end">
 				{#each rows as r, i (r.key)}
 					{#if r.mode === 'all' && i > 0}<DropdownMenu.Separator />{/if}

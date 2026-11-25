@@ -90,18 +90,23 @@ for (const how of ['✕', 'Esc'] as const) {
 	});
 }
 
-// The rerun plan holds no state of its own: it opens on failed:<run>+, a suggestion only rewrites the
-// box, and "from run" is read from the selection.
-test('the rerun plan opens on failed:<run>+ and its suggestions rewrite the box', async ({ page }) => {
+// The rerun plan holds no state of its own: it opens on failed:<run>+, the box's own suggestions offer the
+// run selectors, and "from run" is read from the selection.
+test('the rerun plan opens on failed:<run>+ and the box suggests the run selectors', async ({ page }) => {
 	await page.goto('/plan/rerun?run=run-pa93&mode=from_failure&mock&failure-mock');
 	const box = page.locator('.sel-field').first();
 	await expect(box).toContainText('failed:run-pa93+', { timeout: 20_000 });
 	await expect(page.getByTestId('rerun-of')).toHaveCount(0);
+	await expect(page.getByRole('listbox')).toHaveCount(0);
 	await expect(page.getByTestId('rerun-from')).toContainText('from run');
 	await expect(page.getByRole('cell', { name: 'orders_match_payments' })).toBeVisible();
-	await page.getByTestId('rerun-suggestions').getByRole('button', { name: /Whole run/ }).click();
+	await page.getByRole('button', { name: 'Clear selection' }).click();
+	await selector(page).fill('run:');
+	const whole = page.getByRole('option', { name: /run:run-pa93\s*the whole run/ });
+	await expect(whole).toBeVisible();
+	await whole.click();
 	await expect(box).toContainText('run:run-pa93');
-	await expect(box).not.toContainText('failed:');
+	await expect(page.getByTestId('rerun-from')).toContainText('from run');
 	await page.getByRole('button', { name: 'Clear selection' }).click();
 	await selector(page).fill('country_codes ');
 	await expect(page.getByTestId('rerun-from')).toHaveCount(0);

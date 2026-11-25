@@ -18,7 +18,7 @@
 
 	let { view, runId }: { view: RunDetailState; runId: string } = $props();
 
-	// Mock-up: the header actions' look, switchable with ?actions=1|2|3 for comparison.
+	// Mock-up: the header actions' look, switchable with ?actions=0|1|2|3|4 for comparison; 4 by default.
 	const look = $derived(actionLook(page.url.searchParams.get('actions')));
 	const detailsClass = ACTION_CLASS.details;
 
@@ -93,7 +93,7 @@
 						</span>
 					{/if}
 					<Button variant={look === 'before' ? 'ghost' : 'outline'} size="sm" class={detailsClass[look]} onclick={() => view.toggleDetails()} aria-expanded={view.showDetails} title="Command, version, worker, cost and related runs">
-						{#if look === '3'}<PanelRightIcon />{/if}Details{#if look === 'before'} {view.showDetails ? '▴' : '▾'}{:else if look !== '3'}<ChevronDownIcon />{/if}
+						{#if look === '3' || look === '4'}<PanelRightIcon />{/if}Details{#if look === 'before'} {view.showDetails ? '▴' : '▾'}{:else if look !== '3' && look !== '4'}<ChevronDownIcon />{/if}
 					</Button>
 				</div>
 			</div>
