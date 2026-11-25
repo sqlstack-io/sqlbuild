@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -65,3 +66,4 @@ class SqlTestExecutionResult:
     error_message: str | None = None
     real_model_count: int | None = None
     timeout: ItemTimeoutReport | None = None
+    local_refusal: Mapping[str, str] | None = None

@@ -4484,6 +4484,12 @@ def render_sql_test_comparison_sql(
     output_step_index: int | None = None,
     actual_relations: Mapping[int, str] | None = None,
 ) -> list[str]: ...
+def render_sql_test_comparison_segments(
+    test_entry: SqlTestPlanEntry,
+    *,
+    set_difference_operator: str = "EXCEPT",
+    sql_analysis_dialect: str | None = None,
+) -> tuple[str, list[tuple[int, int, str]]]: ...
 def render_sql_test_difference_sample_sql(
     *,
     test_entry: SqlTestPlanEntry,
@@ -7115,8 +7121,8 @@ class ScenarioTestCommandRequest(NativeRecord):
     selectors: tuple[str, ...]
     exclude: tuple[str, ...]
     retain: bool
-    local: bool
-    strict: bool
+    run_on: str | None
+    verbose: bool
     concurrency: int | None
     sync_snapshots: bool
     refresh: bool
@@ -7135,8 +7141,8 @@ class ScenarioTestCommandRequest(NativeRecord):
         selectors: tuple[str, ...] = (),
         exclude: tuple[str, ...] = (),
         retain: bool = False,
-        local: bool = False,
-        strict: bool = False,
+        run_on: str | None = None,
+        verbose: bool = False,
         concurrency: int | None = None,
         sync_snapshots: bool = False,
         refresh: bool = False,
@@ -7187,6 +7193,8 @@ class TestCommandRequest(NativeRecord):
     case_name: str | None
     inspect: bool
     test_timeout: str | None
+    run_on: str | None
+    verbose: bool
     since: str | None
     explain: bool
     sql_only: bool
@@ -7206,6 +7214,8 @@ class TestCommandRequest(NativeRecord):
         case_name: str | None = None,
         inspect: bool = False,
         test_timeout: str | None = None,
+        run_on: str | None = None,
+        verbose: bool = False,
         since: str | None = None,
         explain: bool = False,
         sql_only: bool = False,
@@ -12060,6 +12070,8 @@ class TargetConfig(NativeRecord):
     diff: TargetDiffConfig
     warehouses: TargetWarehousesConfig
     concurrency: int | None
+    test_run_on: str | None
+    scenario_run_on: str | None
     catalog_connection: str | None
     ignore_audit_failures: bool | None
     plan_from: str | None
@@ -12089,6 +12101,8 @@ class TargetConfig(NativeRecord):
         diff: TargetDiffConfig = ...,
         warehouses: TargetWarehousesConfig = ...,
         concurrency: int | None = ...,
+        test_run_on: str | None = ...,
+        scenario_run_on: str | None = ...,
         catalog_connection: str | None = ...,
         ignore_audit_failures: bool | None = ...,
         plan_from: str | None = ...,
@@ -12121,6 +12135,8 @@ class LocalTargetConfig(NativeRecord):
     diff: TargetDiffConfig
     warehouses: TargetWarehousesConfig
     concurrency: int | None
+    test_run_on: str | None
+    scenario_run_on: str | None
     catalog_connection: str | None
     ignore_audit_failures: bool | None
     plan_from: str | None
@@ -12151,6 +12167,8 @@ class LocalTargetConfig(NativeRecord):
         diff: TargetDiffConfig = ...,
         warehouses: TargetWarehousesConfig = ...,
         concurrency: int | None = ...,
+        test_run_on: str | None = ...,
+        scenario_run_on: str | None = ...,
         catalog_connection: str | None = ...,
         ignore_audit_failures: bool | None = ...,
         plan_from: str | None = ...,
@@ -12183,6 +12201,8 @@ class SettingsConfig(NativeRecord):
     allow_warehouse_round_trips: bool
     ignore_audit_failures: bool
     record_run_host: bool
+    test_run_on: str
+    scenario_run_on: str
     def __init__(
         self,
         sql_analysis: bool = ...,
@@ -12206,6 +12226,8 @@ class SettingsConfig(NativeRecord):
         allow_warehouse_round_trips: bool = ...,
         ignore_audit_failures: bool = ...,
         record_run_host: bool = ...,
+        test_run_on: str = ...,
+        scenario_run_on: str = ...,
     ) -> None: ...
     @property
     def sql_validation(self) -> bool: ...

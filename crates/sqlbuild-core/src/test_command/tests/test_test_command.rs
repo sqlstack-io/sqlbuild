@@ -194,7 +194,7 @@ fn given_results_when_completing_then_renders_summary_failures_and_exit_code() {
 
     for test_case in test_cases {
         assert_eq!(
-            render_test_completion(test_case.counts, &test_case.failures, PLAIN),
+            render_test_completion(test_case.counts, &test_case.failures, None, PLAIN),
             test_case.expected_text,
             "{}",
             test_case.description

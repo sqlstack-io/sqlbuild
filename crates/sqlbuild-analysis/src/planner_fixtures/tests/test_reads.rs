@@ -1,7 +1,11 @@
 use crate::planner_fixtures::_helpers::resolved_reads::resolved_reads;
 use crate::planner_fixtures::_helpers::stub_markers::stub_markers;
+use crate::planner_fixtures::main::prewarm_reads::prewarm_reads;
 use crate::planner_fixtures::models::{FixtureReadCache, FixtureReadKey, FixtureReadReference};
-use crate::planner_fixtures::tests::test_types::{FixtureMarkerTestCase, FixtureReadCacheTestCase};
+use crate::planner_fixtures::tests::helpers::source_read_key;
+use crate::planner_fixtures::tests::test_types::{
+    FixtureMarkerTestCase, FixtureReadCacheTestCase, FixtureReadPrewarmTestCase,
+};
 
 #[test]
 fn given_repeated_reads_when_resolving_then_full_reference_identity_controls_reuse() {
@@ -110,6 +114,51 @@ fn given_marker_text_when_stubbing_for_star_analysis_then_preserves_legacy_lexic
         assert_eq!(
             stub_markers(test_case.sql).ok().as_deref(),
             Some(test_case.expected_sql),
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_prewarmed_reads_when_resolving_each_key_then_no_key_is_analysed_twice() {
+    let test_cases = [
+        FixtureReadPrewarmTestCase {
+            description: "distinct keys",
+            sqls: &[
+                "SELECT order_id FROM __source(\"orders\")",
+                "SELECT status FROM __source(\"orders\")",
+            ],
+            expected_misses: 2,
+        },
+        FixtureReadPrewarmTestCase {
+            description: "repeated key",
+            sqls: &[
+                "SELECT order_id FROM __source(\"orders\")",
+                "SELECT order_id FROM __source(\"orders\")",
+            ],
+            expected_misses: 1,
+        },
+    ];
+    for test_case in test_cases {
+        let keys: Vec<FixtureReadKey> = test_case
+            .sqls
+            .iter()
+            .map(|sql| source_read_key(sql))
+            .collect();
+        let mut cache = prewarm_reads(FixtureReadCache::default(), &keys);
+        assert_eq!(
+            cache.misses, test_case.expected_misses,
+            "{}",
+            test_case.description
+        );
+        for key in &keys {
+            let (updated, reads) = resolved_reads(cache, key);
+            assert!(reads.is_ok(), "{}", test_case.description);
+            cache = updated;
+        }
+        assert_eq!(
+            cache.misses, test_case.expected_misses,
             "{}",
             test_case.description
         );

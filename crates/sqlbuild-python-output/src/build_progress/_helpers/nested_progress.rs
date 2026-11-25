@@ -31,6 +31,8 @@ pub(crate) struct ReporterState {
     pub(crate) cursor_hidden: bool,
     pub(crate) stop_event: Option<Py<PyAny>>,
     pub(crate) thread: Option<Py<PyAny>>,
+    /// Whether item progress waits for each item's result, which may abandon the attempt.
+    pub(crate) holding: bool,
 }
 
 pub(crate) fn optional_argument(

@@ -7,8 +7,8 @@ use sqlbuild_orchestration::runs::models::NodeOutcome;
 use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
 
-use crate::build_progress::main::audit_check::audit_check;
 use crate::result_output::main::events::sql_test_identity::sql_test_identity;
+use crate::result_output::main::results::audit_check::audit_check;
 
 /// Record the outcome of every audit and SQL unit test in `executor_result`, the build's result, so check sensors and run events see them; a singular audit reports under its own `audit:<name>`, and a check the snapshot doesn't record is skipped.
 pub fn report_build_checks(

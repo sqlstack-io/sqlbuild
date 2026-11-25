@@ -108,7 +108,7 @@ SQLite stores values by type affinity, so SQLBuild keeps column types explicitly
 | Snapshots (timestamp, check, historical) | Supported |
 | Schema changes | Add, drop and rename columns in place; type changes rebuild the table and its indexes in one transaction |
 | `sqb diff`, `sqb clone` | Supported; clones are physical copies |
-| Scenarios, `sqb scenario capture`, `--local` replay | Supported; see below |
+| Scenarios, `sqb scenario capture` | Supported on SQLite; see below |
 | Statement time limits | Connection interrupt |
 | `sqb load`: Python loaders | Supported |
 
@@ -118,9 +118,9 @@ Scenario fixtures and models are tables in the same file, named
 `<schema>____sqb_<run>__<kind>__<name>`, and are dropped when the scenario finishes unless you
 pass `--retain`. Concurrent scenarios queue for the file's single writer.
 
-`sqb scenario test --local` transpiles SQLite SQL to DuckDB. Date functions with modifiers, such
-as `datetime(ordered_at, 'start of day')`, have no DuckDB translation and fail locally; use
-`date(...)` or `strftime(...)` in models you want to replay locally.
+Scenarios run on the SQLite file. Local replay converts Snowflake SQL only, so with
+`--run-on auto` SQLite scenarios run on SQLite (reason `dialect: sqlite`), and `--run-on local`
+refuses them.
 
 ## Limits
 

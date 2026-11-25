@@ -27,13 +27,6 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const EXECUTION_COMMAND: &str = "sqb scenario capture";
 
-fn count(label: &str, value: usize) -> SummaryCount {
-    SummaryCount {
-        label: label.to_owned(),
-        value: i64::try_from(value).unwrap_or(i64::MAX),
-    }
-}
-
 /// Run one `sqb scenario capture` request.
 #[pyfunction]
 #[pyo3(signature = (*, request))]
@@ -152,9 +145,9 @@ pub(crate) fn run_scenario_capture_command(
             format_summary_footer(
                 style,
                 &[
-                    count("PASS", passed),
-                    count("FAIL", failed),
-                    count("TOTAL", results.len())
+                    SummaryCount::of("PASS", passed),
+                    SummaryCount::of("FAIL", failed),
+                    SummaryCount::of("TOTAL", results.len())
                 ],
                 None
             )

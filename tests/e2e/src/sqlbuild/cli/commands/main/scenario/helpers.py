@@ -1302,7 +1302,7 @@ def build_snowflake_lambda_scenario_project_files() -> dict[str, str]:
         "sql/models/order_quantities.sql": (
             'MODEL (description "Quantities above each order id.");\n'
             "SELECT order_id,\n"
-            "  FILTER(ARRAY_CONSTRUCT(1, 2, 3), x -> x > order_id) AS big_quantities\n"
+            "  FILTER(ARRAY_CONSTRUCT(1, 2, 3), x -> x::NUMBER > order_id) AS big_quantities\n"
             'FROM __source("raw_orders")\n'
         ),
         "tests/scenarios/order_quantities__lambda.sql": (
@@ -1317,12 +1317,41 @@ def build_snowflake_lambda_scenario_project_files() -> dict[str, str]:
     }
 
 
-def write_snowflake_order_ids_snapshot(*, project_dir: Path, scenario_name: str) -> None:
-    """Write the snapshot a Snowflake capture stores for a one-column order source."""
+SNOWFLAKE_TWO_ORDER_IDS_FIXTURE_SQL: str = "SELECT 1 AS order_id UNION ALL SELECT 2"
+
+
+def build_snowflake_guarded_scenario_project_files() -> dict[str, str]:
+    """An offline Snowflake project whose model's SQLQuack guard raises on the captured rows."""
+
+    return {
+        **build_snowflake_lambda_scenario_project_files(),
+        "sql/models/order_id_lists.sql": (
+            'MODEL (description "Every order id.");\n'
+            "SELECT ARRAY_AGG(order_id) AS order_ids\n"
+            'FROM __source("raw_orders")\n'
+        ),
+        "tests/scenarios/order_id_lists__guarded.sql": (
+            "SCENARIO (description 'ARRAY_AGG of several rows raises its guard locally.');\n"
+            "WITH\n"
+            f"__source__raw_orders AS ({SNOWFLAKE_TWO_ORDER_IDS_FIXTURE_SQL}),\n"
+            "__expected__order_id_lists AS (SELECT ARRAY_CONSTRUCT(1, 2) AS order_ids)\n"
+            "SELECT 1\n"
+        ),
+    }
+
+
+def write_snowflake_order_ids_snapshot(
+    *,
+    project_dir: Path,
+    scenario_name: str,
+    fixture_sql: str = SNOWFLAKE_ORDER_IDS_FIXTURE_SQL,
+    order_ids: tuple[int, ...] = (1,),
+) -> None:
+    """Write the snapshot a Snowflake capture of `fixture_sql` stores for a one-column source."""
 
     snapshot_root: Path = project_dir / "tests" / "_scenario_snapshots" / scenario_name
     (snapshot_root / "sources").mkdir(parents=True)
-    row: str = json.dumps({"ORDER_ID": 1}) + "\n"
+    row: str = "".join(json.dumps({"ORDER_ID": order_id}) + "\n" for order_id in order_ids)
     (snapshot_root / "sources" / "raw_orders.jsonl").write_text(row, encoding="utf-8")
     manifest: dict[str, object] = {
         "capture_adapter": "snowflake",
@@ -1336,7 +1365,7 @@ def write_snowflake_order_ids_snapshot(*, project_dir: Path, scenario_name: str)
                     kind=ScenarioArtifactKind.SOURCE,
                     logical_name="raw_orders",
                     file_path=Path("sources") / "raw_orders.jsonl",
-                    capture_sql=SNOWFLAKE_ORDER_IDS_FIXTURE_SQL,
+                    capture_sql=fixture_sql,
                 ),
             ),
             capture_adapter="snowflake",
@@ -1355,13 +1384,13 @@ def write_snowflake_order_ids_snapshot(*, project_dir: Path, scenario_name: str)
                 "file": "sources/raw_orders.jsonl",
                 "kind": "source",
                 "logical_name": "raw_orders",
-                "row_count": 1,
+                "row_count": len(order_ids),
             }
         ],
         "scenario_name": scenario_name,
         "sqlbuild_version": "0.177.0",
         "total_bytes": len(row.encode("utf-8")),
-        "total_rows": 1,
+        "total_rows": len(order_ids),
         "version": 1,
     }
     (snapshot_root / "scenario.json").write_text(

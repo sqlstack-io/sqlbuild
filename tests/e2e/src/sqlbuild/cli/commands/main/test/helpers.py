@@ -6,15 +6,18 @@ import json
 import os
 import re
 import subprocess
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
+from subprocess import CompletedProcess
 from typing import Any
 
 import duckdb
 
+from tests.e2e.src.sqlbuild.cli.commands.main.test._test_types import RunOnPrecedenceE2ETestCase
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     execute_duckdb,
     prepare_inline_project,
+    run_sqb,
 )
 
 _OPTIONAL_CEREMONY_PROJECT_FILES: dict[str, str] = {
@@ -2530,3 +2533,186 @@ def partitioned_call_fixture_files(*, query: str, expected_rows: str) -> dict[st
             "SELECT 1\n"
         ),
     }
+
+
+DUCKDB_PROJECT: str = 'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n'
+DUCKDB_TARGET: str = (
+    '\n[targets.dev]\nconnection = "main"\n\n[connections.main]\ndatabase = "orders.duckdb"\n'
+)
+DUCKDB_FILES: dict[str, str] = {
+    "sql/sources/raw_orders.yml": (
+        "sources:\n"
+        "  - name: raw_orders\n    description: Raw orders.\n"
+        "    schema: main\n    table: raw_orders\n"
+        "    columns:\n"
+        "      - name: order_id\n        type: INTEGER\n"
+        "      - name: amount\n        type: INTEGER\n"
+    ),
+    "sql/models/orders.sql": (
+        "MODEL (description 'Orders with doubled amounts.');\n\n"
+        'SELECT order_id, amount * 2 AS doubled FROM __source("raw_orders")\n'
+    ),
+    "tests/unit/test_orders.sql": (
+        "TEST();\n\nWITH\n"
+        "__source__raw_orders AS (SELECT 1 AS order_id, 5 AS amount),\n"
+        "__expected__orders AS (SELECT 1 AS order_id, 10 AS doubled)\n"
+        "SELECT 1\n"
+    ),
+}
+
+SNOWFLAKE_FILES: dict[str, str] = {
+    "sqlbuild_project.toml": (
+        'name = "orders"\nadapter = "snowflake"\ndefault_target = "dev"\n\n'
+        '[defaults]\ndatabase = "ANALYTICS"\n\n'
+        '[targets.dev]\nconnection = "main"\nschema = "dev"\n\n'
+        '[connections.main]\naccount = "example"\nuser = "example"\n'
+    ),
+    "sql/sources/raw_orders.yml": (
+        "sources:\n"
+        "  - name: raw_orders\n    description: Raw orders.\n"
+        "    database: RAW\n    schema: shop\n    table: orders\n"
+        "    columns:\n"
+        "      - name: order_id\n        type: NUMBER(38,0)\n"
+        "      - name: status\n        type: VARCHAR\n"
+    ),
+    "sql/models/staging/stg_orders.sql": (
+        "MODEL (description 'Orders with a status hash.');\n\n"
+        "SELECT\n"
+        "  order_id,\n"
+        "  status,\n"
+        "  HASH(status) AS status_hash\n"
+        'FROM __source("raw_orders")\n'
+    ),
+    "sql/models/staging/stg_order_flags.sql": (
+        "MODEL (description 'Orders with a hashed status from a macro.');\n\n"
+        "SELECT\n"
+        "  order_id,\n"
+        '  @py.status_hash("status") AS status_hash\n'
+        'FROM __source("raw_orders")\n'
+    ),
+    "sql/models/staging/_sqlbuild/_macros/python/hashing.py": (
+        '"""Staging hash macros."""\n\n\n'
+        "def status_hash(column: str) -> str:\n"
+        '    """Hash a status column."""\n'
+        '    return f"HASH({column})"\n'
+    ),
+    "sql/models/marts/order_status.sql": (
+        "MODEL (description 'Order status flags.');\n\n"
+        "SELECT\n"
+        "  order_id,\n"
+        "  IFF(status = 'completed', 1, 0) AS is_completed\n"
+        'FROM __source("raw_orders")\n'
+    ),
+    "tests/unit/test_stg_orders.sql": (
+        "TEST();\n\nWITH\n"
+        "__source__raw_orders AS (SELECT 1 AS order_id, 'completed' AS status),\n"
+        "__expected__stg_orders AS (SELECT 1 AS order_id, 'completed' AS status)\n"
+        "SELECT 1\n"
+    ),
+    "tests/unit/test_stg_order_flags.sql": (
+        "TEST();\n\nWITH\n"
+        "__source__raw_orders AS (SELECT 1 AS order_id, 'completed' AS status),\n"
+        "__expected__stg_order_flags AS (SELECT 1 AS order_id)\n"
+        "SELECT 1\n"
+    ),
+    "tests/unit/test_order_status.sql": (
+        "TEST();\n\nWITH\n"
+        "__source__raw_orders AS (SELECT 1 AS order_id, 'completed' AS status),\n"
+        "__expected__order_status AS (SELECT 1 AS order_id, 1 AS is_completed)\n"
+        "SELECT 1\n"
+    ),
+}
+
+
+UNMOCKED_SOURCE_FILES: dict[str, str] = {
+    "sql/sources/raw_customers.yml": (
+        "sources:\n"
+        "  - name: raw_customers\n    description: Raw customers.\n"
+        "    database: RAW\n    schema: shop\n    table: customers\n"
+        "    columns:\n"
+        "      - name: order_id\n        type: NUMBER(38,0)\n"
+        "      - name: customer_id\n        type: NUMBER(38,0)\n"
+    ),
+    "sql/models/marts/order_customers.sql": (
+        "MODEL (description 'Each order with its customer.');\n\n"
+        "SELECT\n"
+        "  orders.order_id,\n"
+        "  customers.customer_id\n"
+        'FROM __source("raw_orders") AS orders\n'
+        "JOIN RAW.shop.customers AS customers ON customers.order_id = orders.order_id\n"
+    ),
+    "tests/unit/test_order_customers_unmocked.sql": (
+        "TEST();\n\nWITH\n"
+        "__source__raw_orders AS (SELECT 1 AS order_id, 'completed' AS status),\n"
+        "__expected__order_customers AS (SELECT 1 AS order_id, 7 AS customer_id)\n"
+        "SELECT 1\n"
+    ),
+}
+
+
+GUARDED_FILES: dict[str, str] = {
+    "sql/models/marts/order_statuses.sql": (
+        "MODEL (description 'Every order status.');\n\n"
+        "SELECT ARRAY_AGG(status) AS statuses\n"
+        'FROM __source("raw_orders")\n'
+    ),
+    "tests/unit/test_order_statuses.sql": (
+        "TEST();\n\nWITH\n"
+        "__source__raw_orders AS (\n"
+        "  SELECT 1 AS order_id, 'completed' AS status UNION ALL SELECT 2, 'open'\n"
+        "),\n"
+        "__expected__order_statuses AS (SELECT ARRAY_CONSTRUCT('completed', 'open') AS statuses)\n"
+        "SELECT 1\n"
+    ),
+}
+
+
+def run_on_precedence_files(test_case: RunOnPrecedenceE2ETestCase) -> dict[str, str]:
+    """The DuckDB project with `test_run_on` set where the case sets it."""
+
+    target: str = DUCKDB_TARGET.replace(
+        'connection = "main"\n', f'connection = "main"\n{test_case.target_line}'
+    )
+    return {
+        **DUCKDB_FILES,
+        "sqlbuild_project.toml": DUCKDB_PROJECT + test_case.settings_toml + target,
+        "sqlbuild_local.toml": test_case.local_toml,
+    }
+
+
+def run_on_counts(*, project: Path, run_on_args: tuple[str, ...]) -> tuple[int, int]:
+    """`(local_count, warehouse_count)` of a passing `sqb test --sql --json` run."""
+
+    result: CompletedProcess[str] = run_sqb(
+        command=("--no-color", "test", "--sql", "--json", *run_on_args), project_dir=project
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    summary: Mapping[str, int] = json.loads(result.stdout)["summary"]
+    return summary["local_count"], summary["warehouse_count"]
+
+
+def check_placements(checks: Sequence[Mapping[str, object]]) -> dict[str, tuple[object, ...]]:
+    """Each check's `(status, run_on, run_on_reason)` by name."""
+
+    return {
+        str(check["name"]): (check["status"], check["run_on"], check["run_on_reason"])
+        for check in checks
+    }
+
+
+def refusal_places(refusals: Sequence[Mapping[str, object]]) -> set[tuple[object, ...]]:
+    """Each refusal's `(code, construct, path, line)`."""
+
+    return {
+        (refusal["code"], refusal["construct"], refusal["path"], refusal["line"])
+        for refusal in refusals
+    }
+
+
+def refused_tests(refusals: Sequence[Mapping[str, Sequence[str]]]) -> list[str]:
+    """Every test the refusals name, sorted."""
+
+    names: list[str] = []
+    for refusal in refusals:
+        names.extend(refusal["tests"])
+    return sorted(names)

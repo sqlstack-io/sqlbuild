@@ -21,8 +21,12 @@ from tests.e2e.src.sqlbuild.cli.commands.main.scenario.helpers import (
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
 
-_SCENARIO_ROW: re.Pattern[str] = re.compile(r"^order_totals_pass\s+PASS  \d+\.\d\ds$", re.M)
-_SUMMARY: re.Pattern[str] = re.compile(r"PASS=2  FAIL=1  TOTAL=3  \(\d+\.\d\ds\)")
+_SCENARIO_ROW: re.Pattern[str] = re.compile(
+    r"^order_totals_pass\s+PASS  warehouse  \d+\.\d\ds$", re.M
+)
+_SUMMARY: re.Pattern[str] = re.compile(
+    r"PASS=2  FAIL=1  TOTAL=3  \(0 local, 3 warehouse, \d+\.\d\ds\)"
+)
 
 
 @pytest.mark.parametrize(

@@ -108,7 +108,7 @@ pub(crate) const FORBIDDEN_STATEMENT_PAYLOAD_FIELDS: [&str; 8] = [
     "statement_sql",
 ];
 
-pub(crate) const STRING_PAYLOAD_FIELDS: [&str; 57] = [
+pub(crate) const STRING_PAYLOAD_FIELDS: [&str; 58] = [
     "adapter",
     "attached_column_name",
     "attached_target_kind",
@@ -156,6 +156,7 @@ pub(crate) const STRING_PAYLOAD_FIELDS: [&str; 57] = [
     "resource_name",
     "result_id",
     "run_kind",
+    "run_on",
     "run_scope_phase",
     "sample_unit",
     "scope",
@@ -992,6 +993,7 @@ pub(crate) const LIFECYCLE_EVENT_CATALOG_V2: [EventDefinition; 24] = [
             "purpose",
             "query_id",
             "row_count",
+            "run_on",
             "sql_digest",
             "statement_kind",
         ],
@@ -1010,6 +1012,7 @@ pub(crate) const LIFECYCLE_EVENT_CATALOG_V2: [EventDefinition; 24] = [
             "metadata",
             "purpose",
             "query_id",
+            "run_on",
             "sql_digest",
             "statement_kind",
         ],
@@ -1030,6 +1033,7 @@ pub(crate) const LIFECYCLE_EVENT_CATALOG_V2: [EventDefinition; 24] = [
             "purpose",
             "query_id",
             "row_count",
+            "run_on",
             "sql_digest",
             "statement_kind",
         ],
@@ -1050,6 +1054,7 @@ pub(crate) const LIFECYCLE_EVENT_CATALOG_V2: [EventDefinition; 24] = [
             "purpose",
             "query_id",
             "row_count",
+            "run_on",
             "sql_digest",
             "statement_kind",
         ],
@@ -1073,6 +1078,7 @@ pub(crate) const LIFECYCLE_EVENT_CATALOG_V2: [EventDefinition; 24] = [
             "purpose",
             "query_id",
             "row_count",
+            "run_on",
             "sql_digest",
             "statement_kind",
         ],

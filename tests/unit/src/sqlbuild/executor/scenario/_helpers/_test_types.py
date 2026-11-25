@@ -203,6 +203,13 @@ class LocalScenarioSqlTestCase:
 
 
 @dataclass(frozen=True)
+class LocalScenarioRefusalTestCase:
+    description: str
+    source_dialect: str
+    expected_reasons: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True)
 class ScenarioLocalVariantLoadTestCase:
     """A Snowflake-captured VARIANT JSONL value and the variant type it must load as."""
 

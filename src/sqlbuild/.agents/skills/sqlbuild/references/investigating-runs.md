@@ -39,6 +39,9 @@ what they printed. `sqb recall query` runs one read-only `SELECT` over a set of 
   `invocation_id` and `artifacts.digest = 'sha256:' || statements.sql_digest` for the SQL text
   (`artifacts.text`), also for failed and cancelled statements. `statements.sql_available = 0` means the text is missing, and
   `sql_unavailable_reason` says why.
+- **Local test statements keep no SQL text.** Statements of tests run in the local DuckDB have
+  `run_on = 'local'` in their event payload (`json_extract(payload, '$.run_on')`) and no stored
+  text; the converted test SQL is in the compiled tests under `target/run/tests/`.
 - **Audit evidence is an artifact.** A warning or failing audit's flagged rows (up to
   `evidence_limit`) are in `artifacts` with `digest = 'sha256:' || audit_results.sample_digest`
   in the same invocation; `sample_digest` is

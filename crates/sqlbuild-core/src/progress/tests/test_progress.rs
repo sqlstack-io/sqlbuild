@@ -419,7 +419,7 @@ fn given_statement_summary_when_formatting_then_line_and_json_report_kinds_and_t
             summary: summary.clone(),
             timing: reported(1540.0, 260.0, 12),
             expected_line: Some(
-                "Statements: 12 (SELECT 7, CREATE 2, DROP 2, ALTER 1); compile 1.5s, execution 0.3s",
+                "Statements: 12 on the warehouse (SELECT 7, CREATE 2, DROP 2, ALTER 1); compile 1.5s, execution 0.3s",
             ),
             expected_json: serde_json::json!({
                 "total": 12,
@@ -438,7 +438,7 @@ fn given_statement_summary_when_formatting_then_line_and_json_report_kinds_and_t
             summary: summary.clone(),
             timing: reported(1000.0, 0.0, 10),
             expected_line: Some(
-                "Statements: 12 (SELECT 7, CREATE 2, DROP 2, ALTER 1); compile 1.0s, execution 0.0s (10 of 12 statements in query history)",
+                "Statements: 12 on the warehouse (SELECT 7, CREATE 2, DROP 2, ALTER 1); compile 1.0s, execution 0.0s (10 of 12 statements in query history)",
             ),
             expected_json: serde_json::json!({
                 "total": 12,
@@ -457,7 +457,7 @@ fn given_statement_summary_when_formatting_then_line_and_json_report_kinds_and_t
             summary: summary.clone(),
             timing: StatementTiming::NotReported("duckdb".to_owned()),
             expected_line: Some(
-                "Statements: 12 (SELECT 7, CREATE 2, DROP 2, ALTER 1); compile time not reported by duckdb",
+                "Statements: 12 on the warehouse (SELECT 7, CREATE 2, DROP 2, ALTER 1); compile time not reported by duckdb",
             ),
             expected_json: serde_json::json!({
                 "total": 12,
@@ -470,7 +470,7 @@ fn given_statement_summary_when_formatting_then_line_and_json_report_kinds_and_t
             summary: summary.clone(),
             timing: StatementTiming::Failed("query history read failed".to_owned()),
             expected_line: Some(
-                "Statements: 12 (SELECT 7, CREATE 2, DROP 2, ALTER 1); compile time unavailable (query history read failed)",
+                "Statements: 12 on the warehouse (SELECT 7, CREATE 2, DROP 2, ALTER 1); compile time unavailable (query history read failed)",
             ),
             expected_json: serde_json::json!({
                 "total": 12,

@@ -5,6 +5,7 @@ pub mod empty_fixture_marker;
 pub mod fixture_line;
 pub mod fixture_schema;
 pub mod merge_metadata;
+pub mod prewarm_reads;
 pub mod propagate_types;
 pub mod render_completed;
 pub mod render_empty;

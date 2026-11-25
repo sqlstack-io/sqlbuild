@@ -45,8 +45,9 @@ impl StatementReport {
     pub(crate) fn of_invocation(
         invocation: &Bound<'_, PyAny>,
         started: Instant,
+        local: &StatementSummary,
     ) -> PyResult<Option<Self>> {
-        Self::read(
+        Self::read_excluding(
             invocation.py(),
             &StatementSource {
                 adapter_name: &invocation.getattr("adapter_name")?.extract::<String>()?,
@@ -54,15 +55,29 @@ impl StatementReport {
                 connection_config: &invocation.getattr("connection_config")?,
                 started,
             },
+            local,
         )
     }
 
-    /// The report of the installed projector, or nothing when no projector is installed.
-    pub(crate) fn read(py: Python<'_>, source: &StatementSource<'_, '_>) -> PyResult<Option<Self>> {
+    /// The report of the installed projector without the statements of a local DuckDB batch.
+    pub(crate) fn read_excluding(
+        py: Python<'_>,
+        source: &StatementSource<'_, '_>,
+        local: &StatementSummary,
+    ) -> PyResult<Option<Self>> {
         let Some(projector) = current_projector(py)? else {
             return Ok(None);
         };
-        let summary: StatementSummary = projector.get().statement_summary()?;
+        let mut summary: StatementSummary = projector.get().statement_summary()?;
+        for (kind, count) in &local.by_kind {
+            if let Some(total) = summary.by_kind.get_mut(kind) {
+                *total = total.saturating_sub(*count);
+            }
+        }
+        summary.by_kind.retain(|_, count| *count > 0);
+        summary
+            .query_ids
+            .retain(|query_id| !local.query_ids.contains(query_id));
         let timing: StatementTiming = statement_timing(py, source, &summary.query_ids)?;
         Ok(Some(Self { summary, timing }))
     }

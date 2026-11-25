@@ -69,7 +69,7 @@ pub fn command_dispatch(facts: &CommandFacts) -> Dispatch {
         "init" => run(&INIT_ROUTE),
         "playground" => run(&PLAYGROUND_ROUTE),
         "skills" => run(&SKILLS_ROUTE),
-        "scenario" => scenario_dispatch(facts, subcommand),
+        "scenario" => scenario_dispatch(subcommand),
         "format" => checked(&FORMAT_ROUTE, format_failure(facts)),
         "rules" => run(&RULES_ROUTE),
         _ => Dispatch::Nothing,

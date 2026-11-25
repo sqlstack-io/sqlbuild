@@ -7,7 +7,7 @@ use sqlbuild_python_base::native_host::types::ReadResult;
 use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
 
-use crate::result_output::main::results::audit_check_id::audit_check_id;
+use crate::result_output::main::events::audit_identity::audit_identity;
 
 /// `audit`'s published check and outcome: its attached check, else a singular audit's own `audit:<name>`.
 pub fn audit_check(
@@ -21,7 +21,7 @@ pub fn audit_check(
         AuditOutcome::NotRun => NodeOutcome::NotRun,
         AuditOutcome::Error => NodeOutcome::Failed,
     };
-    let attached: String = audit_check_id(audit)?;
+    let attached: String = audit_identity(audit, "audit_name")?;
     let key: String = if worker.records_check(&attached) {
         attached
     } else {

@@ -1,6 +1,7 @@
 //! The result row of one finished scenario run.
 
 use crate::cli_text::models::CliStyle;
+use crate::run_on::main::run_on_column::run_on_column;
 use crate::scenario_command::_helpers::expectations::{expectation_failures, expectation_rows};
 use crate::scenario_command::_helpers::rows::{heading, indented_error_lines};
 use crate::scenario_command::constants::RETAINED_KIND_WIDTH;
@@ -13,7 +14,13 @@ pub fn render_scenario_result(row: &ScenarioResultRow, style: CliStyle) -> Strin
         .duration_ms
         .map(|milliseconds| format!("  {:.2}s", milliseconds / 1000.0))
         .unwrap_or_default();
-    let mut text: String = heading(&row.name, &style.status(&row.status), &duration);
+    let run_on: &str = if row.local { "local" } else { "warehouse" };
+    let status: String = format!(
+        "{}  {}",
+        style.status(&row.status),
+        run_on_column(run_on).trim_end()
+    );
+    let mut text: String = heading(&row.name, &status, &duration);
     if let Some(error) = row.error.as_ref().filter(|error| !error.message.is_empty()) {
         text.push_str(&indented_error_lines(error, style));
         if !row.retained && !row.local {

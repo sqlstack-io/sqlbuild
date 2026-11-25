@@ -219,6 +219,20 @@ pub(crate) const TARGET_FIELDS: &[TargetField] = &[
     },
     TargetField {
         group: None,
+        name: "test_run_on",
+        rule: MergeRule::Overlay {
+            decided_by: &["test_run_on"],
+        },
+    },
+    TargetField {
+        group: None,
+        name: "scenario_run_on",
+        rule: MergeRule::Overlay {
+            decided_by: &["scenario_run_on"],
+        },
+    },
+    TargetField {
+        group: None,
         name: "catalog_connection",
         rule: MergeRule::Overlay {
             decided_by: &["catalog_connection"],

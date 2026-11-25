@@ -13,6 +13,8 @@ use sqlbuild_core::scenario_command::main::scenario_activity_message::scenario_a
 use sqlbuild_core::scenario_command::models::ScenarioNamespace;
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::ScenarioRunResult;
+use sqlbuild_python_output::build_progress::main::local_attempt::local_attempt;
+use sqlbuild_python_output::build_progress::models::LocalAttemptStep;
 
 use crate::bindings::_helpers::scenario_command::conversions::{
     capture_row, scenario_result_row, write_local_runtime_target, write_warehouse_runtime_target,
@@ -76,6 +78,9 @@ impl ScenarioProgressRelay {
         let style: CliStyle = CliStyle {
             use_color: self.use_color,
         };
+        if local_attempt(LocalAttemptStep::SettleReplay(&result))? {
+            return Ok(());
+        }
         let plan: Option<&Bound<'_, PyAny>> = (!scenario_plan.is_none()).then_some(&scenario_plan);
         let project_dir: &Bound<'_, PyAny> = self.project_dir.bind(py);
         let rendered: String = match &self.kind {

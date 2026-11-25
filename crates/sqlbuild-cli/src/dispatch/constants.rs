@@ -221,7 +221,7 @@ pub(crate) const FRESHNESS_ROUTE: Route = routed(
     REQUEST_KEYWORD_SHAPE,
 );
 
-const TEST_FIELDS: [Field; 17] = [
+const TEST_FIELDS: [Field; 19] = [
     PROJECT_DIR,
     NO_SQL_VALIDATION,
     NO_COLOR,
@@ -235,6 +235,8 @@ const TEST_FIELDS: [Field; 17] = [
     attr("case_name", "case"),
     same("inspect"),
     same("test_timeout"),
+    same("run_on"),
+    same("verbose"),
     same("since"),
     same("explain"),
     same("sql_only"),
@@ -795,8 +797,8 @@ const SCENARIO_TEST_FIELDS: [Field; 18] = [
     SCENARIO_COMMON[4],
     SCENARIO_COMMON[5],
     SCENARIO_COMMON[6],
-    attr("local", "scenario_local"),
-    attr("strict", "scenario_strict"),
+    same("run_on"),
+    same("verbose"),
     same("concurrency"),
     attr("sync_snapshots", "scenario_sync_snapshots"),
     attr("refresh", "scenario_refresh"),

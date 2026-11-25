@@ -3,6 +3,7 @@
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::pyfunction;
 use pyo3::types::PyFrozenSet;
+use sqlbuild_analysis::planner_fixtures::main::prewarm_reads::prewarm_reads;
 use sqlbuild_analysis::planner_fixtures::main::required_columns::required_columns;
 use sqlbuild_analysis::planner_fixtures::main::star_keys::star_keys;
 use sqlbuild_analysis::planner_fixtures::models::{
@@ -52,11 +53,7 @@ pub(crate) fn required_fixture_columns(
             authoritative.insert(key.clone(), names.iter().cloned().collect());
         }
     }
-    let analysis_dialect = dialect
-        .syntax("expression_inference_profile")?
-        .call0()?
-        .getattr("sql_analysis_dialect")?
-        .extract::<Option<String>>()?;
+    let analysis_dialect = analysis_dialect(dialect)?;
     let mut models: Vec<FixtureReadModel> = Vec::new();
     for name in ordered_model_names {
         let Some(model) = context.models_by_name.get(name) else {
@@ -66,26 +63,9 @@ pub(crate) fn required_fixture_columns(
         let Some(facts) = context.model_facts(py, name)? else {
             continue;
         };
-        let mut references: Vec<FixtureReadReference> = Vec::new();
-        for reference in
-            crate::compiled_views::main::compiled_models::references::references(&model)?
-                .try_iter()?
-        {
-            let reference = reference?;
-            references.push(FixtureReadReference {
-                kind: native_field(&reference, "ref_kind")?.extract()?,
-                name: native_field(&reference, "ref_name")?.extract()?,
-                package: native_field(&reference, "ref_package")?.extract()?,
-                argument_count: native_field(&reference, "call_argument_count")?.extract()?,
-            });
-        }
         models.push(FixtureReadModel {
             name: name.clone(),
-            key: FixtureReadKey {
-                sql: query_sql(&model)?.extract()?,
-                references,
-                dialect: analysis_dialect.clone(),
-            },
+            key: read_key(&model, analysis_dialect.clone())?,
             high_confidence: facts.reads.clone(),
             stars: model_stars(&model, &schema, dialect)?,
         });
@@ -107,6 +87,62 @@ pub(crate) fn required_fixture_columns(
     .map_err(value_error)?;
     owner.cache = cache;
     result.map_err(|error| value_error(format!("{error:?}")))
+}
+
+/// Resolve, in parallel, the reads of every listed model that per-test planning can look up.
+pub(crate) fn prewarm_fixture_reads(
+    context: &RelationFixturePlanningContext,
+    model_names: &[String],
+    dialect: &Bound<'_, Dialect>,
+) -> PyResult<()> {
+    let py = dialect.py();
+    let analysis_dialect = analysis_dialect(dialect)?;
+    let mut keys: Vec<FixtureReadKey> = Vec::new();
+    for name in model_names {
+        if let Some(model) = context.models_by_name.get(name) {
+            let model = model.bind(py);
+            let key = read_key(&model, analysis_dialect.clone())?;
+            if !key.references.is_empty() {
+                keys.push(key);
+            }
+        }
+    }
+    let owner = work_counts(py)?;
+    let mut owner = owner.borrow_mut();
+    let cache = std::mem::take(&mut owner.cache);
+    owner.cache = py
+        .compiler_detach(|| Ok(prewarm_reads(cache, &keys)))
+        .unwrap_or_default();
+    Ok(())
+}
+
+fn analysis_dialect(dialect: &Bound<'_, Dialect>) -> PyResult<Option<String>> {
+    dialect
+        .syntax("expression_inference_profile")?
+        .call0()?
+        .getattr("sql_analysis_dialect")?
+        .extract()
+}
+
+/// The read cache key of one model: its SQL, complete references and analysis dialect.
+fn read_key(model: &Bound<'_, PyAny>, dialect: Option<String>) -> PyResult<FixtureReadKey> {
+    let mut references: Vec<FixtureReadReference> = Vec::new();
+    for reference in
+        crate::compiled_views::main::compiled_models::references::references(model)?.try_iter()?
+    {
+        let reference = reference?;
+        references.push(FixtureReadReference {
+            kind: native_field(&reference, "ref_kind")?.extract()?,
+            name: native_field(&reference, "ref_name")?.extract()?,
+            package: native_field(&reference, "ref_package")?.extract()?,
+            argument_count: native_field(&reference, "call_argument_count")?.extract()?,
+        });
+    }
+    Ok(FixtureReadKey {
+        sql: query_sql(model)?.extract()?,
+        references,
+        dialect,
+    })
 }
 
 pub(crate) fn lineage_reads(model: &Bound<'_, PyAny>) -> PyResult<Vec<ColumnRead>> {

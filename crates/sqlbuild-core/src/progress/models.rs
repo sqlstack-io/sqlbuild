@@ -145,6 +145,27 @@ impl ProgressProjection {
             .insert(resource_name.to_owned());
     }
 
+    /// Treat every pending terminal of this resource as shown, so no later attempt renders it.
+    pub fn forget_resource_attempts(&mut self, resource_id: &str) {
+        let pending: VecDeque<String> = self
+            .pending_terminal_ids_by_resource
+            .remove(resource_id)
+            .unwrap_or_default();
+        self.rendered_terminal_ids.extend(pending);
+    }
+
+    /// `forget_resource_attempts` for every resource reported under `resource_name`.
+    pub fn forget_resource_named(&mut self, resource_name: &str) {
+        let resource_ids: Vec<String> = self
+            .resource_ids_by_name
+            .get(resource_name)
+            .map(|ids| ids.iter().cloned().collect())
+            .unwrap_or_default();
+        for resource_id in resource_ids {
+            self.forget_resource_attempts(&resource_id);
+        }
+    }
+
     /// Record how one audit attempt ended, before its terminal row renders.
     pub fn record_audit_outcome(&mut self, resource_attempt_id: &str, outcome: &str) {
         self.audit_outcomes
