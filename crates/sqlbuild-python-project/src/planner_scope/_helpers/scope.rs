@@ -18,8 +18,9 @@ use crate::references::main::native_execution_gate_edges::native_execution_gate_
 use crate::references::types::ExecutionGates;
 use crate::resource_views::main::source_reads::source_entry::source_entry;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::types::{PyDict, PyFrozenSet, PyTuple};
+use pyo3::types::{PyDict, PyFrozenSet, PyString, PyStringMethods, PyTuple};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
+use sqlbuild_analysis::graph::constants::{AUDIT_KIND, RUN_SELECTOR_KINDS};
 use sqlbuild_analysis::graph::main::downstream_edges::downstream_edges;
 use sqlbuild_analysis::planner_scope::constants::SOURCE;
 use sqlbuild_analysis::planner_scope::main::{
@@ -30,7 +31,7 @@ use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 
 pub(crate) fn build_planner_scope<'py>(
     py: Python<'py>,
@@ -65,7 +66,12 @@ pub(crate) fn build_planner_scope<'py>(
     let (mut selected, audits) = if selected.is_none() {
         resolve_planner_keys(&project, lineage.graph(), (&select, &exclude))?
     } else {
-        let (_, audits) = resolve_planner_keys(&project, lineage.graph(), (&select, &exclude))?;
+        let (select, exclude) = (audit_selectors(&select)?, audit_selectors(&exclude)?);
+        let audits = if select.is_truthy()? {
+            resolve_planner_keys(&project, lineage.graph(), (&select, &exclude))?.1
+        } else {
+            BTreeSet::new()
+        };
         (keys(&selected)?, audits)
     };
     let names = &lineage.graph().names;
@@ -151,6 +157,22 @@ pub(crate) fn build_planner_scope<'py>(
         audits: audits.into_iter().collect(),
     }
     .object(py)
+}
+
+/// The selectors in `texts` that can select an audit: `audit:` and the past-run selectors; the rest select only nodes.
+fn audit_selectors<'py>(texts: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+    let picks = |part: &str| {
+        let part = part.trim_start_matches('+');
+        part.split_once(':')
+            .is_some_and(|(kind, _)| kind == AUDIT_KIND || RUN_SELECTOR_KINDS.contains(&kind))
+    };
+    let mut kept: Vec<Bound<'py, PyString>> = Vec::new();
+    for text in py_strings(texts)? {
+        if text.to_str()?.split(',').any(picks) {
+            kept.push(text);
+        }
+    }
+    Ok(PyTuple::new(texts.py(), kept)?.into_any())
 }
 
 fn default_tuple<'py>(value: &Bound<'py, PyAny>) -> Bound<'py, PyAny> {
