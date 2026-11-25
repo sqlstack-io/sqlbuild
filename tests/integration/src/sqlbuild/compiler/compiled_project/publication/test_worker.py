@@ -78,9 +78,9 @@ ENV_FILE_REGION_FILES: dict[str, str] = {
             "group execution preserves independent downstream work",
             "WITH source(value) AS (VALUES ('invalid')) SELECT CAST(value AS INTEGER) AS amount FROM source",
             "SELECT amount FROM orders",
-            "partial",
+            "failed",
             [(11,)],
-            expected_child_statuses={"staging_job": ("partial",), "marts_job": ("partial",)},
+            expected_child_statuses={"staging_job": ("failed",), "marts_job": ("failed",)},
         ),
         GroupExecutionTestCase(
             "successful jobs honor compiled boundaries",
@@ -121,7 +121,7 @@ ENV_FILE_REGION_FILES: dict[str, str] = {
             "failed",
             [(0,)],
             expected_child_statuses={
-                "staging_job": ("partial", "cancelled"),
+                "staging_job": ("failed", "cancelled"),
                 "marts_job": ("cancelled",),
             },
             expected_totals=("cancelled", None),
@@ -236,7 +236,7 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
             "a failing unit test fails its model, and what reads it is skipped because of it",
             "SELECT 3 AS amount",
             "SELECT count(*) FROM duckdb_tables() WHERE table_name IN ('stg_orders', 'order_totals')",
-            "partial",
+            "failed",
             [(0,)],
             files={
                 "sql/models/raw_orders.sql": (
@@ -278,7 +278,7 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
             "a failing case of a parameterised test fails its model",
             "SELECT 3 AS amount",
             "SELECT count(*) FROM duckdb_tables() WHERE table_name IN ('stg_orders', 'order_totals')",
-            "partial",
+            "failed",
             [(0,)],
             files={
                 "sql/models/raw_orders.sql": (
@@ -320,7 +320,7 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
             "a failing assertion fails the model it reads, with no expected output",
             "SELECT 3 AS amount",
             "SELECT count(*) FROM duckdb_tables() WHERE table_name IN ('stg_orders', 'order_totals')",
-            "partial",
+            "failed",
             [(0,)],
             files={
                 "sql/models/raw_orders.sql": (
@@ -362,7 +362,7 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
             "a failing function test fails its function, and the models calling it are skipped because of it",
             "SELECT 3 AS amount",
             "SELECT count(*) FROM duckdb_tables() WHERE table_name IN ('stg_orders', 'order_totals')",
-            "partial",
+            "failed",
             [(0,)],
             files={
                 "sql/functions/sql/udf__order_band.sql": (
@@ -529,7 +529,7 @@ def test_given_a_failing_unit_test_when_a_worker_builds_then_its_model_fails_and
             "a stale source blocks only its own branch",
             "SELECT 11 AS amount",
             "SELECT amount FROM orders UNION ALL SELECT return_id FROM returns ORDER BY 1",
-            "partial",
+            "failed",
             [(2,), (11,)],
             files={
                 "sql/sources/raw.yml": Path(
@@ -592,7 +592,7 @@ def test_given_a_stale_source_when_a_worker_builds_then_blocked_nodes_finish_ski
             description="a failing seed audit fails its seed, and what reads it is skipped",
             model_sql="SELECT 3 AS amount",
             warehouse_query="SELECT count(*) FROM duckdb_tables() WHERE table_name='coded_orders'",
-            expected_status="partial",
+            expected_status="failed",
             expected_rows=[(0,)],
             files={
                 "sql/seeds/order_codes.csv": "code\nA\nZ\n",
@@ -1721,7 +1721,7 @@ def test_given_an_executing_scheduled_worker_when_cancelled_then_the_statement_s
             "SELECT count(*) AS amount FROM range(500000000) t(value) WHERE value % 7 = 0",
             "SELECT table_name FROM duckdb_tables() "
             "WHERE table_name IN ('orders', 'refunds', 'returns') ORDER BY table_name",
-            "partial",
+            "failed",
             [("orders",)],
             files={
                 "sqlbuild_project.toml": (
@@ -2321,7 +2321,7 @@ NODE_RESULT_FILES: dict[str, str] = {
             "rebuilt tables report their rows and a hard skip names itself to what it blocks",
             "SELECT 11 AS amount",
             "SELECT count(*) FROM events",
-            "partial",
+            "failed",
             [(3,)],
             files=NODE_RESULT_FILES,
             expected_node_results=[

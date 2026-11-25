@@ -1028,10 +1028,6 @@ impl WorkerBuild {
         let outcome = {
             let completed = self.completed.lock().map_err(|_| poisoned())?;
             let outcomes: Vec<NodeOutcome> = completed.values().copied().collect();
-            let good = completed.iter().any(|(key, value)| {
-                matches!(value, NodeOutcome::Success | NodeOutcome::Warn)
-                    && !source_needs_no_run(key)
-            });
             let bad = outcomes.iter().any(|value| {
                 matches!(
                     value,
@@ -1043,8 +1039,6 @@ impl WorkerBuild {
             });
             if cancelled {
                 RunOutcome::Cancelled
-            } else if bad && good {
-                RunOutcome::Partial
             } else if bad || exit_code != 0 {
                 RunOutcome::Failed
             } else if outcomes.contains(&NodeOutcome::Warn) {

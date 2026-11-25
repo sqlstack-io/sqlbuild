@@ -446,7 +446,7 @@ export type AttentionItem =
 
 export type OverviewMetrics = {
 	models: { total: number; addedThisWeek: number; removedThisWeek: number };
-	runs24h: { total: number; success: number; warn: number; partial: number; failed: number; active: number };
+	runs24h: { total: number; success: number; warn: number; failed: number; active: number };
 	checks: CheckCounts;
 	/** Distinct stale nodes, and how many are changed or behind (a node can be both); null when the server reports no project-wide build state, and `sources` null when source freshness is not checked. */
 	stale: { nodes: number; changed: number; behind: number; sources: number | null } | null;

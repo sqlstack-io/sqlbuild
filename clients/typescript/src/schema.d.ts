@@ -3177,7 +3177,7 @@ export interface components {
              */
             sequences: number;
         };
-        /** @description A failed or partial run reruns from failure up to `retries` times, each `retry_delay_seconds` after the last ended. */
+        /** @description A failed run reruns from failure up to `retries` times, each `retry_delay_seconds` after the last ended. */
         OnFailure: {
             /** Format: int32 */
             retries: number;
@@ -4206,7 +4206,7 @@ export interface components {
             occurred_at?: string | null;
         };
         /** @enum {string} */
-        RunEventKind: "completed" | "success" | "warn" | "partial" | "failed" | "cancelled" | "skipped";
+        RunEventKind: "completed" | "success" | "warn" | "failed" | "cancelled" | "skipped";
         /** @description Recall event metadata of a run. Payloads are left out: they can carry SQL, request settings and error text. */
         RunEventRecord: {
             /** Format: int64 */
@@ -4385,7 +4385,7 @@ export interface components {
          * @description Terminal outcomes cannot be confused with a request to change an active status.
          * @enum {string}
          */
-        RunOutcome: "success" | "warn" | "partial" | "failed" | "cancelled" | "skipped";
+        RunOutcome: "success" | "warn" | "failed" | "cancelled" | "skipped";
         /** @description Captured output and error text of a run's invocations; both can quote warehouse data. */
         RunOutput: {
             /** @description Invocation failures and error diagnostics, oldest first. */
@@ -4604,7 +4604,7 @@ export interface components {
             statement_id: string;
         };
         /** @enum {string} */
-        RunStatus: "queued" | "launched" | "running" | "unresponsive" | "success" | "warn" | "partial" | "failed" | "cancelled" | "skipped";
+        RunStatus: "queued" | "launched" | "running" | "unresponsive" | "success" | "warn" | "failed" | "cancelled" | "skipped";
         /** @description What started a run: a schedule or sensor by name, or a person or service account (`api`). */
         RunTrigger: {
             kind: components["schemas"]["RunTriggerKind"];

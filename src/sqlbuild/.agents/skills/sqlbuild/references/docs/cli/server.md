@@ -338,16 +338,30 @@ receive the URL.
       "job_key": "daily_orders",
       "location_id": "01a1d38b-e214-7151-8c8e-8606917c3ee6",
       "target": "production",
-      "outcome": "partial",
+      "outcome": "failed",
+      "url": "https://sqlbuild.example.com/runs/01a1d3b9-2c4e-7f10-8a3b-1d2e3f4a5b6c",
+      "trigger": { "kind": "schedule", "name": "daily_orders", "person": null },
+      "started_at": "2026-11-13T06:52:51.204Z",
+      "ended_at": "2026-11-13T07:12:04.112Z",
+      "duration_ms": 1152908,
+      "error": null,
       "failed_nodes": [
         {
           "node_key": "model:fct_orders",
           "error_code": "E100",
           "message": "Conversion Error: Could not convert string 'n/a' to INT32",
-          "path": "sql/models/marts/fct_orders.sql"
+          "path": "sql/models/marts/fct_orders.sql",
+          "phase": "post_hook",
+          "url": "https://sqlbuild.example.com/runs/01a1d3b9-2c4e-7f10-8a3b-1d2e3f4a5b6c?node=model%3Afct_orders",
+          "logs_url": "https://sqlbuild.example.com/runs/01a1d3b9-2c4e-7f10-8a3b-1d2e3f4a5b6c/output/model%3Afct_orders"
         }
       ],
-      "failed_node_count": 1
+      "failed_node_count": 1,
+      "failed_audits": [],
+      "failed_audit_count": 0,
+      "succeeded_node_count": 194,
+      "skipped_nodes": ["model:fct_order_margin", "model:order_summary"],
+      "skipped_node_count": 2
     }
   }
 }
@@ -366,7 +380,7 @@ seconds, stops delivery and retries the same event. Deduplicate by `event_id`, w
 | `location_broken` | Every instance of a location and target has stopped reporting for over 90 seconds | `location_id`, `target`, `last_seen_at` |
 | `location_failing` | A location and target that checks in failed its latest load (`falling_back`), its plan of what changed (`change_plan_failed`), a discover function (`discovery_failed`) or the connection check after its last load (`degraded`) | `location_id`, `target`, `state`, `failed_at`, `error`, `serving_generation` (the generation runs use instead) |
 | `launch_failed` | Starting a worker failed; it may still start | `run_id`, `claim_id`, `code` |
-| `run_failed` | A job, group or ad-hoc run ends `failed` or `partial` | `run_id`, `run_kind`, `job_key`, `location_id`, `target`, `outcome`, `failed_nodes`, `failed_node_count` |
+| `run_failed` | A job, group or ad-hoc run ends `failed` | See [Fields of `run_failed`](#fields-of-run_failed) |
 | `trigger_skipped` | The scheduler skips a trigger whose stored job or snapshot can't be read, or a sensor whose check failed; the sensor is checked again a minute later | `trigger_id`, `snapshot_id`, `reason` |
 | `sensor_rechecked` | A sensor's last check can't be read, so it is checked again from scratch | `trigger_id`, `snapshot_id`, `evaluation_id` |
 | `calendar_times_dropped` | A publish drops a calendar schedule's due times | `trigger_id`, `snapshot_id`, `times` |
@@ -380,12 +394,32 @@ completed check in that snapshot: a later attempt that fails differently sends n
 doesn't replace it. Everyone who can view the target sees the reason, and it can quote stored
 values.
 
-`run_failed` lists at most 20 failed nodes, ordered by node key; `failed_node_count` is the full
-number. A `partial` run is included because some of its nodes failed. `job_key` is `null` for
-ad-hoc runs. Each `message` is the node's error text with credentials redacted, cut to 2,000
-characters, and `null` when the worker reported none. It can quote warehouse data, so treat the
-webhook like other run evidence. `run_failed` events appear only in the webhook, not in the
-server's platform history.
+### Fields of `run_failed`
+
+`run_failed` carries what an alert needs to say what failed, where, and to link to it:
+
+| Field | Meaning |
+| --- | --- |
+| `run_id`, `run_kind`, `job_key`, `location_id`, `target` | The run, its kind (`job`, `group`, `adhoc`), its job (`null` for ad-hoc runs), and where it ran |
+| `outcome` | `failed` |
+| `url` | The run's page in the UI |
+| `trigger` | What started the run: `kind` is `schedule`, `sensor`, `manual` (a person) or `api` (a service account); `name` is the schedule's or sensor's name; `person` is who asked for a manual or API run |
+| `started_at`, `ended_at`, `duration_ms` | When the run's worker started and the run ended; `null` for a run that never started |
+| `error` | Why the run failed when no node or audit says, such as a project that can't load: `phase` (`launch`, `worker_start`, `load`, `planning` or `build`), `code` (the error's type) and `message`; `null` when `failed_nodes` or `failed_audits` say why |
+| `failed_nodes` | The first 20 failed nodes, ordered by key, each with `node_key`, `error_code`, `message`, `path` (the node's file), `phase` (where a model failed: `pre_hook`, `staging`, `contract`, `audit`, `post_hook` and so on; `null` for other nodes), `url` (the node on the run's page) and `logs_url` (its output) |
+| `failed_node_count` | Every failed node |
+| `failed_audits` | The first 20 error-severity audit failures the run didn't let through, ordered by name, each with `name`, `node_key` (`null` for an end-of-build singular audit), `sqlstate` and `message` (the warehouse's error when the audit's query couldn't run) and `failing_rows` (when it ran) |
+| `failed_audit_count` | Every such audit failure |
+| `succeeded_node_count`, `skipped_node_count` | How many nodes built and how many were skipped |
+| `skipped_nodes` | The first 20 skipped nodes, ordered by key |
+
+The links (`url`, and each failed node's `url` and `logs_url`) are `null` when the server has no
+sign-in origin, such as `[server] password_origin`. `job_key` is `null` for ad-hoc runs. Each
+`message` is the error text with credentials redacted, cut to 2,000 characters, and `null` when the
+worker reported none. It can quote warehouse data, so treat the webhook like other run evidence.
+`run_failed` events appear in the webhook and to
+[`platform_event` sensors](../concepts/orchestration.md#react-with-a-sensor), not in the server's
+platform history.
 
 ## Acknowledge attention items
 
@@ -912,7 +946,7 @@ delay_seconds = 600
 | --- | --- | --- | --- |
 | `owner` | Any non-blank text | None | Shown on the job's page and in the job list |
 | `overlap` | `queue` or `skip` | `queue` | With `skip`, a schedule tick or sensor request that arrives while a run of the job is queued or running starts no run |
-| `retry` | `attempts` from 2 to 11, `delay_seconds` from 0 to 86400 | None | A failed or partial run nobody cancelled reruns its failed, cancelled and skipped nodes, and those it never reached, after the delay, until it succeeds or has run `attempts` times in all |
+| `retry` | `attempts` from 2 to 11, `delay_seconds` from 0 to 86400 | None | A failed run nobody cancelled reruns its failed, cancelled and skipped nodes, and those it never reached, after the delay, until it succeeds or has run `attempts` times in all |
 
 A skipped tick shows as **skipped** in the trigger's tick log, with the run it yielded to, and
 creates no run. A sensor tick lists the requests it skipped the same way.
@@ -933,7 +967,7 @@ Details:
 - A member job's `[retry]` also applies inside a group run. When the member fails, the group runs it
   again after `delay_seconds`, inside the same group run, and the jobs that depend on it wait
   instead of skipping. The group keeps its pool slots meanwhile.
-- A group's own `[retry]` is a final sweep: after the group run ends `failed` or `partial`, it
+- A group's own `[retry]` is a final sweep: after the group run ends `failed`, it
   queues one new linked rerun of the group's failed, cancelled and skipped nodes, and those it never reached.
 - So a retry of a whole run, a job's or a group's, is a new linked run, and a retry of a member
   stays inside its group run.

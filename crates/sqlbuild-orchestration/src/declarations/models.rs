@@ -131,7 +131,7 @@ impl Overlap {
     }
 }
 
-/// A failed or partial run reruns from failure up to `retries` times, each `retry_delay_seconds` after the last ended.
+/// A failed run reruns from failure up to `retries` times, each `retry_delay_seconds` after the last ended.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct OnFailure {

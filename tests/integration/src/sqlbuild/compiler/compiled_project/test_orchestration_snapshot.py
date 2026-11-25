@@ -1374,13 +1374,13 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     },
                 },
                 "edge_job_outcomes_sensor": {
-                    "description": "Keep warning and partial outcomes distinct from success.",
+                    "description": "Keep warning and failed outcomes distinct from success.",
                     "function": "edge_job_outcomes_sensor",
                     "timeout_seconds": 60,
                     "when": {
                         "kind": "run_event",
                         "job_key": "edge_snapshot_orders_job",
-                        "kinds": ["warn", "partial"],
+                        "kinds": ["warn", "failed"],
                     },
                     "minimum_interval_seconds": 30,
                     "default_status": "paused",

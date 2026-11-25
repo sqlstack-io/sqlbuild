@@ -102,7 +102,7 @@ fn given_any_run_rebuilds_when_consuming_then_only_genuine_scoped_successes_queu
                 ),
                 (RunOutcome::Failed, [NodeOutcome::Failed; 2], [true; 2]),
                 (
-                    RunOutcome::Partial,
+                    RunOutcome::Failed,
                     [NodeOutcome::Skipped, NodeOutcome::Success],
                     [false, true],
                 ),

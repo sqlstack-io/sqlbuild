@@ -270,15 +270,11 @@ async fn finish_group(
         }
     }
     let mut outcomes: BTreeSet<String> = BTreeSet::new();
-    let mut good = false;
-    let build = parent.request_json.command.is_build();
-    let source_needs_no_run = |key: &str| build && key.starts_with("source:");
     for key in &parent.request_json.selection {
         let node = nodes
             .get(key)
             .ok_or_else(|| ControlError::Invalid("group node has no child evidence".into()))?;
         outcomes.insert(node.status.clone());
-        good |= matches!(node.status.as_str(), "success" | "warn") && !source_needs_no_run(key);
         let outcome: NodeOutcome = serde_json::from_value(serde_json::json!(node.status))
             .map_err(|error| ControlError::Invalid(error.to_string()))?;
         transaction = group_change(
@@ -310,11 +306,7 @@ async fn finish_group(
             .any(|status| !matches!(status.as_str(), "success" | "warn"));
     let outcome = if parent.state.cancel_requested_at.is_some() {
         RunOutcome::Cancelled
-    } else if stopped {
-        RunOutcome::Failed
-    } else if bad && good {
-        RunOutcome::Partial
-    } else if bad {
+    } else if stopped || bad {
         RunOutcome::Failed
     } else if outcomes.contains("warn")
         || group

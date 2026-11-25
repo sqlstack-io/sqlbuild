@@ -139,7 +139,7 @@ def test_given_a_node_printing_a_large_log_when_a_worker_runs_it_then_its_lines_
             "an asset failing sixty calls deep",
             "SELECT 17 AS amount",
             "SELECT amount FROM orders",
-            "partial",
+            "failed",
             [(17,)],
             files={
                 "python/nodes/assets/score_orders/asset.py": (
@@ -291,7 +291,7 @@ NUL_FAILURE_FILES: dict[str, str] = {
             "SQLite",
             "SELECT 17 AS amount",
             "SELECT amount FROM orders",
-            "partial",
+            "failed",
             [(17,)],
             backend="sqlite",
             files=NUL_FAILURE_FILES,
@@ -301,7 +301,7 @@ NUL_FAILURE_FILES: dict[str, str] = {
             "PostgreSQL",
             "SELECT 17 AS amount",
             "SELECT amount FROM orders",
-            "partial",
+            "failed",
             [(17,)],
             backend="postgres",
             files=NUL_FAILURE_FILES,

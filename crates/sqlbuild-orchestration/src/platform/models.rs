@@ -550,7 +550,7 @@ pub enum PlatformEvent {
         claim_id: Uuid,
         code: String,
     },
-    /// A job, group or ad-hoc run ended failed or partial; only the webhook and platform sensors receive it, never person reads.
+    /// A job, group or ad-hoc run ended failed; only the webhook and platform sensors receive it, never person reads.
     RunFailed(Box<RunFailureEvent>),
     /// A trigger was skipped because its stored job or pinned snapshot can't be read, or a sensor because its check failed; `reason` says which.
     TriggerSkipped {

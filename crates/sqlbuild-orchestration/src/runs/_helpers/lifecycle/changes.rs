@@ -96,7 +96,6 @@ pub(crate) fn validate_authority(
                         | RunChange::Finished {
                             outcome: RunOutcome::Success
                                 | RunOutcome::Warn
-                                | RunOutcome::Partial
                                 | RunOutcome::Failed
                                 | RunOutcome::Cancelled,
                             ..
@@ -162,7 +161,7 @@ pub(crate) fn validate_change(
         ));
     }
     if let RunChange::Finished {
-        outcome: RunOutcome::Success | RunOutcome::Warn | RunOutcome::Partial,
+        outcome: RunOutcome::Success | RunOutcome::Warn,
         ..
     } = request.change
     {
@@ -173,11 +172,8 @@ pub(crate) fn validate_change(
                 .copied()
                 .unwrap_or_default()
         };
-        let good = count("success") + count("warn");
         let bad = count("failed") + count("skipped") + count("cancelled") + count("not_run");
-        let expected = if bad > 0 && good > 0 {
-            RunOutcome::Partial
-        } else if bad > 0 {
+        let expected = if bad > 0 {
             RunOutcome::Failed
         } else if count("warn") > 0 {
             RunOutcome::Warn

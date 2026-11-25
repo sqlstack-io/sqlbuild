@@ -255,7 +255,7 @@ function rowOf(run: Run, wire: Wire['RunRecord']): RunRow {
 function inTab(run: Run, tab: RunRowQuery['tab']): boolean {
 	if (tab === 'active') return isActiveRun(run.status);
 	if (tab === 'queued') return run.status === 'queued';
-	if (tab === 'failed') return run.status === 'failed' || run.status === 'partial' || run.status === 'presumed_failed';
+	if (tab === 'failed') return run.status === 'failed' || run.status === 'presumed_failed';
 	if (tab === 'cancelled') return run.status === 'cancelled';
 	return true;
 }

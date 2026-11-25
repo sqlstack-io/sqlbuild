@@ -298,7 +298,6 @@ export class MockBuild {
 					total: recent.length,
 					success: recent.filter((r) => r.status === 'success').length,
 					warn: recent.filter((r) => r.status === 'warn').length,
-					partial: recent.filter((r) => r.status === 'partial').length,
 					failed: recent.filter((r) => r.status === 'failed' || r.status === 'presumed_failed').length,
 					active: recent.filter((r) => ['queued', 'launched', 'running', 'unresponsive'].includes(r.status)).length
 				},

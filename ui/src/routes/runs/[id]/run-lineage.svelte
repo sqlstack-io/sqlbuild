@@ -112,7 +112,7 @@
 			(view.detail?.children ?? []).flatMap((c) => (c.jobKey ? [[c.jobKey, { nodeCount: view.nodes.filter((n) => n.runId === c.id).length || null, lastRun: { id: c.id, status: c.status, startedAt: c.startedAt, endedAt: c.endedAt }, nodes: memberNodes.data?.get(c.jobKey) ?? null }]] : []))
 		)
 	);
-	const failedMembers = $derived((view.detail?.children ?? []).filter((c) => c.status === 'failed' || c.status === 'partial').filter((c) => view.nodes.some((n) => n.runId === c.id && n.status === 'failed')).flatMap((c) => (c.jobKey ? [c.jobKey] : [])));
+	const failedMembers = $derived((view.detail?.children ?? []).filter((c) => c.status === 'failed').filter((c) => view.nodes.some((n) => n.runId === c.id && n.status === 'failed')).flatMap((c) => (c.jobKey ? [c.jobKey] : [])));
 	let memberSelection = $state<MemberSelection | null>(null);
 	$effect(() => {
 		const node = memberSelection?.node;

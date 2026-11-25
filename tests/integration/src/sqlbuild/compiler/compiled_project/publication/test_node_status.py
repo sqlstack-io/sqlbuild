@@ -137,7 +137,7 @@ def test_given_a_chain_of_three_when_the_second_is_interrupted_then_the_first_st
         description=test_case.description,
         model_sql="SELECT 1 AS amount",
         warehouse_query="",
-        expected_status="partial",
+        expected_status="failed",
         expected_rows=[],
         files={**node_module_files("python/nodes/steps.py", chain)} | test_case.files,
         default_job_files={

@@ -109,7 +109,6 @@ pub enum RunStatus {
     Unresponsive,
     Success,
     Warn,
-    Partial,
     Failed,
     Cancelled,
     /// A group member the group did not run because a job it depends on failed.
@@ -701,7 +700,6 @@ pub(crate) struct ExecutionMetadata {
 pub enum RunOutcome {
     Success,
     Warn,
-    Partial,
     Failed,
     Cancelled,
     /// Only a group sets it, on a member it did not run because a job the member depends on failed.
@@ -714,7 +712,6 @@ impl RunOutcome {
         match self {
             Self::Success => "success",
             Self::Warn => "warn",
-            Self::Partial => "partial",
             Self::Failed => "failed",
             Self::Cancelled => "cancelled",
             Self::Skipped => "skipped",

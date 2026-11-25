@@ -325,7 +325,7 @@ export function deriveTerminalStatus(end: RunEnd, nodes: RunNode[]): RunStatus {
 
 export function statusReason(status: RunStatus, nodes: RunNode[]): string | null {
 	const c = countNodes(nodes);
-	if ((status === 'partial' || status === 'failed') && c.success + c.warn > 0 && (c.failed || nodes.some((n) => n.skippedBecauseOf)))
+	if (status === 'failed' && c.success + c.warn > 0 && (c.failed || nodes.some((n) => n.skippedBecauseOf)))
 		return c.failed
 			? `${c.failed} node${c.failed === 1 ? '' : 's'} failed and ${c.skipped} that depend on ${c.failed === 1 ? 'it' : 'them'} were skipped; the other ${c.success + c.warn} finished`
 			: `${c.skipped} node${c.skipped === 1 ? '' : 's'} skipped because something they depend on failed; the other ${c.success + c.warn} finished`;

@@ -5,6 +5,7 @@ use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlStore, ControlTransaction};
+use crate::store_migrations::_helpers::failed_run_sensors::watch_failed_runs;
 use crate::store_migrations::_helpers::old_form_sensors::drop_old_form_sensors;
 use crate::store_migrations::_helpers::recall_schema::recall_schema;
 use crate::store_migrations::constants::{
@@ -75,6 +76,12 @@ pub(crate) const MIGRATIONS: &[StoreMigration] = &[
         sqlite: include_str!("../sql/0011_discovered_assets_document.sqlite.sql"),
         postgres: include_str!("../sql/0011_discovered_assets_document.postgres.sql"),
         step: None,
+    },
+    StoreMigration {
+        name: "failed_run_outcome",
+        sqlite: include_str!("../sql/0012_failed_run_outcome.sqlite.sql"),
+        postgres: include_str!("../sql/0012_failed_run_outcome.postgres.sql"),
+        step: Some(watch_failed_runs),
     },
 ];
 

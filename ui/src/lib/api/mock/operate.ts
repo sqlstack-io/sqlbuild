@@ -1273,7 +1273,7 @@ export function createOperateFixtures(now: number): OperateFixtures {
 					cursorBefore: `run_event:${4000 + i * 37}`,
 					cursorAfter: `run_event:${4037 + i * 37}`,
 					runRequests: ok ? 1 : 0,
-					skipReason: ok ? null : `${b.run.id} was partial; on-success conditions don't fire on partial runs`
+					skipReason: ok ? null : `${b.run.id} failed; on-success conditions don't fire on failed runs`
 				})
 			);
 			if (ok && runId) reqs.push({ runKey: b.run.id, runId, evaluationId, requestedAt: new Date(t).toISOString(), runStatus: 'success' });

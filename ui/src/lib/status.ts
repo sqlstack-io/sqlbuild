@@ -14,8 +14,6 @@ export const runStatusTone: Record<RunStatus, string> = {
 	unresponsive: 'var(--sb-warning)',
 	success: 'var(--sb-success)',
 	warn: 'var(--sb-warning)',
-	// Mock-up: no Partial state; a run is failed whenever anything failed (the server change is queued).
-	partial: 'var(--sb-error)',
 	failed: 'var(--sb-error)',
 	cancelled: 'var(--sb-text-faint)',
 	skipped: 'var(--sb-text-faint)',
@@ -37,7 +35,6 @@ export const runStatusLabel: Record<RunStatus, string> = {
 	unresponsive: 'No signal',
 	success: 'Succeeded',
 	warn: 'Warnings',
-	partial: 'Failed',
 	failed: 'Failed',
 	cancelled: 'Cancelled',
 	skipped: 'Skipped',
@@ -52,7 +49,6 @@ export const runStatusHelp: Record<RunStatus, string> = {
 	unresponsive: 'The run stopped sending heartbeats; it is marked failed if the silence continues (unresponsive)',
 	success: 'Every node succeeded (success)',
 	warn: 'Finished; some checks warned (warn)',
-	partial: 'Failed (failed)',
 	failed: 'Failed (failed)',
 	cancelled: 'Cancelled (cancelled)',
 	skipped: 'Its group did not run it because a job it depends on failed (skipped)',
@@ -60,7 +56,7 @@ export const runStatusHelp: Record<RunStatus, string> = {
 };
 
 const ACTIVE: ReadonlySet<RunStatus> = new Set(['queued', 'launched', 'running', 'unresponsive']);
-const PROBLEM: ReadonlySet<RunStatus> = new Set(['failed', 'partial', 'presumed_failed']);
+const PROBLEM: ReadonlySet<RunStatus> = new Set(['failed', 'presumed_failed']);
 
 /** Not yet terminal: waiting, starting or executing. */
 export function isActiveRun(status: RunStatus): boolean {

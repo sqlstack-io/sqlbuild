@@ -162,7 +162,7 @@
 	const latest = $derived(data?.latestRun ?? null);
 	const latestText = $derived(latest ? `Last run ${runStatusLabel[latest.status].toLowerCase()} ${formatAgo(latest.endedAt, app.now)}` : 'No runs yet');
 	const m = $derived(data?.metrics);
-	const finished = $derived(m ? m.runs24h.success + m.runs24h.warn + m.runs24h.partial + m.runs24h.failed : 0);
+	const finished = $derived(m ? m.runs24h.success + m.runs24h.warn + m.runs24h.failed : 0);
 	const successRate = $derived(m && finished ? Math.round(((m.runs24h.success + m.runs24h.warn) / finished) * 100) : null);
 	// The last 7 days' query cost, for locations whose adapter reports cost and once any run has some.
 	const showCost = $derived(reportsCost(app.location?.target.adapter) && app.client.supports('getCostSummary'));
@@ -321,7 +321,7 @@
 					<div class="metric">
 						<span class="metric-label">Runs · 24h</span>
 						<div><strong>{m.runs24h.total}</strong><small>{successRate === null ? 'none finished' : `${successRate}% succeeded`}</small></div>
-						<span class:warning-note={m.runs24h.partial + m.runs24h.failed > 0}>{m.runs24h.partial} partial · {m.runs24h.failed} failed · {m.runs24h.active} active</span>
+						<span class:warning-note={m.runs24h.failed > 0}>{m.runs24h.failed} failed · {m.runs24h.active} active</span>
 					</div>
 					<div class="metric">
 						<span class="metric-label">Checks passing</span>

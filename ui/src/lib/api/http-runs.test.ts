@@ -72,7 +72,7 @@ describe('runs list', () => {
 		wire('r2', { status: 'cancelled', cancel_requested_at: '2026-11-06T09:05:00Z' }),
 		wire('r3', { status: 'queued' }),
 		wire('r4', { status: 'failed', node_counts_json: { success: 1, failed: 2, skipped: 3 } }),
-		wire('r5', { status: 'partial' }),
+		wire('r5', { status: 'failed' }),
 		wire('r5-child', { status: 'queued', parent_run_id: 'r5', root_run_id: 'r5' }),
 		wire('r6', { status: 'success' }),
 		wire('r7', { status: 'cancelled', node_counts_json: { success: 1, failed: 1, cancelled: 2, skipped: 1 } })

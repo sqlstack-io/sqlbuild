@@ -18,6 +18,8 @@ mod test_function_cursor;
 mod test_group_members;
 #[path = "test_nodes.rs"]
 mod test_nodes;
+#[path = "test_partial_upgrade.rs"]
+mod test_partial_upgrade;
 #[path = "test_permissions.rs"]
 mod test_permissions;
 #[path = "test_person_state.rs"]

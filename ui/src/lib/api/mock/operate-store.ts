@@ -311,7 +311,7 @@ export class MockOperate {
 			if (f.statuses?.length && !f.statuses.includes(view.status)) continue;
 			if (tab === 'active' && !isActive(view.status)) continue;
 			if (tab === 'queued' && view.status !== 'queued') continue;
-			if (tab === 'failed' && !['failed', 'partial', 'presumed_failed'].includes(view.status)) continue;
+			if (tab === 'failed' && !['failed', 'presumed_failed'].includes(view.status)) continue;
 			if (tab === 'cancelled' && view.status !== 'cancelled') continue;
 			out.push({ rec, view });
 		}

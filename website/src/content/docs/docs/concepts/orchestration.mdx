@@ -282,7 +282,7 @@ Pass `name="..."` to choose another name, which must also end in `_sensor`.
 | Not set | Every `minimum_interval_seconds`: a polling sensor |
 
 `kinds` take the enums `RunEventKind`, `NodeEventKind`, `CheckEventKind` and `PlatformEventKind`
-from `sqlbuild.orchestration`. `RunEventKind` has `SUCCESS`, `WARN`, `PARTIAL`, `FAILED`,
+from `sqlbuild.orchestration`. `RunEventKind` has `SUCCESS`, `WARN`, `FAILED` (a node failed, was skipped or never ran),
 `CANCELLED`, `SKIPPED` (a member its group did not run) and `COMPLETED` for any of them.
 `CheckEventKind` has `FAILED` and `WARN`. `check_event` covers checks inside job runs and manual
 builds, such as one started from the Plan page, where the event's `job` is `None`. It doesn't

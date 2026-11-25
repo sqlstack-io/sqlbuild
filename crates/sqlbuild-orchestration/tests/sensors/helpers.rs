@@ -645,3 +645,63 @@ pub(crate) fn republished_tick() -> crate::sensors::models::SensorEvaluationOutc
 pub(crate) fn cursor_reset_tick() -> crate::sensors::models::SensorEvaluationOutcome {
     abandoned_tick(crate::sensors::models::AbandonReason::CursorReset)
 }
+
+/// Make each named sensor of `snapshot` watch `kinds`, in its `triggers` document and its trigger row, bypassing validation.
+pub(crate) async fn watch_kinds(
+    store: &ControlStore,
+    snapshot: &crate::snapshots::models::SnapshotRecord,
+    watched: &[(&str, &[&str])],
+) {
+    let (mut transaction, rows) = query(
+        begin(store, TransactionMode::Write).await.expect("seed"),
+        "SELECT d.body FROM sqb_snapshot_documents s JOIN sqb_documents d ON d.document_hash=s.document_hash \
+         WHERE s.snapshot_id=$1 AND s.kind='triggers'",
+        vec![Parameter::Id(snapshot.snapshot_id)],
+    )
+    .await
+    .expect("read triggers document");
+    let mut document: serde_json::Value = serde_json::from_slice(
+        &crate::store::main::decompress::decompress(&rows[0]["body"]).expect("decompress"),
+    )
+    .expect("triggers document");
+    for (name, kinds) in watched {
+        document[*name]["when"]["kinds"] = json!(kinds);
+        let definition = document[*name].clone();
+        (transaction, _) = query(
+            transaction,
+            "UPDATE sqb_triggers SET definition_json=$2 WHERE name=$1 AND kind='sensor'",
+            vec![Parameter::Text((*name).into()), Parameter::Json(definition)],
+        )
+        .await
+        .expect("store the trigger row");
+    }
+    let (hash, body) =
+        crate::snapshots::main::publication::stored_document::stored_document(&document)
+            .expect("stored document");
+    (transaction, _) = query(
+        transaction,
+        "INSERT INTO sqb_documents (document_hash, body) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+        vec![Parameter::Text(hash.clone()), Parameter::Bytes(body)],
+    )
+    .await
+    .expect("store the document");
+    (transaction, _) = query(
+        transaction,
+        "UPDATE sqb_snapshot_documents SET document_hash=$2 WHERE snapshot_id=$1 AND kind='triggers'",
+        vec![Parameter::Id(snapshot.snapshot_id), Parameter::Text(hash)],
+    )
+    .await
+    .expect("point the snapshot at it");
+    commit(transaction).await.expect("commit");
+}
+
+/// The run outcomes a sensor's `run_event` condition watches; none for another condition.
+pub(crate) fn watched_run_kinds(
+    definition: &crate::sensors::models::SensorDefinition,
+) -> Vec<crate::sensors::models::RunEventKind> {
+    let Some(crate::sensors::models::SensorCondition::RunEvent { kinds, .. }) = &definition.when
+    else {
+        return Vec::new();
+    };
+    kinds.iter().copied().collect()
+}

@@ -30,7 +30,6 @@ class RunEventKind(StrEnum):
     COMPLETED = "completed"
     SUCCESS = "success"
     WARN = "warn"
-    PARTIAL = "partial"
     FAILED = "failed"
     CANCELLED = "cancelled"
     SKIPPED = "skipped"

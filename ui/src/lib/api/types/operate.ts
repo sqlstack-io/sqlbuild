@@ -15,7 +15,6 @@ export const RUN_STATUSES = [
 	'unresponsive',
 	'success',
 	'warn',
-	'partial',
 	'failed',
 	'cancelled',
 	'skipped',
@@ -112,7 +111,7 @@ export type RunListQuery = {
 
 // ---- runs list (cursor-paged rows with a plain status line) ----
 
-/** Status tabs of the runs list. `active` is queued, launched, running or unresponsive; `failed` includes partial and lost runs. */
+/** Status tabs of the runs list. `active` is queued, launched, running or unresponsive; `failed` includes lost runs. */
 export const RUN_TABS = ['all', 'active', 'queued', 'failed', 'cancelled'] as const;
 export type RunTab = (typeof RUN_TABS)[number];
 
@@ -1054,7 +1053,7 @@ export type RerunMode = 'all' | 'from_failure' | 'selected';
 
 /** What a schedule tick or sensor request does while a run of the job is active; people's runs always queue. */
 export type OverlapPolicy = 'queue' | 'skip';
-/** A job's `[retry]`: a failed or partial run reruns from failure up to `retries` times (`attempts` is one more, counting the first run), `retryDelaySeconds` (`delay_seconds`) after the last ended. */
+/** A job's `[retry]`: a failed run reruns from failure up to `retries` times (`attempts` is one more, counting the first run), `retryDelaySeconds` (`delay_seconds`) after the last ended. */
 export type OnFailure = { retries: number; retryDelaySeconds: number };
 export type JobKind = 'job' | 'group';
 

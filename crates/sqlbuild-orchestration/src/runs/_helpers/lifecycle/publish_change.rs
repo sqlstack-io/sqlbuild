@@ -72,7 +72,7 @@ pub(crate) async fn publish_change(
     let mut transaction = project_change(transaction, request, state).await?;
     match request.change {
         RunChange::Finished {
-            outcome: outcome @ (RunOutcome::Failed | RunOutcome::Partial),
+            outcome: outcome @ RunOutcome::Failed,
             ..
         } => {
             let retried;

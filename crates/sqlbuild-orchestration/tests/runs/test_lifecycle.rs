@@ -33,12 +33,12 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
         RunLifecycleTestCase {
             description: "SQLite preserves facts, outcomes and claims through worker failures",
             backend: Backend::Sqlite,
-            expected_status: RunStatus::Partial,
+            expected_status: RunStatus::Failed,
         },
         RunLifecycleTestCase {
             description: "PostgreSQL preserves facts, outcomes and claims through worker failures",
             backend: Backend::Postgres,
-            expected_status: RunStatus::Partial,
+            expected_status: RunStatus::Failed,
         },
     ];
     for test_case in test_cases {
@@ -302,12 +302,12 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
             }
             assert!(
                 change_run(store, worker, &success).await.is_err(),
-                "mixed node outcomes are partial, not success"
+                "mixed node outcomes fail the run, not succeed it"
             );
-            let partial = RunChangeRequest {
+            let failed = RunChangeRequest {
                 event_id: Uuid::now_v7(),
                 change: RunChange::Finished {
-                    outcome: RunOutcome::Partial,
+                    outcome: RunOutcome::Failed,
                     reason: "independent customer work completed".into(),
                     exit_code: Some(1),
                 },
@@ -331,7 +331,7 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
                 };
                 install_fault(store, &point).await;
                 assert!(
-                    change_run(store, worker, &partial).await.is_err(),
+                    change_run(store, worker, &failed).await.is_err(),
                     "{} at {table} must roll back the complete transition",
                     point.description
                 );
@@ -395,16 +395,16 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
                     .is_none()
             );
             assert!(
-                change_run(store, worker, &partial)
+                change_run(store, worker, &failed)
                     .await
                     .expect("terminal report atomically releases claims")
             );
             assert!(
-                !change_run(store, worker, &partial)
+                !change_run(store, worker, &failed)
                     .await
                     .expect("terminal retry after liveness cleanup")
             );
-            let mut changed = partial.clone();
+            let mut changed = failed.clone();
             changed.change = RunChange::Finished {
                 outcome: RunOutcome::Success,
                 reason: "changed retry".into(),
@@ -454,7 +454,7 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
                 .collect();
             let [PlatformEvent::RunFailed(failure)] = failures.as_slice() else {
                 panic!(
-                    "a partial run publishes one failure event, surviving rolled-back attempts and retries: {failures:?}"
+                    "a run with a failed node publishes one failure event, surviving rolled-back attempts and retries: {failures:?}"
                 );
             };
             let RunFailureEvent {
@@ -491,7 +491,7 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
                     RunKind::Adhoc,
                     None,
                     location,
-                    RunOutcome::Partial
+                    RunOutcome::Failed
                 )
             );
             assert_eq!(

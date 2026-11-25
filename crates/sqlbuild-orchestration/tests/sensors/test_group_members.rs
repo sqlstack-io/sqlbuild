@@ -338,7 +338,7 @@ fn given_a_member_retried_inside_its_group_when_sensors_watch_it_then_only_its_f
                 },
                 node_finished("customers", NodeOutcome::Failed),
                 RunChange::Finished {
-                    outcome: RunOutcome::Partial,
+                    outcome: RunOutcome::Failed,
                     reason: "customers failed".into(),
                     exit_code: Some(1),
                 },
