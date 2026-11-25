@@ -11,9 +11,9 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     NulFailureTestCase,
     NulLogTestCase,
     PhaseEventsTestCase,
-    SinkDeliveryTestCase,
     PythonFailureTestCase,
     RunOutputTestCase,
+    SinkDeliveryTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     control_database,

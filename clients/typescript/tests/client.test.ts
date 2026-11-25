@@ -136,6 +136,7 @@ test("generated client preserves native scopes, replay, path encoding, SSE and b
     assert.deepEqual(denied.error, {
       error: `missing view permission for this target; decision ${decisionId}`,
       decision_id: decisionId,
+      request_id: denied.response.headers.get("x-request-id"),
     });
     const machine = await browser.GET(healthPath, { headers, params });
     assert.equal(machine.response.status, 401);
