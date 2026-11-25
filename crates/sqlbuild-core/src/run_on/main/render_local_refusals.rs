@@ -30,7 +30,7 @@ pub fn render_local_refusals(
     for group in grouped_refusals(&refused) {
         let GroupedRefusal { refusal, names } = group;
         text.push('\n');
-        text.push_str(&refusal_block(&refusal, &names, style));
+        text.push_str(&refusal_block(&refusal, &names, (errors, style)));
         text.push('\n');
     }
     text

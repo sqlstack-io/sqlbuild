@@ -9,6 +9,8 @@ pub(super) struct ResolveTestCase {
 pub(super) struct RenderTestCase {
     pub(super) description: &'static str,
     pub(super) decisions: Vec<RunOnDecision>,
+    /// Whether the refusals stop the tests running, as under `--run-on local`.
+    pub(super) errors: bool,
     pub(super) expected_text: &'static str,
 }
 

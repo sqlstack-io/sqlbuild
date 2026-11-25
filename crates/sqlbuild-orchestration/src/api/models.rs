@@ -12,7 +12,7 @@ use crate::api::_helpers::resources::{
     administrators, audit, changed_builds, changes, location_health, location_work,
     person_bootstrap, person_checks, person_cost, person_location_work, person_maintenance,
     person_node_sql, person_operations, person_plans, person_reads, person_republish,
-    person_selection, run_reads, runs, service_accounts, snapshots, trigger_reads,
+    person_selection, run_reads, runs, server_health, service_accounts, snapshots, trigger_reads,
     warehouse_metadata,
 };
 
@@ -115,6 +115,9 @@ use crate::api::_helpers::resources::{
     changes::subscribe_person,
     location_health::report,
     location_health::recent,
+    server_health::livez,
+    server_health::health,
+    server_health::details,
     location_work::poll,
     location_work::complete,
     location_work::result,

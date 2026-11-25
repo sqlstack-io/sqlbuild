@@ -16,6 +16,7 @@ import { toMaintenanceHistory } from './http-maintenance';
 import { toProviders } from './http-providers';
 import { overviewOf } from './http-overview';
 import { toPlatformEventRecords, toPlatformEvents, toPlatformHealth } from './http-problems';
+import { toHealthDetails, toServerHealth } from './http-health';
 import { roleDetailOf, toRoleDefinition } from './http-roles';
 import { jobDetailOf, runWindowOf, toJob, toTick, toTrigger, toTriggerStateEvent, triggerDetailOf } from './http-jobs';
 import { timelineOf } from './http-timeline';
@@ -24,7 +25,7 @@ import { toSelectionEvaluation, toSelectionVocabulary } from './http-selection';
 import { costSeriesGroups, toCostSelection } from './http-cost';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, BuiltInRole, Capability, DiscoveredSet, Location, NavCounts, PlatformEvent, RepublishResult, Scope, Snapshot, WarehouseSync } from './types';
-import type { Account, AuditEntry, AuditQuery, ConnectionTest, IssuedToken, KeyRotation, LocationDetail, NewPasswordAccount, NewServiceAccount, ServiceAccount, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, ProviderConnection, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
+import type { Account, AuditEntry, AuditQuery, ConnectionTest, IssuedToken, KeyRotation, LocationDetail, NewPasswordAccount, NewServiceAccount, ServiceAccount, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, ServerHealth, HealthComponentDetails, MaintenanceHistory, ProviderConnection, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { Acknowledgement, CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, NodeStates, NodeStatusDelta, Overview, SnapshotChange, ColumnLineage, AttentionAcknowledgement, ConditionShape, AutomaticWithdrawal } from './types/build';
 import type { NodeOutputIndex, NodeOutputPage, NodeOutputSearch, RunNode, RunOutputFollow, AdhocRunCheck, AdhocRunRequest, BulkRunResult, SelectionEvaluation, SelectionRequest, SelectionVocabulary, PlanDiff, PlanPage, PlanPageSection, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, IgnoredAuditFailure, RunCostRow, CostSummary, CostSelection, CostSelectionQuery, CostSeriesGroup, NodeBuildCost, StatementSql } from './types/operate';
 import { newRequestId } from '$lib/browser/request-id';
@@ -100,6 +101,8 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'listPlatformEvents',
 	'listPlatformEventHistory',
 	'platformHealth',
+	'readHealth',
+	'readHealthDetails',
 	'listRoles',
 	'getRole',
 	'getLatestSnapshot',
@@ -889,6 +892,19 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			);
 		},
 		platformHealth: async (): Promise<PlatformHealth> => toPlatformHealth(await problems()),
+		/** A 503 carries the same report: the server answers, and says which part isn't working. */
+		async readHealth(): Promise<ServerHealth> {
+			const { data, error, response } = await http.GET('/api/health');
+			const report = data ?? (response.status === 503 ? (error as Wire['HealthReport'] | undefined) : undefined);
+			if (!report?.components) throw new ApiError(errorText(error, response), response.status);
+			return toServerHealth(report);
+		},
+		async readHealthDetails(): Promise<HealthComponentDetails[]> {
+			const { data, error, response } = await http.GET('/api/health/details');
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toHealthDetails(data);
+		},
 		/** Each location the person sees, with health only where they may list the whole target. */
 		async listLocations(): Promise<LocationSummary[]> {
 			const [locations, events] = await Promise.all([bootstrapLocations(), problems().then((p) => toPlatformEvents(p, Date.now()))]);

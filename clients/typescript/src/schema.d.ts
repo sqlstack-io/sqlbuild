@@ -1449,6 +1449,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/health/details": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readHealthDetails"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/locations/{location_id}/health": {
         parameters: {
             query?: never;
@@ -1849,6 +1881,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/livez": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The process answers; nothing else is checked. */
+        get: operations["livez"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1923,12 +1972,18 @@ export interface components {
          */
         AdministratorChange: "grant" | "revoke" | "disable" | "enable";
         ApiErrorBody: {
+            cause?: null | components["schemas"]["ErrorCause"];
             /**
              * Format: uuid
              * @description Existing durable denial audit ID; absent when no decision was recorded.
              */
             decision_id?: string | null;
             error: string;
+            /**
+             * Format: uuid
+             * @description This request's ID, as the server log and the `x-request-id` header name it.
+             */
+            request_id?: string | null;
         };
         /** @description A condition whose latest acknowledgement event marks it handled. */
         AttentionAcknowledgement: {
@@ -2228,6 +2283,42 @@ export interface components {
             /** Format: uuid */
             snapshot_id?: string | null;
         };
+        /** @description One component's details for administrators: where it is, each cause's message, and the failed requests. */
+        ComponentDetails: {
+            component: components["schemas"]["HealthComponent"];
+            error_chain: string[];
+            /** @description The control database's host and port. */
+            host?: string | null;
+            /** Format: uuid */
+            location_id?: string | null;
+            request_ids: string[];
+        };
+        /** @description One component as anyone may see it: its state, since when, and a short reason. */
+        ComponentHealth: {
+            case?: null | components["schemas"]["ControlCauseCase"];
+            component: components["schemas"]["HealthComponent"];
+            /** Format: date-time */
+            last_failure?: string | null;
+            /**
+             * Format: date-time
+             * @description When it last worked; for a location, its last report.
+             */
+            last_success?: string | null;
+            /**
+             * Format: uuid
+             * @description The location this row is about.
+             */
+            location_id?: string | null;
+            /** @description What people call it: "Control database", "Scheduler", or a location's name. */
+            name: string;
+            reason?: string | null;
+            /**
+             * Format: date-time
+             * @description When it stopped being healthy.
+             */
+            since?: string | null;
+            status: components["schemas"]["HealthStatus"];
+        };
         /** @description A row whose key was already stored with different content; the first row is kept. */
         ConflictEvidence: {
             existing_sha256: string;
@@ -2266,6 +2357,11 @@ export interface components {
             /** @description Where signing out goes when a trusted proxy owns the sign-in; absent means no sign-out link. */
             logout_url?: string | null;
         };
+        /**
+         * @description Which kind of control database failure an error is; the sentence people read follows from it.
+         * @enum {string}
+         */
+        ControlCauseCase: "name_lookup" | "unreachable" | "login_rejected" | "no_free_connections" | "restarting" | "pool_exhausted" | "locked" | "other";
         /** @description One job's estimated query cost on one node: in the period, and in the period before it. */
         CostFactRecord: {
             /** Format: int64 */
@@ -2515,6 +2611,12 @@ export interface components {
             /** Format: uuid */
             trigger_id: string;
         };
+        /** @description A control database failure as an error response names it: its case and since when it has been failing. */
+        ErrorCause: {
+            case: components["schemas"]["ControlCauseCase"];
+            /** Format: date-time */
+            since: string;
+        };
         ExternalIdentityResponse: {
             csrf_token: string;
             /** Format: date-time */
@@ -2561,6 +2663,34 @@ export interface components {
             role_key: string;
             target?: string | null;
         };
+        /**
+         * @description A part of the server whose health is reported.
+         * @enum {string}
+         */
+        HealthComponent: "server" | "control_database" | "scheduler" | "location";
+        /** @description `GET /api/health/details`: what administrators see beside the public report. */
+        HealthDetails: {
+            components: components["schemas"]["ComponentDetails"][];
+        };
+        /** @description `GET /api/health`: every component's state, readable without signing in and without the control database. */
+        HealthReport: {
+            /** Format: date-time */
+            checked_at: string;
+            components: components["schemas"]["ComponentHealth"][];
+            /**
+             * Format: int64
+             * @description How often a client should ask again while the server isn't healthy, in seconds.
+             */
+            retry_seconds: number;
+            server: components["schemas"]["ServerSummary"];
+            /** @description The worst component's: unavailable when the control database is, degraded when anything else isn't healthy. */
+            status: components["schemas"]["HealthStatus"];
+        };
+        /**
+         * @description How a component, or the server as a whole, stands.
+         * @enum {string}
+         */
+        HealthStatus: "healthy" | "degraded" | "unavailable";
         HeartbeatResponse: {
             cancel_requested: boolean;
         };
@@ -5001,6 +5131,14 @@ export interface components {
             retention: components["schemas"]["ServerRetention"];
             /** @description Whether this server runs the scheduler; another server may hold the lease. */
             scheduler: boolean;
+            version: string;
+        };
+        /** @description The server row of the health report. */
+        ServerSummary: {
+            /** Format: date-time */
+            started_at: string;
+            /** Format: int64 */
+            uptime_seconds: number;
             version: string;
         };
         ServiceAccountRole: {
@@ -9626,6 +9764,69 @@ export interface operations {
             };
         };
     };
+    readHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every component is healthy */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthReport"];
+                };
+            };
+            /** @description A component is degraded or the control database is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthReport"];
+                };
+            };
+        };
+    };
+    readHealthDetails: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthDetails"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
     read_location_health: {
         parameters: {
             query?: {
@@ -10953,6 +11154,26 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    livez: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The server process is running */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
             };
         };
     };

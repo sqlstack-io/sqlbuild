@@ -19,6 +19,7 @@ import sqlite3
 import subprocess
 import sys
 import termios
+import threading
 import time
 from collections.abc import Callable, Iterator
 from contextlib import (
@@ -2519,3 +2520,125 @@ INGRESS_LOADER_FILES: dict[str, str] = {
         "    managed: true\n    write_strategy: table\n"
     ),
 }
+
+
+@contextmanager
+def outage_server(directory: Path, database_url: str) -> Iterator[tuple[str, Path]]:
+    """`sqb server` over a control database it may not reach yet, from the moment it listens."""
+    directory.mkdir(parents=True)
+    log: Path = directory / "server.log"
+    environment: dict[str, str] = os.environ.copy()
+    environment.pop("SQLBUILD_PLATFORM_WEBHOOK_URL", None)
+    environment.pop("SQLBUILD_SECURITY_AUDIT_WEBHOOK_URL", None)
+    environment["XDG_STATE_HOME"] = str(directory / "state")
+    environment["SQLBUILD_CONTROL_DATABASE_URL"] = database_url
+    with log.open("wb") as stderr:
+        process: subprocess.Popen[bytes] = subprocess.Popen(
+            [str(Path(sys.executable).with_name("sqb")), "server", "--port", "0", "--no-scheduler"],
+            cwd=directory,
+            env=environment,
+            stdout=subprocess.DEVNULL,
+            stderr=stderr,
+        )
+        try:
+            yield listening_address(process, log), log
+        finally:
+            process.terminate()
+            try:
+                _ = process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                _ = process.wait(timeout=5)
+
+
+def listening_address(process: subprocess.Popen[bytes], log: Path) -> str:
+    """The address a server answers on before its control database is open."""
+    deadline: float = time.monotonic() + 10
+    while "Control API listening: " not in log.read_text():
+        assert process.poll() is None, log.read_text()
+        assert time.monotonic() < deadline, "the server did not start listening"
+        time.sleep(0.02)
+    return "http://" + log.read_text().partition("Control API listening: ")[2].splitlines()[0]
+
+
+def http_reply(url: str) -> tuple[int, dict[str, str], Any]:
+    """A GET's status, headers and body, JSON when it is JSON, whatever the status."""
+    try:
+        with urlopen(url, timeout=10) as response:
+            status: int = response.status
+            headers: dict[str, str] = {
+                key.lower(): value for key, value in response.headers.items()
+            }
+            body: bytes = response.read()
+    except HTTPError as error:
+        status = error.code
+        headers = {key.lower(): value for key, value in error.headers.items()}
+        body = error.read()
+    json_body: bool = headers.get("content-type", "").startswith("application/json")
+    return status, headers, json.loads(body) if json_body else body.decode()
+
+
+def wait_for_health(
+    url: str, wanted: Callable[[dict[str, Any]], bool], seconds: float
+) -> dict[str, Any]:
+    """The first health report `wanted` accepts, read every half second."""
+    deadline: float = time.monotonic() + seconds
+    report: dict[str, Any] = {}
+    while time.monotonic() < deadline:
+        report = http_reply(f"{url}/api/health")[2]
+        if wanted(report):
+            return report
+        time.sleep(0.5)
+    raise AssertionError(f"health never became what was wanted: {report}")
+
+
+def control_database_row(report: dict[str, Any]) -> dict[str, Any]:
+    """The control database's row of a health report, by what anyone may see of it."""
+    row: dict[str, Any] = next(
+        component
+        for component in report["components"]
+        if component["component"] == "control_database"
+    )
+    return {"status": row["status"], "reason": row["reason"], "case": row.get("case")}
+
+
+def free_port() -> int:
+    """A local port nothing listens on yet."""
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port: int = probe.getsockname()[1]
+    return port
+
+
+@contextmanager
+def forwarded_port(port: int, target: tuple[str, int]) -> Iterator[None]:
+    """Accept on `port` and relay every connection to `target` until the block ends."""
+    listener: socket.socket = socket.create_server(("127.0.0.1", port))
+    stop: threading.Event = threading.Event()
+
+    def relay(source: socket.socket, sink: socket.socket) -> None:
+        with suppress(OSError):
+            while chunk := source.recv(65536):
+                sink.sendall(chunk)
+        with suppress(OSError):
+            sink.shutdown(socket.SHUT_WR)
+
+    def accept() -> None:
+        listener.settimeout(0.2)
+        while not stop.is_set():
+            try:
+                client, _ = listener.accept()
+            except TimeoutError:
+                continue
+            upstream: socket.socket = socket.create_connection(target)
+            threading.Thread(target=relay, args=(client, upstream), daemon=True).start()
+            threading.Thread(target=relay, args=(upstream, client), daemon=True).start()
+
+    acceptor: threading.Thread = threading.Thread(target=accept, daemon=True)
+    acceptor.start()
+    try:
+        yield
+    finally:
+        stop.set()
+        acceptor.join(timeout=2)
+        listener.close()

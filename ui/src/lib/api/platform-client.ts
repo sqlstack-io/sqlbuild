@@ -20,6 +20,8 @@ import type {
 	PlatformEventQuery,
 	PlatformEventRecord,
 	PlatformHealth,
+	ServerHealth,
+	HealthComponentDetails,
 	ProviderConnection,
 	RoleAssignment,
 	RoleAssignmentRequest,
@@ -44,6 +46,10 @@ export interface PlatformApi {
 	// ---- server status and problems (shown on Locations) ----
 	/** Scheduler, server replicas, heartbeat and event forwarding. */
 	platformHealth(): Promise<PlatformHealth>;
+	/** The server's own health, read without signing in; it answers while the control database is unreachable. */
+	readHealth(): Promise<ServerHealth>;
+	/** Where the control database is, each cause and the failed requests, for people who may manage people. */
+	readHealthDetails(): Promise<HealthComponentDetails[]>;
 	/** Problems recorded as platform events, newest first; by location, or server-wide with `locationId: null`. */
 	listPlatformEventHistory(query?: PlatformEventQuery): Promise<PlatformEventRecord[]>;
 

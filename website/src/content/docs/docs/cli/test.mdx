@@ -93,7 +93,8 @@ On the warehouse (4 tests)
   missing rule: node:method_call                  1 test
 ```
 
-`--verbose` and `--inspect` print the full diagnostics instead.
+`--verbose` and `--inspect` print the full diagnostics instead, as notes (`note[SQ0003]`), since these
+tests still run; under `--run-on local` they are errors.
 
 With `--json`, each check has `run_on` (`local` or `warehouse`) and `run_on_reason` (the first
 refusal's `<category>: <construct>`, or `null`), `summary` has `local_count` and

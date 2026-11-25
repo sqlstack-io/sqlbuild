@@ -44,9 +44,26 @@ fn refusal_place(refusal: &LocalRefusal) -> RefusalPlace {
     }
 }
 
-/// One refusal in SQLQuack's layout, notes, help and the items it blocks.
-pub(crate) fn refusal_block(refusal: &LocalRefusal, names: &[String], style: CliStyle) -> String {
+/// One refusal in SQLQuack's layout, notes, help and the items it blocks: an `error` where it stops them running,
+/// a `note` where they run on the warehouse instead.
+pub(crate) fn refusal_block(
+    refusal: &LocalRefusal,
+    names: &[String],
+    (errors, style): (bool, CliStyle),
+) -> String {
     let message: String = refusal.message.clone().unwrap_or_else(|| refusal.title());
+    let code: String = refusal.code.clone().unwrap_or_default();
+    let severity: &str = if errors { "error" } else { "note" };
+    let labelled: String = if code.is_empty() {
+        severity.to_owned()
+    } else {
+        format!("{severity}[{code}]")
+    };
+    let header: String = if errors {
+        style.error_strong(&labelled)
+    } else {
+        style.accent_strong(&labelled)
+    };
     let mut lines: Vec<String> = match (&refusal.path, refusal.line, refusal.column) {
         (Some(path), Some(line), Some(column)) => {
             let caret: i64 = refusal.snippet_column.unwrap_or(column);
@@ -57,7 +74,7 @@ pub(crate) fn refusal_block(refusal: &LocalRefusal, names: &[String], style: Cli
                 column: caret,
                 end_line: Some(line),
                 end_column: Some(caret + refusal.width.max(1)),
-                code: refusal.code.clone().unwrap_or_default(),
+                code: code.clone(),
                 message,
                 fault: true,
                 engine: String::new(),
@@ -68,6 +85,8 @@ pub(crate) fn refusal_block(refusal: &LocalRefusal, names: &[String], style: Cli
                 .lines()
                 .map(str::to_owned)
                 .collect();
+            located[0] =
+                located[0].replacen(&style.error_strong(&format!("error[{code}]")), &header, 1);
             if caret != column && located.len() > 1 {
                 located[1] = style.muted(&format!(" --> {path}:{line}:{column}"));
             }
@@ -78,16 +97,7 @@ pub(crate) fn refusal_block(refusal: &LocalRefusal, names: &[String], style: Cli
             located
         }
         _ => {
-            let code: String = refusal.code.clone().unwrap_or_default();
-            let header: String = if code.is_empty() {
-                format!("{}: {message}", style.error_strong("error"))
-            } else {
-                format!(
-                    "{}: {message}",
-                    style.error_strong(&format!("error[{code}]"))
-                )
-            };
-            let mut header_lines: Vec<String> = vec![header];
+            let mut header_lines: Vec<String> = vec![format!("{header}: {message}")];
             let label: &str = refusal.label.as_deref().unwrap_or(&refusal.reason);
             if !label.is_empty() && label != message {
                 header_lines.push(format!("  {} {label}", style.muted(NOTE_LABEL)));

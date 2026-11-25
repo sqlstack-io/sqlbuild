@@ -41,6 +41,11 @@ export type FakeJob = { key: string; kind: 'job' | 'group'; concurrency: number 
 
 const MODELS = ['orders', 'order_items', 'customers', 'payments', 'refunds'];
 
+/** A part of the server's health report, as the server sends it. */
+export type FakeHealthPart = { component: 'server' | 'control_database' | 'scheduler' | 'location'; name: string; status: 'healthy' | 'degraded' | 'unavailable'; reason?: string; case?: string; since?: string; location_id?: string };
+/** A control database outage: every API read but health answers 503 with this cause. */
+export type FakeOutage = { case: string; message: string; since: string };
+
 const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 const later = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -52,6 +57,14 @@ export class FakeControl {
 	#notices: string[] = [];
 	#states: Record<TargetName, { seen: string; version: number }> = { shop: { seen: '', version: 0 }, returns: { seen: '', version: 0 } };
 	#lease = new Date(Date.now() - 60_000).toISOString();
+	/** The control database's outage, while there is one. */
+	outage: FakeOutage | null = null;
+	/** Parts that aren't healthy while pages still work. */
+	degraded: FakeHealthPart[] = [];
+	/** No session: the bootstrap is refused, as for a person who hasn't signed in. */
+	signedOut = false;
+	/** Health reads answered so far. */
+	healthReads = 0;
 
 	constructor(overrides: Partial<Record<TargetName, Partial<TargetState>>> = {}) {
 		const base = (): TargetState => ({ changed: [], sync: 'settled', schedulerLeader: true, acks: [], failedRun: false, readDelayMs: 0, failReads: false, failWithdrawals: false, healthDelayMs: 0, jobs: [] });
@@ -90,6 +103,11 @@ export class FakeControl {
 		const request = route.request();
 		const url = new URL(request.url());
 		const path = url.pathname;
+		if (path === '/api/health') return this.#serverHealth(route);
+		if (this.outage) {
+			return json(route, { error: this.outage.message, request_id: '0190d1a0-0000-7000-8000-0000000000ff', cause: { case: this.outage.case, since: this.outage.since } }, 503);
+		}
+		if (this.signedOut && path === '/api/control/bootstrap') return json(route, { error: 'sign in required' }, 401);
 		if (path === '/api/control/bootstrap') {
 			return json(route, {
 				login_mode: 'disabled',
@@ -176,6 +194,28 @@ export class FakeControl {
 		const applies = !!latest && (body.withdraws === undefined || body.withdraws === latest.event_id);
 		if (applies) target.acks = target.acks.filter((a) => a.key !== body.key);
 		return json(route, { applied: applies });
+	}
+
+	/** `/api/health` as the server answers it: 503 with the same report unless every part is healthy. */
+	#serverHealth(route: Route) {
+		this.healthReads += 1;
+		const now = new Date().toISOString();
+		const started = new Date(Date.now() - 3_600_000).toISOString();
+		const row = (part: FakeHealthPart) => ({ location_id: part.location_id, reason: part.reason ?? null, case: part.case, since: part.since ?? started, last_success: part.status === 'healthy' ? now : started, last_failure: part.status === 'healthy' ? null : now, ...part });
+		const database: FakeHealthPart = this.outage
+			? { component: 'control_database', name: 'Control database', status: 'unavailable', reason: this.outage.message, case: this.outage.case, since: this.outage.since }
+			: { component: 'control_database', name: 'Control database', status: 'healthy' };
+		const parts: FakeHealthPart[] = [
+			{ component: 'server', name: 'Server', status: 'healthy' },
+			database,
+			{ component: 'scheduler', name: 'Scheduler', status: 'healthy' },
+			...(Object.keys(LOCATIONS) as TargetName[]).map((name): FakeHealthPart => this.degraded.find((d) => d.name === name) ?? { component: 'location', name, status: 'healthy', location_id: LOCATIONS[name] }),
+			...this.degraded.filter((d) => d.component !== 'location')
+		];
+		const status = this.outage ? 'unavailable' : this.degraded.length ? 'degraded' : 'healthy';
+		// Retried every second here, so a recovery shows quickly; the server says 10.
+		const report = { status, checked_at: now, retry_seconds: 1, server: { version: '0.262.0', started_at: started, uptime_seconds: 3600 }, components: parts.map(row) };
+		return json(route, report, status === 'healthy' ? 200 : 503);
 	}
 
 	#node(target: TargetState, model: string) {

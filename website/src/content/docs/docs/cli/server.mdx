@@ -78,6 +78,54 @@ process group, so Ctrl+C in the server's terminal reaches only the server. A sec
 SIGTERM while the workers stop kills their process groups at once; the server still records the
 runs and releases their claims before it exits.
 
+## Check the server's health
+
+Each server keeps its own health in memory, so it can answer while its control database can't be
+reached:
+
+| Path | Sign-in | Answers |
+| --- | --- | --- |
+| `/livez` | None | `200 ok` while the process runs; it checks nothing else |
+| `/api/health` | None | Each part's state, since when and a short reason; `200` when every part is healthy, `503` otherwise |
+| `/api/health/details` | People who may manage people | Where the control database is, each cause's own message and the IDs of requests that failed |
+
+The parts are the server (version and uptime), the control database (checked every 10 seconds),
+the scheduler on servers that run one, and each location, which is degraded once it hasn't
+reported for 90 seconds. The report's `status` is `unavailable` while the control database is,
+`degraded` while any other part isn't healthy, and `healthy` otherwise. Point a load balancer's
+liveness check at `/livez`, and monitoring at `/api/health`.
+
+When a request fails because of the control database, the error says why instead of a generic
+"busy":
+
+| `cause.case` | Message |
+| --- | --- |
+| `name_lookup` | Can't reach the control database: `<host>` doesn't resolve (DNS) |
+| `unreachable` | Can't reach the control database at `<host>:<port>` |
+| `login_rejected` | The control database rejected the login for `<user>` |
+| `no_free_connections` | The control database has no free connections |
+| `restarting` | The control database is restarting |
+| `pool_exhausted` | All 10 control database connections were busy for 30 s |
+| `locked` | The control database is locked by another process |
+| `other` | Control database error: `<the error's own message>` |
+
+The response body carries `error` (the message), `cause` with `case` and `since`, and
+`request_id`, which every response also sends as `x-request-id`. The server log has each failure
+with its request ID and every cause's own message, never the password. Any other unknown path
+under `/api/` is a JSON `404`, never the UI's page.
+
+`sqb server` listens before it opens its control database. While the database can't be reached,
+for example because its host doesn't resolve, the server answers `/livez`, `/api/health` and the
+UI, refuses other API requests with `503` and the cause, and tries again with a wait that doubles
+up to 30 seconds. It then starts the full API on the same address without a restart. A failure that
+retrying can't fix, such as a rejected login or a schema it can't migrate, stops the server.
+
+The UI reads the same health. The top bar says **Live**, **Degraded** or **Unavailable**, and
+links to **Status**, which shows every part without signing in. While the control database is
+unavailable, every page keeps its address and says it isn't available, with the reason, since
+when and the parts, and loads by itself when the database is back. While a part is degraded, pages
+work and a banner names it.
+
 ## Serve over HTTPS
 
 Code locations and workers send their bearer token with every request to the `--server` URL.

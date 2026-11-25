@@ -670,3 +670,38 @@ export type ServerSettings = {
 	schedulerEnabled: boolean;
 	retention: RetentionSetting[];
 };
+
+/** How a part of the server, or the server as a whole, stands. */
+export type HealthStatus = 'healthy' | 'degraded' | 'unavailable';
+/** Which kind of control database failure a reason describes. */
+export type ControlCauseCase = 'name_lookup' | 'unreachable' | 'login_rejected' | 'no_free_connections' | 'restarting' | 'pool_exhausted' | 'locked' | 'other';
+export type HealthComponentKind = 'server' | 'control_database' | 'scheduler' | 'location';
+
+/** One part of the server as anyone may see it, read from the server's memory. */
+export type HealthComponent = {
+	component: HealthComponentKind;
+	/** "Control database", "Scheduler", or a location's name. */
+	name: string;
+	locationId: string | null;
+	status: HealthStatus;
+	/** When it stopped being healthy, or since when it has been. */
+	since: string | null;
+	reason: string | null;
+	case: ControlCauseCase | null;
+	/** When it last worked; for a location, its last report. */
+	lastSuccess: string | null;
+	lastFailure: string | null;
+};
+
+/** `GET /api/health`, which answers without signing in and while the control database is unreachable. */
+export type ServerHealth = {
+	status: HealthStatus;
+	checkedAt: string;
+	/** How often to ask again while the server isn't healthy. */
+	retrySeconds: number;
+	server: { version: string; startedAt: string; uptimeSeconds: number };
+	components: HealthComponent[];
+};
+
+/** What administrators see beside the health report. */
+export type HealthComponentDetails = { component: HealthComponentKind; locationId: string | null; host: string | null; errorChain: string[]; requestIds: string[] };
