@@ -178,8 +178,27 @@ Cursors define the incremental replay boundary. SQLBuild queries `MAX(cursor)` f
 | `cursor` | Output column used to track incremental position |
 | `cursor_type` | `timestamp` or `integer` |
 | `cursor_grain` | Time grain for timestamp cursors: `second`, `minute`, `hour`, `day`, `month`, `year` |
-| `cursor_start` | Lower bound floor; the cursor will never replay before this value |
+| `cursor_start` | Lower bound floor; the cursor will never replay before this value, even inside an [explicit cursor window](#explicit-cursor-windows) |
 | `cursor_inputs` | Map of upstream ref/source names to their cursor columns |
+
+### Explicit cursor windows
+
+`--start-cursor-ts` and `--end-cursor-ts` (or the `-int` forms, or `--start-cursor` and
+`--end-cursor`) give every selected cursor model the same window, and each model fits it to its own
+`cursor_start`:
+
+- A window that starts before a model's `cursor_start` and ends after it starts that model at its
+  `cursor_start`. The plan warns on that model:
+  `explicit start 2020-06-01 is before cursor_start 2021-01-01; the window starts at 2021-01-01`.
+- A window that ends at or before a model's `cursor_start` skips that model. The plan lists it under
+  **Window before cursor_start** with the reason `window ends before cursor_start 2021-01-01`; in
+  `sqb plan --json` its row has `"action": "skip"`, `"reason": "window_before_cursor_start"` and
+  that reason as `skip_reason`.
+- When the window skips every selected cursor model, there is nothing to build and the plan fails
+  with `P001`, naming the window and each model's `cursor_start`. Selected models without a cursor
+  don't count.
+
+A window that reaches a model's exclusive `cursor_end` still fails that model.
 
 ### cursor_inputs
 

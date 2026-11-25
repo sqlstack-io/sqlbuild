@@ -13601,6 +13601,7 @@ class PlanReason(StrEnum):
     DISABLED = "disabled"
     SOURCE_FRESHNESS_ERROR = "source_freshness_error"
     EXTERNAL_UPSTREAM_FAILED = "external_upstream_failed"
+    WINDOW_BEFORE_CURSOR_START = "window_before_cursor_start"
 
 class IncrementalStrategy(StrEnum):
     APPEND = "append"
@@ -14184,6 +14185,7 @@ class ModelPlanEntry(NativeRecord):
     dynamic_readers: tuple[str, ...]
     dynamic_paused: bool
     planning_error: PlanWarning | None
+    skip_reason: str | None
     def __init__(
         self,
         key: CompiledObjectKey,
@@ -14281,6 +14283,7 @@ class ModelPlanEntry(NativeRecord):
         dynamic_readers: tuple[str, ...] = ...,
         dynamic_paused: bool = ...,
         planning_error: PlanWarning | None = ...,
+        skip_reason: str | None = ...,
     ) -> None: ...
 
 class CloneSourcePlanEntry(NativeRecord):

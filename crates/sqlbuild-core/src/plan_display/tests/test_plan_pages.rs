@@ -20,6 +20,11 @@ fn given_a_plan_when_paging_each_section_then_every_section_pages_its_rows_in_pl
             expected_rows: &["unplannable"],
         },
         SectionTestCase {
+            description: "models an explicit window skips, though skipped and not run by --changed",
+            section: PlanPageSection::WindowBeforeCursorStart,
+            expected_rows: &["late_feed"],
+        },
+        SectionTestCase {
             description: "full refresh",
             section: PlanPageSection::FullRefresh,
             expected_rows: &["archive"],
@@ -349,28 +354,33 @@ fn given_a_plan_when_summarised_then_sections_are_counts_and_no_row_list_is_left
             expected_value: json!("planning_error"),
         },
         SummaryFieldTestCase {
-            description: "then full refresh",
+            description: "then models the window skips",
             pointer: "/sections/1/section",
+            expected_value: json!("window_before_cursor_start"),
+        },
+        SummaryFieldTestCase {
+            description: "then full refresh",
+            pointer: "/sections/2/section",
             expected_value: json!("full_refresh"),
         },
         SummaryFieldTestCase {
             description: "routine models after the changes",
-            pointer: "/sections/8/section",
+            pointer: "/sections/9/section",
             expected_value: json!("routine_models"),
         },
         SummaryFieldTestCase {
             description: "warnings last",
-            pointer: "/sections/25/section",
+            pointer: "/sections/26/section",
             expected_value: json!("warnings"),
         },
         SummaryFieldTestCase {
             description: "no section beyond the plan's",
-            pointer: "/sections/26",
+            pointer: "/sections/27",
             expected_value: Value::Null,
         },
         SummaryFieldTestCase {
             description: "a section's size",
-            pointer: "/sections/6/total",
+            pointer: "/sections/7/total",
             expected_value: json!(2),
         },
         SummaryFieldTestCase {

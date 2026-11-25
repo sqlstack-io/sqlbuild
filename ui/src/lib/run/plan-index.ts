@@ -6,10 +6,11 @@ import { plural } from '$lib/format/plural';
 import { changedSections, loadedRows, looseWarnings, planSections, sectionSize, type PlanEntry, type PlanSection } from './plan-text';
 
 /** The plan's groups in plan order; the index sorts them under Will run and Won't run. */
-export type PlanGroupKey = 'errors' | 'full_refresh' | 'changed' | 'renames' | 'first_run' | 'loads' | 'python' | 'held_back' | 'warnings' | 'unchanged' | 'skipped';
-const ORDER: PlanGroupKey[] = ['errors', 'full_refresh', 'changed', 'renames', 'first_run', 'loads', 'python', 'held_back', 'warnings', 'unchanged', 'skipped'];
+export type PlanGroupKey = 'errors' | 'window' | 'full_refresh' | 'changed' | 'renames' | 'first_run' | 'loads' | 'python' | 'held_back' | 'warnings' | 'unchanged' | 'skipped';
+const ORDER: PlanGroupKey[] = ['errors', 'window', 'full_refresh', 'changed', 'renames', 'first_run', 'loads', 'python', 'held_back', 'warnings', 'unchanged', 'skipped'];
 const TITLES: Record<PlanGroupKey, string> = {
 	errors: 'Planning failed',
+	window: 'Window before cursor_start',
 	full_refresh: 'Full refresh',
 	changed: 'Changed',
 	renames: 'Renames and migrations',
@@ -24,6 +25,7 @@ const TITLES: Record<PlanGroupKey, string> = {
 /** Each server section's group in the index. */
 const GROUP_OF: Record<PlanPageSection, PlanGroupKey> = {
 	planning_error: 'errors',
+	window_before_cursor_start: 'window',
 	full_refresh: 'full_refresh',
 	query_changed: 'changed',
 	function_changed: 'changed',

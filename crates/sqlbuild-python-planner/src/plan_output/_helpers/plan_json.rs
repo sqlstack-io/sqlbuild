@@ -292,6 +292,10 @@ pub(crate) fn model_json<'py>(entry: &Bound<'py, PyAny>) -> PyResult<Bound<'py, 
             })?,
         )?;
     }
+    let skip_reason: Bound<'py, PyAny> = native_field(entry, "skip_reason")?;
+    if !skip_reason.is_none() {
+        model.set_item("skip_reason", skip_reason)?;
+    }
     let planning_error: Bound<'py, PyAny> = native_field(entry, "planning_error")?;
     if !planning_error.is_none() {
         model.set_item("action", ERROR_ACTION)?;

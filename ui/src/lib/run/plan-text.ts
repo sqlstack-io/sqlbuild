@@ -181,6 +181,7 @@ export function planSections(plan: PlanDocument): PlanSection[] {
 	const functionEntry = (f: PlanDocument['functions'][number]) => ({ name: f.name, value: f.language, detail: [] });
 	add('Changed functions', plan.functions.filter((f) => f.reason && f.reason !== 'no_change').map(functionEntry), true, 'changed_functions');
 	add('Planning failed', plan.models.filter((m) => m.error).map((m) => changedEntry(m, 'planning_error')), true, 'planning_error');
+	add('Window before cursor_start', plan.models.filter((m) => m.skip_reason).map((m) => ({ name: m.name, value: m.skip_reason ?? '', detail: [] })), false, 'window_before_cursor_start');
 	if (isFullRefresh(plan)) {
 		const counts = new Map<string, number>();
 		for (const m of active) counts.set(m.materialization_type, (counts.get(m.materialization_type) ?? 0) + 1);

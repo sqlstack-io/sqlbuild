@@ -326,6 +326,8 @@ pub struct ModelPlanText {
     pub reinitialised_by: Option<String>,
     /// Whether the warehouse lists this kept dynamic model as suspended.
     pub paused: bool,
+    /// Why a skipped model is shown anyway, such as `window ends before cursor_start 2021-01-01`.
+    pub skip_reason: Option<String>,
 }
 
 /// One planned function.

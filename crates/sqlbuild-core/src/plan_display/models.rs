@@ -38,6 +38,8 @@ pub struct TimestampGrainFacts {
 pub enum PlanPageSection {
     /// Models that couldn't be planned, with their errors.
     PlanningError,
+    /// Models an explicit cursor window skips, as it ends before their `cursor_start`.
+    WindowBeforeCursorStart,
     /// Built models the plan rebuilds in full.
     FullRefresh,
     QueryChanged,

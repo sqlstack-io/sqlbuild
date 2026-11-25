@@ -96,6 +96,7 @@ pub(super) fn full_plan() -> serde_json::Value {
             planned_model("skipped_model", ("skip", "no_change")),
             planned_model("not_run", ("create_view", "no_change")),
             planned_model("unplannable", ("error", "planning_error")),
+            planned_model("late_feed", ("skip", "window_before_cursor_start")),
         ],
         "seeds": [
             {"name": "countries", "reason": "first_run"},

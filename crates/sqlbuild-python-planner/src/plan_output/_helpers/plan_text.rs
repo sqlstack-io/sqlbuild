@@ -262,6 +262,7 @@ fn model_text(entry: &Bound<'_, PyAny>) -> PyResult<ModelPlanText> {
             name,
             action,
             reason,
+            skip_reason: optional_text(&native_field(entry, "skip_reason")?)?,
             ..ModelPlanText::default()
         });
     }
@@ -300,6 +301,7 @@ fn model_text(entry: &Bound<'_, PyAny>) -> PyResult<ModelPlanText> {
         query_diff: coloured(model_query_diff(entry, &reason)?),
         reinitialised_by: optional_text(&native_field(entry, "reinitialised_by")?)?,
         paused: native_field(entry, "dynamic_paused")?.is_truthy()?,
+        skip_reason: None,
         name,
         action,
         reason,

@@ -51,8 +51,9 @@ pub(crate) const STALE_INPUT_WARNING_TITLE: &str = "Stale inputs detected";
 pub(crate) const SOURCE_FRESHNESS_UNKNOWN_WARNING_TITLE: &str = "source freshness unknown";
 pub(crate) const DIFF_HEADER_MARKER: &str = "# ";
 pub(crate) const EFFECTIVE_BATCH_SIZE_TOKEN: &str = "effective";
-pub(crate) const REASON_GROUPS: [(&str, &str); 8] = [
+pub(crate) const REASON_GROUPS: [(&str, &str); 9] = [
     ("planning_error", "Planning failed"),
+    ("window_before_cursor_start", "Window before cursor_start"),
     ("full_refresh", "Full refresh"),
     ("query_changed", "Query changed"),
     ("function_changed", "Function changed"),

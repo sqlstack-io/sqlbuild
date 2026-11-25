@@ -825,6 +825,8 @@ export type PlanModel = {
 	old_name?: PlanOldName | null;
 	/** A paged row's diff counts in place of its diff text, which `planDiff` reads on demand. */
 	diff_stats?: { query?: PlanDiffStats; config?: PlanDiffStats };
+	/** Why a skipped model is listed anyway, such as `window ends before cursor_start 2021-01-01`. */
+	skip_reason?: string;
 	/** Why the model couldn't be planned, on a row whose action is `error`; a build of it is refused. */
 	error?: { code: string | null; message: string; help: string | null };
 };
@@ -949,6 +951,7 @@ export type PlanCantRun = {
 /** Every plan section a server summary counts and pages, in plan order. */
 export type PlanPageSection =
 	| 'planning_error'
+	| 'window_before_cursor_start'
 	| 'full_refresh'
 	| 'query_changed'
 	| 'function_changed'

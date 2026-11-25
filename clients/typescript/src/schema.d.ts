@@ -7778,7 +7778,7 @@ export interface operations {
         parameters: {
             query: {
                 /** @description The section to page */
-                section: "planning_error" | "full_refresh" | "query_changed" | "function_changed" | "config_changed" | "schema_changed" | "first_run" | "renamed" | "routine_models" | "migrations" | "column_migrations" | "table_type_conversions" | "retention" | "loader_reloads" | "loader_loads" | "source_reloads" | "source_loads" | "changed_functions" | "functions" | "first_run_seeds" | "changed_seeds" | "unchanged_seeds" | "python_nodes" | "held_back" | "unchanged" | "warnings";
+                section: "planning_error" | "window_before_cursor_start" | "full_refresh" | "query_changed" | "function_changed" | "config_changed" | "schema_changed" | "first_run" | "renamed" | "routine_models" | "migrations" | "column_migrations" | "table_type_conversions" | "retention" | "loader_reloads" | "loader_loads" | "source_reloads" | "source_loads" | "changed_functions" | "functions" | "first_run_seeds" | "changed_seeds" | "unchanged_seeds" | "python_nodes" | "held_back" | "unchanged" | "warnings";
                 /** @description Rows to skip; 0 by default */
                 offset?: number;
                 /** @description At most this many rows, capped at 1000 */

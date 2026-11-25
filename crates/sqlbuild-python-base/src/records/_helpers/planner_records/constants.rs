@@ -676,6 +676,7 @@ const R_MODEL_PLAN_ENTRY: RecordSpec = RecordSpec {
         FieldSpec::new("dynamic_readers", FieldDefault::EmptyTuple),
         FieldSpec::new("dynamic_paused", FieldDefault::False),
         FieldSpec::new("planning_error", FieldDefault::None),
+        FieldSpec::new("skip_reason", FieldDefault::None),
     ],
 };
 const R_CLONE_SOURCE_PLAN_ENTRY: RecordSpec = RecordSpec {

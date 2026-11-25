@@ -52,6 +52,7 @@ export function planResultOf(outcome: Wire['LocationWorkOutcome']): PlanResult {
 /** The plan list a section's rows join: models for model sections, `changed` lists for held-back and unchanged nodes. */
 const SECTION_LIST: Record<PlanPageSection, keyof PlanDocument | 'held_back' | 'unchanged'> = {
 	planning_error: 'models',
+	window_before_cursor_start: 'models',
 	full_refresh: 'models',
 	query_changed: 'models',
 	function_changed: 'models',

@@ -41,12 +41,12 @@ fn section_lines<T>(
     lines
 }
 
-/// Models whose action is not `skip`.
+/// Models whose action is not `skip`, and skipped models with a reason to show.
 pub(crate) fn active_models(report: &PlanTextReport) -> Vec<&ModelPlanText> {
     report
         .models
         .iter()
-        .filter(|model| model.action != SKIP_ACTION)
+        .filter(|model| model.action != SKIP_ACTION || model.skip_reason.is_some())
         .collect()
 }
 
@@ -427,6 +427,9 @@ fn schema_change_suffix(model: &ModelPlanText) -> String {
 }
 
 fn action_text(model: &ModelPlanText) -> String {
+    if let Some(reason) = &model.skip_reason {
+        return reason.clone();
+    }
     if model.action == ERROR_ACTION {
         return ERROR_ACTION.to_owned();
     }

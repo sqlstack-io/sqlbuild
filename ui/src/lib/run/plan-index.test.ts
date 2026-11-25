@@ -151,6 +151,22 @@ describe('a model that can\'t be planned', () => {
 	});
 });
 
+describe('a model an explicit cursor window skips', () => {
+	const plan: PlanDocument = {
+		...empty,
+		models: [model('late_feed', 'window_before_cursor_start', { action: 'skip', skip_reason: 'window ends before cursor_start 2021-01-01' }), model('early_feed', 'query_changed', { query_diff: [...head, '-select 1', '+select 2'] })]
+	};
+
+	it('is listed with its reason, apart from the models that build', () => {
+		const groups = planGroups(plan);
+		expect(groups.map((g) => [g.key, g.count])).toEqual([
+			['window', 1],
+			['changed', 1]
+		]);
+		expect(groups[0].rows.map((r) => [r.name, r.action])).toEqual([['late_feed', 'window ends before cursor_start 2021-01-01']]);
+	});
+});
+
 describe('an opened diff', () => {
 	it('shows the first changed lines, then says the rest is cut off', () => {
 		const diff = [{ text: '@@', cls: 'hunk' as const }, ...Array.from({ length: 20 }, (_, i) => ({ text: `+${i}`, cls: 'add' as const }))];

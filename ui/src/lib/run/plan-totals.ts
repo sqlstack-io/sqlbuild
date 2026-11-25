@@ -35,7 +35,7 @@ const RUNS = new Set<PlanPageSection>([
 	'python_nodes'
 ]);
 /** Sections whose rows are selected nodes the build leaves alone. */
-const WONT = new Set<PlanPageSection>(['planning_error', 'held_back', 'unchanged']);
+const WONT = new Set<PlanPageSection>(['planning_error', 'window_before_cursor_start', 'held_back', 'unchanged']);
 
 /** One part of a total: a label, its nodes, and the plan index group it opens. */
 export type TotalPart = { key: string; group: string; label: string; count: number };
@@ -61,6 +61,7 @@ const PARTS: { key: string; group: string; label: string; sections: PlanPageSect
 	{ key: 'python', group: 'python', label: 'Python', sections: ['python_nodes'] },
 	{ key: 'unchanged', group: 'unchanged', label: 'unchanged', sections: ['routine_models', 'unchanged_seeds'] },
 	{ key: 'errors', group: 'errors', label: 'planning failed', sections: ['planning_error'] },
+	{ key: 'window', group: 'window', label: 'before cursor_start', sections: ['window_before_cursor_start'] },
 	{ key: 'held_back', group: 'held_back', label: 'held back', sections: ['held_back'] },
 	{ key: 'skipped', group: 'skipped', label: 'skipped by --changed', sections: ['unchanged'] }
 ];
@@ -76,7 +77,7 @@ export function planTotals(counts: PlanSectionCount[], steps: number): PlanTotal
 	const of = (sections: PlanPageSection[]) => counts.filter((c) => sections.includes(c.section)).reduce((n, c) => n + c.total, 0);
 	const sum = (keep: Set<PlanPageSection>) => counts.filter((c) => keep.has(c.section)).reduce((n, c) => n + c.total, 0);
 	const parts = PARTS.map((p) => ({ key: p.key, group: p.group, label: p.label, count: of(p.sections) })).filter((p) => p.count > 0);
-	const wontKeys = new Set(['errors', 'held_back', 'skipped']);
+	const wontKeys = new Set(['errors', 'window', 'held_back', 'skipped']);
 	return {
 		run: sum(RUNS),
 		wont: sum(WONT),
