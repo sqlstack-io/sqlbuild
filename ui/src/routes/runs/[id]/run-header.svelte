@@ -73,7 +73,7 @@
 							{#if i}<span class="sep">{' · '}</span>{/if}
 							{#if f.href}<a href={to(f.href)} title={f.title}>{f.text}</a>{:else}<span class:live={f.live} title={f.title}>{f.text}</span>{/if}
 						{/each}
-						<span class="sep">{' · '}</span><RunSummary {view} />
+						<span class="sep before-figures">{' · '}</span><RunSummary {view} />
 					</span>
 				</div>
 				<div class="actions">
@@ -178,6 +178,10 @@
 	}
 	.sep {
 		color: var(--sb-text-faint);
+	}
+	/* Clear of the first figure's reserved pill room, as between the figures. */
+	.before-figures {
+		margin-right: 6px;
 	}
 	.live {
 		color: var(--sb-running);

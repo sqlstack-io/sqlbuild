@@ -312,20 +312,20 @@ export function countNodes(nodes: RunNode[]): NodeCounts {
 	return c;
 }
 
-/** Terminal status from node outcomes: partial when something failed and everything else completed. */
+/** Terminal status from node outcomes: failed whenever anything failed; the counts say how much built. */
 export function deriveTerminalStatus(end: RunEnd, nodes: RunNode[]): RunStatus {
 	if (end === 'never_started' || end === 'crashed' || end === 'check_failed') return 'failed';
 	if (end === 'cancelled') return 'cancelled';
 	if (end === 'presumed_failed') return 'presumed_failed';
 	const c = countNodes(nodes);
 	const blocked = c.failed + nodes.filter((n) => n.skippedBecauseOf).length;
-	if (blocked) return c.success + c.warn > 0 ? 'partial' : 'failed';
+	if (blocked) return 'failed';
 	return c.warn ? 'warn' : 'success';
 }
 
 export function statusReason(status: RunStatus, nodes: RunNode[]): string | null {
 	const c = countNodes(nodes);
-	if (status === 'partial')
+	if ((status === 'partial' || status === 'failed') && c.success + c.warn > 0 && (c.failed || nodes.some((n) => n.skippedBecauseOf)))
 		return c.failed
 			? `${c.failed} node${c.failed === 1 ? '' : 's'} failed and ${c.skipped} that depend on ${c.failed === 1 ? 'it' : 'them'} were skipped; the other ${c.success + c.warn} finished`
 			: `${c.skipped} node${c.skipped === 1 ? '' : 's'} skipped because something they depend on failed; the other ${c.success + c.warn} finished`;

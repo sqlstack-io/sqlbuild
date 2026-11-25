@@ -54,10 +54,10 @@ for (const q of QUICK_FILTERS) {
 
 	test(`${q.name} moves nothing in the log toolbar`, async ({ page }) => {
 		await open(page, q.run);
-		// The toolbar, the filter box, each control in it, and the table's header under the Showing line.
+		// The header's figures, the log toolbar, the filter box, each control in it, and the table's header under the Showing line.
 		const boxes = () =>
 			page.evaluate(() =>
-				['.log-head .filters', '.log-filter .field', '.filters .menu-trigger', '.filters .count', '.log thead'].flatMap((sel) =>
+				['[data-testid="run-summary"]', '[data-testid="run-summary"] .fig', '.log-head .filters', '.log-filter .field', '.filters .menu-trigger', '.filters .count', '.log thead'].flatMap((sel) =>
 					[...document.querySelectorAll(sel)].map((el) => {
 						const r = el.getBoundingClientRect();
 						return `${sel} ${r.x},${r.y},${r.width},${r.height}`;

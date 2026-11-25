@@ -17,6 +17,8 @@
 	// rows that don't apply are left out, and two rows that would run the same thing show once. Each opens
 	// the rerun plan, where it is checked before it runs.
 	let { view, look = 'before' }: { view: RunDetailState; look?: ActionLook } = $props();
+	// Prominence follows usefulness: tinted (never red) when the run didn't succeed, quiet like Details when it did.
+	const succeeded = $derived(view.run?.status === 'success' || view.run?.status === 'warn');
 
 	const detail = $derived(view.detail);
 	const runId = $derived(view.run?.id ?? '');
@@ -37,7 +39,7 @@
 {#if failures.length || detail?.rerunFromFailureNodes.length}
 	<span title={blocked ?? undefined}>
 		<DropdownMenu.Root>
-			<DropdownMenu.Trigger class={cn(buttonVariants({ variant: 'outline', size: 'sm' }), ACTION_CLASS.rerun[look])} disabled={!!blocked} data-testid="rerun-menu">{#if look === '2' || look === '3' || look === '4'}<RotateCcwIcon />{/if}Rerun <ChevronDownIcon /></DropdownMenu.Trigger>
+			<DropdownMenu.Trigger class={cn(buttonVariants({ variant: 'outline', size: 'sm' }), ACTION_CLASS.rerun[look === '4' && succeeded ? '3' : look])} disabled={!!blocked} data-testid="rerun-menu">{#if look === '2' || look === '3' || look === '4'}<RotateCcwIcon />{/if}Rerun <ChevronDownIcon /></DropdownMenu.Trigger>
 			<DropdownMenu.Content class="w-80 p-1.5" align="end">
 				{#each rows as r, i (r.key)}
 					{#if r.mode === 'all' && i > 0}<DropdownMenu.Separator />{/if}
@@ -52,4 +54,11 @@
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>
 	</span>
+{:else if succeeded && view.nodes.length}
+	<!-- Nothing failed: one choice, the whole run, so no menu; quiet like Details. -->
+	{#if blocked}
+		<span title={blocked} class={cn(buttonVariants({ variant: 'outline', size: 'sm' }), ACTION_CLASS.rerun['3'], 'pointer-events-none opacity-50')} data-testid="rerun-menu"><RotateCcwIcon />Rerun</span>
+	{:else}
+		<a href={to(rerunHref([runId], 'all'))} class={cn(buttonVariants({ variant: 'outline', size: 'sm' }), ACTION_CLASS.rerun[look === 'before' ? 'before' : '3'])} title="Open a rerun of the whole run" data-testid="rerun-menu"><RotateCcwIcon />Rerun</a>
+	{/if}
 {/if}
