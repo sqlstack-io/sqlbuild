@@ -766,7 +766,7 @@ from tests.unit.src.sqlbuild.cli.output.main.plan.helpers import (
                 ),
             ),
             expected_fragments=(
-                "Plan ready  0 selected, 3 sources to load",
+                "Plan ready  3 sources to load",
                 "raw_events",
                 "delete_insert (cursor: event_at)",
                 "raw_orders",

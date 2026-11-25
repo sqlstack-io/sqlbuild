@@ -67,7 +67,9 @@ pub(crate) fn ready_summary(report: &PlanTextReport, full_refresh: bool) -> Stri
         parts.push("full refresh".to_owned());
     }
     let selected: usize = report.models.len() + report.seeds.len() + report.functions.len();
-    parts.push(format!("{selected} selected"));
+    if selected > 0 {
+        parts.push(format!("{selected} selected"));
+    }
     let sources: usize = report.source_loads.len();
     if sources > 0 {
         let noun: &str = if sources == 1 { "source" } else { "sources" };
@@ -92,6 +94,9 @@ pub(crate) fn ready_summary(report: &PlanTextReport, full_refresh: bool) -> Stri
     if not_run > 0 {
         let noun: &str = if not_run == 1 { "audit" } else { "audits" };
         parts.push(format!("{not_run} {noun} not run"));
+    }
+    if parts.is_empty() {
+        return "0 selected".to_owned();
     }
     parts.join(", ")
 }

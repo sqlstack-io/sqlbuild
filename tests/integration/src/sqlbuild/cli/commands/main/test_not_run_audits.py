@@ -42,7 +42,7 @@ from tests.integration.src.sqlbuild.cli.commands.main.helpers import write_not_r
             setup=(("build", "orders", "payments"),),
             command=("plan", "audit:orders_have_payments"),
             expected_exit_code=0,
-            expected_texts=("Plan ready  0 selected, 1 audit", "Audits (1)"),
+            expected_texts=("Plan ready  1 audit", "Audits (1)"),
             expected_absent=("Models (", "not run"),
         ),
         NotRunAuditTestCase(
