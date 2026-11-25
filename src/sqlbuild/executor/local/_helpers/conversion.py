@@ -226,6 +226,20 @@ def check_all(
     return len(results)
 
 
+def warehouse_relations(
+    *, sql: str, schema: Mapping[str, Any] | None, conversion: LocalConversion
+) -> tuple[str, ...]:
+    """Declared relations the converted SQL names in full, not via a fixture CTE: warehouse-only."""
+
+    relations: Mapping[str, Any] = (_WORK.statement_schema(schema, sql) or {}).get("relations", {})
+    return tuple(
+        relation
+        for relation in sorted(relations)
+        if ".".join('"' + part.replace('"', '""') + '"' for part in relation.split("."))
+        in conversion.sql
+    )
+
+
 def local_work_counts() -> LocalWorkCounts:
     """Conversions, bindings, schema serialisations and cache reads this process did or received."""
 

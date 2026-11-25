@@ -43,3 +43,12 @@ class CachedConversionTestCase:
     expected_first_conversions: int
     expected_later_conversions: int
     expected_later_cached: int
+
+
+@dataclass(frozen=True)
+class WarehouseRelationsTestCase:
+    """A statement over declared relations, and those only the warehouse can give it."""
+
+    description: str
+    sql: str
+    expected_relations: tuple[str, ...]

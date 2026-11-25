@@ -2624,6 +2624,32 @@ SNOWFLAKE_FILES: dict[str, str] = {
 }
 
 
+UNMOCKED_SOURCE_FILES: dict[str, str] = {
+    "sql/sources/raw_customers.yml": (
+        "sources:\n"
+        "  - name: raw_customers\n    description: Raw customers.\n"
+        "    database: RAW\n    schema: shop\n    table: customers\n"
+        "    columns:\n"
+        "      - name: order_id\n        type: NUMBER(38,0)\n"
+        "      - name: customer_id\n        type: NUMBER(38,0)\n"
+    ),
+    "sql/models/marts/order_customers.sql": (
+        "MODEL (description 'Each order with its customer.');\n\n"
+        "SELECT\n"
+        "  orders.order_id,\n"
+        "  customers.customer_id\n"
+        'FROM __source("raw_orders") AS orders\n'
+        "JOIN RAW.shop.customers AS customers ON customers.order_id = orders.order_id\n"
+    ),
+    "tests/unit/test_order_customers_unmocked.sql": (
+        "TEST();\n\nWITH\n"
+        "__source__raw_orders AS (SELECT 1 AS order_id, 'completed' AS status),\n"
+        "__expected__order_customers AS (SELECT 1 AS order_id, 7 AS customer_id)\n"
+        "SELECT 1\n"
+    ),
+}
+
+
 def run_on_precedence_files(test_case: RunOnPrecedenceE2ETestCase) -> dict[str, str]:
     """The DuckDB project with `test_run_on` set where the case sets it."""
 

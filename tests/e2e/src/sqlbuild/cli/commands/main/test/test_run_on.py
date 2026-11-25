@@ -18,6 +18,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.test._test_types import (
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.test.helpers import (
     SNOWFLAKE_FILES,
+    UNMOCKED_SOURCE_FILES,
     check_placements,
     refusal_places,
     refused_tests,
@@ -215,6 +216,52 @@ def test_given_snowflake_project_when_tests_need_conversion_then_reports_sqlquac
 
     assert result.returncode == test_case.expected_exit_code, result.stdout + result.stderr
     assert test_case.expected_text in _DURATION.sub("", result.stdout), result.stdout
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    (
+        RunOnTextE2ETestCase(
+            description="inspect sends a test reading an unmocked declared source to the warehouse",
+            command=("test", "--sql", "--inspect", "--select", "test_order_customers_unmocked"),
+            expected_exit_code=0,
+            expected_text=(
+                "test_order_customers_unmocked\n"
+                "  runs on: warehouse  (warehouse relation: RAW.SHOP.CUSTOMERS)\n"
+            ),
+        ),
+        RunOnTextE2ETestCase(
+            description="--run-on local refuses a test reading an unmocked declared source",
+            command=(
+                "test",
+                "--sql",
+                "--run-on",
+                "local",
+                "--select",
+                "test_order_customers_unmocked",
+            ),
+            expected_exit_code=1,
+            expected_text="warehouse relation: RAW.SHOP.CUSTOMERS",
+        ),
+    ),
+    ids=lambda case: case.description,
+)
+def test_given_snowflake_test_reading_an_unmocked_source_when_testing_then_it_needs_the_warehouse(
+    tmp_path: Path, test_case: RunOnTextE2ETestCase
+) -> None:
+    project: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="run_on_snowflake_unmocked",
+        repo_files={**SNOWFLAKE_FILES, **UNMOCKED_SOURCE_FILES},
+    )
+
+    result: CompletedProcess[str] = run_sqb(
+        command=("--no-color", *test_case.command), project_dir=project
+    )
+
+    output: str = _DURATION.sub("", result.stdout + result.stderr)
+    assert result.returncode == test_case.expected_exit_code, output
+    assert test_case.expected_text in output, output
 
 
 @pytest.mark.parametrize(

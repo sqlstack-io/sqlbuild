@@ -14,6 +14,7 @@ from sqlbuild.executor.local._helpers.conversion import (
     check_all,
     local_check,
     use_conversion_cache,
+    warehouse_relations,
 )
 from sqlbuild.executor.local._helpers.positions import placed_refusal
 from sqlbuild.executor.local._helpers.schema import project_schema
@@ -174,8 +175,13 @@ def _converted_decision(*, entry: SqlTestPlanEntry, context: DecisionContext) ->
         path=context.compiled_paths.get(entry.name, ""),
     )
     conversion: LocalConversion | None = check.conversion
-    if conversion is None or conversion.converted:
+    if conversion is None:
         return _bound_decision(name=entry.name, missing=check.missing)
+    if conversion.converted:
+        return _relations_decision(
+            name=entry.name,
+            relations=warehouse_relations(sql=sql, schema=context.schema, conversion=conversion),
+        )
     sources: TestSources = _test_sources(entry=entry, context=context)
     return RunOnDecision(
         name=entry.name,
@@ -227,17 +233,24 @@ def _test_file(*, entry: SqlTestPlanEntry, project_dir: Path) -> tuple[str | Non
 def _bound_decision(*, name: str, missing: str | None) -> RunOnDecision:
     """Local, unless the test reads a relation only the warehouse has."""
 
-    if missing is None:
+    return _relations_decision(name=name, relations=() if missing is None else (missing,))
+
+
+def _relations_decision(*, name: str, relations: Sequence[str]) -> RunOnDecision:
+    """Local, unless the test reads relations only the warehouse has: one refusal for each."""
+
+    if not relations:
         return RunOnDecision(name=name, run_on=RUN_ON_LOCAL)
     return RunOnDecision(
         name=name,
         run_on=RUN_ON_WAREHOUSE,
-        refusals=(
+        refusals=tuple(
             LocalRefusal(
                 category=RELATION_REASON_CATEGORY,
-                construct=missing,
-                reason=f"the test reads {missing}, which only the warehouse has",
-            ),
+                construct=relation,
+                reason=f"the test reads {relation}, which only the warehouse has",
+            )
+            for relation in relations
         ),
     )
 
