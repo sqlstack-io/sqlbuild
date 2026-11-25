@@ -79,6 +79,11 @@ impl NativeProgressProjector {
         self.held.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
+    /// Whether lines are being held back instead of written.
+    pub fn is_holding(&self) -> bool {
+        self.held().is_some()
+    }
+
     /// Hold back every line from now on instead of writing it.
     pub fn hold_lines(&self) {
         *self.held() = Some(Vec::new());

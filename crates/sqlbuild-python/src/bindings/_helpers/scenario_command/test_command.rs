@@ -25,6 +25,8 @@ use sqlbuild_core::scenario_command::models::{
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::{ExecutionStatus, ScenarioRunResult};
 use sqlbuild_host::types::ResultEnum;
+use sqlbuild_python_output::build_progress::main::local_attempt::local_attempt;
+use sqlbuild_python_output::build_progress::models::LocalAttemptStep;
 use sqlbuild_python_output::result_output::main::results::split_scenario_fallbacks::split_scenario_fallbacks;
 
 use crate::bindings::_helpers::change_selection::base_snapshot::{
@@ -188,9 +190,9 @@ fn finish(
         .iter()
         .zip(tallies)
         .filter(|(label, value)| **label != STATUSES[2] || *value > 0)
-        .map(|(label, value)| count(label, value))
+        .map(|(label, value)| SummaryCount::of(label, value))
         .collect();
-    counts.push(count("TOTAL", results.len()));
+    counts.push(SummaryCount::of("TOTAL", results.len()));
     let succeeded: bool = tallies[1] == 0 && tallies[2] == 0;
     let local: usize = results
         .iter()
@@ -288,13 +290,6 @@ fn finish(
     Ok(succeeded)
 }
 
-fn count(label: &str, value: usize) -> SummaryCount {
-    SummaryCount {
-        label: label.to_owned(),
-        value: i64::try_from(value).unwrap_or(i64::MAX),
-    }
-}
-
 /// Run `scenarios` locally on run-scoped DuckDB or on the warehouse, as `run` is set up.
 fn execute_batch<'py>(
     request: &Bound<'py, PyAny>,
@@ -317,10 +312,7 @@ fn execute_batch<'py>(
         RelayContext {
             project_dir: &run.project.project_dir,
             adapter: &run.adapter,
-            kind: CompletionKind::Run {
-                target_dir,
-                fallback,
-            },
+            kind: CompletionKind::Run { target_dir },
             style: run.style,
         },
     )?;
@@ -376,15 +368,9 @@ fn execute_batch<'py>(
         ]);
         ExecutorHost::RunScenarioTestPipeline
     };
-    let projector = current_projector(py)?.filter(|_| fallback);
-    if let Some(projector) = &projector {
-        projector.get().hold_lines();
-    }
+    local_attempt(LocalAttemptStep::HoldReplays(py, fallback))?;
     let ran: PyResult<Bound<'py, PyAny>> = call_with(&host_entry(py, runner)?, &arguments);
-    if let Some(projector) = &projector {
-        let held: Vec<String> = projector.get().release_lines();
-        projector.get().write_held(py, &held)?;
-    }
+    local_attempt(LocalAttemptStep::ReleaseReplays(py))?;
     Vec::<ScenarioRunResult<_>>::read(&ran?)
 }
 

@@ -943,14 +943,20 @@ impl BuildProgressCallbacks {
 }
 
 /// What happens to local test progress in `auto`, where a local attempt can fall back.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub enum LocalAttemptStep<'a> {
-    /// When true, hold each test's lines until its result is known.
-    Hold(bool),
-    /// Write lines as they come again, with those still held; nothing when none are held.
-    Release,
-    /// Drop the lines of this result's attempt: the test runs again on the warehouse.
-    Abandon(&'a Bound<'a, PyAny>),
+    /// When true, hold each test's lines on this reporter until its result is known.
+    Hold(&'a Bound<'a, PyAny>, bool),
+    /// Write the reporter's lines as they come again, with those still held.
+    Release(&'a Bound<'a, PyAny>),
+    /// Drop the lines of this result's attempt on the reporter: it runs again on the warehouse.
+    Abandon(&'a Bound<'a, PyAny>, &'a Bound<'a, PyAny>),
+    /// When true, hold every progress line of a batch of local scenario replays.
+    HoldReplays(Python<'a>, bool),
+    /// Write the held replay lines, if any, and write lines as they come again.
+    ReleaseReplays(Python<'a>),
+    /// Settle a finished replay while held: drop its lines when it falls back, else write them.
+    SettleReplay(&'a Bound<'a, PyAny>),
 }
 
 /// Render one live spinner row for all running items and grouped completed rows.

@@ -460,6 +460,17 @@ pub struct SummaryCount {
     pub value: i64,
 }
 
+impl SummaryCount {
+    /// The count `value` under `label`, saturating at `i64::MAX`.
+    #[must_use]
+    pub fn of(label: &str, value: usize) -> Self {
+        Self {
+            label: label.to_owned(),
+            value: i64::try_from(value).unwrap_or(i64::MAX),
+        }
+    }
+}
+
 /// One aligned name/value row: the plain name sets the width, the styled name is shown.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AlignedRow {

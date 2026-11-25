@@ -9,6 +9,7 @@ pub mod format_load_execution_json;
 pub mod format_scenario_execution_json_with;
 pub mod format_scenario_snapshot_execution_json;
 pub mod format_seed_execution_json;
+pub mod local_refusal;
 pub mod register_aggregation;
 pub mod register_documents;
 pub mod split_scenario_fallbacks;

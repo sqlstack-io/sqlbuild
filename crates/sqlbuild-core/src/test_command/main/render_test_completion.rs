@@ -8,13 +8,6 @@ use crate::test_command::constants::{DEFAULT_ERROR, ERROR_LABEL, ERROR_LABEL_WID
 use crate::test_command::models::TestFailure;
 use crate::text::main::python_splitlines::python_splitlines;
 
-fn count(label: &str, value: usize) -> SummaryCount {
-    SummaryCount {
-        label: label.to_owned(),
-        value: i64::try_from(value).unwrap_or(i64::MAX),
-    }
-}
-
 fn failure_lines(failure: &TestFailure, style: CliStyle) -> Vec<String> {
     let message: &str = failure
         .error_message
@@ -58,13 +51,13 @@ pub fn render_test_completion(
         .filter(|failure| failure.error_code.as_deref() == Some(TIMEOUT_CODE))
         .count();
     let mut counts: Vec<SummaryCount> = vec![
-        count("PASS", passed),
-        count("FAIL", total - passed - timed_out.min(total - passed)),
+        SummaryCount::of("PASS", passed),
+        SummaryCount::of("FAIL", total - passed - timed_out.min(total - passed)),
     ];
     if timed_out > 0 {
-        counts.push(count("TIMEOUT", timed_out));
+        counts.push(SummaryCount::of("TIMEOUT", timed_out));
     }
-    counts.push(count("TOTAL", total));
+    counts.push(SummaryCount::of("TOTAL", total));
     let split: Option<String> = split.map(|(local, warehouse)| run_on_split(local, warehouse));
     let summary: String = format_summary_footer(style, &counts, split.as_deref());
     let mut rendered: String = format!("\n{summary}");

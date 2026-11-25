@@ -16,7 +16,6 @@ use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_core::progress::main::statement_summary_delta::statement_summary_delta;
 use sqlbuild_core::progress::models::StatementSummary;
 use sqlbuild_core::run_on::main::apply_local_refusals::apply_local_refusals;
-use sqlbuild_core::run_on::main::read_local_refusal::read_local_refusal;
 use sqlbuild_core::run_on::main::read_run_on_decisions::read_run_on_decisions;
 use sqlbuild_core::run_on::main::render_local_refusals::render_local_refusals;
 use sqlbuild_core::run_on::main::render_warehouse_census::render_warehouse_census;
@@ -89,6 +88,7 @@ use sqlbuild_python_output::build_progress::models::ConnectionProgressReporter;
 use sqlbuild_python_output::build_progress::models::LocalAttemptStep;
 use sqlbuild_python_output::build_progress::models::NestedCommandProgressCallbacks;
 use sqlbuild_python_output::result_output::main::events::sql_test_identity::sql_test_identity;
+use sqlbuild_python_output::result_output::main::results::local_refusal::local_refusal;
 use sqlbuild_python_output::result_output::main::results::test_execution_json::test_execution_json;
 use sqlbuild_python_output::result_output::main::results::write_execution_json_output::write_execution_json_output;
 use sqlbuild_python_output::result_output::models::ExecutionEventWriter;
@@ -246,11 +246,12 @@ impl TestCallbackRelay {
     }
 
     fn on_test_complete(&self, py: Python<'_>, result: &Bound<'_, PyAny>) -> PyResult<()> {
-        if let (true, Some((name, refusal))) = (self.fallback, local_refusal(result)?) {
+        if let (true, Some((name, refusal))) = (self.fallback, refused(result)?) {
             let mut run_on = self.run_on.lock().unwrap_or_else(PoisonError::into_inner);
             if run_on.get(&name).map(String::as_str) == Some(LOCAL_RUN_ON) {
                 run_on.insert(name, format!("{WAREHOUSE_RUN_ON}  ({})", refusal.title()));
-                return local_attempt(self.progress.bind(py), LocalAttemptStep::Abandon(result));
+                let step = LocalAttemptStep::Abandon(self.progress.bind(py), result);
+                return local_attempt(step).map(drop);
             }
         }
         let mut group: String = String::new();
@@ -356,10 +357,8 @@ impl TestCallbackRelay {
 }
 
 /// The test that ran locally and failed where the warehouse would not, and why, when it did.
-fn local_refusal(result: &Bound<'_, PyAny>) -> PyResult<Option<(String, LocalRefusal)>> {
-    let found: Option<HashMap<String, String>> =
-        native_field(result, "local_refusal")?.extract()?;
-    Ok(found.map(read_local_refusal))
+fn refused(result: &Bound<'_, PyAny>) -> PyResult<Option<(String, LocalRefusal)>> {
+    local_refusal(&native_field(result, "local_refusal")?)
 }
 
 fn unknown_case(py: Python<'_>, message: String) -> PyErr {
@@ -785,12 +784,12 @@ fn run_tests<'py>(
             let memory: Bound<'py, PyDict> = PyDict::new(py);
             memory.set_item("database", ":memory:")?;
             let progress: &Bound<'py, PyAny> = relay.get().progress.bind(py);
-            local_attempt(progress, LocalAttemptStep::Hold(warehouse_optional))?;
+            local_attempt(LocalAttemptStep::Hold(progress, warehouse_optional))?;
             let ran: PyResult<Vec<Bound<'py, PyAny>>> =
                 run(&local, (adapter, memory.into_any()), false);
-            local_attempt(progress, LocalAttemptStep::Release)?;
+            local_attempt(LocalAttemptStep::Release(progress))?;
             for result in ran? {
-                let Some((name, refusal)) = local_refusal(&result)? else {
+                let Some((name, refusal)) = refused(&result)? else {
                     results.push(result);
                     continue;
                 };
