@@ -3773,7 +3773,7 @@ requires-dist = [
     { name = "rivers", marker = "extra == 'rivers'", specifier = ">=0.1.4" },
     { name = "snowflake-connector-python", marker = "extra == 'snowflake'", specifier = ">=4.7.1,<5" },
     { name = "sqlbuild-cli", directory = "crates/sqlbuild-cli" },
-    { name = "sqlquack", specifier = "==0.23.0" },
+    { name = "sqlquack", specifier = "==0.24.0" },
 ]
 provides-extras = ["dbt", "snowflake", "bigquery", "databricks", "dagster", "postgres", "sqlserver", "clickhouse", "rivers"]
 
@@ -3823,31 +3823,31 @@ wheels = [
 
 [[package]]
 name = "sqlquack"
-version = "0.23.0"
+version = "0.24.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "sqlquack-cli" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/23/6f/1dcc7f923b00134b7adfad1caccaa25098b6789202009959b0498b193be2/sqlquack-0.23.0.tar.gz", hash = "sha256:489312e22f0b3b123acadca46b77ee0f4a0147377b68edf6f979d954d7ff2f61", size = 2840427, upload-time = "2026-11-23T08:03:34.826Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ef/f3/44e8bf45ddb8537a620ac858809b5f188d37d0336ea6eee6734326e8b906/sqlquack-0.24.0.tar.gz", hash = "sha256:bfdc59f4c548717c0a7e4b576d3a2e67800cfe19314854662383823dd8f20910", size = 2855058, upload-time = "2026-11-25T11:01:28.804Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b4/26/95bcfed7d3bbe77212484c2ad2db37478030e984afeec12f7e3f2945b4e6/sqlquack-0.23.0-cp312-abi3-macosx_10_15_x86_64.whl", hash = "sha256:86966d58897d0972ab1aa49c1a3085bb8c5e366df9c257a3692bce8f4ebacf43", size = 29843529, upload-time = "2026-11-23T08:03:05.952Z" },
-    { url = "https://files.pythonhosted.org/packages/18/9b/3a4ec9563d116b682805b60930707847d2ba3a91a694bc48b384a4103db9/sqlquack-0.23.0-cp312-abi3-macosx_11_0_arm64.whl", hash = "sha256:89cd034d4b60cf998d8f2954e78e2986bcfa54ca0cd5f16949af5495a2a19876", size = 27462937, upload-time = "2026-11-23T08:03:08.829Z" },
-    { url = "https://files.pythonhosted.org/packages/ea/26/32a5d682cc25ca5aa0276efd07623e7b013b2f2cc9740cb12745a9b11e93/sqlquack-0.23.0-cp312-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:013dae85bd1626ac8dc6e352c31917699848c4617339cdcbd4f7e9cda880d271", size = 30496288, upload-time = "2026-11-23T08:03:11.65Z" },
-    { url = "https://files.pythonhosted.org/packages/40/89/d80808faa76c3fc6b20b96901f0bc168e590e94f3d242a5600f9aaebf716/sqlquack-0.23.0-cp312-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:d70f3df9a5410059cf7fbb33fe4ed563ae6d6af2683225b0ca676f3e28ab0910", size = 34821809, upload-time = "2026-11-23T08:03:14.422Z" },
-    { url = "https://files.pythonhosted.org/packages/f8/45/86d9d897024e064a9e1110bd24b4ca37a5154fee2c9534861ba337fef576/sqlquack-0.23.0-cp312-abi3-win_amd64.whl", hash = "sha256:0e90e9cc43ceb3a2e6366aad989b1fd93f759abd048f004fe16831837219aa27", size = 28431283, upload-time = "2026-11-23T08:03:17.155Z" },
+    { url = "https://files.pythonhosted.org/packages/7d/51/db34c59fa7218554213184d1c21f20bcd2d2ac7c985011783794f7c52d4c/sqlquack-0.24.0-cp312-abi3-macosx_10_15_x86_64.whl", hash = "sha256:f593691acd89c764bcd3a3afa38284cf95c9fc6511b65e30ce9410ba36c56749", size = 29860768, upload-time = "2026-11-25T11:00:46.451Z" },
+    { url = "https://files.pythonhosted.org/packages/da/71/ddde68825d2f4c13cc9fa5fccc2f859a30bdb8029332673aeee90328117d/sqlquack-0.24.0-cp312-abi3-macosx_11_0_arm64.whl", hash = "sha256:80a832a602ada910991e49c36c8e5b57fb5ad0418af8362c4604b5bf6d3ebd1b", size = 27480144, upload-time = "2026-11-25T11:00:49.529Z" },
+    { url = "https://files.pythonhosted.org/packages/4c/ff/59a5dd542345cd04d280eccf2332bd69107e9d3a504e6090d7819273f3dc/sqlquack-0.24.0-cp312-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:531d424d6404b9acc5baca1ebe2160014efe60373139bd63c0b83634487ac580", size = 30514391, upload-time = "2026-11-25T11:00:52.826Z" },
+    { url = "https://files.pythonhosted.org/packages/8f/69/f33b42b1667fc8ddedb1431abe5f18823a99b77a8fa5ea0d85394d34d899/sqlquack-0.24.0-cp312-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:f43741100b0c46e37c8e5ee33596cc1e73afa499f51b826222f0a1d3831a13c2", size = 34838062, upload-time = "2026-11-25T11:00:57.752Z" },
+    { url = "https://files.pythonhosted.org/packages/10/63/b5ab3f28981647cad8425a767ef2b15f94fe94f3462957e5c5c97fa438ab/sqlquack-0.24.0-cp312-abi3-win_amd64.whl", hash = "sha256:8354f31b4aa4d9ae8c180976d9a01606c982247be4af724caef721a14c150a01", size = 28442280, upload-time = "2026-11-25T11:01:00.813Z" },
 ]
 
 [[package]]
 name = "sqlquack-cli"
-version = "0.23.0"
+version = "0.24.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/3e/e6/67961b83e19a0389c4a1302b0ff7aec6c80622eb9a7ab9d54a62ddaea644/sqlquack_cli-0.23.0.tar.gz", hash = "sha256:b57b11e87c95fe4952f4438100eaa488cfd85a5d20b24cef241294722e179097", size = 2837911, upload-time = "2026-11-23T08:03:36.213Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5c/8c/2644630819af79df10c72d17cd8f7a2e273c4e1435aeb40de63a996e5015/sqlquack_cli-0.24.0.tar.gz", hash = "sha256:54da4f47395749bf78004f55deaa69b6af2e9de3bcc422fe7efde4b623005f4f", size = 2852330, upload-time = "2026-11-25T11:01:30.691Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/01/2b/09f6acddf01da3a1b7c93f15e7300819e626b4c6c8f98d388edf1e2afe31/sqlquack_cli-0.23.0-py3-none-macosx_10_15_x86_64.whl", hash = "sha256:780e952b3a95b67a506bee5ac3c96753392448c79d11ec4b69506bcb5fe57b41", size = 32623212, upload-time = "2026-11-23T08:03:20.188Z" },
-    { url = "https://files.pythonhosted.org/packages/1c/08/d523107601efc4ae1edb2e136d17c5d17503d3727e4dc39d4729b0e51266/sqlquack_cli-0.23.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:b9f7738c1588d8f33d183a56179f2e47c619a4203faff6550d09ffe323a33648", size = 30008836, upload-time = "2026-11-23T08:03:23.353Z" },
-    { url = "https://files.pythonhosted.org/packages/91/ea/08012f4ebbff0a1447b905e43d7a73ab8c8cc9570db5519319a2f6a149c8/sqlquack_cli-0.23.0-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:879ad0aa05a6adc1120bc61a28c33b8f54c2c088373aaa982bca2b1aea196652", size = 32465161, upload-time = "2026-11-23T08:03:26.166Z" },
-    { url = "https://files.pythonhosted.org/packages/23/55/695d0b33f1b7acfbb7d2e7c8b49de531acdcbbbb894b41fdfb324518ecb2/sqlquack_cli-0.23.0-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:ef0d691fa58489449ebf2dacf81a88e0e081cbc00e3e4b46caea9739c92407ea", size = 36839141, upload-time = "2026-11-23T08:03:29.516Z" },
-    { url = "https://files.pythonhosted.org/packages/fe/0d/0dfd8f76d3c9661345d667f7568aba9c04ee66d41429349f527095295158/sqlquack_cli-0.23.0-py3-none-win_amd64.whl", hash = "sha256:8ae386c45decfe07f468c1c92704e69da6313a1ff391346eb82d8676447d9636", size = 30643456, upload-time = "2026-11-23T08:03:32.639Z" },
+    { url = "https://files.pythonhosted.org/packages/ef/cf/b4762cb0f1aa5a67d1dae65164884768390fd80c8236260bfbbffc78a850/sqlquack_cli-0.24.0-py3-none-macosx_10_15_x86_64.whl", hash = "sha256:6c0846b0c46d35047ff2c907de1bc3f3ec51f50ff78dc57fec41beb571beee9e", size = 32641147, upload-time = "2026-11-25T11:01:04.341Z" },
+    { url = "https://files.pythonhosted.org/packages/ec/c8/12e1f279c5ac35dcafdbb6256cb109fbc8e663d42d61bbd93d3f93b82753/sqlquack_cli-0.24.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:9bef1557fdfb2b78d7ae83ac1aaf24448b7eab8f07609445d3daeac0b837dc45", size = 29988874, upload-time = "2026-11-25T11:01:15.444Z" },
+    { url = "https://files.pythonhosted.org/packages/37/40/88d78545f0d68086a90f3bcfe745eb00ccf7134d3aeb1c2890a774e63d48/sqlquack_cli-0.24.0-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:696e412cb5c7e20611638fba219b2b06c01d005cd91485f25a889e0418847112", size = 32451039, upload-time = "2026-11-25T11:01:18.56Z" },
+    { url = "https://files.pythonhosted.org/packages/dd/48/07e7fbc001f9c1f711239627c336c40ddbac0c2ac97c1681d1f2dab84116/sqlquack_cli-0.24.0-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:790f4780f63424a850e92c618727ba7d7a4e4830f476746860b899cb40b93ca2", size = 36740739, upload-time = "2026-11-25T11:01:21.976Z" },
+    { url = "https://files.pythonhosted.org/packages/48/67/4b4081331ab3e908da9e38f3753665bcae17af0755603545e3365531b9e2/sqlquack_cli-0.24.0-py3-none-win_amd64.whl", hash = "sha256:ecd4c731c12b4eeda7f7cf6a22f49f22c25cbffecb9d8593e01b96e2cb41a8c2", size = 30670975, upload-time = "2026-11-25T11:01:25.942Z" },
 ]
 
 [[package]]
