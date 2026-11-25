@@ -315,6 +315,8 @@ pub(crate) struct LocationWatch {
     pub(crate) checked: bool,
     /// A claimed republish, owed the result of the next compile to finish.
     pub(crate) republish: Option<PendingRepublish>,
+    /// The generation lookups, whose failures in a row become a reported failed load.
+    pub(crate) lookups: GenerationLookups,
 }
 
 /// What one compile published, for the watcher and any republish it owes.
@@ -845,5 +847,31 @@ impl std::fmt::Debug for RepublishCaller {
                 .field("ca", ca)
                 .finish(),
         }
+    }
+}
+
+/// The location's generation lookups: the last generation it got, and how many failed in a row since. It reports a failed load once per streak, at `LOOKUP_FAILURES_REPORTED`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct GenerationLookups {
+    failures: u32,
+    last: Option<i64>,
+}
+
+impl GenerationLookups {
+    /// Count one failed lookup; true for the one to report.
+    pub(crate) fn failed(&mut self) -> bool {
+        self.failures += 1;
+        self.failures == crate::native_commands::constants::LOOKUP_FAILURES_REPORTED
+    }
+
+    /// A lookup answered with `generation`: the streak ends.
+    pub(crate) fn answered(&mut self, generation: i64) {
+        self.failures = 0;
+        self.last = Some(generation);
+    }
+
+    /// The generation after the last one the location got, or the first: the one it can't load.
+    pub(crate) fn next(self) -> i64 {
+        self.last.map_or(1, |generation| generation + 1)
     }
 }

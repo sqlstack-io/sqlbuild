@@ -499,3 +499,17 @@ pub(super) struct ModelErrorsTestCase {
     pub(super) document: serde_json::Value,
     pub(super) expected_reason: Option<&'static str>,
 }
+
+pub(super) struct LookupFailuresTestCase {
+    pub(super) description: &'static str,
+    /// Each lookup: `failed` or `answered`, as the location loop calls them.
+    pub(super) lookups:
+        &'static [fn(&mut crate::native_commands::models::GenerationLookups) -> bool],
+    pub(super) expected_reports: &'static [bool],
+}
+
+pub(super) struct LookupFailureHealthTestCase {
+    pub(super) description: &'static str,
+    pub(super) answered: Option<i64>,
+    pub(super) expected_generation: i64,
+}

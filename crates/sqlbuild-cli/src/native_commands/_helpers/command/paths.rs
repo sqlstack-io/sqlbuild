@@ -16,7 +16,7 @@ use crate::native_commands::constants::{
     DEVELOPMENT_CONTROL_FILE, DEVELOPMENT_OUTPUT_FOLDER, LOCATION_COMMIT_CHECK_SECONDS,
 };
 use crate::native_commands::errors::PythonNeeded;
-use crate::native_commands::models::{LocationWatch, ProjectLocation};
+use crate::native_commands::models::{GenerationLookups, LocationWatch, ProjectLocation};
 use crate::replay::main::output_file_identities::output_file_identities;
 
 /// Observe the same project inputs as compiler reuse, excluding redirected command output.
@@ -43,6 +43,7 @@ pub(crate) fn location_watch(root: &Path) -> LocationWatch {
         commit_checked_at: tokio::time::Instant::now(),
         checked: false,
         republish: None,
+        lookups: GenerationLookups::default(),
     }
 }
 

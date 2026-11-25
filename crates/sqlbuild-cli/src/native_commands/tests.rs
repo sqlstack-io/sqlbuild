@@ -30,5 +30,7 @@ mod rules;
 mod sync_schedule;
 #[path = "tests/test_terminal.rs"]
 mod terminal;
+#[path = "tests/test_lookup_failures.rs"]
+mod test_lookup_failures;
 #[path = "tests/test_types.rs"]
 mod test_types;

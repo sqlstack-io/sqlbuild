@@ -79,7 +79,10 @@ healthcheck:
 A Quadlet unit uses the same command in `HealthCmd=`.
 
 A `falling_back` location still runs scheduled jobs from its last good snapshot. Restarting it
-does not fix the failed load; fix the project and deploy it again. Plan previews on it fail at once
+does not fix the failed load; fix the project and deploy it again. A location that keeps checking in
+but can't get its next generation number from the server can't load new code either: after three
+failed lookups in a row it reports a failed load with the lookup's error, so it is `falling_back`
+until a later publication succeeds. Plan previews on it fail at once
 with the load's error instead of waiting for the location.
 
 A location that checks in but is `falling_back`, `change_plan_failed`, `discovery_failed` or

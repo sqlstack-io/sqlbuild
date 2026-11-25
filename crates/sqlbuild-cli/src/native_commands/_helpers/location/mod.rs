@@ -1,5 +1,6 @@
 pub(crate) mod api_start;
 pub(crate) mod changed_build;
+pub(crate) mod compile_turn;
 pub(crate) mod compiler_discovery;
 pub(crate) mod compiler_restart;
 pub(crate) mod dev_cancel;
@@ -13,6 +14,7 @@ pub(crate) mod env_reload;
 pub(crate) mod execution;
 pub(crate) mod health;
 pub(crate) mod held_copy;
+pub(crate) mod lookup_failure;
 pub(crate) mod plan_document;
 pub(crate) mod plan_request;
 pub(crate) mod plan_reuse;
