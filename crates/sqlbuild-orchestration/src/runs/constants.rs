@@ -74,3 +74,13 @@ pub(crate) const MISSING_SECRET_ERROR_CODE: &str = "D012";
 /// How a worker's message for such a node starts, and the phrase after its variables.
 pub(crate) const MISSING_SECRET_PREFIX: &str = "provider ";
 pub(crate) const MISSING_SECRET_PHRASE: &str = " not set (missing from ";
+/// The fewest characters of a run ID `run:`, `failed:` and `skipped:` take, like a short git hash.
+pub(crate) const MIN_RUN_ID_PREFIX: usize = 8;
+/// How many runs an ambiguous run ID prefix lists.
+pub(crate) const MAX_LISTED_RUN_MATCHES: usize = 5;
+/// The most failed audits `failed:` reads from one run.
+pub(crate) const PAST_RUN_AUDIT_LIMIT: usize = 10_000;
+/// Run node statuses `failed:` selects: what failed, was cancelled or was never reached.
+pub(crate) const FAILED_RUN_NODE_STATUSES: [&str; 3] = ["failed", "cancelled", "not_run"];
+/// The run node status `skipped:` selects.
+pub(crate) const SKIPPED_RUN_NODE_STATUS: &str = "skipped";

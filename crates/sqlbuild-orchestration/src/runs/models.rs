@@ -1186,6 +1186,36 @@ pub struct SelectionEvaluation {
     pub error: Option<SelectionProblem>,
 }
 
+/// A past run's results as node keys, for `run:`, `failed:` and `skipped:`; failed audits are `audit:<name>`.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PastRunResults {
+    /// The run the typed ID names.
+    pub run_id: Uuid,
+    /// Every node the run selected.
+    pub selected: BTreeSet<String>,
+    /// Its failed, cancelled and never-reached nodes, and its failed audits.
+    pub failed: BTreeSet<String>,
+    /// The nodes it skipped because something they depend on failed.
+    pub skipped: BTreeSet<String>,
+}
+
+/// The past runs to read for a command's `run:`, `failed:` and `skipped:` selectors.
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PastRunsQuery {
+    /// Comma-separated run IDs, full or a unique prefix of at least 8 characters.
+    #[serde(default)]
+    pub ids: String,
+}
+
+/// The past runs read, or why one can't be: too short, unknown or ambiguous.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PastRunsRead {
+    /// Each run by the ID as given; empty when `error` is set.
+    pub runs: crate::runs::types::PastRuns,
+    pub error: Option<String>,
+}
+
 /// Why `sqb` refuses a selection, where, and what might have been meant.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SelectionProblem {

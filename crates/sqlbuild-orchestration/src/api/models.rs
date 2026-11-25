@@ -99,6 +99,7 @@ use crate::api::_helpers::resources::{
     person_plans::diff,
     person_selection::evaluate,
     person_selection::vocabulary,
+    person_selection::past_runs,
     person_node_sql::read,
     password_sessions::login,
     password_sessions::current,

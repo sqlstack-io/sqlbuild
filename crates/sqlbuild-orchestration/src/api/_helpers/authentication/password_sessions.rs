@@ -261,6 +261,10 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
             get(crate::api::_helpers::resources::person_selection::vocabulary),
         )
         .route(
+            "/api/control/locations/{location_id}/targets/{target}/selection/runs",
+            get(crate::api::_helpers::resources::person_selection::past_runs),
+        )
+        .route(
             "/api/control/locations/{location_id}/targets/{target}/catalog",
             get(crate::api::_helpers::resources::person_operations::catalog),
         )

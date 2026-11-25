@@ -46,6 +46,8 @@ mod test_node_errors;
 mod test_node_event_resources;
 #[path = "test_node_results.rs"]
 mod test_node_results;
+#[path = "test_past_runs.rs"]
+mod test_past_runs;
 #[path = "test_permissions.rs"]
 mod test_permissions;
 #[path = "test_pinned_jobs.rs"]

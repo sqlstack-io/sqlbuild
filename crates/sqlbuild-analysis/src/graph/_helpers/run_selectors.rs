@@ -111,10 +111,3 @@ pub(crate) fn attach(graph: ProjectGraph, runs: BTreeMap<String, RunResults>) ->
         ..graph
     }
 }
-
-/// Selected keys without audits, and the names of the audits among them.
-pub(crate) fn split_audits(keys: Vec<ObjectKey>) -> (Vec<ObjectKey>, BTreeSet<String>) {
-    let (audits, nodes): (Vec<ObjectKey>, Vec<ObjectKey>) =
-        keys.into_iter().partition(|key| key.0 == AUDIT_KIND);
-    (nodes, audits.into_iter().map(|(_, name)| name).collect())
-}

@@ -4,6 +4,8 @@ mod adhoc_planner;
 mod helpers;
 #[path = "tests/test_job_pins.rs"]
 mod job_pins;
+#[path = "tests/test_run_selectors.rs"]
+mod run_selectors;
 #[path = "tests/test_selection_evaluation.rs"]
 mod selection_evaluation;
 #[path = "tests/test_types.rs"]

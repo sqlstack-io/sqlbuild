@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::runs::_helpers::lifecycle::publications::viewed_publication;
+use crate::runs::_helpers::requests::past_runs::read_selected_past_runs;
 use crate::runs::models::{SelectionProblem, ViewedSelection};
 use crate::runs::types::CommandPlanner;
 use crate::store::errors::ControlError;
@@ -47,16 +48,24 @@ pub async fn select_viewed_nodes(
             }),
         });
     };
-    Ok(match publication.prepared.evaluate(select, exclude) {
-        Ok(keys) => ViewedSelection {
-            snapshot_id,
-            keys: Some(keys.into_iter().collect()),
-            error: None,
+    let past = read_selected_past_runs(
+        store,
+        (location_id, target),
+        (publication.prepared.as_ref(), select, exclude),
+    )
+    .await?;
+    Ok(
+        match past.and_then(|past| publication.prepared.evaluate((select, exclude), &past)) {
+            Ok(keys) => ViewedSelection {
+                snapshot_id,
+                keys: Some(keys.into_iter().collect()),
+                error: None,
+            },
+            Err(problem) => ViewedSelection {
+                snapshot_id,
+                keys: Some(BTreeSet::new()),
+                error: Some(*problem),
+            },
         },
-        Err(problem) => ViewedSelection {
-            snapshot_id,
-            keys: Some(BTreeSet::new()),
-            error: Some(*problem),
-        },
-    })
+    )
 }

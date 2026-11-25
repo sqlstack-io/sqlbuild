@@ -191,11 +191,16 @@ pub(crate) struct ExactKeyPublication {
 }
 
 impl crate::runs::types::PreparedPublication for ExactKeyPublication {
+    /// Exact keys never name a past run.
+    fn run_selector_ids(&self, _texts: &[String]) -> std::collections::BTreeSet<String> {
+        std::collections::BTreeSet::new()
+    }
+
     /// Exact keys only: each token names one published key, and an unknown one is refused with its position.
     fn evaluate(
         &self,
-        select: &str,
-        exclude: &str,
+        (select, exclude): (&str, &str),
+        _past: &crate::runs::types::PastRuns,
     ) -> Result<Vec<String>, Box<crate::runs::models::SelectionProblem>> {
         let known = |field: crate::runs::models::SelectionField, text: &str| {
             let mut keys: std::collections::BTreeSet<String> = Default::default();
@@ -249,7 +254,11 @@ impl crate::runs::types::PreparedPublication for ExactKeyPublication {
         }
     }
 
-    fn plan(&self, command: &[String]) -> Result<crate::runs::models::CommandPlan, String> {
+    fn plan(
+        &self,
+        command: &[String],
+        _past: &crate::runs::types::PastRuns,
+    ) -> Result<crate::runs::models::CommandPlan, String> {
         let (resources, jobs) = (&self.resources, &self.jobs);
         let mut plan = crate::runs::models::CommandPlan {
             verb: command.first().cloned().unwrap_or_default(),
@@ -660,4 +669,16 @@ pub(crate) struct RunFailureSummary {
     pub(crate) failed_audit_count: i64,
     pub(crate) succeeded_node_count: i64,
     pub(crate) error: Option<(crate::runs::models::RunFailurePhase, Option<String>)>,
+}
+
+/// A typed run ID's run, and the keys it selected, failed and skipped.
+pub(crate) type ExpectedPastRun = (&'static str, u128, [&'static [&'static str]; 3]);
+
+pub(crate) struct PastRunLookupTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The run IDs as typed.
+    pub(crate) ids: &'static [&'static str],
+    /// Each typed ID's run, or the refusal.
+    pub(crate) expected_runs: Result<Vec<ExpectedPastRun>, &'static str>,
 }

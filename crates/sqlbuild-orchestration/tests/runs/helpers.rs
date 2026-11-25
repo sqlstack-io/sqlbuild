@@ -564,3 +564,24 @@ pub(crate) async fn age_stored_requests(store: &ControlStore) {
         commit(transaction).await.expect("commit");
     }
 }
+
+/// Set a queued run's node to `status`, as a worker's report would have left it.
+pub(crate) async fn set_node_status(
+    store: &ControlStore,
+    (run_id, node_key): (Uuid, &str),
+    status: &str,
+) {
+    let transaction = begin(store, TransactionMode::Write).await.expect("begin");
+    let (transaction, _) = query(
+        transaction,
+        "UPDATE sqb_run_nodes SET status=$3 WHERE run_id=$1 AND node_key=$2",
+        vec![
+            Parameter::Id(run_id),
+            Parameter::Text(node_key.to_owned()),
+            Parameter::Text(status.to_owned()),
+        ],
+    )
+    .await
+    .expect("set the node status");
+    commit(transaction).await.expect("commit");
+}

@@ -1,6 +1,7 @@
 //! A selection evaluates as `sqb build` resolves it, refusals point at their token, and the vocabulary counts nodes.
 
 use sqlbuild_orchestration::runs::models::{SelectionField, SelectionProblem, SelectionRefusal};
+use sqlbuild_orchestration::runs::types::PastRuns;
 
 use crate::adhoc::tests::helpers::{orders_publication, owned_evaluation};
 use crate::adhoc::tests::test_types::{
@@ -86,7 +87,7 @@ fn given_typed_selections_when_evaluated_then_keys_or_located_refusals_match_sqb
     let publication = orders_publication();
     for test_case in test_cases {
         let actual = publication
-            .evaluate(test_case.select, test_case.exclude)
+            .evaluate((test_case.select, test_case.exclude), &PastRuns::new())
             .map_err(|problem| {
                 Box::new(SelectionProblem {
                     help: None,
@@ -232,7 +233,9 @@ fn given_refused_selectors_when_evaluated_then_the_refused_part_its_type_and_val
             .select
             .split_once(" --exclude ")
             .unwrap_or((test_case.select, ""));
-        let problem = publication.evaluate(select, exclude).err();
+        let problem = publication
+            .evaluate((select, exclude), &PastRuns::new())
+            .err();
         assert_eq!(
             (
                 problem.as_ref().and_then(|problem| problem.code.clone()),

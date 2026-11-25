@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::runs::_helpers::lifecycle::publications::viewed_publication;
+use crate::runs::_helpers::requests::past_runs::read_selected_past_runs;
 use crate::runs::constants::{SELECTION_PAGE_DEFAULT, SELECTION_PAGE_MAX};
 use crate::runs::models::{SelectionEvaluation, SelectionProblem, SelectionQuery};
 use crate::runs::types::CommandPlanner;
@@ -40,7 +41,17 @@ pub async fn evaluate_selection(
             }),
         });
     };
-    let keys = match publication.prepared.evaluate(&query.select, &query.exclude) {
+    let past = read_selected_past_runs(
+        store,
+        (location_id, target),
+        (publication.prepared.as_ref(), &query.select, &query.exclude),
+    )
+    .await?;
+    let keys = match past.and_then(|past| {
+        publication
+            .prepared
+            .evaluate((&query.select, &query.exclude), &past)
+    }) {
         Ok(keys) => keys,
         Err(problem) => {
             return Ok(SelectionEvaluation {
