@@ -7,6 +7,7 @@ use crate::authorization::main::decisions::authorize_listing::authorize_listing;
 use crate::authorization::main::decisions::authorize_person::authorize_person;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::platform::constants::{LOCATION_SILENCE_SECONDS, PLAN_EXPIRY_SECONDS, PLAN_QUEUE_LIMIT};
+use crate::platform::main::health::load_failure_refusal::load_failure_refusal;
 use crate::platform::main::work::enqueue_location_work::enqueue_location_work;
 use crate::platform::main::work::read_location_work::read_location_work;
 use crate::platform::models::{LocationWork, LocationWorkRequest, PlanRequest};
@@ -98,6 +99,10 @@ pub(in crate::runs) async fn request_plan_in(
         return Err(ControlError::Invalid(format!(
             "no sqb location serve has reported for {target} in the last {LOCATION_SILENCE_SECONDS} seconds; start it and plan again"
         )));
+    }
+    let (transaction, refusal) = load_failure_refusal(transaction, (location_id, target)).await?;
+    if let Some(refusal) = refusal {
+        return Err(ControlError::Invalid(refusal));
     }
     if count("mine") > 0 {
         return Err(ControlError::Invalid(

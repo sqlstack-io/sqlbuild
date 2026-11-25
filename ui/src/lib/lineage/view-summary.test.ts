@@ -1,3 +1,4 @@
+import { withServerStatus } from '$lib/build-area/status-fixtures';
 import { describe, expect, it } from 'vitest';
 import type { CatalogNode, StaleReason } from '$lib/api';
 import { shownNodes } from './folder-selection';
@@ -5,15 +6,15 @@ import { viewSummary } from './view-summary';
 
 function node(key: string, kind: CatalogNode['kind'], path: string, stale: StaleReason['reason'][] = [], lastOutcome: CatalogNode['lastOutcome'] = null): CatalogNode {
 	const reasons = stale.map((reason) => ({ reason, upstream: [], detail: '', since: '' }) as unknown as StaleReason);
-	return { key, kind, path, upstream: [], group: null, tags: [], stale: reasons, lastOutcome, lastBuild: null } as unknown as CatalogNode;
+	return withServerStatus({ key, kind, path, upstream: [], group: null, tags: [], stale: reasons, lastOutcome, lastBuild: null } as unknown as CatalogNode);
 }
 
 const nodes = [
 	node('source:raw_orders', 'source', 'sources/shop.yml'),
-	node('model:orders', 'table', 'models/marts/orders.sql', ['changed', 'behind']),
-	node('model:customers', 'table', 'models/marts/customers.sql', ['behind']),
-	node('model:order_view', 'view', 'models/marts/order_view.sql', ['changed_upstream']),
-	node('model:inventory', 'incremental', 'models/stock/inventory.sql', [], 'failed')
+	node('model:orders', 'table', 'sql/models/marts/orders.sql', ['changed', 'behind']),
+	node('model:customers', 'table', 'sql/models/marts/customers.sql', ['behind']),
+	node('model:order_view', 'view', 'sql/models/marts/order_view.sql', ['changed_upstream']),
+	node('model:inventory', 'incremental', 'sql/models/stock/inventory.sql', [], 'failed')
 ];
 
 describe('view summary', () => {
@@ -26,8 +27,9 @@ describe('view summary', () => {
 				{ kind: 'table', count: 2 },
 				{ kind: 'incremental', count: 1 }
 			],
+			// One status each: an upstream definition change leaves the view current.
 			changed: 1,
-			behind: 2,
+			behind: 1,
 			failed: 1
 		});
 	});

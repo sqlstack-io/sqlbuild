@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use crate::platform::models::{PlatformEvent, PlatformEventEnvelope, StorageKind};
+use crate::platform::models::{LocationHealth, PlatformEvent, PlatformEventEnvelope, StorageKind};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
@@ -70,6 +70,8 @@ pub(crate) struct CompileFailureTestCase {
     pub(crate) finding_count: u64,
     pub(crate) listed: usize,
     pub(crate) message_chars: usize,
+    /// The load error's length.
+    pub(crate) error_chars: usize,
     pub(crate) expected_accepted: bool,
 }
 
@@ -80,4 +82,42 @@ pub(crate) struct ProviderSecretsHealthTestCase {
     pub(crate) expected_providers: &'static [(&'static str, bool)],
     pub(crate) expected_missing: u64,
     pub(crate) expected_state: crate::platform::models::LocationState,
+}
+
+/// A location instance in a health history, by when its process started.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum Instance {
+    /// Started three hours before the read.
+    Previous,
+    /// Started 25 seconds before the read.
+    Restarted,
+    /// Started eight days before the read, before the history kept.
+    LongRunning,
+    /// An instance whose session ID carries no start time.
+    Unordered,
+}
+
+/// One report in a health history: the instance, how many seconds before the read, and what it said.
+pub(crate) struct Reported {
+    pub(crate) instance: Instance,
+    pub(crate) seconds_ago: i64,
+    pub(crate) health: ReportedHealth,
+}
+
+/// What an instance said: a report of the generation, built by a health helper such as `published`.
+#[derive(Clone, Copy)]
+pub(crate) struct ReportedHealth(pub(crate) fn(i64) -> LocationHealth, pub(crate) i64);
+
+pub(crate) struct LocationStateTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) reported: Vec<Reported>,
+    /// Provider checks the previous instance sent after the restart, filling the history.
+    pub(crate) later_reports: usize,
+    pub(crate) expected_state: crate::platform::models::LocationState,
+}
+
+pub(crate) struct FailingLocationTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: crate::store::tests::store_test_types::Backend,
+    pub(crate) expected_error: &'static str,
 }

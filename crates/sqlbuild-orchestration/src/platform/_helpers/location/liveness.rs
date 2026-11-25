@@ -3,6 +3,7 @@
 use chrono::TimeDelta;
 use uuid::Uuid;
 
+use crate::platform::_helpers::health::failing_locations::failing_locations;
 use crate::platform::_helpers::health::observations::observe;
 use crate::platform::constants::LOCATION_SILENCE_SECONDS;
 use crate::platform::models::{PlatformEvent, WatchdogLocation};
@@ -62,4 +63,34 @@ pub(crate) async fn scan_location_page(
     }
     commit(transaction).await?;
     Ok(next)
+}
+
+/// Every failing location once per failure: the time it was reported tells one failure from the next.
+pub(crate) async fn observe_failing_locations(
+    store: &ControlStore,
+    installation_id: Uuid,
+) -> Result<(), ControlError> {
+    let (mut transaction, failing) =
+        failing_locations(begin(store, TransactionMode::Write).await?).await?;
+    for location in failing {
+        let incident = Some(location.failed_at);
+        transaction = observe(
+            transaction,
+            installation_id,
+            (
+                PlatformEvent::LocationFailing {
+                    location_id: location.location_id,
+                    target: location.target,
+                    state: location.state,
+                    failed_at: location.failed_at,
+                    error: location.error,
+                    serving_generation: location.serving.map(|snapshot| snapshot.generation),
+                },
+                incident,
+            ),
+        )
+        .await?;
+    }
+    commit(transaction).await?;
+    Ok(())
 }

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { goto, pushState } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { untrack } from 'svelte';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -9,7 +9,7 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { shortName } from '$lib/build-area/labels';
 	import { folderOf } from '$lib/lineage/catalog-graph';
-	import { readSelectionParams, writeSelectionParams } from '$lib/selection/command';
+	import { writeSelectionParams } from '$lib/selection/command';
 	import { app } from '$lib/state/app.svelte';
 	import { useCatalogNodes } from '$lib/state/catalog.svelte';
 	import type { SelectionState } from '$lib/state/selection.svelte';
@@ -65,11 +65,7 @@
 	function follow(event: MouseEvent, url: string) {
 		if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 		event.preventDefault();
-		const next = new URL(url, page.url);
-		pushState(next, {});
-		const linked = readSelectionParams(next.searchParams);
-		selection.select = linked.select;
-		selection.exclude = linked.exclude;
+		selection.navigate(new URL(url, page.url));
 	}
 
 	let opened = $state.raw<{ at: string; ids: ReadonlySet<string> }>({ at: '', ids: new Set() });

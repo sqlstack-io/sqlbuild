@@ -3,13 +3,13 @@ use serde_json::json;
 use sqlbuild_orchestration::warehouse_metadata::models::WarehouseHistoryKind;
 
 use crate::native_commands::_helpers::location::changed_build::{
-    changed_build_nodes, changed_build_settings,
+    changed_build_nodes, changed_build_settings, model_errors,
 };
 use crate::native_commands::_helpers::location::execution::metadata_sync;
 use crate::native_commands::models::LocationMetadataSync;
 use crate::native_commands::tests::helpers::{acknowledge_complete_pages, one_location};
 use crate::native_commands::tests::test_types::{
-    ChangedBuildNodesTestCase, ChangedBuildSettingsTestCase, ReplanTestCase,
+    ChangedBuildNodesTestCase, ChangedBuildSettingsTestCase, ModelErrorsTestCase, ReplanTestCase,
 };
 
 #[test]
@@ -116,6 +116,45 @@ fn given_completed_syncs_when_deciding_to_replan_then_a_publication_an_applied_c
         );
         assert_eq!(
             replans, test_case.expected_replans,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_plan_with_models_it_could_not_plan_when_read_then_the_reason_names_each_model() {
+    let test_cases = [
+        ModelErrorsTestCase {
+            description: "every model planned",
+            document: json!({"models": [{"name": "orders", "action": "create_table"}]}),
+            expected_reason: None,
+        },
+        ModelErrorsTestCase {
+            description: "one model",
+            document: json!({"models": [
+                {"name": "orders", "action": "error", "error": {"code": "S203", "message": "model 'orders' sets full_refresh false", "help": null}},
+                {"name": "totals", "action": "create_table"},
+            ]}),
+            expected_reason: Some(
+                "Can't plan 1 model: orders: model 'orders' sets full_refresh false",
+            ),
+        },
+        ModelErrorsTestCase {
+            description: "several models",
+            document: json!({"models": [
+                {"name": "orders", "action": "error", "error": {"code": "S203", "message": "full_refresh false", "help": null}},
+                {"name": "returns", "action": "error", "error": {"code": "S302", "message": "empty inputs", "help": null}},
+            ]}),
+            expected_reason: Some(
+                "Can't plan 2 models: orders: full_refresh false; returns: empty inputs",
+            ),
+        },
+    ];
+    for test_case in test_cases {
+        assert_eq!(
+            model_errors(&test_case.document).as_deref(),
+            test_case.expected_reason,
             "{}",
             test_case.description
         );

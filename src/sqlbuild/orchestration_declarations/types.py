@@ -16,6 +16,7 @@ class PlatformEventKind(StrEnum):
     TICK_OVERDUE = "tick_overdue"
     CALENDAR_HORIZON_LOW = "calendar_horizon_low"
     LOCATION_BROKEN = "location_broken"
+    LOCATION_FAILING = "location_failing"
     LAUNCH_FAILED = "launch_failed"
     RUN_FAILED = "run_failed"
     TRIGGER_SKIPPED = "trigger_skipped"

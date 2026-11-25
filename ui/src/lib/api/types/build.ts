@@ -79,6 +79,10 @@ export type CatalogNode = {
 	sourceFreshness: SourceFreshness | null;
 	/** Null when the server does not report check counts. */
 	checks: CheckCounts | null;
+	/** The server's one status for the node (`NodeState.status`); null until its state is read. */
+	status: NodeBuildStatus | null;
+	/** When the status was reached; null when not built. */
+	statusAt: Iso | null;
 };
 
 // ---- discovered sets ----
@@ -111,13 +115,20 @@ export type NodeState = {
 	/** The definition differs from the one the last build recorded. */
 	definitionChanged: boolean;
 	checks: CheckCounts | null;
+	/** The server's one status for the node, which every page shows as it is; null from an older server. */
+	status: NodeBuildStatus | null;
+	/** When the status was reached: the last build, or the last run for a node without a table. */
+	statusAt: Iso | null;
 };
+
+/** Where a node stands, as the server works it out once for every page. */
+export type NodeBuildStatus = 'current' | 'changed' | 'behind' | 'failed' | 'not_built' | 'source';
 
 /** Every node's state at one status version of a snapshot. */
 /**
  * What `sqb build --changed` with default options runs, as the location planned it from the synced copy
  * after its last publication or sync: nodes changed themselves, and nodes downstream of them, as keys.
- * `failing` is why that plan failed, with both lists empty; a failed plan is never shown as a count.
+ * `failing` is why that plan failed (both lists empty) or which models it couldn't plan (the lists name the rest).
  */
 export type ChangedBuild = { generation: number; changed: string[]; downstream: string[]; failing: string | null };
 

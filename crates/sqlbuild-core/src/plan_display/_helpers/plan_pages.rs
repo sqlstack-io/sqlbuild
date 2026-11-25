@@ -13,7 +13,12 @@ use crate::plan_display::constants::{
 use crate::plan_display::models::PlanPageSection;
 
 /// Every section, in the order the plan reads, with its name in the API.
-pub(crate) const SECTIONS: [(PlanPageSection, &str); 25] = [
+pub(crate) const SECTIONS: [(PlanPageSection, &str); 27] = [
+    (PlanPageSection::PlanningError, "planning_error"),
+    (
+        PlanPageSection::WindowBeforeCursorStart,
+        "window_before_cursor_start",
+    ),
     (PlanPageSection::FullRefresh, "full_refresh"),
     (PlanPageSection::QueryChanged, "query_changed"),
     (PlanPageSection::FunctionChanged, "function_changed"),
@@ -45,7 +50,12 @@ pub(crate) const SECTIONS: [(PlanPageSection, &str); 25] = [
 ];
 
 /// A model's section by its plan reason; reasons without their own section build as routine models.
-const MODEL_REASONS: [(&str, PlanPageSection); 7] = [
+const MODEL_REASONS: [(&str, PlanPageSection); 9] = [
+    ("planning_error", PlanPageSection::PlanningError),
+    (
+        "window_before_cursor_start",
+        PlanPageSection::WindowBeforeCursorStart,
+    ),
     ("full_refresh", PlanPageSection::FullRefresh),
     ("query_changed", PlanPageSection::QueryChanged),
     ("function_changed", PlanPageSection::FunctionChanged),
@@ -154,9 +164,13 @@ impl<'document> PlanRows<'document> {
     }
 
     fn models(&self, section: PlanPageSection) -> Vec<&'document Value> {
+        let shown_anyway: bool = matches!(
+            section,
+            PlanPageSection::PlanningError | PlanPageSection::WindowBeforeCursorStart
+        );
         self.kept("models", |model| {
-            text(model, "action") != SKIP_ACTION
-                && self.runs_node(&node_key("model", model))
+            (shown_anyway || text(model, "action") != SKIP_ACTION)
+                && (shown_anyway || self.runs_node(&node_key("model", model)))
                 && model_section(model) == section
         })
     }

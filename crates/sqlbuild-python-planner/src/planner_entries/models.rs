@@ -101,3 +101,20 @@ pub struct PlanEntryBuildInputs {
     pub max_microbatches_is_override: bool,
     pub microbatch_limit_action: Py<PyAny>,
 }
+
+/// One model's turn under an explicit cursor window: planned, with a clamp warning when the window started before its floor, or skipped because the window ends at or before it.
+pub(crate) enum WindowTurn<'py> {
+    Planned(
+        (Bound<'py, PyAny>, Bound<'py, PyAny>),
+        Option<Bound<'py, PyAny>>,
+    ),
+    /// The skip row, and the floor and window that skipped it.
+    Skipped(Bound<'py, PyAny>, (String, String)),
+}
+
+/// What an explicit cursor window did across the selection: how many cursor models planned, and which it skipped (`model (cursor_start floor)`, and the window).
+#[derive(Debug, Default)]
+pub(crate) struct WindowTally {
+    pub(crate) cursor_models_planned: usize,
+    pub(crate) window_skips: Vec<(String, String)>,
+}

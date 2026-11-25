@@ -200,7 +200,8 @@ export class FakeControl {
 			elapsed_millis: 10,
 			progress: { position: target.sync === 'running' ? 1 : 2, kinds: 2, rows: 5, elapsed_millis: 20, completed: target.sync !== 'running' }
 		};
-		return [{ received_at: at, report: { event_id: '0190d1a0-0000-7000-8000-0000000000dd', session_id: '0190d1a0-0000-7000-8000-0000000000ee', target: 'dev', health } }];
+		// The server computes the state; a sync report alone leaves the target healthy.
+		return { state: 'healthy', observations: [{ received_at: at, report: { event_id: '0190d1a0-0000-7000-8000-0000000000dd', session_id: '0190d1a0-0000-7000-8000-0000000000ee', target: 'dev', health } }] };
 	}
 
 	#failedRun(name: TargetName) {

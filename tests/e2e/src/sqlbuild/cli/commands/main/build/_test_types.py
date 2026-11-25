@@ -1780,3 +1780,15 @@ class DiscoveredNodesE2ETestCase:
     expected_exit_code: int
     expected_output_patterns: tuple[str, ...]
     expected_runs: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class CursorWindowFloorTestCase:
+    description: str
+    select: tuple[str, ...]
+    window: tuple[str, str]
+    expected_returncode: int
+    expected_output_fragments: tuple[str, ...]
+    expected_json_rows: dict[str, dict[str, str]]
+    expected_warning_fragments: dict[str, str]
+    expected_rows: dict[str, tuple[str, ...]]

@@ -8,11 +8,11 @@ use crate::cli_text::_helpers::layout::tree_connector;
 use crate::cli_text::constants::{
     ALTER_DYNAMIC_ACTION, BOUNDED_BACKFILL, CHANGED_IDENTITY, COLUMN_ADDED, COLUMN_REMOVED,
     COLUMN_TYPE_CHANGED, CONFIG_CHANGED_REASON, CREATE_DYNAMIC_ACTION, CREATE_VIEW_ACTION,
-    CUSTOM_ACTION, DIFF_HEADER_MARKER, EFFECTIVE_BATCH_SIZE_TOKEN, ERROR_SEVERITY_VALUE,
-    FIRST_RUN_REASON, FORWARD_BACKFILL, FULL_BACKFILL, FULL_REFRESH_REASON, INFO_SEVERITY_VALUE,
-    NO_CHANGE_REASON, NORMAL_INCREMENTAL_REASON, QUERY_CHANGED_REASON, REASON_GROUPS,
-    SCHEMA_CHANGED_REASON, SKIP_ACTION, SOURCE_FRESHNESS_UNKNOWN_WARNING_TITLE,
-    STALE_INPUT_WARNING_TITLE,
+    CUSTOM_ACTION, DIFF_HEADER_MARKER, EFFECTIVE_BATCH_SIZE_TOKEN, ERROR_ACTION,
+    ERROR_SEVERITY_VALUE, FIRST_RUN_REASON, FORWARD_BACKFILL, FULL_BACKFILL, FULL_REFRESH_REASON,
+    INFO_SEVERITY_VALUE, NO_CHANGE_REASON, NORMAL_INCREMENTAL_REASON, QUERY_CHANGED_REASON,
+    REASON_GROUPS, SCHEMA_CHANGED_REASON, SKIP_ACTION, SOURCE_FRESHNESS_UNKNOWN_WARNING_TITLE,
+    STALE_INPUT_WARNING_TITLE, UNBOUNDED_RANGE,
 };
 use crate::cli_text::models::{
     CliStyle, CursorPlanText, DisplayLimit, FunctionPlanText, ModelPlanText, PlanTextReport,
@@ -41,12 +41,12 @@ fn section_lines<T>(
     lines
 }
 
-/// Models whose action is not `skip`.
+/// Models whose action is not `skip`, and skipped models with a reason to show.
 pub(crate) fn active_models(report: &PlanTextReport) -> Vec<&ModelPlanText> {
     report
         .models
         .iter()
-        .filter(|model| model.action != SKIP_ACTION)
+        .filter(|model| model.action != SKIP_ACTION || model.skip_reason.is_some())
         .collect()
 }
 
@@ -427,6 +427,12 @@ fn schema_change_suffix(model: &ModelPlanText) -> String {
 }
 
 fn action_text(model: &ModelPlanText) -> String {
+    if let Some(reason) = &model.skip_reason {
+        return reason.clone();
+    }
+    if model.action == ERROR_ACTION {
+        return ERROR_ACTION.to_owned();
+    }
     if model.action == CREATE_VIEW_ACTION {
         return "recreate view".to_owned();
     }
@@ -715,6 +721,19 @@ pub(crate) fn full_refresh_count_lines(active: &[&ModelPlanText]) -> Vec<String>
     )];
     for (label, count) in counts {
         lines.push(format!("  {count:>3} {label}"));
+    }
+    let unbounded: usize = active
+        .iter()
+        .filter(|model| {
+            model
+                .cursor
+                .as_ref()
+                .and_then(|cursor| cursor.range.as_deref())
+                .is_some_and(|range| range.ends_with(UNBOUNDED_RANGE))
+        })
+        .count();
+    if unbounded > 0 {
+        lines.push(format!("  {unbounded:>3} cursor range {UNBOUNDED_RANGE}"));
     }
     lines
 }

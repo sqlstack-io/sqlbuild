@@ -254,6 +254,16 @@
        },
        {
         "kind": "store_true",
+        "options": ["--allow-starting"],
+        "dest": "location_allow_starting",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "for health, exit 0 while the newest instance is starting, for container health checks",
+        "group": 1
+       },
+       {
+        "kind": "store_true",
         "options": ["--wait"],
         "dest": "location_wait",
         "nargs": 0,

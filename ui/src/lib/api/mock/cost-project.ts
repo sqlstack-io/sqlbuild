@@ -5,10 +5,11 @@
 
 import type { ApiClient } from '../client';
 import type { CostFact, CostSelection, CostSelectionQuery, CostSeriesGroup, NodeBuildCost, RunStatus, Scope, SelectionEvaluation, SelectionProblem, SelectionVocabulary, VocabularyEntry } from '../types';
+import { dirOfFolder } from '$lib/project-layout';
 import { costPeriod, inCostGroup } from './cost-rows';
 
-/** A folder as `path:` selects it: models under `sql/models/`, Python nodes under their own root. */
-const pathOf = (folder: string) => (folder.startsWith('python/') ? folder : `sql/models/${folder}`);
+/** A folder's directory, as `path:` selects it: `marts` is `sql/models/marts`, `python/loaders` is `python/nodes/loaders`. */
+const pathOf = (folder: string) => dirOfFolder(folder);
 
 /** Leaf folders, their model count and model name prefix: 2,281 models. */
 const FOLDERS: [string, number, string][] = [
@@ -46,8 +47,8 @@ const FOLDERS: [string, number, string][] = [
 	['reporting/daily', 80, 'rpt'],
 	['reporting/exports', 60, 'rpt'],
 	['snapshots', 56, 'snap'],
-	['python/nodes/loaders', 18, 'py'],
-	['python/nodes/checks', 12, 'py']
+	['python/loaders', 18, 'py'],
+	['python/checks', 12, 'py']
 ];
 const ENTITIES = ['orders', 'order_lines', 'customers', 'sessions', 'events', 'payments', 'refunds', 'invoices', 'products', 'inventory', 'shipments', 'returns', 'campaigns', 'clicks', 'impressions', 'subscriptions', 'accounts', 'users', 'devices', 'pageviews', 'carts', 'promotions', 'suppliers', 'stores', 'warehouses', 'forecasts', 'features', 'experiments', 'ledger', 'fx_rates', 'tickets', 'reviews'];
 const SUFFIXES = ['', '_daily', '_hourly', '_enriched', '_latest', '_history', '_by_region', '_by_channel', '_scd', '_rollup', '_v2', '_agg', '_dedup', '_flat', '_wide', '_weekly'];
@@ -74,7 +75,7 @@ const JOBS: [string, number, number, string, string[]][] = [
 	['campaigns_daily', 1, 2.9, 'Small', ['marketing/campaigns', 'marketing/audiences']],
 	['exports_daily', 1, 1.4, 'X-Small', ['reporting/exports']],
 	['fx_rates_hourly', 24, 0.04, 'X-Small', ['finance/fx']],
-	['partner_loaders', 12, 0.12, 'X-Small', ['python/nodes/loaders', 'staging/partners/feeds']],
+	['partner_loaders', 12, 0.12, 'X-Small', ['python/loaders', 'staging/partners/feeds']],
 	['shipments_4h', 6, 0.7, 'Small', ['staging/orders', 'intermediate/orders']],
 	['returns_daily', 1, 1.1, 'X-Small', ['intermediate/orders', 'marts/core']],
 	['experiments_daily', 1, 3.3, 'Small', ['product/experiments']],
@@ -86,7 +87,7 @@ const JOBS: [string, number, number, string, string[]][] = [
 	['marts_weekly_rebuild', 1 / 7, 72, 'Large', ['marts', 'intermediate']],
 	['forecasts_daily', 1, 7.5, 'Medium', ['ml/scoring', 'finance/revenue']],
 	['suppliers_weekly', 1 / 7, 3.1, 'Small', ['staging/partners']],
-	['data_quality', 4, 0.6, 'Small', ['python/nodes/checks', 'marts/core']]
+	['data_quality', 4, 0.6, 'Small', ['python/checks', 'marts/core']]
 ];
 /** What runs started by hand or from the CLI built. */
 const MANUAL_FOLDERS = ['marts/core', 'intermediate/pricing'];

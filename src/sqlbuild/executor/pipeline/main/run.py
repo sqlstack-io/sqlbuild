@@ -45,7 +45,7 @@ from sqlbuild.executor.pipeline._helpers.scenario import (
 from sqlbuild.executor.pipeline._helpers.seeding import (
     run_seed_pipeline as run_seed_pipeline,
 )
-from sqlbuild.executor.pipeline._helpers.settings import resolve_build_inputs
+from sqlbuild.executor.pipeline._helpers.settings import plannable_plan, resolve_build_inputs
 from sqlbuild.executor.pipeline._helpers.testing import (
     run_test_pipeline as run_test_pipeline,
 )
@@ -75,6 +75,7 @@ def run_build_pipeline(
 ) -> BuildExecutionResult:
     """Execute a full build pipeline: resolve settings, open connections, run plan, close."""
 
+    plan = plannable_plan(plan)
     with run_scope(runtime.run_id) as identity:
         dispatcher: EventDispatcher | None = current_event_dispatcher()
         started: float = time.monotonic()

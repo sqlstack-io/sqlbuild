@@ -480,3 +480,36 @@ pub(super) struct CheckGraceTestCase {
     pub(super) expected_within: std::time::Duration,
     pub(super) expected_compiler: bool,
 }
+
+pub(crate) struct HealthExitTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) state: sqlbuild_orchestration::platform::models::LocationState,
+    pub(crate) allow_starting: bool,
+    pub(crate) expected_code: i32,
+}
+
+pub(super) struct CrashedCheckTestCase {
+    pub(super) description: &'static str,
+    pub(super) script: &'static str,
+    pub(super) expected_rediscovers: u64,
+}
+
+pub(super) struct ModelErrorsTestCase {
+    pub(super) description: &'static str,
+    pub(super) document: serde_json::Value,
+    pub(super) expected_reason: Option<&'static str>,
+}
+
+pub(super) struct LookupFailuresTestCase {
+    pub(super) description: &'static str,
+    /// Each lookup: `failed` or `answered`, as the location loop calls them.
+    pub(super) lookups:
+        &'static [fn(&mut crate::native_commands::models::GenerationLookups) -> bool],
+    pub(super) expected_reports: &'static [bool],
+}
+
+pub(super) struct LookupFailureHealthTestCase {
+    pub(super) description: &'static str,
+    pub(super) answered: Option<i64>,
+    pub(super) expected_generation: i64,
+}

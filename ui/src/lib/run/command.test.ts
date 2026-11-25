@@ -5,8 +5,8 @@ import { changedBuildCounts, changedBuildLabel, commandTokens, jobBuildTokens, j
 const node = (key: string, kind: SnapshotNode['kind'], path: string, tags: string[] = []): SnapshotNode => ({ key, kind, group: '', tags, path, cursor: null, upstream: [] });
 
 const NODES: SnapshotNode[] = [
-	node('model:customers', 'table', 'models/marts/customers.sql', ['finance']),
-	node('seed:countries', 'seed', 'seeds/countries.csv'),
+	node('model:customers', 'table', 'sql/models/marts/customers.sql', ['finance']),
+	node('seed:countries', 'seed', 'sql/seeds/countries.csv'),
 	node('source:shop.orders', 'source', 'sources.yml')
 ];
 
@@ -21,7 +21,7 @@ describe('the plan page command line', () => {
 		expect(values('sqb build --select countr')).toEqual(['seed:countries']);
 		expect(values('sqb build --select shop.ord')).toEqual(['source:shop.orders']);
 		expect(values('sqb build --select fin')).toEqual(['tag:finance']);
-		expect(values('sqb build --select marts')).toEqual(['path:models/marts']);
+		expect(values('sqb build --select marts')).toEqual(['path:sql/models/marts']);
 	});
 
 	it('reads --changed as the CLI does: its counts only after =, never the next token', () => {
@@ -114,6 +114,12 @@ describe('changed build counts', () => {
 		expect(changedBuildCounts(4, { generation: 3, changed: ['model:orders', 'model:customers'], downstream: ['model:revenue'], failing: null })).toEqual({ changed: 2, downstream: 1, failing: null });
 		expect(changedBuildCounts(4, { generation: 3, changed: [], downstream: [], failing: null })).toEqual({ changed: 4, downstream: null, failing: null });
 		expect(changedBuildCounts(4, null)).toEqual({ changed: 4, downstream: null, failing: null });
+	});
+
+	it('keeps the planned count of a plan with models it couldn\'t plan, with them as the tooltip', () => {
+		const counts = changedBuildCounts(4, { generation: 3, changed: ['model:totals'], downstream: [], failing: "Can't plan 1 model: orders: full_refresh false" });
+		expect(counts).toEqual({ changed: 1, downstream: 0, failing: "Can't plan 1 model: orders: full_refresh false" });
+		expect(changedBuildLabel(counts.changed, counts.downstream, 'bar', counts.failing).tooltip).toBe("Plan failing: Can't plan 1 model: orders: full_refresh false");
 	});
 
 	it('shows no planned count while the location\'s plan is failing, and gives the reason as the tooltip', () => {

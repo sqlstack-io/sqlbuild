@@ -11,9 +11,9 @@ export function needsBuilding(keys: Iterable<string>, byKey: ReadonlyMap<string,
 	let changed = 0;
 	let behind = 0;
 	for (const key of new Set(keys)) {
-		const reasons = byKey.get(key)?.stale ?? [];
-		if (reasons.some((r) => r.reason === 'changed')) changed++;
-		else if (reasons.length) behind++;
+		const status = byKey.get(key)?.status;
+		if (status === 'changed') changed++;
+		else if (status === 'behind') behind++;
 	}
 	return { changed, behind };
 }
@@ -28,6 +28,6 @@ export function viewSummary(nodes: readonly CatalogNode[]): ViewSummary {
 		total: nodes.length,
 		byKind,
 		...needsBuilding(nodes.map((n) => n.key), new Map(nodes.map((n) => [n.key, n]))),
-		failed: nodes.filter((n) => n.lastOutcome === 'failed').length
+		failed: nodes.filter((n) => n.status === 'failed').length
 	};
 }

@@ -253,11 +253,11 @@ export function auditSample(nodeKey: string, statementId: string, count: number)
 
 /** A Python node's exception: where it was raised in the node's own code, and the whole traceback. */
 function pythonFailureDetail(): Pick<RunNode, 'errorLocation' | 'errorDetail'> {
-	return { errorLocation: { file: 'models/ml/score_customers_v2.py', line: 26 }, errorDetail: V2_TRACEBACK.join('\n') };
+	return { errorLocation: { file: 'python/nodes/ml/score_customers_v2.py', line: 26 }, errorDetail: V2_TRACEBACK.join('\n') };
 }
 
 function checkFailureDetail(key: string): Pick<RunNode, 'errorLocation' | 'errorDetail'> {
-	const file = (snapshotNode(key)?.path ?? `models/${key}.sql`).replace(/\.sql$/, '.yml');
+	const file = (snapshotNode(key)?.path ?? `sql/models/${key}.sql`).replace(/\.sql$/, '.yml');
 	return {
 		errorLocation: { file, line: 12 },
 		errorDetail: ['check unique(order_id) failed: 14 duplicate rows (severity error)', `  --> ${file}:12`, '', 'The table was built, then its error-severity check failed, so the node failed and its downstream was skipped.'].join('\n')
@@ -266,7 +266,7 @@ function checkFailureDetail(key: string): Pick<RunNode, 'errorLocation' | 'error
 
 /** Mock failure location and full text: the model file, and a line inside its main statement. */
 function failureDetail(key: string, run: Run, message: string): Pick<RunNode, 'errorLocation' | 'errorDetail'> {
-	const file = snapshotNode(key)?.path ?? `models/${key}.sql`;
+	const file = snapshotNode(key)?.path ?? `sql/models/${key}.sql`;
 	const line = 4 + (hash(key) % 30);
 	const queryId = queryIdOf(statementIdOf(run, key));
 	return {
@@ -421,7 +421,7 @@ export function sqlFor(key: string, kind: string, target: string): string {
 	if (kind === 'create_view') return `create or replace view ${rel} as\nselect *\nfrom ${src}`;
 	if (kind === 'merge')
 		return `merge into ${rel} as t\nusing (\n  select * from ${src}\n  where updated_at >= :start_cursor and updated_at < :end_cursor\n) as s\non t.id = s.id\nwhen matched then update set *\nwhen not matched then insert *`;
-	if (kind === 'load_seed') return `insert into ${rel}\nselect * from read_csv('seeds/${key}.csv')`;
+	if (kind === 'load_seed') return `insert into ${rel}\nselect * from read_csv('sql/seeds/${key}.csv')`;
 	if (kind === 'loader_insert') return `insert into ${rel}\nselect * from staging.${key}__batch`;
 	return `create or replace table ${rel}__sqb_stage as\nselect *\nfrom ${from.join('\njoin ') || src};\n\nalter table ${rel}__sqb_stage swap with ${rel}`;
 }
@@ -588,7 +588,7 @@ function pythonOutput(key: string, s: number, e: number | null, now: number, out
 					[
 						'WARNING shop.events: page 4 failed, retrying in 5s',
 						'Traceback (most recent call last):',
-						'  File "/app/models/ingest/raw_events.py", line 18, in raw_events',
+						'  File "/app/python/nodes/ingest/raw_events.py", line 18, in raw_events',
 						'    rows = fetch_page(since=ctx.current_cursor_value, page=page)',
 						'  File "/app/shop/events_api.py", line 41, in fetch_page',
 						'    resp.raise_for_status()',
@@ -619,7 +619,7 @@ function pythonOutput(key: string, s: number, e: number | null, now: number, out
 			1_400,
 			'stderr',
 			[
-				'/app/models/ml/score_customers.py:11: FutureWarning: DataFrame.fillna with \'method\' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.',
+				'/app/python/nodes/ml/score_customers.py:11: FutureWarning: DataFrame.fillna with \'method\' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.',
 				'  features = features.fillna(method="ffill")'
 			].join('\n')
 		);

@@ -38,7 +38,7 @@ export function hugeProjectNodes(template: CatalogNode): CatalogNode[] {
 					key,
 					kind: 'table',
 					group: null,
-					path: `models/${folder}/${sub}/${key}.sql`,
+					path: `sql/models/${folder}/${sub}/${key}.sql`,
 					upstream: [],
 					description: `${folder} ${sub.replace('/', ' ')} ${NOUNS[i % NOUNS.length]}`,
 					stale,

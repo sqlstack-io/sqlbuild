@@ -1,3 +1,4 @@
+import { withServerStatus } from '$lib/build-area/status-fixtures';
 import { describe, expect, it } from 'vitest';
 import type { CatalogNode, JobGroupMember, StaleReason } from '$lib/api';
 import { layoutFolderGraph } from './folder-graph';
@@ -35,7 +36,7 @@ const member = (jobKey: string, stage: number, waitsFor: string[] = []): JobGrou
 
 function node(key: string, upstream: string[] = [], stale: StaleReason['reason'][] = []): CatalogNode {
 	const reasons = stale.map((reason) => ({ reason, upstream: [], detail: '', since: '', change: 'definition' }) as unknown as StaleReason);
-	return { key, kind: 'table', path: `models/${key.split(':')[1]}.sql`, upstream, group: null, tags: [], stale: reasons, lastOutcome: null, lastBuild: null } as unknown as CatalogNode;
+	return withServerStatus({ key, kind: 'table', path: `sql/models/${key.split(':')[1]}.sql`, upstream, group: null, tags: [], stale: reasons, lastOutcome: null, lastBuild: null } as unknown as CatalogNode);
 }
 
 // customers builds two staging models; orders reads both, through a source no member selects for one;

@@ -124,6 +124,8 @@ from sqlbuild.adapters.clickhouse.constants import (
     EXPECTED_OUTPUT_COLUMNS_CONFIG_KEY,
     FRESH_GENERATION_CLAUSE,
     GENERATION_COMMENT_PREFIX,
+    HIGHEST_TIMESTAMP_CURSOR,
+    LOWEST_TIMESTAMP_CURSOR,
     MAX_IDENTIFIER_LENGTH,
     MAX_QUERY_SIZE_BYTES,
     MODEL_NAME_CONFIG_KEY,
@@ -677,6 +679,13 @@ class ClickHouseAdapter(
         self, *, expression: str, target_type: str, alias: str
     ) -> str:
         return f"CAST({expression} AS {nullable_type(target_type)}) AS {alias}"
+
+    def cursor_type_range(self, *, cursor_type: str | None) -> tuple[str, str]:
+        """Timestamp cursors span DateTime64's range here, which the bound literals parse into."""
+
+        if cursor_type == CursorKind.INTEGER:
+            return super().cursor_type_range(cursor_type=cursor_type)
+        return (LOWEST_TIMESTAMP_CURSOR, HIGHEST_TIMESTAMP_CURSOR)
 
     def render_cursor_bound_literal(self, *, value: str, cursor_type: str | None) -> str:
         if cursor_type == CursorKind.INTEGER:

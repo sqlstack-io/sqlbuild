@@ -767,7 +767,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/health', { params: { path: { location_id: locationId, target } } });
 			if (response.status === 401) onUnauthorized();
 			if (!data) throw new ApiError(errorText(error, response), response.status);
-			return warehouseSyncOf(data);
+			return warehouseSyncOf(data.observations);
 		},
 		/** The location takes the request within seconds; the sync's result arrives as a `warehouse_sync` change. */
 		async requestWarehouseSync(scope: Scope): Promise<void> {
@@ -907,7 +907,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 				locations.map(async (location) => {
 					const [{ data, response }, snapshot] = await locationHealth(location.id);
 					if (response.status === 403) healthRefused.add(location.id);
-					return data ? [toWarehouseConnection(location, data, snapshot)] : [];
+					return data ? [toWarehouseConnection(location, data.observations, snapshot)] : [];
 				})
 			);
 			return read.flat();
@@ -1070,7 +1070,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 				attentionAcknowledgementsOf(scope),
 				// Missing provider secrets come from the target's own health; a refused or failed read leaves the item out and judges nothing.
 				locationHealth(scope.locationId)
-					.then(([health]) => (health.data ? { read: true, event: missingSecretsEventOf(scope.locationId, health.data) } : { read: false, event: null }))
+					.then(([health]) => (health.data ? { read: true, event: missingSecretsEventOf(scope.locationId, health.data.observations) } : { read: false, event: null }))
 					.catch(() => ({ read: false, event: null })),
 				listedTriggers(scope)
 			]);

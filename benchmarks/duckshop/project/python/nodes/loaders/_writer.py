@@ -17,7 +17,7 @@ from pathlib import Path
 
 import yaml
 
-SOURCES_DIR = Path(__file__).resolve().parents[2] / "sql" / "sources"
+SOURCES_DIR = Path(__file__).resolve().parents[3] / "sql" / "sources"
 BATCH_SIZE = 500
 JSON_TYPES = {"VARIANT": "", "OBJECT": "::OBJECT", "ARRAY": "::ARRAY"}
 

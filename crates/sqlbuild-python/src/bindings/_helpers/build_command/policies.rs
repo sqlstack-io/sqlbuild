@@ -11,9 +11,9 @@ use sqlbuild_core::build_command::main::model_limit_error::model_limit_error;
 use sqlbuild_core::build_command::main::plan_safety_steps::plan_safety_steps;
 use sqlbuild_core::build_command::main::render_confirmation_prompt::render_confirmation_prompt;
 use sqlbuild_core::build_command::models::{
-    ColumnMigrationFact, ModelLimit, ModelMigrationFact, PlanSafetyFacts, PlanSafetyGates,
-    PlanWarningFact, PolicyStep, RetentionFact, SnapshotPolicies, SnapshotRefreshFact,
-    TableTypeFact,
+    ColumnMigrationFact, ModelErrorFact, ModelLimit, ModelMigrationFact, PlanSafetyFacts,
+    PlanSafetyGates, PlanWarningFact, PolicyStep, RetentionFact, SnapshotPolicies,
+    SnapshotRefreshFact, TableTypeFact,
 };
 use sqlbuild_python_base::records::main::construct::new_error::new_error;
 
@@ -137,6 +137,14 @@ fn plan_facts(plan: &Bound<'_, PyAny>) -> PyResult<PlanSafetyFacts> {
         }
     }
     for entry in entries(plan, "model_entries")? {
+        let planning_error: Bound<'_, PyAny> = native_field(&entry, "planning_error")?;
+        if !planning_error.is_none() {
+            facts.model_errors.push(ModelErrorFact {
+                code: optional_text(&planning_error, "code")?,
+                message: text(&planning_error, "message")?,
+                help: optional_text(&planning_error, "help")?,
+            });
+        }
         if optional_text(&entry, "materialization_type")?.as_deref() == Some(SNAPSHOT_VALUE)
             && text(&entry, "reason")? == FULL_REFRESH_REASON
         {

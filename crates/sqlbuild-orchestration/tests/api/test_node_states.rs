@@ -19,6 +19,9 @@ use crate::node_states::_helpers::views::{current_view, refresh_view, target_cac
 use crate::node_states::main::report_changed_build::report_changed_build;
 use crate::node_states::main::start_node_states::start_node_states;
 use crate::node_states::models::ChangedBuildReport;
+use crate::platform::main::health::location_health::location_health;
+use crate::platform::main::health::report_location_health::report_location_health;
+use crate::platform::models::{LocationHealth, LocationHealthReport, LocationState};
 use crate::runs::main::requests::request_job_run::request_job_run;
 use crate::runs::models::JobRunRequest;
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
@@ -397,6 +400,75 @@ fn given_changed_build_reports_when_people_read_node_states_then_only_the_curren
                 changed_build().await,
                 json!({"generation": 2, "changed": [], "downstream": [], "failing": "Model orders cannot plan a full rebuild"}),
                 "{}: a failed plan replaces the count with its reason",
+                test_case.description
+            );
+            report_location_health(
+                store,
+                location,
+                &LocationHealthReport {
+                    event_id: Uuid::now_v7(),
+                    session_id,
+                    target: "development".into(),
+                    health: LocationHealth::Connection {
+                        generation: 2,
+                        healthy: true,
+                        trigger: None,
+                        elapsed_millis: None,
+                    },
+                },
+            )
+            .await
+            .expect("published");
+            let health = location_health(store, (location, Some("development")))
+                .await
+                .expect("health");
+            assert_eq!(
+                (
+                    health
+                        .iter()
+                        .find_map(|observation| match &observation.report.health {
+                            LocationHealth::ChangePlanFailed { generation, reason } => {
+                                Some((*generation, reason.clone()))
+                            }
+                            _ => None,
+                        }),
+                    LocationState::of(&health, ("development", chrono::Utc::now())),
+                ),
+                (
+                    Some((2, "Model orders cannot plan a full rebuild".to_owned())),
+                    LocationState::ChangePlanFailed
+                ),
+                "{}: a failed plan of what changed is the location's health, not only a log line",
+                test_case.description
+            );
+            let partial = ChangedBuildReport {
+                session_id,
+                generation: 2,
+                changed: vec!["model:totals".into()],
+                downstream: Vec::new(),
+                failing: Some(
+                    "Can't plan 1 model: orders: model 'orders' sets full_refresh false".into(),
+                ),
+            };
+            report_changed_build(store, (location, "development"), &partial)
+                .await
+                .expect("partial changed build");
+            next_notice(&mut feed).await.expect("node status");
+            assert_eq!(
+                changed_build().await,
+                json!({"generation": 2, "changed": ["model:totals"], "downstream": [], "failing": "Can't plan 1 model: orders: model 'orders' sets full_refresh false"}),
+                "{}: a plan with models it couldn't plan keeps the rest and names those models",
+                test_case.description
+            );
+            assert_eq!(
+                LocationState::of(
+                    &location_health(store, (location, Some("development")))
+                        .await
+                        .expect("health"),
+                    ("development", chrono::Utc::now())
+                ),
+                LocationState::ChangePlanFailed,
+                "{}: models it couldn't plan count as a failed plan of what changed",
                 test_case.description
             );
             assert!(

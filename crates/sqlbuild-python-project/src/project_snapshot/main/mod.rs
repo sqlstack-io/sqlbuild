@@ -3,6 +3,7 @@ pub mod compile_declarations;
 pub mod compile_project_roles;
 pub mod job_group_cycles;
 pub mod model_nodes;
+pub mod orchestration_selectors;
 pub mod providers_document;
 pub mod python_declarations;
 pub mod register_snapshot;

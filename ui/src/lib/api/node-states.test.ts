@@ -18,7 +18,9 @@ function node(key: string, upstream: string[] = [], builtAt: string | null = '20
 		lastOutcome: builtAt ? 'success' : null,
 		stale: [],
 		sourceFreshness: null,
-		checks: { total: 0, passing: 0, warning: 0, failing: 0 }
+		checks: { total: 0, passing: 0, warning: 0, failing: 0 },
+		status: builtAt ? 'current' : 'not_built',
+		statusAt: builtAt
 	};
 }
 
@@ -27,6 +29,8 @@ const built = (key: string, builtAt: string, extra: Partial<NodeState> = {}): No
 	lastOutcome: 'success',
 	definitionChanged: false,
 	checks: { total: 1, passing: 1, warning: 0, failing: 0 },
+	status: 'current',
+	statusAt: builtAt,
 	...extra
 });
 

@@ -80,6 +80,9 @@ export function createSelection(options: { url?: boolean; follow?: boolean; init
 	let vocabulary = $state.raw<SelectionVocabulary | null>(null);
 	let recent = $state.raw<RecentSelection[]>(readRecent());
 	let asked = 0;
+	/** The query of a link `navigate` is taking: the URL effect leaves it to that one navigation. */
+	let following: string | null = null;
+	let followed = 0;
 
 	const active = $derived(!!(select.trim() || exclude.trim()));
 	/** The selected nodes' names, without their `kind:`, for lists that name nodes only by name. */
@@ -164,7 +167,7 @@ export function createSelection(options: { url?: boolean; follow?: boolean; init
 		$effect(() => {
 			const params = writeSelectionParams(page.url.searchParams, { select, exclude });
 			for (const old of options.replaces ?? []) params.delete(old);
-			if (params.toString() === page.url.searchParams.toString()) return;
+			if (params.toString() === page.url.searchParams.toString() || params.toString() === following) return;
 			const url = new URL(page.url);
 			url.search = params.toString();
 			void goto(url, { replaceState: true, noScroll: true, keepFocus: true });
@@ -183,6 +186,20 @@ export function createSelection(options: { url?: boolean; follow?: boolean; init
 		},
 		set exclude(v: string) {
 			exclude = v;
+		},
+		/**
+		 * Takes a link in place: the selection changes now, and the URL follows as one new history
+		 * entry, so Back goes up again. Nothing replaces that entry while it is being made.
+		 */
+		navigate(url: URL) {
+			const linked = readSelectionParams(url.searchParams);
+			const ticket = ++followed;
+			following = url.searchParams.toString();
+			select = linked.select;
+			exclude = linked.exclude;
+			void goto(url, { noScroll: true, keepFocus: true }).finally(() => {
+				if (ticket === followed) following = null;
+			});
 		},
 		/** Whether anything is selected or excepted; otherwise every node is in. */
 		get active() {

@@ -1,14 +1,15 @@
 //! Model, function and SQL-hook orchestration through adapter-owned rendering.
 
-use crate::planner_phases::constants::FULL_BACKFILL_WITHOUT_INTERVAL_CODE;
+use crate::planner_phases::constants::UNBOUNDED_CURSOR_MARK;
 use crate::planner_resolution::_helpers::cursor::cursor_model::{
     compute_model_cursor_bounds, unbounded,
 };
+use crate::planner_resolution::constants::CURSOR_START;
 use crate::planner_resolution::main::references::model_hook_entries::model_hook_entries;
 use crate::planner_resolution::models::Resolution;
 use crate::planner_resolution::models::{CursorFiltering, ModelSqlRequest};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
+use pyo3::types::{PyDict, PyString, PyTuple};
 use pyo3::{PyErr, pyfunction};
 use sqlbuild_model_config::config_values::models::ConfigNode;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
@@ -19,7 +20,10 @@ use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_front::attachments::main::resolve_cursor_intrinsics::resolve_cursor_intrinsics;
+use sqlbuild_python_front::cursor::main::scalars::render_value::render_value;
 use sqlbuild_python_front::cursor::main::scalars::sentinel_to_token::sentinel_to_token;
+use sqlbuild_python_front::cursor::main::scalars::try_parse::try_parse;
+use sqlbuild_python_front::model_config::main::config::config_cursor_bound::config_cursor_bound;
 use sqlbuild_python_front::model_config::main::config::config_node_of::config_node_of;
 use sqlbuild_python_front::model_config::main::config::config_text_is::config_text_is;
 use sqlbuild_python_front::model_config::main::config::config_text_object::config_text_object;
@@ -120,7 +124,12 @@ pub(crate) fn resolve_model_sql<'py>(
             {
                 unbounded(py)?
             }
-            _ => return Err(unresolved_bounds_error(py, &name, cause.as_deref())?),
+            _ if cause.is_some() => {
+                sql = full_build_bounds(&sql, model, &cursor_type, &resolution.dialect)?;
+                resolution.assert_resolved(&sql, &format!("Model '{name}'"))?;
+                return Ok(sql);
+            }
+            _ => return Err(unresolved_bounds_error(py, &name)?),
         };
         sql = intrinsic_bounds(&sql, &bounds, &cursor_type, &resolution.dialect)?;
     }
@@ -167,19 +176,46 @@ fn intrinsic_bounds<'py>(
     Ok(resolve_cursor_intrinsics(py, sql, Some(&start_sql), Some(&end_sql))?.0)
 }
 
-fn unresolved_bounds_error(py: Python<'_>, name: &str, cause: Option<&str>) -> PyResult<PyErr> {
+fn unresolved_bounds_error(py: Python<'_>, name: &str) -> PyResult<PyErr> {
     let error = error_class(py, ErrorId::PlannerInput)?;
-    let kwargs = PyDict::new(py);
-    let message = if let Some(cause) = cause {
-        kwargs.set_item("code", FULL_BACKFILL_WITHOUT_INTERVAL_CODE)?;
-        kwargs.set_item("help", "rebuild it with an explicit cursor interval (--start-cursor-ts and --end-cursor-ts, or the -int forms), or make it a microbatch model so a full rebuild can run batch by batch")?;
-        format!(
-            "Model '{name}' was given a FULL backfill ({cause}), but it uses cursor intrinsics and a non-microbatch full rebuild has no cursor interval"
-        )
-    } else {
-        format!("Model '{name}' uses cursor intrinsics, but cursor bounds could not be resolved")
+    let message =
+        format!("Model '{name}' uses cursor intrinsics, but cursor bounds could not be resolved");
+    Ok(PyErr::from_value(error.call1((message,))?))
+}
+
+/// A non-microbatch full build's intrinsics: the model's `cursor_start` floor or the cursor type's lowest value, to its highest.
+fn full_build_bounds<'py>(
+    sql: &str,
+    model: &Bound<'py, PyAny>,
+    cursor_type: &Bound<'py, PyAny>,
+    dialect: &Bound<'py, Dialect>,
+) -> PyResult<String> {
+    let py = model.py();
+    let (lowest, highest): (String, String) = call_with(
+        &dialect.syntax("cursor_type_range")?,
+        &[("cursor_type", cursor_type.clone())],
+    )?
+    .extract()?;
+    let literal = |value: &str| -> PyResult<String> {
+        call_with(
+            &dialect.syntax("render_cursor_bound_literal")?,
+            &[
+                ("value", PyString::new(py, value).into_any()),
+                ("cursor_type", cursor_type.clone()),
+            ],
+        )?
+        .extract()
     };
-    Ok(PyErr::from_value(error.call((message,), Some(&kwargs))?))
+    let floor = match config_cursor_bound(py, &model_values(model)?, CURSOR_START)? {
+        Some(floor) => try_parse(&floor, cursor_type)?,
+        None => None,
+    };
+    let start = match floor {
+        Some(floor) => literal(&render_value(&floor)?)?,
+        None => format!("{} {UNBOUNDED_CURSOR_MARK}", literal(&lowest)?),
+    };
+    let end = format!("{} {UNBOUNDED_CURSOR_MARK}", literal(&highest)?);
+    Ok(resolve_cursor_intrinsics(py, sql, Some(&start), Some(&end))?.0)
 }
 
 #[pyfunction]

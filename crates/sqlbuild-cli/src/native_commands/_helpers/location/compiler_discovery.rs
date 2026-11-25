@@ -52,7 +52,7 @@ pub(crate) async fn sleep_until(due: Option<Instant>) {
     }
 }
 
-/// Call the set due for its `check_every` again; republish when its result changed. Shutdown, or a request waiting out its grace, stops it.
+/// Call the set due for its `check_every` again; republish when its result changed, or with discovery when the check crashed, so the publication reports the set. Shutdown, or a request waiting out its grace, stops it.
 pub(crate) async fn check_discovered(
     compiler: Option<LocationCompiler>,
     discovery: &mut LocationDiscovery,
@@ -83,17 +83,17 @@ pub(crate) async fn check_discovered(
     let reply: DiscoveredSetChecked = match reply {
         Some(Ok(reply)) => reply,
         unfinished => {
+            let crashed: bool = unfinished.is_some();
             let problem: String = match unfinished {
-                Some(_) => format!("Checking discovered set {name} failed"),
-                None => format!(
-                    "Checking discovered set {name} did not finish within {} seconds of a request waiting for it",
+                Some(Err(error)) => format!(
+                    "Checking discovered set {name} failed: {error}; the location restarts its interpreter and discovers again"
+                ),
+                _ => format!(
+                    "Checking discovered set {name} did not finish within {} seconds of a request waiting for it; the location restarts its interpreter",
                     CHECK_GRACE.as_secs()
                 ),
             };
-            drop(write_output(&[(
-                Stream::Stderr,
-                &format!("{problem}; the location restarts its interpreter.\n"),
-            )]));
+            drop(write_output(&[(Stream::Stderr, &format!("{problem}.\n"))]));
             discovery.checked(
                 &name,
                 DiscoveredSetChecked {
@@ -103,6 +103,9 @@ pub(crate) async fn check_discovered(
                 Instant::now(),
             );
             stop_location_runtime(Some(active)).await?;
+            if crashed {
+                request_republish(republish, true);
+            }
             return Ok(None);
         }
     };

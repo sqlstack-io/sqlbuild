@@ -4,6 +4,8 @@ use crate::planner_changes::main::replaces_incremental_relation::replaces_increm
 use crate::planner_entries::_helpers::entries::values::{
     MICROBATCH_CONCURRENCY_MESSAGE, error_of, native, none, planner_type, replaced, string,
 };
+use crate::planner_entries::_helpers::entries::window_turns::window_turn;
+use crate::planner_entries::models::WindowTally;
 use crate::planner_entries::models::{
     ModelPlanContext, PlanEntriesRequest, PlanEntryBuildInputs, PlannerRelationsContext,
 };
@@ -16,7 +18,6 @@ use crate::planner_resolution::main::cursor::config_str::config_str;
 use crate::planner_resolution::main::cursor::cursor_safety_configs::cursor_safety_configs;
 use crate::planner_resolution::main::cursor::empty_cursor_inputs::empty_cursor_inputs;
 use crate::planner_resolution::main::cursor::microbatch_range::microbatch_range;
-use crate::planner_resolution::main::cursor::model_cursor_overrides::model_cursor_overrides;
 use crate::planner_resolution::main::cursor::plan_cursor_bounds::plan_cursor_bounds;
 use crate::planner_resolution::main::cursor::with_cursor_safety_warnings::with_cursor_safety_warnings;
 use crate::planner_resolution::main::references::model_hook_entries::model_hook_entries;
@@ -464,6 +465,7 @@ pub(crate) fn plan_entries<'py>(
     let microbatch = enum_member(py, RecordId::IncrementalMode, "MICROBATCH")?;
     let mut entries: Vec<Bound<'py, PyAny>> = Vec::new();
     let mut warnings: Vec<Bound<'py, PyAny>> = Vec::new();
+    let mut tally = WindowTally::default();
     for key in &scope_data.order {
         let name = &key.1;
         if !scope_data.selected.contains(key) || !models.contains(name)? {
@@ -473,24 +475,31 @@ pub(crate) fn plan_entries<'py>(
             continue;
         };
         let resolved = models.get_item(name)?;
-        let overrides = model_cursor_overrides(
+        let turn = window_turn(
             &model,
-            &cursor_overrides,
-            (start_override.clone(), end_override.clone()),
-        )?;
-        let effective_full_refresh =
-            resolve_model_full_refresh(&model, full_refresh.applies(name))?;
-        let (mut entry, entry_warnings) = plan_model_from_change(&ModelPlanRequest {
-            model: model.clone(),
-            snapshot: snapshot.clone(),
-            context: &reads,
-            sql_analysis_enabled,
-            full_refresh: effective_full_refresh,
-            overrides,
-            change_result: native_field(&resolved, "change")?,
-            protect_full_refresh: !freshness_blocked.contains(name)?
-                && !external_blocked.contains(name)?,
-        })?;
+            (
+                &cursor_overrides,
+                (start_override.clone(), end_override.clone()),
+            ),
+            |overrides| {
+                plan_model_from_change(&ModelPlanRequest {
+                    model: model.clone(),
+                    snapshot: snapshot.clone(),
+                    context: &reads,
+                    sql_analysis_enabled,
+                    full_refresh: resolve_model_full_refresh(&model, full_refresh.applies(name))?,
+                    overrides,
+                    change_result: native_field(&resolved, "change")?,
+                    protect_full_refresh: !freshness_blocked.contains(name)?
+                        && !external_blocked.contains(name)?,
+                })
+            },
+        );
+        let Some((mut entry, entry_warnings)) =
+            tally.take((&mut entries, &mut warnings), &model, turn)?
+        else {
+            continue;
+        };
         let entry_name = native_field(&entry, "name")?;
         if freshness_blocked.contains(&entry_name)? {
             entry = replaced(
@@ -537,6 +546,7 @@ pub(crate) fn plan_entries<'py>(
             warnings.push(warning?);
         }
     }
+    tally.refuse_empty_window(py)?;
     if let Some(warning) = check_microbatch_concurrency(&project, &dialect, &entries, concurrency)?
     {
         warnings.push(warning);

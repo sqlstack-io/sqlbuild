@@ -5616,3 +5616,25 @@ def orders_job_project(job_values: str) -> dict[str, str]:
             'name = "orders_job"\ndescription = "Orders."\n' + job_values
         ),
     }
+
+
+def orchestration_job(name: str, select: str, exclude: str = "") -> str:
+    """A job file selecting `select` and excluding `exclude`, which may be empty."""
+
+    return (
+        f'name = "{name}"\ndescription = "Build {name}."\n'
+        f'select = "{select}"\nexclude = "{exclude}"\n'
+    )
+
+
+def orchestration_sensor(select: str) -> str:
+    """A sensor file whose `source_new_data` condition selects `select`."""
+
+    return (
+        "from sqlbuild.orchestration import RunRequest, SensorContext, sensor, "
+        "source_new_data\n\n\n"
+        "@sensor(description='Build orders on new data.', "
+        f"when=source_new_data(select='{select}'))\n"
+        "def regions_sensor(ctx: SensorContext):\n"
+        "    return RunRequest(job='orders_job')\n"
+    )
