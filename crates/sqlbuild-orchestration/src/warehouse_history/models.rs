@@ -98,8 +98,7 @@ pub struct CheckEvidence {
     #[schema(value_type = Vec<Vec<Object>>)]
     pub rows: Vec<Vec<serde_json::Value>>,
     pub truncated: Option<String>,
-    /// The warehouse's error when the audit's query could not run, SQLSTATE included, redacted and
-    /// bounded like a node's error text; `None` when it ran.
+    /// The warehouse's error, SQLSTATE included, when the audit's query could not run; redacted like a node's.
     pub execution_error: Option<String>,
 }
 
