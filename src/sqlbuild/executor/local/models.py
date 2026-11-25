@@ -91,10 +91,21 @@ class DecisionContext:
 
 
 @dataclass(frozen=True)
+class LocalConversion:
+    """What SQLBuild keeps of a SQLQuack conversion: its DuckDB SQL and macros, or its refusals."""
+
+    converted: bool
+    sql: str
+    macros: tuple[str, ...]
+    refusals: tuple[Mapping[str, Any], ...]
+    rendered: str
+
+
+@dataclass(frozen=True)
 class LocalSqlCheck:
     """One statement's SQLQuack conversion, when asked for, and the relation DuckDB lacks for it."""
 
-    conversion: Any
+    conversion: LocalConversion | None
     missing: str | None
     bound: bool = True
 
@@ -106,3 +117,4 @@ class LocalWorkCounts:
     conversions: int
     bindings: int
     schema_keys: int
+    cached: int = 0

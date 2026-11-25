@@ -14,6 +14,7 @@ from sqlbuild.executor.local.main._convert_local_sql import (
     convert_local_sql,
     file_placed_refusal,
 )
+from sqlbuild.executor.local.models import LocalConversion
 from sqlbuild.executor.scenario.exceptions import LocalSqlRefusedError
 from sqlbuild.executor.scenario.models import LocalSql
 
@@ -44,7 +45,7 @@ def convert_sql_for_local_duckdb(
                 },
             ),
         )
-    conversion: Any = convert_local_sql(
+    conversion: LocalConversion = convert_local_sql(
         sql=sql,
         schema=schema,
         time_zone=time_zone,
@@ -56,10 +57,10 @@ def convert_sql_for_local_duckdb(
             f"'{resource_name}':\n{conversion.rendered.rstrip()}",
             refusals=tuple(
                 file_placed_refusal(refusal=refusal, sql=sql, file=file)
-                for refusal in conversion.report["refusals"]
+                for refusal in conversion.refusals
             ),
         )
-    return LocalSql(sql=conversion.sql, macros=tuple(conversion.macros))
+    return LocalSql(sql=conversion.sql, macros=conversion.macros)
 
 
 def replace_local_relations(*, sql: str, relation_replacements: dict[str, str]) -> str:

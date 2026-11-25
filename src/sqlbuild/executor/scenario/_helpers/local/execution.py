@@ -33,6 +33,7 @@ from sqlbuild.executor.local.constants import (
     SNAPSHOT_STALE_CATEGORY,
     UTC_TIME_ZONE,
 )
+from sqlbuild.executor.local.main._convert_local_sql import use_local_conversion_cache
 from sqlbuild.executor.run.models import ModelExecutionResult
 from sqlbuild.executor.scenario._helpers.execution.model_execution import execute_scenario_models
 from sqlbuild.executor.scenario._helpers.lifecycle.expectations import (
@@ -149,6 +150,7 @@ def execute_local_scenario_load_only_run(
 
     run_dir: Path = project_dir / "target" / "run" / "scenarios" / scenario_plan.name
     run_dir.mkdir(parents=True, exist_ok=True)
+    use_local_conversion_cache(project_dir)
     duckdb_path: Path = run_dir / "local.duckdb"
     _remove_local_duckdb_files(duckdb_path)
     connection: Any = (

@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 import sqlquack
 
+from sqlbuild.executor.local._helpers import conversion as conversion_module
 from sqlbuild.executor.local._helpers.conversion import check_all, local_check, local_work_counts
 from sqlbuild.executor.local.models import LocalWorkCounts
 
@@ -55,4 +56,14 @@ def work_delta(before: LocalWorkCounts) -> LocalWorkCounts:
         conversions=after.conversions - before.conversions,
         bindings=after.bindings - before.bindings,
         schema_keys=after.schema_keys - before.schema_keys,
+        cached=after.cached - before.cached,
+    )
+
+
+def fresh_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Forget this process's checks, as a new `sqb` process starts without them."""
+
+    monkeypatch.setattr(
+        "sqlbuild.executor.local._helpers.conversion._WORK",
+        conversion_module._LocalWork(),
     )

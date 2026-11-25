@@ -15,6 +15,7 @@ from sqlbuild.executor.local.constants import (
     CONVERTED_DIALECT,
     UTC_TIME_ZONE,
 )
+from sqlbuild.executor.local.models import LocalConversion
 
 _UTC_SESSION_SQL: str = f"SET TimeZone = '{UTC_TIME_ZONE}'"
 _INVALIDATED_MARKER: str = "database has been invalidated"
@@ -77,13 +78,16 @@ class LocalTestAdapter(DuckDbAdapter):
     def _converted_execute(self, *, connection: Any, sql: str) -> Any:
         if self._dialect != CONVERTED_DIALECT or sql == _UTC_SESSION_SQL:
             return super().execute(connection=connection, sql=sql)
-        conversion: Any = converted(
+        conversion: LocalConversion = converted(
             sql=sql, schema=self._schema, time_zone=self._time_zone, path="test.sql"
         )
         if not conversion.converted:
             raise ExecutorInputError(
                 "SQLQuack refused SQL the local test run needed: "
-                + "; ".join(f"{item.code}: {item.label}" for item in conversion.diagnostics),
+                + "; ".join(
+                    f"{refusal.get('code')}: {refusal.get('label')}"
+                    for refusal in conversion.refusals
+                ),
                 code=CANNOT_RUN_LOCALLY_CODE,
                 help="Run this test on the warehouse with --run-on warehouse.",
             )

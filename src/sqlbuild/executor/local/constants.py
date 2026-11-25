@@ -24,4 +24,6 @@ UTC_TIME_ZONE: str = "UTC"
 
 STATEMENT_CONSTRUCT: str = "statement"
 
+CONVERSION_CACHE_DIR: str = "target/sqlquack-cache"
+
 CANNOT_RUN_LOCALLY_CODE: str = "T007"

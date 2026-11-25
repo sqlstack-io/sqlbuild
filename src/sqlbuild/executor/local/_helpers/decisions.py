@@ -10,11 +10,16 @@ from typing import Any
 
 from sqlbuild._native import SqlTestPlanEntry, render_sql_test_comparison_segments
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
-from sqlbuild.executor.local._helpers.conversion import check_all, local_check
+from sqlbuild.executor.local._helpers.conversion import (
+    check_all,
+    local_check,
+    use_conversion_cache,
+)
 from sqlbuild.executor.local._helpers.positions import placed_refusal
 from sqlbuild.executor.local._helpers.schema import project_schema
 from sqlbuild.executor.local._helpers.session import session_time_zone
 from sqlbuild.executor.local.constants import (
+    CONVERSION_CACHE_DIR,
     CONVERTED_DIALECT,
     DIALECT_REASON_CATEGORY,
     FUNCTION_REASON_CATEGORY,
@@ -25,6 +30,7 @@ from sqlbuild.executor.local.constants import (
 )
 from sqlbuild.executor.local.models import (
     DecisionContext,
+    LocalConversion,
     LocalRefusal,
     LocalSqlCheck,
     RunOnDecision,
@@ -58,6 +64,7 @@ def decision_context(
     )
     if run_on == RUN_ON_WAREHOUSE or dialect not in (CONVERTED_DIALECT, LOCAL_DIALECT):
         return context
+    use_conversion_cache(location[0] / CONVERSION_CACHE_DIR)
     rendered: dict[str, tuple[str, list[tuple[int, int, str]]]] = {
         entry.name: _rendered(entry=entry, context=context)
         for entry in test_entries
@@ -166,16 +173,15 @@ def _converted_decision(*, entry: SqlTestPlanEntry, context: DecisionContext) ->
         time_zone=context.time_zone,
         path=context.compiled_paths.get(entry.name, ""),
     )
-    conversion: Any = check.conversion
-    if conversion.converted:
+    conversion: LocalConversion | None = check.conversion
+    if conversion is None or conversion.converted:
         return _bound_decision(name=entry.name, missing=check.missing)
     sources: TestSources = _test_sources(entry=entry, context=context)
     return RunOnDecision(
         name=entry.name,
         run_on=RUN_ON_WAREHOUSE,
         refusals=tuple(
-            placed_refusal(refusal=refusal, sources=sources)
-            for refusal in conversion.report["refusals"]
+            placed_refusal(refusal=refusal, sources=sources) for refusal in conversion.refusals
         ),
     )
 

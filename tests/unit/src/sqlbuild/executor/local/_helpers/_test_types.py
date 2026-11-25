@@ -32,3 +32,14 @@ class BindingWorkTestCase:
     repeats: int
     expected_bindings: int
     expected_missing: tuple[str | None, ...]
+
+
+@dataclass(frozen=True)
+class CachedConversionTestCase:
+    """Statements converted in one run, then read from the disk cache by a later one."""
+
+    description: str
+    statement_count: int
+    expected_first_conversions: int
+    expected_later_conversions: int
+    expected_later_cached: int
