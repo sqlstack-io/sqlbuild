@@ -1,6 +1,7 @@
 //! Planner selector parsing and resolution over native project graphs, raising `PlannerInputError`.
 
 use crate::job_settings::main::graph_with_jobs::graph_with_jobs;
+use crate::planner_selection::_helpers::past_runs::with_audits_and_runs;
 use crate::planner_selection::main::py_strings::py_strings;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 use pyo3::types::PyString;
@@ -94,7 +95,10 @@ pub(crate) fn resolved<'py>(
     graph: &ProjectGraph,
     (select, exclude): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
 ) -> PyResult<Bound<'py, PyFrozenSet>> {
-    compiled_keys(select.py(), &resolve_graph_keys(graph, (select, exclude))?)
+    compiled_keys(
+        select.py(),
+        &resolve_graph_keys(None, graph, (select, exclude))?,
+    )
 }
 
 pub(crate) fn view_graph(mappings: GraphViewMappings<'_, '_>) -> PyResult<NativeProjectGraph> {
@@ -111,8 +115,9 @@ pub(crate) fn arguments_graph(arguments: &KeywordArguments<'_>) -> PyResult<Nati
     })
 }
 
-/// Resolve graph keys for native planning without building a public frozenset.
-fn resolve_graph_keys<'py>(
+/// Resolve graph keys for native planning without building a public frozenset; with `project`, its audits and the past runs the selectors name can be selected too.
+pub(crate) fn resolve_graph_keys<'py>(
+    project: Option<&Bound<'py, PyAny>>,
     graph: &ProjectGraph,
     (select, exclude): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
 ) -> PyResult<Vec<ObjectKey>> {
@@ -124,5 +129,11 @@ fn resolve_graph_keys<'py>(
     let (select, exclude) = (carrier.send_all(&select)?, carrier.send_all(&exclude)?);
     let all: Vec<String> = select.iter().chain(&exclude).cloned().collect();
     let graph = graph_with_jobs(py, graph, &all, &[])?;
+    let graph = match project {
+        Some(project) => {
+            with_audits_and_runs(project, &graph, &all)?.map_err(|error| carrier.error(error))?
+        }
+        None => graph,
+    };
     resolve_selectors(&graph, &select, &exclude).map_err(|error| carrier.error(error))
 }

@@ -442,26 +442,35 @@ fn job(graph: &ProjectGraph, value: &str) -> Resolved {
             ),
         ));
     };
-    let pattern: bool = is_pattern(value);
     let mut keys: Keys = Keys::new();
-    let mut found: bool = false;
-    for (name, selected) in jobs {
-        if name == value || (pattern && glob_matches(value, name)) {
-            found = true;
-            keys.extend(selected.clone()?);
-        }
+    for name in matching_names(value, jobs.keys(), "job")? {
+        keys.extend(jobs[name].clone()?);
     }
-    if found {
-        return Ok(keys);
+    Ok(keys)
+}
+
+/// The `names` that `value` names or, as a glob, matches; none is an unknown-`noun` error suggesting the closest name.
+pub(crate) fn matching_names<'n>(
+    value: &str,
+    names: impl Iterator<Item = &'n String> + Clone,
+    noun: &str,
+) -> Result<Vec<&'n String>, SelectorError> {
+    let pattern: bool = is_pattern(value);
+    let matched: Vec<&String> = names
+        .clone()
+        .filter(|name| *name == value || (pattern && glob_matches(value, name)))
+        .collect();
+    if !matched.is_empty() {
+        return Ok(matched);
     }
     Err(SelectorError {
         code: UNKNOWN_NAME_CODE,
         message: format!(
-            "unknown job {} '{value}'",
+            "unknown {noun} {} '{value}'",
             if pattern { "pattern" } else { "name" }
         ),
         help: (!pattern)
-            .then(|| suggestion(value, jobs.keys().map(String::as_str).collect()))
+            .then(|| suggestion(value, names.map(String::as_str).collect()))
             .flatten(),
     })
 }

@@ -5,14 +5,14 @@ use std::cell::RefCell;
 use std::collections::BTreeSet;
 
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
-use sqlbuild_analysis::graph::constants::{AUDIT_KIND, RUN_SELECTOR_KINDS};
+use sqlbuild_analysis::graph::constants::AUDIT_KIND;
 use sqlbuild_analysis::graph::main::attach_audits_and_runs::attach_audits_and_runs;
-use sqlbuild_analysis::graph::main::parse_selector::parse_selector;
-use sqlbuild_analysis::graph::models::{ParsedSelector, ProjectGraph, RunResults};
+use sqlbuild_analysis::graph::models::{ProjectGraph, RunResults};
 use sqlbuild_orchestration::runs::models::PastRunResults;
 use sqlbuild_orchestration::runs::types::PastRuns;
 
 use crate::adhoc::_helpers::publication::{IndexedPublication, python_kind};
+use crate::run_selectors::main::names_audits_or_runs::names_audits_or_runs;
 
 thread_local! {
     /// The past runs of the plan or evaluation running on this thread.
@@ -62,18 +62,6 @@ fn graph_keys(nodes: &BTreeSet<String>, include_python: bool) -> BTreeSet<Object
         .iter()
         .filter_map(|node| run_key(node, include_python))
         .collect()
-}
-
-/// Whether a part of `selectors` is an `audit:` or a past-run selector.
-fn names_audits_or_runs(selectors: &[String]) -> bool {
-    selectors
-        .iter()
-        .flat_map(|selector| selector.split(char::is_whitespace))
-        .flat_map(|token| token.split(','))
-        .any(|part| {
-            matches!(parse_selector(part), Ok(ParsedSelector::Kind { kind, .. })
-                if kind == AUDIT_KIND || RUN_SELECTOR_KINDS.contains(&kind.as_str()))
-        })
 }
 
 /// A run node key as a selector graph key: an audit by its name, a Python node only when the command runs Python.

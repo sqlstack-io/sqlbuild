@@ -1404,6 +1404,10 @@ paths = ["crates/sqlbuild-orchestration/src/platform/models.rs", "crates/sqlbuil
 reason = "PlatformEvent::event_type and RunChange::event_type each name their own enum's stored event types, one arm per variant; only the variant-to-string match shape is alike."
 
 [[dupes.allowlist]]
+paths = ["crates/sqlbuild-cli/src/person_login/main/read_past_runs.rs", "crates/sqlbuild-cli/src/person_login/main/read_sensor_events.rs", "crates/sqlbuild-cli/src/person_login/main/request_warehouse_sync.rs"]
+reason = "Each is the public entry for one request a saved `sqb login` session makes: it opens the session and calls its own transport request, which stays private to person_login. Only the open-session-then-call shape is alike; the requests, arguments and results differ."
+
+[[dupes.allowlist]]
 paths = ["scripts/native_layering/_helpers/layering.py", "src/sqlbuild/executor/dynamic_pauses/_helpers/scope.py"]
 reason = "A ten-line depth-first walk in two packages that must not import each other: the dependency-layering tool walks Cargo.lock packages, the build's dynamic-model hold walks plan edges between models."
 

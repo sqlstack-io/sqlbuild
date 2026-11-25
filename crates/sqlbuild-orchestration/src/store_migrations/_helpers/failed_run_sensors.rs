@@ -7,11 +7,10 @@ use std::pin::Pin;
 use serde_json::Value;
 
 use crate::sensors::models::RunEventKind;
-use crate::snapshots::main::publication::stored_document::stored_document;
 use crate::store::errors::ControlError;
-use crate::store::main::decompress::decompress;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
+use crate::store_migrations::_helpers::trigger_documents::rewrite_trigger_documents;
 
 /// The run outcome 0012 folds into `failed`.
 const PARTIAL: &str = "partial";
@@ -53,44 +52,14 @@ async fn rewrite_sensors(
 async fn rewrite_documents(
     transaction: ControlTransaction,
 ) -> Result<ControlTransaction, ControlError> {
-    let (mut transaction, rows) = query(
-        transaction,
-        "SELECT document_hash, body FROM sqb_documents WHERE document_hash IN \
-         (SELECT document_hash FROM sqb_snapshot_documents WHERE kind='triggers')",
-        Vec::new(),
-    )
-    .await?;
-    for row in rows {
-        let mut document: Value = serde_json::from_slice(&decompress(&row["body"])?)
-            .map_err(|error| ControlError::Invalid(error.to_string()))?;
-        let Some(entries) = document.as_object_mut() else {
-            continue;
-        };
+    rewrite_trigger_documents(transaction, |entries| {
         let mut changed = false;
         for entry in entries.values_mut() {
             changed |= watch_failed(entry)?;
         }
-        if !changed {
-            continue;
-        }
-        let (hash, body) = stored_document(&document)?;
-        (transaction, _) = query(
-            transaction,
-            "INSERT INTO sqb_documents (document_hash, body) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-            vec![Parameter::Text(hash.clone()), Parameter::Bytes(body)],
-        )
-        .await?;
-        (transaction, _) = query(
-            transaction,
-            "UPDATE sqb_snapshot_documents SET document_hash=$2 WHERE kind='triggers' AND document_hash=$1",
-            vec![
-                Parameter::Text(row["document_hash"].as_str().unwrap_or_default().to_owned()),
-                Parameter::Text(hash),
-            ],
-        )
-        .await?;
-    }
-    Ok(transaction)
+        Ok(changed)
+    })
+    .await
 }
 
 /// A JSON column as read back: a value, or its text on a store that returns JSON as text.

@@ -1,7 +1,7 @@
 //! `sqb` command dispatch: the native route table applied to a parsed namespace.
 
-use crate::bindings::_helpers::review_command::support::attribute;
 use sqlbuild_python_base::records::main::construct::new_error::new_error;
+use sqlbuild_python_base::records::main::fields::attribute_text::attribute_text as attribute;
 use std::path::PathBuf;
 
 use crate::bindings::_helpers::audit_command::command::run_audit_command;

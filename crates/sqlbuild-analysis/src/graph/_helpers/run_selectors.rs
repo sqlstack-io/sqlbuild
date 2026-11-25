@@ -3,10 +3,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::assembly::project::types::ObjectKey;
-use crate::graph::_helpers::selectors::{Keys, error, glob_matches, is_pattern, parse, suggestion};
+use crate::graph::_helpers::selectors::{Keys, error, matching_names, parse};
 use crate::graph::constants::{
     AUDIT_KIND, FAILED_KIND, INTERSECTION_SEPARATOR, KIND_SEPARATOR, RUN_SELECTOR_KINDS,
-    SKIPPED_KIND, UNKNOWN_NAME_CODE, UNMAPPED_KIND_CODE, UNMAPPED_KINDS,
+    SKIPPED_KIND, UNMAPPED_KIND_CODE, UNMAPPED_KINDS,
 };
 use crate::graph::errors::SelectorError;
 use crate::graph::models::{ParsedSelector, ProjectGraph, RunResults};
@@ -24,25 +24,10 @@ pub(crate) fn audit(graph: &ProjectGraph, value: &str) -> Resolved {
             ),
         ));
     };
-    let pattern: bool = is_pattern(value);
-    let keys: Keys = audits
-        .iter()
-        .filter(|name| *name == value || (pattern && glob_matches(value, name)))
+    Ok(matching_names(value, audits.iter(), "audit")?
+        .into_iter()
         .map(|name| (AUDIT_KIND.to_owned(), name.clone()))
-        .collect();
-    if !keys.is_empty() {
-        return Ok(keys);
-    }
-    Err(SelectorError {
-        code: UNKNOWN_NAME_CODE,
-        message: format!(
-            "unknown audit {} '{value}'",
-            if pattern { "pattern" } else { "name" }
-        ),
-        help: (!pattern)
-            .then(|| suggestion(value, audits.iter().map(String::as_str).collect()))
-            .flatten(),
-    })
+        .collect())
 }
 
 /// What the run `value` names selected, didn't finish or skipped, by `kind`.

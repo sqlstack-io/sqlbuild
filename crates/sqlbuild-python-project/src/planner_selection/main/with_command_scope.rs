@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use pyo3::prelude::{Bound, PyAny, PyResult};
 use sqlbuild_cli::run_selectors::main::past_run_source::past_run_source;
 use sqlbuild_cli::run_selectors::models::PastRunSource;
 use sqlbuild_recall::settings::models::{RecallSettings, StoreLocation};
@@ -10,6 +10,7 @@ use sqlbuild_recall::settings::models::{RecallSettings, StoreLocation};
 use crate::job_settings::main::with_job_scope::with_job_scope;
 use crate::planner_selection::_helpers::past_runs::with_past_run_source;
 use crate::planner_selection::constants::RUN_SELECTOR_COMMANDS;
+use sqlbuild_python_base::records::main::fields::attribute_text::attribute_text;
 
 /// Run `run` with jobs from `project_dir` on `args`' `--target`, and past runs from its `--server`, else the local SQLite Recall store `recall` names.
 pub fn with_command_scope<T>(
@@ -47,12 +48,4 @@ fn command_source(
         (project_dir, selected_target),
         store,
     )))
-}
-
-/// `args.<name>` as text; `None` when unset or missing.
-fn attribute_text(args: &Bound<'_, PyAny>, name: &str) -> PyResult<Option<String>> {
-    match args.getattr_opt(name)? {
-        Some(value) if !value.is_none() => Ok(Some(value.str()?.to_string())),
-        _ => Ok(None),
-    }
 }

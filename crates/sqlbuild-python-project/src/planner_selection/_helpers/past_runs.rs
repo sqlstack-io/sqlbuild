@@ -6,18 +6,18 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
-use sqlbuild_analysis::graph::constants::{AUDIT_KIND, PLANNER_DEFAULT_CODE, RUN_SELECTOR_KINDS};
+use sqlbuild_analysis::graph::constants::{AUDIT_KIND, PLANNER_DEFAULT_CODE};
 use sqlbuild_analysis::graph::errors::SelectorError;
 use sqlbuild_analysis::graph::main::attach_audits_and_runs::attach_audits_and_runs;
-use sqlbuild_analysis::graph::main::parse_selector::parse_selector;
 use sqlbuild_analysis::graph::main::run_selector_ids::run_selector_ids;
-use sqlbuild_analysis::graph::models::{ParsedSelector, ProjectGraph, RunResults};
+use sqlbuild_analysis::graph::models::{ProjectGraph, RunResults};
 use sqlbuild_cli::run_selectors::main::read_past_run_keys::read_past_run_keys;
 use sqlbuild_cli::run_selectors::models::{PastRunKeys, PastRunSource};
 use sqlbuild_cli::run_selectors::types::PastRunKeysById;
 
 use crate::compiled_views::main::project::audits::audits;
 use crate::resource_views::main::audit_reads::name::name;
+use sqlbuild_cli::run_selectors::main::names_audits_or_runs::names_audits_or_runs;
 
 thread_local! {
     /// Where the running command's run selectors read past runs from, `None` for commands that select neither audits nor past runs; per thread, as the job scope is.
@@ -96,18 +96,6 @@ pub(crate) fn with_audits_and_runs<'g>(
         graph.clone(),
         (names, runs),
     ))))
-}
-
-/// Whether a part of `selectors` is an `audit:` or a past-run selector.
-fn names_audits_or_runs(selectors: &[String]) -> bool {
-    selectors
-        .iter()
-        .flat_map(|selector| selector.split(char::is_whitespace))
-        .flat_map(|token| token.split(','))
-        .any(|part| {
-            matches!(parse_selector(part), Ok(ParsedSelector::Kind { kind, .. })
-                if kind == AUDIT_KIND || RUN_SELECTOR_KINDS.contains(&kind.as_str()))
-        })
 }
 
 fn graph_results(keys: &PastRunKeys) -> RunResults {
