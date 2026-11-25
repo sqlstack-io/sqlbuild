@@ -10,9 +10,9 @@ from sqlbuild._native import (
     DiscoveredHookFunction,
     ModelPlanEntry,
     PlanAction,
-    PlannerInputError,
     PlanOutput,
     PlanReason,
+    PlanWarning,
     project_with,
 )
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
@@ -199,14 +199,15 @@ def test_given_unblocked_protected_model_when_planning_then_full_rebuild_is_refu
     connection: Any = adapter.connect({"database": ":memory:"})
     try:
         create_protected_model_state(adapter=adapter, connection=connection)
-        with pytest.raises(PlannerInputError) as raised:
-            build_execution_plan_from_kwargs(
-                project=build_protected_schema_replay_project(),
-                adapter=adapter,
-                connection=connection,
-                external_blocked_model_names=test_case.external_blocked_model_names,
-            )
+        plan_output: PlanOutput = build_execution_plan_from_kwargs(
+            project=build_protected_schema_replay_project(),
+            adapter=adapter,
+            connection=connection,
+            external_blocked_model_names=test_case.external_blocked_model_names,
+        )
     finally:
         adapter.close(connection)
 
-    assert raised.value.code == test_case.expected_action
+    error: PlanWarning | None = plan_output.model_entries[0].planning_error
+    assert error is not None
+    assert error.code == test_case.expected_action

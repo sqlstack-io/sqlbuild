@@ -5,6 +5,9 @@ use crate::project_snapshot::models::RunsIn;
 /// The code a node fails with when a provider it uses is missing secrets, as `sqb build` reports it.
 pub(crate) const MISSING_SECRET_CODE: &str = "D012";
 
+/// The sensor condition field of `executed_successfully` selectors, as publication names it.
+pub(crate) const EXECUTED_SUCCESSFULLY: &str = "executed_successfully";
+
 /// Snapshot node kinds a provider consumer can run inside.
 pub(crate) const MODEL_NODE_KIND: &str = "model";
 pub(crate) const SOURCE_NODE_KIND: &str = "source";

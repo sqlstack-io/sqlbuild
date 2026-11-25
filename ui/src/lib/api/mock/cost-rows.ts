@@ -2,6 +2,7 @@
 // period before, job by node, and daily series by job, top-level folder or any group. Pure.
 
 import type { CostFact, CostSelection, CostSeriesGroup, SelectionProblem } from '../types';
+import { folderOfDir } from '$lib/project-layout';
 
 /** One selected node's cost in one build. */
 export type CostRowIn = { runId: string; job: string | null; nodeKey: string; folder: string; startedAt: number; pending: boolean; credits: number; usd: number | null; seconds: number; queries: number; bytes: number };
@@ -16,11 +17,10 @@ export function costPeriod(days: number, now: number) {
 	return { first, previous: first - days * DAY, dates, day };
 }
 
-/** A node's folder from its published path: without `sql/models/` (or `models/`), other roots as published. */
+/** A node's folder from its published path, as the server's cost folder and the catalog group it (`folderOfDir`). */
 export function costFolder(path: string | undefined): string {
 	if (!path) return 'other';
-	const dir = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
-	return dir.replace(/^(sql\/)?models(\/|$)/, '');
+	return folderOfDir(path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '');
 }
 
 const addUsd = (a: number | null, b: number | null) => (a === null || b === null ? null : a + b);

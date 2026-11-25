@@ -24,8 +24,18 @@ fn given_location_health_reports_when_checking_health_then_down_falling_back_or_
             expected_exit: 1,
         },
         LocationHealthTestCase {
-            description: "a recent heartbeat",
+            description: "a recent heartbeat before the instance's own first load finishes",
             reports: &[r#"{"kind":"heartbeat"}"#],
+            other_target_connections: 0,
+            expected_state: "starting",
+            expected_exit: 3,
+        },
+        LocationHealthTestCase {
+            description: "a recent heartbeat after the instance's own load connected",
+            reports: &[
+                r#"{"kind":"heartbeat"}"#,
+                r#"{"kind":"connection","generation":2,"healthy":true}"#,
+            ],
             other_target_connections: 0,
             expected_state: "healthy",
             expected_exit: 0,
@@ -88,14 +98,14 @@ fn given_location_health_reports_when_checking_health_then_down_falling_back_or_
             ],
             other_target_connections: 0,
             expected_state: "discovery_failed",
-            expected_exit: 0,
+            expected_exit: 1,
         },
         LocationHealthTestCase {
             description: "the warehouse connection check failed",
             reports: &[r#"{"kind":"connection","generation":2,"healthy":false}"#],
             other_target_connections: 0,
             expected_state: "degraded",
-            expected_exit: 0,
+            expected_exit: 1,
         },
     ];
     let runtime = tokio::runtime::Builder::new_current_thread()

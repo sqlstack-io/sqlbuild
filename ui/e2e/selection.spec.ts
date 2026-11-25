@@ -107,7 +107,7 @@ test('a job page shows its selection as chips that open in Lineage', async ({ pa
 
 test('a job selecting folders opens in Lineage without an error', async ({ page }) => {
 	await page.goto('/jobs/core_build?mock');
-	await expect(page.locator('.sel-chips .sel-chip')).toHaveText([/path:models\/staging/, /path:models\/marts/]);
+	await expect(page.locator('.sel-chips .sel-chip')).toHaveText([/path:sql\/models\/staging/, /path:sql\/models\/marts/]);
 	await page.locator('.sel-chips').getByRole('link', { name: 'Open in Lineage' }).click();
 	await page.waitForURL(/\/lineage\?/);
 	await expect(page.locator('.sb-count')).toHaveText(/^\d+ nodes?$/);
@@ -119,8 +119,8 @@ test('a folder on the Overview opens in the catalog as a path selection', async 
 	const marts = page.locator('a.group-row', { hasText: 'marts' }).first();
 	await marts.click();
 	await page.waitForURL(/\/catalog\?/);
-	expect(new URL(page.url()).searchParams.get('select')).toBe('path:models/marts');
-	await expect(page.locator('.selection-bar .sel-chip')).toHaveText([/path:models\/marts/]);
+	expect(new URL(page.url()).searchParams.get('select')).toBe('path:sql/models/marts');
+	await expect(page.locator('.selection-bar .sel-chip')).toHaveText([/path:sql\/models\/marts/]);
 	await expect(page.getByRole('alert')).toHaveCount(0);
 	await expect(page.getByRole('button', { name: /^Folder/ })).toHaveCount(0);
 });

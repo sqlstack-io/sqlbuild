@@ -4,16 +4,24 @@ import type { Edge, Node } from '@xyflow/svelte';
 import { cardLabel } from './discovered-labels';
 import type { CatalogNode, StaleReason } from '$lib/api';
 import { FUNCTION_KINDS, PYTHON_KINDS, kindLine, nodeIconKey } from '$lib/build-area/labels';
+import { PYTHON_FOLDER, folderOfDir } from '$lib/project-layout';
 
 export type CardStatus = 'ok' | 'fail' | 'warn' | 'src' | 'none';
 export type CardStale = 'changed' | 'compiled' | 'upstream' | 'behind';
 
 export function cardStatus(node: CatalogNode): CardStatus {
 	if (node.kind === 'source') return 'src';
-	if (node.lastOutcome === 'failed') return 'fail';
-	if (node.lastOutcome === 'warn') return 'warn';
-	if (node.lastOutcome === 'success' || node.lastOutcome === 'skipped') return node.lastBuild ? 'ok' : 'none';
-	return node.lastBuild ? 'ok' : 'none';
+	// The server's status: changed and behind are built, and show as a stale badge.
+	switch (node.status) {
+		case 'failed':
+			return 'fail';
+		case 'current':
+		case 'changed':
+		case 'behind':
+			return 'ok';
+		default:
+			return 'none';
+	}
 }
 
 /** The stale reason to show on a card: own changes first, then upstream changes, then behind. */
@@ -23,6 +31,18 @@ export function cardStale(reasons: StaleReason[]): CardStale | undefined {
 	if (reasons.some((r) => r.reason === 'changed_upstream')) return 'upstream';
 	if (reasons.some((r) => r.reason === 'behind')) return 'behind';
 	return undefined;
+}
+
+/** A card's stale badge, which follows the server's status; the reasons only say which kind of change. */
+function staleBadge(node: CatalogNode): CardStale | undefined {
+	const reasons = node.stale ?? [];
+	if (node.status === 'changed') {
+		const shown = cardStale(reasons);
+		return shown === 'compiled' ? 'compiled' : 'changed';
+	}
+	if (node.status === 'behind') return 'behind';
+	// A current node can still have an upstream whose definition changed: shown, but not as its status.
+	return node.status === 'current' && cardStale(reasons) === 'upstream' ? 'upstream' : undefined;
 }
 
 export function checksBadge(node: CatalogNode): { checks?: string; checksColor?: string } {
@@ -42,10 +62,10 @@ export function cardData(node: CatalogNode): Record<string, unknown> {
 		nodeKind: node.kind,
 		status: node.liveStatus ?? cardStatus(node),
 		// A node the active run is building, or has just built, shows that, not whether it was stale.
-		stale: node.liveStatus ? undefined : cardStale(node.stale ?? []),
+		stale: node.liveStatus ? undefined : staleBadge(node),
 		live: !!node.liveStatus,
 		icon: nodeIconKey(node),
-		lastBuiltAt: node.kind === 'source' ? (node.sourceFreshness?.loadedAt ?? undefined) : node.lastBuild?.builtAt,
+		lastBuiltAt: node.kind === 'source' ? (node.sourceFreshness?.loadedAt ?? undefined) : (node.statusAt ?? undefined),
 		description: node.description || undefined,
 		tags: node.tags,
 		columnCount: node.columnCount || undefined,
@@ -64,16 +84,17 @@ export function catalogGraph(nodes: CatalogNode[]): { nodes: Node[]; edges: Edge
 export const GROUPED_ABOVE = 150;
 
 /**
- * The folder a node lives in, such as `marts/core`, or its source file, such as `sources/orders`;
- * a declared group wins.
+ * The folder a node lives in, as the project layout groups it (`folderOfDir`): a model's folder
+ * below `sql/models/`, such as `marts/core`, a source's file below `sql/`, such as `sources/orders`,
+ * or `python/exports` for a Python node; a declared group wins.
  */
 export function folderOf(node: CatalogNode): string {
 	if (node.group) return node.group;
-	const path = node.path.replace(/^models\//, '');
-	if (node.kind === 'source') return path.replace(/\.[^./]+$/, '') || 'sources';
-	const slash = path.lastIndexOf('/');
-	if (slash > 0) return path.slice(0, slash);
-	return node.kind === 'seed' ? 'seeds' : PYTHON_KINDS.includes(node.kind) ? 'python' : FUNCTION_KINDS.includes(node.kind) ? 'functions' : 'models';
+	if (node.kind === 'source') return folderOfDir(node.path.replace(/\.[^./]+$/, '')) || 'sources';
+	const slash = node.path.lastIndexOf('/');
+	const folder = slash > 0 ? folderOfDir(node.path.slice(0, slash)) : '';
+	if (folder) return folder;
+	return node.kind === 'seed' ? 'seeds' : PYTHON_KINDS.includes(node.kind) ? PYTHON_FOLDER : FUNCTION_KINDS.includes(node.kind) ? 'functions' : 'models';
 }
 
 /** The outermost folder around a node, such as `marts`, which the catalog filters and Overview counts by. */
@@ -89,8 +110,8 @@ export function groupCard(group: string, members: CatalogNode[]): GroupCard {
 	return {
 		group,
 		count: members.length,
-		ok: built.filter((n) => cardStatus(n) === 'ok' && !n.stale?.length).length,
-		stale: built.filter((n) => !!n.stale?.length).length,
-		failed: built.filter((n) => n.lastOutcome === 'failed').length
+		ok: built.filter((n) => n.status === 'current').length,
+		stale: built.filter((n) => n.status === 'changed' || n.status === 'behind').length,
+		failed: built.filter((n) => n.status === 'failed').length
 	};
 }

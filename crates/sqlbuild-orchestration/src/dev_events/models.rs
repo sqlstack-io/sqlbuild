@@ -54,11 +54,10 @@ pub enum DevEvent {
     Changed { paths: Vec<String>, more: usize },
     /// The interpreter restarted because Python sources changed.
     Restarted { reason: String },
-    /// A generation was published; `record` is the publication record `sqb location serve` prints.
+    /// A generation was published as `snapshot_id`.
     Published {
         generation: i64,
         snapshot_id: String,
-        record: serde_json::Value,
     },
     /// A generation failed; the last good generation keeps serving.
     Failed {

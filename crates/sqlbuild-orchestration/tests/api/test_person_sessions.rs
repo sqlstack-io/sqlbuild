@@ -306,12 +306,37 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                         format!("/api/control/locations/{location}/targets/development/jobs"),
                         format!("/api/control/locations/{location}/targets/development/triggers"),
                         format!("/api/control/locations/{location}/targets/development/snapshots"),
-                        format!("/api/control/locations/{location}/targets/development/health"),
                         format!(
                             "/api/control/locations/{location}/targets/development/triggers/{}/ticks",
                             trigger.trigger_id
                         ),
                     ];
+                    let health_path =
+                        format!("/api/control/locations/{location}/targets/development/health");
+                    let health = request(
+                        &provider.client,
+                        session,
+                        (Method::GET, &health_path),
+                        (&Value::Null, &session.csrf),
+                    )
+                    .await;
+                    assert_eq!(
+                        health.status().as_u16(),
+                        role_case.expected_metadata,
+                        "{health_path}"
+                    );
+                    let health: Value = health.json().await.expect("health response");
+                    assert_eq!(
+                        (
+                            health["state"].is_string(),
+                            health["observations"].is_array()
+                        ),
+                        (
+                            role_case.expected_metadata == StatusCode::OK.as_u16(),
+                            role_case.expected_metadata == StatusCode::OK.as_u16()
+                        ),
+                        "{health_path}: {health}"
+                    );
                     let unknown_reads = [
                         format!("{metadata}/{}/nodes", Uuid::now_v7()),
                         format!(

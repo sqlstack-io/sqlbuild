@@ -40,6 +40,10 @@ _EVALUATING: str = "Evaluating configured rules..."
             expected_health={
                 "kind": "compile_failed",
                 "generation": 1,
+                "error": (
+                    "configured rules failed with 1 finding(s); first: SQBRMODEL102 "
+                    "SELECT * is allowed only inside dependency import CTEs"
+                ),
                 "rules": {
                     "finding_count": 1,
                     "findings": [

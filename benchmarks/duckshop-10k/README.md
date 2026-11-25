@@ -26,7 +26,9 @@ iteration. `checksum.txt` records the full profile only.
 
 The generator uses no randomness, clocks or environment: the same generator version always writes
 byte-identical files. `checksum.txt` holds the generator version, the file count and the SHA-256 of
-`MANIFEST.sha256`, a sorted list of the SHA-256 of every generated file.
+`MANIFEST.sha256`, a sorted list of the SHA-256 of every generated file. The generator writes it to
+`target/MANIFEST.sha256` in the generated project, beside SQLBuild's local build output, so the
+project root holds only project files.
 
 When a change alters any generated file, bump `GENERATOR_VERSION` in `duckshop10k/__init__.py` and
 run `python benchmarks/duckshop-10k/generate.py --update-checksum`.
@@ -38,7 +40,7 @@ run `python benchmarks/duckshop-10k/generate.py --update-checksum`.
 | Models | 10,840 |
 | Staging, intermediate, marts and snapshots | 6,149 (56.7%), 2,519 (23.2%), 2,162 (19.9%), 10 |
 | Incremental models | 583, 112 of them with a capped automatic start and 112 renamed |
-| Python export assets | 433 in 241 modules sharing one helper module |
+| Python export assets | 433, each in its own `asset.py`, sharing one helper module |
 | Sources | 2,466 table sources and one expression source |
 | Unit tests and scenarios | 288 and 2 |
 | Dependency depth | 11 at most; 170 models at depth 7 or more |
@@ -57,7 +59,7 @@ A large project also carries planning workload the layers above barely touch, so
 it in the proportions such projects have: an incrementally kept history of every third timestamped
 intermediate table, one in five of them capping how far ahead its automatic start may sit and one in
 five renamed from an older name with `migrate_from`, and a Python export asset for every fifth
-published mart, a few per module, all sharing one helper module. A live plan reads a cursor bound for
+published mart, each in its own `asset.py`, all sharing one helper module. A live plan reads a cursor bound for
 each incremental model, plans each rename and discovers each Python node.
 
 The models that use `HASH`, `TIMESTAMP_LTZ` or `CURRENT_TIMESTAMP()` are tagged `known_divergence`,

@@ -130,6 +130,43 @@ describe('the plan index', () => {
 	});
 });
 
+describe('a model that can\'t be planned', () => {
+	const plan: PlanDocument = {
+		...empty,
+		has_errors: true,
+		models: [
+			model('orders', 'planning_error', { action: 'error', error: { code: 'S203', message: "model 'orders' sets full_refresh false", help: 'allow the rebuild' } }),
+			model('totals', 'query_changed', { query_diff: [...head, '-select 1', '+select 2'] })
+		]
+	};
+	const groups = planGroups(plan);
+
+	it('is its own group first, with its error, and the rest still plans', () => {
+		expect(groups.map((g) => [g.key, g.count])).toEqual([
+			['errors', 1],
+			['changed', 1]
+		]);
+		expect(groups[0].title).toBe('Planning failed');
+		expect(groups[0].rows.map((r) => [r.name, r.action, r.detail, r.notes])).toEqual([['orders', 'error', "error[S203]: model 'orders' sets full_refresh false", ['help: allow the rebuild']]]);
+	});
+});
+
+describe('a model an explicit cursor window skips', () => {
+	const plan: PlanDocument = {
+		...empty,
+		models: [model('late_feed', 'window_before_cursor_start', { action: 'skip', skip_reason: 'window ends before cursor_start 2021-01-01' }), model('early_feed', 'query_changed', { query_diff: [...head, '-select 1', '+select 2'] })]
+	};
+
+	it('is listed with its reason, apart from the models that build', () => {
+		const groups = planGroups(plan);
+		expect(groups.map((g) => [g.key, g.count])).toEqual([
+			['window', 1],
+			['changed', 1]
+		]);
+		expect(groups[0].rows.map((r) => [r.name, r.action])).toEqual([['late_feed', 'window ends before cursor_start 2021-01-01']]);
+	});
+});
+
 describe('an opened diff', () => {
 	it('shows the first changed lines, then says the rest is cut off', () => {
 		const diff = [{ text: '@@', cls: 'hunk' as const }, ...Array.from({ length: 20 }, (_, i) => ({ text: `+${i}`, cls: 'add' as const }))];

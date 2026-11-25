@@ -44,6 +44,9 @@ pub(crate) const PLAN_EXPIRY_SECONDS: i64 = 600;
 /// Unfinished plans one target accepts across everyone; each person may have one.
 pub(crate) const PLAN_QUEUE_LIMIT: i64 = 4;
 
+/// The most health observations a read keeps, newest first.
+pub(crate) const RECENT_HEALTH_LIMIT: usize = 100;
+
 /// A location instance unseen for longer than this cannot take a plan; locations report every 30 seconds.
 pub(crate) const LOCATION_SILENCE_SECONDS: i64 = 90;
 

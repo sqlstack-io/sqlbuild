@@ -13,7 +13,9 @@ use crate::native_commands::tests::helpers::{PLAN_FILE, discovered_load, failed_
 #[cfg(unix)]
 use crate::native_commands::tests::helpers::{scripted_compiler, silent_compiler};
 #[cfg(unix)]
-use crate::native_commands::tests::test_types::{CheckGraceTestCase, CheckShutdownTestCase};
+use crate::native_commands::tests::test_types::{
+    CheckGraceTestCase, CheckShutdownTestCase, CrashedCheckTestCase,
+};
 use crate::native_commands::tests::test_types::{
     DiscoveryCheckTestCase, DiscoveryReportTestCase, FailedCompileDiscoveryTestCase,
     RediscoverTestCase,
@@ -372,6 +374,59 @@ fn given_a_request_waiting_on_a_check_when_the_grace_passes_then_only_an_unfinis
         );
         assert!(
             elapsed >= test_case.expected_at_least,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn given_a_check_whose_interpreter_crashes_when_it_ends_then_the_location_republishes_and_discovers_again()
+ {
+    let test_cases = [
+        CrashedCheckTestCase {
+            description: "an interpreter that exits mid-check rediscovers, so the publication reports the set",
+            script: "read request; exit 3",
+            expected_rediscovers: 1,
+        },
+        CrashedCheckTestCase {
+            description: "a check that answers asks for nothing",
+            script: r#"read request; echo '{"set":null,"changed":false}'; exec sleep 600"#,
+            expected_rediscovers: 0,
+        },
+    ];
+
+    for test_case in test_cases {
+        let rediscovers: u64 = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime")
+            .block_on(async {
+                let mut load = discovered_load(&["a"]);
+                for set in load.discovered.values_mut() {
+                    set.check_every_seconds = Some(0);
+                }
+                let mut discovery = LocationDiscovery::default();
+                discovery.published(&load, Instant::now());
+                let (republish, controls) = tokio::sync::watch::channel(Default::default());
+                let (_sender, requests) = tokio::sync::mpsc::channel(1);
+                tokio::time::timeout(
+                    Duration::from_secs(10),
+                    check_discovered(
+                        Some(scripted_compiler(test_case.script)),
+                        &mut discovery,
+                        ((&republish, ("synthetic", uuid::Uuid::nil())), &requests),
+                    ),
+                )
+                .await
+                .expect("the check ends")
+                .expect("the interpreter is usable or stopped");
+                controls.borrow().rediscovers
+            });
+
+        assert_eq!(
+            rediscovers, test_case.expected_rediscovers,
             "{}",
             test_case.description
         );

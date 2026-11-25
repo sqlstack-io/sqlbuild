@@ -3,11 +3,12 @@
 /// Adapter attributes that only write SQL or describe the dialect, by prefix.
 const SYNTAX_PREFIXES: [&str; 3] = ["render_", "_render_", "supports_"];
 /// Adapter attributes that only describe the dialect or its defaults; none takes a connection.
-const SYNTAX_ATTRIBUTES: [&str; 33] = [
+const SYNTAX_ATTRIBUTES: [&str; 34] = [
     "adapter_name",
     "allows_implicit_managed_write_schema",
     "build_cursor_filter",
     "collection_rendering",
+    "cursor_type_range",
     "default_database",
     "default_promotion_strategy",
     "default_schema",

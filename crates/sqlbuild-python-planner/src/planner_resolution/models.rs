@@ -166,3 +166,14 @@ impl<'py> Resolution<'py> {
         Ok(value)
     }
 }
+
+/// How an explicit cursor window fits one model's `cursor_start` floor.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum WindowFit {
+    /// The window starts at or after the floor, or names no start before it.
+    Inside,
+    /// The window starts before the floor and ends after it: the model starts at the floor.
+    Clamped { requested: String, floor: String },
+    /// The window, as `start to end`, ends at or before the floor: the model has nothing to build in it.
+    BeforeFloor { floor: String, window: String },
+}

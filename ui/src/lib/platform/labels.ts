@@ -18,18 +18,22 @@ import type {
 } from '$lib/api';
 
 export const healthTone: Record<LocationHealth, string> = {
+	starting: 'var(--sb-running)',
 	healthy: 'var(--sb-success)',
-	degraded: 'var(--sb-warning)',
+	degraded: 'var(--sb-error)',
 	missing_secrets: 'var(--sb-error)',
-	discovery_failed: 'var(--sb-warning)',
-	falling_back: 'var(--sb-warning)',
+	change_plan_failed: 'var(--sb-error)',
+	discovery_failed: 'var(--sb-error)',
+	falling_back: 'var(--sb-error)',
 	broken: 'var(--sb-error)'
 };
 
 export const healthLabel: Record<LocationHealth, string> = {
+	starting: 'Starting',
 	healthy: 'Healthy',
 	degraded: 'Needs attention',
 	missing_secrets: 'Missing provider secrets',
+	change_plan_failed: 'Change plan failed',
 	discovery_failed: 'Discovery failed',
 	falling_back: 'Running previous version',
 	broken: 'Broken'
@@ -37,9 +41,11 @@ export const healthLabel: Record<LocationHealth, string> = {
 
 /** What each health means, for tooltips. */
 export const healthHelp: Record<LocationHealth, string> = {
+	starting: 'The newest instance is loading the project; earlier instances keep serving',
 	healthy: 'Loaded and starting scheduled runs',
 	degraded: 'Running, with open problems',
 	missing_secrets: 'A provider setting is missing from the location environment',
+	change_plan_failed: 'Planning what changed failed on the current snapshot, so what needs building is unknown',
 	discovery_failed: 'A discover function failed at the last publish; its nodes keep their last good items',
 	falling_back: 'The last deploy failed to load; the previous version keeps running',
 	broken: 'Not starting scheduled runs'
@@ -67,6 +73,7 @@ export const eventKindLabel: Record<PlatformEventKind, string> = {
 	calendar_times_dropped: 'Calendar times dropped',
 	scheduler_no_leader: 'Scheduler stopped',
 	location_broken: 'Location not checking in',
+	location_failing: 'Location failing',
 	location_missing_secrets: 'Provider secrets missing',
 	launch_failed: 'Couldn’t start runs',
 	connection_test_failed: 'Connection test failed',

@@ -86,8 +86,10 @@ hashes before writing. The warehouse persists in its named volume, and so does r
 folder with PostgreSQL in this image, so recreating the server keeps it. `docker compose down
 --volumes` deletes both.
 
-Check the location the way a container health check would; it exits 1 when the location is down
-or its last load failed:
+Check the location the way a deploy's cutover check would; it exits 0 only when the newest instance
+loaded the current code, 3 while it is still starting, and 1 when the location is down or its last
+load failed. The container's own health check passes `--allow-starting`, so a starting location
+counts as alive:
 
 ```sh
 docker compose exec location sqb location health --server http://server:8000 --location-id "$SQLBUILD_LOCATION_ID" --target development
@@ -257,7 +259,7 @@ Network=sqlbuild.network
 Volume=sqlbuild-warehouse:/warehouse
 Secret=sqlbuild-orders-location-token,type=env,target=SQLBUILD_LOCATION_TOKEN
 Exec=location serve --server http://sqlbuild-server:8000 --location-id 00000000-0000-0000-0000-000000000001 --target development
-HealthCmd=sqb location health --server http://sqlbuild-server:8000 --location-id 00000000-0000-0000-0000-000000000001 --target development
+HealthCmd=sqb location health --allow-starting --server http://sqlbuild-server:8000 --location-id 00000000-0000-0000-0000-000000000001 --target development
 HealthInterval=30s
 HealthStartPeriod=60s
 PodmanArgs=--cpus 2 --memory 1g

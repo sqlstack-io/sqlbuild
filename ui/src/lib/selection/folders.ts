@@ -4,12 +4,9 @@
 import type { CatalogNode } from '$lib/api';
 import { shortName } from '$lib/build-area/labels';
 import { topFolder } from '$lib/lineage/catalog-graph';
+import { canSelectByPath } from '$lib/project-layout';
 
 const dirOf = (path: string) => (path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '');
-
-/** The project folders a `path:` selector can start at; any other, such as `seeds/`, is an error (S012). */
-const PATH_ROOTS = ['models', 'python'];
-export const canSelectByPath = (dir: string) => PATH_ROOTS.some((root) => dir.startsWith(`${root}/`));
 
 /**
  * Of `dirs`, those a `path:` selector would over-select: a node sits somewhere under one but doesn't
@@ -57,7 +54,7 @@ export function folderSelections(nodes: readonly CatalogNode[]): Map<string, str
 	const groupAt = new Map<string, string>();
 	for (const [g, list] of groups) {
 		const dir = commonDir(list.map((n) => dirOf(n.path)));
-		// A bare root such as `models` holds every model; it never stands for one group. Nor can a folder
+		// A bare root such as `sql/models` holds every model; it never stands for one group. Nor can a folder
 		// outside the roots a path selector accepts.
 		if (!canSelectByPath(dir) || groupAt.has(dir)) continue;
 		folderOf.set(g, dir);

@@ -11,6 +11,7 @@
 	import { app } from '$lib/state/app.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { checkOutcomeLabel, checkOutcomeTone, nodeOutcomeTone, staleReasonDetail, staleReasonLabel } from '$lib/status';
+	import { statusLabel } from '$lib/build-area/node-status';
 	import { formatCredits, formatMs, formatNumber, kindLine, relationName, runScopePhaseHelp, runScopePhaseLabel, shortName } from '$lib/build-area/labels';
 	import { driftLabel, driftOf, type Tab } from './utils';
 
@@ -46,7 +47,7 @@
 		{:else}
 			<section class="panel">
 				<div class="status-top">
-					{#if node.lastOutcome}<StatusLabel tone={nodeOutcomeTone[node.lastOutcome]} label="Last build {node.lastOutcome}" />{:else if !node.lastBuild}<StatusLabel tone="var(--sb-text-faint)" label="Not built" muted />{/if}
+					{#if statusLabel(node)}{@const s = statusLabel(node)!}<StatusLabel tone={s.tone} label={s.label} muted={node.status === 'not_built'} />{/if}
 					<span class="muted">Last built: <BuildSource build={node.lastBuild} /></span>
 				</div>
 				<div class="stat-grid" class:five={!!node.cost}>

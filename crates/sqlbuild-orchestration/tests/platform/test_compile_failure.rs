@@ -12,14 +12,15 @@ use crate::store::tests::store_helpers::{close_test_store, open_test_store, run}
 use crate::store::tests::store_test_types::Backend;
 
 #[test]
-fn given_rule_findings_when_a_location_reports_a_failed_load_then_only_bounded_lists_are_accepted()
-{
+fn given_rule_findings_and_an_error_when_a_location_reports_a_failed_load_then_only_bounded_reports_are_accepted()
+ {
     let test_cases = [
         CompileFailureTestCase {
             description: "one finding",
             finding_count: 1,
             listed: 1,
             message_chars: 60,
+            error_chars: 80,
             expected_accepted: true,
         },
         CompileFailureTestCase {
@@ -27,6 +28,7 @@ fn given_rule_findings_when_a_location_reports_a_failed_load_then_only_bounded_l
             finding_count: 222,
             listed: 50,
             message_chars: 500,
+            error_chars: 4000,
             expected_accepted: true,
         },
         CompileFailureTestCase {
@@ -34,6 +36,7 @@ fn given_rule_findings_when_a_location_reports_a_failed_load_then_only_bounded_l
             finding_count: 51,
             listed: 51,
             message_chars: 60,
+            error_chars: 80,
             expected_accepted: false,
         },
         CompileFailureTestCase {
@@ -41,6 +44,15 @@ fn given_rule_findings_when_a_location_reports_a_failed_load_then_only_bounded_l
             finding_count: 1,
             listed: 2,
             message_chars: 60,
+            error_chars: 80,
+            expected_accepted: false,
+        },
+        CompileFailureTestCase {
+            description: "an over-long load error",
+            finding_count: 1,
+            listed: 1,
+            message_chars: 60,
+            error_chars: 4001,
             expected_accepted: false,
         },
         CompileFailureTestCase {
@@ -48,6 +60,7 @@ fn given_rule_findings_when_a_location_reports_a_failed_load_then_only_bounded_l
             finding_count: 1,
             listed: 1,
             message_chars: 501,
+            error_chars: 80,
             expected_accepted: false,
         },
     ];
@@ -83,6 +96,7 @@ fn given_rule_findings_when_a_location_reports_a_failed_load_then_only_bounded_l
                         finding_count: test_case.finding_count,
                         findings: vec![finding; test_case.listed],
                     }),
+                    error: Some("e".repeat(test_case.error_chars)),
                 },
             };
             assert_eq!(

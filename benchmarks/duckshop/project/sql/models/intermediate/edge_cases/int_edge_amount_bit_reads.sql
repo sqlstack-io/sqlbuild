@@ -107,14 +107,13 @@ final AS (
     (f.group_hash = b.group_hash)::BOOLEAN AS group_hash_is_order_free
   FROM checks AS c
   INNER JOIN group_sizes AS s
-    ON c.group_code = s.group_code,
-  group_names AS n,
-  hash_forward AS f,
-  hash_backward AS b
-  WHERE
-    n.group_code = c.group_code
-    AND f.group_code = c.group_code
-    AND b.group_code = c.group_code
+    ON c.group_code = s.group_code
+  INNER JOIN group_names AS n
+    ON c.group_code = n.group_code
+  INNER JOIN hash_forward AS f
+    ON c.group_code = f.group_code
+  INNER JOIN hash_backward AS b
+    ON c.group_code = b.group_code
 )
 
 SELECT *

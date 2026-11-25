@@ -61,6 +61,11 @@ services:
         SQLBUILD_VERSION: ${SQLBUILD_VERSION:-}
         SQLBUILD_GIT_REVISION: ${SQLBUILD_GIT_REVISION:?Set SQLBUILD_GIT_REVISION}
     command: [location, serve, --server, "http://server:8000", --location-id, "${SQLBUILD_LOCATION_ID:?Set SQLBUILD_LOCATION_ID}", --target, development]
+    # Alive while starting: whether the new code loaded is the deploy's cutover check, not the container's.
+    healthcheck:
+      test: [CMD, sqb, location, health, --allow-starting, --server, "http://server:8000", --location-id, "${SQLBUILD_LOCATION_ID:?Set SQLBUILD_LOCATION_ID}", --target, development]
+      interval: 30s
+      start_period: 60s
     environment:
       SQLBUILD_LOCATION_TOKEN: ${SQLBUILD_LOCATION_TOKEN:-}
     volumes:

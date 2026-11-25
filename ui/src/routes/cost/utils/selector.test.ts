@@ -15,7 +15,8 @@ describe('the Cost page’s selection as a place', () => {
 
 	it('writes folders as path selectors under the project layout, and back', () => {
 		expect(pathOfFolder('staging/orders')).toBe('sql/models/staging/orders');
-		expect(pathOfFolder('python/nodes/loaders')).toBe('python/nodes/loaders');
+		expect(pathOfFolder('python/loaders')).toBe('python/nodes/loaders');
+		expect(folderOfPath('python/nodes/loaders')).toBe('python/loaders');
 		expect(folderOfPath('sql/models/staging/')).toBe('staging');
 		expect(selectorOf({ base: ['tag:finance'], job: 'nightly', folder: 'marts', model: null })).toBe('tag:finance,job:nightly,path:sql/models/marts');
 		expect(union('job:a', 'job:b')).toBe('job:a job:b');

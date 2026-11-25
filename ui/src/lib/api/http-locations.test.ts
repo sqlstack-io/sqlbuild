@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { connectionDetailsOf, connectionTestOf, firstSyncPending, healthOf, instancesOf, missingSecretsEventOf, missingSecretsOf, poolCapWarningsOf, toLocationDetail, toWarehouseConnection, warehouseSyncOf } from './http-locations';
+import { checkInsOf, connectionDetailsOf, connectionTestOf, firstSyncPending, instancesOf, missingSecretsEventOf, missingSecretsOf, poolCapWarningsOf, toLocationDetail, toWarehouseConnection, warehouseSyncOf } from './http-locations';
 
 const now = Date.parse('2026-11-08T12:00:00Z');
 const at = (secondsAgo: number) => new Date(now - secondsAgo * 1000).toISOString();
-type Health = Parameters<typeof healthOf>[0][number]['report']['health'];
+type Health = Parameters<typeof checkInsOf>[0][number]['report']['health'];
 const seen = (secondsAgo: number, health: Health, session = 's-1') => ({
 	received_at: at(secondsAgo),
 	report: { event_id: `e-${secondsAgo}`, session_id: session, target: 'prod', health }
 });
 
 describe('location health', () => {
-	it('is broken without a check-in in the last 90 seconds, whatever was reported before', () => {
-		expect(healthOf([seen(91, { kind: 'heartbeat' })], now)).toEqual({ health: 'broken', liveInstances: 0, lastSeenAt: at(91) });
+	it('counts no live instance without a check-in in the last 90 seconds', () => {
+		expect(checkInsOf([seen(91, { kind: 'heartbeat' })], now)).toEqual({ liveInstances: 0, lastSeenAt: at(91) });
 	});
 
 	it("reads the server's newest pool-cap warning, job by job", () => {
@@ -23,25 +23,12 @@ describe('location health', () => {
 
 	it("doesn't count the server's pool-cap warning as a location check-in", () => {
 		const capped = seen(5, { kind: 'pool_capped', generation: 2, jobs: [] }, '00000000-0000-0000-0000-000000000000');
-		expect(healthOf([capped, seen(91, { kind: 'heartbeat' })], now)).toEqual({ health: 'broken', liveInstances: 0, lastSeenAt: at(91) });
+		expect(checkInsOf([capped, seen(91, { kind: 'heartbeat' })], now)).toEqual({ liveInstances: 0, lastSeenAt: at(91) });
 	});
 
 	it('counts each live instance once', () => {
 		const observations = [seen(10, { kind: 'heartbeat' }), seen(20, { kind: 'connection', generation: 2, healthy: true }), seen(30, { kind: 'heartbeat' }, 's-2')];
-		expect(healthOf(observations, now)).toMatchObject({ health: 'healthy', liveInstances: 2, lastSeenAt: at(10) });
-	});
-
-	it('falls back after a failed load until a newer generation connects', () => {
-		const failed = seen(20, { kind: 'compile_failed', generation: 3 });
-		expect(healthOf([seen(5, { kind: 'heartbeat' }), failed, seen(40, { kind: 'connection', generation: 2, healthy: true })], now).health).toBe('falling_back');
-		expect(healthOf([seen(5, { kind: 'connection', generation: 4, healthy: true }), failed], now).health).toBe('healthy');
-	});
-
-	it('reports missing provider secrets ahead of a failed connection until a newer report finds none', () => {
-		const missing = seen(10, { kind: 'provider_secrets', generation: 2, missing: 1, providers: [] });
-		const unhealthy = seen(10, { kind: 'connection', generation: 2, healthy: false });
-		expect(healthOf([missing, unhealthy], now).health).toBe('missing_secrets');
-		expect(healthOf([seen(5, { kind: 'provider_secrets', generation: 3, missing: 0, providers: [] }), missing], now).health).toBe('healthy');
+		expect(checkInsOf(observations, now)).toEqual({ liveInstances: 2, lastSeenAt: at(10) });
 	});
 
 	it('lists the newest check\'s providers missing secrets, the target\'s allowed ones last, and raises only the others', () => {
@@ -68,19 +55,10 @@ describe('location health', () => {
 		);
 		const allowedOnly = seen(5, { kind: 'provider_secrets', generation: 3, missing: 0, providers: [bucket] });
 		expect(missingSecretsEventOf('loc-1:prod', [allowedOnly, newest])).toBeNull();
-		expect(healthOf([allowedOnly], now).health).toBe('healthy');
 	});
 
-	it('reports a failed discover function ahead of a failed connection until a newer publish discovers it', () => {
-		const failed = seen(10, { kind: 'discovery', generation: 2, sets: [{ name: 'orders_plan', status: 'failed', error: 'ssh timeout', items: 11 }] });
-		const unhealthy = seen(10, { kind: 'connection', generation: 2, healthy: false });
-		expect(healthOf([failed, unhealthy], now).health).toBe('discovery_failed');
-		expect(healthOf([seen(5, { kind: 'discovery', generation: 3, sets: [{ name: 'orders_plan', status: 'ok', items: 12 }] }), failed], now).health).toBe('healthy');
-	});
-
-	it('needs attention when the latest connection check failed', () => {
+	it('records a failed connection check', () => {
 		const observations = [seen(5, { kind: 'connection', generation: 2, healthy: false }), seen(60, { kind: 'connection', generation: 1, healthy: true })];
-		expect(healthOf(observations, now).health).toBe('degraded');
 		expect(connectionTestOf(observations)).toMatchObject({ outcome: 'failed', at: at(5) });
 	});
 
@@ -110,20 +88,20 @@ describe('location processes', () => {
 describe('toLocationDetail', () => {
 	const location = { id: 'loc:prod', name: 'orders', health: null, lastSeenAt: null, target: { name: 'prod', adapter: null, connectionSummary: null }, warehouseSync: { lastSyncedAt: null, lastError: null } };
 
-	it('shows a failed reload as its health, without inventing a failed deploy or error text', () => {
-		const detail = toLocationDetail(location, [seen(5, { kind: 'heartbeat' }), seen(20, { kind: 'compile_failed', generation: 3 }), seen(40, { kind: 'connection', generation: 2, healthy: true })], null, now);
+	it("shows the server's state, without inventing a failed deploy or error text", () => {
+		const detail = toLocationDetail(location, { state: 'falling_back', observations: [seen(5, { kind: 'heartbeat' }), seen(20, { kind: 'compile_failed', generation: 3 }), seen(40, { kind: 'connection', generation: 2, healthy: true })] }, null, now);
 		expect([detail.health, detail.failedDeploy, detail.lastLoadError, detail.snapshot]).toEqual(['falling_back', null, null, null]);
 	});
 
 	it('lists the rule findings that failed the load, as sqb compile prints them', () => {
 		const rules = { finding_count: 3, findings: [{ code: 'SQBRMODEL102', message: 'SELECT * is allowed only inside dependency import CTEs', path: 'models/orders.sql', line: 2 }] };
-		const detail = toLocationDetail(location, [seen(20, { kind: 'compile_failed', generation: 3, rules })], null, now);
+		const detail = toLocationDetail(location, { state: 'falling_back', observations: [seen(20, { kind: 'compile_failed', generation: 3, rules })] }, null, now);
 		expect(detail.lastLoadError).toBe('Compile failed: 3 rule findings\nmodels/orders.sql:2 [SQBRMODEL102] SELECT * is allowed only inside dependency import CTEs\n… and 2 more');
 	});
 
-	it('is healthy again once a newer generation connects', () => {
-		const detail = toLocationDetail(location, [seen(5, { kind: 'connection', generation: 4, healthy: true }), seen(20, { kind: 'compile_failed', generation: 3 })], null, now);
-		expect([detail.health, detail.connectionTest?.outcome]).toEqual(['healthy', 'ok']);
+	it('shows no load error once the server reads the location healthy again', () => {
+		const detail = toLocationDetail(location, { state: 'healthy', observations: [seen(5, { kind: 'connection', generation: 4, healthy: true }), seen(20, { kind: 'compile_failed', generation: 3, error: 'job x: unknown' })] }, null, now);
+		expect([detail.health, detail.lastLoadError, detail.connectionTest?.outcome]).toEqual(['healthy', null, 'ok']);
 	});
 });
 

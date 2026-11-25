@@ -50,7 +50,10 @@ export function toCatalogNode(wire: Wire['CatalogNodeRecord']): CatalogNode | nu
 				? [{ reason: 'changed', change: 'definition', detail: 'The definition changed since it was last built here.', since: state.lastBuild.builtAt }]
 				: [],
 		sourceFreshness: null,
-		checks: state.checks
+		checks: state.checks,
+		// The listing carries no state; the node-states read sets it.
+		status: null,
+		statusAt: null
 	};
 }
 
@@ -64,7 +67,9 @@ export function toNodeState(wire: Wire['NodeState']): NodeState {
 		lastOutcome: outcome === 'success' || outcome === 'warn' || outcome === 'failed' ? outcome : null,
 		definitionChanged: wire.definition_changed,
 		// A recording from an older server, such as the static demo's, has no counts: unknown, not zero.
-		checks: wire.checks ?? null
+		checks: wire.checks ?? null,
+		status: 'status' in wire ? (wire.status ?? null) : null,
+		statusAt: 'status_at' in wire ? (wire.status_at ?? null) : null
 	};
 }
 

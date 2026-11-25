@@ -5,6 +5,7 @@ use crate::platform::main::health::read_person_location_health::read_person_loca
 use crate::platform::main::health::report_remote_location_health::report_remote_location_health;
 use crate::platform::models::{
     ConnectionCheckTrigger, LocationHealth, LocationHealthObservation, LocationHealthReport,
+    LocationState,
 };
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
@@ -199,15 +200,20 @@ fn given_scoped_location_observations_when_retried_or_read_then_history_and_auth
                     (DefaultRole::None, &no_caps),
                 )
             };
+            let read = person_read("preview #1").await.expect("person health");
             assert_eq!(
-                person_read("preview #1").await.expect("person health"),
-                observations,
-                "a person sees the same observations for the reporting target"
+                (read.observations.clone(), read.state),
+                (
+                    observations.clone(),
+                    LocationState::of(&observations, ("preview #1", Utc::now()))
+                ),
+                "a person sees the same observations for the reporting target, and the server's state of them"
             );
             assert!(
                 person_read("another target")
                     .await
                     .expect("other target health")
+                    .observations
                     .is_empty(),
                 "another target's read leaves this target's observations out"
             );
@@ -223,7 +229,10 @@ fn given_scoped_location_observations_when_retried_or_read_then_history_and_auth
                 .await
                 .expect("aged report");
                 commit(transaction).await.expect("aged report committed");
-                let reports = person_read("preview #1").await.expect("aged health");
+                let reports = person_read("preview #1")
+                    .await
+                    .expect("aged health")
+                    .observations;
                 assert_eq!(
                     reports
                         .iter()
@@ -289,7 +298,8 @@ fn given_scoped_location_observations_when_retried_or_read_then_history_and_auth
             assert_eq!(
                 person_read("preview #1")
                     .await
-                    .expect("quiet target health"),
+                    .expect("quiet target health")
+                    .observations,
                 observations,
                 "a busier target's newer observations do not push out this target's"
             );
@@ -399,7 +409,8 @@ fn given_pool_amounts_above_this_servers_caps_when_reading_health_then_a_pool_ca
                 (DefaultRole::None, &caps),
             )
             .await
-            .expect("health");
+            .expect("health")
+            .observations;
 
             let capped = pool_capped(&observations);
             assert!(

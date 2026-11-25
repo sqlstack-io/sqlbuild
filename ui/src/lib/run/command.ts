@@ -3,6 +3,7 @@
 // nodes. The server resolves selectors and refuses flags; nothing here decides
 // whether a command may run. Pure: no side effects.
 
+import { canSelectByPath } from '$lib/project-layout';
 import type { ChangedBuild, CursorWindow, LaunchVerb, RerunMode, SnapshotNode } from '$lib/api';
 import { flagSpec, VERBS, type FlagSpec } from './command-table';
 import { plural } from '$lib/format/plural';
@@ -108,12 +109,12 @@ export const CHANGED_PLAN_HREF = planHref([], 'build', { flags: { '--changed': t
 
 /**
  * The counts the "Build N changed" button shows: the location's plan of `CHANGED_PLAN_HREF` when it
- * names a change, else the nodes whose definitions changed, with the downstream count unknown, and
- * why that plan is failing, if it is.
+ * names a change (a plan with models it couldn't plan still names the rest), else the nodes whose
+ * definitions changed, with the downstream count unknown, and why that plan is failing, if it is.
  */
 export function changedBuildCounts(definitionChanged: number, build: ChangedBuild | null): { changed: number; downstream: number | null; failing: string | null } {
 	const failing = build?.failing ?? null;
-	return build?.changed.length && !failing ? { changed: build.changed.length, downstream: build.downstream.length, failing } : { changed: definitionChanged, downstream: null, failing };
+	return build?.changed.length ? { changed: build.changed.length, downstream: build.downstream.length, failing } : { changed: definitionChanged, downstream: null, failing };
 }
 
 /** The "Build N changed" button's main label, its lighter bracketed part (null without one), and its tooltip. */
@@ -232,7 +233,8 @@ function selectorPool(nodes: SnapshotNode[]): { value: string; hint: string }[] 
 	const unique = (values: string[]) => [...new Set(values)].sort();
 	return [
 		...unique(nodes.flatMap((n) => n.tags)).map((t) => ({ value: `tag:${t}`, hint: 'tag' })),
-		...unique(nodes.filter((n) => n.path.includes('/')).map((n) => n.path.replace(/\/[^/]+$/, ''))).map((p) => ({ value: `path:${p}`, hint: 'folder' })),
+		// Only folders a `path:` selector accepts, below `sql/models/` or `python/nodes/`.
+		...unique(nodes.map((n) => n.path.replace(/\/?[^/]*$/, '')).filter(canSelectByPath)).map((p) => ({ value: `path:${p}`, hint: 'folder' })),
 		...nodes.map((n) => ({ value: selectorOf(n.key), hint: n.kind }))
 	];
 }

@@ -12,6 +12,8 @@ mod helpers;
 mod init;
 #[path = "tests/test_location_discovery.rs"]
 mod location_discovery;
+#[path = "tests/test_location_health.rs"]
+mod location_health;
 #[path = "tests/test_location_metadata.rs"]
 mod location_metadata;
 #[path = "tests/test_location_plan.rs"]
@@ -28,5 +30,7 @@ mod rules;
 mod sync_schedule;
 #[path = "tests/test_terminal.rs"]
 mod terminal;
+#[path = "tests/test_lookup_failures.rs"]
+mod test_lookup_failures;
 #[path = "tests/test_types.rs"]
 mod test_types;

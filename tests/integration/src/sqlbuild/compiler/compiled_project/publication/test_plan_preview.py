@@ -635,13 +635,14 @@ def test_given_a_synced_copy_when_a_preview_reads_source_freshness_then_it_is_un
             edited_file="sql/functions/sql/udf__adjust_amount.sql",
             edit=("amount + 1", "amount + 100"),
             selection=["model:order_amounts"],
+            expected_error_model="order_amounts",
             expected_code="S203",
             expected_reason="model 'order_amounts' sets full_refresh false",
         ),
     ],
     ids=lambda case: case.description,
 )
-def test_given_a_plan_that_fails_when_the_location_plans_it_then_its_own_error_is_stored(
+def test_given_a_model_that_cannot_be_planned_when_the_location_plans_it_then_its_error_row_is_stored(
     test_case: FailedPlanTestCase, tmp_path: Path
 ) -> None:
     project: Path = tmp_path / "project"
@@ -655,10 +656,16 @@ def test_given_a_plan_that_fails_when_the_location_plans_it_then_its_own_error_i
 
     published, plan = changed_build_and_plan_from_copy(tmp_path, project, test_case.selection)
 
-    assert plan["error"]["code"] == test_case.expected_code, plan
-    assert test_case.expected_reason in plan["error"]["message"], plan
+    rows: dict[str, dict[str, Any]] = {model["name"]: model for model in plan["models"]}
+    error: dict[str, Any] = rows[test_case.expected_error_model]["error"]
+    assert plan["has_errors"] is True, plan
+    assert rows[test_case.expected_error_model]["action"] == "error", plan
+    assert error["code"] == test_case.expected_code, plan
+    assert test_case.expected_reason in error["message"], plan
     assert published["changed"] == [] and published["downstream"] == [], published
-    assert published["failing"] == plan["error"]["message"], published
+    assert published["failing"] == (
+        f"Can't plan 1 model: {test_case.expected_error_model}: {error['message']}"
+    ), published
 
 
 @pytest.mark.parametrize(

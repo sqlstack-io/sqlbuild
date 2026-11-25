@@ -255,7 +255,7 @@
 	// The index under Will run and Won't run, each entry counting nodes once (plan-totals.ts), warnings apart.
 	const counts = $derived(planSectionCounts(plan));
 	const totals = $derived(planTotals(counts, migrationSteps(plan)));
-	const WONT_GROUPS = new Set<PlanGroupKey>(['held_back', 'skipped']);
+	const WONT_GROUPS = new Set<PlanGroupKey>(['errors', 'window', 'held_back', 'skipped']);
 	const FUNCTION_SECTIONS = new Set<PlanPageSection>(['functions', 'changed_functions']);
 	const runGroups = $derived(groups.filter((g) => !WONT_GROUPS.has(g.key) && g.key !== 'warnings'));
 	const wontGroups = $derived(groups.filter((g) => WONT_GROUPS.has(g.key)));

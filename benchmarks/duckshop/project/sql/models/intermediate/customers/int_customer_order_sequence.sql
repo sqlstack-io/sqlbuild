@@ -27,13 +27,13 @@ WITH orders AS (
 
 valid_orders AS (
   SELECT
-    o.order_id,
-    o.customer_id,
-    o.placed_at,
-    o.placed_date_local,
-    o.amount_usd,
-    o.sales_channel
-  FROM orders AS o
+    order_id,
+    customer_id,
+    placed_at,
+    placed_date_local,
+    amount_usd,
+    sales_channel
+  FROM orders
   WHERE NOT @sql.is_status(@enum("order_status").CANCELLED)
 ),
 

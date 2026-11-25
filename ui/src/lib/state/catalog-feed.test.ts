@@ -21,13 +21,17 @@ function node(key: string, upstream: string[] = []): CatalogNode {
 		lastOutcome: 'success',
 		stale: [],
 		sourceFreshness: null,
-		checks: null
+		checks: null,
+		status: 'current',
+		statusAt: '2026-01-01T00:00:00.000Z'
 	};
 }
 
 const failed = (runId: string): NodeState => ({
 	lastBuild: { fingerprintRunId: runId, runId: null, jobKey: null, builtAt: '2026-01-02T00:00:00.000Z', fingerprint: 'g' },
 	lastOutcome: 'failed',
+	status: 'failed',
+	statusAt: '2026-01-02T00:00:00.000Z',
 	definitionChanged: false,
 	checks: null
 });

@@ -726,3 +726,11 @@ pub(crate) struct CostFolderTestCase {
     pub(crate) path: Option<&'static str>,
     pub(crate) expected_folder: &'static str,
 }
+
+pub(crate) struct PlanLoadFailureTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The error the location reports with its failed load; absent from an older location.
+    pub(crate) load_error: Option<&'static str>,
+    pub(crate) expected_message: &'static str,
+}

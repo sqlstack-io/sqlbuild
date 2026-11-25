@@ -4,6 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use sqlbuild_analysis::graph::main::parse_selector::parse_selector;
 use sqlbuild_analysis::graph::models::ParsedSelector;
+use sqlbuild_core::constants::{MODELS_PATH, PYTHON_NODE_ROOT};
 use sqlbuild_core::text::main::close_matches::close_matches;
 use sqlbuild_orchestration::runs::models::{
     SelectionField, SelectionLocation, SelectionProblem, SelectionRefusal, SelectionVocabulary,
@@ -276,7 +277,7 @@ fn kind_of(key: &str) -> &str {
     key.split_once(':').map_or("", |(kind, _)| kind)
 }
 
-/// `models/staging/orders` and every folder above it.
+/// `sql/models/staging/orders` and each folder above it that a `path:` selector accepts.
 fn folders(folder: &str) -> Vec<String> {
     if folder.is_empty() || folder == PROJECT_FOLDER {
         return Vec::new();
@@ -284,7 +285,16 @@ fn folders(folder: &str) -> Vec<String> {
     let parts: Vec<&str> = folder.split('/').collect();
     (1..=parts.len())
         .map(|depth| parts[..depth].join("/"))
+        .filter(|path| is_path_root_folder(path))
         .collect()
+}
+
+/// Whether a folder is `sql/models` or `python/nodes` or below one, never `sql` or `python` (S012).
+fn is_path_root_folder(path: &str) -> bool {
+    [MODELS_PATH, PYTHON_NODE_ROOT].contains(&path)
+        || [MODELS_PATH, PYTHON_NODE_ROOT]
+            .iter()
+            .any(|root| path.starts_with(&format!("{root}/")))
 }
 
 fn entries(counts: BTreeMap<String, u64>) -> Vec<VocabularyEntry> {

@@ -1,3 +1,4 @@
+import { countStatus } from '$lib/build-area/node-status';
 import { topFolder } from '$lib/lineage/catalog-graph';
 import { recentDeploys } from '$lib/build-area/overview-panels';
 import { clearedAcknowledgements, visibleEventKey, withConditions } from '$lib/build-area/attention-conditions';
@@ -53,19 +54,14 @@ export function problemRunsOf(topLevel: Run[], now: number): Run[] {
 
 const attentionRun = ({ id, jobKey, kind, status, statusReason, nodeCounts, startedAt, endedAt }: Run): AttentionRun => ({ id, jobKey, kind, status, statusReason, nodeCounts, startedAt, endedAt });
 
-/** Build state per top-level folder, for the nodes SQLBuild builds; a node can be both changed and behind. */
+/** Build state per top-level folder, for the nodes SQLBuild builds, by the server's status of each. */
 export function groupStatusOf(nodes: CatalogNode[]): GroupStatus[] {
 	const groups = new Map<string, GroupStatus>();
 	for (const n of nodes) {
 		if (n.kind === 'source') continue;
 		const group = topFolder(n);
 		const g = groups.get(group) ?? { group, total: 0, current: 0, changed: 0, behind: 0, failed: 0 };
-		const stale = n.stale ?? [];
-		g.total += 1;
-		if (n.lastOutcome === 'failed') g.failed += 1;
-		if (stale.some((s) => s.reason !== 'behind')) g.changed += 1;
-		if (stale.some((s) => s.reason === 'behind')) g.behind += 1;
-		if (!stale.length && n.lastOutcome !== 'failed' && n.lastBuild) g.current += 1;
+		countStatus(g, n);
 		groups.set(group, g);
 	}
 	return [...groups.values()].sort((a, b) => a.group.localeCompare(b.group));
