@@ -189,7 +189,7 @@ function eventTag(e: RunEvent): LogEntry['tag'] {
 	if (e.type === 'resource_attempt_completed') return { text: 'built', tone: TAG_TONE.ok };
 	if (e.type === 'resource_attempt_failed' || e.type === 'statement_failed' || e.type === 'invocation_failed') return { text: 'failed', tone: TAG_TONE.err };
 	if (e.type === 'resource_attempt_skipped') return { text: 'skipped', tone: TAG_TONE.quiet };
-	if (e.type === 'audit_completed') return { text: 'audit', tone: e.level === 'error' ? TAG_TONE.err : e.level === 'info' ? TAG_TONE.ok : TAG_TONE.warn };
+	if (e.type === 'audit_completed') return { text: 'audit', tone: e.check?.outcome === 'not-run' ? TAG_TONE.quiet : e.level === 'error' ? TAG_TONE.err : e.level === 'info' ? TAG_TONE.ok : TAG_TONE.warn };
 	if (e.type === 'node_log') return { text: 'log', tone: e.level === 'info' ? TAG_TONE.quiet : TAG_TONE.warn };
 	return undefined;
 }

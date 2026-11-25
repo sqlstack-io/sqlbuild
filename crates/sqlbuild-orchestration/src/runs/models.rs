@@ -487,7 +487,7 @@ pub struct RunEventRecord {
     pub outcome: Option<String>,
     pub row_count: Option<i64>,
     pub affected_rows: Option<i64>,
-    /// A summary of what an event names, such as a member retry or the command a worker started; never error or SQL text.
+    /// A summary of what an event names, such as a member retry, the command a worker started or why an audit was not run; never error or SQL text.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
     /// For a check's result: its name as declared, its ID and this result's, and the rows it found; never its SQL or rows.

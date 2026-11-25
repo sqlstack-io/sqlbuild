@@ -86,3 +86,7 @@ pub(crate) const PAST_RUN_AUDIT_LIMIT: usize = 10_000;
 pub(crate) const FAILED_RUN_NODE_STATUSES: [&str; 3] = ["failed", "cancelled", "not_run"];
 /// The run node status `skipped:` selects.
 pub(crate) const SKIPPED_RUN_NODE_STATUS: &str = "skipped";
+/// An audit check that was not run because the target lacks a read: neither run nor failed, so run selectors leave it out.
+pub(crate) const NOT_RUN_STATUS: &str = "not_run";
+/// The kind of a run node row that records an attached check.
+pub(crate) const CHECK_KIND: &str = "check";

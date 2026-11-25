@@ -48,6 +48,9 @@ fn given_node_and_check_reports_when_stored_and_read_then_each_event_names_its_n
                 Some("r-1".into()),
                 Some(14),
             ),
+            stored_outcome: "warn",
+            not_run_reason: None,
+            expected_message: None,
         },
         NodeEventResourcesTestCase {
             description: "PostgreSQL node and check events",
@@ -64,6 +67,47 @@ fn given_node_and_check_reports_when_stored_and_read_then_each_event_names_its_n
                 Some("r-1".into()),
                 Some(14),
             ),
+            stored_outcome: "warn",
+            not_run_reason: None,
+            expected_message: None,
+        },
+        NodeEventResourcesTestCase {
+            description: "SQLite: an audit that was not run says why",
+            backend: Backend::Sqlite,
+            expected_named: [
+                ("run_node_started", "model", "payments"),
+                ("run_check_started", "check", "payments_positive"),
+                ("run_check_finished", "check", "payments_positive"),
+                ("run_node_finished", "model", "payments"),
+            ],
+            expected_check: (
+                Some("payments_positive".into()),
+                Some("b-payments-positive".into()),
+                Some("r-1".into()),
+                Some(14),
+            ),
+            stored_outcome: "not_run",
+            not_run_reason: Some("reads payments, which doesn't exist in the target"),
+            expected_message: Some("reads payments, which doesn't exist in the target"),
+        },
+        NodeEventResourcesTestCase {
+            description: "PostgreSQL: an audit that was not run says why",
+            backend: Backend::Postgres,
+            expected_named: [
+                ("run_node_started", "model", "payments"),
+                ("run_check_started", "check", "payments_positive"),
+                ("run_check_finished", "check", "payments_positive"),
+                ("run_node_finished", "model", "payments"),
+            ],
+            expected_check: (
+                Some("payments_positive".into()),
+                Some("b-payments-positive".into()),
+                Some("r-1".into()),
+                Some(14),
+            ),
+            stored_outcome: "not_run",
+            not_run_reason: Some("reads payments, which doesn't exist in the target"),
+            expected_message: Some("reads payments, which doesn't exist in the target"),
         },
     ];
     for test_case in test_cases {
@@ -237,17 +281,19 @@ fn given_node_and_check_reports_when_stored_and_read_then_each_event_names_its_n
             let transaction = begin(store, TransactionMode::Write).await.expect("begin");
             let (transaction, _) = query(
                 transaction,
-                "UPDATE recall_events SET event_type='audit_completed', outcome='warn', payload=$1 WHERE event_id=$2",
+                "UPDATE recall_events SET event_type='audit_completed', outcome=$3, payload=$1 WHERE event_id=$2",
                 vec![
                     Parameter::Json(json!({
                         "audit_name": "payments_positive",
                         "binding_key": "b-payments-positive",
                         "result_id": "r-1",
-                        "outcome": "warn",
+                        "outcome": test_case.stored_outcome,
                         "violation_count": 14,
                         "executed_sql": "SELECT 1",
+                        "not_run_reason": test_case.not_run_reason,
                     })),
                     Parameter::Text(check_finished.event_id.to_string()),
+                    Parameter::Text(test_case.stored_outcome.to_owned()),
                 ],
             )
             .await
@@ -278,6 +324,17 @@ fn given_node_and_check_reports_when_stored_and_read_then_each_event_names_its_n
                 checks,
                 vec![test_case.expected_check.clone()],
                 "{}: a check result names its check and the rows it found, never its SQL",
+                test_case.description
+            );
+            let messages: Vec<Option<String>> = events
+                .iter()
+                .filter(|event| event.event_type == "audit_completed")
+                .map(|event| event.message.clone())
+                .collect();
+            assert_eq!(
+                messages,
+                vec![test_case.expected_message.map(str::to_owned)],
+                "{}: a check result's summary is why it wasn't run, if it wasn't",
                 test_case.description
             );
             close_test_store(fixture).await;

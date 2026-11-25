@@ -4,12 +4,13 @@ import { rowsText } from './events';
 import { quickPickText, withNameToggled } from './picks';
 import { skipCause } from './skips';
 import { summaryOf } from './summary';
+import { checksOf } from './checks';
 
 const node = (nodeKey: string, status: RunNode['status'], extra: Partial<RunNode> = {}) => ({ nodeKey, status, runId: 'r', kind: 'table', rowsAffected: null, skippedBecauseOf: null, ...extra }) as RunNode;
-const check = (level: RunEvent['level']) => ({ type: 'audit_completed', level }) as RunEvent;
+const check = (level: RunEvent['level'], outcome: NonNullable<RunEvent['check']>['outcome'] = 'passed') => ({ type: 'audit_completed', level, check: { name: 'a', outcome, rows: null, bindingKey: null, resultId: null } }) as RunEvent;
 
 describe('a run’s summary line', () => {
-	it('counts what it built, what incrementals added, and its problems and checks', () => {
+	it('counts what it built, what incrementals added, and its problems and checks, an audit not run on its own', () => {
 		const nodes = [
 			node('model:orders', 'success'),
 			node('model:events', 'success', { kind: 'incremental', rowsAffected: 48_000 }),
@@ -18,7 +19,7 @@ describe('a run’s summary line', () => {
 			node('model:report', 'skipped'),
 			node('model:late', 'not_run')
 		];
-		expect(summaryOf(nodes, [check('info'), check('info'), check('warn')], false)).toEqual({
+		expect(summaryOf(nodes, [check('info'), check('info'), check('warn', 'warned'), check('info', 'not-run')], false)).toEqual({
 			built: 3,
 			incremental: 1,
 			incrementalRows: 48_000,
@@ -30,7 +31,8 @@ describe('a run’s summary line', () => {
 			waiting: 0,
 			checksPassed: 2,
 			checksWarned: 1,
-			checksFailed: 0
+			checksFailed: 0,
+			checksNotRun: 1
 		});
 	});
 
@@ -86,5 +88,16 @@ describe('a node’s rows', () => {
 			rowsText(node('model:orders_view', 'success', { kind: 'view' })),
 			rowsText(node('model:orders', 'running'))
 		]).toEqual(['+1,200 rows', '+1 row', '5,000 rows', '320 rows so far', null, null]);
+	});
+});
+
+describe('a node’s checks', () => {
+	it('lists an audit that was not run after the others, with why', () => {
+		const notRun = { ...check('info', 'not-run'), id: 'e2', message: "reads payments, which doesn't exist in the target" } as RunEvent;
+		const failed = { ...check('error', 'failed'), id: 'e1' } as RunEvent;
+		expect(checksOf([notRun, failed]).map((c) => [c.outcome, c.reason])).toEqual([
+			['failed', null],
+			['not-run', "reads payments, which doesn't exist in the target"]
+		]);
 	});
 });

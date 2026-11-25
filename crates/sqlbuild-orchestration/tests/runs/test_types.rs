@@ -574,6 +574,11 @@ pub(crate) struct NodeEventResourcesTestCase {
     pub(crate) expected_named: [(&'static str, &'static str, &'static str); 4],
     /// The check result's name, check ID, result ID and rows found, as the run's events report them.
     pub(crate) expected_check: CheckFields,
+    /// The check result's outcome, and why it didn't run when it is `not_run`.
+    pub(crate) stored_outcome: &'static str,
+    pub(crate) not_run_reason: Option<&'static str>,
+    /// The check event's summary: the reason a not-run audit gives, never error text.
+    pub(crate) expected_message: Option<&'static str>,
 }
 
 /// A check result's name, check ID, result ID and rows found.

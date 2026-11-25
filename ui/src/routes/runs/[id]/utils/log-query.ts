@@ -68,6 +68,7 @@ export const QUICK = {
 	errors: { text: 'level:error', label: 'errors' },
 	warnings: { text: 'level:warn', label: 'warnings' },
 	auditsFailed: { text: 'kind:audit outcome:failed', label: 'failed audits' },
+	auditsNotRun: { text: 'kind:audit outcome:not-run', label: 'audits not run' },
 	failed: { text: 'kind:node outcome:failed', label: 'failed nodes' },
 	built: { text: 'outcome:built', label: 'built' },
 	skipped: { text: 'outcome:skipped', label: 'skipped' },

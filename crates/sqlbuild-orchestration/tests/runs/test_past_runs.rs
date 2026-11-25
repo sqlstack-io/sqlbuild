@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::_helpers::requests::past_runs::read_past_runs;
 use crate::runs::models::PastRunResults;
-use crate::runs::tests::helpers::{queue, request, set_node_status, snapshot};
+use crate::runs::tests::helpers::{insert_check, queue, request, set_node_status, snapshot};
 use crate::runs::tests::test_types::PastRunLookupTestCase;
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::begin::begin;
@@ -23,7 +23,7 @@ const THIRD: u128 = 0x01a1_d3c0_0000_7000_8000_0000_0000_0003;
 fn given_runs_when_run_selectors_name_them_then_full_ids_and_unique_prefixes_read_their_results() {
     let test_cases = [
         PastRunLookupTestCase {
-            description: "SQLite: a full ID and a unique 8-character prefix each name their run, with what it selected, failed and skipped",
+            description: "SQLite: a full ID and a unique 8-character prefix each name their run, with what it selected, failed and skipped, and no audit it didn't run",
             backend: Backend::Sqlite,
             ids: &["01a1d3b9-0000-7000-8000-000000000001", "01a1d3c0"],
             expected_runs: Ok(vec![
@@ -58,7 +58,7 @@ fn given_runs_when_run_selectors_name_them_then_full_ids_and_unique_prefixes_rea
             expected_runs: Err("no run 'ffffffff' in this location and target"),
         },
         PastRunLookupTestCase {
-            description: "PostgreSQL: a full ID and a unique 8-character prefix each name their run, with what it selected, failed and skipped",
+            description: "PostgreSQL: a full ID and a unique 8-character prefix each name their run, with what it selected, failed and skipped, and no audit it didn't run",
             backend: Backend::Postgres,
             ids: &["01a1d3b9-0000-7000-8000-000000000001", "01a1d3c0"],
             expected_runs: Ok(vec![
@@ -120,6 +120,12 @@ fn given_runs_when_run_selectors_name_them_then_full_ids_and_unique_prefixes_rea
             }
             set_node_status(store, (Uuid::from_u128(FIRST), "orders"), "failed").await;
             set_node_status(store, (Uuid::from_u128(FIRST), "customers"), "skipped").await;
+            insert_check(
+                store,
+                (Uuid::from_u128(FIRST), "audit:orders_have_payments"),
+                "not_run",
+            )
+            .await;
             let ids: BTreeSet<String> = test_case.ids.iter().map(|id| (*id).to_owned()).collect();
             let transaction = begin(store, TransactionMode::Read).await.expect("read");
             let (transaction, past) = read_past_runs(transaction, (location, "development"), &ids)

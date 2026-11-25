@@ -56,6 +56,7 @@ fn given_attached_checks_when_a_claim_reports_observations_then_frozen_membershi
                 "cancelled",
                 "passed",
                 "blocked",
+                "unread",
             ] {
                 input.nodes.insert(
                     format!("check:{name}"),
@@ -217,6 +218,16 @@ fn given_attached_checks_when_a_claim_reports_observations_then_frozen_membershi
             )
             .await
             .expect("blocked check was not executed");
+            change_run(
+                store,
+                worker,
+                &report(RunChange::CheckFinished {
+                    node_key: "check:unread".into(),
+                    outcome: NodeOutcome::NotRun,
+                }),
+            )
+            .await
+            .expect("a check whose reads the target lacks finishes not run, never having started");
             let nodes = list_run_nodes(store, claim.request.run_id)
                 .await
                 .expect("frozen nodes");
@@ -238,7 +249,7 @@ fn given_attached_checks_when_a_claim_reports_observations_then_frozen_membershi
                     .iter()
                     .filter(|row| row["event_type"] == "run_check_finished")
                     .count(),
-                8
+                9
             );
             for change in [
                 RunChange::NodeStarted {

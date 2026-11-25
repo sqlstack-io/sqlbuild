@@ -476,7 +476,7 @@ export function toRunEvent(wire: Wire['RunEventRecord'], runId: string): RunEven
 	};
 }
 
-const CHECK_OUTCOMES: Record<string, RunEventCheck['outcome']> = { pass: 'passed', warn: 'warned', error: 'failed' };
+const CHECK_OUTCOMES: Record<string, RunEventCheck['outcome']> = { pass: 'passed', warn: 'warned', error: 'failed', not_run: 'not-run' };
 
 /** A check result's name, outcome and rows from its event; a result with no name recorded is named by its outcome. */
 export function checkOf(wire: Wire['RunEventRecord']): RunEventCheck {

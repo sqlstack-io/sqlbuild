@@ -317,7 +317,8 @@ export type RunEventPhase = {
 /** A check's result in a run: its name as declared, its outcome, the rows it found, and its identity for its evidence. */
 export type RunEventCheck = {
 	name: string;
-	outcome: 'passed' | 'warned' | 'failed' | 'skipped';
+	/** `not-run`: an end-of-build audit whose reads the target doesn't have; its event's message says which. */
+	outcome: 'passed' | 'warned' | 'failed' | 'skipped' | 'not-run';
 	rows: number | null;
 	/** The check's ID on the Checks page and this result's, to read the rows it found once they are synced. */
 	bindingKey: string | null;

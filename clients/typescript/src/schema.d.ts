@@ -4261,7 +4261,7 @@ export interface components {
             event_id: string;
             event_type: string;
             invocation_id: string;
-            /** @description A summary of what an event names, such as a member retry or the command a worker started; never error or SQL text. */
+            /** @description A summary of what an event names, such as a member retry, the command a worker started or why an audit was not run; never error or SQL text. */
             message?: string | null;
             occurred_at: string;
             outcome?: string | null;

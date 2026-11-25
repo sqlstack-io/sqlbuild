@@ -585,3 +585,24 @@ pub(crate) async fn set_node_status(
     .expect("set the node status");
     commit(transaction).await.expect("commit");
 }
+
+/// Record an attached check of `run_id` that finished with `status`, as a worker's check result does.
+pub(crate) async fn insert_check(
+    store: &ControlStore,
+    (run_id, node_key): (Uuid, &str),
+    status: &str,
+) {
+    let transaction = begin(store, TransactionMode::Write).await.expect("begin");
+    let (transaction, _) = query(
+        transaction,
+        "INSERT INTO sqb_run_nodes (run_id, node_key, status, writes, kind) VALUES ($1,$2,$3,FALSE,'check')",
+        vec![
+            Parameter::Id(run_id),
+            Parameter::Text(node_key.to_owned()),
+            Parameter::Text(status.to_owned()),
+        ],
+    )
+    .await
+    .expect("record the check");
+    commit(transaction).await.expect("commit");
+}

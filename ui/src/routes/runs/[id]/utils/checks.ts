@@ -2,7 +2,7 @@
 
 import type { RunEvent } from '$lib/api';
 
-export type CheckOutcome = 'failed' | 'warned' | 'passed' | 'skipped';
+export type CheckOutcome = 'failed' | 'warned' | 'passed' | 'skipped' | 'not-run';
 export type CheckResult = {
 	id: string;
 	/** As declared, such as `not_null(payment_id)`. */
@@ -16,11 +16,13 @@ export type CheckResult = {
 	/** The check's ID and this result's, for the rows it found. */
 	bindingKey: string | null;
 	resultId: string | null;
+	/** Why it was not run, such as `reads payments, which doesn't exist in the target`; null otherwise. */
+	reason: string | null;
 };
 
-const RANK: Record<CheckOutcome, number> = { failed: 0, warned: 1, passed: 2, skipped: 3 };
+const RANK: Record<CheckOutcome, number> = { failed: 0, warned: 1, passed: 2, skipped: 3, 'not-run': 4 };
 
-/** A node's checks from its `audit_completed` events, problems first (failed, then warned), then passed and skipped. */
+/** A node's checks from its `audit_completed` events, problems first (failed, then warned), then passed, skipped and not run. */
 export function checksOf(events: readonly RunEvent[]): CheckResult[] {
 	return events
 		.filter((e) => e.type === 'audit_completed')
@@ -35,7 +37,8 @@ export function checksOf(events: readonly RunEvent[]): CheckResult[] {
 				noun: problem ? (check.name.startsWith('unique') ? 'duplicate rows' : 'failing rows') : null,
 				statementId: e.statementId,
 				bindingKey: check.bindingKey,
-				resultId: check.resultId
+				resultId: check.resultId,
+				reason: check.outcome === 'not-run' ? e.message || null : null
 			};
 		})
 		.sort((a, b) => RANK[a.outcome] - RANK[b.outcome]);

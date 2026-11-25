@@ -5,8 +5,8 @@ use std::collections::BTreeSet;
 use uuid::Uuid;
 
 use crate::runs::constants::{
-    FAILED_RUN_NODE_STATUSES, MAX_LISTED_RUN_MATCHES, MIN_RUN_ID_PREFIX, PAST_RUN_AUDIT_LIMIT,
-    SKIPPED_RUN_NODE_STATUS,
+    CHECK_KIND, FAILED_RUN_NODE_STATUSES, MAX_LISTED_RUN_MATCHES, MIN_RUN_ID_PREFIX,
+    NOT_RUN_STATUS, PAST_RUN_AUDIT_LIMIT, SKIPPED_RUN_NODE_STATUS,
 };
 use crate::runs::models::{PastRunResults, SelectionProblem};
 use crate::runs::types::PastRuns;
@@ -137,7 +137,7 @@ async fn run_results(
 ) -> Result<(ControlTransaction, PastRunResults), ControlError> {
     let (transaction, rows) = query(
         transaction,
-        "SELECT node_key, status FROM sqb_run_nodes WHERE run_id=$1",
+        "SELECT node_key, status, kind FROM sqb_run_nodes WHERE run_id=$1",
         vec![Parameter::Id(run_id)],
     )
     .await?;
@@ -149,6 +149,9 @@ async fn run_results(
         let (Some(key), Some(status)) = (row["node_key"].as_str(), row["status"].as_str()) else {
             continue;
         };
+        if row["kind"].as_str() == Some(CHECK_KIND) && status == NOT_RUN_STATUS {
+            continue;
+        }
         results.selected.insert(key.to_owned());
         if FAILED_RUN_NODE_STATUSES.contains(&status) {
             results.failed.insert(key.to_owned());

@@ -278,6 +278,7 @@ pub(crate) async fn run_events_in(
                  CASE WHEN event_type='{AUDIT_COMPLETED_EVENT}' THEN payload->>'binding_key' END AS check_binding_key, \
                  CASE WHEN event_type='{AUDIT_COMPLETED_EVENT}' THEN payload->>'result_id' END AS check_result_id, \
                  CASE WHEN event_type='{AUDIT_COMPLETED_EVENT}' THEN CAST(payload->>'violation_count' AS BIGINT) END AS check_rows, \
+                 CASE WHEN event_type='{AUDIT_COMPLETED_EVENT}' THEN payload->>'not_run_reason' END AS not_run_reason, \
                  CASE WHEN event_type='{INVOCATION_PHASE_EVENT}' THEN payload->>'phase' END AS phase, \
                  CASE WHEN event_type='{INVOCATION_PHASE_EVENT}' THEN CAST(payload->>'count' AS BIGINT) END AS phase_count, \
                  CASE WHEN event_type='{INVOCATION_PHASE_EVENT}' THEN payload->>'name' END AS phase_name, \
@@ -296,10 +297,13 @@ pub(crate) async fn run_events_in(
             for (column, _) in START_FIELDS {
                 row.remove(column);
             }
+            let not_run_reason: Option<String> = row
+                .remove("not_run_reason")
+                .and_then(|reason| reason.as_str().map(str::to_owned));
             let message = if launched {
                 launch_message(&payload)?
             } else {
-                started.or(member_message(&payload)?)
+                started.or(not_run_reason).or(member_message(&payload)?)
             };
             if let Some(message) = message {
                 row.insert("message".into(), Value::String(message));

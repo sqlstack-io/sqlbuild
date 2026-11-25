@@ -23,6 +23,7 @@
 			s.warned ? { key: 'warned', text: plural(s.warned, 'warning'), filter: QUICK.warnings, tone: 'warn' } : null,
 			s.skipped ? { key: 'skipped', text: `${s.skipped} skipped`, filter: QUICK.skipped, tone: 'muted' } : null,
 			s.notRun ? { key: 'not_run', text: `${s.notRun} not run`, filter: QUICK.notRun, tone: 'muted' } : null,
+			s.checksNotRun ? { key: 'checks_not_run', text: `${plural(s.checksNotRun, 'audit')} not run`, filter: QUICK.auditsNotRun, tone: 'muted' } : null,
 			s.running ? { key: 'running', text: `${s.running} running`, filter: QUICK.running, tone: 'run' } : null,
 			s.waiting ? { key: 'waiting', text: `${s.waiting} waiting`, filter: QUICK.waiting, tone: 'muted' } : null,
 			// The note sits only after its figure: no parenthesis without the count it explains.

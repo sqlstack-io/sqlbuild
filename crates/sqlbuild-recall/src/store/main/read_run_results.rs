@@ -6,7 +6,7 @@ use crate::store::_helpers::sqlite::checked;
 use crate::store::errors::StoreError;
 use crate::store::models::{RecallRunResults, SqliteStore};
 
-/// The resources `run_id` attempted or skipped by outcome, with its unignored error-severity audit failures as `audit:<name>`.
+/// The resources `run_id` attempted or skipped by outcome, with its unignored error-severity audit failures as `audit:<name>`; an audit it didn't run, for a read the target lacked, is none of them.
 pub fn read_run_results(store: &SqliteStore, run_id: &str) -> Result<RecallRunResults, StoreError> {
     let keys = |sql: &str| -> Result<BTreeSet<String>, StoreError> {
         let mut statement = checked(store.connection.prepare(sql), "read the run")?;
@@ -21,7 +21,9 @@ pub fn read_run_results(store: &SqliteStore, run_id: &str) -> Result<RecallRunRe
         run_id: run_id.to_owned(),
         selected: keys(
             "SELECT DISTINCT resource_id FROM recall_events WHERE run_id = ?1 \
-             AND resource_id IS NOT NULL AND event_type LIKE 'resource_attempt_%'",
+             AND resource_id IS NOT NULL AND event_type LIKE 'resource_attempt_%' \
+             AND NOT (resource_kind = 'audit' AND resource_name IN \
+             (SELECT audit_name FROM audit_results WHERE run_id = ?1 AND outcome = 'not_run'))",
         )?,
         failed: keys(
             "SELECT DISTINCT resource_id FROM recall_events WHERE run_id = ?1 \
