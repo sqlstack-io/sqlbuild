@@ -19,7 +19,12 @@ from sqlquack.api.constants import DEFAULT_PATH
 
 from sqlbuild.errors.contracts.exceptions import ExecutorInputError
 from sqlbuild.executor.local.classes.empty_duckdb import EmptyDuckDb
-from sqlbuild.executor.local.constants import TIMEZONE_PARAMETER, UTC_TIME_ZONE
+from sqlbuild.executor.local.constants import (
+    CONVERSION_CACHE_INDEX,
+    CONVERSION_CACHE_LIFETIME_SECONDS,
+    TIMEZONE_PARAMETER,
+    UTC_TIME_ZONE,
+)
 from sqlbuild.executor.local.models import ConvertedSql, LocalSqlCheck, LocalWorkCounts
 
 _PARALLEL_MINIMUM: int = 8
@@ -50,6 +55,7 @@ class _LocalWork:
         }
         self._empty: EmptyDuckDb | None = None
         self._cache_dir: Path | None = None
+        self._used: set[str] = set()
 
     def use_cache_dir(self, directory: Path | None) -> None:
         with self._lock:
@@ -58,6 +64,18 @@ class _LocalWork:
     def cache_dir(self) -> Path | None:
         with self._lock:
             return self._cache_dir
+
+    def mark_used(self, path: Path) -> None:
+        with self._lock:
+            self._used.add(path.stem)
+
+    def take_used(self) -> set[str]:
+        """The cache entries this process read or wrote since the last call."""
+
+        with self._lock:
+            used: set[str] = self._used
+            self._used = set()
+            return used
 
     def schema_key(self, schema: Mapping[str, Any] | None) -> str:
         """The schema's JSON, serialised once per schema object."""
@@ -320,6 +338,7 @@ def _stored(job: _CheckJob) -> LocalSqlCheck | None:
         kept: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
+    _WORK.mark_used(path)
     return LocalSqlCheck(
         conversion=ConvertedSql(
             converted=bool(kept["converted"]),
@@ -356,6 +375,59 @@ def _keep(*, job: _CheckJob, check: LocalSqlCheck) -> None:
             encoding="utf-8",
         )
         os.replace(partial, path)
+    except OSError:
+        partial.unlink(missing_ok=True)
+        return
+    _WORK.mark_used(path)
+
+
+def prune_conversion_cache(*, now: float) -> int:
+    """Record this run's use of kept conversions, then delete those unused for a week; how many."""
+
+    directory: Path | None = _WORK.cache_dir()
+    used: set[str] = _WORK.take_used()
+    if directory is None or not directory.is_dir():
+        return 0
+    index: Path = directory / CONVERSION_CACHE_INDEX
+    last_used: dict[str, float] = {**_last_used(index), **dict.fromkeys(used, now)}
+    kept: dict[str, float] = {}
+    pruned: int = 0
+    for entry in directory.glob("*/*.json"):
+        stamp: float = last_used.get(entry.stem, now)
+        if now - stamp <= CONVERSION_CACHE_LIFETIME_SECONDS:
+            kept[entry.stem] = stamp
+            continue
+        try:
+            entry.unlink()
+        except OSError:
+            kept[entry.stem] = stamp
+            continue
+        pruned += 1
+    _write_last_used(index=index, last_used=kept)
+    return pruned
+
+
+def _last_used(index: Path) -> dict[str, float]:
+    """When each kept conversion was last used, by entry name; empty when unreadable."""
+
+    try:
+        loaded: Any = json.loads(index.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(loaded, dict):
+        return {}
+    return {
+        str(name): float(stamp)
+        for name, stamp in loaded.items()
+        if isinstance(stamp, int | float) and not isinstance(stamp, bool)
+    }
+
+
+def _write_last_used(*, index: Path, last_used: Mapping[str, float]) -> None:
+    partial: Path = index.with_suffix(f".{os.getpid()}.{threading.get_ident()}.tmp")
+    try:
+        partial.write_text(json.dumps(last_used, sort_keys=True), encoding="utf-8")
+        os.replace(partial, index)
     except OSError:
         partial.unlink(missing_ok=True)
 

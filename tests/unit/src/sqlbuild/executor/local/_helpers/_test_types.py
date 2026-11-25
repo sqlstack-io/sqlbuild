@@ -46,6 +46,18 @@ class CachedConversionTestCase:
 
 
 @dataclass(frozen=True)
+class CachePruningTestCase:
+    """Entries one run keeps, a later run using some of them `days_later`, then pruning."""
+
+    description: str
+    statement_count: int
+    later_used_count: int
+    days_later: int
+    expected_pruned: int
+    expected_kept: int
+
+
+@dataclass(frozen=True)
 class WarehouseRelationsTestCase:
     """A statement over declared relations, and those only the warehouse can give it."""
 

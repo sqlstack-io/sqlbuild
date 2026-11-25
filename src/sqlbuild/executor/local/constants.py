@@ -25,6 +25,8 @@ UTC_TIME_ZONE: str = "UTC"
 STATEMENT_CONSTRUCT: str = "statement"
 
 CONVERSION_CACHE_DIR: str = "target/sqlquack-cache"
+CONVERSION_CACHE_INDEX: str = "used.json"
+CONVERSION_CACHE_LIFETIME_SECONDS: float = 7 * 24 * 60 * 60
 
 CANNOT_RUN_LOCALLY_CODE: str = "T007"
 CANNOT_RUN_LOCALLY_HELP: str = "Run this test on the warehouse with --run-on warehouse."

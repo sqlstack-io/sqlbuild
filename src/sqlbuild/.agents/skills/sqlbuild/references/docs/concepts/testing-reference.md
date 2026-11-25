@@ -471,7 +471,8 @@ How SQLBuild decides, at compile time, before anything runs:
 - **Work per run.** Each distinct test statement is converted once, in worker processes, and the
   test run reuses those conversions. Conversions are kept in `target/sqlquack-cache/`, keyed by the
   SQL, the declared relations it reads, the session and the SQLQuack version, so a later run
-  converts only the statements that changed. Deleting the folder is always safe.
+  converts only the statements that changed. At the end of a run, SQLBuild deletes the conversions
+  no run has used for 7 days. Deleting the folder is always safe.
 - **Other adapters.** SQLQuack converts Snowflake SQL only, so tests run on the warehouse (reason
   `dialect: <adapter>`).
 - **Time zone.** Local runs use a UTC session. When the target's connection sets another

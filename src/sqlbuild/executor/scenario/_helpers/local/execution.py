@@ -33,6 +33,9 @@ from sqlbuild.executor.local.constants import (
     SNAPSHOT_STALE_CATEGORY,
     UTC_TIME_ZONE,
 )
+from sqlbuild.executor.local.main._prune_local_conversion_cache import (
+    prune_local_conversion_cache,
+)
 from sqlbuild.executor.local.main._use_local_conversion_cache import use_local_conversion_cache
 from sqlbuild.executor.run.models import ModelExecutionResult
 from sqlbuild.executor.scenario._helpers.execution.model_execution import execute_scenario_models
@@ -206,6 +209,7 @@ def execute_local_scenario_load_only_run(
         if running is not None:
             running.finish(connection=connection)
         adapter.close(connection)
+        _ = prune_local_conversion_cache()
 
     return result
 

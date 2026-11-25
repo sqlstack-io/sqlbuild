@@ -26,6 +26,9 @@ from sqlbuild.adapter.contract.models import FunctionInfo
 from sqlbuild.compiler.compile.types import FunctionLanguage
 from sqlbuild.executor.build.models import FunctionExecutionResult
 from sqlbuild.executor.functions.main._execute import execute_function
+from sqlbuild.executor.local.main._prune_local_conversion_cache import (
+    prune_local_conversion_cache,
+)
 from sqlbuild.executor.pipeline._helpers.connections import (
     close_connections,
     open_worker_connections,
@@ -178,6 +181,7 @@ def run_test_pipeline(
     finally:
         recovery.close_replacements()
         close_connections(adapter=adapter, connections=connections, active_error=active_error)
+        _ = prune_local_conversion_cache()
 
 
 def _run_tests(
