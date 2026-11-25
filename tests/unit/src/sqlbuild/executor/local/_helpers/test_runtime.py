@@ -3,8 +3,9 @@
 import pytest
 
 from sqlbuild.errors.contracts.exceptions import LocalRunRefusedError
-from sqlbuild.executor.local._helpers.runtime import local_run_refusal
+from sqlbuild.executor.local._helpers.runtime import local_failure_refusal, local_run_refusal
 from tests.unit.src.sqlbuild.executor.local._helpers._test_types import (
+    FailureTextRefusalTestCase,
     LocalRunRefusalTestCase,
     OwnFailureTestCase,
 )
@@ -75,6 +76,40 @@ def test_given_an_error_snowflake_would_raise_too_when_classifying_then_it_is_th
     refused: LocalRunRefusedError | None = local_run_refusal(error=error, fatal=test_case.fatal)
 
     assert (refused is not None) is test_case.expected_refused
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        FailureTextRefusalTestCase(
+            description="a model step whose guard raised",
+            message=(
+                "local model 'order_id_lists' failed: Conversion Error: Could not convert string"
+                " 'array_agg_order#0123456789ab: ARRAY_AGG of several values in no defined order'"
+                " to INT32"
+            ),
+            expected_title="SQLQuack guard: array_agg_order",
+        ),
+        FailureTextRefusalTestCase(
+            description="a model step DuckDB failed internally",
+            message="local model 'orders' failed: INTERNAL Error: unexpected plan\nStack Trace:",
+            expected_title="DuckDB internal error: unexpected plan",
+        ),
+        FailureTextRefusalTestCase(
+            description="a model step that failed as Snowflake would",
+            message="local model 'orders' failed: Binder Error: Referenced column a not found",
+            expected_title=None,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_scenario_step_failure_when_classifying_its_text_then_guards_and_bugs_refuse(
+    test_case: FailureTextRefusalTestCase,
+) -> None:
+    refused: LocalRunRefusedError | None = local_failure_refusal(test_case.message)
+
+    title: str | None = None if refused is None else f"{refused.category}: {refused.construct}"
+    assert title == test_case.expected_title
 
 
 if __name__ == "__main__":

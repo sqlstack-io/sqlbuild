@@ -142,7 +142,10 @@ PASS=2  FAIL=0  ERROR=1  TOTAL=3  (3 local, 0 warehouse, 1.20s)
 After the summary, `--run-on local` lists why scenarios could not run locally (`Can't run locally`),
 and `auto` counts what sent scenarios to the warehouse (`On the warehouse`), as
 [`sqb test`](/docs/cli/test#local-and-warehouse-runs) does. A snapshot reason reads
-`snapshot stale: scenario:<name>` or `snapshot missing: scenario:<name>`. With `--json`, each
+`snapshot stale: scenario:<name>` or `snapshot missing: scenario:<name>`. A scenario whose
+converted SQL hits a SQLQuack guard or a DuckDB internal error while it replays runs again on the
+warehouse in `auto`, with the reason `SQLQuack guard: <name>` or `DuckDB internal error: <message>`,
+and its local attempt prints nothing; with `--run-on local` it is an `ERROR` (`T007`). With `--json`, each
 scenario has `run_on` and `run_on_reason`, `summary` has `local_count` and `warehouse_count`, and
 the document has `refusals`, as for `sqb test`.
 

@@ -13,6 +13,7 @@ use sqlbuild_core::scenario_command::main::scenario_activity_message::scenario_a
 use sqlbuild_core::scenario_command::models::ScenarioNamespace;
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::ScenarioRunResult;
+use sqlbuild_python_base::build_progress::main::progress::current_projector::current_projector;
 
 use crate::bindings::_helpers::scenario_command::conversions::{
     capture_row, scenario_result_row, write_local_runtime_target, write_warehouse_runtime_target,
@@ -31,8 +32,8 @@ use sqlbuild_python_output::build_progress::models::ConnectionProgressReporter;
 /// How a finished scenario is reported.
 #[derive(Clone, Debug)]
 pub(crate) enum CompletionKind {
-    /// A test run: write its runtime SQL under `target_dir` and its result row.
-    Run { target_dir: PathBuf },
+    /// A test run's runtime SQL and row; with `fallback`, none for a replay the warehouse reruns.
+    Run { target_dir: PathBuf, fallback: bool },
     /// A snapshot capture: its capture row.
     Capture,
     /// A local snapshot sync or refresh: its sync row.
@@ -76,10 +77,20 @@ impl ScenarioProgressRelay {
         let style: CliStyle = CliStyle {
             use_color: self.use_color,
         };
+        if let (CompletionKind::Run { fallback: true, .. }, Some(projector)) =
+            (&self.kind, current_projector(py)?)
+        {
+            let held: Vec<String> = projector.get().exchange_held_lines(Vec::new());
+            if !native_field(&result, "local_refusal")?.is_none() {
+                let name: String = native_field(&result, "scenario_name")?.extract()?;
+                return projector.get().forget_resource_named(&name);
+            }
+            projector.get().write_held(py, &held)?;
+        }
         let plan: Option<&Bound<'_, PyAny>> = (!scenario_plan.is_none()).then_some(&scenario_plan);
         let project_dir: &Bound<'_, PyAny> = self.project_dir.bind(py);
         let rendered: String = match &self.kind {
-            CompletionKind::Run { target_dir } => {
+            CompletionKind::Run { target_dir, .. } => {
                 if let Some(plan) = plan {
                     let adapter: &Bound<'_, PyAny> = self.adapter.bind(py);
                     if native_field(&result, "local_status")?.is_none() {

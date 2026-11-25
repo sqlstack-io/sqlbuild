@@ -25,6 +25,7 @@ use sqlbuild_core::scenario_command::models::{
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::{ExecutionStatus, ScenarioRunResult};
 use sqlbuild_host::types::ResultEnum;
+use sqlbuild_python_output::result_output::main::results::split_scenario_fallbacks::split_scenario_fallbacks;
 
 use crate::bindings::_helpers::change_selection::base_snapshot::{
     BaseComparison, base_comparison, base_variant,
@@ -299,7 +300,7 @@ fn execute_batch<'py>(
     request: &Bound<'py, PyAny>,
     run: &TestRun<'py>,
     (pipeline, scenarios): (&Bound<'py, PyAny>, &Bound<'py, PyTuple>),
-    section: &SectionStatus<'py>,
+    (section, fallback): (&SectionStatus<'py>, bool),
 ) -> PyResult<Vec<ScenarioRunResult<Bound<'py, PyAny>>>> {
     let py: Python<'py> = request.py();
     if scenarios.is_empty() {
@@ -316,7 +317,10 @@ fn execute_batch<'py>(
         RelayContext {
             project_dir: &run.project.project_dir,
             adapter: &run.adapter,
-            kind: CompletionKind::Run { target_dir },
+            kind: CompletionKind::Run {
+                target_dir,
+                fallback,
+            },
             style: run.style,
         },
     )?;
@@ -372,7 +376,16 @@ fn execute_batch<'py>(
         ]);
         ExecutorHost::RunScenarioTestPipeline
     };
-    Vec::<ScenarioRunResult<_>>::read(&call_with(&host_entry(py, runner)?, &arguments)?)
+    let projector = current_projector(py)?.filter(|_| fallback);
+    if let Some(projector) = &projector {
+        projector.get().hold_lines();
+    }
+    let ran: PyResult<Bound<'py, PyAny>> = call_with(&host_entry(py, runner)?, &arguments);
+    if let Some(projector) = &projector {
+        let held: Vec<String> = projector.get().release_lines();
+        projector.get().write_held(py, &held)?;
+    }
+    Vec::<ScenarioRunResult<_>>::read(&ran?)
 }
 
 /// The project adapter whose dialect locally replayed SQL is authored in.
@@ -525,11 +538,11 @@ fn since_base(request: &Bound<'_, PyAny>, run: &TestRun<'_>) -> PyResult<Option<
 }
 
 /// The scenarios of `scenarios` whose name is in `names`, in order.
-fn named<'py>(scenarios: &Bound<'py, PyTuple>, names: &[&str]) -> PyResult<Bound<'py, PyTuple>> {
+fn named<'py>(scenarios: &Bound<'py, PyTuple>, names: &[String]) -> PyResult<Bound<'py, PyTuple>> {
     let mut kept: Vec<Bound<'py, PyAny>> = Vec::new();
     for scenario in scenarios.iter() {
         let name: String = native_field(&scenario, "name")?.extract()?;
-        if names.contains(&name.as_str()) {
+        if names.contains(&name) {
             kept.push(scenario);
         }
     }
@@ -581,7 +594,7 @@ pub(crate) fn run_scenario_test_command(
             return synced.write_failure_json(request, &run.project.namespace);
         }
     }
-    let decisions: Vec<RunOnDecision> = if run.local {
+    let mut decisions: Vec<RunOnDecision> = if run.local {
         decide(&run, (&pipeline, &scenarios), mode)?
     } else {
         scenarios
@@ -595,15 +608,15 @@ pub(crate) fn run_scenario_test_command(
             })
             .collect::<PyResult<_>>()?
     };
-    let local_names: Vec<&str> = decisions
+    let local_names: Vec<String> = decisions
         .iter()
         .filter(|decision| mode == RunOn::Local || decision.local())
-        .map(|decision| decision.name.as_str())
+        .map(|decision| decision.name.clone())
         .collect();
-    let warehouse_names: Vec<&str> = decisions
+    let mut warehouse_names: Vec<String> = decisions
         .iter()
         .filter(|decision| mode != RunOn::Local && !decision.local())
-        .map(|decision| decision.name.as_str())
+        .map(|decision| decision.name.clone())
         .collect();
     let section: SectionStatus<'_> = begin_section(
         &run.stream,
@@ -619,12 +632,15 @@ pub(crate) fn run_scenario_test_command(
     let mut local_statements: StatementSummary = StatementSummary::default();
     if run.local {
         let before: StatementSummary = statement_summary(py)?;
-        results.extend(execute_batch(
+        let ran = execute_batch(
             request,
             &run,
             (&pipeline, &named(&scenarios, &local_names)?),
-            &section,
-        )?);
+            (&section, mode == RunOn::Auto),
+        )?;
+        let (kept, fallbacks) = split_scenario_fallbacks(ran, (&mut decisions, mode))?;
+        results.extend(kept);
+        warehouse_names.extend(fallbacks);
         local_statements = statement_summary_delta(&before, &statement_summary(py)?);
     }
     let reporting: TestRun<'_> = if warehouse_names.is_empty() || !run.local {
@@ -633,7 +649,7 @@ pub(crate) fn run_scenario_test_command(
                 request,
                 &run,
                 (&pipeline, &named(&scenarios, &warehouse_names)?),
-                &section,
+                (&section, false),
             )?);
         }
         run
@@ -659,7 +675,7 @@ pub(crate) fn run_scenario_test_command(
                 &remote_pipeline,
                 &named(&remote_scenarios, &warehouse_names)?,
             ),
-            &section,
+            (&section, false),
         )?);
         remote
     };

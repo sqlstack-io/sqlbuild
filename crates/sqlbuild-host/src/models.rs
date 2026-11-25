@@ -780,4 +780,6 @@ pub struct ScenarioRunResult<V> {
     pub error_help: Option<String>,
     pub error_message: Option<String>,
     pub duration_ms: Option<f64>,
+    /// Why a local replay failed where the warehouse would not: `test`, `category`, `construct`, `reason`.
+    pub local_refusal: Option<V>,
 }

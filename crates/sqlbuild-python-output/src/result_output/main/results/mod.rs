@@ -11,5 +11,6 @@ pub mod format_scenario_snapshot_execution_json;
 pub mod format_seed_execution_json;
 pub mod register_aggregation;
 pub mod register_documents;
+pub mod split_scenario_fallbacks;
 pub mod test_execution_json;
 pub mod write_execution_json_output;

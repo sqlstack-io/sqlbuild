@@ -380,6 +380,7 @@ class ScenarioRunResult:
     error_help: str | None = None
     error_message: str | None = None
     duration_ms: float | None = None
+    local_refusal: dict[str, str] | None = None
 
 
 @dataclass(frozen=True)

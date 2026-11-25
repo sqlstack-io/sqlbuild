@@ -25,14 +25,17 @@ from sqlbuild.adapter.contract.classes.duckdb_backed_adapter import DuckDbBacked
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.adapter.contract.types import TablePromotionMode
 from sqlbuild.compiler.compile.types import FunctionLanguage
+from sqlbuild.errors.contracts.exceptions import LocalRunRefusedError
 from sqlbuild.executor.build.models import FunctionExecutionResult
 from sqlbuild.executor.functions.main._execute import execute_function
 from sqlbuild.executor.local.constants import (
+    CANNOT_RUN_LOCALLY_CODE,
     SNAPSHOT_INVALID_CATEGORY,
     SNAPSHOT_MISSING_CATEGORY,
     SNAPSHOT_STALE_CATEGORY,
     UTC_TIME_ZONE,
 )
+from sqlbuild.executor.local.main._local_failure_refusal import local_failure_refusal
 from sqlbuild.executor.local.main._prune_local_conversion_cache import (
     prune_local_conversion_cache,
 )
@@ -92,6 +95,7 @@ from sqlbuild.runtime.observability.classes.resource_attempt_lifecycle import (
 )
 
 _LOCAL_STEP_FAILED_MESSAGE: str = "local scenario step failed"
+_CANNOT_REPLAY_LOCALLY_HELP: str = "Run this scenario on the warehouse with --run-on warehouse."
 _UTC_SESSION_SQL: str = f"SET TimeZone = '{UTC_TIME_ZONE}'"
 
 
@@ -195,15 +199,17 @@ def execute_local_scenario_load_only_run(
             loaded_relations=load_result.relations,
         )
     except Exception as exc:
-        return ScenarioRunResult(
-            scenario_name=scenario_plan.name,
-            status=ExecutionStatus.FAILED,
-            local_status=ScenarioLocalRunStatus.ERROR,
-            retained=True,
-            local_duckdb_path=duckdb_path,
-            error_code=error_code(error=exc, fallback_code=SCENARIO_LOCAL_INTERNAL),
-            error_help=error_help(exc),
-            error_message=error_message(exc),
+        return _with_local_refusal(
+            ScenarioRunResult(
+                scenario_name=scenario_plan.name,
+                status=ExecutionStatus.FAILED,
+                local_status=ScenarioLocalRunStatus.ERROR,
+                retained=True,
+                local_duckdb_path=duckdb_path,
+                error_code=error_code(error=exc, fallback_code=SCENARIO_LOCAL_INTERNAL),
+                error_help=error_help(exc),
+                error_message=error_message(exc),
+            )
         )
     finally:
         if running is not None:
@@ -758,7 +764,7 @@ def _local_result(
     resolved_failure: ScenarioFailureDetails = (
         failure if failure is not None else ScenarioFailureDetails()
     )
-    return ScenarioRunResult(
+    result: ScenarioRunResult = ScenarioRunResult(
         scenario_name=scenario_plan.name,
         status=ExecutionStatus.SUCCESS
         if local_status == ScenarioLocalRunStatus.PASS
@@ -777,6 +783,40 @@ def _local_result(
         error_help=resolved_failure.error_help,
         error_message=resolved_failure.error_message,
     )
+    return _with_local_refusal(result) if local_status == ScenarioLocalRunStatus.ERROR else result
+
+
+def _with_local_refusal(result: ScenarioRunResult) -> ScenarioRunResult:
+    """`result` as a refusal when a SQLQuack guard or DuckDB internal error failed it locally."""
+
+    messages: list[str] = [
+        message
+        for step in (
+            result,
+            *result.function_results,
+            *result.model_results,
+            *result.expected_results,
+            *result.assertion_results,
+        )
+        if (message := getattr(step, "error_message", None)) is not None
+    ]
+    for message in messages:
+        refused: LocalRunRefusedError | None = local_failure_refusal(message)
+        if refused is None:
+            continue
+        return replace(
+            result,
+            error_code=CANNOT_RUN_LOCALLY_CODE,
+            error_help=_CANNOT_REPLAY_LOCALLY_HELP,
+            error_message=refused.message,
+            local_refusal={
+                "test": result.scenario_name,
+                "category": refused.category,
+                "construct": refused.construct,
+                "reason": refused.message,
+            },
+        )
+    return result
 
 
 def _local_target(table_name: str) -> CompiledRelationLocation:

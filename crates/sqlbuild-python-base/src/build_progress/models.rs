@@ -135,6 +135,12 @@ impl NativeProgressProjector {
         Ok(())
     }
 
+    /// Never render the pending terminals of the resources reported under `resource_name`.
+    pub fn forget_resource_named(&self, resource_name: &str) -> PyResult<()> {
+        self.locked()?.forget_resource_named(resource_name);
+        Ok(())
+    }
+
     /// Write lines as they come again, first writing every resource's lines still held back.
     pub fn stop_holding_resources(&self, py: Python<'_>) -> PyResult<()> {
         let Some(mut held) = self.held_by_resource().take() else {

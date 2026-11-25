@@ -302,6 +302,7 @@ impl<'py> ReadResult<'py> for ScenarioRunResult<Bound<'py, PyAny>> {
             error_help: ReadResult::read(&field(value, "error_help")?)?,
             error_message: ReadResult::read(&field(value, "error_message")?)?,
             duration_ms: ReadResult::read(&field(value, "duration_ms")?)?,
+            local_refusal: ReadResult::read(&field(value, "local_refusal")?)?,
         })
     }
 }

@@ -86,3 +86,12 @@ class OwnFailureTestCase:
     message: str
     fatal: bool
     expected_refused: bool
+
+
+@dataclass(frozen=True)
+class FailureTextRefusalTestCase:
+    """A scenario step's failure text, and the refusal title it means or None."""
+
+    description: str
+    message: str
+    expected_title: str | None
