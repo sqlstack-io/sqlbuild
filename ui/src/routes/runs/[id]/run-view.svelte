@@ -6,7 +6,6 @@
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import FailureSummary from './failure-summary.svelte';
-	import ActiveFilter from './active-filter.svelte';
 	import CantRunProblem from '$lib/run/cant-run-problem.svelte';
 	import { runDetailCantRun } from '$lib/run/cant-run';
 	import IgnoredAuditsPanel from './ignored-audits-panel.svelte';
@@ -127,7 +126,7 @@
 								<span class="picks">
 									<span class="faint">Pick</span>
 									{#each QUICK_PICKS as q (q.value)}
-										<Button variant="link" size="inline" class={view.activePick === q.value ? 'pick-on sb-pressed text-[12.5px]' : 'text-[12.5px]'} aria-pressed={view.activePick === q.value} title={view.activePick === q.value ? 'Put back the selection from before' : undefined} onclick={() => view.pick(q.value)}>{q.label}</Button>
+										<Button variant="link" size="inline" class={view.activePick === q.value ? 'pick-on sb-pressed text-[12.5px]' : 'text-[12.5px]'} aria-pressed={view.activePick === q.value} title={view.activePick === q.value ? 'Take this out of the log filter' : 'Filter the log to these'} onclick={() => view.pick(q.value)}>{q.label}</Button>
 									{/each}
 								</span>
 								{#if view.planLink && planCount}
@@ -138,10 +137,6 @@
 							{/snippet}
 						</SelectionBar>
 					</div>
-					{#if view.statusFilter}
-						{@const g = view.nodeGroups.find((x) => x.key === view.statusFilter)}
-						<ActiveFilter what={view.figureLabel || (g?.label.toLowerCase() ?? '')} shown={g?.nodes.length ?? 0} total={nodes.length} noun="node" onclear={() => view.clearFocus()} testid="timeline-filter" />
-					{/if}
 				{/if}
 				<div class="flex min-h-0 flex-1">
 					<div class="relative flex min-h-0 flex-1 flex-col">

@@ -81,7 +81,7 @@ export function runFailures(nodes: readonly RunNode[], events: readonly RunEvent
 				statementId: e.statementId,
 				nodeKey: e.nodeKey,
 				checkId: e.check!.bindingKey,
-				logQuery: `kind:check level:error`
+				logQuery: `kind:audit outcome:failed`
 			};
 		});
 	const failedNodes = nodes

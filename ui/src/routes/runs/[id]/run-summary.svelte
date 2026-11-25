@@ -1,28 +1,28 @@
 <script lang="ts">
 	import { plural } from '$lib/format/plural';
 	import type { RunDetailState } from './state.svelte';
-	import type { NodeGroupKey } from './types';
+	import { QUICK, type QuickFilter } from './utils/log-query';
 
-	// What the run did, in one line: problems first, then what it built. Each figure
-	// filters the timeline and the log to its nodes; picking it again shows everything. A figure that is
-	// zero is left out, and with it its separator.
+	// What the run did, in one line: problems first, then what it built. Each figure writes its words into
+	// the log's filter (`outcome:built`, `kind:audit outcome:failed`…) and takes them out again; it reads as
+	// pressed whenever the filter holds them, typed or clicked. A figure that is zero is left out.
 	let { view }: { view: RunDetailState } = $props();
 
 	const s = $derived(view.summary);
 	const rows = (n: number) => n.toLocaleString('en-GB');
-	type Fig = { key: NodeGroupKey | 'checks_failed'; text: string; tone?: 'err' | 'warn' | 'run'; note?: string };
+	type Fig = { key: string; text: string; filter: QuickFilter; tone?: 'err' | 'warn' | 'run'; note?: string };
 	const figs = $derived.by((): Fig[] => {
 		const out: (Fig | null)[] = [
-			s.failed ? { key: 'failed', text: `${s.failed} failed`, tone: 'err' } : null,
-			s.skipped ? { key: 'skipped', text: `${s.skipped} skipped` } : null,
-			s.notRun ? { key: 'not_run', text: `${s.notRun} not run` } : null,
-			s.running ? { key: 'running', text: `${s.running} running`, tone: 'run' } : null,
-			s.waiting ? { key: 'waiting', text: `${s.waiting} waiting` } : null,
+			s.failed ? { key: 'failed', text: `${s.failed} failed`, filter: QUICK.failed, tone: 'err' } : null,
+			s.skipped ? { key: 'skipped', text: `${s.skipped} skipped`, filter: QUICK.skipped } : null,
+			s.notRun ? { key: 'not_run', text: `${s.notRun} not run`, filter: QUICK.notRun } : null,
+			s.running ? { key: 'running', text: `${s.running} running`, filter: QUICK.running, tone: 'run' } : null,
+			s.waiting ? { key: 'waiting', text: `${s.waiting} waiting`, filter: QUICK.waiting } : null,
 			// The note sits only after its figure: no parenthesis without the count it explains.
-			s.built ? { key: 'succeeded', text: `${s.built} built`, note: s.incremental ? `(${s.incremental} incremental, +${rows(s.incrementalRows)} rows)` : undefined } : null,
-			s.warned ? { key: 'warned', text: plural(s.warned, 'warning'), tone: 'warn' } : null,
+			s.built ? { key: 'succeeded', text: `${s.built} built`, filter: QUICK.built, note: s.incremental ? `(${s.incremental} incremental, +${rows(s.incrementalRows)} rows)` : undefined } : null,
+			s.warned ? { key: 'warned', text: plural(s.warned, 'warning'), filter: QUICK.warnings, tone: 'warn' } : null,
 			// Failed checks count with the nodes: a run can fail on a check after every node built.
-			s.checksFailed ? { key: 'checks_failed', text: `${plural(s.checksFailed, 'audit')} failed`, tone: 'err' } : null
+			s.checksFailed ? { key: 'checks_failed', text: `${plural(s.checksFailed, 'audit')} failed`, filter: QUICK.auditsFailed, tone: 'err' } : null
 		];
 		return out.filter((f): f is Fig => !!f);
 	});
@@ -36,16 +36,15 @@
 		<span class="part"
 			><a
 				class="fig {f.tone ?? ''}"
-				class:sb-pressed={view.figure === f.key}
-				class:on={view.figure === f.key}
-				aria-current={view.figure === f.key ? "true" : undefined}
+				class:sb-pressed={view.logHolds(f.filter.text)}
+				class:on={view.logHolds(f.filter.text)}
+				aria-current={view.logHolds(f.filter.text) ? 'true' : undefined}
 				href="?show={f.key}"
 				onclick={(ev) => {
 					ev.preventDefault();
-					if (f.key === 'checks_failed') view.toggleChecksFilter('failed audits');
-					else view.focusGroup(f.key, f.text.replace(/^\d+ /, ''));
+					view.toggleLog(f.filter.text);
 				}}
-				title={view.figure === f.key ? 'Show everything again' : f.key === 'checks_failed' ? 'Show only the failed audits in the log' : 'Show only these on the timeline and in the log'}>{f.text}</a
+				title={view.logHolds(f.filter.text) ? `Take ${f.filter.text} out of the log filter` : `Filter the log: ${f.filter.text}`}>{f.text}</a
 			>{#if f.note}<span class="faint">{` ${f.note}`}</span>{/if}</span
 		>
 	{:else}

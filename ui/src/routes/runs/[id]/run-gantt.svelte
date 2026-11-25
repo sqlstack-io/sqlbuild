@@ -99,10 +99,15 @@
 	onMount(() => {
 		gutterW = autoFit();
 		const el = measureEl;
-		if (!el) return;
-		const ro = new ResizeObserver(() => (viewportW = el.clientWidth));
+		const sc = ganttEl;
+		if (!el || !sc) return;
+		// The width the rows can use: the scroller's, less its vertical scrollbar where the system draws
+		// one (not the box around it), so the last bars and their durations are never under it.
+		const measure = () => (viewportW = Math.min(el.clientWidth, sc.clientWidth || el.clientWidth));
+		const ro = new ResizeObserver(measure);
 		ro.observe(el);
-		viewportW = el.clientWidth;
+		ro.observe(sc);
+		measure();
 		return () => ro.disconnect();
 	});
 

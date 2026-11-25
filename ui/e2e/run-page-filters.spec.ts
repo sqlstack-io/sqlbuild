@@ -15,54 +15,55 @@ async function open(page: Page, url = RUN) {
 	await expect(summary(page)).toContainText('built', { timeout: 20_000 });
 }
 
-test('the header’s failed-audits figure shows only the failed audits, and again shows everything', async ({ page }) => {
-	await open(page);
-	const before = await logCount(page);
-	const figure = summary(page).getByRole('link', { name: '1 audit failed' });
-	await figure.click();
-	await expect(page.getByTestId('log-filter-active')).toContainText('Showing failed audits · 1 of');
-	await expect(figure).toHaveAttribute('aria-current', 'true');
-	await figure.click();
-	await expect(page.getByTestId('log-filter-active')).toHaveCount(0);
-	await expect(figure).not.toHaveAttribute('aria-current', 'true');
-	expect(await logCount(page)).toBe(before);
-});
+/** What the log shows and how the page reads: rows, the Showing line, what is pressed, and the layout around it. */
+async function snapshot(page: Page) {
+	await page.waitForTimeout(300);
+	return {
+		box: (await logFilter(page).inputValue()).trim(),
+		line: (await page.getByTestId('log-filter-active').count()) ? (await page.getByTestId('log-filter-active').textContent())?.trim() : null,
+		rows: await page.locator('.log tbody tr').evaluateAll((rows) => rows.slice(0, 40).map((r) => (r.textContent ?? '').replace(/\s+/g, ' ').trim())),
+		pressed: await page.locator('[aria-pressed="true"], [aria-current="true"]').evaluateAll((els) => els.map((e) => (e.textContent ?? '').trim()).filter(Boolean).sort()),
+		layout: [await logCount(page), await page.getByRole('radio', { name: 'Events' }).count(), await page.getByRole('button', { name: 'Levels' }).count(), await page.getByRole('button', { name: 'Kinds' }).count() + (await page.locator('.filters .menu-trigger').count())]
+	};
+}
 
-test('the header’s built figure narrows the timeline and the log, and again shows everything', async ({ page }) => {
-	await open(page);
-	const before = await logCount(page);
-	const figure = summary(page).getByRole('link', { name: '93 built' });
-	await figure.click();
-	await expect(page.getByTestId('timeline-filter')).toContainText('Showing built · 93 of 93 nodes');
-	await expect(figure).toHaveAttribute('aria-current', 'true');
-	await figure.click();
-	await expect(page.getByTestId('timeline-filter')).toHaveCount(0);
-	expect(await logCount(page)).toBe(before);
-});
+// Every quick filter only writes words into the log's filter box: clicking it shows exactly what typing
+// those words does, the layout never moves, and a second click takes out only its own words.
+const QUICK_FILTERS: { run: string; name: string; control: (page: Page) => ReturnType<Page['getByRole']>; text: string }[] = [
+	{ run: RUN, name: 'the failed-audits figure', control: (p) => summary(p).getByRole('link', { name: '1 audit failed' }), text: 'kind:audit outcome:failed' },
+	{ run: RUN, name: 'the built figure', control: (p) => summary(p).getByRole('link', { name: '93 built' }), text: 'outcome:built' },
+	{ run: '/runs/run-4f2a?mock', name: 'the skipped figure', control: (p) => summary(p).getByRole('link', { name: /^\d+ skipped$/ }), text: 'outcome:skipped' },
+	{ run: RUN, name: 'the Errors chip', control: (p) => p.getByRole('button', { name: /^Errors \d/ }), text: 'level:error' },
+	{ run: RUN, name: "the Didn't succeed pick", control: (p) => p.getByRole('button', { name: "Didn't succeed", exact: true }), text: 'outcome:failed,cancelled,not-run' },
+	{ run: '/runs/run-4f2a?mock', name: 'the Skipped pick', control: (p) => p.getByRole('button', { name: 'Skipped', exact: true }), text: 'outcome:skipped' }
+];
 
-test('the Errors chip shows only failures, and again puts back the filter text exactly', async ({ page }) => {
-	await open(page);
-	await logFilter(page).fill('orders');
-	const chip = page.getByRole('button', { name: /^Errors \d/ });
-	await chip.click();
-	await expect(page.getByTestId('errors-only')).toContainText('Showing errors only');
-	await expect(chip).toHaveAttribute('aria-pressed', 'true');
-	await chip.click();
-	await expect(page.getByTestId('errors-only')).toHaveCount(0);
-	await expect(logFilter(page)).toHaveValue('orders');
-});
+for (const q of QUICK_FILTERS) {
+	test(`${q.name} does exactly what typing ${q.text} does`, async ({ page }) => {
+		await open(page, q.run);
+		const before = await snapshot(page);
+		await q.control(page).click();
+		const clicked = await snapshot(page);
+		expect(clicked.box).toBe(q.text);
+		expect(clicked.line).toMatch(/^Showing .+ · [\d,]+ of [\d,]+ events?$/);
+		expect(clicked.layout).toEqual(before.layout);
+		await q.control(page).click();
+		expect(await snapshot(page)).toEqual(before);
+		await logFilter(page).fill(`${q.text} `);
+		await logFilter(page).evaluate((el) => (el as HTMLInputElement).blur());
+		expect(await snapshot(page)).toEqual(clicked);
+	});
 
-test('a Pick chip fills the selection, and again puts back the selection from before', async ({ page }) => {
-	await open(page, '/runs/run-4f2a?mock');
-	await selector(page).fill('fact_orders ');
-	const skipped = page.getByRole('button', { name: 'Skipped', exact: true });
-	await skipped.click();
-	await expect(skipped).toHaveAttribute('aria-pressed', 'true');
-	await expect(page.locator('.sel-field').first()).not.toContainText('fact_orders');
-	await skipped.click();
-	await expect(skipped).toHaveAttribute('aria-pressed', 'false');
-	await expect(page.locator('.sel-field').first()).toContainText('fact_orders');
-});
+	test(`${q.name}'s second click keeps what was typed`, async ({ page }) => {
+		await open(page, q.run);
+		await logFilter(page).fill('orders');
+		await q.control(page).click();
+		await expect(logFilter(page)).toHaveValue(`orders ${q.text} `);
+		await expect(page.getByTestId('log-filter-active')).toContainText(`Showing orders ${q.text}`);
+		await q.control(page).click();
+		await expect(logFilter(page)).toHaveValue(/^orders\s*$/);
+	});
+}
 
 for (const how of ['✕', 'Esc'] as const) {
 	test(`the node selector clears with ${how} and keeps focus`, async ({ page }) => {

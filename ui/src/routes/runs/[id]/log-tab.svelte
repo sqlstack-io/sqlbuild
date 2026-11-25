@@ -14,6 +14,7 @@
 	import { formatStamp } from '$lib/format/time';
 	import { nodeLabel, shortRunId } from '$lib/operate/labels';
 	import type { LogEntry } from './utils';
+	import { describeQuery, holdsText, kindOf, outcomeOf, OUTCOMES, QUICK, QUICK_LIST, toggleText } from './utils/log-query';
 	import { CHECK_FAILED_CODE, fullStamp, tracebackOf } from './utils';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
@@ -27,7 +28,6 @@
 		entries,
 		grouped,
 		runId,
-		filteredBy,
 		printed = $bindable(false),
 		memberOf = () => null,
 		memory,
@@ -36,17 +36,16 @@
 		onframe,
 		onnode,
 		onstatement,
-		request = null,
-		errorsOnly = $bindable(false)
+		query = $bindable('')
 	}: {
-		/** Whether the Errors filter is on, for the page to keep the log's place around it. */
-		errorsOnly?: boolean;
-		/** A filter set from outside the log, such as the failure summary's Show in log. */
-		request?: { query: string; seq: number } | null;
+		/**
+		 * The log's one filter: the text in its box. The page's quick filters (header figures, Pick chips)
+		 * and this tab's Errors chip, Levels and Kinds only write words into it.
+		 */
+		query?: string;
 		entries: LogEntry[];
 		grouped: boolean;
 		runId: string;
-		filteredBy: string[];
 		/** Whether what the run printed is shown; a failing run's last printed block always is. */
 		printed?: boolean;
 		/** A node name clicked: the log shows only that node. */
@@ -77,8 +76,6 @@
 	// `level:` and `kind:` into it.
 	// Back to the page restores the log as it was: its filter, stream and open rows.
 	const mem = <T>(key: string, fallback: T): T => (memory && key in memory ? (memory[key] as T) : fallback);
-	// svelte-ignore state_referenced_locally
-	let query = $state(mem('logQuery', ''));
 	// Long printed blocks fold to their first lines.
 	const FOLD = 4;
 	// svelte-ignore state_referenced_locally
@@ -97,7 +94,7 @@
 	const modeEntries = $derived(entries.filter((e) => inMode(e) && (showExpected || !e.expected)));
 	// svelte-ignore state_referenced_locally
 	let stream = $state<'all' | 'stdout' | 'stderr'>(mem('logStream', 'all'));
-	const kindOf = (e: LogEntry) => e.tag?.text.replace(/ /g, '-') ?? null;
+	// `kind:` is what a row is (node, audit, query, run, log…); `outcome:` how it ended (built, failed…).
 	type Term = { key: string; value: string };
 	const terms = $derived(
 		query
@@ -105,14 +102,16 @@
 			.split(/\s+/)
 			.filter(Boolean)
 			.map((t): Term => {
-				const m = t.match(/^(node|kind|level|job|stream):(.*)$/i);
+				const m = t.match(/^(node|kind|outcome|level|job|stream):(.*)$/i);
 				return m ? { key: m[1].toLowerCase(), value: m[2].toLowerCase() } : { key: 'text', value: t.toLowerCase() };
 			})
 	);
 	const holds = (e: LogEntry, t: Term) => {
 		if (!t.value) return true;
 		if (t.key === 'node') return !!e.nodeKey && nodeLabel(e.nodeKey).toLowerCase() === t.value;
-		if (t.key === 'kind') return kindOf(e) === t.value;
+		if (t.key === 'kind') return t.value.split(',').includes(kindOf(e));
+		// `outcome:failed,cancelled` is any of them.
+		if (t.key === 'outcome') return t.value.split(',').includes(outcomeOf(e) ?? '');
 		// Errors are failures: a failed node, check or query, not the run's own summary line.
 		if (t.key === 'level') return e.level === (t.value === 'warning' ? 'warn' : t.value) && (t.value !== 'error' || e.category !== 'run');
 		if (t.key === 'job') return memberOf(e.runId)?.toLowerCase() === t.value;
@@ -124,19 +123,11 @@
 	const termValue = (key: string) => terms.find((t) => t.key === key && t.value)?.value ?? null;
 	const level = $derived((termValue('level') === 'warning' ? 'warn' : termValue('level')) ?? 'all');
 	const kind = $derived(termValue('kind') ?? 'all');
-	/** The Errors chip toggles: on remembers the filter text it changed; off puts that text back exactly, unless it was edited since. */
-	let beforeErrors: { query: string; after: string } | null = null;
-	function toggleErrors() {
-		if (level === 'error') {
-			if (beforeErrors && beforeErrors.after === query) query = beforeErrors.query;
-			else setTerm('level', null);
-			beforeErrors = null;
-			return;
-		}
-		const before = query;
-		setTerm('level', 'error');
-		beforeErrors = { query: before, after: query };
-	}
+	/** The Errors chip: `level:error` into the text, or out again; whatever else is typed stays. */
+	const errorsOn = $derived(holdsText(query, QUICK.errors.text));
+	const toggleErrors = () => (query = toggleText(query, QUICK.errors.text));
+	/** The one "Showing …" line, read from the text alone: typed or clicked, the same words read the same. */
+	const showing = $derived(describeQuery(query, QUICK_LIST));
 	/** Writes `key:value` into the filter text, in place of any earlier one; null takes it out. */
 	function setTerm(key: string, value: string | null) {
 		const kept = query.split(/\s+/).filter((t) => t && !t.toLowerCase().startsWith(`${key}:`));
@@ -146,14 +137,15 @@
 	const kindValues = $derived(printed ? [] : uniq(modeEntries.map(kindOf)));
 	const filterOptions = $derived<FilterOption[]>([
 		{ prefix: 'node', hint: 'a node', values: uniq(entries.map((e) => (e.nodeKey ? nodeLabel(e.nodeKey) : null))) },
-		{ prefix: 'kind', hint: 'built, merged, failed, check, log…', values: kindValues },
+		{ prefix: 'kind', hint: 'node, audit, query, run, log', values: kindValues },
+		{ prefix: 'outcome', hint: 'built, failed, skipped, not-run, passed…; a,b for either', values: OUTCOMES.filter((o) => modeEntries.some((e) => outcomeOf(e) === o)) },
 		{ prefix: 'level', hint: 'error, warn, info', values: uniq(modeEntries.map((e) => e.level)) },
 		{ prefix: 'job', hint: 'a member job', values: grouped ? uniq(entries.map((e) => memberOf(e.runId))) : [] },
 		{ prefix: 'stream', hint: 'stdout or stderr', values: printed ? uniq(entries.map((e) => e.stream)) : [] }
 	]);
 	// Counts for each menu choice: what the rest of the filter leaves, by level or by kind.
 	const levelCounts = $derived(countBy(modeEntries.filter((e) => matchesExcept(e, 'level') && !(e.level === 'error' && e.category === 'run')), (e) => e.level));
-	const kindCounts = $derived(countBy(modeEntries.filter((e) => matchesExcept(e, 'kind')), (e) => kindOf(e) ?? ''));
+	const kindCounts = $derived(countBy(modeEntries.filter((e) => matchesExcept(e, 'kind')), (e): string => kindOf(e)));
 	// A count shows only when it matters: errors and warnings in what the switch shows, none when zero.
 	const errors = $derived(levelCounts.get('error') ?? 0);
 	const warnings = $derived(levelCounts.get('warn') ?? 0);
@@ -166,16 +158,7 @@
 	// svelte-ignore state_referenced_locally
 	let longOpen = $state<Set<string>>(new Set(mem<string[]>('logLong', [])));
 	$effect(() => {
-		errorsOnly = level === 'error';
-	});
-	let applied = 0;
-	$effect(() => {
-		if (!request || request.seq === applied) return;
-		applied = request.seq;
-		query = `${request.query} `;
-	});
-	$effect(() => {
-		if (memory) Object.assign(memory, { logExpected: showExpected, logQuery: query, logStream: stream, logFolded: [...open], logQueries: [...expanded], logDetails: [...detailOpen], logLong: [...longOpen] });
+		if (memory) Object.assign(memory, { logExpected: showExpected, logStream: stream, logFolded: [...open], logQueries: [...expanded], logDetails: [...detailOpen], logLong: [...longOpen] });
 	});
 
 	/** A node line's queries (its build statements, not its checks'), or a query row's own statement. */
@@ -198,7 +181,8 @@
 		const url = URL.createObjectURL(new Blob([text + '\n'], { type: 'text/plain' }));
 		const a = document.createElement('a');
 		a.href = url;
-		a.download = `${runId}${filteredBy.length ? `-${filteredBy.join('-')}` : ''}.log`;
+		const node = termValue('node');
+		a.download = `${runId}${node ? `-${node}` : ''}.log`;
 		a.click();
 		URL.revokeObjectURL(url);
 	}
@@ -255,15 +239,15 @@
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>
 	{/if}
-	{#if errors || level === 'error'}<Button variant={level === 'error' ? 'outline' : 'ghost'} size="sm" class={level === 'error' ? 'count err on sb-pressed' : 'count err'} aria-pressed={level === 'error'} onclick={toggleErrors} title={level === 'error' ? 'Show every event' : 'Show only failures'}>Errors {errors}</Button>{/if}
+	{#if errors || errorsOn}<Button variant={errorsOn ? 'outline' : 'ghost'} size="sm" class={errorsOn ? 'count err on sb-pressed' : 'count err'} aria-pressed={errorsOn} onclick={toggleErrors} title={errorsOn ? 'Take level:error out of the filter' : 'Filter the log: level:error'}>Errors {errors}</Button>{/if}
 	{#if warnings}<Button variant="link" size="inline" class="count warn" onclick={() => setTerm('level', level === 'warn' ? null : 'warn')} title="Show only warnings">Warnings {warnings}</Button>{/if}
 	{#if expectedCount && !printed}<Button variant="link" size="inline" class="expected" aria-pressed={showExpected} onclick={() => (showExpected = !showExpected)} title="Failed lookups the run expects, such as a schema not created yet">{showExpected ? 'Hide' : 'Show'} {plural(expectedCount, 'expected lookup')}</Button>{/if}
 	<span class="grow"></span>
 	<Button variant="ghost" size="sm" onclick={download} disabled={!shown.length} title="Download the rows shown as a text file"><DownloadIcon />Download</Button>
 </div>
 
-{#if level === 'error'}
-	<ActiveFilter what="errors only" shown={shown.length} total={modeEntries.length} noun="event" onclear={toggleErrors} testid="errors-only" />
+{#if showing}
+	<ActiveFilter what={showing.label} typed={showing.typed} shown={shown.length} total={modeEntries.length} noun="event" onclear={() => (query = '')} testid="log-filter-active" />
 {/if}
 
 <DataTable class="static compact log" embedded columns={logColumns} rows={shown} key={(e) => e.id} empty={entries.length ? 'Nothing in the log matches these filters.' : 'Nothing logged yet.'}>

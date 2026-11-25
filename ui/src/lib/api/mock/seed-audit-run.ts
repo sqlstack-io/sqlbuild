@@ -85,14 +85,15 @@ export function seedAuditExecution(start: number, end: number, nodes: readonly R
 	const auditId = 'stmt-pa93-audit-orders_match_payments';
 	statement({ id: auditId, nodeKey: '', kind: 'audit', status: 'failed', startedAt: iso(auditAt - 350), endedAt: iso(auditAt), rowsAffected: null, queryId: '01b8e2a3-0000-4c1f-0000-00000000a93e', error: MISSING_OBJECT_ERROR });
 	ev('statement_failed', auditAt, MISSING_OBJECT_ERROR.split('\n').pop()!, { statementId: auditId });
-	ev('audit_completed', auditAt + 20, `${SEED_AUDIT_CHECK}: query failed (severity error)`, {
+	// As sqb reports it once warehouse errors keep their message: the audit's name, then the error.
+	ev('audit_completed', auditAt + 20, `${SEED_AUDIT_CHECK}: ${MISSING_OBJECT_ERROR.replace('\n', ' ')}`, {
 		statementId: auditId,
 		level: 'error',
 		check: { name: SEED_AUDIT_CHECK, outcome: 'failed', rows: null, bindingKey: 'chk-end-orders-payments', resultId: null }
 	});
-	out('stderr', auditAt + 20, `  ✗ check ${SEED_AUDIT_CHECK}  ${MISSING_OBJECT_ERROR.replace('\n', ' ')}`, true);
-	ev('invocation_failed', end - 400, '93 built · 0 failed · 0 skipped · 1 check failed');
-	out('stderr', end - 400, '✗ Completed with errors  93 built · 1 check failed', true);
+	out('stderr', auditAt + 20, `  ✗ audit ${SEED_AUDIT_CHECK}  ${MISSING_OBJECT_ERROR.replace('\n', ' ')}`, true);
+	ev('invocation_failed', end - 400, '93 built · 0 failed · 0 skipped · 1 audit failed');
+	out('stderr', end - 400, '✗ Completed with errors  93 built · 1 audit failed', true);
 	// The worker's own housekeeping line, which today's page shows as the run's reason.
 	out('stdout', end - 200, 'worker executor completed and closed its connections');
 }

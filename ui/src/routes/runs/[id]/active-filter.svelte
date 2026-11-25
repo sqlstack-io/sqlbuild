@@ -3,13 +3,13 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { plural } from '$lib/format/plural';
 
-	// The one line every filter on the run page shows while it is on (a header figure, the Errors chip):
-	// what it shows, how many of how many, and ✕ to clear it. One component, so they read alike.
-	let { what, shown, total, noun, onclear, testid }: { what: string; shown: number; total: number; noun: string; onclear: () => void; testid?: string } = $props();
+	// The line a filter shows while it is on: what it shows, how many of how many, and ✕ to clear it.
+	// `typed`: `what` is filter text as typed, shown as code.
+	let { what, shown, total, noun, onclear, testid, typed = false }: { what: string; shown: number; total: number; noun: string; onclear: () => void; testid?: string; typed?: boolean } = $props();
 </script>
 
 <div class="active-filter" role="status" data-testid={testid}>
-	<span>Showing {what} · {shown.toLocaleString('en-GB')} of {plural(total, noun)}</span>
+	<span>Showing {#if typed}<code>{what}</code>{:else}{what}{/if} · {shown.toLocaleString('en-GB')} of {plural(total, noun)}</span>
 	<Button variant="ghost" size="icon-xs" onclick={onclear} aria-label="Clear the filter" title="Show everything"><XIcon /></Button>
 </div>
 
@@ -24,5 +24,10 @@
 		background: color-mix(in srgb, var(--primary) 6%, var(--background));
 		color: var(--muted-foreground);
 		font-size: 12px;
+	}
+	code {
+		color: var(--foreground);
+		font-family: var(--font-mono);
+		font-size: 11.5px;
 	}
 </style>

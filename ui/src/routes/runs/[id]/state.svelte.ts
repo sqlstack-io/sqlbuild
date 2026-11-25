@@ -9,9 +9,10 @@ import { createSelection } from '$lib/state/selection.svelte';
 import { nodeLabel } from '$lib/operate/labels';
 import { planHref } from '$lib/run/command';
 import { pageMemory } from './utils/page-memory';
-import { quickPickText, runFailures, summaryOf, withNameToggled, type QuickPick } from './utils';
+import { runFailures, summaryOf, withNameToggled, type QuickPick } from './utils';
+import { holdsText, QUICK, toggleText } from './utils/log-query';
 import { isActiveRun } from '$lib/status';
-import type { BottomTab, NodeGroupKey } from './types';
+import type { BottomTab } from './types';
 import { bannersFor, groupNodes, progressOf, runCostOf } from './utils';
 
 function message(error: unknown): string {
@@ -74,18 +75,13 @@ export function createRunDetailState(runId: string) {
 	const nodes = $derived(detail?.nodes ?? []);
 	const active = $derived(!!run && isActiveRun(run.status));
 	const progress = $derived(progressOf(nodes));
-	// ---- the timeline narrowed to one outcome, picked in the panel's summary ----
-	let statusFilter = $state<NodeGroupKey | null>(remembered('statusFilter', null));
-	/** The header's failed-checks figure: the log shows only failed checks; again shows everything. */
-	let checksFilter = $state<boolean>(remembered('checksFilter', false));
-	/** The picked figure's words, such as `built` or `failed checks`, for the active-filter line. */
-	let figureLabel = $state<string>(remembered('figureLabel', ''));
 	const nodeGroups = $derived(groupNodes(nodes, active));
-	/** The timeline's nodes: those of the outcome picked, else all; a picked outcome no node has any more shows all. */
-	const shownNodes = $derived.by(() => {
-		const group = statusFilter && nodeGroups.find((g) => g.key === statusFilter);
-		return group ? group.nodes : nodes;
-	});
+	/** The timeline shows every node: quick filters narrow the log, through its filter text, and nothing else. */
+	const shownNodes = $derived(nodes);
+	// ---- the log's one filter: the text in its box ----
+	// The header's figures, the Errors chip and the Pick chips only add their words to it or take them out;
+	// what is shown, what is pressed and the "Showing …" line are read back from it.
+	let logQuery = $state<string>(remembered('logQuery', ''));
 	const cause = $derived(outputRes.data?.find((l) => l.error)?.text ?? null);
 	// The failure summary leads when it knows what failed; the worker's own end line is never a reason.
 	const housekeeping = (text: string | null) => !!text && /worker executor completed|closed its connections/.test(text);
@@ -127,47 +123,38 @@ export function createRunDetailState(runId: string) {
 		else selection.exclude = withNameToggled(selection.exclude, name);
 	}
 
-	// A quick pick toggles: picked again while its selection is unchanged, it puts back the selection it replaced.
-	let picked = $state<{ pick: QuickPick; text: string; select: string; exclude: string } | null>(null);
-	function pick(quick: QuickPick) {
-		const text = quickPickText(quick, nodes, run?.jobKey ?? null);
-		const current = picked && picked.text === selection.select && !selection.exclude ? picked : null;
-		if (current?.pick === quick) {
-			selection.select = current.select;
-			selection.exclude = current.exclude;
-			picked = null;
-			return;
-		}
-		// Switching from one pick to another keeps the selection from before the first.
-		const before = current ?? { select: selection.select, exclude: selection.exclude };
-		picked = { pick: quick, text, select: before.select, exclude: before.exclude };
-		selection.select = text;
-		selection.exclude = '';
+	/** A quick filter's click: its words go into the log's filter text, or come out again; the log shows. */
+	function toggleLog(text: string) {
+		logQuery = toggleText(logQuery, text);
+		tab = 'log';
 	}
-	/** The quick pick whose selection is shown, if it is unchanged since it was picked. */
-	const activePick = $derived(picked && picked.text === selection.select && !selection.exclude ? picked.pick : null);
+	/** A Pick chip: its words in the log's filter text, like any quick filter. */
+	function pick(quick: QuickPick) {
+		toggleLog(quick === 'skipped' ? QUICK.skipped.text : QUICK.unfinished.text);
+	}
+	const activePick = $derived<QuickPick | null>(holdsText(logQuery, QUICK.unfinished.text) ? 'unfinished' : holdsText(logQuery, QUICK.skipped.text) ? 'skipped' : null);
 
 	function clearSelection() {
 		selection.select = '';
 		selection.exclude = '';
 	}
 
-	// ---- the quick filter: a summary figure's nodes, or a node clicked in the log; apart from the selection ----
-	// A jump's filter belongs to the tab it opened (`tab`); leaving that tab drops it, so the tab left
-	// behind shows what it did before. A summary figure's filter has no tab: it applies everywhere.
+	// ---- Statements and Cost: a node picked for one of them; the log has its filter text instead ----
+	// A jump's filter belongs to the tab it opened (`tab`); leaving that tab drops it.
 	let focus = $state<{ label: string; keys: string[]; tab?: BottomTab } | null>(remembered('focus', null));
 
-	/** A filter for the log, set from outside it (the failure summary's Show in log); `seq` makes a repeat apply again. */
-	let logRequest = $state<{ query: string; seq: number } | null>(null);
+	/** The failure summary's Show in log: its words become the log's filter text. */
 	function showInLog(query: string) {
-		focus = null;
-		statusFilter = null;
+		logQuery = `${query} `;
 		tab = 'log';
-		logRequest = { query, seq: (logRequest?.seq ?? 0) + 1 };
 	}
 
+	/** A node picked for a tab: the log gets `node:<name>` in its text; Statements and Cost follow it as before. */
 	function focusNode(key: string, nextTab: BottomTab) {
-		focus = { label: nodeLabel(key), keys: [key], tab: nextTab };
+		if (nextTab === 'log') {
+			logQuery = toggleText(logQuery.split(/\s+/).filter((w) => w && !w.toLowerCase().startsWith('node:')).join(' '), `node:${nodeLabel(key)}`);
+			focus = null;
+		} else focus = { label: nodeLabel(key), keys: [key], tab: nextTab };
 		tab = nextTab;
 	}
 
@@ -175,28 +162,6 @@ export function createRunDetailState(runId: string) {
 		if (focus?.tab && focus.tab !== next) focus = null;
 		if (next !== 'statements') statementFocus = null;
 		tab = next;
-	}
-
-	/** A summary figure: the timeline and the log show only its nodes; again shows everything. */
-	// A header figure toggles: on keeps the focus it replaced (a node picked in the log), off puts it back.
-	let focusBefore: typeof focus | undefined = undefined;
-	function figureOn() {
-		if (focusBefore === undefined && !statusFilter && !checksFilter) focusBefore = focus;
-	}
-	function figureOff() {
-		statusFilter = null;
-		checksFilter = false;
-		focus = focusBefore ?? null;
-		focusBefore = undefined;
-	}
-	function focusGroup(key: NodeGroupKey | null, label = '') {
-		if (!key || statusFilter === key) return figureOff();
-		figureOn();
-		checksFilter = false;
-		figureLabel = label;
-		statusFilter = key;
-		const group = nodeGroups.find((g) => g.key === key);
-		focus = { label, keys: group?.nodes.map((n) => n.nodeKey) ?? [] };
 	}
 
 	// ---- failed nodes' error text ----
@@ -222,7 +187,7 @@ export function createRunDetailState(runId: string) {
 	/** A line of the drawer's node's code to show, from a traceback frame. */
 	let codeLine = $state<number | null>(remembered('codeLine', null));
 	$effect(() => {
-		Object.assign(memory, { select: selection.select, exclude: selection.exclude, tab, focus: $state.snapshot(focus), statusFilter, checksFilter, figureLabel, drawer, codeLine });
+		Object.assign(memory, { select: selection.select, exclude: selection.exclude, tab, focus: $state.snapshot(focus), logQuery, drawer, codeLine });
 	});
 
 	const summary = $derived(summaryOf(nodes, events, active));
@@ -285,36 +250,21 @@ export function createRunDetailState(runId: string) {
 		get shownNodes() {
 			return shownNodes;
 		},
-		get statusFilter() {
-			return nodeGroups.some((g) => g.key === statusFilter) ? statusFilter : null;
+		/** The log's filter text: the one filter the log has. */
+		get logQuery() {
+			return logQuery;
 		},
-		/** The header figure whose filter is on: a node group, or the failed checks. */
-		get figure(): NodeGroupKey | 'checks_failed' | null {
-			if (checksFilter) return 'checks_failed';
-			return nodeGroups.some((g) => g.key === statusFilter) ? statusFilter : null;
+		set logQuery(text: string) {
+			logQuery = text;
 		},
-		get figureLabel() {
-			return figureLabel;
-		},
-		get checksFilter() {
-			return checksFilter;
-		},
-		/** The failed-checks figure: on shows only failed checks in the log; again shows everything. */
-		toggleChecksFilter(label: string) {
-			if (checksFilter) return figureOff();
-			figureOn();
-			statusFilter = null;
-			focus = null;
-			figureLabel = label;
-			checksFilter = true;
-			tab = 'log';
+		/** A quick filter's click: its words in the log's filter text, or out again. */
+		toggleLog,
+		/** Whether a quick filter's words are all in the log's filter text: it reads as pressed. */
+		logHolds(text: string) {
+			return holdsText(logQuery, text);
 		},
 		get activePick() {
 			return activePick;
-		},
-		/** Shows only the nodes of `key` on the timeline, or all again when it is already picked. */
-		filterStatus(key: NodeGroupKey | null) {
-			statusFilter = statusFilter === key ? null : key;
 		},
 		get active() {
 			return active;
@@ -340,14 +290,9 @@ export function createRunDetailState(runId: string) {
 			return focus;
 		},
 		clearFocus() {
-			if (statusFilter || checksFilter) return figureOff();
 			focus = null;
 		},
-		focusGroup,
 		showInLog,
-		get logRequest() {
-			return logRequest;
-		},
 		get errorsReadable() {
 			return errorsReadable;
 		},
