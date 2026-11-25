@@ -1,5 +1,44 @@
 # Changelog
 
+## [0.261.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.260.0...v0.261.0) (2026-11-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* the server alone computes a location's health state, and serves it
+* failing locations impossible to miss, cursor windows per model, folder roots in the UI ([#1625](https://github.com/sqlstack-io/sqlbuild/issues/1625))
+* location health and planning report failures they used to hide.
+
+### Features
+
+* a failing location shows a banner on every page, a "Location failing" item on the Overview, its state on the Locations pages, and a location_failing platform event ([e68d409](https://github.com/sqlstack-io/sqlbuild/commit/e68d409d4563f96987425d7d745d04287f80ff4e))
+* failing locations impossible to miss, cursor windows per model, folder roots in the UI ([#1625](https://github.com/sqlstack-io/sqlbuild/issues/1625)) ([e68d409](https://github.com/sqlstack-io/sqlbuild/commit/e68d409d4563f96987425d7d745d04287f80ff4e))
+* the server alone computes a location's health state, and serves it ([e68d409](https://github.com/sqlstack-io/sqlbuild/commit/e68d409d4563f96987425d7d745d04287f80ff4e))
+
+
+### Bug Fixes
+
+* a full build binds cursor intrinsics to the whole cursor range instead of refusing ([e68d409](https://github.com/sqlstack-io/sqlbuild/commit/e68d409d4563f96987425d7d745d04287f80ff4e))
+* a location that can't get its next generation number reports a failed load ([e68d409](https://github.com/sqlstack-io/sqlbuild/commit/e68d409d4563f96987425d7d745d04287f80ff4e))
+* clamp an explicit cursor window to each model's cursor_start ([e68d409](https://github.com/sqlstack-io/sqlbuild/commit/e68d409d4563f96987425d7d745d04287f80ff4e))
+* **cli:** a crashed discovered-set check discovers again, so its failure is reported ([e68d409](https://github.com/sqlstack-io/sqlbuild/commit/e68d409d4563f96987425d7d745d04287f80ff4e))
+* **cli:** keep publication records off sqb dev's stdout ([e68d409](https://github.com/sqlstack-io/sqlbuild/commit/e68d409d4563f96987425d7d745d04287f80ff4e))
+* **cli:** report starting until a restarted location's own first load finishes ([e68d409](https://github.com/sqlstack-io/sqlbuild/commit/e68d409d4563f96987425d7d745d04287f80ff4e))
+* compute one build status per node on the server and render it on every page ([e68d409](https://github.com/sqlstack-io/sqlbuild/commit/e68d409d4563f96987425d7d745d04287f80ff4e))
+* **deps:** upgrade to SQLQuack 0.23.1 and SQLClean 0.12.1 ([e68d409](https://github.com/sqlstack-io/sqlbuild/commit/e68d409d4563f96987425d7d745d04287f80ff4e))
+* fail plans at once with the load error when a location can't load the current code ([e68d409](https://github.com/sqlstack-io/sqlbuild/commit/e68d409d4563f96987425d7d745d04287f80ff4e))
+* one model's planning error no longer fails the whole plan ([e68d409](https://github.com/sqlstack-io/sqlbuild/commit/e68d409d4563f96987425d7d745d04287f80ff4e))
+* order a location's load reports by arrival, so a later publication clears earlier failures ([e68d409](https://github.com/sqlstack-io/sqlbuild/commit/e68d409d4563f96987425d7d745d04287f80ff4e))
+* resolve job and sensor selectors at compile, as a location does when it publishes ([e68d409](https://github.com/sqlstack-io/sqlbuild/commit/e68d409d4563f96987425d7d745d04287f80ff4e))
+* **server:** name cost folders as the catalog does and offer only selectable path folders ([e68d409](https://github.com/sqlstack-io/sqlbuild/commit/e68d409d4563f96987425d7d745d04287f80ff4e))
+* **ui:** group the catalog and overview by folders below sql/ and python/nodes/ ([e68d409](https://github.com/sqlstack-io/sqlbuild/commit/e68d409d4563f96987425d7d745d04287f80ff4e))
+* **ui:** make each Cost drill one navigation, so Back right after drilling goes up ([e68d409](https://github.com/sqlstack-io/sqlbuild/commit/e68d409d4563f96987425d7d745d04287f80ff4e))
+
+
+### Tests
+
+* fix the duckshop benchmarks for SQLClean 0.12 findings and the sql/ layout, and stale tests for the new health shape ([e68d409](https://github.com/sqlstack-io/sqlbuild/commit/e68d409d4563f96987425d7d745d04287f80ff4e))
+
 ## [0.260.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.259.0...v0.260.0) (2026-11-24)
 
 
