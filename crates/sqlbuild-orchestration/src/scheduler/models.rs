@@ -25,6 +25,8 @@ pub struct SchedulerState {
     pub(crate) pruned_at: Option<std::time::Instant>,
     /// The address people reach the UI at, which sensor events link runs under.
     pub(crate) origin: Option<String>,
+    /// The server's health, which each cycle reports to.
+    pub(crate) health: Option<crate::health::models::ServerHealth>,
 }
 
 impl SchedulerState {
@@ -35,6 +37,16 @@ impl SchedulerState {
             lease: None,
             pruned_at: None,
             origin: None,
+            health: None,
+        }
+    }
+
+    /// The state whose cycles report to the server's `health`.
+    #[must_use]
+    pub fn with_health(self, health: crate::health::models::ServerHealth) -> Self {
+        Self {
+            health: Some(health),
+            ..self
         }
     }
 

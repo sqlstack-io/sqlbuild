@@ -143,5 +143,6 @@ pub(crate) async fn diff(
         status: axum::http::StatusCode::NOT_FOUND,
         message: "plan diff not found".into(),
         decision_id: None,
+        cause: None,
     })
 }

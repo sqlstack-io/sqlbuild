@@ -1,7 +1,5 @@
 //! Start the control API and the platform roles that run beside it.
 
-use std::net::SocketAddr;
-
 use sqlbuild_orchestration::api::main::serve_api::serve_api;
 use sqlbuild_orchestration::api::models::{ApiAuthentication, ServerFacts};
 use sqlbuild_orchestration::platform::models::RetentionPolicies;
@@ -15,6 +13,7 @@ use tokio::task::JoinSet;
 use crate::argv::models::Stream;
 use crate::native_commands::_helpers::command::terminal::write_output;
 use crate::native_commands::_helpers::location::execution::start_platform_roles;
+use crate::native_commands::models::ApiStandby;
 
 /// Resolve once `shutdown` turns true or its sender is gone.
 async fn stopped(mut shutdown: watch::Receiver<bool>) {
@@ -28,15 +27,11 @@ async fn stopped(mut shutdown: watch::Receiver<bool>) {
 /// Start the control API and the platform roles beside it, with the retention `facts` and `run_output` set.
 pub(crate) async fn start_api(
     mut tasks: JoinSet<Result<(), ControlError>>,
-    (address, store, shutdown): (SocketAddr, &ControlStore, &watch::Receiver<bool>),
+    (standby, store, shutdown): (ApiStandby, &ControlStore, &watch::Receiver<bool>),
     (authentication, handoff, facts): (ApiAuthentication, RunHandoff, &ServerFacts),
     run_output: Option<(OutputStore, u16)>,
 ) -> Result<JoinSet<Result<(), ControlError>>, ControlError> {
-    drop(write_output(&[(
-        Stream::Stderr,
-        "Starting control API...\n",
-    )]));
-    let listener = tokio::net::TcpListener::bind(address).await?;
+    let ApiStandby { listener, end } = standby;
     let address = listener.local_addr()?;
     tasks.spawn(serve_api(
         store.clone(),
@@ -52,6 +47,8 @@ pub(crate) async fn start_api(
             stopped(shutdown.clone()),
         ),
     ));
+    // The API accepts on the same socket from here; the standby finishes what it has and stops.
+    end.send(()).ok();
     start_platform_roles(
         &mut tasks,
         (store, shutdown),

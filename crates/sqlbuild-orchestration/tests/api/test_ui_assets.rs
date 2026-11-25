@@ -34,6 +34,7 @@ fn given_embedded_ui_when_requesting_pages_assets_and_api_paths_then_only_ui_pat
             expected_status: 200,
             expected_body: "<html>shell</html>",
             expected_cache: Some("no-cache"),
+            expected_policy: true,
         },
         UiAssetTestCase {
             description: "client route falls back to the shell",
@@ -42,6 +43,7 @@ fn given_embedded_ui_when_requesting_pages_assets_and_api_paths_then_only_ui_pat
             expected_status: 200,
             expected_body: "<html>shell</html>",
             expected_cache: Some("no-cache"),
+            expected_policy: true,
         },
         UiAssetTestCase {
             description: "hashed asset is immutable",
@@ -50,6 +52,7 @@ fn given_embedded_ui_when_requesting_pages_assets_and_api_paths_then_only_ui_pat
             expected_status: 200,
             expected_body: "start()",
             expected_cache: Some("public, max-age=31536000, immutable"),
+            expected_policy: true,
         },
         UiAssetTestCase {
             description: "unhashed asset revalidates",
@@ -58,6 +61,7 @@ fn given_embedded_ui_when_requesting_pages_assets_and_api_paths_then_only_ui_pat
             expected_status: 200,
             expected_body: "theme()",
             expected_cache: Some("no-cache"),
+            expected_policy: true,
         },
         UiAssetTestCase {
             description: "missing file is not the shell",
@@ -66,22 +70,25 @@ fn given_embedded_ui_when_requesting_pages_assets_and_api_paths_then_only_ui_pat
             expected_status: 404,
             expected_body: "",
             expected_cache: None,
+            expected_policy: false,
         },
         UiAssetTestCase {
-            description: "unknown API path is not the shell",
+            description: "unknown API path is a JSON 404, not the shell",
             method: reqwest::Method::GET,
             path: "/api/unknown",
             expected_status: 404,
-            expected_body: "",
-            expected_cache: None,
+            expected_body: r#"{"error":"no such API endpoint"}"#,
+            expected_cache: Some("no-store"),
+            expected_policy: false,
         },
         UiAssetTestCase {
-            description: "bare API prefix is not the shell",
+            description: "bare API prefix is a JSON 404, not the shell",
             method: reqwest::Method::GET,
             path: "/api",
             expected_status: 404,
-            expected_body: "",
-            expected_cache: None,
+            expected_body: r#"{"error":"no such API endpoint"}"#,
+            expected_cache: Some("no-store"),
+            expected_policy: false,
         },
         UiAssetTestCase {
             description: "unknown auth path is not the shell",
@@ -90,6 +97,7 @@ fn given_embedded_ui_when_requesting_pages_assets_and_api_paths_then_only_ui_pat
             expected_status: 404,
             expected_body: "",
             expected_cache: None,
+            expected_policy: false,
         },
         UiAssetTestCase {
             description: "writes never reach the shell",
@@ -98,6 +106,7 @@ fn given_embedded_ui_when_requesting_pages_assets_and_api_paths_then_only_ui_pat
             expected_status: 404,
             expected_body: "",
             expected_cache: None,
+            expected_policy: false,
         },
         UiAssetTestCase {
             description: "API routes keep precedence",
@@ -106,6 +115,7 @@ fn given_embedded_ui_when_requesting_pages_assets_and_api_paths_then_only_ui_pat
             expected_status: 200,
             expected_body: "api",
             expected_cache: None,
+            expected_policy: false,
         },
     ];
     run(async {
@@ -145,7 +155,7 @@ fn given_embedded_ui_when_requesting_pages_assets_and_api_paths_then_only_ui_pat
             );
             assert_eq!(
                 header("content-security-policy").is_some(),
-                test_case.expected_cache.is_some(),
+                test_case.expected_policy,
                 "{}",
                 test_case.description
             );
@@ -178,7 +188,7 @@ fn given_embedded_ui_when_paths_carry_dot_segments_encodings_or_extra_slashes_th
             description: "parent segment after the API prefix",
             path: "/api/../theme.js",
             expected_status: 404,
-            expected_body: "",
+            expected_body: r#"{"error":"no such API endpoint"}"#,
         },
         UiPathTestCase {
             description: "parent segment inside a client route",
@@ -256,13 +266,13 @@ fn given_embedded_ui_when_paths_carry_dot_segments_encodings_or_extra_slashes_th
             description: "bare API prefix",
             path: "/api",
             expected_status: 404,
-            expected_body: "",
+            expected_body: r#"{"error":"no such API endpoint"}"#,
         },
         UiPathTestCase {
             description: "API prefix with a trailing slash",
             path: "/api/",
             expected_status: 404,
-            expected_body: "",
+            expected_body: r#"{"error":"no such API endpoint"}"#,
         },
         UiPathTestCase {
             description: "auth prefix with a trailing slash",

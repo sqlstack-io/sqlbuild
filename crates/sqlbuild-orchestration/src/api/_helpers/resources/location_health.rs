@@ -8,6 +8,7 @@ use crate::api::_helpers::authentication::bearer::require_location;
 use crate::api::errors::ApiError;
 use crate::api::models::MutationResponse;
 use crate::credentials::models::TokenIdentity;
+use crate::health::models::ServerHealth;
 use crate::platform::main::health::location_health::location_health;
 use crate::platform::main::health::report_location_health::report_location_health;
 use crate::platform::models::{
@@ -22,14 +23,14 @@ use crate::store::models::ControlStore;
     security(("bearer" = [])))]
 pub(crate) async fn report(
     State(store): State<ControlStore>,
-    Extension(identity): Extension<TokenIdentity>,
+    (Extension(identity), Extension(health)): (Extension<TokenIdentity>, Extension<ServerHealth>),
     Path(location_id): Path<Uuid>,
     Json(report): Json<LocationHealthReport>,
 ) -> Result<Json<MutationResponse>, ApiError> {
     require_location(&identity, location_id)?;
-    Ok(Json(MutationResponse {
-        applied: report_location_health(&store, location_id, &report).await?,
-    }))
+    let applied = report_location_health(&store, location_id, &report).await?;
+    health.location_reported(location_id, chrono::Utc::now());
+    Ok(Json(MutationResponse { applied }))
 }
 
 #[utoipa::path(get, path = "/api/locations/{location_id}/health", operation_id = "read_location_health",

@@ -17,6 +17,7 @@ pub(crate) async fn generic_server_errors(response: Response) -> Response {
         status: response.status(),
         message: "internal server error".into(),
         decision_id: None,
+        cause: None,
     }
     .into_response()
 }

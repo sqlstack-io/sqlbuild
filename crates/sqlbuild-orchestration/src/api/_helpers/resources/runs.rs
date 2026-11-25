@@ -38,6 +38,7 @@ pub(crate) async fn execution(
             status: StatusCode::UNAUTHORIZED,
             message: "run claim is no longer active".into(),
             decision_id: None,
+            cause: None,
         })?;
     Ok(Json(execution))
 }
@@ -59,6 +60,7 @@ pub(crate) async fn report(
             status: StatusCode::FORBIDDEN,
             message: "report does not match the authenticated run and claim".into(),
             decision_id: None,
+            cause: None,
         });
     }
     let applied = change_run_linked(
@@ -126,6 +128,7 @@ pub(crate) fn no_output_store() -> ApiError {
         status: StatusCode::SERVICE_UNAVAILABLE,
         message: "this server keeps no run output store".into(),
         decision_id: None,
+        cause: None,
     }
 }
 
@@ -159,5 +162,6 @@ fn require_worker(identity: &TokenIdentity, run_id: Uuid) -> Result<Uuid, ApiErr
         status: StatusCode::FORBIDDEN,
         message: "credential does not authorize this run".into(),
         decision_id: None,
+        cause: None,
     })
 }

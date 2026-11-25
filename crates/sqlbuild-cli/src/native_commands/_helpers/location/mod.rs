@@ -1,3 +1,4 @@
+pub(crate) mod api_standby;
 pub(crate) mod api_start;
 pub(crate) mod changed_build;
 pub(crate) mod compile_turn;

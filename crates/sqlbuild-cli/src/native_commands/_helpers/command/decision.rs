@@ -43,6 +43,7 @@ use crate::native_commands::models::{
 };
 use crate::server_config::models::{ServerConfig, ServerSection};
 use sqlbuild_core::cost_command::constants::DESCENDING_ORDER;
+use sqlbuild_orchestration::health::models::ServerHealth;
 
 /// Whether `sqb review --json` failed to parse, which Python reports as a JSON document.
 pub(crate) fn review_json_failure(arguments: &[String], outcome: &ArgvOutcome) -> bool {
@@ -353,6 +354,10 @@ pub(crate) fn control_api_settings(
             origin,
             version: env!("CARGO_PKG_VERSION").into(),
             scheduler: scheduler_enabled(namespace, standalone, &config.server),
+            health: ServerHealth::new(
+                env!("CARGO_PKG_VERSION"),
+                scheduler_enabled(namespace, standalone, &config.server),
+            ),
             output: None,
             audit,
             statistics,

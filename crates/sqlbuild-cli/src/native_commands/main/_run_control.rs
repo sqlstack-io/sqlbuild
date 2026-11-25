@@ -1,5 +1,6 @@
 //! Supervise native API/scheduler roles together; a failed role stops its siblings.
 
+use sqlbuild_orchestration::health::models::ServerHealth;
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
 use sqlbuild_orchestration::scheduler::models::SchedulerState;
 use sqlbuild_orchestration::store::errors::ControlError;
@@ -13,6 +14,7 @@ use crate::native_commands::_helpers::command::decision::{
     control_address, control_api_settings, control_output,
 };
 use crate::native_commands::_helpers::command::terminal::write_output;
+use crate::native_commands::_helpers::location::api_standby::{open_store_waiting, start_standby};
 use crate::native_commands::_helpers::location::api_start::start_api;
 use crate::native_commands::_helpers::location::execution::{
     open_control_store, open_control_workers,
@@ -28,7 +30,14 @@ pub(crate) async fn run_control(
     let config = read_server_config(namespace)?;
     let address = control_address(namespace, standalone, &config.server)?;
     let (authentication, mut facts) = control_api_settings(namespace, standalone, &config)?;
-    let store = open_control_store(namespace, Some(&config.server)).await?;
+    let standby = match address {
+        Some(address) => Some(start_standby(address, &facts.health).await?),
+        None => None,
+    };
+    let store = match standby {
+        Some(_) => open_store_waiting(namespace, &config.server, &facts.health).await?,
+        None => open_control_store(namespace, Some(&config.server)).await?,
+    };
     let run_output = control_output(namespace, &config, (&store, &mut facts))?;
     let (workers, handoff) = open_control_workers(
         (&store, namespace),
@@ -39,17 +48,22 @@ pub(crate) async fn run_control(
     facts.pool_caps = workers.pool_caps();
     let (stop, shutdown) = watch::channel(false);
     let mut tasks = JoinSet::new();
-    if let Some(address) = address {
+    if let Some(standby) = standby {
         tasks = start_api(
             tasks,
-            (address, &store, &shutdown),
+            (standby, &store, &shutdown),
             (authentication, handoff, &facts),
             run_output,
         )
         .await?;
     }
     if facts.scheduler {
-        start_scheduler(&mut tasks, (store, facts.origin.clone()), shutdown, workers);
+        start_scheduler(
+            &mut tasks,
+            (store, facts.origin.clone(), facts.health.clone()),
+            shutdown,
+            workers,
+        );
     }
     supervise_control_roles(tasks, stop).await
 }
@@ -57,7 +71,7 @@ pub(crate) async fn run_control(
 /// Start the scheduler, whose sensor events link runs under `origin`.
 fn start_scheduler(
     tasks: &mut JoinSet<Result<(), ControlError>>,
-    (store, origin): (ControlStore, Option<String>),
+    (store, origin, health): (ControlStore, Option<String>, ServerHealth),
     shutdown: watch::Receiver<bool>,
     workers: Workers,
 ) {
@@ -65,7 +79,9 @@ fn start_scheduler(
     tasks.spawn(async move {
         run_scheduler(
             &store,
-            SchedulerState::new(Uuid::now_v7()).with_origin(origin),
+            SchedulerState::new(Uuid::now_v7())
+                .with_origin(origin)
+                .with_health(health),
             shutdown,
             workers,
         )

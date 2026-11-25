@@ -11,6 +11,8 @@ pub mod credentials;
 
 pub mod declarations;
 
+pub mod health;
+
 pub mod dev_events;
 
 pub mod discovered_sets;

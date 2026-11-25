@@ -14,7 +14,7 @@ pub const JOB_SETTING_CONFLICT_CODE: &str = "S027";
 /// How a conflict names a job's `[retry]` table.
 pub const RETRY_SETTING: &str = "[retry]";
 /// Every option of `sqb build`, in the parser's order, as a job setting.
-pub const JOB_SETTINGS: [JobSettingSpec; 54] = [
+pub const JOB_SETTINGS: [JobSettingSpec; 57] = [
     JobSettingSpec {
         name: "help",
         options: &["-h", "--help"],
@@ -448,6 +448,36 @@ pub const JOB_SETTINGS: [JobSettingSpec; 54] = [
     JobSettingSpec {
         name: "exclude",
         options: &["--exclude"],
+        scope: RunRequest,
+        python_nodes: false,
+        whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
+        group: OneBuild,
+    },
+    JobSettingSpec {
+        name: "login_server",
+        options: &["--server"],
+        scope: RunRequest,
+        python_nodes: false,
+        whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
+        group: OneBuild,
+    },
+    JobSettingSpec {
+        name: "login_ca",
+        options: &["--ca-cert"],
+        scope: RunRequest,
+        python_nodes: false,
+        whole_run: false,
+        command_line: CommandLineValues::Any,
+        consumer: None,
+        group: OneBuild,
+    },
+    JobSettingSpec {
+        name: "person_location",
+        options: &["--location-id"],
         scope: RunRequest,
         python_nodes: false,
         whole_run: false,

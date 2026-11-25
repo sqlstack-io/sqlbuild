@@ -774,6 +774,7 @@ pub(crate) async fn sensor_events(
                 status: StatusCode::BAD_REQUEST,
                 message: "choose at most one of latest, event and run".into(),
                 decision_id: None,
+                cause: None,
             });
         }
     };
@@ -790,6 +791,7 @@ pub(crate) async fn sensor_events(
         status: StatusCode::CONFLICT,
         message,
         decision_id: None,
+        cause: None,
     })
 }
 
@@ -877,5 +879,6 @@ fn not_found(message: &str) -> ApiError {
         status: StatusCode::NOT_FOUND,
         message: message.into(),
         decision_id: None,
+        cause: None,
     }
 }

@@ -875,3 +875,11 @@ impl GenerationLookups {
         self.last.map_or(1, |generation| generation + 1)
     }
 }
+
+/// The server's bound address while its standby answers there, until the control API takes it over.
+pub(crate) struct ApiStandby {
+    /// The API's own handle on the bound socket.
+    pub(crate) listener: tokio::net::TcpListener,
+    /// Ends the standby, which finishes its open requests first.
+    pub(crate) end: tokio::sync::oneshot::Sender<()>,
+}

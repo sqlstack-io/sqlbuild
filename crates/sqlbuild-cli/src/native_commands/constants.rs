@@ -93,6 +93,9 @@ pub(crate) const ADMIN_OPEN_NOTICE: std::time::Duration = std::time::Duration::f
 pub(crate) const OPENING_STORE: &str = "Opening control store...\n";
 /// Printed when the control store is open.
 pub(crate) const STORE_READY: &str = "Control store ready\n";
+/// The first wait before opening an unreachable control store again; each retry doubles it up to `STORE_RETRY_MAX`.
+pub(crate) const STORE_RETRY_FIRST: std::time::Duration = std::time::Duration::from_secs(1);
+pub(crate) const STORE_RETRY_MAX: std::time::Duration = std::time::Duration::from_secs(30);
 /// An admin command committed, and its result didn't reach stdout.
 pub(crate) const ADMIN_DELIVERY_FAILED: &str =
     "Control administration result delivery failed; changes may already be committed\n";

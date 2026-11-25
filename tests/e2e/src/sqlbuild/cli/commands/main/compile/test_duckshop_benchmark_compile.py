@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -71,8 +72,7 @@ def test_given_benchmark_project_when_compiling_then_reports_no_errors_or_warnin
         BenchmarkProjectTestPlanTestCase(
             description="duckshop",
             project_dir=REPO_ROOT / "benchmarks" / "duckshop" / "project",
-            expected_final_line_prefix="Test plan inspection complete: ",
-            expected_final_line_suffix=" selected, 0 errors.",
+            expected_summary_pattern=r"^Test plan inspection complete: \d+ selected, 0 errors\.$",
         )
     ],
     ids=lambda case: case.description,
@@ -94,9 +94,7 @@ def test_given_benchmark_project_when_inspecting_test_plan_then_every_unit_test_
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
-    final_line: str = result.stdout.strip().splitlines()[-1]
-    assert final_line.startswith(test_case.expected_final_line_prefix), result.stdout
-    assert final_line.endswith(test_case.expected_final_line_suffix), result.stdout
+    assert re.search(test_case.expected_summary_pattern, result.stdout, re.MULTILINE), result.stdout
 
 
 @pytest.mark.parametrize(

@@ -111,6 +111,7 @@ use sqlbuild_orchestration::dev_events::main::emit_dev_event::emit_dev_event;
 use sqlbuild_orchestration::dev_events::main::parse_dev_control::parse_dev_control;
 use sqlbuild_orchestration::dev_events::main::parse_dev_event::parse_dev_event;
 use sqlbuild_orchestration::dev_events::models::{DevControl, DevEvent};
+use sqlbuild_orchestration::health::models::ServerHealth;
 use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::platform::main::health::report_remote_location_health::report_remote_location_health;
 use sqlbuild_orchestration::platform::main::installation::run_maintenance::run_maintenance;
@@ -180,6 +181,7 @@ pub(crate) async fn run_development_roles(
         (url.clone(), written.clone()),
     )?;
     let (stop, shutdown) = watch::channel(false);
+    let health = ServerHealth::new(env!("CARGO_PKG_VERSION"), scheduler);
     let mut roles: DevRoles = DevRoles::default();
     drop(messages.send(ScreenMessage::Started {
         step: DevStep::Api,
@@ -200,6 +202,7 @@ pub(crate) async fn run_development_roles(
                 ServerFacts {
                     version: env!("CARGO_PKG_VERSION").into(),
                     scheduler,
+                    health: health.clone(),
                     output: Some(output.clone()),
                     ..ServerFacts::default()
                 },
@@ -257,7 +260,9 @@ pub(crate) async fn run_development_roles(
         roles.spawn(Some("scheduler"), async move {
             run_scheduler(
                 &scheduler_store,
-                SchedulerState::new(Uuid::now_v7()).with_origin(origin),
+                SchedulerState::new(Uuid::now_v7())
+                    .with_origin(origin)
+                    .with_health(health),
                 shutdown,
                 workers,
             )
