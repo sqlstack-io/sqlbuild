@@ -33,9 +33,7 @@ const QUICK_FILTERS: { run: string; name: string; control: (page: Page) => Retur
 	{ run: RUN, name: 'the failed-audits figure', control: (p) => summary(p).getByRole('link', { name: '1 audit failed' }), text: 'kind:audit outcome:failed' },
 	{ run: RUN, name: 'the built figure', control: (p) => summary(p).getByRole('link', { name: '93 built' }), text: 'outcome:built' },
 	{ run: '/runs/run-4f2a?mock', name: 'the skipped figure', control: (p) => summary(p).getByRole('link', { name: /^\d+ skipped$/ }), text: 'outcome:skipped' },
-	{ run: RUN, name: 'the Errors chip', control: (p) => p.getByRole('button', { name: /^Errors \d/ }), text: 'level:error' },
-	{ run: RUN, name: "the Didn't succeed pick", control: (p) => p.getByRole('button', { name: "Didn't succeed", exact: true }), text: 'outcome:failed,cancelled,not-run' },
-	{ run: '/runs/run-4f2a?mock', name: 'the Skipped pick', control: (p) => p.getByRole('button', { name: 'Skipped', exact: true }), text: 'outcome:skipped' }
+	{ run: RUN, name: 'the Errors chip', control: (p) => p.getByRole('button', { name: /^Errors \d/ }), text: 'level:error' }
 ];
 
 for (const q of QUICK_FILTERS) {
@@ -52,6 +50,28 @@ for (const q of QUICK_FILTERS) {
 		await logFilter(page).fill(`${q.text} `);
 		await logFilter(page).evaluate((el) => (el as HTMLInputElement).blur());
 		expect(await snapshot(page)).toEqual(clicked);
+	});
+
+	test(`${q.name} moves nothing in the log toolbar`, async ({ page }) => {
+		await open(page, q.run);
+		// The toolbar, the filter box, each control in it, and the table's header under the Showing line.
+		const boxes = () =>
+			page.evaluate(() =>
+				['.log-head .filters', '.log-filter .field', '.filters .menu-trigger', '.filters .count', '.log thead'].flatMap((sel) =>
+					[...document.querySelectorAll(sel)].map((el) => {
+						const r = el.getBoundingClientRect();
+						return `${sel} ${r.x},${r.y},${r.width},${r.height}`;
+					})
+				)
+			);
+		const before = await boxes();
+		expect(before.length).toBeGreaterThan(3);
+		await q.control(page).click();
+		await expect(page.getByTestId('log-filter-active')).toBeVisible();
+		expect(await boxes()).toEqual(before);
+		await q.control(page).click();
+		await expect(page.getByTestId('log-filter-active')).toHaveCount(0);
+		expect(await boxes()).toEqual(before);
 	});
 
 	test(`${q.name}'s second click keeps what was typed`, async ({ page }) => {

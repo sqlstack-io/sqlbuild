@@ -9,7 +9,7 @@ import { createSelection } from '$lib/state/selection.svelte';
 import { nodeLabel } from '$lib/operate/labels';
 import { planHref } from '$lib/run/command';
 import { pageMemory } from './utils/page-memory';
-import { runFailures, summaryOf, withNameToggled, type QuickPick } from './utils';
+import { runFailures, summaryOf, withNameToggled } from './utils';
 import { holdsText, QUICK, toggleText } from './utils/log-query';
 import { isActiveRun } from '$lib/status';
 import type { BottomTab } from './types';
@@ -128,12 +128,6 @@ export function createRunDetailState(runId: string) {
 		logQuery = toggleText(logQuery, text);
 		tab = 'log';
 	}
-	/** A Pick chip: its words in the log's filter text, like any quick filter. */
-	function pick(quick: QuickPick) {
-		toggleLog(quick === 'skipped' ? QUICK.skipped.text : QUICK.unfinished.text);
-	}
-	const activePick = $derived<QuickPick | null>(holdsText(logQuery, QUICK.unfinished.text) ? 'unfinished' : holdsText(logQuery, QUICK.skipped.text) ? 'skipped' : null);
-
 	function clearSelection() {
 		selection.select = '';
 		selection.exclude = '';
@@ -263,9 +257,6 @@ export function createRunDetailState(runId: string) {
 		logHolds(text: string) {
 			return holdsText(logQuery, text);
 		},
-		get activePick() {
-			return activePick;
-		},
 		get active() {
 			return active;
 		},
@@ -285,7 +276,6 @@ export function createRunDetailState(runId: string) {
 			return selected;
 		},
 		selection,
-		pick,
 		get focus() {
 			return focus;
 		},

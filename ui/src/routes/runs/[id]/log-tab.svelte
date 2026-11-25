@@ -125,6 +125,7 @@
 	const kind = $derived(termValue('kind') ?? 'all');
 	/** The Errors chip: `level:error` into the text, or out again; whatever else is typed stays. */
 	const errorsOn = $derived(holdsText(query, QUICK.errors.text));
+	const warningsOn = $derived(holdsText(query, QUICK.warnings.text));
 	const toggleErrors = () => (query = toggleText(query, QUICK.errors.text));
 	/** The one "Showing …" line, read from the text alone: typed or clicked, the same words read the same. */
 	const showing = $derived(describeQuery(query, QUICK_LIST));
@@ -147,8 +148,10 @@
 	const levelCounts = $derived(countBy(modeEntries.filter((e) => matchesExcept(e, 'level') && !(e.level === 'error' && e.category === 'run')), (e) => e.level));
 	const kindCounts = $derived(countBy(modeEntries.filter((e) => matchesExcept(e, 'kind')), (e): string => kindOf(e)));
 	// A count shows only when it matters: errors and warnings in what the switch shows, none when zero.
-	const errors = $derived(levelCounts.get('error') ?? 0);
-	const warnings = $derived(levelCounts.get('warn') ?? 0);
+	// Counted over the whole stream, not what the filter leaves: the chips and their counts never come and go as it changes.
+	const streamLevels = $derived(countBy(modeEntries.filter((e) => !(e.level === 'error' && e.category === 'run')), (e) => e.level));
+	const errors = $derived(streamLevels.get('error') ?? 0);
+	const warnings = $derived(streamLevels.get('warn') ?? 0);
 	const levelText = $derived(LEVELS.find((l) => l.value === level)?.label ?? 'Levels');
 	const levelOptions = $derived(LEVELS.map((l) => ({ ...l, count: l.value === 'all' ? [...levelCounts.values()].reduce((a, b) => a + b, 0) : (levelCounts.get(l.value) ?? 0) })));
 	const kindOptions = $derived([{ value: 'all', label: 'All kinds', count: [...kindCounts.values()].reduce((a, b) => a + b, 0) }, ...kindValues.map((k) => ({ value: k, label: k, count: kindCounts.get(k) ?? 0 }))]);
@@ -197,6 +200,7 @@
 </script>
 
 <!-- Controls right after what they act on, from the left: what to show, then narrow it. -->
+<div class="log-head">
 <div class="filters">
 	{#if hasOutput}
 		<SegmentedFilter
@@ -239,16 +243,21 @@
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>
 	{/if}
-	{#if errors || errorsOn}<Button variant={errorsOn ? 'outline' : 'ghost'} size="sm" class={errorsOn ? 'count err on sb-pressed' : 'count err'} aria-pressed={errorsOn} onclick={toggleErrors} title={errorsOn ? 'Take level:error out of the filter' : 'Filter the log: level:error'}>Errors {errors}</Button>{/if}
-	{#if warnings}<Button variant="link" size="inline" class="count warn" onclick={() => setTerm('level', level === 'warn' ? null : 'warn')} title="Show only warnings">Warnings {warnings}</Button>{/if}
+	<!-- The same button pressed or not: pressed is a background only, so the toolbar never moves. -->
+	{#if errors}<Button variant="ghost" size="sm" class={errorsOn ? 'count err on sb-pressed' : 'count err'} aria-pressed={errorsOn} onclick={toggleErrors} title={errorsOn ? 'Take level:error out of the filter' : 'Filter the log: level:error'}>Errors {errors}</Button>{/if}
+	{#if warnings}<Button variant="ghost" size="sm" class={warningsOn ? 'count warn on sb-pressed' : 'count warn'} aria-pressed={warningsOn} onclick={() => (query = toggleText(query, QUICK.warnings.text))} title={warningsOn ? 'Take level:warn out of the filter' : 'Filter the log: level:warn'}>Warnings {warnings}</Button>{/if}
 	{#if expectedCount && !printed}<Button variant="link" size="inline" class="expected" aria-pressed={showExpected} onclick={() => (showExpected = !showExpected)} title="Failed lookups the run expects, such as a schema not created yet">{showExpected ? 'Hide' : 'Show'} {plural(expectedCount, 'expected lookup')}</Button>{/if}
 	<span class="grow"></span>
 	<Button variant="ghost" size="sm" onclick={download} disabled={!shown.length} title="Download the rows shown as a text file"><DownloadIcon />Download</Button>
 </div>
 
-{#if showing}
-	<ActiveFilter what={showing.label} typed={showing.typed} shown={shown.length} total={modeEntries.length} noun="event" onclear={() => (query = '')} testid="log-filter-active" />
-{/if}
+<!-- The Showing line's own slot, there whether or not a filter is on, so nothing above or below it moves. -->
+<div class="filter-slot">
+	{#if showing}
+		<ActiveFilter what={showing.label} typed={showing.typed} shown={shown.length} total={modeEntries.length} noun="event" onclear={() => (query = '')} testid="log-filter-active" />
+	{/if}
+</div>
+</div>
 
 <DataTable class="static compact log" embedded columns={logColumns} rows={shown} key={(e) => e.id} empty={entries.length ? 'Nothing in the log matches these filters.' : 'Nothing logged yet.'}>
 	{#snippet row(e)}
@@ -351,10 +360,19 @@
 
 <style>
 	/* Calmer: no rules between rows, one text size, muted secondary text, room around the toolbar. */
-	.filters {
+	.log-head {
 		position: sticky;
 		top: 0;
 		z-index: 6;
+		background: var(--background);
+	}
+	.filter-slot {
+		height: 26px;
+	}
+	.filter-slot > :global(.active-filter) {
+		height: 100%;
+	}
+	.filters {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
@@ -362,8 +380,12 @@
 		padding: 10px 24px;
 		background: var(--background);
 	}
+	/* A fixed width, so a label that changes (Levels → Errors, Kinds → audit) moves nothing after it. */
 	.filters :global(.menu-trigger) {
 		display: inline-flex;
+		width: 84px;
+		justify-content: space-between;
+		overflow: hidden;
 		align-items: center;
 		gap: 4px;
 		padding: 3px 4px;
@@ -388,6 +410,9 @@
 	/* Pressed (`sb-pressed`), in the error colour. */
 	.filters :global(.count.err.on) {
 		--pressed-tone: var(--sb-error);
+	}
+	.filters :global(.count.warn.on) {
+		--pressed-tone: var(--sb-warning);
 	}
 	.filters :global(.expected.expected) {
 		color: var(--sb-text-faint);

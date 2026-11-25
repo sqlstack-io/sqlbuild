@@ -100,7 +100,10 @@
 	.log-filter {
 		position: relative;
 	}
+	/* A fixed width: the text scrolls inside, and the ✕ appearing never resizes the box. */
 	.field {
+		box-sizing: border-box;
+		width: 300px;
 		display: flex;
 		align-items: center;
 		gap: 6px;
@@ -110,7 +113,8 @@
 		color: var(--sb-text-faint);
 	}
 	input {
-		width: 260px;
+		flex: 1;
+		min-width: 0;
 		border: 0;
 		outline: 0;
 		background: transparent;

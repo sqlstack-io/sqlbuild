@@ -15,7 +15,7 @@
 	import SelectionBar from '$lib/components/selection/selection-bar.svelte';
 	import { to } from '$lib/paths';
 	import { nodeLabel, shortRunId } from '$lib/operate/labels';
-	import { skipCause, QUICK_PICKS } from './utils';
+	import { skipCause } from './utils';
 	import DetailsDrawer from './details-drawer.svelte';
 	import RunBanners from './run-banners.svelte';
 	import RunGantt from './run-gantt.svelte';
@@ -116,19 +116,13 @@
 		<div bind:this={splitEl} class="flex min-h-0 flex-1 flex-col" class:select-none={dragging}>
 			<div class="flex min-h-0 flex-col" style:flex={hasBottom ? topFrac : 1}>
 				{#if nodes.length}
-					<!-- One toolbar row above the chart: the view, the selection to plan with its quick picks, and Plan these. -->
+					<!-- One toolbar row above the chart: the view, the selection to plan, and Plan these. -->
 					<div class="pick">
 						<SelectionBar selection={view.selection} {names} total={nodes.length} build={false} copy={false}>
 							{#snippet leading()}
 								<SegmentedFilter label="View" bind:value={topView} options={[{ value: 'timeline', label: 'Timeline' }, { value: 'graph', label: 'Graph' }]} />
 							{/snippet}
 							{#snippet trailing()}
-								<span class="picks">
-									<span class="faint">Pick</span>
-									{#each QUICK_PICKS as q (q.value)}
-										<Button variant="link" size="inline" class={view.activePick === q.value ? 'pick-on sb-pressed text-[12.5px]' : 'text-[12.5px]'} aria-pressed={view.activePick === q.value} title={view.activePick === q.value ? 'Take this out of the log filter' : 'Filter the log to these'} onclick={() => view.pick(q.value)}>{q.label}</Button>
-									{/each}
-								</span>
 								{#if view.planLink && planCount}
 									<a class="plan" href={to(view.planLink)} data-testid="plan-these" title="Open the plan page for this selection{view.run?.jobKey && view.run.kind !== 'group' ? ` as ${view.run.jobKey} builds it` : ''}">Plan these {planCount} →</a>
 								{:else}
@@ -204,9 +198,6 @@
 	.cant-run > :global(*) {
 		flex: none;
 	}
-	.faint {
-		color: var(--sb-text-faint);
-	}
 	.pick {
 		padding: 4px 14px;
 		border-bottom: 1px solid var(--border-subtle);
@@ -227,26 +218,8 @@
 		min-width: 260px;
 		flex: 1;
 	}
-	.picks :global(button) {
-		color: var(--muted-foreground);
-	}
-	.picks :global(button:hover) {
-		color: var(--foreground);
-	}
-	.picks {
-		display: inline-flex;
-		flex: none;
-		align-items: center;
-		gap: 10px;
-		margin: 0 6px 0 8px;
-		font-size: 12.5px;
-	}
 	.plan {
 		flex: none;
-	}
-	.picks :global(.pick-on) {
-		padding: 0 5px;
-		text-decoration: none;
 	}
 	.plan {
 		padding: 3px 10px;

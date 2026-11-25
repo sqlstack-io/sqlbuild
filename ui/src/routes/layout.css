@@ -590,5 +590,5 @@
 	box-shadow:
 		inset 0 0 0 1px color-mix(in srgb, var(--pressed-tone) 55%, transparent),
 		inset 0 1px 3px color-mix(in srgb, black 35%, transparent);
-	font-weight: 600;
+	/* Pressed is a background and an inset line only: never a border or a weight, so nothing moves. */
 }

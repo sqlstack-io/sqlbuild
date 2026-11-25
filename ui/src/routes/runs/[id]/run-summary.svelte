@@ -62,7 +62,10 @@
 		font-size: 12.5px;
 	}
 	/* Calm: a figure is plain text until hovered; only problems keep their status colour. */
+	/* The pressed background needs room around the text; the negative margin gives it without moving anything. */
 	.fig {
+		margin: 0 -5px;
+		padding: 0 5px;
 		color: var(--foreground);
 		font-size: 12.5px;
 	}
@@ -70,7 +73,6 @@
 		text-decoration: underline;
 	}
 	.fig.on {
-		padding: 0 5px;
 		text-decoration: none;
 	}
 	.fig.err.on {
