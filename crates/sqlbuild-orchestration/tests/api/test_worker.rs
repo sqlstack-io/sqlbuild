@@ -65,7 +65,7 @@ fn given_a_claimed_run_when_a_worker_connects_then_verification_precedes_start_a
                 &request((location, publication.snapshot_id), 1, 0, &["orders"]),
             )
             .await;
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("acquire")
                 .expect("leader");
@@ -202,6 +202,7 @@ fn given_a_claimed_run_when_a_worker_connects_then_verification_precedes_start_a
                         error_code: None,
                         skipped_because_of: None,
                         error_message: None,
+                        phase: None,
                     },
                 )
                 .await
@@ -450,6 +451,7 @@ fn given_an_older_server_when_a_worker_reports_error_text_then_the_refusal_asks_
                         error_code: Some("R002".into()),
                         skipped_because_of: None,
                         error_message: test_case.error_message.map(str::to_owned),
+                        phase: None,
                     },
                 )
                 .await;
@@ -578,6 +580,7 @@ fn given_a_server_older_than_node_results_when_a_worker_reports_them_then_the_re
         error_code: None,
         skipped_because_of: None,
         error_message: None,
+        phase: None,
     };
     let test_cases = [
         PreviousServerTestCase {

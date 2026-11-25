@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use crate::credentials::models::AuditContext;
-use crate::platform::models::PlatformEvent;
+use crate::platform::models::{PlatformEvent, RunFailureEvent};
 use crate::runs::main::execution::change_run::change_run;
 use crate::runs::main::execution::claim_next_run::claim_next_run;
 use crate::runs::main::execution::heartbeat_run::heartbeat_run;
@@ -9,7 +9,7 @@ use crate::runs::main::listings::list_run_nodes::list_run_nodes;
 use crate::runs::main::listings::list_runs::list_runs;
 use crate::runs::models::{
     NodeOutcome, RunAuthority, RunChange, RunChangeRequest, RunKind, RunNodeFailure, RunOutcome,
-    RunStatus,
+    RunStatus, RunTrigger, RunTriggerKind,
 };
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
@@ -55,7 +55,7 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
                 .await
                 .expect("snapshot");
             let scope = (location, published.snapshot_id);
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -250,6 +250,7 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
                         error_code: (outcome == NodeOutcome::Failed).then(|| "E100".into()),
                         skipped_because_of: None,
                         error_message: None,
+                        phase: None,
                     },
                     ..started.clone()
                 };
@@ -451,24 +452,89 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
                         .expect("typed run failure")
                 })
                 .collect();
+            let [PlatformEvent::RunFailed(failure)] = failures.as_slice() else {
+                panic!(
+                    "a partial run publishes one failure event, surviving rolled-back attempts and retries: {failures:?}"
+                );
+            };
+            let RunFailureEvent {
+                run_id,
+                run_kind,
+                job_key,
+                location_id,
+                outcome,
+                url,
+                trigger,
+                started_at,
+                ended_at,
+                duration_ms,
+                error,
+                failed_nodes,
+                failed_node_count,
+                failed_audits,
+                failed_audit_count,
+                succeeded_node_count,
+                skipped_nodes,
+                skipped_node_count,
+                ..
+            } = failure.as_ref();
             assert_eq!(
-                failures,
-                vec![PlatformEvent::RunFailed {
-                    run_id: started.run_id,
-                    run_kind: RunKind::Adhoc,
-                    job_key: None,
-                    location_id: location,
-                    target: "development".into(),
-                    outcome: RunOutcome::Partial,
-                    failed_nodes: vec![RunNodeFailure {
-                        node_key: "orders".into(),
-                        error_code: Some("E100".into()),
-                        message: None,
-                        path: None,
-                    }],
-                    failed_node_count: 1,
+                (
+                    *run_id,
+                    *run_kind,
+                    job_key.as_deref(),
+                    *location_id,
+                    *outcome
+                ),
+                (
+                    started.run_id,
+                    RunKind::Adhoc,
+                    None,
+                    location,
+                    RunOutcome::Partial
+                )
+            );
+            assert_eq!(
+                failed_nodes,
+                &vec![RunNodeFailure {
+                    node_key: "orders".into(),
+                    error_code: Some("E100".into()),
+                    message: None,
+                    path: None,
+                    phase: None,
+                    url: None,
+                    logs_url: None,
                 }],
-                "a partial run publishes one failure event, surviving rolled-back attempts and retries"
+                "no origin, no links"
+            );
+            assert_eq!(
+                (
+                    *failed_node_count,
+                    *succeeded_node_count,
+                    *skipped_node_count
+                ),
+                (1, 1, 0)
+            );
+            assert!(
+                skipped_nodes.is_empty() && failed_audits.is_empty() && *failed_audit_count == 0
+            );
+            assert_eq!(*error, None, "a failed node says why the run failed");
+            assert_eq!(*url, None);
+            assert_eq!(
+                *trigger,
+                RunTrigger {
+                    kind: RunTriggerKind::Manual,
+                    name: None,
+                    person: None
+                },
+                "an operator's ad-hoc run, by no known person"
+            );
+            assert!(started_at.is_some() && ended_at.is_some());
+            assert_eq!(
+                *duration_ms,
+                started_at
+                    .zip(*ended_at)
+                    .map(|(start, end)| (end - start).num_milliseconds())
             );
             let late_failure = RunChangeRequest {
                 event_id: Uuid::now_v7(),
@@ -583,7 +649,7 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
                 ),
                 "even duplicate observations require a live leader"
             );
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect successor")
                 .expect("successor");
@@ -709,7 +775,7 @@ fn given_unclaimed_work_when_an_operator_cancels_then_a_terminal_fact_prevents_l
                     .is_err(),
                 "retry identity includes the cancellation reason"
             );
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

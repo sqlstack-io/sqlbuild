@@ -145,6 +145,8 @@ class WorkerExecutionTestCase:
     )
     # Whether the build compiles again instead of planning from the compile the worker verified.
     expected_compiles_again: bool = False
+    # Each failed run node as (key, the phase its worker reported it failed in).
+    expected_failed_phases: list[tuple[str, str | None]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

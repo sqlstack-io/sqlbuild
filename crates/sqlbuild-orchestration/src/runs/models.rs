@@ -587,6 +587,69 @@ pub struct RunNodeFailure {
     pub message: Option<String>,
     /// Relative to the project root, with `/` separators; null when the run's snapshot is gone.
     pub path: Option<String>,
+    /// Where a model failed, such as `staging`, `audit` or `post_hook`; null for other nodes or when not reported.
+    pub phase: Option<String>,
+    /// The node in the run's UI page; null when the server has no origin.
+    pub url: Option<String>,
+    /// The node's output in the UI; null when the server has no origin.
+    pub logs_url: Option<String>,
+}
+
+/// An error-severity audit failure in one run: its name, the warehouse's SQLSTATE and redacted error text, or its failing rows.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RunAuditFailure {
+    pub name: String,
+    /// The node it checks; null for an end-of-build singular audit.
+    pub node_key: Option<String>,
+    /// The warehouse's SQLSTATE when the audit's query could not run, such as `42S02`.
+    pub sqlstate: Option<String>,
+    /// The warehouse's error when the query could not run, redacted and bounded like a node's.
+    pub message: Option<String>,
+    /// The rows that failed it, when its query ran.
+    pub failing_rows: Option<i64>,
+}
+
+/// What started a run: a schedule or sensor by name, or a person or service account (`api`).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RunTrigger {
+    pub kind: RunTriggerKind,
+    /// The schedule's or sensor's name; null for manual and API runs.
+    pub name: Option<String>,
+    /// Who asked for a manual or API run, by display name.
+    pub person: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RunTriggerKind {
+    Schedule,
+    Sensor,
+    Manual,
+    Api,
+}
+
+/// Where a run failed outside any node.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RunFailurePhase {
+    /// The launcher could not start a worker.
+    Launch,
+    /// A worker was started but never reported starting the run.
+    WorkerStart,
+    /// The worker failed loading the project, before compiling it.
+    Load,
+    /// The worker failed compiling, inspecting the warehouse or planning.
+    Planning,
+    /// The worker failed while building, outside any node.
+    Build,
+}
+
+/// Why a run failed outside any node: where, the error's type or code, and its redacted, bounded text.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RunFailureCause {
+    pub phase: RunFailurePhase,
+    pub code: Option<String>,
+    pub message: Option<String>,
 }
 
 /// One build attempt of a node by a run in this target; the same metadata as the run's node list.
@@ -704,6 +767,13 @@ pub enum RunChange {
             deserialize_with = "crate::runs::_helpers::lifecycle::error_text::bounded_error_text"
         )]
         error_message: Option<String>,
+        /// Where a failed model failed, such as `staging` or `post_hook`; a short lowercase token or absent.
+        #[serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            deserialize_with = "crate::runs::_helpers::lifecycle::error_text::failure_phase"
+        )]
+        phase: Option<String>,
     },
     /// Observational attached-check facts never expand the frozen execution selection.
     CheckStarted {

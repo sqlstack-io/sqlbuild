@@ -3676,22 +3676,10 @@ export interface components {
             kind: "launch_failed";
             /** Format: uuid */
             run_id: string;
-        } | {
-            /** Format: int64 */
-            failed_node_count: number;
-            /** @description The first failed nodes by key, with redacted and bounded error text. */
-            failed_nodes: components["schemas"]["RunNodeFailure"][];
-            job_key?: string | null;
+        } | (components["schemas"]["RunFailureEvent"] & {
             /** @enum {string} */
             kind: "run_failed";
-            /** Format: uuid */
-            location_id: string;
-            outcome: components["schemas"]["RunOutcome"];
-            /** Format: uuid */
-            run_id: string;
-            run_kind: components["schemas"]["RunKind"];
-            target: string;
-        } | {
+        }) | {
             /** @enum {string} */
             kind: "trigger_skipped";
             reason: string;
@@ -4089,6 +4077,21 @@ export interface components {
             /** Format: uuid */
             run_id: string;
         };
+        /** @description An error-severity audit failure in one run: its name, the warehouse's SQLSTATE and redacted error text, or its failing rows. */
+        RunAuditFailure: {
+            /**
+             * Format: int64
+             * @description The rows that failed it, when its query ran.
+             */
+            failing_rows?: number | null;
+            /** @description The warehouse's error when the query could not run, redacted and bounded like a node's. */
+            message?: string | null;
+            name: string;
+            /** @description The node it checks; null for an end-of-build singular audit. */
+            node_key?: string | null;
+            /** @description The warehouse's SQLSTATE when the audit's query could not run, such as `42S02`. */
+            sqlstate?: string | null;
+        };
         /** @description This is a server-owned instruction, not an arbitrary status supplied by a worker. */
         RunChange: {
             container_id?: string | null;
@@ -4127,6 +4130,8 @@ export interface components {
             no_change_reason?: string | null;
             node_key: string;
             outcome: components["schemas"]["NodeOutcome"];
+            /** @description Where a failed model failed, such as `staging` or `post_hook`; a short lowercase token or absent. */
+            phase?: string | null;
             /** Format: int64 */
             rows_affected?: number | null;
             skipped_because_of?: string | null;
@@ -4256,6 +4261,52 @@ export interface components {
             };
             sqb_version: string;
         };
+        /** @description Why a run failed outside any node: where, the error's type or code, and its redacted, bounded text. */
+        RunFailureCause: {
+            code?: string | null;
+            message?: string | null;
+            phase: components["schemas"]["RunFailurePhase"];
+        };
+        /** @description What a `run_failed` event says: the run, what started it, when, what failed and why, with UI links. */
+        RunFailureEvent: {
+            /** Format: int64 */
+            duration_ms?: number | null;
+            /** Format: date-time */
+            ended_at?: string | null;
+            error?: null | components["schemas"]["RunFailureCause"];
+            /** Format: int64 */
+            failed_audit_count: number;
+            /** @description The first error-severity audit failures by name. */
+            failed_audits: components["schemas"]["RunAuditFailure"][];
+            /** Format: int64 */
+            failed_node_count: number;
+            /** @description The first failed nodes by key, with redacted and bounded error text. */
+            failed_nodes: components["schemas"]["RunNodeFailure"][];
+            job_key?: string | null;
+            /** Format: uuid */
+            location_id: string;
+            outcome: components["schemas"]["RunOutcome"];
+            /** Format: uuid */
+            run_id: string;
+            run_kind: components["schemas"]["RunKind"];
+            /** Format: int64 */
+            skipped_node_count: number;
+            /** @description The first skipped nodes by key. */
+            skipped_nodes: string[];
+            /** Format: date-time */
+            started_at?: string | null;
+            /** Format: int64 */
+            succeeded_node_count: number;
+            target: string;
+            trigger: components["schemas"]["RunTrigger"];
+            /** @description The run's UI page; null when the server has no origin. */
+            url?: string | null;
+        };
+        /**
+         * @description Where a run failed outside any node.
+         * @enum {string}
+         */
+        RunFailurePhase: "launch" | "worker_start" | "load" | "planning" | "build";
         /** @description One error-severity audit failure a run or one of its current members let through; never its SQL or evidence. */
         RunIgnoredAuditFailure: {
             attached_column_name?: string | null;
@@ -4285,11 +4336,17 @@ export interface components {
         /** @description A node's outcome error in one run: redacted, bounded text and the project file of the node, never its SQL. */
         RunNodeFailure: {
             error_code?: string | null;
+            /** @description The node's output in the UI; null when the server has no origin. */
+            logs_url?: string | null;
             /** @description Null when the worker reported none or the run's history has been pruned. */
             message?: string | null;
             node_key: string;
             /** @description Relative to the project root, with `/` separators; null when the run's snapshot is gone. */
             path?: string | null;
+            /** @description Where a model failed, such as `staging`, `audit` or `post_hook`; null for other nodes or when not reported. */
+            phase?: string | null;
+            /** @description The node in the run's UI page; null when the server has no origin. */
+            url?: string | null;
         };
         RunNodeRecord: {
             /** Format: date-time */
@@ -4548,6 +4605,16 @@ export interface components {
         };
         /** @enum {string} */
         RunStatus: "queued" | "launched" | "running" | "unresponsive" | "success" | "warn" | "partial" | "failed" | "cancelled" | "skipped";
+        /** @description What started a run: a schedule or sensor by name, or a person or service account (`api`). */
+        RunTrigger: {
+            kind: components["schemas"]["RunTriggerKind"];
+            /** @description The schedule's or sensor's name; null for manual and API runs. */
+            name?: string | null;
+            /** @description Who asked for a manual or API run, by display name. */
+            person?: string | null;
+        };
+        /** @enum {string} */
+        RunTriggerKind: "schedule" | "sensor" | "manual" | "api";
         /** @description Inclusive typed CLI cursor bounds; the native planner derives exclusive execution ends. */
         RunWindow: {
             /** Format: date-time */

@@ -121,7 +121,7 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_unfinished_nodes_re
                     .is_err(),
                 "a live source cannot be rerun"
             );
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -169,6 +169,7 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_unfinished_nodes_re
                         skipped_because_of: (outcome == NodeOutcome::Skipped)
                             .then(|| "orders".into()),
                         error_message: None,
+                        phase: None,
                     });
                 }
                 changes.push(RunChange::Finished {
@@ -488,7 +489,7 @@ fn given_cancelled_nodes_when_rerunning_from_failure_then_every_unfinished_node_
                         "on_failure": {"retries": 1, "retry_delay_seconds": 0}}}),
                 );
                 publish_snapshot(store, &input).await.expect("publish");
-                let lease = acquire_lease(store, Uuid::now_v7())
+                let lease = acquire_lease(store, (Uuid::now_v7(), None))
                     .await
                     .expect("elect")
                     .expect("leader");
@@ -554,6 +555,7 @@ fn given_cancelled_nodes_when_rerunning_from_failure_then_every_unfinished_node_
                         error_code: None,
                         skipped_because_of: None,
                         error_message: None,
+                        phase: None,
                     };
                     change_run(store, worker(), &change(claimed, finished))
                         .await

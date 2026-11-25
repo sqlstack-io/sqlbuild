@@ -143,3 +143,9 @@ test('the failure summary shows a failed audit’s warehouse error', async ({ pa
 	await expect(failures).toContainText('42S02');
 	await expect(failures).toContainText("Object 'WAFFLE_SHOP.RECONCILIATION.FCT_ORDER_PAYMENTS' does not exist or not authorized.");
 });
+
+// A run_failed event links each failed node as `/runs/<id>?node=<key>`: the page opens with that node in the drawer.
+test('a link to one node of a run opens it in the drawer', async ({ page }) => {
+	await page.goto('/runs/run-4f2a?mock&node=dim_customers');
+	await expect(page.getByRole('complementary').filter({ hasText: 'dim_customers' }).first()).toBeVisible({ timeout: 20_000 });
+});

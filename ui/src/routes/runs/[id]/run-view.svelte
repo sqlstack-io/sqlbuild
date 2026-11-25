@@ -22,6 +22,7 @@
 	import RunHeader from './run-header.svelte';
 	import RunTabs from './run-tabs.svelte';
 	import { createRunDetailState } from './state.svelte';
+	import { page } from '$app/state';
 	import { bottomTabs } from './utils';
 	import { preparingSpan } from './utils/preparing';
 
@@ -29,6 +30,9 @@
 
 	// svelte-ignore state_referenced_locally
 	const view = createRunDetailState(runId);
+	// A link to one node of the run (`?node=<key>`, as a run_failed event gives) opens it in the drawer.
+	const linkedNode = page.url.searchParams.get('node');
+	if (linkedNode) view.openDrawer(linkedNode);
 
 	const detail = $derived(view.detail);
 	const cantRun = $derived(detail ? runDetailCantRun(detail) : []);

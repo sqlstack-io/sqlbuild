@@ -185,7 +185,7 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                         .expect("built-in metadata access")
                         .is_empty()
                     );
-                    let lease = acquire_lease(store, Uuid::now_v7())
+                    let lease = acquire_lease(store, (Uuid::now_v7(), None))
                         .await
                         .expect("elect")
                         .expect("leader");

@@ -183,7 +183,7 @@ pub(crate) async fn publish_platform_impostor(store: &ControlStore, identity: (U
     let mut requested = request(identity, 42, 0, &["orders"]);
     requested.image_id = None;
     queue(store, &requested).await;
-    let lease = acquire_lease(store, Uuid::now_v7())
+    let lease = acquire_lease(store, (Uuid::now_v7(), None))
         .await
         .expect("elect")
         .expect("leader");

@@ -633,3 +633,31 @@ pub(crate) struct StartMessageTestCase {
     pub(crate) fields: Vec<(&'static str, serde_json::Value)>,
     pub(crate) expected_message: Option<&'static str>,
 }
+
+/// A node the worker reports finished: its key, outcome and failure phase.
+pub(crate) type ReportedNode = (
+    &'static str,
+    crate::runs::models::NodeOutcome,
+    Option<&'static str>,
+);
+
+pub(crate) struct RunFailureEventTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) nodes: &'static [ReportedNode],
+    pub(crate) failed_end_audits: &'static [&'static str],
+    pub(crate) expected_summary: RunFailureSummary,
+}
+
+/// The parts of a `run_failed` event a test compares; node links are relative to the run's page.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct RunFailureSummary {
+    pub(crate) links_to_run: bool,
+    /// The first failed node's phase, link and output link.
+    pub(crate) first_node: Option<(Option<String>, Option<String>, Option<String>)>,
+    /// The first failed audit's name, SQLSTATE and message.
+    pub(crate) first_audit: Option<(String, Option<String>, Option<String>)>,
+    pub(crate) failed_audit_count: i64,
+    pub(crate) succeeded_node_count: i64,
+    pub(crate) error: Option<(crate::runs::models::RunFailurePhase, Option<String>)>,
+}

@@ -57,6 +57,16 @@ pub(crate) struct RunRecallScope {
     selection: BTreeSet<String>,
 }
 
+impl RunRecallScope {
+    /// A run's invocations, for reads that authorize nothing by node.
+    pub(crate) const fn of_invocations(namespaces: Vec<String>) -> Self {
+        Self {
+            namespaces,
+            selection: BTreeSet::new(),
+        }
+    }
+}
+
 /// The run's transaction and scope, plus the deciding context and granted scope of a sensitive read.
 pub(crate) type RunRecallRead = (
     ControlTransaction,
@@ -573,7 +583,7 @@ pub(crate) async fn run_output_in(
 }
 
 /// Exact scheduler and worker invocations, plus the worker's nested invocations.
-fn invocation_filter(scope: &RunRecallScope, first: usize) -> (String, Vec<Parameter>) {
+pub(crate) fn invocation_filter(scope: &RunRecallScope, first: usize) -> (String, Vec<Parameter>) {
     let mut clauses: Vec<String> = Vec::new();
     let mut parameters: Vec<Parameter> = Vec::new();
     for namespace in &scope.namespaces {
@@ -598,4 +608,24 @@ fn display_text(value: &Value) -> Result<Option<String>, ControlError> {
             Ok(Some(String::from_utf8_lossy(&bytes).into_owned()))
         }
     }
+}
+
+/// A warehouse error's SQLSTATE: the five characters in brackets, as in `002003 (42S02): ...`.
+pub(crate) fn sqlstate(text: &str) -> Option<String> {
+    for (start, _) in text.match_indices('(') {
+        let (Some(code), Some(")")) = (
+            text.get(start + 1..start + 6),
+            text.get(start + 6..start + 7),
+        ) else {
+            continue;
+        };
+        if code.bytes().all(is_sqlstate_byte) {
+            return Some(code.to_owned());
+        }
+    }
+    None
+}
+
+const fn is_sqlstate_byte(byte: u8) -> bool {
+    byte.is_ascii_digit() || byte.is_ascii_uppercase()
 }

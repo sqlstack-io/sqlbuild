@@ -157,6 +157,8 @@ pub(crate) struct Completion {
     pub(crate) no_change_reason: Option<String>,
     pub(crate) error_code: Option<String>,
     pub(crate) error_message: Option<String>,
+    /// Where a failed model failed, such as `staging` or `post_hook`.
+    pub(crate) phase: Option<String>,
     /// The node skipped itself with a hard skip, so the nodes it blocks name it as their cause.
     pub(crate) skipped_itself: bool,
 }
@@ -170,6 +172,7 @@ impl Completion {
             no_change_reason: None,
             error_code: None,
             error_message: None,
+            phase: None,
             skipped_itself: false,
         }
     }
@@ -508,6 +511,7 @@ impl WorkerBuild {
                 error_code: completion.error_code,
                 skipped_because_of: skipped_because_of.clone(),
                 error_message: completion.error_message.as_deref().map(redact_error_text),
+                phase: completion.phase.filter(|_| outcome == NodeOutcome::Failed),
             },
         )?;
         let cause = match outcome {
@@ -873,6 +877,13 @@ impl WorkerBuild {
                 Some(value) => value.extract()?,
                 None => None,
             };
+            let phase: Option<String> = match result.getattr_opt("failed_phase")? {
+                Some(value) if !value.is_none() => Some(match value.getattr_opt("value")? {
+                    Some(inner) => inner.extract()?,
+                    None => value.str()?.extract()?,
+                }),
+                _ => None,
+            };
             let detail: Option<String> = match result.getattr_opt("error_detail")? {
                 Some(value) => value.extract()?,
                 None => None,
@@ -902,6 +913,7 @@ impl WorkerBuild {
                     table_rows,
                     error_code: error,
                     error_message: message,
+                    phase,
                     skipped_itself: outcome == NodeOutcome::Skipped
                         && skip_mode.as_deref() == Some(HARD_SKIP_MODE),
                     ..Completion::of(outcome)

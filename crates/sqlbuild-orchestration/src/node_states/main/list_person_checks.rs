@@ -12,7 +12,7 @@ use crate::node_states::models::{CachedJson, HeldCheckList, NodeStateCache};
 use crate::snapshots::main::reads::listing_read::listing_read;
 use crate::snapshots::main::reads::read_current_record::read_current_record;
 use crate::store::errors::ControlError;
-use crate::warehouse_history::main::read_latest_checks::read_latest_checks;
+use crate::warehouse_history::main::checks::read_latest_checks::read_latest_checks;
 
 /// Authorizes every read; a held list of the current snapshot is served as it is, otherwise the results are read and the list kept unless a signal arrived meanwhile.
 pub async fn list_person_checks(

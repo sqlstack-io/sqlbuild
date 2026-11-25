@@ -12,8 +12,8 @@ use crate::credentials::models::{AuditContext, AuthenticatedPerson, DefaultRole}
 use crate::runs::types::CommandPlanner;
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
-use crate::warehouse_history::main::read_person_cost_selection::read_person_cost_selection;
-use crate::warehouse_history::main::read_person_cost_series::read_person_cost_series;
+use crate::warehouse_history::main::costs::read_person_cost_selection::read_person_cost_selection;
+use crate::warehouse_history::main::costs::read_person_cost_series::read_person_cost_series;
 use crate::warehouse_history::models::{CostSelectionRecord, CostSeriesBatch, CostSeriesGroup};
 
 /// Default and largest cost window, in days.

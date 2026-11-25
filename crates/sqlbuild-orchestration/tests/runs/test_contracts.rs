@@ -1,5 +1,7 @@
 #[path = "claims/helpers.rs"]
 pub(crate) mod claim_helpers;
+#[path = "failure_events/helpers.rs"]
+pub(crate) mod failure_event_helpers;
 #[path = "helpers.rs"]
 pub(crate) mod helpers;
 #[path = "monitor/helpers.rs"]
@@ -58,6 +60,8 @@ mod test_requests;
 mod test_reruns;
 #[path = "test_retries.rs"]
 mod test_retries;
+#[path = "test_run_failure_event.rs"]
+mod test_run_failure_event;
 #[path = "test_run_logs.rs"]
 mod test_run_logs;
 #[path = "test_selection.rs"]

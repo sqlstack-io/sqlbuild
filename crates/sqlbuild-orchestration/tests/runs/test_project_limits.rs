@@ -49,7 +49,7 @@ fn given_a_project_limit_and_a_server_cap_when_claiming_then_each_location_runs_
             };
             let store = &fixture.store;
             migrate_store(store).await.expect("migrate run store");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -145,7 +145,7 @@ fn given_pool_amounts_when_claiming_then_a_run_takes_all_its_slots_at_once_or_no
             };
             let store = &fixture.store;
             migrate_store(store).await.expect("migrate run store");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

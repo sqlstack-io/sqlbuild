@@ -88,7 +88,7 @@ fn given_attached_checks_when_a_claim_reports_observations_then_frozen_membershi
                 .nodes
                 .insert("check:products".into(), input.nodes["products"].clone());
             let published = publish_snapshot(store, &input).await.expect("snapshot");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -253,6 +253,7 @@ fn given_attached_checks_when_a_claim_reports_observations_then_frozen_membershi
                     error_code: None,
                     skipped_because_of: None,
                     error_message: None,
+                    phase: None,
                 },
                 RunChange::Finished {
                     outcome: RunOutcome::Failed,

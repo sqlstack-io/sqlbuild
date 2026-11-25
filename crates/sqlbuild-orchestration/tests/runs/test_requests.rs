@@ -191,7 +191,7 @@ fn given_a_published_job_when_requested_and_retried_after_redeploy_then_audit_an
                     .expect("no duplicate facts"),
                 facts
             );
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

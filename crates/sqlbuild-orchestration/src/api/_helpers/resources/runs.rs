@@ -13,7 +13,7 @@ use uuid::Uuid;
 use crate::api::errors::ApiError;
 use crate::api::models::{HeartbeatResponse, MutationResponse};
 use crate::credentials::models::{CredentialScope, TokenIdentity};
-use crate::runs::main::execution::change_run::change_run;
+use crate::runs::main::execution::change_run_linked::change_run_linked;
 use crate::runs::main::execution::heartbeat_run::heartbeat_run;
 use crate::runs::main::execution::publish_run_output::publish_run_output;
 use crate::runs::main::execution::publish_run_recall::publish_run_recall;
@@ -49,7 +49,7 @@ pub(crate) async fn execution(
     security(("bearer" = [])))]
 pub(crate) async fn report(
     State(store): State<ControlStore>,
-    Extension(identity): Extension<TokenIdentity>,
+    (Extension(identity), Extension(facts)): (Extension<TokenIdentity>, Extension<ServerFacts>),
     Path(run_id): Path<Uuid>,
     Json(request): Json<RunChangeRequest>,
 ) -> Result<Json<MutationResponse>, ApiError> {
@@ -61,7 +61,12 @@ pub(crate) async fn report(
             decision_id: None,
         });
     }
-    let applied = change_run(&store, RunAuthority::Worker { run_id, claim_id }, &request).await?;
+    let applied = change_run_linked(
+        &store,
+        (RunAuthority::Worker { run_id, claim_id }, &request),
+        facts.origin.as_deref(),
+    )
+    .await?;
     Ok(Json(MutationResponse { applied }))
 }
 

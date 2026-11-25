@@ -21,7 +21,7 @@ use crate::store::tests::store_helpers::{close_test_store, open_test_store, run}
 use crate::store::tests::store_test_types::Backend;
 use crate::store::types::Row;
 use crate::warehouse_history::_helpers::run_recall::node_of;
-use crate::warehouse_history::main::read_person_run_events::read_person_run_events;
+use crate::warehouse_history::main::runs::read_person_run_events::read_person_run_events;
 
 const NODE_EVENTS: [&str; 4] = [
     "run_node_started",
@@ -88,7 +88,7 @@ fn given_node_and_check_reports_when_stored_and_read_then_each_event_names_its_n
                 snapshot_node("check", json!({"name": "payments_positive"})),
             );
             let published = publish_snapshot(store, &input).await.expect("snapshot");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -134,6 +134,7 @@ fn given_node_and_check_reports_when_stored_and_read_then_each_event_names_its_n
                     error_code: None,
                     skipped_because_of: None,
                     error_message: None,
+                    phase: None,
                 }),
             ] {
                 assert!(change_run(store, worker, &request).await.expect("report"));

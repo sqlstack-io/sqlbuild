@@ -649,6 +649,45 @@ def test_given_a_failing_seed_audit_when_a_worker_builds_then_its_seed_fails_wit
     "test_case",
     [
         WorkerExecutionTestCase(
+            description="a model failing in its post-hook reports that phase",
+            model_sql="SELECT 1 AS amount",
+            warehouse_query="SELECT 1",
+            expected_status="failed",
+            expected_rows=[],
+            files={
+                "sql/models/orders.sql": (
+                    "MODEL (description 'Orders.', materialized table, "
+                    'post_hooks [inline_sql("SELECT * FROM missing_post_hook_table")]);\n'
+                    "SELECT 1 AS amount\n"
+                ),
+            },
+            expected_failed_phases=[("model:orders", "post_hook")],
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_failing_post_hook_when_a_worker_builds_then_the_node_reports_its_failure_phase(
+    test_case: WorkerExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
+        run: dict[str, Any] = wait_for_run(
+            worker.api, worker.process, worker.log, job_key="annual_orders_job"
+        )
+        assert run["status"] == test_case.expected_status, worker.log.read_text()
+        with sqlite3.connect(worker.control_store) as control:
+            phases: list[tuple[str, str | None]] = control.execute(
+                "SELECT n.node_key, json_extract(e.payload, '$.change.change.phase') "
+                "FROM sqb_run_nodes n JOIN recall_events e ON e.storage_id=n.finished_storage_id "
+                "WHERE n.run_id=? AND n.kind='node' AND n.status='failed' ORDER BY n.node_key",
+                (run["run_id"],),
+            ).fetchall()
+        assert phases == test_case.expected_failed_phases, worker.log.read_text()
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        WorkerExecutionTestCase(
             description="opposing parent and independent child limits, capped by the launcher",
             model_sql="SELECT 11 AS amount",
             warehouse_query="SELECT amount FROM orders UNION ALL SELECT amount FROM inventory ORDER BY amount",

@@ -301,6 +301,7 @@ async fn finish_checked_run(
             error_code: None,
             skipped_because_of: None,
             error_message: None,
+            phase: None,
         });
     }
     for (check, finished) in checks {
@@ -361,6 +362,7 @@ pub(crate) fn node_finished(node_key: &str, outcome: NodeOutcome) -> RunChange {
         error_code: None,
         skipped_because_of: None,
         error_message: None,
+        phase: None,
     }
 }
 

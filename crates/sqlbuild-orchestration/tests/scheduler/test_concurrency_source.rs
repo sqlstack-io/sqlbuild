@@ -341,7 +341,7 @@ fn given_a_job_published_before_0004_when_its_run_fails_before_a_republish_then_
             request_job_run(store, (&operator(), None), &manual_run(location, "orders"))
                 .await
                 .expect("a manual run of the migrated job");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -423,7 +423,7 @@ fn given_a_group_pinned_to_a_snapshot_document_in_the_old_form_when_advancing_it
             )
             .await
             .expect("request the group");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -493,7 +493,7 @@ fn given_a_group_member_pinned_to_an_old_document_when_claiming_then_it_fails_an
             )
             .await
             .expect("request the group");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -656,7 +656,7 @@ fn given_a_running_member_when_its_group_snapshot_becomes_unreadable_then_the_gr
             )
             .await
             .expect("request the group");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

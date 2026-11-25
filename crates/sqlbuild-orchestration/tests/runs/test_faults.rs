@@ -57,7 +57,7 @@ fn given_failures_during_claim_publication_when_retried_then_claims_slots_livene
             );
             input.pools.insert("warehouse".into(), pool_slots(1, 100));
             queue(store, &input).await;
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -141,7 +141,7 @@ fn given_failures_during_claim_publication_when_retried_then_claims_slots_livene
                     .is_none()
             );
             expire_lease(store).await;
-            let next = acquire_lease(store, Uuid::now_v7())
+            let next = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("take over")
                 .expect("new leader");

@@ -328,3 +328,15 @@ pub struct CostSeriesBatch {
     pub dates: Vec<String>,
     pub series: Vec<Vec<f64>>,
 }
+
+/// A failed run's facts from its Recall history, for its `run_failed` event.
+#[derive(Debug, Default)]
+pub(crate) struct RunFailureRecall {
+    /// The first error-severity audit failures that weren't let through, by name.
+    pub(crate) audits: Vec<crate::runs::models::RunAuditFailure>,
+    pub(crate) audit_count: i64,
+    /// The error type and redacted text of the run's failing invocation, if one reported an error.
+    pub(crate) invocation_error: Option<(Option<String>, Option<String>)>,
+    /// The worker phases the run reported, such as `compiled` and `started_execution`.
+    pub(crate) phases: std::collections::BTreeSet<String>,
+}

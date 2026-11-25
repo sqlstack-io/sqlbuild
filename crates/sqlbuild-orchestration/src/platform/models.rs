@@ -5,7 +5,10 @@ use crate::credentials::models::AuditRetention;
 use crate::declarations::models::TriggerDefinition;
 use crate::discovered_sets::models::DiscoveredSetStatus;
 use crate::platform::_helpers::health::current_instance::{CurrentInstance, current_instance};
-use crate::runs::models::{RunKind, RunLogRetention, RunNodeFailure, RunOutcome};
+use crate::runs::models::{
+    RunAuditFailure, RunFailureCause, RunKind, RunLogRetention, RunNodeFailure, RunOutcome,
+    RunTrigger,
+};
 use crate::sensors::models::{SensorEvaluationRequest, SensorFunctionOutcome};
 use crate::snapshots::models::{SnapshotRecord, SnapshotRetention};
 use crate::warehouse_metadata::models::StateHistoryRetention;
@@ -547,18 +550,8 @@ pub enum PlatformEvent {
         claim_id: Uuid,
         code: String,
     },
-    /// A job, group or ad-hoc run ended failed or partial; only the webhook receives it, never person reads.
-    RunFailed {
-        run_id: Uuid,
-        run_kind: RunKind,
-        job_key: Option<String>,
-        location_id: Uuid,
-        target: String,
-        outcome: RunOutcome,
-        /// The first failed nodes by key, with redacted and bounded error text.
-        failed_nodes: Vec<RunNodeFailure>,
-        failed_node_count: i64,
-    },
+    /// A job, group or ad-hoc run ended failed or partial; only the webhook and platform sensors receive it, never person reads.
+    RunFailed(Box<RunFailureEvent>),
     /// A trigger was skipped because its stored job or pinned snapshot can't be read, or a sensor because its check failed; `reason` says which.
     TriggerSkipped {
         trigger_id: Uuid,
@@ -579,6 +572,35 @@ pub enum PlatformEvent {
     },
 }
 
+/// What a `run_failed` event says: the run, what started it, when, what failed and why, with UI links.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RunFailureEvent {
+    pub run_id: Uuid,
+    pub run_kind: RunKind,
+    pub job_key: Option<String>,
+    pub location_id: Uuid,
+    pub target: String,
+    pub outcome: RunOutcome,
+    /// The run's UI page; null when the server has no origin.
+    pub url: Option<String>,
+    pub trigger: RunTrigger,
+    pub started_at: Option<DateTime<Utc>>,
+    pub ended_at: Option<DateTime<Utc>>,
+    pub duration_ms: Option<i64>,
+    /// Why the run failed outside any node; null when its failed nodes or audits say why.
+    pub error: Option<RunFailureCause>,
+    /// The first failed nodes by key, with redacted and bounded error text.
+    pub failed_nodes: Vec<RunNodeFailure>,
+    pub failed_node_count: i64,
+    /// The first error-severity audit failures by name.
+    pub failed_audits: Vec<RunAuditFailure>,
+    pub failed_audit_count: i64,
+    pub succeeded_node_count: i64,
+    /// The first skipped nodes by key.
+    pub skipped_nodes: Vec<String>,
+    pub skipped_node_count: i64,
+}
+
 impl PlatformEvent {
     #[must_use]
     pub const fn kind(&self) -> PlatformEventKind {
@@ -590,7 +612,7 @@ impl PlatformEvent {
             Self::LocationBroken { .. } => PlatformEventKind::LocationBroken,
             Self::LocationFailing { .. } => PlatformEventKind::LocationFailing,
             Self::LaunchFailed { .. } => PlatformEventKind::LaunchFailed,
-            Self::RunFailed { .. } => PlatformEventKind::RunFailed,
+            Self::RunFailed(_) => PlatformEventKind::RunFailed,
             Self::TriggerSkipped { .. } => PlatformEventKind::TriggerSkipped,
             Self::SensorRechecked { .. } => PlatformEventKind::SensorRechecked,
             Self::CalendarTimesDropped { .. } => PlatformEventKind::CalendarTimesDropped,
@@ -607,7 +629,7 @@ impl PlatformEvent {
             Self::LocationBroken { .. } => "platform_location_broken",
             Self::LocationFailing { .. } => "platform_location_failing",
             Self::LaunchFailed { .. } => "platform_launch_failed",
-            Self::RunFailed { .. } => "platform_run_failed",
+            Self::RunFailed(_) => "platform_run_failed",
             Self::TriggerSkipped { .. } => "platform_trigger_skipped",
             Self::SensorRechecked { .. } => "platform_sensor_rechecked",
             Self::CalendarTimesDropped { .. } => "platform_calendar_times_dropped",

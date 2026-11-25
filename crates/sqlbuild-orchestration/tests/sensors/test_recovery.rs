@@ -59,7 +59,7 @@ fn given_a_crashed_sensor_when_leadership_or_snapshot_changes_then_stale_results
                 .expect("triggers")
                 .remove(0);
             append_events(store, 0..1, chrono::Utc::now()).await;
-            let first = acquire_lease(store, Uuid::now_v7())
+            let first = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -69,7 +69,7 @@ fn given_a_crashed_sensor_when_leadership_or_snapshot_changes_then_stale_results
                 .expect("due");
             expire_lease(store).await;
             let replica = second_store(store).await;
-            let successor = acquire_lease(&replica, Uuid::now_v7())
+            let successor = acquire_lease(&replica, (Uuid::now_v7(), None))
                 .await
                 .expect("takeover")
                 .expect("new leader");

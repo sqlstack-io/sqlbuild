@@ -12,6 +12,9 @@ pub struct SchedulerLease {
     pub holder: Uuid,
     pub epoch: i64,
     pub expires_at: DateTime<Utc>,
+    /// The address people reach the UI at, carried so changes made under the lease link runs under it.
+    #[serde(default)]
+    pub origin: Option<String>,
 }
 
 /// Process identity survives cycles; the database remains authoritative for leadership.

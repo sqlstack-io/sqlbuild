@@ -411,7 +411,7 @@ pub(crate) async fn seed_logged_runs(
     scope: (Uuid, Uuid),
     ended_hours_ago: &[Value],
 ) {
-    let lease = acquire_lease(store, Uuid::now_v7())
+    let lease = acquire_lease(store, (Uuid::now_v7(), None))
         .await
         .expect("elect")
         .expect("leader");

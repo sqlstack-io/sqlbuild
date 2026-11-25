@@ -72,7 +72,7 @@ fn given_a_sub_second_trigger_start_or_cursor_when_evaluated_then_cron_ticks_lan
             set_trigger_state(store, trigger_id,
                 "UPDATE sqb_trigger_state SET started_at=$1, last_tick_for=NULL, next_due_at=NULL WHERE trigger_id=$2",
                 started).await;
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("election")
                 .expect("lease");

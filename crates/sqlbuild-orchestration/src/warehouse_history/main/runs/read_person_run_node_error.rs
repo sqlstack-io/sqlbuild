@@ -43,14 +43,18 @@ pub async fn read_person_run_node_error(
     .await?;
     let mut result = None;
     if let Some(row) = rows.into_iter().next() {
-        let message = match &row["payload"] {
-            Value::Null => None,
+        let (message, phase) = match &row["payload"] {
+            Value::Null => (None, None),
             payload => match serde_json::from_value::<RunChangeRequest>(payload["change"].clone())
                 .map_err(|error| ControlError::Invalid(error.to_string()))?
                 .change
             {
-                RunChange::NodeFinished { error_message, .. } => error_message,
-                _ => None,
+                RunChange::NodeFinished {
+                    error_message,
+                    phase,
+                    ..
+                } => (error_message, phase),
+                _ => (None, None),
             },
         };
         let snapshot_id: Uuid = serde_json::from_value(row["snapshot_id"].clone())
@@ -67,6 +71,9 @@ pub async fn read_person_run_node_error(
                 .and_then(|node| node.definition.get("path"))
                 .and_then(Value::as_str)
                 .map(|path| path.replace('\\', "/")),
+            phase,
+            url: None,
+            logs_url: None,
         });
     }
     let transaction = append_audit(

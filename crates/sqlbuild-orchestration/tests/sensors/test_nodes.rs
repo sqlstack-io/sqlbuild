@@ -83,7 +83,7 @@ fn given_any_run_rebuilds_when_consuming_then_only_genuine_scoped_successes_queu
             publish_snapshot(store, &isolated)
                 .await
                 .expect("other target snapshot");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -210,6 +210,7 @@ fn given_any_run_rebuilds_when_consuming_then_only_genuine_scoped_successes_queu
                     error_code: None,
                     skipped_because_of: None,
                     error_message: None,
+                    phase: None,
                 },
             ];
             for change in changes {
@@ -303,6 +304,7 @@ fn given_any_run_rebuilds_when_consuming_then_only_genuine_scoped_successes_queu
                     error_code: None,
                     skipped_because_of: None,
                     error_message: None,
+                    phase: None,
                 },
             ] {
                 change_run(
