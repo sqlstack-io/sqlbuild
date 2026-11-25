@@ -15,6 +15,8 @@ use sqlbuild_analysis::definition_changes::models::{ExecutedItem, SelectedItem};
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_core::progress::main::statement_summary_delta::statement_summary_delta;
 use sqlbuild_core::progress::models::StatementSummary;
+use sqlbuild_core::run_on::main::apply_local_refusals::apply_local_refusals;
+use sqlbuild_core::run_on::main::read_local_refusal::read_local_refusal;
 use sqlbuild_core::run_on::main::read_run_on_decisions::read_run_on_decisions;
 use sqlbuild_core::run_on::main::render_local_refusals::render_local_refusals;
 use sqlbuild_core::run_on::main::render_warehouse_census::render_warehouse_census;
@@ -242,8 +244,7 @@ impl TestCallbackRelay {
     }
 
     fn on_test_complete(&self, py: Python<'_>, result: &Bound<'_, PyAny>) -> PyResult<()> {
-        if self.fallback && local_refusal(result)?.is_some() {
-            let name: String = result.getattr("test_name")?.extract()?;
+        if let (true, Some((name, _))) = (self.fallback, local_refusal(result)?) {
             let mut run_on = self.run_on.lock().unwrap_or_else(PoisonError::into_inner);
             if run_on.get(&name).map(String::as_str) == Some(LOCAL_RUN_ON) {
                 run_on.insert(name, WAREHOUSE_RUN_ON.to_owned());
@@ -352,20 +353,11 @@ impl TestCallbackRelay {
     }
 }
 
-/// Why a test that ran locally failed where the warehouse would not, when it did.
-fn local_refusal(result: &Bound<'_, PyAny>) -> PyResult<Option<LocalRefusal>> {
-    let refusal: Bound<'_, PyAny> = result.getattr("local_refusal")?;
-    if refusal.is_none() {
-        return Ok(None);
-    }
-    let text = |key: &str| -> PyResult<String> { refusal.get_item(key)?.extract() };
-    Ok(Some(LocalRefusal {
-        category: text("category")?,
-        construct: text("construct")?,
-        reason: text("reason")?,
-        width: 1,
-        ..LocalRefusal::default()
-    }))
+/// The test that ran locally and failed where the warehouse would not, and why, when it did.
+fn local_refusal(result: &Bound<'_, PyAny>) -> PyResult<Option<(String, LocalRefusal)>> {
+    let found: Option<HashMap<String, String>> =
+        native_field(result, "local_refusal")?.extract()?;
+    Ok(found.map(read_local_refusal))
 }
 
 fn unknown_case(py: Python<'_>, message: String) -> PyErr {
@@ -595,6 +587,8 @@ pub(crate) struct TestPlacement<'py> {
     /// Tests that do not run, with the code and message of their error row.
     unplaced: Vec<(Bound<'py, PyAny>, &'static str, &'static str)>,
     local: Vec<Bound<'py, PyAny>>,
+    /// The local tests' names, in the same order.
+    local_names: Vec<String>,
     warehouse: Vec<Bound<'py, PyAny>>,
     /// Where each test runs, by name, for its row.
     run_on: HashMap<String, String>,
@@ -602,8 +596,7 @@ pub(crate) struct TestPlacement<'py> {
     warehouse_optional: bool,
 }
 
-/// The tests' results in plan order, the local batch's statements, and why local tests failed
-/// where the warehouse would not; in `auto` those tests ran again on the warehouse.
+/// Results in plan order, local statements, and each local test failing where the warehouse wouldn't.
 type RanTests<'py> = (
     Vec<SqlTestExecutionResult<Bound<'py, PyAny>>>,
     StatementSummary,
@@ -689,6 +682,7 @@ fn run_tests<'py>(
     let TestPlacement {
         unplaced,
         local,
+        local_names,
         mut warehouse,
         run_on,
         warehouse_optional,
@@ -789,16 +783,14 @@ fn run_tests<'py>(
             let memory: Bound<'py, PyDict> = PyDict::new(py);
             memory.set_item("database", ":memory:")?;
             for result in run(&local, (adapter, memory.into_any()), false)? {
-                let Some(refusal) = local_refusal(&result)? else {
+                let Some((name, refusal)) = local_refusal(&result)? else {
                     results.push(result);
                     continue;
                 };
-                let name: String = result.getattr("test_name")?.extract()?;
-                let entry: Option<&Bound<'py, PyAny>> = local.iter().find(|entry| {
-                    entry
-                        .getattr("name")
-                        .is_ok_and(|test| test.eq(&name).unwrap_or(false))
-                });
+                let entry = local_names
+                    .iter()
+                    .position(|test| *test == name)
+                    .map(|at| &local[at]);
                 refused_locally.push((name, refusal));
                 match (warehouse_optional, entry) {
                     (true, Some(entry)) => warehouse.push(entry.clone()),
@@ -1239,14 +1231,7 @@ fn run_sql_tests<'py>(
         (concurrency, &timeout, worker),
         placement,
     )?;
-    for (name, refusal) in refused_locally {
-        if let Some(decision) = decisions.iter_mut().find(|decision| decision.name == name) {
-            if mode == RunOn::Auto {
-                decision.run_on = WAREHOUSE_RUN_ON.to_owned();
-            }
-            decision.refusals = vec![refusal];
-        }
-    }
+    apply_local_refusals(&mut decisions, refused_locally, mode);
     write_test_runtime_target(
         (
             &native_field(invocation, "effective_project_dir")?
@@ -1314,6 +1299,7 @@ fn place_tests<'py>(
     let mut placement: TestPlacement<'py> = TestPlacement {
         unplaced: Vec::new(),
         local: Vec::new(),
+        local_names: Vec::new(),
         warehouse: Vec::new(),
         run_on: HashMap::new(),
         warehouse_optional: mode == RunOn::Auto,
@@ -1336,7 +1322,10 @@ fn place_tests<'py>(
                 decision.run_on = WAREHOUSE_RUN_ON.to_owned();
                 placement.warehouse.push(entry);
             }
-            _ if decision.local() => placement.local.push(entry),
+            _ if decision.local() => {
+                placement.local_names.push(name.clone());
+                placement.local.push(entry);
+            }
             RunOn::Local => {
                 decision.run_on = LOCAL_RUN_ON.to_owned();
                 placement.unplaced.push((

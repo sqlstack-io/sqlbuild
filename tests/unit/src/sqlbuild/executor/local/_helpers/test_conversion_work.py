@@ -4,7 +4,6 @@ import uuid
 
 import pytest
 
-from sqlbuild.executor.local._helpers.conversion import local_work_counts
 from sqlbuild.executor.local.models import LocalWorkCounts
 from tests.unit.src.sqlbuild.executor.local._helpers._test_types import (
     BindingWorkTestCase,
@@ -15,6 +14,7 @@ from tests.unit.src.sqlbuild.executor.local._helpers.helpers import (
     ORDERS_SCHEMA_RELATIONS,
     check_each,
     counting_convert,
+    work_counts,
     work_delta,
 )
 
@@ -51,7 +51,7 @@ def test_given_tests_when_checking_locally_then_each_statement_converts_once_wit
     schema: dict[str, object] = {"relations": dict(ORDERS_SCHEMA_RELATIONS)}
     tag: str = uuid.uuid4().hex
     statements: tuple[str, ...] = tuple(f"{sql} /* {tag} */" for sql in test_case.statements)
-    before: LocalWorkCounts = local_work_counts()
+    before: LocalWorkCounts = work_counts()
 
     _pooled, checks = check_each(
         statements=statements, schema=schema, repeats=test_case.repeats, convert=True
@@ -87,7 +87,7 @@ def test_given_many_tests_when_checking_in_workers_then_running_them_converts_no
         f"SELECT id + {index} AS id FROM shop.raw.orders /* {tag} */"
         for index in range(test_case.statement_count)
     )
-    before: LocalWorkCounts = local_work_counts()
+    before: LocalWorkCounts = work_counts()
 
     pooled, _checks = check_each(statements=statements, schema=schema, repeats=2, convert=True)
 
@@ -115,7 +115,7 @@ def test_given_duckdb_tests_when_checking_locally_then_each_binds_once_in_an_emp
 ) -> None:
     tag: str = uuid.uuid4().hex
     statements: tuple[str, ...] = tuple(f"{sql} /* {tag} */" for sql in test_case.statements)
-    before: LocalWorkCounts = local_work_counts()
+    before: LocalWorkCounts = work_counts()
 
     _pooled, checks = check_each(
         statements=statements, schema=None, repeats=test_case.repeats, convert=False

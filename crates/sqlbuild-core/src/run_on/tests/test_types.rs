@@ -43,3 +43,9 @@ pub(super) struct FragmentTestCase {
     pub(super) decisions: Vec<RunOnDecision>,
     pub(super) expected_fragments: &'static [&'static str],
 }
+
+pub(super) struct LocalRefusalTestCase {
+    pub(super) description: &'static str,
+    pub(super) mode: RunOn,
+    pub(super) expected_decision: RunOnDecision,
+}

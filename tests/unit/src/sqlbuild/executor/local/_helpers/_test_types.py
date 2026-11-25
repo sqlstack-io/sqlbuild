@@ -56,10 +56,21 @@ class WarehouseRelationsTestCase:
 
 @dataclass(frozen=True)
 class LocalRunRefusalTestCase:
-    """A DuckDB failure of converted SQL, and the refusal title it gives, if any."""
+    """A DuckDB failure of converted SQL that keeps the test off DuckDB, and the refusal title."""
 
     description: str
     error_type: str
     message: str
     fatal: bool
-    expected_title: str | None
+    expected_title: str
+
+
+@dataclass(frozen=True)
+class OwnFailureTestCase:
+    """A DuckDB failure of converted SQL that is the test's own result."""
+
+    description: str
+    error_type: str
+    message: str
+    fatal: bool
+    expected_refused: bool

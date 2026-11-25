@@ -33,7 +33,7 @@ from sqlbuild.executor.local.constants import (
     SNAPSHOT_STALE_CATEGORY,
     UTC_TIME_ZONE,
 )
-from sqlbuild.executor.local.main._convert_local_sql import use_local_conversion_cache
+from sqlbuild.executor.local.main._use_local_conversion_cache import use_local_conversion_cache
 from sqlbuild.executor.run.models import ModelExecutionResult
 from sqlbuild.executor.scenario._helpers.execution.model_execution import execute_scenario_models
 from sqlbuild.executor.scenario._helpers.lifecycle.expectations import (

@@ -192,6 +192,7 @@ def _execute_sql_test(
                 local_refusal=None
                 if refused is None
                 else {
+                    "test": test_entry.name,
                     "category": refused.category,
                     "construct": refused.construct,
                     "reason": refused.message,

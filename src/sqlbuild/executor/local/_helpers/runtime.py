@@ -14,6 +14,7 @@ from sqlbuild.executor.local.constants import (
 _GUARD_RAISE: re.Pattern[str] = re.compile(r"'([a-z][a-z0-9_]*)#(?:[0-9a-f]{12}|\?): ([^']*)")
 _INTERNAL_PREFIX: re.Pattern[str] = re.compile(r"^\s*INTERNAL Error:\s*")
 _CONSTRUCT_WIDTH: int = 80
+_INTERNAL_EXCEPTION: str = "InternalException"
 
 
 def local_run_refusal(*, error: Exception, fatal: bool) -> LocalRunRefusedError | None:
@@ -29,7 +30,7 @@ def local_run_refusal(*, error: Exception, fatal: bool) -> LocalRunRefusedError 
             construct=guard,
             help=CANNOT_RUN_LOCALLY_HELP,
         )
-    if not fatal or type(error).__name__ != "InternalException":
+    if not fatal or type(error).__name__ != _INTERNAL_EXCEPTION:
         return None
     first: str = _INTERNAL_PREFIX.sub("", message).splitlines()[0].strip() if message else ""
     return LocalRunRefusedError(

@@ -4,7 +4,10 @@ import pytest
 
 from sqlbuild.errors.contracts.exceptions import LocalRunRefusedError
 from sqlbuild.executor.local._helpers.runtime import local_run_refusal
-from tests.unit.src.sqlbuild.executor.local._helpers._test_types import LocalRunRefusalTestCase
+from tests.unit.src.sqlbuild.executor.local._helpers._test_types import (
+    LocalRunRefusalTestCase,
+    OwnFailureTestCase,
+)
 
 
 @pytest.mark.parametrize(
@@ -21,6 +24,30 @@ from tests.unit.src.sqlbuild.executor.local._helpers._test_types import LocalRun
             expected_title="SQLQuack guard: array_agg_order",
         ),
         LocalRunRefusalTestCase(
+            description="a DuckDB internal error names its first line",
+            error_type="InternalException",
+            message="INTERNAL Error: an expression should not be used here yet!\n\nStack Trace:",
+            fatal=True,
+            expected_title="DuckDB internal error: an expression should not be used here yet!",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_guard_or_engine_bug_when_classifying_then_it_refuses_naming_it(
+    test_case: LocalRunRefusalTestCase,
+) -> None:
+    error: Exception = type(test_case.error_type, (Exception,), {})(test_case.message)
+
+    refused: LocalRunRefusedError | None = local_run_refusal(error=error, fatal=test_case.fatal)
+
+    assert refused is not None
+    assert f"{refused.category}: {refused.construct}" == test_case.expected_title
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        OwnFailureTestCase(
             description="an emulated Snowflake error is the test's own result",
             error_type="ConversionException",
             message=(
@@ -28,34 +55,26 @@ from tests.unit.src.sqlbuild.executor.local._helpers._test_types import LocalRun
                 "Numeric value is not recognized' to INT32"
             ),
             fatal=False,
-            expected_title=None,
+            expected_refused=False,
         ),
-        LocalRunRefusalTestCase(
-            description="a DuckDB internal error names its first line",
-            error_type="InternalException",
-            message="INTERNAL Error: an expression should not be used here yet!\n\nStack Trace:",
-            fatal=True,
-            expected_title="DuckDB internal error: an expression should not be used here yet!",
-        ),
-        LocalRunRefusalTestCase(
+        OwnFailureTestCase(
             description="any other DuckDB error is the test's own result",
             error_type="BinderException",
             message="Binder Error: Referenced column a not found",
             fatal=False,
-            expected_title=None,
+            expected_refused=False,
         ),
     ],
     ids=lambda case: case.description,
 )
-def test_given_a_duckdb_failure_when_classifying_then_only_guards_and_engine_bugs_refuse(
-    test_case: LocalRunRefusalTestCase,
+def test_given_an_error_snowflake_would_raise_too_when_classifying_then_it_is_the_tests_own(
+    test_case: OwnFailureTestCase,
 ) -> None:
     error: Exception = type(test_case.error_type, (Exception,), {})(test_case.message)
 
     refused: LocalRunRefusedError | None = local_run_refusal(error=error, fatal=test_case.fatal)
 
-    title: str | None = None if refused is None else f"{refused.category}: {refused.construct}"
-    assert title == test_case.expected_title
+    assert (refused is not None) is test_case.expected_refused
 
 
 if __name__ == "__main__":

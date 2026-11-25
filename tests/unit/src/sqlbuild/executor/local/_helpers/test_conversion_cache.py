@@ -5,13 +5,14 @@ from pathlib import Path
 import pytest
 import sqlquack
 
-from sqlbuild.executor.local._helpers.conversion import local_work_counts, use_conversion_cache
+from sqlbuild.executor.local._helpers.conversion import use_conversion_cache
 from sqlbuild.executor.local.models import LocalWorkCounts
 from tests.unit.src.sqlbuild.executor.local._helpers._test_types import CachedConversionTestCase
 from tests.unit.src.sqlbuild.executor.local._helpers.helpers import (
     ORDERS_SCHEMA_RELATIONS,
     check_each,
     fresh_run,
+    work_counts,
     work_delta,
 )
 
@@ -46,14 +47,14 @@ def test_given_conversions_kept_on_disk_when_a_later_run_checks_them_then_none_c
     )
     fresh_run(monkeypatch)
     use_conversion_cache(tmp_path)
-    first: LocalWorkCounts = local_work_counts()
+    first: LocalWorkCounts = work_counts()
     _pooled, first_checks = check_each(
         statements=statements, schema=schema, repeats=1, convert=True
     )
     first_work: LocalWorkCounts = work_delta(first)
     fresh_run(monkeypatch)
     use_conversion_cache(tmp_path)
-    later: LocalWorkCounts = local_work_counts()
+    later: LocalWorkCounts = work_counts()
 
     _pooled, later_checks = check_each(
         statements=statements, schema=schema, repeats=1, convert=True
@@ -89,13 +90,13 @@ def test_given_another_sqlquack_version_when_checking_then_kept_conversions_are_
     )
     fresh_run(monkeypatch)
     use_conversion_cache(tmp_path)
-    first: LocalWorkCounts = local_work_counts()
+    first: LocalWorkCounts = work_counts()
     _ = check_each(statements=statements, schema=schema, repeats=1, convert=True)
     first_work: LocalWorkCounts = work_delta(first)
     fresh_run(monkeypatch)
     use_conversion_cache(tmp_path)
     monkeypatch.setattr(sqlquack, "__version__", f"{sqlquack.__version__}.other")
-    later: LocalWorkCounts = local_work_counts()
+    later: LocalWorkCounts = work_counts()
 
     _ = check_each(statements=statements, schema=schema, repeats=1, convert=True)
 

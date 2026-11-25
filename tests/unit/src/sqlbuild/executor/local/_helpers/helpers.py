@@ -9,7 +9,7 @@ import pytest
 import sqlquack
 
 from sqlbuild.executor.local._helpers import conversion as conversion_module
-from sqlbuild.executor.local._helpers.conversion import check_all, local_check, local_work_counts
+from sqlbuild.executor.local._helpers.conversion import check_all, local_check
 from sqlbuild.executor.local.models import LocalWorkCounts
 
 ORDERS_SCHEMA_RELATIONS: dict[str, list[list[str]]] = {
@@ -26,9 +26,8 @@ def counting_convert(
     calls: list[frozenset[str]] = []
     original: Callable[..., Any] = sqlquack.convert
 
-    def convert(*, sql: str, options: Any = None, **rest: Any) -> Any:
-        schema: dict[str, Any] = dict(options.schema or {}) if options is not None else {}
-        calls.append(frozenset(schema.get("relations", {})))
+    def convert(*, sql: str, options: Any, **rest: Any) -> Any:
+        calls.append(frozenset(dict(options.schema or {}).get("relations", {})))
         return original(sql=sql, options=options, **rest)
 
     monkeypatch.setattr(sqlquack, "convert", convert)
@@ -41,17 +40,23 @@ def check_each(
     """How many statements workers checked up front, then each check read `repeats` times."""
 
     pooled: int = check_all(sqls=list(statements), schema=schema, time_zone=None, convert=convert)
+    repeated: list[str] = list(statements) * repeats
     return pooled, [
         local_check(sql=sql, schema=schema, time_zone=None, path="test.sql", convert=convert)
-        for _ in range(repeats)
-        for sql in statements
+        for sql in repeated
     ]
+
+
+def work_counts() -> LocalWorkCounts:
+    """Conversions, bindings, schema serialisations and cache reads this process did so far."""
+
+    return conversion_module._WORK.counts()
 
 
 def work_delta(before: LocalWorkCounts) -> LocalWorkCounts:
     """The work done since `before`."""
 
-    after: LocalWorkCounts = local_work_counts()
+    after: LocalWorkCounts = work_counts()
     return LocalWorkCounts(
         conversions=after.conversions - before.conversions,
         bindings=after.bindings - before.bindings,

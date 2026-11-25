@@ -1,19 +1,21 @@
 use serde_json::json;
 
 use crate::cli_text::models::CliStyle;
+use crate::run_on::main::apply_local_refusals::apply_local_refusals;
+use crate::run_on::main::read_local_refusal::read_local_refusal;
 use crate::run_on::main::render_local_refusals::render_local_refusals;
 use crate::run_on::main::render_warehouse_census::render_warehouse_census;
 use crate::run_on::main::resolve_run_on::resolve_run_on;
 use crate::run_on::main::run_on_column::run_on_column;
 use crate::run_on::main::run_on_inspection_line::run_on_inspection_line;
-use crate::run_on::models::RunOn;
+use crate::run_on::models::{LocalRefusal, RunOn, RunOnDecision};
 use crate::run_on::tests::helpers::{
     layers, local, read_digest, refusal_digest, refused, refused_in_macro_output, run_on_document,
     unplaced,
 };
 use crate::run_on::tests::test_types::{
-    ColumnTestCase, FragmentTestCase, InspectionTestCase, JsonTestCase, ReadTestCase,
-    RenderTestCase, ResolveTestCase,
+    ColumnTestCase, FragmentTestCase, InspectionTestCase, JsonTestCase, LocalRefusalTestCase,
+    ReadTestCase, RenderTestCase, ResolveTestCase,
 };
 
 const PLAIN: CliStyle = CliStyle { use_color: false };
@@ -235,6 +237,64 @@ fn given_refusal_in_macro_output_when_rendering_then_points_at_call_and_shows_ge
                 .iter()
                 .all(|fragment| text.contains(fragment)),
             "{}: {text}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_local_test_refused_while_running_when_applied_then_auto_moves_it_and_local_keeps_it() {
+    let guard = LocalRefusal {
+        category: "SQLQuack guard".to_owned(),
+        construct: "array_agg_order".to_owned(),
+        reason: "ARRAY_AGG of several values in no defined order".to_owned(),
+        width: 1,
+        ..LocalRefusal::default()
+    };
+    let test_cases = [
+        LocalRefusalTestCase {
+            description: "auto runs the test on the warehouse, giving the guard as the reason",
+            mode: RunOn::Auto,
+            expected_decision: RunOnDecision {
+                name: "test_orders".to_owned(),
+                run_on: "warehouse".to_owned(),
+                refusals: vec![guard.clone()],
+            },
+        },
+        LocalRefusalTestCase {
+            description: "local keeps the test local and lists the guard it can't run past",
+            mode: RunOn::Local,
+            expected_decision: RunOnDecision {
+                name: "test_orders".to_owned(),
+                run_on: "local".to_owned(),
+                refusals: vec![guard.clone()],
+            },
+        },
+    ];
+    for test_case in test_cases {
+        let mut decisions = vec![local("test_orders"), local("test_customers")];
+        let fields = [
+            ("test", "test_orders"),
+            ("category", "SQLQuack guard"),
+            ("construct", "array_agg_order"),
+            ("reason", "ARRAY_AGG of several values in no defined order"),
+        ];
+
+        apply_local_refusals(
+            &mut decisions,
+            vec![read_local_refusal(
+                fields
+                    .into_iter()
+                    .map(|(key, value)| (key.to_owned(), value.to_owned()))
+                    .collect(),
+            )],
+            test_case.mode,
+        );
+
+        assert_eq!(
+            decisions,
+            vec![test_case.expected_decision, local("test_customers")],
+            "{}",
             test_case.description
         );
     }

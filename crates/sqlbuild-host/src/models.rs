@@ -686,6 +686,8 @@ pub struct SqlTestExecutionResult<V> {
     pub error_message: Option<String>,
     pub real_model_count: Option<i64>,
     pub timeout: Option<ItemTimeoutReport>,
+    /// Why a local run failed where the warehouse would not: `test`, `category`, `construct`, `reason`.
+    pub local_refusal: Option<V>,
 }
 
 /// Everything one build executed, as the executor returns it. Mirrors `sqlbuild.executor.build.models.BuildExecutionResult`; `V` is a host value.

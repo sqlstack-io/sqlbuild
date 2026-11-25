@@ -232,7 +232,7 @@ record!(ItemTimeoutReport {
 record!(SqlTestExecutionResult<V> {
     test_name, outcome, source_path, block_index, parent_name, case_name, case_index,
     case_fingerprint, parameter_schema, parameter_values, step_results, error_code, error_help,
-    error_message, real_model_count, timeout,
+    error_message, real_model_count, timeout, local_refusal,
 });
 record!(BuildExecutionResult<V> {
     status, model_results, seed_results, function_results, load_results, test_results,

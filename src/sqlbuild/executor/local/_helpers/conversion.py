@@ -17,6 +17,7 @@ import sqlquack
 from sqlquack import ConvertOptions
 from sqlquack.api.constants import DEFAULT_PATH
 
+from sqlbuild.errors.contracts.exceptions import ExecutorInputError
 from sqlbuild.executor.local.classes.empty_duckdb import EmptyDuckDb
 from sqlbuild.executor.local.constants import TIMEZONE_PARAMETER, UTC_TIME_ZONE
 from sqlbuild.executor.local.models import ConvertedSql, LocalSqlCheck, LocalWorkCounts
@@ -72,13 +73,17 @@ class _LocalWork:
             self._counts["schema_keys"] += 1
         return key
 
-    def statement_schema(self, schema: Mapping[str, Any] | None, sql: str) -> dict[str, Any] | None:
+    def statement_schema(
+        self, *, schema: Mapping[str, Any] | None, sql: str
+    ) -> dict[str, Any] | None:
         """Only the relations whose names `sql` mentions, so each call reads a small schema."""
 
         if not schema:
             return None
         with self._lock:
-            known = self._relation_names.get(id(schema))
+            known: tuple[Mapping[str, Any], dict[str, list[str]]] | None = self._relation_names.get(
+                id(schema)
+            )
         if known is None or known[0] is not schema:
             by_name: dict[str, list[str]] = {}
             for relation in schema.get("relations", {}):
@@ -88,14 +93,11 @@ class _LocalWork:
                 self._relation_names[id(schema)] = known
         relations: Mapping[str, Any] = schema.get("relations", {})
         mentioned: set[str] = {token.upper() for token in _IDENTIFIER.findall(sql)}
-        return {
-            **schema,
-            "relations": {
-                relation: relations[relation]
-                for name in mentioned & known[1].keys()
-                for relation in known[1][name]
-            },
-        }
+        read: dict[str, Any] = {}
+        for name in mentioned & known[1].keys():
+            for relation in known[1][name]:
+                read[relation] = relations[relation]
+        return {**schema, "relations": read}
 
     def get(self, key: _CheckKey) -> LocalSqlCheck | None:
         with self._lock:
@@ -106,7 +108,7 @@ class _LocalWork:
             return list(dict.fromkeys(key for key in keys if key not in self._checks))
 
     def store(
-        self, checks: Mapping[_CheckKey, LocalSqlCheck], *, counts: Mapping[str, int]
+        self, *, checks: Mapping[_CheckKey, LocalSqlCheck], counts: Mapping[str, int]
     ) -> None:
         with self._lock:
             self._checks.update(checks)
@@ -143,7 +145,8 @@ def converted(
     conversion: ConvertedSql | None = local_check(
         sql=sql, schema=schema, time_zone=time_zone, path=path
     ).conversion
-    assert conversion is not None
+    if conversion is None:
+        raise ExecutorInputError(f"SQL checked for conversion was not converted: {path}")
     return conversion
 
 
@@ -163,17 +166,17 @@ def local_check(
         return cached
     job: _CheckJob = (
         sql,
-        _WORK.statement_schema(schema, sql),
+        _WORK.statement_schema(schema=schema, sql=sql),
         _session(time_zone=time_zone),
         convert,
     )
     stored: LocalSqlCheck | None = _stored(job)
     if stored is not None:
-        _WORK.store({key: stored}, counts={"cached": 1})
+        _WORK.store(checks={key: stored}, counts={"cached": 1})
         return stored
-    check: LocalSqlCheck = _check(job, empty=_WORK.empty(), path=path)
-    _keep(job, check)
-    _WORK.store({key: check}, counts=_check_counts(check))
+    check: LocalSqlCheck = _check(job=job, empty=_WORK.empty(), path=path)
+    _keep(job=job, check=check)
+    _WORK.store(checks={key: check}, counts=_check_counts(check))
     return check
 
 
@@ -192,7 +195,7 @@ def check_all(
     jobs_by_key: dict[_CheckKey, _CheckJob] = {
         key: (
             key[0],
-            _WORK.statement_schema(schema, key[0]),
+            _WORK.statement_schema(schema=schema, sql=key[0]),
             _session(time_zone=time_zone),
             convert,
         )
@@ -201,7 +204,7 @@ def check_all(
     stored: dict[_CheckKey, LocalSqlCheck] = {
         key: check for key, job in jobs_by_key.items() if (check := _stored(job)) is not None
     }
-    _WORK.store(stored, counts={"cached": len(stored)})
+    _WORK.store(checks=stored, counts={"cached": len(stored)})
     missing = [key for key in missing if key not in stored]
     workers: int = min(_MAX_WORKERS, os.cpu_count() or 1)
     if len(missing) < _PARALLEL_MINIMUM or workers <= 1:
@@ -219,10 +222,10 @@ def check_all(
         )
     totals: dict[str, int] = {"conversions": 0, "bindings": 0}
     for job, check in zip(jobs, results, strict=True):
-        _keep(job, check)
+        _keep(job=job, check=check)
         for name, count in _check_counts(check).items():
             totals[name] += count
-    _WORK.store(dict(zip(missing, results, strict=True)), counts=totals)
+    _WORK.store(checks=dict(zip(missing, results, strict=True)), counts=totals)
     return len(results)
 
 
@@ -231,19 +234,19 @@ def warehouse_relations(
 ) -> tuple[str, ...]:
     """Declared relations the converted SQL names in full, not via a fixture CTE: warehouse-only."""
 
-    relations: Mapping[str, Any] = (_WORK.statement_schema(schema, sql) or {}).get("relations", {})
+    relations: Mapping[str, Any] = (_WORK.statement_schema(schema=schema, sql=sql) or {}).get(
+        "relations", {}
+    )
     return tuple(
-        relation
-        for relation in sorted(relations)
-        if ".".join('"' + part.replace('"', '""') + '"' for part in relation.split("."))
-        in conversion.sql
+        relation for relation in sorted(relations) if _quoted_name(relation) in conversion.sql
     )
 
 
-def local_work_counts() -> LocalWorkCounts:
-    """Conversions, bindings, schema serialisations and cache reads this process did or received."""
+def _quoted_name(relation: str) -> str:
+    """`DB.SCHEMA.TABLE` as converted SQL names it: `"DB"."SCHEMA"."TABLE"`."""
 
-    return _WORK.counts()
+    parts: list[str] = ['"' + part.replace('"', '""') + '"' for part in relation.split(".")]
+    return ".".join(parts)
 
 
 def _key(
@@ -257,7 +260,7 @@ def _session(*, time_zone: str | None) -> dict[str, str]:
     return {} if zone == UTC_TIME_ZONE else {TIMEZONE_PARAMETER: zone}
 
 
-def _check(job: _CheckJob, *, empty: EmptyDuckDb, path: str) -> LocalSqlCheck:
+def _check(*, job: _CheckJob, empty: EmptyDuckDb, path: str) -> LocalSqlCheck:
     """Convert Snowflake SQL, whose unknown names SQLQuack refuses; bind DuckDB SQL as authored."""
 
     sql, schema, session, convert = job
@@ -321,7 +324,7 @@ def _stored(job: _CheckJob) -> LocalSqlCheck | None:
     )
 
 
-def _keep(job: _CheckJob, check: LocalSqlCheck) -> None:
+def _keep(*, job: _CheckJob, check: LocalSqlCheck) -> None:
     """Write `check`'s conversion for later runs; a write that fails only loses the shortcut."""
 
     path: Path | None = _cache_file(job)
@@ -356,4 +359,4 @@ def _check_counts(check: LocalSqlCheck) -> dict[str, int]:
 
 
 def _worker_check(job: _CheckJob) -> LocalSqlCheck:
-    return _check(job, empty=_WORK.empty(), path=DEFAULT_PATH)
+    return _check(job=job, empty=_WORK.empty(), path=DEFAULT_PATH)

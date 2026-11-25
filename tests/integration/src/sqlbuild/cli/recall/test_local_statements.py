@@ -1,5 +1,6 @@
 """Statements of tests run locally are recorded by digest, without their SQL text."""
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -51,7 +52,7 @@ def test_given_tests_run_locally_when_recorded_then_their_statements_keep_no_sql
 ) -> None:
     project_dir: Path = write_tested_project(tmp_path / "orders_shop")
 
-    completed = run(project_dir, *test_case.args)
+    completed: subprocess.CompletedProcess[bytes] = run(project_dir, *test_case.args)
     rows: list[list[object]] = recall_rows(project_dir, test_case.sql)
 
     stderr: str = completed.stderr.decode(errors="replace")

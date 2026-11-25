@@ -26,8 +26,8 @@ _SCHEMA: dict[str, object] = {"relations": {"ORDERS": [["TOTAL", "NUMBER(38,0)"]
             source_dialect="snowflake",
             sql="select IFNULL(total, 0) as total from orders",
             expected_sql=(
-                'SELECT COALESCE(CAST("ORDERS"."TOTAL" AS DECIMAL(38, 0)), '
-                'CAST(0 AS DECIMAL(38, 0))) AS "TOTAL"\nFROM "ORDERS" AS "ORDERS"'
+                'SELECT COALESCE(CAST("ORDERS"."TOTAL" AS DECIMAL(38,0)), '
+                'CAST(0 AS DECIMAL(38,0))) AS "TOTAL" FROM "ORDERS"'
             ),
         ),
     ],

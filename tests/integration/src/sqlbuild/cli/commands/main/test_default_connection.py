@@ -233,9 +233,9 @@ def test_given_target_without_connection_when_resolving_offline_then_connection_
             ),
         ),
         DefaultConnectionCliTestCase(
-            description="test execution fails before connecting without any connection",
+            description="warehouse test execution fails before connecting without any connection",
             project_toml=_NO_CONNECTION_PROJECT,
-            argv=("test",),
+            argv=("test", "--run-on", "warehouse"),
             expected_exit_code=1,
             expected_output_fragments=("error[D001]", "target dev has no connection"),
         ),
