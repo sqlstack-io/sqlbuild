@@ -50,7 +50,7 @@ describe('a run that failed on a check after every node built', () => {
 	it('leads with the check, its warehouse code and the cause, never the worker’s end line', () => {
 		const [failure, ...rest] = runFailures([built], events, statements, 'prod');
 		expect(rest).toEqual([]);
-		expect([failure.kind, failure.code, failure.checkId, failureLine(failure)]).toEqual(['check', '42S02', 'chk-1', 'Failed: check orders_match_payments after the build · input not built in prod']);
+		expect([failure.kind, failure.code, failure.checkId, failureLine(failure)]).toEqual(['check', '42S02', 'chk-1', 'Failed: audit orders_match_payments after the build · input not built in prod']);
 	});
 
 	it('reads the SQLSTATE and the relations a query reads', () => {

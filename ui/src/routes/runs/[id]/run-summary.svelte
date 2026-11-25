@@ -22,7 +22,7 @@
 			s.built ? { key: 'succeeded', text: `${s.built} built`, note: s.incremental ? `(${s.incremental} incremental, +${rows(s.incrementalRows)} rows)` : undefined } : null,
 			s.warned ? { key: 'warned', text: plural(s.warned, 'warning'), tone: 'warn' } : null,
 			// Failed checks count with the nodes: a run can fail on a check after every node built.
-			s.checksFailed ? { key: 'checks_failed', text: `${plural(s.checksFailed, 'check')} failed`, tone: 'err' } : null
+			s.checksFailed ? { key: 'checks_failed', text: `${plural(s.checksFailed, 'audit')} failed`, tone: 'err' } : null
 		];
 		return out.filter((f): f is Fig => !!f);
 	});
@@ -42,10 +42,10 @@
 				href="?show={f.key}"
 				onclick={(ev) => {
 					ev.preventDefault();
-					if (f.key === 'checks_failed') view.toggleChecksFilter('failed checks');
+					if (f.key === 'checks_failed') view.toggleChecksFilter('failed audits');
 					else view.focusGroup(f.key, f.text.replace(/^\d+ /, ''));
 				}}
-				title={view.figure === f.key ? 'Show everything again' : f.key === 'checks_failed' ? 'Show only the failed checks in the log' : 'Show only these on the timeline and in the log'}>{f.text}</a
+				title={view.figure === f.key ? 'Show everything again' : f.key === 'checks_failed' ? 'Show only the failed audits in the log' : 'Show only these on the timeline and in the log'}>{f.text}</a
 			>{#if f.note}<span class="faint">{` ${f.note}`}</span>{/if}</span
 		>
 	{:else}

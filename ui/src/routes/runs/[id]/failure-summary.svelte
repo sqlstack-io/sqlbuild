@@ -67,7 +67,7 @@
 		<div class="actions">
 			{#if st}<Button variant="outline" size="sm" aria-pressed={queryOpen.has(f.id)} onclick={() => toggleQuery(f.id)}>{queryOpen.has(f.id) ? 'Hide query' : 'Show query'}</Button>{/if}
 			<Button variant="outline" size="sm" onclick={() => view.showInLog(f.logQuery)}>Show in log</Button>
-			{#if f.checkId}<a class={buttonVariants({ variant: 'outline', size: 'sm' })} href={to(`/checks/${f.checkId}`)}>Open the check</a>{:else if f.kind === 'node' && f.nodeKey}<Button variant="outline" size="sm" onclick={() => view.openDrawer(f.nodeKey)}>Open the node</Button>{/if}
+			{#if f.checkId}<a class={buttonVariants({ variant: 'outline', size: 'sm' })} href={to(`/checks/${f.checkId}`)}>Open the audit</a>{:else if f.kind === 'node' && f.nodeKey}<Button variant="outline" size="sm" onclick={() => view.openDrawer(f.nodeKey)}>Open the node</Button>{/if}
 			<CopyButton value={f.message} label="Copy error" text="Copy error" showValue={false} />
 		</div>
 		{#if st && queryOpen.has(f.id)}<div class="query"><QueryPanel statement={st} onstatements={() => view.showStatement(st.id, st.nodeKey)} /></div>{/if}

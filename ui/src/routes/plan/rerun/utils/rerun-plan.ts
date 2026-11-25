@@ -1,32 +1,49 @@
-// What a rerun of one run runs, as selection text and as rows: each preset (the Rerun menu's rows) fills
-// the selection box with exactly what it reruns, and the table lists the real nodes and checks. Pure.
+// A rerun is a selection like any other: `failed:<run>+` reruns what didn't succeed, `audit:<name>` one
+// audit, `run:<run>` the whole run. Presets only write that text; what runs, and which run it came from,
+// is read back from the text alone. Pure.
 
 import type { RunDetail } from '$lib/api';
 import { nodeLabel } from '$lib/operate/labels';
 import type { RerunRow } from '../../../runs/[id]/utils/rerun-rows';
 import type { RunFailure } from '../../../runs/[id]/utils/run-failures';
 
-export type RerunItem = { key: string; name: string; kind: 'check' | 'node'; where: string | null; last: string | null };
+export type RerunItem = { key: string; name: string; kind: 'audit' | 'node'; where: string | null; last: string | null };
 
-/** The selection text a preset fills the box with: names, `check:` for checks, or the run's own selection. */
-export function presetText(row: RerunRow, detail: RunDetail, failures: readonly RunFailure[]): string {
-	const checks = new Set(failures.filter((f) => f.kind === 'check').map((f) => f.name));
-	const asToken = (name: string) => (checks.has(name) ? `check:${name}` : name);
-	if (row.mode === 'all') return detail.selection.join(' ');
-	if (row.mode === 'selected') return row.nodes.map(asToken).join(' ');
-	return [...detail.rerunFromFailureNodes.map(nodeLabel), ...[...checks].map((c) => `check:${c}`)].join(' ');
+const RUN_TYPES = ['run', 'failed', 'skipped'];
+const typed = (text: string) =>
+	text
+		.split(/\s+/)
+		.filter(Boolean)
+		.map((t) => t.replace(/^\+/, '').replace(/\+$/, ''))
+		.flatMap((t) => (t.indexOf(':') > 0 ? [{ type: t.slice(0, t.indexOf(':')), value: t.slice(t.indexOf(':') + 1) }] : []));
+
+/** The selection text a preset writes into the box. */
+export function presetText(row: RerunRow, runId: string): string {
+	if (row.mode === 'all') return `run:${runId}`;
+	if (row.mode === 'from_failure') return `failed:${runId}+`;
+	return row.nodes.map((n) => (row.key === 'check' ? `audit:${n}` : n)).join(' ');
 }
 
-/** The rows the box's text runs: the checks it names, then the nodes it selects, each with its last result in this run. */
+/** The runs a selection reruns from (`run:`, `failed:`, `skipped:`), as written: the provenance a plan shows. */
+export function runsNamed(text: string): string[] {
+	return [...new Set(typed(text).filter((t) => RUN_TYPES.includes(t.type)).map((t) => t.value))];
+}
+
+/** A written run ID (full, or a prefix of 8 or more) is this run's. */
+export const namesRun = (written: string, runId: string) => written === runId || (written.length >= 8 && runId.startsWith(written));
+
+/** The rows the box's text runs: the audits it names, then the nodes it selects, each with its last result in that run. */
 export function rerunItems(text: string, nodeKeys: readonly string[], detail: RunDetail, failures: readonly RunFailure[]): RerunItem[] {
 	const failed = new Map(failures.filter((f) => f.kind === 'check').map((f) => [f.name, f]));
-	const whole = text.trim() === detail.selection.join(' ');
-	const named = text.split(/\s+/).filter((t) => t.startsWith('check:')).map((t) => t.slice(6));
-	// The whole run reruns its checks too; the failed ones are the ones this run knows about.
-	const checkNames = [...new Set([...named, ...(whole ? failed.keys() : [])])];
+	const audits = new Set<string>();
+	for (const t of typed(text)) {
+		if (t.type === 'audit') audits.add(t.value);
+		// `failed:` and `run:` bring the run's failed audits with them.
+		if ((t.type === 'failed' || t.type === 'run') && namesRun(t.value, detail.run.id)) for (const name of failed.keys()) audits.add(name);
+	}
 	const status = new Map(detail.nodes.map((n) => [n.nodeKey, n.status]));
 	return [
-		...checkNames.map((name): RerunItem => ({ key: `check:${name}`, name, kind: 'check', where: failed.get(name)?.where ?? null, last: failed.has(name) ? 'failed' : null })),
+		...[...audits].map((name): RerunItem => ({ key: `audit:${name}`, name, kind: 'audit', where: failed.get(name)?.where ?? null, last: failed.has(name) ? 'failed' : null })),
 		...nodeKeys.map((key): RerunItem => ({ key, name: nodeLabel(key), kind: 'node', where: null, last: status.get(key) ?? null }))
 	];
 }

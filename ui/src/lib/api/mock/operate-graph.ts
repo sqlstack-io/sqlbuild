@@ -203,6 +203,42 @@ function inDir(n: SnapshotNode, dir: string): boolean {
 	return rooted && (dirOf(n) === at || dirOf(n).startsWith(`${at}/`));
 }
 
+/** What `run:`, `failed:` and `skipped:` read: a run's own nodes by result (set by the run store). */
+export type RunResults = { selected: string[]; failed: string[]; skipped: string[]; failedAudits: string[] };
+let runIdsKnown: () => string[] = () => [];
+let runResultsOf: (id: string) => RunResults | null = () => null;
+export function setRunResolver(ids: () => string[], results: (id: string) => RunResults | null) {
+	runIdsKnown = ids;
+	runResultsOf = results;
+}
+
+/** A run ID, or a unique prefix of at least 8 characters, as the run it names; a refusal reads why. */
+export function resolveRunId(text: string): { id: string } | { error: string } {
+	const ids = runIdsKnown();
+	if (ids.includes(text)) return { id: text };
+	if (text.length < 8) return { error: `run ID prefix '${text}' is shorter than 8 characters` };
+	const hits = ids.filter((id) => id.startsWith(text));
+	if (hits.length === 1) return { id: hits[0] };
+	return { error: hits.length ? `run ID prefix '${text}' matches ${hits.length} runs: ${hits.join(', ')}` : `no run '${text}'` };
+}
+
+/** The audits a selection names: `audit:<name>`, and the failed audits of each `failed:` or `run:` run. */
+export function auditsSelected(select: string): string[] {
+	const out = new Set<string>();
+	for (const token of select.split(/\s+/)) {
+		const body = token.replace(/^\+/, '').replace(/\+$/, '');
+		const colon = body.indexOf(':');
+		if (colon < 0) continue;
+		const [type, value] = [body.slice(0, colon), body.slice(colon + 1)];
+		if (type === 'audit' && END_CHECKS.has(value)) out.add(value);
+		if (type === 'failed' || type === 'run') {
+			const run = resolveRunId(value);
+			if ('id' in run) for (const a of runResultsOf(run.id)?.failedAudits ?? []) out.add(a);
+		}
+	}
+	return [...out];
+}
+
 /** `job:<key>`: the job's nodes, as `operate.ts` resolves them (set there, which imports this module). */
 let jobNodesOf: (key: string) => string[] = () => [];
 export function setJobResolver(resolve: (key: string) => string[]) {
@@ -215,7 +251,9 @@ function matchPart(part: string): Set<string> | null {
 	const down = part.endsWith('+') && part.length > 1;
 	const body = part.replace(/^\+/, '').replace(/\+$/, '');
 	const [type, value] = body.includes(':') ? [body.slice(0, body.indexOf(':')), body.slice(body.indexOf(':') + 1)] : ['name', body];
-	const jobKeys = type === 'job' ? new Set(jobNodesOf(value)) : null;
+	const run = type === 'run' || type === 'failed' || type === 'skipped' ? resolveRunId(value) : null;
+	const results = run && 'id' in run ? runResultsOf(run.id) : null;
+	const jobKeys = type === 'job' ? new Set(jobNodesOf(value)) : results ? new Set(type === 'run' ? results.selected : type === 'failed' ? results.failed : results.skipped) : null;
 	const base = SNAPSHOT_NODES.filter((n) =>
 		jobKeys ? jobKeys.has(n.key) :
 		type === 'tag' ? n.tags.includes(value) : type === 'kind' ? selectorKind(n) === value : type === 'path' ? inDir(n, value) : n.key === value
@@ -235,8 +273,16 @@ export function evaluateMockSelection(select: string, exclude: string): { keys: 
 		const chosen = new Set<string>();
 		for (const match of text.matchAll(/\S+/g)) {
 			const token = match[0];
-			// An end-of-build check named as a rerun target selects itself, not nodes (the server needs this too).
-			if (END_CHECKS.has(token.replace(/^check:/, '')) && token.startsWith('check:')) continue;
+			// An audit selects itself, not nodes; so does a run whose failures are audits only (the server needs this too).
+			if (token.startsWith('audit:') && END_CHECKS.has(token.slice(6))) continue;
+			const runPart = /^(failed|skipped|run):([^,+]+)\+?$/.exec(token);
+			if (runPart) {
+				const run = resolveRunId(runPart[2]);
+				if ('error' in run) return { code: 'S007', message: run.error, help: null, location: { field, token, start: match.index, end: match.index + token.length }, suggestions: [], refused: { part: 0, type: runPart[1], value: runPart[2] } };
+				const found = matchPart(token);
+				for (const key of found ?? []) chosen.add(key);
+				continue;
+			}
 			let hits = null as Set<string> | null;
 			for (const [index, part] of token.split(',').entries()) {
 				const found = matchPart(part);
@@ -258,7 +304,7 @@ export function evaluateMockSelection(select: string, exclude: string): { keys: 
 	const excluded = resolve('exclude', exclude);
 	if (!(excluded instanceof Set)) return { keys: [], error: excluded };
 	const keys = [...selected].filter((key) => !excluded.has(key)).sort();
-	const namesCheck = select.split(/\s+/).some((t) => t.startsWith('check:') && END_CHECKS.has(t.slice(6)));
+	const namesCheck = auditsSelected(select).length > 0;
 	if (!keys.length && namesCheck) return { keys, error: null };
 	if (!keys.length) return { keys, error: { code: null, message: 'the selectors match no nodes in the current publication', help: null, location: null, suggestions: [], refused: null } };
 	return { keys, error: null };

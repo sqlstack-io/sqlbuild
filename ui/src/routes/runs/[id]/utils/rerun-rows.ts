@@ -8,7 +8,7 @@ export type RerunRow = {
 	key: string;
 	label: string;
 	description: string;
-	/** How much it runs, such as `1 check` or `93 nodes`. */
+	/** How much it runs, such as `1 audit` or `93 nodes`. */
 	count: string;
 	mode: 'from_failure' | 'selected' | 'all';
 	/** The nodes or checks a `selected` row runs. */
@@ -26,11 +26,11 @@ export function rerunRows({ failures, unfinished, total, jobKey }: { failures: r
 	const runsAgain = [...unfinished, ...checks.map((c) => `check:${c.name}`)].sort();
 	const candidates: (RerunRow & { runs: string[] })[] = [];
 	if (runsAgain.length) {
-		const parts = [unfinished.length ? count(unfinished.length, 'node', 'nodes') : null, checks.length ? count(checks.length, 'check', 'checks') : null].filter(Boolean);
+		const parts = [unfinished.length ? count(unfinished.length, 'node', 'nodes') : null, checks.length ? count(checks.length, 'audit', 'audits') : null].filter(Boolean);
 		candidates.push({
 			key: 'unfinished',
 			label: "Rerun what didn't succeed",
-			description: unfinished.length ? 'Failed, cancelled and skipped nodes, and failed checks' : `The failed ${checks.length === 1 ? `check ${firstCheck.name}` : 'checks'}`,
+			description: unfinished.length ? 'Failed, cancelled and skipped nodes, and failed audits' : `The failed ${checks.length === 1 ? `audit ${firstCheck.name}` : 'audits'}`,
 			count: parts.join(' · '),
 			mode: 'from_failure',
 			nodes: [],
@@ -39,13 +39,13 @@ export function rerunRows({ failures, unfinished, total, jobKey }: { failures: r
 	}
 	if (firstNode?.nodeKey) {
 		const name = nodeLabel(firstNode.nodeKey);
-		candidates.push({ key: 'node', label: 'Rerun the failed node and its checks', description: name, count: '1 node', mode: 'selected', nodes: [name], runs: [firstNode.nodeKey] });
+		candidates.push({ key: 'node', label: 'Rerun the failed node and its audits', description: name, count: '1 node', mode: 'selected', nodes: [name], runs: [firstNode.nodeKey] });
 	}
 	if (firstCheck) {
 		const where = firstCheck.where === 'after the build' ? 'after the build' : `on ${firstCheck.where}`;
-		candidates.push({ key: 'check', label: 'Rerun the failed check only', description: `${firstCheck.name}, ${where}`, count: '1 check', mode: 'selected', nodes: [firstCheck.name], runs: [`check:${firstCheck.name}`] });
+		candidates.push({ key: 'check', label: 'Rerun the failed audit only', description: `${firstCheck.name}, ${where}`, count: '1 audit', mode: 'selected', nodes: [firstCheck.name], runs: [`check:${firstCheck.name}`] });
 	}
-	candidates.push({ key: 'all', label: 'Rerun the whole run', description: jobKey ? `Every node and check of ${jobKey}` : 'Every node and check of the selection', count: count(total, 'node', 'nodes'), mode: 'all', nodes: [], runs: ['*'] });
+	candidates.push({ key: 'all', label: 'Rerun the whole run', description: jobKey ? `Every node and audit of ${jobKey}` : 'Every node and audit of the selection', count: count(total, 'node', 'nodes'), mode: 'all', nodes: [], runs: ['*'] });
 	const seen = new Set<string>();
 	return candidates.flatMap(({ runs, ...row }) => {
 		const same = runs.join(' ');

@@ -15,12 +15,12 @@ async function open(page: Page, url = RUN) {
 	await expect(summary(page)).toContainText('built', { timeout: 20_000 });
 }
 
-test('the header’s failed-checks figure shows only the failed checks, and again shows everything', async ({ page }) => {
+test('the header’s failed-audits figure shows only the failed audits, and again shows everything', async ({ page }) => {
 	await open(page);
 	const before = await logCount(page);
-	const figure = summary(page).getByRole('link', { name: '1 check failed' });
+	const figure = summary(page).getByRole('link', { name: '1 audit failed' });
 	await figure.click();
-	await expect(page.getByTestId('log-filter-active')).toContainText('Showing failed checks · 1 of');
+	await expect(page.getByTestId('log-filter-active')).toContainText('Showing failed audits · 1 of');
 	await expect(figure).toHaveAttribute('aria-current', 'true');
 	await figure.click();
 	await expect(page.getByTestId('log-filter-active')).toHaveCount(0);
@@ -89,3 +89,20 @@ for (const how of ['✕', 'Esc'] as const) {
 		await expect(logFilter(page)).toBeFocused();
 	});
 }
+
+// The rerun plan holds no state of its own: it opens on failed:<run>+, a suggestion only rewrites the
+// box, and "from run" is read from the selection.
+test('the rerun plan opens on failed:<run>+ and its suggestions rewrite the box', async ({ page }) => {
+	await page.goto('/plan/rerun?run=run-pa93&mode=from_failure&mock&failure-mock');
+	const box = page.locator('.sel-field').first();
+	await expect(box).toContainText('failed:run-pa93+', { timeout: 20_000 });
+	await expect(page.getByTestId('rerun-of')).toHaveCount(0);
+	await expect(page.getByTestId('rerun-from')).toContainText('from run');
+	await expect(page.getByRole('cell', { name: 'orders_match_payments' })).toBeVisible();
+	await page.getByTestId('rerun-suggestions').getByRole('button', { name: /Whole run/ }).click();
+	await expect(box).toContainText('run:run-pa93');
+	await expect(box).not.toContainText('failed:');
+	await page.getByRole('button', { name: 'Clear selection' }).click();
+	await selector(page).fill('country_codes ');
+	await expect(page.getByTestId('rerun-from')).toHaveCount(0);
+});

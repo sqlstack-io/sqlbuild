@@ -108,8 +108,8 @@ export function runFailures(nodes: readonly RunNode[], events: readonly RunEvent
 	return [...checks, ...failedNodes].sort((a, b) => a.at.localeCompare(b.at)).map(({ at: _at, ...f }) => f);
 }
 
-/** A failure's one line: `Failed: check orders_match_payments after the build · input not built in prod`. */
+/** A failure's one line: `Failed: audit orders_match_payments after the build · input not built in prod`. */
 export function failureLine(f: RunFailure): string {
-	const what = f.kind === 'check' ? `check ${f.name}${f.where ? ` ${f.where === 'after the build' ? f.where : `on ${f.where}`}` : ''}` : f.name;
+	const what = f.kind === 'check' ? `audit ${f.name}${f.where ? ` ${f.where === 'after the build' ? f.where : `on ${f.where}`}` : ''}` : f.name;
 	return [`Failed: ${what}`, f.cause ?? errorLine(f.message)].join(' · ');
 }

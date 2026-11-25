@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { noun, plural } from '$lib/format/plural';
 	import HelpTip from '$lib/components/help-tip.svelte';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import PageBody from '$lib/components/page-body.svelte';
 	import DataTable from '$lib/components/list/data-table.svelte';
 	import type { TableColumn } from '$lib/components/list/table-columns';
@@ -31,7 +32,7 @@
 	import SelectionBar from '$lib/components/selection/selection-bar.svelte';
 	import { createSelection } from '$lib/state/selection.svelte';
 	import { nodeLabel } from '$lib/operate/labels';
-	import { presetText, rerunItems, type RerunItem } from './utils/rerun-plan';
+	import { namesRun, presetText, rerunItems, runsNamed, type RerunItem } from './utils/rerun-plan';
 
 	const runIds = page.url.searchParams.getAll('run');
 	const picked = page.url.searchParams.getAll('node');
@@ -60,25 +61,27 @@
 	const runStatements = createResource((client, scope) => (single && client.supports('listRunStatements') ? client.listRunStatements(scope, runIds[0]) : Promise.resolve([])), runIds.map((id) => `run:${id}`));
 	const failures = $derived(first ? runFailures(first.nodes, runEvents.data ?? [], runStatements.data ?? [], first.run.target) : []);
 	const presets = $derived(first ? rerunRows({ failures, unfinished: first.rerunFromFailureNodes, total: first.nodes.length, jobKey: first.run.jobKey }) : []);
-	const textOf = (r: RerunRow) => (first ? presetText(r, first, failures) : '');
+	const textOf = (r: RerunRow) => (first ? presetText(r, first.run.id) : '');
 	const selection = createSelection({ initial: { select: '', exclude: '' } });
 	let filled = false;
 	$effect(() => {
 		if (filled || !first || !runEvents.data || !presets.length) return;
 		filled = true;
-		const wanted = requested === 'all' ? 'all' : requested === 'from_failure' ? 'unfinished' : picked.some((n) => failures.some((f) => f.kind === 'check' && f.name === n)) ? 'check' : 'node';
-		const row = presets.find((r) => r.key === wanted) ?? presets.find((r) => r.mode === requested) ?? presets[0];
-		selection.select = textOf(row);
+		// Rerun opens on `failed:<run>+`; a whole-run or one-node rerun opens on its own text.
+		const wanted = requested === 'all' ? 'all' : requested === 'selected' ? (picked.some((n) => failures.some((f) => f.kind === 'check' && f.name === n)) ? 'check' : 'node') : 'unfinished';
+		const row = presets.find((r) => r.key === wanted);
+		selection.select = row ? textOf(row) : `failed:${first.run.id}+`;
 	});
 	/** The preset whose text the box holds, if any; edited text reruns exactly what it names. */
 	const activePreset = $derived(presets.find((r) => textOf(r) === selection.select.trim()) ?? null);
-	const nodeKeys = $derived(selection.keys ? [...selection.keys].filter((k) => first?.nodes.some((n) => n.nodeKey === k) || !activePreset || activePreset.mode !== 'all') : []);
+	const nodeKeys = $derived(selection.keys ? [...selection.keys] : []);
 	const items = $derived<RerunItem[]>(first ? rerunItems(selection.select, nodeKeys, first, failures) : []);
-	const checkCount = $derived(items.filter((i) => i.kind === 'check').length);
-	const nodeCount = $derived(items.length - checkCount);
-	const headerLook = $derived(page.url.searchParams.get('header') ?? 'a');
+	const auditCount = $derived(items.filter((i) => i.kind === 'audit').length);
+	const nodeCount = $derived(items.length - auditCount);
+	/** Where the plan came from, read from the selection alone: the runs its `run:`, `failed:` and `skipped:` name. */
+	const fromRuns = $derived(runsNamed(selection.select));
 	const nodesOf = (d: RunDetail): string[] =>
-		single ? items.map((i) => (i.kind === 'check' ? i.name : nodeLabel(i.key))) : mode === 'from_failure' ? d.rerunFromFailureNodes : d.selection;
+		single ? items.map((i) => (i.kind === 'audit' ? i.name : nodeLabel(i.key))) : mode === 'from_failure' ? d.rerunFromFailureNodes : d.selection;
 	const blockedOf = (d: RunDetail): string | null => rerunChoices(d, [], can).find((c) => c.mode === (mode === 'selected' ? 'all' : mode))?.disabledReason ?? null;
 	const rows = $derived((details.data ?? []).filter((d) => !done.has(d.run.id)).map((d) => ({ detail: d, nodes: nodesOf(d), blocked: blockedOf(d) })));
 	const ready = $derived(rows.filter((r) => !r.blocked && r.nodes.length));
@@ -129,13 +132,13 @@
 	}
 
 	const what = (d: RunDetail) => d.run.jobKey ?? 'ad-hoc run';
-	/** A preset's short name in the segmented control: "What didn't succeed", "Failed check only", "Whole run". */
+	/** A suggestion's short name: "What didn't succeed", "Failed audit only", "Whole run". */
 	const presetLabel = (r: RerunRow) => {
 		const text = r.label.replace(/^Rerun /, '').replace(/^the /, '');
 		return text.charAt(0).toUpperCase() + text.slice(1);
 	};
 	const nodeColumns: TableColumn[] = [
-		{ id: 'node', label: 'Node or check', minWidth: 200 },
+		{ id: 'node', label: 'Node or audit', minWidth: 200 },
 		{ id: 'kind', label: 'Kind', width: '30%' },
 		{ id: 'last', label: 'Last result', width: '160px' }
 	];
@@ -150,37 +153,20 @@
 
 <div class="flex min-h-0 flex-1 flex-col">
 	{#if single && first}
-		{@const short = shortRunId(first.run.id)}
-		{@const counted = [nodeCount ? plural(nodeCount, 'node') : null, checkCount ? plural(checkCount, 'check') : null].filter(Boolean).join(' · ') || 'nothing'}
-		{#snippet presetsControl()}
-			<SegmentedFilter
-				label="What to rerun"
-				value={activePreset?.key ?? ''}
-				options={presets.map((r) => ({ value: r.key, label: presetLabel(r), title: r.description }))}
-				onselect={(key: string) => {
-					const r = presets.find((x) => x.key === key);
-					if (r) selection.select = textOf(r);
-				}}
-			/>
-		{/snippet}
-		<!-- Mock-up: three headers to compare, with ?header=a|b|c. -->
-		<div class="head head-{headerLook}" data-testid="rerun-of">
-			{#if headerLook === 'b'}
-				<nav class="crumbs" aria-label="Breadcrumb"><a href={to('/runs')}>Runs</a><span>/</span><a href={to(`/runs/${first.run.id}`)}>{short}</a><span>/</span><span>Rerun</span></nav>
-				<h2>Plan · {counted}</h2>
-				<div class="row">{@render presetsControl()}<HelpTip text="Repeats the run's own version and settings, as frozen when it started" label="About rerunning" /></div>
-			{:else if headerLook === 'c'}
-				<div class="row">
-					<span class="line"><RotateCwIcon size={14} /> Rerun <a class="mono" href={to(`/runs/${first.run.id}`)}>{short}</a> <span class="faint">({what(first)})</span></span>
-					<span class="push">{@render presetsControl()}</span>
-				</div>
-			{:else}
-				<h2>Rerun of <a href={to(`/runs/${first.run.id}`)}>{what(first)} · {short}</a></h2>
-				<div class="row">{@render presetsControl()}<HelpTip text="Repeats the run's own version and settings, as frozen when it started" label="About rerunning" /></div>
-			{/if}
-		</div>
+		<!-- The box is the whole plan: Rerun opens it on failed:<run>+, and the suggestions only rewrite its text. -->
 		<div class="pick">
-			<SelectionBar {selection} names={first.nodes.map((n) => ({ value: nodeLabel(n.nodeKey), hint: n.kind ?? '' }))} total={first.nodes.length} build={false} copy={false} />
+			<SelectionBar {selection} names={first.nodes.map((n) => ({ value: nodeLabel(n.nodeKey), hint: n.kind ?? '' }))} total={first.nodes.length} build={false} />
+			{#if presets.length}
+				<div class="suggest" data-testid="rerun-suggestions">
+					<span class="faint">Suggestions</span>
+					{#each presets as r (r.key)}
+						{@const text = textOf(r)}
+						<Button variant="link" size="inline" class={activePreset?.key === r.key ? 'sb-pressed text-[12.5px]' : 'text-[12.5px]'} aria-pressed={activePreset?.key === r.key} title={r.description} onclick={() => (selection.select = text)}>
+							{presetLabel(r)} <code class="mono faint">{text}</code>
+						</Button>
+					{/each}
+				</div>
+			{/if}
 		</div>
 	{:else}
 	<div class="cmd">
@@ -216,7 +202,7 @@
 				<div class="loading" role="status"><RotateCwIcon size={14} class="animate-spin" /> Loading the run…</div>
 			{:else if single && first}
 				<div class="summary">
-					{#if nodeCount || !checkCount}<b>{nodeCount}</b> {noun(nodeCount, 'node')}<span>·</span>{/if}{#if checkCount}<b>{checkCount}</b> {noun(checkCount, 'check')}<span>·</span>{/if}{runStatusLabel[first.run.status].toLowerCase()} {formatAgo(first.run.endedAt, app.now)}
+					{#if nodeCount || !auditCount}<b>{nodeCount}</b> {noun(nodeCount, 'node')}{/if}{#if nodeCount && auditCount}<span>·</span>{/if}{#if auditCount}<b>{auditCount}</b> {noun(auditCount, 'audit')}{/if}{#each fromRuns as written (written)}{@const known = namesRun(written, first.run.id)}<span>·</span><span data-testid="rerun-from">from run {#if known}<a class="mono" href={to(`/runs/${first.run.id}`)}>{shortRunId(first.run.id)}</a> <span class="faint">({what(first)}, {runStatusLabel[first.run.status].toLowerCase()} {formatAgo(first.run.endedAt, app.now)})</span>{:else}<span class="mono">{written}</span>{/if}</span>{/each}
 					<div class="tabs"><SegmentedFilter label="View" bind:value={view} options={[{ value: 'nodes', label: 'List' }, { value: 'graph', label: 'Graph' }]} /></div>
 				</div>
 				{#if view === 'graph' && catalog.data}
@@ -226,8 +212,8 @@
 						{#snippet row(item)}
 							{@const node = byKey.get(item.key)}
 							<tr>
-								<td>{#if item.kind === 'check'}<a href={to(`/checks?q=${item.name}`)} class="mono">{item.name}</a>{:else}<a href={to(`/catalog/${item.key}`)} class="mono">{item.name}</a>{/if}</td>
-								<td class="faint">{item.kind === 'check' ? `Check${item.where ? ` · ${item.where}` : ''}` : node ? kindLine(node) : ''}</td>
+								<td>{#if item.kind === 'audit'}<a href={to(`/checks?q=${item.name}`)} class="mono">{item.name}</a>{:else}<a href={to(`/catalog/${item.key}`)} class="mono">{item.name}</a>{/if}</td>
+								<td class="faint">{item.kind === 'audit' ? `Audit${item.where ? ` · ${item.where}` : ''}` : node ? kindLine(node) : ''}</td>
 								<td class:bad-text={item.last === 'failed'} class:faint={item.last !== 'failed'}>{item.last === 'success' ? 'built' : item.last ? item.last.replace('_', ' ') : '—'}</td>
 							</tr>
 						{/snippet}
@@ -266,48 +252,6 @@
 </div>
 
 <style>
-	.head {
-		display: flex;
-		flex-direction: column;
-		gap: 10px;
-		padding: 16px 24px 12px;
-		border-bottom: 1px solid var(--border-subtle);
-	}
-	.head h2 {
-		font-family: var(--font-display);
-		font-size: 18px;
-		font-weight: 600;
-	}
-	.head h2 a:hover {
-		color: var(--primary);
-	}
-	.head .row {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-	}
-	.head .crumbs {
-		display: flex;
-		gap: 6px;
-		color: var(--muted-foreground);
-		font-size: 12.5px;
-	}
-	.head .crumbs a:hover {
-		color: var(--foreground);
-	}
-	.head-c {
-		padding: 10px 24px;
-	}
-	.head-c .line {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		font-size: 14px;
-		font-weight: 500;
-	}
-	.head-c .push {
-		margin-left: auto;
-	}
 	.mono {
 		font-family: var(--font-mono);
 		font-size: 12.5px;
@@ -315,6 +259,14 @@
 	.pick {
 		padding: 4px 14px;
 		border-bottom: 1px solid var(--border-subtle);
+	}
+	.suggest {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 4px 14px;
+		padding: 2px 10px 8px;
+		font-size: 12.5px;
 	}
 	.pick :global(.selection-bar) {
 		border-bottom: none;
