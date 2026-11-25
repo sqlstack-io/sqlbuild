@@ -1672,3 +1672,13 @@ class MidSubmitCancelTestCase:
     sent_signal: signal.Signals
     expected_exit_code: int
     expected_notice: str
+
+
+@dataclass(frozen=True)
+class RunSelectorPlanTestCase:
+    description: str
+    # The plan's selectors; `{run}` is the failed run's ID, `{prefix}` its first 8 characters.
+    selectors: tuple[str, ...]
+    expected_models: list[str]
+    expected_audits: list[str]
+    expected_error: str | None = None
