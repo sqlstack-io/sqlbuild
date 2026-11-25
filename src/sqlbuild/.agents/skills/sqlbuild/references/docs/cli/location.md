@@ -63,14 +63,20 @@ new code. Once that load finishes, the state comes from it: `falling_back` if it
 `healthy` or one of the states above. For an instance that started more than 7 days ago, whose
 first reports are no longer kept, the state comes from the location's newest reports of any instance.
 
-A Compose health check for the location service:
+A container health check asks whether the location is alive, not whether the newest code has
+loaded: pass `--allow-starting`, which exits `0` while the state is `starting` and leaves every other
+exit code as it is. Whether a deploy's new code loaded is the deploy's cutover check: poll
+`sqb location health` without the flag until it exits `0`. A Compose health check for the location
+service, as the shipped `compose.yml` has:
 
 ```yaml
 healthcheck:
-  test: [CMD, sqb, location, health, --server, "http://server:8000", --location-id, "${SQLBUILD_LOCATION_ID}", --target, development]
+  test: [CMD, sqb, location, health, --allow-starting, --server, "http://server:8000", --location-id, "${SQLBUILD_LOCATION_ID}", --target, development]
   interval: 30s
   start_period: 60s
 ```
+
+A Quadlet unit uses the same command in `HealthCmd=`.
 
 A `falling_back` location still runs scheduled jobs from its last good snapshot. Restarting it
 does not fix the failed load; fix the project and deploy it again. Plan previews on it fail at once

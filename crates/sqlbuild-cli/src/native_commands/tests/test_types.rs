@@ -484,6 +484,7 @@ pub(super) struct CheckGraceTestCase {
 pub(crate) struct HealthExitTestCase {
     pub(crate) description: &'static str,
     pub(crate) state: sqlbuild_orchestration::platform::models::LocationState,
+    pub(crate) allow_starting: bool,
     pub(crate) expected_code: i32,
 }
 

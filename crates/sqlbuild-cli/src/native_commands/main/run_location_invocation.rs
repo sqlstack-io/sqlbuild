@@ -11,7 +11,7 @@ use crate::native_commands::_helpers::location::health::health_exit_code;
 use uuid::Uuid;
 
 use crate::argv::models::{Namespace, Stream};
-use crate::native_commands::_helpers::command::decision::text;
+use crate::native_commands::_helpers::command::decision::{flag, text};
 use crate::native_commands::_helpers::command::terminal::write_output;
 use crate::native_commands::_helpers::location::execution::location_options;
 use crate::native_commands::_helpers::location::republish_command::run_republish;
@@ -84,7 +84,7 @@ fn location_health(namespace: &Namespace) -> i32 {
                 (Stream::Stdout, &format!("{document}\n")),
                 (Stream::Stderr, "Location health checked successfully\n"),
             ]));
-            health_exit_code(state)
+            health_exit_code(state, flag(namespace, "location_allow_starting"))
         }
         Err(error) => {
             drop(write_output(&[(
