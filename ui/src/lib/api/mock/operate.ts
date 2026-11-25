@@ -957,6 +957,7 @@ export function createOperateFixtures(now: number): OperateFixtures {
 			rerunOfRunId: seed.rerunOf ?? null,
 			memberAttempt: null,
 			narrowing: null,
+			command: null,
 			window: null,
 			requestedBy: seed.by,
 			priority: seed.priority ?? job?.priority ?? 0,

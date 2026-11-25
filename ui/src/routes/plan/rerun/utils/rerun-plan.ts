@@ -10,14 +10,6 @@ import type { RunFailure } from '../../../runs/[id]/utils/run-failures';
 
 export type RerunItem = { key: string; name: string; kind: 'audit' | 'node'; where: string | null; last: string | null };
 
-const RUN_TYPES = ['run', 'failed', 'skipped'];
-const typed = (text: string) =>
-	text
-		.split(/\s+/)
-		.filter(Boolean)
-		.map((t) => t.replace(/^\+/, '').replace(/\+$/, ''))
-		.flatMap((t) => (t.indexOf(':') > 0 ? [{ type: t.slice(0, t.indexOf(':')), value: t.slice(t.indexOf(':') + 1) }] : []));
-
 /** The selection text a preset writes into the box. */
 export function presetText(row: RerunRow, runId: string): string {
 	if (row.mode === 'all') return `run:${runId}`;
@@ -31,11 +23,6 @@ export function openingText(mode: RerunMode, picked: readonly string[], runId: s
 	if (mode === 'all') return `run:${runId}`;
 	if (mode === 'selected' && picked.length) return picked.map((n) => (audits.has(n) ? `audit:${n}` : n)).join(' ');
 	return `failed:${runId}+`;
-}
-
-/** The runs a selection reruns from (`run:`, `failed:`, `skipped:`), as written: the provenance a plan shows. */
-export function runsNamed(text: string): string[] {
-	return [...new Set(typed(text).filter((t) => RUN_TYPES.includes(t.type)).map((t) => t.value))];
 }
 
 /** A written run ID (full, or a prefix of 8 or more) is this run's. */

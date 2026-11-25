@@ -32,8 +32,8 @@
 	import { createSelection } from '$lib/state/selection.svelte';
 	import type { SuggestionItem } from '$lib/selection/suggest';
 	import { nodeLabel } from '$lib/operate/labels';
-	import { buildRequest, copyCommand } from '$lib/selection/command';
-	import { namesRun, openingText, presetSuggestions, rerunItems, runsNamed, type RerunItem } from './utils/rerun-plan';
+	import { buildRequest, copyCommand, runsNamed } from '$lib/selection/command';
+	import { namesRun, openingText, presetSuggestions, rerunItems, type RerunItem } from './utils/rerun-plan';
 
 	const runIds = page.url.searchParams.getAll('run');
 	const picked = page.url.searchParams.getAll('node');

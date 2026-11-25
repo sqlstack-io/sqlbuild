@@ -165,6 +165,7 @@ export function toRun(wire: Wire['RunRecord'], locationId: string, childRunCount
 		rerunOfRunId: wire.rerun_of_run_id ?? null,
 		memberAttempt: wire.member_attempt ?? null,
 		narrowing: wire.narrowing ?? null,
+		command: wire.command ?? null,
 		window: wire.window ? { start: String(wire.window.start), end: String(wire.window.end) } : null,
 		requestedBy: requesterOf(wire),
 		priority: wire.priority,

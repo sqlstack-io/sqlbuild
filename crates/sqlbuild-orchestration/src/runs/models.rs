@@ -322,6 +322,13 @@ pub struct RunRecord {
         deserialize_with = "crate::runs::_helpers::lifecycle::narrowing::frozen_member_attempt"
     )]
     pub member_attempt: Option<u8>,
+    /// An ad-hoc run's command as the person typed it, as argument tokens after `sqb`; absent for every other run.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::runs::_helpers::lifecycle::narrowing::authored_command"
+    )]
+    pub command: Option<Vec<String>>,
 }
 
 /// A queued run's place in claim order within its location and target, and what holds it back.

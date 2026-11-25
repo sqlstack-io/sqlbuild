@@ -138,6 +138,15 @@ test('the rerun plan opens on failed:<run>+ and the box suggests the run selecto
 	await expect(page).toHaveURL(/\/runs\/(?!run-pa93)[^/?]+/);
 });
 
+// A rerun is an ad-hoc run of its selection, so the run it starts says which run it came from.
+test('a rerun started from the rerun plan says which run it came from', async ({ page }) => {
+	await page.goto('/plan/rerun?run=run-pa93&mode=from_failure&mock');
+	await expect(page.getByTestId('rerun-command')).toHaveText('sqb build -s failed:run-pa93+', { timeout: 20_000 });
+	await page.getByRole('button', { name: 'Run', exact: true }).click();
+	await expect(page).toHaveURL(/\/runs\/(?!run-pa93)[^/?]+/);
+	await expect(page.getByText('from run pa93')).toBeVisible({ timeout: 20_000 });
+});
+
 // A failed audit's warehouse error is read from its result (behind view.evidence), not from the run's
 // listings: the summary line gives the cause, and opened, the SQLSTATE and the warehouse's sentence.
 test('the failure summary shows a failed audit’s warehouse error', async ({ page }) => {

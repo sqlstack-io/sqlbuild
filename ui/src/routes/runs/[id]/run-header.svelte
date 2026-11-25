@@ -6,6 +6,7 @@
 	import { formatAgo, formatDuration, formatStamp } from '$lib/format/time';
 	import { narrowingText, shortRunId } from '$lib/operate/labels';
 	import { app } from '$lib/state/app.svelte';
+	import { runsNamed } from '$lib/selection/command';
 	import { runKindLabel, runOriginLabel } from '$lib/status';
 	import RunSummary from './run-summary.svelte';
 	import RerunMenu from './rerun-menu.svelte';
@@ -23,6 +24,10 @@
 	/** A group's member that never started: "not started", never "skipped". */
 	const notStarted = $derived(!!run?.parentRunId && run.status === 'skipped' && !run.startedAt);
 	type Fact = { text: string; href?: string; title?: string; live?: boolean };
+	/** A full run ID links to its run; a typed prefix is shown as written. */
+	const FULL_RUN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+	/** The past runs an ad-hoc run's command reran from, read from its command alone. */
+	const fromRuns = $derived(run?.command ? runsNamed(run.command.join(' ')) : []);
 	/** The first line's facts, in order; a missing one leaves no separator behind. */
 	const facts = $derived.by((): Fact[] => {
 		if (!run) return [];
@@ -34,6 +39,7 @@
 					? { text: `rerun of ${shortRunId(run.rerunOfRunId)}`, href: `/runs/${run.rerunOfRunId}` }
 					: { text: runOriginLabel[run.origin].toLowerCase() },
 			run.narrowing ? { text: `part: ${narrowingText(run.narrowing)}`, title: `Ran part of ${run.jobKey}` } : null,
+			...fromRuns.map((written): Fact => ({ text: `from run ${shortRunId(written)}`, href: FULL_RUN_ID.test(written) ? `/runs/${written}` : undefined, title: `sqb ${run.command?.join(' ')}` })),
 			run.window ? { text: `window ${run.window.start} → ${run.window.end}` } : null,
 			retried ? { text: `${retried} retried`, title: 'Member jobs the group retried inside this run' } : null,
 			{ text: `by ${run.requestedBy.displayName}`, title: run.requestedBy.name },

@@ -4476,6 +4476,8 @@ export interface components {
         RunRecord: {
             /** Format: date-time */
             cancel_requested_at?: string | null;
+            /** @description An ad-hoc run's command as the person typed it, as argument tokens after `sqb`; absent for every other run. */
+            command?: string[] | null;
             /** Format: date-time */
             ended_at?: string | null;
             git_dirty?: boolean | null;

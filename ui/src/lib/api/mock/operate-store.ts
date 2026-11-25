@@ -805,7 +805,8 @@ export class MockOperate {
 			flags: parts.flags,
 			nodes: check.writeSet.length ? check.writeSet : check.selection.filter((n) => snapshotNode(n)?.kind !== 'source'),
 			priority: request.priority,
-			verb: parts.verb
+			verb: parts.verb,
+			command: request.command
 		});
 		this.#ctx.changes.emit('runs');
 		return this.#ctx.reply(this.#view(rec, scope));
@@ -1209,6 +1210,7 @@ export class MockOperate {
 		origin: Run['origin'];
 		jobKey: string | null;
 		narrowing?: Run['narrowing'];
+		command?: string[];
 		by: Principal;
 		select: string[];
 		exclude: string[];
@@ -1240,6 +1242,7 @@ export class MockOperate {
 				rerunOfRunId: spec.rerunOf ?? null,
 				memberAttempt: null,
 				narrowing: spec.narrowing ?? null,
+				command: spec.command ?? null,
 				window: null,
 				requestedBy: spec.by,
 				priority: spec.priority,
@@ -1292,9 +1295,17 @@ export class MockOperate {
 		const parts = parseCommand(request.command.join(' '));
 		const unknownFlag = Object.keys(parts.flags).find((f) => !flagSpec(parts.verb, f));
 		if (unknownFlag) return refused(`${unknownFlag} is not available for ad-hoc runs`);
-		const resolution = resolveSelection(parts.select, parts.exclude);
+		// Run and audit selectors resolve as the selection bar's evaluation does; the rest as before.
+		const pastToken = (t: string) => /^\+?(failed|skipped|run|audit):/.test(t);
+		const past = parts.select.filter(pastToken);
+		const plain = parts.select.filter((t) => !pastToken(t));
+		const resolution = plain.length || !past.length ? resolveSelection(plain, parts.exclude.filter((t) => !pastToken(t))) : { nodes: [], unknown: [] };
+		const fromRuns = past.length ? evaluateMockSelection(past.join(' '), parts.exclude.filter(pastToken).join(' ')) : { keys: [], error: null };
+		if (fromRuns.error) return refused(fromRuns.error.message);
 		if (resolution.unknown.length) return refused(`no nodes match selector '${resolution.unknown[0]}'`);
-		if (!resolution.nodes.length) return refused('the selection resolves to no nodes');
+		const audits = fromRuns.keys.filter((k) => k.startsWith('audit:'));
+		resolution.nodes = [...new Set([...resolution.nodes, ...fromRuns.keys.filter((k) => !k.startsWith('audit:'))])];
+		if (!resolution.nodes.length && !audits.length) return refused('the selection resolves to no nodes');
 		const isSource = (n: string) => snapshotNode(n)?.kind === 'source';
 		const isManaged = (n: string) => snapshotNode(n)?.kind === 'loader';
 		const selection =
@@ -1306,7 +1317,7 @@ export class MockOperate {
 						? resolution.nodes.filter(isManaged)
 						: resolution.nodes;
 		const empty = { seed: 'the selectors match no seeds in the current publication', load: 'the selectors match no managed sources in the current publication' } as Partial<Record<LaunchVerb, string>>;
-		if (!selection.length) return refused(empty[parts.verb] ?? 'no sources are selected or upstream of the selection');
+		if (!selection.length && !(audits.length && parts.verb === 'build')) return refused(empty[parts.verb] ?? 'no sources are selected or upstream of the selection');
 		const writable = selection.filter((n) => !isSource(n));
 		const writeSet =
 			parts.verb === 'build'
@@ -1338,7 +1349,7 @@ export class MockOperate {
 		];
 		return {
 			verb: parts.verb,
-			selection,
+			selection: [...selection, ...audits],
 			writeSet,
 			settings,
 			permissions,

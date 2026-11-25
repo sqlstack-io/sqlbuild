@@ -4,7 +4,7 @@ import { backspace, choose, comma, commit, EMPTY, fieldOf, fieldText, finished, 
 import { readingText } from './reading';
 import { parseSelection } from './syntax';
 import { pickedValues, setValuesIn, toggleValueIn } from './picker';
-import { buildHref, copyCommand, problemParts, problemText, problemToken, readSelectionParams, writeSelectionParams } from './command';
+import { buildHref, copyCommand, runsNamed, problemParts, problemText, problemToken, readSelectionParams, writeSelectionParams } from './command';
 import { suggest } from './suggest';
 
 const typing = (s: FieldState, text: string) => ({ ...s, text });
@@ -186,5 +186,14 @@ describe('suggestions', () => {
 
 	it('offers audit names after audit:, as an audit selector takes them', () => {
 		expect(suggest('audit:rev', VOCAB, []).flatMap((g) => g.items.map((i) => i.insert))).toEqual(['audit:revenue_reconciles']);
+	});
+});
+
+describe('runs named', () => {
+	it.each([
+		{ description: 'run selectors in any position, with + and comma parts, once each', text: 'build -s failed:abc12345+ tag:x,run:abc12345 --exclude skipped:def67890', expected: ['abc12345', 'def67890'] },
+		{ description: 'no run selector names no run', text: 'build -s audit:a_matches_c model:b', expected: [] }
+	])('$description', ({ text, expected }) => {
+		expect(runsNamed(text)).toEqual(expected);
 	});
 });

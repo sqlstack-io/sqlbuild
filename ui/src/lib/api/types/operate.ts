@@ -73,6 +73,8 @@ export type Run = {
 	memberAttempt: number | null;
 	/** How a person narrowed this run of a job, as typed; null when it runs the whole job. */
 	narrowing: { select: string[]; exclude: string[] } | null;
+	/** An ad-hoc run's command as typed, as the argument tokens after `sqb`; null for every other run. */
+	command: string[] | null;
 	/** The cursor window a backfill processes, inclusive; null for every other run. */
 	window: { start: string; end: string } | null;
 	requestedBy: Principal;

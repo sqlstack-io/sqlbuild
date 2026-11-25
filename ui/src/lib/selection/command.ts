@@ -44,6 +44,19 @@ export function copyCommand(s: Selection): string {
 	return ['sqb', ...buildRequest(s).command.map(shellWord)].join(' ');
 }
 
+const RUN_TYPES = ['run', 'failed', 'skipped'];
+
+/** The runs a selection or command reruns from (`run:`, `failed:`, `skipped:`), as written: the provenance a plan or run shows. */
+export function runsNamed(text: string): string[] {
+	const runs = text
+		.split(/\s+/)
+		.flatMap((token) => token.split(','))
+		.map((token) => token.replace(/^\+/, '').replace(/\+$/, ''))
+		.filter((token) => RUN_TYPES.includes(token.slice(0, token.indexOf(':'))))
+		.map((token) => token.slice(token.indexOf(':') + 1));
+	return [...new Set(runs)];
+}
+
 /** The plan page with `sqb build -s … [--exclude …]` filled in; its command line splits on spaces, so nothing is quoted. */
 export function buildHref(s: Selection): string {
 	const out = ['sqb', 'build'];
