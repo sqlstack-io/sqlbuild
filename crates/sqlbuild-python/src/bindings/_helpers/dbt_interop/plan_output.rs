@@ -5,6 +5,7 @@ use pyo3::types::{PyDict, PyDictMethods};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_python_base::native_host::models::Dialect;
+use sqlbuild_python_compile::compile_driver::main::setup::publish_plan_summary::publish_plan_summary;
 use sqlbuild_python_planner::live_reads::models::LiveReads;
 
 use crate::bindings::_helpers::command_runtime::connection::anchor_local_database_path;
@@ -247,7 +248,9 @@ pub(crate) fn build_sqlbuild_plan_output<'py>(
         }
     })();
     native_field(&environment, "adapter")?.call_method1("close", (connection,))?;
-    planned
+    let planned: Bound<'py, PyAny> = planned?;
+    publish_plan_summary(&planned, pyo3::types::PyTuple::empty(planned.py()).as_any())?;
+    Ok(planned)
 }
 
 /// Attach live SQLBuild planning when the selection contains SQLBuild models.

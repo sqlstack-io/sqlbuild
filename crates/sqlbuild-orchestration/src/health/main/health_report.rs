@@ -45,6 +45,13 @@ pub fn health_report(health: &ServerHealth, now: DateTime<Utc>) -> HealthReport 
             ),
         )
     }));
+    components.extend(state.forwarding.iter().map(|(name, forwarding)| {
+        component(
+            (HealthComponent::EventForwarding, name),
+            forwarding,
+            (HealthStatus::Degraded, "", health.started_at),
+        )
+    }));
     components.extend(
         state
             .locations

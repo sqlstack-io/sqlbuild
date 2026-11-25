@@ -721,6 +721,12 @@ pub struct PlatformProblems {
     /// Checking-in locations whose run-history sync is failing, until a sync report succeeds.
     #[serde(default)]
     pub failing_syncs: Vec<FailingSync>,
+    /// Lifecycle event sinks whose newest run lost events, until a run delivers all of its events.
+    #[serde(default)]
+    pub failing_sinks: Vec<FailingSink>,
+    /// This server's event webhooks that can't deliver, until one delivers again.
+    #[serde(default)]
+    pub failing_forwarding: Vec<FailingForwarding>,
     pub overdue_ticks: Vec<OverdueTick>,
     /// Running calendar schedules whose dates run out within a day.
     #[serde(default)]
@@ -870,6 +876,70 @@ pub struct FailingSync {
     pub last_success_at: Option<DateTime<Utc>>,
 }
 
+/// An event webhook this server can't deliver to: since when, and why; its events stay queued.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct FailingForwarding {
+    /// Such as `Platform event forwarding`.
+    pub name: String,
+    pub since: DateTime<Utc>,
+    pub reason: String,
+    pub last_success_at: Option<DateTime<Utc>>,
+}
+
+/// A lifecycle event sink whose runs lose events: since its first lossy run in a row, and why.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct FailingSink {
+    pub location_id: Uuid,
+    pub location_name: String,
+    pub target: String,
+    /// The sink's name in the project.
+    pub sink: String,
+    /// The first run in a row whose events it lost.
+    pub since: DateTime<Utc>,
+    /// What it lost, such as `8 of 8 events not delivered (8 failed)`.
+    pub reason: String,
+    /// The newest run whose events it lost.
+    pub run_id: Uuid,
+    /// The newest run before that whose events it all delivered.
+    pub last_success_at: Option<DateTime<Utc>>,
+}
+
+/// A run's report of its sinks' deliveries, with where the run ran.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct SinkReport {
+    pub(crate) location_id: Uuid,
+    pub(crate) location_name: String,
+    pub(crate) target: String,
+    pub(crate) run_id: Uuid,
+    pub(crate) at: DateTime<Utc>,
+    pub(crate) sinks: Vec<crate::runs::models::SinkDelivery>,
+    pub(crate) teardown_failures: Vec<String>,
+}
+
+/// A stored sink delivery report and where its run ran.
+#[derive(Debug, Deserialize)]
+pub(crate) struct SinkReportRow {
+    pub(crate) occurred_at: DateTime<Utc>,
+    pub(crate) payload: SinkReportPayload,
+    pub(crate) location_id: Uuid,
+    pub(crate) location_name: String,
+    pub(crate) target: String,
+}
+
+/// A stored run change's payload.
+#[derive(Debug, Deserialize)]
+pub(crate) struct SinkReportPayload {
+    pub(crate) change: crate::runs::models::RunChangeRequest,
+}
+
+/// A sink's reports read newest first: failing so far, failing before a lossless report, or never failing.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum SinkStreak {
+    Failing(FailingSink),
+    Ended(FailingSink),
+    Clear,
+}
+
 /// A running schedule whose next tick is more than 30 seconds late.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct OverdueTick {
@@ -900,6 +970,7 @@ pub(crate) struct ProblemScan {
     pub(crate) broken: Vec<BrokenLocation>,
     pub(crate) failing: Vec<FailingLocation>,
     pub(crate) failing_syncs: Vec<FailingSync>,
+    pub(crate) failing_sinks: Vec<FailingSink>,
     pub(crate) late_targets: std::collections::BTreeSet<(Uuid, String)>,
     pub(crate) low_calendars: Vec<LowCalendar>,
     pub(crate) skipped_triggers: Vec<SkippedTrigger>,

@@ -43,6 +43,17 @@ describe('toPlatformEvents', () => {
 		]);
 	});
 
+	it('makes a sink that loses events, and a webhook the server can’t deliver to, problems since they began', () => {
+		const sink = { location_id: 'l1', location_name: 'orders', target: 'production', sink: 'kafka', since: '2026-11-08T11:42:00Z', reason: '8 of 8 events not delivered (8 failed)', run_id: 'r-9', last_success_at: null };
+		const forwarding = { name: 'Platform event forwarding', since: '2026-11-08T11:50:00Z', reason: 'Can’t deliver platform events: the webhook answered HTTP 503; they are kept and retried every 5 s', last_success_at: null };
+		const events = toPlatformEvents({ scheduler_leader: true, broken_locations: [], overdue_ticks: [], failing_sinks: [sink], failing_forwarding: [forwarding] }, NOW);
+		const at = (iso: string) => formatClock(iso, NOW);
+		expect(events.map((e) => [e.kind, e.severity, e.locationId, e.subject, e.message])).toEqual([
+			['event_sink_failed', 'warning', 'l1:production', 'kafka', `orders · production: event sink kafka losing events since ${at(sink.since)}: 8 of 8 events not delivered (8 failed).`],
+			['event_forwarding_failed', 'warning', null, 'Platform event forwarding', `Platform event forwarding failing since ${at(forwarding.since)}: ${forwarding.reason}.`]
+		]);
+	});
+
 	it('reports nothing while the scheduler leads and nothing is late', () => {
 		expect(toPlatformEvents({ scheduler_leader: true, scheduler_lease_expires_at: '2026-11-08T12:00:10Z', broken_locations: [], overdue_ticks: [] }, NOW)).toEqual([]);
 	});

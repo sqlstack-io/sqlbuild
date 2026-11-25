@@ -14,7 +14,9 @@ use crate::project_snapshot::_helpers::snapshot::snapshot_execution::is_function
 use crate::project_snapshot::_helpers::snapshot::snapshot_execution::planned_key;
 use crate::project_snapshot::_helpers::snapshot::snapshot_execution::poisoned;
 use crate::project_snapshot::_helpers::snapshot::snapshot_execution::severity;
-use crate::project_snapshot::_helpers::snapshot::snapshot_logs::{node_log_changes, upload_loss};
+use crate::project_snapshot::_helpers::snapshot::snapshot_logs::{
+    node_log_changes, sink_deliveries, upload_loss,
+};
 use crate::project_snapshot::_helpers::snapshot::snapshot_worker::WorkerOwner;
 use crate::project_snapshot::_helpers::snapshot::snapshot_worker::unavailable;
 use crate::project_snapshot::types::NodeKeys;
@@ -54,6 +56,7 @@ use sqlbuild_orchestration::snapshots::models::SnapshotRecord;
 use sqlbuild_orchestration::worker::errors::WorkerError;
 use sqlbuild_orchestration::worker::main::connect_worker::connect_worker;
 use sqlbuild_orchestration::worker::main::start_worker::start_worker;
+use sqlbuild_python_base::event_exporting::main::take_closed_export::take_closed_export;
 use sqlbuild_python_base::invocation_phases::constants::MATCHED_PHASE;
 use sqlbuild_python_base::invocation_phases::main::phase_since::phase_since;
 use sqlbuild_python_base::native_host::main::publish_invocation_phase::publish_invocation_phase;
@@ -1094,6 +1097,14 @@ impl WorkerBuild {
                     .bind(py)
                     .get()
                     .change(py, "worker-output-loss", change),
+            );
+        }
+        if let Some(change) = take_closed_export().and_then(sink_deliveries) {
+            drop(
+                self.worker
+                    .bind(py)
+                    .get()
+                    .change(py, "worker-sink-deliveries", change),
             );
         }
         let ignored: u32 = self.ignored_audit_failures.load(Ordering::SeqCst);

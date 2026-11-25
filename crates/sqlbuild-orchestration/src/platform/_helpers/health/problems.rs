@@ -5,6 +5,7 @@ use uuid::Uuid;
 
 use crate::declarations::models::Schedule;
 use crate::platform::_helpers::health::failing_locations::failing_locations;
+use crate::platform::_helpers::health::failing_sinks::{failing_sinks, sink_reports};
 use crate::platform::constants::LOCATION_SILENCE_SECONDS;
 use std::collections::BTreeSet;
 
@@ -61,6 +62,7 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
     .await?;
     let (transaction, problems) = trigger_problems(transaction).await?;
     let (transaction, failing) = failing_locations(transaction).await?;
+    let (transaction, sinks) = sink_reports(transaction).await?;
     commit(transaction).await?;
     let schedules: Vec<RunningSchedule> = schedules
         .into_iter()
@@ -94,6 +96,7 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
             .collect::<Result<_, _>>()?,
         failing: failing.locations,
         failing_syncs: failing.syncs,
+        failing_sinks: failing_sinks(&sinks),
         late_targets: late_targets
             .into_iter()
             .map(|row| {

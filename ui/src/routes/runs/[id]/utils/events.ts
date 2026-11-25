@@ -33,7 +33,8 @@ const PHASE_TEXT: Record<string, (p: RunEventPhase) => string> = {
 	discovered_set: (p) => `Used discovered set ${p.name ?? ''}${p.count === null ? '' : ` · ${plural(p.count, 'item', 'items')}`}`,
 	connected: (p) => `Connected to ${p.name ?? 'the warehouse'}`,
 	inspected: () => 'Inspected warehouse',
-	planned: (p) => (p.count === null ? 'Planned' : `Planned · ${p.count.toLocaleString('en-GB')} selected`),
+	// What the plan runs, such as `3 selected · 1 Python node`; older runs reported only a count.
+	planned: (p) => (p.name ? `Planned · ${p.name}` : p.count === null ? 'Planned' : `Planned · ${p.count.toLocaleString('en-GB')} selected`),
 	started_execution: (p) => ['Started execution', p.count === null ? null : `concurrency ${p.count}`, p.detail].filter(Boolean).join(' · ')
 };
 

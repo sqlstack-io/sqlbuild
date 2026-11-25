@@ -675,7 +675,7 @@ export type ServerSettings = {
 export type HealthStatus = 'healthy' | 'degraded' | 'unavailable';
 /** Which kind of control database failure a reason describes. */
 export type ControlCauseCase = 'name_lookup' | 'unreachable' | 'login_rejected' | 'no_free_connections' | 'restarting' | 'pool_exhausted' | 'locked' | 'other';
-export type HealthComponentKind = 'server' | 'control_database' | 'scheduler' | 'location';
+export type HealthComponentKind = 'server' | 'control_database' | 'scheduler' | 'location' | 'event_forwarding';
 
 /** One part of the server as anyone may see it, read from the server's memory. */
 export type HealthComponent = {

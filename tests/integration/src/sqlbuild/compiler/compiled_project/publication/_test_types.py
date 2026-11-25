@@ -205,8 +205,17 @@ class NulLogTestCase(WorkerExecutionTestCase):
 class PhaseEventsTestCase(WorkerExecutionTestCase):
     description: str
     backend: Literal["sqlite", "postgres"] = "sqlite"
-    # Each phase in order, and whether it reports a duration.
+    # Each phase in order up to the first node event, and whether it reports a duration.
     expected_phases: tuple[tuple[str, bool], ...] = ()
+    # What the planned phase says the plan runs.
+    expected_planned: str = ""
+
+
+@dataclass(frozen=True)
+class SinkDeliveryTestCase(WorkerExecutionTestCase):
+    description: str
+    # Each sink's name, and whether it failed every event it accepted.
+    expected_sinks: tuple[tuple[str, bool], ...] = ()
 
 
 @dataclass(frozen=True)

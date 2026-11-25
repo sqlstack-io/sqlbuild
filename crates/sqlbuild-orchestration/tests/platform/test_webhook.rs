@@ -134,11 +134,11 @@ fn given_a_location_outage_when_webhook_delivery_retries_then_all_health_facts_s
             let restarted = connect_webhook(&endpoint, WebhookSource::Platform)
                 .expect("restart webhook client");
             let (sink_stop, sink_shutdown) = tokio::sync::watch::channel(false);
-            let sink_store = second.clone();
-            let dispatcher =
-                tokio::spawn(
-                    async move { run_webhook(&sink_store, restarted, sink_shutdown).await },
-                );
+            let dispatcher = tokio::spawn(run_webhook(
+                (second.clone(), None),
+                restarted,
+                sink_shutdown,
+            ));
             wait_for_webhook(&receiver, &dispatcher, test_case.expected_events + 2).await;
             sink_stop.send(true).expect("stop dispatcher");
             tokio::time::timeout(Duration::from_secs(2), dispatcher)

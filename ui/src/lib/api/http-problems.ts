@@ -89,6 +89,34 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 			sync: { halted: sync.halted, unreachable: sync.unreachable, retrySeconds: sync.retry_seconds ?? null, retryAt: sync.retry_at ?? null, lastSuccessAt: sync.last_success_at ?? null }
 		});
 	}
+	for (const sink of problems.failing_sinks ?? []) {
+		const place = placeOf(sink.location_name, sink.target);
+		events.push({
+			id: `sink:${keyOf(sink.location_id, sink.target)}:${sink.sink}`,
+			kind: 'event_sink_failed',
+			severity: 'warning',
+			occurredAt: sink.since,
+			// The first lossy run in a row tells one failing streak from the next.
+			occurrence: sink.since,
+			active: true,
+			locationId: keyOf(sink.location_id, sink.target),
+			subject: sink.sink,
+			message: `${place}: event sink ${sink.sink} losing events since ${formatClock(sink.since, now)}: ${sink.reason}.`
+		});
+	}
+	for (const forwarding of problems.failing_forwarding ?? []) {
+		events.push({
+			id: `forwarding:${forwarding.name}`,
+			kind: 'event_forwarding_failed',
+			severity: 'warning',
+			occurredAt: forwarding.since,
+			occurrence: forwarding.since,
+			active: true,
+			locationId: null,
+			subject: forwarding.name,
+			message: `${forwarding.name} failing since ${formatClock(forwarding.since, now)}: ${forwarding.reason}.`
+		});
+	}
 	const late = new Map<string, Wire['OverdueTick'][]>();
 	for (const tick of problems.overdue_ticks) {
 		const key = keyOf(tick.location_id, tick.target);

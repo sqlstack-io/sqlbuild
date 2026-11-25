@@ -56,6 +56,8 @@ pub(crate) const SUPERSEDED_CHILD: &str = "EXISTS(SELECT 1 FROM sqb_runs s WHERE
 pub(crate) const MEMBER_RETRYING_EVENT: &str = "run_member_retrying";
 /// The scheduler's launch fact, which names the container a worker started in, if any.
 pub(crate) const RUN_LAUNCHED_EVENT: &str = "run_launched";
+/// A run's report of what its lifecycle event sinks delivered.
+pub(crate) const SINK_DELIVERIES_EVENT: &str = "run_sink_deliveries";
 /// The group run event recorded when a retried member succeeds.
 pub(crate) const MEMBER_RECOVERED_EVENT: &str = "run_member_recovered";
 

@@ -93,6 +93,7 @@ pub(crate) fn validate_authority(
                         | RunChange::Compiled { .. }
                         | RunChange::Recovered
                         | RunChange::AuditFailuresIgnored { .. }
+                        | RunChange::SinkDeliveries { .. }
                         | RunChange::Finished {
                             outcome: RunOutcome::Success
                                 | RunOutcome::Warn
@@ -144,7 +145,8 @@ pub(crate) fn validate_change(
         | RunChange::CheckStarted { .. }
         | RunChange::CheckFinished { .. }
         | RunChange::Compiled { .. }
-        | RunChange::AuditFailuresIgnored { .. } => {
+        | RunChange::AuditFailuresIgnored { .. }
+        | RunChange::SinkDeliveries { .. } => {
             matches!(state.status, Running | Unresponsive)
         }
         RunChange::Unresponsive => state.status == Running,

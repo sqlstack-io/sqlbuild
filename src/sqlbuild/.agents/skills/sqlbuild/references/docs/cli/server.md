@@ -17,6 +17,7 @@ Online: https://sqlbuild.com/docs/cli/server/
 - Call the server from scripts with service accounts
 - Sign in through a reverse proxy
 - Receive platform events
+- See lost lifecycle events
 - Acknowledge attention items
 - Back up the control database
 - Upgrade
@@ -117,8 +118,9 @@ reached:
 | `/api/health/details` | People who may manage people | Where the control database is, each cause's own message and the IDs of requests that failed |
 
 The parts are the server (version and uptime), the control database (checked every 10 seconds),
-the scheduler on servers that run one, and each location, which is degraded once it hasn't
-reported for 90 seconds. The report's `status` is `unavailable` while the control database is,
+the scheduler on servers that run one, each location, which is degraded once it hasn't
+reported for 90 seconds, and each event webhook the server forwards to (see
+[Receive platform events](#receive-platform-events)). The report's `status` is `unavailable` while the control database is,
 `degraded` while any other part isn't healthy, and `healthy` otherwise. Point a load balancer's
 liveness check at `/livez`, and monitoring at `/api/health`.
 
@@ -420,6 +422,13 @@ Delivery is at least once and in order. A response other than `2xx`, or no respo
 seconds, stops delivery and retries the same event. Deduplicate by `event_id`, which the
 `Idempotency-Key` header repeats.
 
+While the webhook fails, **Platform event forwarding** is degraded in the server's health, with
+since when and why, such as `the webhook answered HTTP 503` or `can't connect to the webhook`, and
+it is an item on every Overview's attention list. Events are kept and retried every 5 seconds, and
+the item clears with the first delivery. The security audit webhook
+(`SQLBUILD_SECURITY_AUDIT_WEBHOOK_URL`) is reported the same way, as **Security audit event
+forwarding**.
+
 | `kind` | Sent when | Fields |
 | --- | --- | --- |
 | `heartbeat` | Each server replica is alive, periodically | `replica_id`, `store_bytes` (the control database size on disk) |
@@ -469,6 +478,16 @@ worker reported none. It can quote warehouse data, so treat the webhook like oth
 `run_failed` events appear in the webhook and to
 [`platform_event` sensors](../concepts/orchestration.md#react-with-a-sensor), not in the server's
 platform history.
+
+## See lost lifecycle events
+
+A worker counts what each of the project's lifecycle event sinks delivered when its run's command
+closes, and reports it with the run. A sink that dropped or failed events in the newest run of a
+location and target is an item on that target's attention list, such as `event sink kafka losing
+events since 17:42: 8 of 8 events not delivered (8 failed)`, from its first run in a row that lost
+events. A sink provider whose teardown raised is listed as `sink providers`, because events it
+still held may not have been delivered. The item clears once a run delivers every event. Runs from
+the last 7 days count.
 
 ## Acknowledge attention items
 

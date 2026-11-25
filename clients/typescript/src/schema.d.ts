@@ -2626,6 +2626,16 @@ export interface components {
             /** Format: uuid */
             session_id: string;
         };
+        /** @description An event webhook this server can't deliver to: since when, and why; its events stay queued. */
+        FailingForwarding: {
+            /** Format: date-time */
+            last_success_at?: string | null;
+            /** @description Such as `Platform event forwarding`. */
+            name: string;
+            reason: string;
+            /** Format: date-time */
+            since: string;
+        };
         /** @description A checking-in location whose latest load, plan of what changed, discovery or connection check failed, and what it serves instead. */
         FailingLocation: {
             /** @description What failed, redacted; absent when an older location reported no text. */
@@ -2641,6 +2651,32 @@ export interface components {
             serving?: null | components["schemas"]["SnapshotRecord"];
             /** @description `falling_back`, `change_plan_failed`, `discovery_failed` or `degraded`. */
             state: components["schemas"]["LocationState"];
+            target: string;
+        };
+        /** @description A lifecycle event sink whose runs lose events: since its first lossy run in a row, and why. */
+        FailingSink: {
+            /**
+             * Format: date-time
+             * @description The newest run before that whose events it all delivered.
+             */
+            last_success_at?: string | null;
+            /** Format: uuid */
+            location_id: string;
+            location_name: string;
+            /** @description What it lost, such as `8 of 8 events not delivered (8 failed)`. */
+            reason: string;
+            /**
+             * Format: uuid
+             * @description The newest run whose events it lost.
+             */
+            run_id: string;
+            /**
+             * Format: date-time
+             * @description The first run in a row whose events it lost.
+             */
+            since: string;
+            /** @description The sink's name in the project. */
+            sink: string;
             target: string;
         };
         /** @description A checking-in location whose run-history sync is failing: since when, why, and when it tries again. */
@@ -2697,7 +2733,7 @@ export interface components {
          * @description A part of the server whose health is reported.
          * @enum {string}
          */
-        HealthComponent: "server" | "control_database" | "scheduler" | "location";
+        HealthComponent: "server" | "control_database" | "scheduler" | "location" | "event_forwarding";
         /** @description `GET /api/health/details`: what administrators see beside the public report. */
         HealthDetails: {
             components: components["schemas"]["ComponentDetails"][];
@@ -3921,8 +3957,12 @@ export interface components {
             broken_locations: components["schemas"]["BrokenLocation"][];
             /** @description Calendars whose pending times a republish dropped, until their next successful tick. */
             dropped_calendar_times?: components["schemas"]["DroppedCalendarTimes"][];
+            /** @description This server's event webhooks that can't deliver, until one delivers again. */
+            failing_forwarding?: components["schemas"]["FailingForwarding"][];
             /** @description Checking-in locations whose latest load, plan of what changed, discovery or connection check failed. */
             failing_locations?: components["schemas"]["FailingLocation"][];
+            /** @description Lifecycle event sinks whose newest run lost events, until a run delivers all of its events. */
+            failing_sinks?: components["schemas"]["FailingSink"][];
             /** @description Checking-in locations whose run-history sync is failing, until a sync report succeeds. */
             failing_syncs?: components["schemas"]["FailingSync"][];
             /** @description Running calendar schedules whose dates run out within a day. */
@@ -4389,6 +4429,12 @@ export interface components {
             count: number;
             /** @enum {string} */
             kind: "audit_failures_ignored";
+        } | {
+            /** @enum {string} */
+            kind: "sink_deliveries";
+            sinks: components["schemas"]["SinkDelivery"][];
+            /** @description Each sink provider whose teardown raised, such as `'kafka' (KafkaProducer) raised KafkaException`. */
+            teardown_failures?: string[];
         };
         RunChangeRequest: {
             change: components["schemas"]["RunChange"];
@@ -5253,6 +5299,24 @@ export interface components {
             principal_id: string;
             /** Format: uuid */
             session_id: string;
+        };
+        /** @description One lifecycle event sink's deliveries in a run. */
+        SinkDelivery: {
+            /** Format: int64 */
+            accepted: number;
+            /** Format: int64 */
+            delivered: number;
+            /**
+             * Format: int64
+             * @description Events the sink never got: its queue was full or it was too slow.
+             */
+            dropped: number;
+            /**
+             * Format: int64
+             * @description Events the sink raised on.
+             */
+            failed: number;
+            name: string;
         };
         /** @description A trigger the scheduler skips because its stored job or pinned snapshot can't be read, or a sensor whose check failed; it clears once its location publishes again or, for a sensor, a later check completes. */
         SkippedTrigger: {

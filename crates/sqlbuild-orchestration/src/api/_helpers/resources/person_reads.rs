@@ -24,6 +24,8 @@ use crate::declarations::main::read_person_providers::read_person_providers;
 use crate::declarations::models::{
     JobDetailRecord, JobRecord, PersonTriggerChange, PersonTriggerRecord, ProvidersRead,
 };
+use crate::health::main::failing_forwarding::failing_forwarding;
+use crate::health::models::ServerHealth;
 use crate::node_states::main::list_person_catalog_nodes::list_person_catalog_nodes;
 use crate::node_states::main::read_person_node_states::read_person_node_states;
 use crate::node_states::models::{NodeStateCache, NodeStatesRecord};
@@ -845,12 +847,13 @@ pub(crate) async fn health(
         (status = 401, description = "Session rejected")), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn problems(
     State(store): State<ControlStore>,
-    Extension(default_role): Extension<DefaultRole>,
+    (Extension(default_role), Extension(health)): (Extension<DefaultRole>, Extension<ServerHealth>),
     Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
 ) -> Result<Json<PlatformProblems>, ApiError> {
-    Ok(Json(
-        read_person_problems(&store, principal, default_role).await?,
-    ))
+    Ok(Json(PlatformProblems {
+        failing_forwarding: failing_forwarding(&health),
+        ..read_person_problems(&store, principal, default_role).await?
+    }))
 }
 
 #[utoipa::path(get, path = "/api/control/platform/events", operation_id = "listPersonPlatformEvents",

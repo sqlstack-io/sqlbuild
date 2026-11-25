@@ -11,6 +11,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     NulFailureTestCase,
     NulLogTestCase,
     PhaseEventsTestCase,
+    SinkDeliveryTestCase,
     PythonFailureTestCase,
     RunOutputTestCase,
 )
@@ -356,9 +357,11 @@ def test_given_a_nul_in_an_exception_when_its_traceback_is_reported_then_the_fai
                 ("connected", True),
                 ("inspected", True),
                 ("planned", True),
-                ("connected", True),
                 ("started_execution", False),
+                ("connected", True),
+                ("node", False),
             ),
+            expected_planned="1 selected",
         ),
         PhaseEventsTestCase(
             "PostgreSQL",
@@ -374,9 +377,44 @@ def test_given_a_nul_in_an_exception_when_its_traceback_is_reported_then_the_fai
                 ("connected", True),
                 ("inspected", True),
                 ("planned", True),
-                ("connected", True),
                 ("started_execution", False),
+                ("connected", True),
+                ("node", False),
             ),
+            expected_planned="1 selected",
+        ),
+        PhaseEventsTestCase(
+            "a job of one Python asset starts execution before the asset and opens no SQL connections",
+            "SELECT 17 AS amount",
+            "SELECT 1",
+            "success",
+            [(1,)],
+            files={
+                "python/nodes/assets/score_orders/asset.py": (
+                    "from sqlbuild.assets import asset\n\n\n"
+                    "@asset(description='Scores orders.')\n"
+                    "def score_orders(ctx):\n"
+                    "    return 17\n"
+                ),
+                "orchestration/jobs/annual_orders_job.toml": (
+                    'name = "annual_orders_job"\n'
+                    'description = "Score orders."\n'
+                    'select = "score_orders"\n'
+                    'schedule = { cron = "0 0 * * *", timezone = "UTC", '
+                    'starts_at = "2000-01-01T00:00:00Z" }\n'
+                ),
+            },
+            expected_phases=(
+                ("discovered", True),
+                ("compiled", True),
+                ("matched", True),
+                ("connected", True),
+                ("inspected", True),
+                ("planned", True),
+                ("started_execution", False),
+                ("node", False),
+            ),
+            expected_planned="1 Python node",
         ),
     ],
     ids=lambda case: case.description,
@@ -390,14 +428,70 @@ def test_given_a_worker_run_when_it_prepares_then_each_phase_is_a_run_event_with
     ):
         run: dict[str, Any] = wait_for_run(worker.api, worker.process, worker.log)
         database: str = url or f"sqlite://{worker.control_store}"
-        phases: list[tuple[str, bool]] = [
-            (str(phase), duration is not None)
-            for phase, duration in control_query(
-                database,
-                "SELECT payload->>'phase', duration_ms FROM recall_events "
-                "WHERE event_type='invocation_phase' ORDER BY occurred_at, storage_id",
-            )
-        ]
+        events: list[tuple[Any, ...]] = control_query(
+            database,
+            "SELECT COALESCE(payload->>'phase', 'node'), duration_ms, payload->>'name' "
+            "FROM recall_events "
+            "WHERE event_type IN ('invocation_phase', 'resource_attempt_started') "
+            "ORDER BY occurred_at, storage_id",
+        )
+    first_node: int = [phase for phase, _, _ in events].index("node")
+    phases: list[tuple[str, bool]] = [
+        (str(phase), duration is not None) for phase, duration, _ in events[: first_node + 1]
+    ]
+    planned: Any = {phase: name for phase, _, name in events}["planned"]
 
     assert run["status"] == test_case.expected_status, worker.log.read_text()[-4000:]
-    assert phases == list(test_case.expected_phases), phases
+    assert (phases, planned) == (
+        list(test_case.expected_phases),
+        test_case.expected_planned,
+    ), test_case.description
+
+
+SINK_FILES: dict[str, str] = {
+    "python/event_sinks/events.py": (
+        "from sqlbuild.event_sinks import LifecycleEvent, lifecycle_event_sink\n\n\n"
+        "@lifecycle_event_sink\n"
+        "def broker(event: LifecycleEvent) -> None:\n"
+        "    raise RuntimeError('broker unavailable')\n\n\n"
+        "@lifecycle_event_sink\n"
+        "def archive(event: LifecycleEvent) -> None:\n"
+        "    del event\n"
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SinkDeliveryTestCase(
+            "a sink that fails every event and one that delivers them",
+            "SELECT 17 AS amount",
+            "SELECT amount FROM orders",
+            "success",
+            [(17,)],
+            files=SINK_FILES,
+            expected_sinks=(("archive", False), ("broker", True)),
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_worker_run_with_event_sinks_when_it_finishes_then_it_reports_each_sinks_deliveries(
+    test_case: SinkDeliveryTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
+        run: dict[str, Any] = wait_for_run(worker.api, worker.process, worker.log)
+        events: list[tuple[Any, ...]] = control_query(
+            f"sqlite://{worker.control_store}",
+            "SELECT event_type, payload FROM recall_events "
+            "WHERE event_type IN ('run_sink_deliveries', 'run_terminated') ORDER BY storage_id",
+        )
+    reported: dict[str, Any] = json.loads(events[0][1])["change"]["change"]
+    sinks: list[tuple[str, bool]] = sorted(
+        (sink["name"], sink["failed"] == sink["accepted"] > 0) for sink in reported["sinks"]
+    )
+    assert (run["status"], [event_type for event_type, _ in events], sinks) == (
+        test_case.expected_status,
+        ["run_sink_deliveries", "run_terminated"],
+        list(test_case.expected_sinks),
+    ), worker.log.read_text()[-4000:]

@@ -46,6 +46,7 @@ use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_compile::compile_driver::main::jobs::build_concurrency::build_concurrency;
 use sqlbuild_python_compile::compile_driver::main::jobs::connection_limit::connection_limit;
 use sqlbuild_python_compile::compile_driver::main::jobs::job_run_context::job_run_context;
+use sqlbuild_python_compile::compile_driver::main::jobs::publish_execution_start::publish_execution_start;
 use sqlbuild_python_compile::compile_driver::main::setup::build_project_relation_targets::build_project_relation_targets;
 use sqlbuild_python_compile::compile_driver::main::setup::project_target_settings::project_target_settings;
 use sqlbuild_python_compile::compile_driver::models::TargetSettingsValues;
@@ -304,6 +305,7 @@ pub(crate) fn prepare_build_execution<'py>(
         on_node_complete: native_field(&callbacks, "on_node_complete")?,
         providers: providers.clone(),
     };
+    publish_execution_start(&plan, concurrency)?;
     let lifecycle: Bound<'py, DirectPythonLifecycle> =
         prepare_direct_python_lifecycle(context, pipeline, &inputs)?;
     Ok(Preparation {
@@ -504,6 +506,7 @@ pub(crate) fn execute_build_plan<'py>(
             ("callbacks", build_callbacks),
             ("customizations", customizations),
             ("initial_state", initial_state),
+            ("execution_announced", boolean(py, true)),
         ],
     )?;
     for warning in recorder.get().finish(py, &result)? {

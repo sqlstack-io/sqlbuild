@@ -420,3 +420,48 @@ pub(crate) fn failing_sync_of(
         last_success_at: Some(at(-30)),
     }
 }
+
+/// A sink that accepted, dropped and failed the given numbers of events.
+pub(crate) fn delivered(
+    name: &str,
+    (accepted, dropped, failed): (u64, u64, u64),
+) -> crate::runs::models::SinkDelivery {
+    crate::runs::models::SinkDelivery {
+        name: name.into(),
+        accepted,
+        delivered: accepted - dropped - failed,
+        dropped,
+        failed,
+    }
+}
+
+/// A run's sink report at `minutes`, from the `orders` location's `prod` target.
+pub(crate) fn report(
+    minutes: i64,
+    sinks: Vec<crate::runs::models::SinkDelivery>,
+    teardown_failures: Vec<String>,
+) -> crate::platform::models::SinkReport {
+    crate::platform::models::SinkReport {
+        location_id: uuid::Uuid::nil(),
+        location_name: "orders".into(),
+        target: "prod".into(),
+        run_id: uuid::Uuid::from_u128(u128::try_from(minutes).unwrap_or_default()),
+        at: at(minutes),
+        sinks,
+        teardown_failures,
+    }
+}
+
+/// The problem `sink` of the newest report, at minute 3, makes for `reason`.
+pub(crate) fn failing_sink_of(sink: &str, reason: &str) -> crate::platform::models::FailingSink {
+    crate::platform::models::FailingSink {
+        location_id: uuid::Uuid::nil(),
+        location_name: "orders".into(),
+        target: "prod".into(),
+        sink: sink.into(),
+        since: at(3),
+        reason: reason.into(),
+        run_id: uuid::Uuid::from_u128(3),
+        last_success_at: None,
+    }
+}

@@ -128,3 +128,17 @@ pub(crate) struct FailingSyncTestCase {
     pub(crate) observations: Vec<crate::platform::models::LocationHealthObservation>,
     pub(crate) expected_sync: Option<crate::platform::models::FailingSync>,
 }
+
+pub(crate) struct FailingSinkTestCase {
+    pub(crate) description: &'static str,
+    /// Newest first, as the scan reads them.
+    pub(crate) reports: Vec<crate::platform::models::SinkReport>,
+    pub(crate) expected_sinks: Vec<crate::platform::models::FailingSink>,
+}
+
+pub(crate) struct StoredSinkTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: crate::store::tests::store_test_types::Backend,
+    /// Each failing sink with its reason.
+    pub(crate) expected_sinks: Vec<(String, String)>,
+}

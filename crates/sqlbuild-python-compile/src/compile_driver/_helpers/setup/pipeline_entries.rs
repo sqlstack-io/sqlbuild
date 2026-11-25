@@ -11,6 +11,17 @@ use sqlbuild_python_base::records::types::RecordId;
 
 /// Discovered Python node functions whose selectors need the Python graph.
 const PYTHON_NODE_FUNCTIONS: [&str; 3] = ["loader_functions", "asset_functions", "check_functions"];
+/// The plan entries the SQL phase runs; with none of them it opens no warehouse connection.
+pub(crate) const SQL_PHASE_ENTRIES: [&str; 8] = [
+    "execution_order",
+    "audit_entries",
+    "test_entries",
+    "migration_entries",
+    "column_migration_entries",
+    "retention_entries",
+    "old_name_view_entries",
+    "table_type_entries",
+];
 /// Plan entry lists that are runtime work.
 pub(crate) const PLAN_WORK_ENTRIES: [&str; 6] = [
     "model_entries",

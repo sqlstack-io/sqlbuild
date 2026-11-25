@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use crate::credentials::models::Action;
 use crate::declarations::models::PoolSlots;
-use crate::runs::constants::RUN_LAUNCHED_EVENT;
+use crate::runs::constants::{RUN_LAUNCHED_EVENT, SINK_DELIVERIES_EVENT};
 use crate::runs::types::{CommandPlanner, PreparedPublication};
 use crate::snapshots::models::WriterNode;
 
@@ -807,6 +807,26 @@ pub enum RunChange {
     AuditFailuresIgnored {
         count: u32,
     },
+    /// What each lifecycle event sink delivered, counted when the worker's command closed; sent before `Finished`.
+    SinkDeliveries {
+        sinks: Vec<SinkDelivery>,
+        /// Each sink provider whose teardown raised, such as `'kafka' (KafkaProducer) raised KafkaException`.
+        #[serde(default)]
+        teardown_failures: Vec<String>,
+    },
+}
+
+/// One lifecycle event sink's deliveries in a run.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SinkDelivery {
+    pub name: String,
+    pub accepted: u64,
+    pub delivered: u64,
+    /// Events the sink never got: its queue was full or it was too slow.
+    pub dropped: u64,
+    /// Events the sink raised on.
+    pub failed: u64,
 }
 
 impl RunChange {
@@ -827,6 +847,7 @@ impl RunChange {
             Self::CancelRequested { .. } => "run_cancel_requested",
             Self::Finished { .. } => "run_terminated",
             Self::AuditFailuresIgnored { .. } => "run_audit_failures_ignored",
+            Self::SinkDeliveries { .. } => SINK_DELIVERIES_EVENT,
         }
     }
 

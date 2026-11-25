@@ -19,6 +19,8 @@ use crate::cli_text::models::{
     PlanWarningText, ProviderUsageText, PythonPlanText, SchemaFindingText, SourceFreshnessText,
     SourceLoadPlanText,
 };
+use crate::plan_display::main::plan_summary_parts::plan_summary_parts;
+use crate::plan_display::models::PlanSummaryCounts;
 
 const STYLE: CliStyle = CliStyle { use_color: true };
 
@@ -60,45 +62,18 @@ pub(crate) fn full_refresh_layout(report: &PlanTextReport) -> bool {
         || (report.full_refresh && active.is_empty())
 }
 
-/// `N selected`, with the full-refresh, source-load and Python-node parts.
+/// `N selected`, with the full-refresh, source-load and Python-node parts, leaving out zero counts.
 pub(crate) fn ready_summary(report: &PlanTextReport, full_refresh: bool) -> String {
-    let mut parts: Vec<String> = Vec::new();
-    if full_refresh {
-        parts.push("full refresh".to_owned());
-    }
-    let selected: usize = report.models.len() + report.seeds.len() + report.functions.len();
-    if selected > 0 {
-        parts.push(format!("{selected} selected"));
-    }
-    let sources: usize = report.source_loads.len();
-    if sources > 0 {
-        let noun: &str = if sources == 1 { "source" } else { "sources" };
-        let action: &str = if report.source_loads.iter().any(|load| load.is_reload) {
-            "reload"
-        } else {
-            "load"
-        };
-        parts.push(format!("{sources} {noun} to {action}"));
-    }
-    let python: usize = report.python_entries.len();
-    if python > 0 {
-        let noun: &str = if python == 1 { "node" } else { "nodes" };
-        parts.push(format!("{python} Python {noun}"));
-    }
-    let audits: usize = report.audits.len();
-    if audits > 0 {
-        let noun: &str = if audits == 1 { "audit" } else { "audits" };
-        parts.push(format!("{audits} {noun}"));
-    }
-    let not_run: usize = report.audits_not_run.len();
-    if not_run > 0 {
-        let noun: &str = if not_run == 1 { "audit" } else { "audits" };
-        parts.push(format!("{not_run} {noun} not run"));
-    }
-    if parts.is_empty() {
-        return "0 selected".to_owned();
-    }
-    parts.join(", ")
+    plan_summary_parts(&PlanSummaryCounts {
+        full_refresh,
+        selected: report.models.len() + report.seeds.len() + report.functions.len(),
+        sources: report.source_loads.len(),
+        reloads_sources: report.source_loads.iter().any(|load| load.is_reload),
+        python: report.python_entries.len(),
+        audits: report.audits.len(),
+        audits_not_run: report.audits_not_run.len(),
+    })
+    .join(", ")
 }
 
 /// The name column every plan section aligns to.

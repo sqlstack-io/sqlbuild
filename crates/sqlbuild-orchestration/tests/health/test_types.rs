@@ -80,3 +80,11 @@ pub(crate) struct FailingStreakTestCase {
     pub(crate) failures_after: Vec<i64>,
     pub(crate) expected_since_minutes: i64,
 }
+
+pub(crate) struct ForwardingTestCase {
+    pub(crate) description: &'static str,
+    /// Each delivery attempt: seconds after the start, and whether it delivered.
+    pub(crate) outcomes: Vec<(i64, bool)>,
+    /// The server's status, the forwarding row's since in seconds after the start, and its reason.
+    pub(crate) expected_state: (HealthStatus, Option<i64>, Option<&'static str>),
+}

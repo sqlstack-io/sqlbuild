@@ -97,6 +97,8 @@ pub enum HealthComponent {
     ControlDatabase,
     Scheduler,
     Location,
+    /// The server forwarding platform or security audit events to a webhook.
+    EventForwarding,
 }
 
 /// How a component, or the server as a whole, stands.
@@ -149,6 +151,8 @@ pub(crate) struct HealthState {
     /// `None` when this server runs no scheduler.
     pub(crate) scheduler: Option<ComponentState>,
     pub(crate) locations: BTreeMap<Uuid, SeenLocation>,
+    /// Each webhook this server forwards events to, by its name.
+    pub(crate) forwarding: BTreeMap<String, ComponentState>,
 }
 
 /// One server's in-memory health, shared by its API, scheduler and control database probe.
@@ -378,6 +382,31 @@ impl ServerHealth {
                 request_ids: VecDeque::new(),
             });
         }
+    }
+
+    /// The webhook `name` delivered what it had at `at`.
+    pub fn forwarding_succeeded(&self, name: &str, at: DateTime<Utc>) {
+        self.state()
+            .forwarding
+            .entry(name.to_owned())
+            .or_default()
+            .succeed(at);
+    }
+
+    /// The webhook `name` couldn't deliver at `at`, because of `reason`; its events stay queued.
+    pub fn forwarding_failed(&self, name: &str, (reason, at): (&str, DateTime<Utc>)) {
+        self.state()
+            .forwarding
+            .entry(name.to_owned())
+            .or_default()
+            .fail(ComponentFailure {
+                at,
+                since: at,
+                reason: reason.to_owned(),
+                case: None,
+                chain: Vec::new(),
+                request_ids: VecDeque::new(),
+            });
     }
 
     /// A location's instance reported at `at`.
