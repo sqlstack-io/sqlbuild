@@ -6,67 +6,50 @@
 	import { to } from '$lib/paths';
 	import { rerunHref } from '$lib/run/command';
 	import { app } from '$lib/state/app.svelte';
-	import { cn } from '$lib/utils';
 	import { rerunChoices, runFailures } from './utils';
 	import type { RunDetailState } from './state.svelte';
+	import { rerunRows } from './utils/rerun-rows';
+	import { ACTION_CLASS, type ActionLook } from './utils/action-looks';
+	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
+	import { cn } from '$lib/utils';
 
-	// One rerun action for a run that failed: what to run again, from the failure outwards. Each choice
-	// opens the rerun plan, where it is checked before it runs.
-	let { view }: { view: RunDetailState } = $props();
+	// What to run again, from the failure outwards, on the app's own menu: the first row is the default,
+	// rows that don't apply are left out, and two rows that would run the same thing show once. Each opens
+	// the rerun plan, where it is checked before it runs.
+	let { view, look = 'before' }: { view: RunDetailState; look?: ActionLook } = $props();
 
 	const detail = $derived(view.detail);
 	const runId = $derived(view.run?.id ?? '');
 	const failures = $derived(runFailures(view.nodes, view.events, view.statements, view.run?.target ?? ''));
-	const first = $derived(failures[0]);
-	/** Why no choice can run now: still running, or no permission; null when they can. */
+	/** Why nothing can run again now: still running, or no permission; null when it can. */
 	const blocked = $derived(detail ? (rerunChoices(detail, [], (c) => app.can(c)).find((c) => c.mode === 'all')?.disabledReason ?? null) : 'Loading');
-	const unfinished = $derived(detail?.rerunFromFailureNodes.length ?? 0);
-	type Choice = { label: string; note: string; href: string | null; reason: string | null };
-	const choices = $derived.by((): Choice[] => {
-		const check = first?.kind === 'check' ? first : null;
-		const node = first?.nodeKey ?? null;
-		return [
-			check
-				? { label: 'Failed check only', note: check.name, href: rerunHref([runId], 'selected', [check.name]), reason: null }
-				: { label: 'Failed node only', note: node ?? '', href: node ? rerunHref([runId], 'selected', [node]) : null, reason: node ? null : 'Nothing failed' },
-			{ label: 'Node and its checks', note: node ?? '—', href: node ? rerunHref([runId], 'selected', [node]) : null, reason: node ? null : 'An end-of-build check has no node' },
-			{ label: "Didn't succeed + skipped", note: unfinished ? `${unfinished} nodes` : `${failures.length} ${failures.length === 1 ? 'check' : 'checks'}`, href: rerunHref([runId], 'from_failure'), reason: null },
-			{ label: 'Whole run', note: view.run?.jobKey ?? 'selection', href: rerunHref([runId], 'all'), reason: null }
-		];
-	});
+	const rows = $derived(
+		rerunRows({
+			failures,
+			unfinished: detail?.rerunFromFailureNodes ?? [],
+			total: view.nodes.length,
+			jobKey: view.run?.jobKey ?? null
+		})
+	);
+	const hrefOf = (r: (typeof rows)[number]) => (r.mode === 'selected' ? rerunHref([runId], 'selected', r.nodes) : rerunHref([runId], r.mode));
 </script>
 
-{#if first}
+{#if failures.length || detail?.rerunFromFailureNodes.length}
 	<span title={blocked ?? undefined}>
 		<DropdownMenu.Root>
-			<DropdownMenu.Trigger class={cn(buttonVariants({ variant: 'outline', size: 'sm' }))} disabled={!!blocked} data-testid="rerun-failed">Rerun failed <ChevronDownIcon size={13} /></DropdownMenu.Trigger>
-			<DropdownMenu.Content class="w-80" align="end">
-				{#each choices as c (c.label)}
-					<DropdownMenu.Item disabled={!c.href || !!c.reason} title={c.reason ?? undefined} onSelect={() => c.href && goto(to(c.href))}>
-						<span class="choice"><span>{c.label}</span><span class="note">{c.note}</span></span>
+			<DropdownMenu.Trigger class={cn(buttonVariants({ variant: 'outline', size: 'sm' }), ACTION_CLASS.rerun[look])} disabled={!!blocked} data-testid="rerun-menu">{#if look === '2' || look === '3'}<RotateCcwIcon />{/if}Rerun <ChevronDownIcon /></DropdownMenu.Trigger>
+			<DropdownMenu.Content class="w-80 p-1.5" align="end">
+				{#each rows as r, i (r.key)}
+					{#if r.mode === 'all' && i > 0}<DropdownMenu.Separator />{/if}
+					<DropdownMenu.Item class="items-start gap-3 px-2.5 py-2" onSelect={() => goto(to(hrefOf(r)))}>
+						<span class="flex min-w-0 flex-1 flex-col gap-0.5">
+							<span class="text-[13px] font-medium">{r.label}</span>
+							<small class="text-muted-foreground truncate text-[11.5px]" title={r.description}>{r.description}</small>
+						</span>
+						<span class="text-muted-foreground shrink-0 pt-px text-[12px] tabular-nums">{r.count}</span>
 					</DropdownMenu.Item>
 				{/each}
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>
 	</span>
 {/if}
-
-<style>
-	.choice {
-		white-space: nowrap;
-		display: flex;
-		width: 100%;
-		min-width: 0;
-		align-items: baseline;
-		justify-content: space-between;
-		gap: 12px;
-	}
-	.note {
-		overflow: hidden;
-		color: var(--sb-text-faint);
-		font-family: var(--font-mono);
-		font-size: 11.5px;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-</style>

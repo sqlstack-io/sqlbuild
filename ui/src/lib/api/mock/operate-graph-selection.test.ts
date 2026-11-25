@@ -26,9 +26,9 @@ describe('mock selection evaluation', () => {
 		expect(mockVocabulary().kinds).toEqual([
 			{ value: 'asset', count: 46 },
 			{ value: 'loader', count: 2 },
-			// 2 and 92 of them from the run-page failure mock-up (seed-audit-run.ts).
+			// 2 from the run-page failure mock-up (seed-audit-run.ts); its 92 seeds load only where it is shown.
 			{ value: 'model', count: 33 },
-			{ value: 'seed', count: 93 },
+			{ value: 'seed', count: import.meta.env.DEV ? 93 : 1 },
 			{ value: 'source', count: 6 }
 		]);
 	});

@@ -9,10 +9,18 @@
 	import { runKindLabel, runOriginLabel } from '$lib/status';
 	import RunSummary from './run-summary.svelte';
 	import RerunMenu from './rerun-menu.svelte';
+	import { page } from '$app/state';
+	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
+	import PanelRightIcon from '@lucide/svelte/icons/panel-right';
+	import { ACTION_CLASS, actionLook } from './utils/action-looks';
 	import { retriedMembers } from './utils';
 	import type { RunDetailState } from './state.svelte';
 
 	let { view, runId }: { view: RunDetailState; runId: string } = $props();
+
+	// Mock-up: the header actions' look, switchable with ?actions=1|2|3 for comparison.
+	const look = $derived(actionLook(page.url.searchParams.get('actions')));
+	const detailsClass = ACTION_CLASS.details;
 
 	const run = $derived(view.run);
 	const what = $derived(run?.jobKey ?? (view.detail?.selection.join(' ') || 'whole project'));
@@ -69,7 +77,7 @@
 					</span>
 				</div>
 				<div class="actions">
-					{#if !view.active}<RerunMenu {view} />{/if}
+					{#if !view.active}<RerunMenu {view} {look} />{/if}
 					{#if view.active}
 						<span title={!app.can('run.cancel') ? "You don't have permission to cancel (run.cancel)" : cancelRequested ? 'Cancel already requested; see the progress below' : 'Stops the run: running queries are cancelled, then the run is stopped'}>
 							<Button
@@ -84,7 +92,9 @@
 							</Button>
 						</span>
 					{/if}
-					<Button variant="ghost" size="sm" onclick={() => view.toggleDetails()} aria-expanded={view.showDetails} title="Command, version, nodes, cost, related runs and technical details">Details {view.showDetails ? '▴' : '▾'}</Button>
+					<Button variant={look === 'before' ? 'ghost' : 'outline'} size="sm" class={detailsClass[look]} onclick={() => view.toggleDetails()} aria-expanded={view.showDetails} title="Command, version, worker, cost and related runs">
+						{#if look === '3'}<PanelRightIcon />{/if}Details{#if look === 'before'} {view.showDetails ? '▴' : '▾'}{:else if look !== '3'}<ChevronDownIcon />{/if}
+					</Button>
 				</div>
 			</div>
 		{:else if view.detailRes.error}

@@ -157,7 +157,7 @@ export const JOB_DEFS: JobDef[] = [
 		key: 'load_reference',
 		kind: 'job',
 		description: 'Reference seeds',
-		select: 'path:sql/seeds',
+		select: 'kind:seed',
 		exclude: [],
 		members: [],
 		overlap: 'queue',
@@ -175,7 +175,7 @@ export const JOB_DEFS: JobDef[] = [
 			`load_reference = job(
     "load_reference",
     description="Reference seeds",
-    select="path:sql/seeds",
+    select="kind:seed",
     owner="data-platform",
 )`
 		)

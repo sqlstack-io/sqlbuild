@@ -6,6 +6,7 @@
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import FailureSummary from './failure-summary.svelte';
+	import ActiveFilter from './active-filter.svelte';
 	import CantRunProblem from '$lib/run/cant-run-problem.svelte';
 	import { runDetailCantRun } from '$lib/run/cant-run';
 	import IgnoredAuditsPanel from './ignored-audits-panel.svelte';
@@ -16,7 +17,7 @@
 	import { to } from '$lib/paths';
 	import { nodeLabel, shortRunId } from '$lib/operate/labels';
 	import { skipCause, QUICK_PICKS } from './utils';
-	import RelatedRuns from './related-runs.svelte';
+	import DetailsDrawer from './details-drawer.svelte';
 	import RunBanners from './run-banners.svelte';
 	import RunGantt from './run-gantt.svelte';
 	import RunHeader from './run-header.svelte';
@@ -112,7 +113,6 @@
 			</div>
 		{/if}
 		<IgnoredAuditsPanel {view} />
-		<RelatedRuns {view} />
 
 		<div bind:this={splitEl} class="flex min-h-0 flex-1 flex-col" class:select-none={dragging}>
 			<div class="flex min-h-0 flex-col" style:flex={hasBottom ? topFrac : 1}>
@@ -127,7 +127,7 @@
 								<span class="picks">
 									<span class="faint">Pick</span>
 									{#each QUICK_PICKS as q (q.value)}
-										<Button variant="link" size="inline" class="text-[12.5px]" onclick={() => view.pick(q.value)}>{q.label}</Button>
+										<Button variant="link" size="inline" class={view.activePick === q.value ? 'pick-on sb-pressed text-[12.5px]' : 'text-[12.5px]'} aria-pressed={view.activePick === q.value} title={view.activePick === q.value ? 'Put back the selection from before' : undefined} onclick={() => view.pick(q.value)}>{q.label}</Button>
 									{/each}
 								</span>
 								{#if view.planLink && planCount}
@@ -140,10 +140,7 @@
 					</div>
 					{#if view.statusFilter}
 						{@const g = view.nodeGroups.find((x) => x.key === view.statusFilter)}
-						<div class="filtered" data-testid="timeline-filter">
-							Showing {g?.label.toLowerCase()} only · {g?.nodes.length} of {nodes.length}
-							<Button variant="link" size="inline" class="text-[12px]" onclick={() => view.clearFocus()}>Show all</Button>
-						</div>
+						<ActiveFilter what={view.figureLabel || (g?.label.toLowerCase() ?? '')} shown={g?.nodes.length ?? 0} total={nodes.length} noun="node" onclear={() => view.clearFocus()} testid="timeline-filter" />
 					{/if}
 				{/if}
 				<div class="flex min-h-0 flex-1">
@@ -194,6 +191,7 @@
 	{/if}
 </div>
 <NodeDrawer {view} />
+<DetailsDrawer {view} />
 </div>
 
 <style>
@@ -234,6 +232,12 @@
 		min-width: 260px;
 		flex: 1;
 	}
+	.picks :global(button) {
+		color: var(--muted-foreground);
+	}
+	.picks :global(button:hover) {
+		color: var(--foreground);
+	}
 	.picks {
 		display: inline-flex;
 		flex: none;
@@ -245,11 +249,9 @@
 	.plan {
 		flex: none;
 	}
-	.filtered {
-		padding: 4px 24px;
-		border-bottom: 1px solid var(--border);
-		color: var(--sb-text-faint);
-		font-size: 12px;
+	.picks :global(.pick-on) {
+		padding: 0 5px;
+		text-decoration: none;
 	}
 	.plan {
 		padding: 3px 10px;

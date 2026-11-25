@@ -18,8 +18,13 @@ const DOMAINS = [
 	'store_format', 'supplier_type', 'card_brand', 'refund_reason', 'contact_channel', 'packaging_type', 'holiday', 'fiscal_period'
 ];
 const SUFFIXES = ['codes', 'names', 'mapping', 'aliases'];
-/** 92 reference seeds, beside the project's own `country_codes`: 93 in the run. */
-export const REFERENCE_SEEDS: string[] = DOMAINS.flatMap((d) => SUFFIXES.map((s) => `${d}_${s}`));
+/**
+ * 92 reference seeds, beside the project's own `country_codes`: 93 in the run. Only where the mock-up is
+ * looked at (the dev server, or `?failure-mock`): 92 more seeds change the Lineage overview's layout, which
+ * the layout tests check against the usual mock project.
+ */
+const SHOWN = import.meta.env.DEV || (typeof location !== 'undefined' && new URLSearchParams(location.search).has('failure-mock'));
+export const REFERENCE_SEEDS: string[] = SHOWN ? DOMAINS.flatMap((d) => SUFFIXES.map((s) => `${d}_${s}`)) : [];
 
 export const ORDERS_MATCH_PAYMENTS_SQL = `SELECT o.order_id, o.amount_cents, p.amount_cents AS paid_cents
 FROM "${DATABASE}"."RECONCILIATION"."FCT_ORDER_PAYMENTS" o

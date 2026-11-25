@@ -5,12 +5,13 @@
 	import XIcon from '@lucide/svelte/icons/x';
 	import { app } from '$lib/state/app.svelte';
 	import LogTab from './log-tab.svelte';
+	import ActiveFilter from './active-filter.svelte';
 	import type { RunDetailState } from './state.svelte';
 	import StatementsTab from './statements-tab.svelte';
 	import CostTab from './cost-tab.svelte';
 	import type { BottomTab } from './types';
 	import { bottomTabs, logEntries, markExpectedLookups } from './utils';
-	import { tick } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { plural } from '$lib/format/plural';
 	import { skipCause } from './utils';
 
@@ -38,7 +39,16 @@
 	const entries = $derived(markExpectedLookups(logEntries(view.events, view.outputRes.data ?? [], { nodes: view.nodes, skipCause: (n) => skipCause(n, view.nodes, edges), now: app.now }), view.statements));
 	const statements = $derived(filtering ? view.statements.filter((s) => sel.has(s.nodeKey)) : view.statements);
 	// Printed lines carry their node when sqb printed them for one; others are kept when they mention it.
-	const shownEntries = $derived(filtering ? entries.filter((e) => (e.nodeKey ? sel.has(e.nodeKey) : filterKeys.some((k) => e.text.includes(k)))) : entries);
+	// The header's failed-checks figure: only the failed checks' lines.
+	const shownEntries = $derived(
+		view.checksFilter
+			? entries.filter((e) => e.category === 'checks' && e.level === 'error')
+			: filtering
+				? entries.filter((e) => (e.nodeKey ? sel.has(e.nodeKey) : filterKeys.some((k) => e.text.includes(k))))
+				: entries
+	);
+	/** Every row the log would show without a filter, for the active-filter line's total. */
+	const allCount = $derived(entries.filter((e) => !e.expected && (printed ? e.category === 'output' : e.category !== 'output')).length);
 	const grouped = $derived((view.detail?.children.length ?? 0) > 0);
 	// Kept here so the choice survives switching tabs, and the Log count matches the rows shown.
 	// Events | Output: the log opens on its events, one line per node; Output is what sqb printed.
@@ -89,6 +99,22 @@
 		atBottom = true;
 		seen = logCount;
 	}
+	// A filter turned on keeps the log's place; turned off again, the log goes back to where it was.
+	let errorsOnly = $state(false);
+	const filterOn = $derived(!!view.figure || errorsOnly);
+	let placeBefore: number | null = null;
+	$effect(() => {
+		const on = filterOn;
+		untrack(() => {
+			if (!scroller) return;
+			if (on && placeBefore === null) placeBefore = scroller.scrollTop;
+			if (!on && placeBefore !== null) {
+				const top = placeBefore;
+				placeBefore = null;
+				void tick().then(() => scroller && (scroller.scrollTop = top));
+			}
+		});
+	});
 	// A new filter or the printed-output switch changes what is shown, not what is new.
 	let shownKey = '';
 	$effect(() => {
@@ -115,7 +141,7 @@
 		bind:value={view.tab}
 		tabs={TABS.map((t) => ({ value: t.value, label: t.label, count: count(t.value), title: t.value === 'statements' ? 'SQL statements the run sent to the warehouse' : t.value === 'cost' ? 'Estimated query cost of this run, by node and warehouse' : undefined }))}
 	/>
-	{#if filtering}
+	{#if filtering && !view.figure}
 		<span class="chip" title={view.selected.join(', ')}>
 			Filtered to <b>{chipText}</b>
 			<Button variant="ghost" size="icon-xs" class="rounded-full" onclick={showAll} aria-label="Show all" title="Show the whole log"><XIcon /></Button>
@@ -123,6 +149,9 @@
 	{/if}
 </div>
 
+{#if view.figure && view.tab === 'log'}
+	<ActiveFilter what={view.figureLabel} shown={logCount} total={allCount} noun="event" onclear={() => view.clearFocus()} testid="log-filter-active" />
+{/if}
 <div class="log-area">
 <PageBody padding="0" bind:scroller {onscroll}>
 	{#if view.tab === 'statements'}
@@ -134,7 +163,7 @@
 			<p class="err">Couldn't load this run's cost: {view.costRes.error}</p>
 		{/if}
 	{:else}
-		<LogTab request={view.logRequest} entries={shownEntries} {grouped} memory={mem} statements={view.statements} onquery={(id, key) => view.showStatement(id, key)} onframe={(key, line) => view.openCode(key, line)} memberOf={(id) => view.detail?.children.find((c) => c.id === id)?.jobKey ?? null} bind:printed runId={view.run?.id ?? ''} filteredBy={filterKeys} onnode={(key) => view.focusNode(key, 'log')} onstatement={app.client.supports('listRunStatements') ? (key) => view.focusNode(key, 'statements') : undefined} />
+		<LogTab request={view.logRequest} entries={shownEntries} {grouped} memory={mem} statements={view.statements} onquery={(id, key) => view.showStatement(id, key)} onframe={(key, line) => view.openCode(key, line)} memberOf={(id) => view.detail?.children.find((c) => c.id === id)?.jobKey ?? null} bind:printed bind:errorsOnly runId={view.run?.id ?? ''} filteredBy={filterKeys} onnode={(key) => view.focusNode(key, 'log')} onstatement={app.client.supports('listRunStatements') ? (key) => view.focusNode(key, 'statements') : undefined} />
 	{/if}
 </PageBody>
 {#if view.tab === 'log' && !atBottom && fresh > 0}

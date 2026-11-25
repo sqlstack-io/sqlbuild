@@ -135,7 +135,7 @@
 		<!-- Opens at a zoom where the cards' names read (the shared readable fit); Reset view returns there.
 		     Pan and zoom only: cards and folders stay where the layout put them. Zoomed out past the
 		     point where cards are dots, an open folder shows its count instead of blank cards. -->
-		<GraphCanvas bind:nodes bind:edges bind:fit fitOnInit minFitZoom={NAME_ZOOM} controls="fit" {nodeTypes} elementsSelectable nodesDraggable={false} {onnodeclick} fitViewOptions={{ padding: 0.06, maxZoom: 1, minZoom: LABEL_MIN_ZOOM }} minZoom={0.05} />
+		<GraphCanvas bind:nodes bind:edges bind:fit fitOnInit minFitZoom={NAME_ZOOM} fitLabel="Reset view" controls="fit" {nodeTypes} elementsSelectable nodesDraggable={false} {onnodeclick} fitViewOptions={{ padding: 0.06, maxZoom: 1, minZoom: LABEL_MIN_ZOOM }} minZoom={0.05} />
 	</div>
 {/if}
 

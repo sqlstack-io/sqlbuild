@@ -2,7 +2,10 @@
 // resolves selectors against the real snapshot; this stands in for it.
 
 import type { NodeKind, SnapshotNode } from '../types';
-import { REFERENCE_SEEDS } from './seed-audit-run';
+import { REFERENCE_SEEDS, SEED_AUDIT_CHECK } from './seed-audit-run';
+
+/** End-of-build checks a selection can name with `check:`, as a rerun target. */
+const END_CHECKS = new Set([SEED_AUDIT_CHECK, 'revenue_reconciles']);
 import { DISCOVERED_NODES } from './discovered';
 import type { SelectionProblem, SelectionVocabulary, VocabularyEntry } from '../types/operate';
 import { MODELS_ROOT, PATH_SELECTOR_ROOTS, PYTHON_NODES_ROOT, SQL_ROOT } from '$lib/project-layout';
@@ -79,9 +82,11 @@ export const SNAPSHOT_NODES: SnapshotNode[] = [
 	// Discovered steps of two forecast plans (discovered.ts).
 	...DISCOVERED_NODES,
 	// The run-page failure mock-up (seed-audit-run.ts): 92 reference seeds, and two models no run builds.
-	...REFERENCE_SEEDS.map((key) => node(key, 'seed', 'reference', [], { path: `${SQL_ROOT}/seeds/reference/${key}.csv` })),
-	node('fct_order_payments', 'table', 'reconciliation', ['fact_orders', 'stg_payments']),
-	node('fct_payment_totals', 'table', 'reconciliation', ['stg_payments'])
+	// Beside country_codes in sql/seeds, so the Lineage overview's folders keep their shape.
+	...REFERENCE_SEEDS.map((key) => node(key, 'seed', 'staging', [])),
+	// Never built, and read only by the audit: no edges, so the rest of the mock project lays out as before.
+	node('fct_order_payments', 'table', 'finance', [], { path: `${MODELS_ROOT}/finance/reconciliation/fct_order_payments.sql` }),
+	node('fct_payment_totals', 'table', 'finance', [], { path: `${MODELS_ROOT}/finance/reconciliation/fct_payment_totals.sql` })
 ];
 
 const BY_KEY = new Map(SNAPSHOT_NODES.map((n) => [n.key, n]));
@@ -230,6 +235,8 @@ export function evaluateMockSelection(select: string, exclude: string): { keys: 
 		const chosen = new Set<string>();
 		for (const match of text.matchAll(/\S+/g)) {
 			const token = match[0];
+			// An end-of-build check named as a rerun target selects itself, not nodes (the server needs this too).
+			if (END_CHECKS.has(token.replace(/^check:/, '')) && token.startsWith('check:')) continue;
 			let hits = null as Set<string> | null;
 			for (const [index, part] of token.split(',').entries()) {
 				const found = matchPart(part);
@@ -251,6 +258,8 @@ export function evaluateMockSelection(select: string, exclude: string): { keys: 
 	const excluded = resolve('exclude', exclude);
 	if (!(excluded instanceof Set)) return { keys: [], error: excluded };
 	const keys = [...selected].filter((key) => !excluded.has(key)).sort();
+	const namesCheck = select.split(/\s+/).some((t) => t.startsWith('check:') && END_CHECKS.has(t.slice(6)));
+	if (!keys.length && namesCheck) return { keys, error: null };
 	if (!keys.length) return { keys, error: { code: null, message: 'the selectors match no nodes in the current publication', help: null, location: null, suggestions: [], refused: null } };
 	return { keys, error: null };
 }

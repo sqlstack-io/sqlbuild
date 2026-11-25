@@ -36,14 +36,16 @@
 		<span class="part"
 			><a
 				class="fig {f.tone ?? ''}"
-				class:on={view.statusFilter === f.key}
+				class:sb-pressed={view.figure === f.key}
+				class:on={view.figure === f.key}
+				aria-current={view.figure === f.key ? "true" : undefined}
 				href="?show={f.key}"
 				onclick={(ev) => {
 					ev.preventDefault();
-					if (f.key === 'checks_failed') view.showInLog('kind:check level:error');
+					if (f.key === 'checks_failed') view.toggleChecksFilter('failed checks');
 					else view.focusGroup(f.key, f.text.replace(/^\d+ /, ''));
 				}}
-				title="Show only these on the timeline and in the log">{f.text}</a
+				title={view.figure === f.key ? 'Show everything again' : f.key === 'checks_failed' ? 'Show only the failed checks in the log' : 'Show only these on the timeline and in the log'}>{f.text}</a
 			>{#if f.note}<span class="faint">{` ${f.note}`}</span>{/if}</span
 		>
 	{:else}
@@ -60,16 +62,20 @@
 		white-space: pre-wrap;
 		font-size: 12.5px;
 	}
+	/* Calm: a figure is plain text until hovered; only problems keep their status colour. */
 	.fig {
-		color: var(--primary);
+		color: var(--foreground);
 		font-size: 12.5px;
 	}
-	.fig:hover,
-	.fig.on {
+	.fig:hover {
 		text-decoration: underline;
 	}
 	.fig.on {
-		font-weight: 600;
+		padding: 0 5px;
+		text-decoration: none;
+	}
+	.fig.err.on {
+		--pressed-tone: var(--sb-error);
 	}
 	.fig.err {
 		color: var(--sb-error);

@@ -19,7 +19,7 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import LogFilter, { type FilterOption } from './log-filter.svelte';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
-	import XIcon from '@lucide/svelte/icons/x';
+	import ActiveFilter from './active-filter.svelte';
 	import { cn } from '$lib/utils';
 	import { buttonVariants } from '$lib/components/ui/button/button.svelte';
 
@@ -36,8 +36,11 @@
 		onframe,
 		onnode,
 		onstatement,
-		request = null
+		request = null,
+		errorsOnly = $bindable(false)
 	}: {
+		/** Whether the Errors filter is on, for the page to keep the log's place around it. */
+		errorsOnly?: boolean;
 		/** A filter set from outside the log, such as the failure summary's Show in log. */
 		request?: { query: string; seq: number } | null;
 		entries: LogEntry[];
@@ -121,6 +124,19 @@
 	const termValue = (key: string) => terms.find((t) => t.key === key && t.value)?.value ?? null;
 	const level = $derived((termValue('level') === 'warning' ? 'warn' : termValue('level')) ?? 'all');
 	const kind = $derived(termValue('kind') ?? 'all');
+	/** The Errors chip toggles: on remembers the filter text it changed; off puts that text back exactly, unless it was edited since. */
+	let beforeErrors: { query: string; after: string } | null = null;
+	function toggleErrors() {
+		if (level === 'error') {
+			if (beforeErrors && beforeErrors.after === query) query = beforeErrors.query;
+			else setTerm('level', null);
+			beforeErrors = null;
+			return;
+		}
+		const before = query;
+		setTerm('level', 'error');
+		beforeErrors = { query: before, after: query };
+	}
 	/** Writes `key:value` into the filter text, in place of any earlier one; null takes it out. */
 	function setTerm(key: string, value: string | null) {
 		const kept = query.split(/\s+/).filter((t) => t && !t.toLowerCase().startsWith(`${key}:`));
@@ -149,6 +165,9 @@
 	let detailOpen = $state<Set<string>>(new Set(mem<string[]>('logDetails', [])));
 	// svelte-ignore state_referenced_locally
 	let longOpen = $state<Set<string>>(new Set(mem<string[]>('logLong', [])));
+	$effect(() => {
+		errorsOnly = level === 'error';
+	});
 	let applied = 0;
 	$effect(() => {
 		if (!request || request.seq === applied) return;
@@ -236,7 +255,7 @@
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>
 	{/if}
-	{#if errors || level === 'error'}<Button variant={level === 'error' ? 'outline' : 'ghost'} size="sm" class={level === 'error' ? 'count err on' : 'count err'} aria-pressed={level === 'error'} onclick={() => setTerm('level', level === 'error' ? null : 'error')} title={level === 'error' ? 'Show every event' : 'Show only failures'}>Errors {errors}</Button>{/if}
+	{#if errors || level === 'error'}<Button variant={level === 'error' ? 'outline' : 'ghost'} size="sm" class={level === 'error' ? 'count err on sb-pressed' : 'count err'} aria-pressed={level === 'error'} onclick={toggleErrors} title={level === 'error' ? 'Show every event' : 'Show only failures'}>Errors {errors}</Button>{/if}
 	{#if warnings}<Button variant="link" size="inline" class="count warn" onclick={() => setTerm('level', level === 'warn' ? null : 'warn')} title="Show only warnings">Warnings {warnings}</Button>{/if}
 	{#if expectedCount && !printed}<Button variant="link" size="inline" class="expected" aria-pressed={showExpected} onclick={() => (showExpected = !showExpected)} title="Failed lookups the run expects, such as a schema not created yet">{showExpected ? 'Hide' : 'Show'} {plural(expectedCount, 'expected lookup')}</Button>{/if}
 	<span class="grow"></span>
@@ -244,10 +263,7 @@
 </div>
 
 {#if level === 'error'}
-	<div class="only" data-testid="errors-only">
-		Showing errors only · {shown.length} of {plural(modeEntries.length, 'event')}
-		<Button variant="ghost" size="icon-xs" onclick={() => setTerm('level', null)} aria-label="Show every event" title="Show every event"><XIcon /></Button>
-	</div>
+	<ActiveFilter what="errors only" shown={shown.length} total={modeEntries.length} noun="event" onclear={toggleErrors} testid="errors-only" />
 {/if}
 
 <DataTable class="static compact log" embedded columns={logColumns} rows={shown} key={(e) => e.id} empty={entries.length ? 'Nothing in the log matches these filters.' : 'Nothing logged yet.'}>
@@ -385,27 +401,15 @@
 	.filters :global(.count.err) {
 		color: var(--sb-error);
 	}
-	/* Pressed: the filter is on. Tinted and bordered in the error colour, so it reads as held down. */
+	/* Pressed (`sb-pressed`), in the error colour. */
 	.filters :global(.count.err.on) {
-		border-color: color-mix(in srgb, var(--sb-error) 55%, var(--border));
-		background: color-mix(in srgb, var(--sb-error) 20%, transparent);
-		box-shadow: inset 0 1px 3px color-mix(in srgb, black 35%, transparent);
-		font-weight: 600;
+		--pressed-tone: var(--sb-error);
 	}
 	.filters :global(.expected.expected) {
 		color: var(--sb-text-faint);
 		font-size: 12px;
 	}
-	.only {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		padding: 3px 24px;
-		border-block: 1px solid color-mix(in srgb, var(--sb-error) 25%, var(--border-subtle));
-		background: color-mix(in srgb, var(--sb-error) 5%, var(--background));
-		color: var(--muted-foreground);
-		font-size: 12px;
-	}
+
 	.filters :global(.count.warn) {
 		color: var(--sb-warning);
 	}

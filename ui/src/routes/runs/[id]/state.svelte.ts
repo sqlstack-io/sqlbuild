@@ -76,6 +76,10 @@ export function createRunDetailState(runId: string) {
 	const progress = $derived(progressOf(nodes));
 	// ---- the timeline narrowed to one outcome, picked in the panel's summary ----
 	let statusFilter = $state<NodeGroupKey | null>(remembered('statusFilter', null));
+	/** The header's failed-checks figure: the log shows only failed checks; again shows everything. */
+	let checksFilter = $state<boolean>(remembered('checksFilter', false));
+	/** The picked figure's words, such as `built` or `failed checks`, for the active-filter line. */
+	let figureLabel = $state<string>(remembered('figureLabel', ''));
 	const nodeGroups = $derived(groupNodes(nodes, active));
 	/** The timeline's nodes: those of the outcome picked, else all; a picked outcome no node has any more shows all. */
 	const shownNodes = $derived.by(() => {
@@ -123,10 +127,25 @@ export function createRunDetailState(runId: string) {
 		else selection.exclude = withNameToggled(selection.exclude, name);
 	}
 
+	// A quick pick toggles: picked again while its selection is unchanged, it puts back the selection it replaced.
+	let picked = $state<{ pick: QuickPick; text: string; select: string; exclude: string } | null>(null);
 	function pick(quick: QuickPick) {
-		selection.select = quickPickText(quick, nodes, run?.jobKey ?? null);
+		const text = quickPickText(quick, nodes, run?.jobKey ?? null);
+		const current = picked && picked.text === selection.select && !selection.exclude ? picked : null;
+		if (current?.pick === quick) {
+			selection.select = current.select;
+			selection.exclude = current.exclude;
+			picked = null;
+			return;
+		}
+		// Switching from one pick to another keeps the selection from before the first.
+		const before = current ?? { select: selection.select, exclude: selection.exclude };
+		picked = { pick: quick, text, select: before.select, exclude: before.exclude };
+		selection.select = text;
 		selection.exclude = '';
 	}
+	/** The quick pick whose selection is shown, if it is unchanged since it was picked. */
+	const activePick = $derived(picked && picked.text === selection.select && !selection.exclude ? picked.pick : null);
 
 	function clearSelection() {
 		selection.select = '';
@@ -159,12 +178,22 @@ export function createRunDetailState(runId: string) {
 	}
 
 	/** A summary figure: the timeline and the log show only its nodes; again shows everything. */
+	// A header figure toggles: on keeps the focus it replaced (a node picked in the log), off puts it back.
+	let focusBefore: typeof focus | undefined = undefined;
+	function figureOn() {
+		if (focusBefore === undefined && !statusFilter && !checksFilter) focusBefore = focus;
+	}
+	function figureOff() {
+		statusFilter = null;
+		checksFilter = false;
+		focus = focusBefore ?? null;
+		focusBefore = undefined;
+	}
 	function focusGroup(key: NodeGroupKey | null, label = '') {
-		if (!key || statusFilter === key) {
-			statusFilter = null;
-			focus = null;
-			return;
-		}
+		if (!key || statusFilter === key) return figureOff();
+		figureOn();
+		checksFilter = false;
+		figureLabel = label;
 		statusFilter = key;
 		const group = nodeGroups.find((g) => g.key === key);
 		focus = { label, keys: group?.nodes.map((n) => n.nodeKey) ?? [] };
@@ -193,7 +222,7 @@ export function createRunDetailState(runId: string) {
 	/** A line of the drawer's node's code to show, from a traceback frame. */
 	let codeLine = $state<number | null>(remembered('codeLine', null));
 	$effect(() => {
-		Object.assign(memory, { select: selection.select, exclude: selection.exclude, tab, focus: $state.snapshot(focus), statusFilter, drawer, codeLine });
+		Object.assign(memory, { select: selection.select, exclude: selection.exclude, tab, focus: $state.snapshot(focus), statusFilter, checksFilter, figureLabel, drawer, codeLine });
 	});
 
 	const summary = $derived(summaryOf(nodes, events, active));
@@ -259,6 +288,30 @@ export function createRunDetailState(runId: string) {
 		get statusFilter() {
 			return nodeGroups.some((g) => g.key === statusFilter) ? statusFilter : null;
 		},
+		/** The header figure whose filter is on: a node group, or the failed checks. */
+		get figure(): NodeGroupKey | 'checks_failed' | null {
+			if (checksFilter) return 'checks_failed';
+			return nodeGroups.some((g) => g.key === statusFilter) ? statusFilter : null;
+		},
+		get figureLabel() {
+			return figureLabel;
+		},
+		get checksFilter() {
+			return checksFilter;
+		},
+		/** The failed-checks figure: on shows only failed checks in the log; again shows everything. */
+		toggleChecksFilter(label: string) {
+			if (checksFilter) return figureOff();
+			figureOn();
+			statusFilter = null;
+			focus = null;
+			figureLabel = label;
+			checksFilter = true;
+			tab = 'log';
+		},
+		get activePick() {
+			return activePick;
+		},
 		/** Shows only the nodes of `key` on the timeline, or all again when it is already picked. */
 		filterStatus(key: NodeGroupKey | null) {
 			statusFilter = statusFilter === key ? null : key;
@@ -287,8 +340,8 @@ export function createRunDetailState(runId: string) {
 			return focus;
 		},
 		clearFocus() {
+			if (statusFilter || checksFilter) return figureOff();
 			focus = null;
-			statusFilter = null;
 		},
 		focusGroup,
 		showInLog,
@@ -314,6 +367,7 @@ export function createRunDetailState(runId: string) {
 		},
 		openDrawer(key: string | null) {
 			drawer = key;
+			if (key) showDetails = false;
 			codeLine = null;
 		},
 		get codeLine() {
@@ -342,6 +396,7 @@ export function createRunDetailState(runId: string) {
 		clickNode(key: string) {
 			selectNode(key);
 			drawer = key;
+			showDetails = false;
 			codeLine = null;
 		},
 		get summary() {
@@ -353,8 +408,10 @@ export function createRunDetailState(runId: string) {
 		get showDetails() {
 			return showDetails;
 		},
+		/** Details and the node drawer share the right-hand panel: opening one closes the other. */
 		toggleDetails() {
 			showDetails = !showDetails;
+			if (showDetails) drawer = null;
 		},
 		get tab() {
 			return tab;

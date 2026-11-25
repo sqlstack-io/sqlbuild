@@ -166,7 +166,7 @@
 		min-width: 0;
 	}
 	.message {
-		color: var(--sb-mono-err);
+		color: var(--foreground);
 		font-family: var(--font-mono);
 		font-size: 12px;
 		overflow-wrap: anywhere;

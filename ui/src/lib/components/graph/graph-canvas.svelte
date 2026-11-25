@@ -28,6 +28,7 @@
 		readable = true,
 		fitFloor = READABLE_ZOOM,
 		minFitZoom,
+		fitLabel,
 		controls = 'fit',
 		showLock = false,
 		framed = false,
@@ -51,6 +52,8 @@
 		fitFloor?: number;
 		/** The lowest zoom the readable fit (first view and Reset view) opens at, whatever the graph's size. */
 		minFitZoom?: number;
+		/** The fit button's name: "Reset view" where it returns to the view the graph opened at. */
+		fitLabel?: string;
 		/** `fit`: zoom buttons with a readable fit; `full`: the library's own controls, for a very large graph drawn whole. */
 		controls?: 'fit' | 'full' | 'none';
 		showLock?: boolean;
@@ -152,7 +155,7 @@
 		<ViewportPortal target="back">
 			<div class="grid" style:transform="translate({gridArea.x}px, {gridArea.y}px)" style:width="{gridArea.width}px" style:height="{gridArea.height}px"></div>
 		</ViewportPortal>
-		{#if controls === 'fit'}<FitControls onfit={() => fit?.()} {showLock} />{:else if controls === 'full'}<Controls {showLock} />{/if}
+		{#if controls === 'fit'}<FitControls onfit={() => fit?.()} {showLock} label={fitLabel} />{:else if controls === 'full'}<Controls {showLock} />{/if}
 		{@render children?.()}
 	</SvelteFlow>
 </div>
