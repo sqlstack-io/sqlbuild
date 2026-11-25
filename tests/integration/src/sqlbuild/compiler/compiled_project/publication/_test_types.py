@@ -732,6 +732,7 @@ class FailedPlanTestCase:
     edited_file: str
     edit: tuple[str, str]
     selection: list[str]
+    expected_error_model: str
     expected_code: str
     expected_reason: str
 

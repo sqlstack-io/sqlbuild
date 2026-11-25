@@ -11,26 +11,28 @@ use sqlbuild_python_project::compiled_views::main::compiled_models::model_key::m
 use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 
 use crate::planner_entries::_helpers::entries::values::{planner_model, planner_type, string};
+use crate::planner_entries::constants::SOURCE_VALIDATION_CODE_PREFIX;
 use crate::planner_resolution::models::WindowFit;
 use crate::planner_strategy::main::strategy::materialization_of::materialization_of;
 
-/// The model's error row and its error-severity warning, or `error` itself when it isn't a planning error a person can fix.
+/// The model's error row and its error-severity warning, or `error` itself when it isn't a planning error: a compile or validation error, such as a capped watermark edge (P001) or a source that breaks its contract (S4xx), still fails the plan.
 pub(crate) fn planning_error<'py>(
     model: &Bound<'py, PyAny>,
     error: PyErr,
 ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
     let py: Python<'py> = model.py();
     let value: Bound<'py, PyAny> = error.value(py).clone().into_any();
-    if !value.is_instance(&error_class(py, ErrorId::PlannerInput)?)?
-        && !value.is_instance(&error_class(py, ErrorId::CompileInput)?)?
-    {
-        return Err(error);
-    }
     let attribute = |name: &str| -> PyResult<Bound<'py, PyAny>> {
         Ok(value
             .getattr_opt(name)?
             .unwrap_or_else(|| py.None().into_bound(py)))
     };
+    let code: String = attribute("code")?.str()?.to_string();
+    if !value.is_instance(&error_class(py, ErrorId::PlannerInput)?)?
+        || code.starts_with(SOURCE_VALIDATION_CODE_PREFIX)
+    {
+        return Err(error);
+    }
     let message: Bound<'py, PyAny> = match attribute("message")? {
         message if message.is_truthy()? => message,
         _ => value.str()?.into_any(),

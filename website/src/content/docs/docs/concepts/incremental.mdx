@@ -198,7 +198,7 @@ Cursors define the incremental replay boundary. SQLBuild queries `MAX(cursor)` f
   with `P001`, naming the window and each model's `cursor_start`. Selected models without a cursor
   don't count.
 
-A window that reaches a model's exclusive `cursor_end` still fails that model.
+A window that reaches a model's exclusive `cursor_end` still fails the plan with `P001`.
 
 ### cursor_inputs
 

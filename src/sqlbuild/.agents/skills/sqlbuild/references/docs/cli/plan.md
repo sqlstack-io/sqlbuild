@@ -195,6 +195,12 @@ every other model plans as usual. In `sqb plan --json` the model's row has `"act
 `"reason": "planning_error"` and an `error` object with `code`, `message` and `help`, and the
 plan has `"has_errors": true`; the plan exits `1`.
 
+Only planning errors become error rows: a model the plan can't decide how to build, such as `S203`,
+a cursor input error (`S302`) or a cursor safety limit. Compile and validation errors still fail the
+whole plan with their code, as before: an invalid project edge such as a capped watermark input
+(`P001`), and source checks against the warehouse (`S4xx`), such as a missing source or a source
+column that breaks an enforced contract.
+
 `sqb build` refuses a selection that contains a model that can't be planned, with that model's
 error; select around it or fix it. A location's plan of what changed keeps the models it could
 plan and reports the others, so the location's health is `change_plan_failed`, naming them.
