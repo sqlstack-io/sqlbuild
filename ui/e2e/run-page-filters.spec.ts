@@ -112,7 +112,7 @@ for (const how of ['✕', 'Esc'] as const) {
 }
 
 // The rerun plan holds no state of its own: it opens on failed:<run>+, the box's own suggestions offer the
-// run selectors, and "from run" is read from the selection.
+// presets as text, "from run" is read from the selection, and Run submits the command shown beside it.
 test('the rerun plan opens on failed:<run>+ and the box suggests the run selectors', async ({ page }) => {
 	await page.goto('/plan/rerun?run=run-pa93&mode=from_failure&mock');
 	const box = page.locator('.sel-field').first();
@@ -121,16 +121,21 @@ test('the rerun plan opens on failed:<run>+ and the box suggests the run selecto
 	await expect(page.getByRole('listbox')).toHaveCount(0);
 	await expect(page.getByTestId('rerun-from')).toContainText('from run');
 	await expect(page.getByRole('cell', { name: 'orders_match_payments' })).toBeVisible();
+	await expect(page.getByTestId('rerun-command')).toHaveText('sqb build -s failed:run-pa93+');
 	await page.getByRole('button', { name: 'Clear selection' }).click();
 	await selector(page).fill('run:');
-	const whole = page.getByRole('option', { name: /run:run-pa93\s*the whole run/ });
+	const whole = page.getByRole('option', { name: /Rerun the whole run/ });
 	await expect(whole).toBeVisible();
 	await whole.click();
 	await expect(box).toContainText('run:run-pa93');
 	await expect(page.getByTestId('rerun-from')).toContainText('from run');
+	await expect(page.getByTestId('rerun-command')).toHaveText('sqb build -s run:run-pa93');
 	await page.getByRole('button', { name: 'Clear selection' }).click();
 	await selector(page).fill('country_codes ');
 	await expect(page.getByTestId('rerun-from')).toHaveCount(0);
+	await expect(page.getByTestId('rerun-command')).toHaveText('sqb build -s country_codes');
+	await page.getByRole('button', { name: 'Run', exact: true }).click();
+	await expect(page).toHaveURL(/\/runs\/(?!run-pa93)[^/?]+/);
 });
 
 // A failed audit's warehouse error is read from its result (behind view.evidence), not from the run's

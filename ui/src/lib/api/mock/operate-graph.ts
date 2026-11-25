@@ -314,9 +314,10 @@ export function evaluateMockSelection(select: string, exclude: string): { keys: 
 	if (!(selected instanceof Set)) return { keys: [], error: selected };
 	const excluded = resolve('exclude', exclude);
 	if (!(excluded instanceof Set)) return { keys: [], error: excluded };
-	const keys = [...selected].filter((key) => !excluded.has(key)).sort();
-	const namesCheck = auditsSelected(select).length > 0;
-	if (!keys.length && namesCheck) return { keys, error: null };
+	// Audits are selected as `audit:<name>` keys beside the nodes, as the server returns them.
+	const leftOut = new Set(auditsSelected(exclude));
+	const audits = auditsSelected(select).filter((name) => !leftOut.has(name)).map((name) => `audit:${name}`);
+	const keys = [...[...selected].filter((key) => !excluded.has(key)), ...audits].sort();
 	if (!keys.length) return { keys, error: { code: null, message: 'the selectors match no nodes in the current publication', help: null, location: null, suggestions: [], refused: null } };
 	return { keys, error: null };
 }
@@ -340,6 +341,7 @@ export function mockVocabulary(): Omit<SelectionVocabulary, 'snapshotId' | 'jobs
 		paths: counted(SNAPSHOT_NODES.flatMap(folders)),
 		sources: counted(SNAPSHOT_NODES.filter((n) => n.kind === 'source').map((n) => n.key)),
 		seeds: counted(SNAPSHOT_NODES.filter((n) => n.kind === 'seed').map((n) => n.key)),
-		kinds: counted(SNAPSHOT_NODES.map(selectorKind))
+		kinds: counted(SNAPSHOT_NODES.map(selectorKind)),
+		audits: counted([...END_CHECKS])
 	};
 }

@@ -255,7 +255,7 @@ function evaluateCostSelection(select: string, exclude: string): SelectionEvalua
 		}
 		return chosen;
 	};
-	const reply = (keys: string[], error: SelectionProblem | null): SelectionEvaluation => ({ snapshotId: 'mock-snapshot', count: keys.length, keys, nextOffset: null, error });
+	const reply = (keys: string[], error: SelectionProblem | null): SelectionEvaluation => ({ snapshotId: 'mock-snapshot', count: keys.length, audits: 0, keys, nextOffset: null, error });
 	const selected = select.trim() ? resolve('select', select) : new Set(catalog().metas.map((m) => m.key));
 	if (!(selected instanceof Set)) return reply([], selected);
 	const excluded = exclude.trim() ? resolve('exclude', exclude) : new Set<string>();
@@ -281,7 +281,8 @@ function costVocabulary(): SelectionVocabulary {
 		jobs: [...jobs].filter(([j]) => j !== MANUAL).map(([value, keys]) => ({ value, count: keys.length })).sort((a, b) => a.value.localeCompare(b.value)),
 		sources: [],
 		seeds: [],
-		kinds: [{ value: 'model', count: metas.length }]
+		kinds: [{ value: 'model', count: metas.length }],
+		audits: []
 	};
 }
 

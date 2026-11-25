@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::runs::_helpers::lifecycle::publications::viewed_publication;
 use crate::runs::_helpers::requests::past_runs::read_selected_past_runs;
-use crate::runs::constants::{SELECTION_PAGE_DEFAULT, SELECTION_PAGE_MAX};
+use crate::runs::constants::{AUDIT_KEY_PREFIX, SELECTION_PAGE_DEFAULT, SELECTION_PAGE_MAX};
 use crate::runs::models::{SelectionEvaluation, SelectionProblem, SelectionQuery};
 use crate::runs::types::CommandPlanner;
 use crate::store::errors::ControlError;
@@ -29,6 +29,7 @@ pub async fn evaluate_selection(
         return Ok(SelectionEvaluation {
             snapshot_id: None,
             count: 0,
+            audits: 0,
             keys: Vec::new(),
             next_offset: None,
             error: Some(SelectionProblem {
@@ -57,6 +58,7 @@ pub async fn evaluate_selection(
             return Ok(SelectionEvaluation {
                 snapshot_id: Some(snapshot.snapshot_id),
                 count: 0,
+                audits: 0,
                 keys: Vec::new(),
                 next_offset: None,
                 error: Some(*problem),
@@ -78,6 +80,10 @@ pub async fn evaluate_selection(
     Ok(SelectionEvaluation {
         snapshot_id: Some(snapshot.snapshot_id),
         count: keys.len() as u64,
+        audits: keys
+            .iter()
+            .filter(|key| key.starts_with(AUDIT_KEY_PREFIX))
+            .count() as u64,
         next_offset: ((end as usize) < keys.len()).then_some(end),
         keys: page,
         error: None,

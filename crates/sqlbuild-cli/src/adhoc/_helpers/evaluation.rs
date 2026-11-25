@@ -79,6 +79,13 @@ pub(crate) fn vocabulary(publication: &IndexedPublication) -> SelectionVocabular
         sources: entries(sources),
         seeds: entries(seeds),
         kinds: entries(kinds),
+        audits: entries(
+            publication
+                .audits
+                .iter()
+                .map(|(name, keys)| (name.clone(), keys.len() as u64))
+                .collect(),
+        ),
     }
 }
 

@@ -65,6 +65,8 @@ pub(crate) const PUBLICATIONS_PER_TARGET: usize = 2;
 /// Selected keys per page of a selection evaluation, and the most a request may ask for.
 pub(crate) const SELECTION_PAGE_DEFAULT: u32 = 1_000;
 pub(crate) const SELECTION_PAGE_MAX: u32 = 10_000;
+/// The key prefix of an audit a selection picks, singular or attached.
+pub(crate) const AUDIT_KEY_PREFIX: &str = "audit:";
 
 /// A followed run's repeated output reads are audited at most once per person, run and kind in this window, on each server.
 pub(crate) const REPEATED_READ_AUDIT: std::time::Duration = std::time::Duration::from_secs(600);

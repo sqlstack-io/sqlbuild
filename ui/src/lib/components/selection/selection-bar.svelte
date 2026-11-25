@@ -117,7 +117,7 @@
 		<span class="sb-count" class:pending={selection.evaluating} aria-live="polite">
 			{#if !selection.active}All <b>{total.toLocaleString('en')}</b> nodes
 			{:else if problem}0 nodes
-			{:else if selection.evaluation}<b>{selection.evaluation.count.toLocaleString('en')}</b> {noun(selection.evaluation.count, 'node')}
+			{:else if selection.evaluation}{@const { count, audits } = selection.evaluation}{#if count - audits || !audits}<b>{(count - audits).toLocaleString('en')}</b> {noun(count - audits, 'node')}{/if}{#if count - audits && audits} · {/if}{#if audits}<b>{audits.toLocaleString('en')}</b> {noun(audits, 'audit')}{/if}
 			{:else}—{/if}
 		</span>
 		{#if offerCopy}<Button variant="outline" size="bar" disabled={blocked} onclick={copy} title={command}>{#if copied}<CheckIcon />Copied{:else}<CopyIcon />Copy as <code>sqb build -s …</code>{/if}</Button>{/if}

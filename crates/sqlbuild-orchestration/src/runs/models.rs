@@ -1177,8 +1177,11 @@ pub struct SelectionQuery {
 pub struct SelectionEvaluation {
     /// The publication evaluated; `None` before the first one.
     pub snapshot_id: Option<Uuid>,
-    /// Every selected node, across all pages.
+    /// Every selected node and audit, across all pages.
     pub count: u64,
+    /// How many of them are audits, keyed `audit:<name>[:…]`.
+    #[serde(default)]
+    pub audits: u64,
     /// One page of the selected `kind:name` keys, sorted.
     pub keys: Vec<String>,
     /// The offset of the next page, when there is one.
@@ -1280,6 +1283,9 @@ pub struct SelectionVocabulary {
     pub seeds: Vec<VocabularyEntry>,
     /// `kind:` values: the nodes of each kind.
     pub kinds: Vec<VocabularyEntry>,
+    /// `audit:` names: the audits each name selects, one per target it is attached to.
+    #[serde(default)]
+    pub audits: Vec<VocabularyEntry>,
 }
 
 /// One selector value and the number of nodes it selects.

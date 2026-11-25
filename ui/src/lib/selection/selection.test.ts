@@ -159,7 +159,8 @@ const VOCAB: SelectionVocabulary = {
 	jobs: [],
 	sources: [],
 	seeds: [],
-	kinds: [{ value: 'model', count: 20 }]
+	kinds: [{ value: 'model', count: 20 }],
+	audits: [{ value: 'revenue_reconciles', count: 1 }]
 };
 
 describe('suggestions', () => {
@@ -181,5 +182,9 @@ describe('suggestions', () => {
 
 	it('offers only that type’s values after a colon', () => {
 		expect(suggest('tag:fin', VOCAB, []).flatMap((g) => g.items.map((i) => i.insert))).toEqual(['tag:finance']);
+	});
+
+	it('offers audit names after audit:, as an audit selector takes them', () => {
+		expect(suggest('audit:rev', VOCAB, []).flatMap((g) => g.items.map((i) => i.insert))).toEqual(['audit:revenue_reconciles']);
 	});
 });

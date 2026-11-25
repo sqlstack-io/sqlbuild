@@ -665,7 +665,7 @@ export class MockOperate {
 		const offset = request.offset ?? 0;
 		const limit = Math.min(Math.max(request.limit ?? 1000, 1), 10_000);
 		const page = keys.slice(offset, offset + limit);
-		return this.#ctx.reply({ snapshotId: 'mock-snapshot', count: keys.length, keys: page, nextOffset: offset + limit < keys.length ? offset + limit : null, error });
+		return this.#ctx.reply({ snapshotId: 'mock-snapshot', count: keys.length, audits: keys.filter((key) => key.startsWith('audit:')).length, keys: page, nextOffset: offset + limit < keys.length ? offset + limit : null, error });
 	}
 
 	selectionVocabulary(scope: Scope): Promise<SelectionVocabulary> {

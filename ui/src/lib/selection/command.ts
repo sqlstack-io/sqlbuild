@@ -2,7 +2,7 @@
 // command line. Pure.
 
 import { parseSelection } from './syntax';
-import type { SelectionProblem } from '$lib/api';
+import type { AdhocRunRequest, SelectionProblem } from '$lib/api';
 
 export const SELECT_PARAM = 'select';
 export const EXCLUDE_PARAM = 'exclude';
@@ -30,13 +30,18 @@ export function shellWord(token: string): string {
 	return /^[\w.:/,+@=%-]+$/.test(token) && !token.startsWith('~') ? token : `'${token.replaceAll("'", `'\\''`)}'`;
 }
 
-/** `sqb build -s … [--exclude …]` to paste into a shell. */
+/** The ad-hoc run of `sqb build -s … [--exclude …]`: the argument tokens after `sqb`, as the server receives them. */
+export function buildRequest(s: Selection): AdhocRunRequest {
+	const words = (text: string) => parseSelection(text).map((t) => t.raw);
+	const command = ['build'];
+	if (s.select.trim()) command.push('-s', ...words(s.select));
+	if (s.exclude.trim()) command.push('--exclude', ...words(s.exclude));
+	return { command, priority: 0 };
+}
+
+/** `sqb build -s … [--exclude …]` to paste into a shell: exactly the tokens {@link buildRequest} submits, quoted. */
 export function copyCommand(s: Selection): string {
-	const words = (text: string) => parseSelection(text).map((t) => shellWord(t.raw));
-	const out = ['sqb', 'build'];
-	if (s.select.trim()) out.push('-s', ...words(s.select));
-	if (s.exclude.trim()) out.push('--exclude', ...words(s.exclude));
-	return out.join(' ');
+	return ['sqb', ...buildRequest(s).command.map(shellWord)].join(' ');
 }
 
 /** The plan page with `sqb build -s … [--exclude …]` filled in; its command line splits on spaces, so nothing is quoted. */

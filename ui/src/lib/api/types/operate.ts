@@ -741,7 +741,10 @@ export type SelectionProblem = {
 /** What `sqb build --select … --exclude …` selects in the current publication: one page of keys and the total. */
 export type SelectionEvaluation = {
 	snapshotId: string | null;
+	/** Every selected node and audit. */
 	count: number;
+	/** How many of them are audits (`audit:<name>[:…]` keys). */
+	audits: number;
 	keys: string[];
 	nextOffset: number | null;
 	error: SelectionProblem | null;
@@ -760,6 +763,8 @@ export type SelectionVocabulary = {
 	sources: VocabularyEntry[];
 	seeds: VocabularyEntry[];
 	kinds: VocabularyEntry[];
+	/** Audit names an `audit:` selector takes, counting the targets each is attached to. */
+	audits: VocabularyEntry[];
 };
 
 // ---- ad-hoc runs (the plan page) ----

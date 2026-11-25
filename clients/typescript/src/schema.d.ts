@@ -1161,6 +1161,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/selection/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPastRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/selection/vocabulary": {
         parameters: {
             query?: never;
@@ -1963,6 +1979,21 @@ export interface components {
             error: string;
             /** Format: uuid */
             request_id: string;
+        };
+        BTreeMap: {
+            [key: string]: {
+                /** @description Its failed, cancelled and never-reached nodes, and its failed audits. */
+                failed: string[];
+                /**
+                 * Format: uuid
+                 * @description The run the typed ID names.
+                 */
+                run_id: string;
+                /** @description Every node the run selected. */
+                selected: string[];
+                /** @description The nodes it skipped because something they depend on failed. */
+                skipped: string[];
+            };
         };
         /**
          * @description How one recorded stretch of a microbatch model's cursor stands.
@@ -3376,6 +3407,12 @@ export interface components {
             csrf_token: string;
             identity: components["schemas"]["SessionIdentity"];
         };
+        /** @description The past runs read, or why one can't be: too short, unknown or ambiguous. */
+        PastRunsRead: {
+            error?: string | null;
+            /** @description Each run by the ID as given; empty when `error` is set. */
+            runs: components["schemas"]["BTreeMap"];
+        };
         /** @description The person's name, the actions allowed server-wide, and the location targets they can view. */
         PersonAccess: {
             actions: components["schemas"]["Action"][];
@@ -4668,7 +4705,12 @@ export interface components {
         SelectionEvaluation: {
             /**
              * Format: int64
-             * @description Every selected node, across all pages.
+             * @description How many of them are audits, keyed `audit:<name>[:…]`.
+             */
+            audits?: number;
+            /**
+             * Format: int64
+             * @description Every selected node and audit, across all pages.
              */
             count: number;
             error?: null | components["schemas"]["SelectionProblem"];
@@ -4727,6 +4769,8 @@ export interface components {
         };
         /** @description The values each selector type takes in the current publication, with how many nodes each one selects. */
         SelectionVocabulary: {
+            /** @description `audit:` names: the audits each name selects, one per target it is attached to. */
+            audits?: components["schemas"]["VocabularyEntry"][];
             /** @description `job:` names: the nodes each job or job group selects. */
             jobs: components["schemas"]["VocabularyEntry"][];
             /** @description `kind:` values: the nodes of each kind. */
@@ -8779,6 +8823,47 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPastRuns: {
+        parameters: {
+            query?: {
+                /** @description Comma-separated run IDs, each full or a unique prefix of at least 8 characters */
+                ids?: string;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What each run selected, didn't finish and skipped, or why one can't be read */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PastRunsRead"];
                 };
             };
             /** @description Session rejected */

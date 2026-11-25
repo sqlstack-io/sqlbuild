@@ -3,7 +3,9 @@
 use sqlbuild_orchestration::runs::models::{SelectionField, SelectionProblem, SelectionRefusal};
 use sqlbuild_orchestration::runs::types::PastRuns;
 
-use crate::adhoc::tests::helpers::{orders_publication, owned_evaluation};
+use crate::adhoc::tests::helpers::{
+    audited_orders_publication, orders_publication, owned_evaluation,
+};
 use crate::adhoc::tests::test_types::{
     RefusedPartTestCase, SelectionEvaluationTestCase, VocabularyTestCase,
 };
@@ -144,6 +146,27 @@ fn given_a_publication_when_its_vocabulary_is_read_then_each_value_counts_the_no
         },
     ];
     let vocabulary = orders_publication().vocabulary();
+    for test_case in test_cases {
+        let actual: Vec<(&str, u64)> = (test_case.entries_of)(&vocabulary)
+            .iter()
+            .map(|entry| (entry.value.as_str(), entry.count))
+            .collect();
+        assert_eq!(
+            actual, test_case.expected_entries,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_audits_when_the_vocabulary_is_read_then_each_audit_name_counts_its_targets() {
+    let test_cases = [VocabularyTestCase {
+        description: "a singular audit and an attached audit are each listed once, by name",
+        entries_of: |vocabulary| &vocabulary.audits,
+        expected_entries: &[("not_null_orders_id", 1), ("orders_match_payments", 1)],
+    }];
+    let vocabulary = audited_orders_publication().vocabulary();
     for test_case in test_cases {
         let actual: Vec<(&str, u64)> = (test_case.entries_of)(&vocabulary)
             .iter()

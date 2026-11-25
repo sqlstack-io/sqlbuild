@@ -12,7 +12,8 @@ export const SELECTOR_HINTS: { type: string; hint: string }[] = [
 	{ type: 'kind', hint: 'every node of one kind: model, source, seed, …' },
 	{ type: 'source', hint: 'a source table' },
 	{ type: 'seed', hint: 'a seed' },
-	{ type: 'test', hint: 'a test' }
+	{ type: 'test', hint: 'a test' },
+	{ type: 'audit', hint: 'an audit, by name' }
 ];
 
 /** The vocabulary list each selector type takes its values from. */
@@ -22,11 +23,12 @@ export const VALUES_OF: Record<string, keyof Omit<SelectionVocabulary, 'snapshot
 	job: 'jobs',
 	kind: 'kinds',
 	source: 'sources',
-	seed: 'seeds'
+	seed: 'seeds',
+	audit: 'audits'
 };
 
 /** What a group of values is called, by selector type. */
-const GROUP_NAME: Record<string, string> = { tag: 'Tags', path: 'Folders', job: 'Jobs', kind: 'Kinds', source: 'Sources', seed: 'Seeds' };
+const GROUP_NAME: Record<string, string> = { tag: 'Tags', path: 'Folders', job: 'Jobs', kind: 'Kinds', source: 'Sources', seed: 'Seeds', audit: 'Audits' };
 
 /** A node name to offer, with where it lives. */
 export type NameEntry = { value: string; hint: string; count?: number };
