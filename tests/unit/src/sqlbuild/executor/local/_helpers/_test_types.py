@@ -90,8 +90,17 @@ class OwnFailureTestCase:
 
 @dataclass(frozen=True)
 class FailureTextRefusalTestCase:
-    """A scenario step's failure text, and the refusal title it means or None."""
+    """A scenario step's failure text that keeps the scenario off DuckDB, and the refusal title."""
 
     description: str
     message: str
-    expected_title: str | None
+    expected_title: str
+
+
+@dataclass(frozen=True)
+class OwnFailureTextTestCase:
+    """A scenario step's failure text that Snowflake would raise too: the scenario's own result."""
+
+    description: str
+    message: str
+    expected_refused: bool

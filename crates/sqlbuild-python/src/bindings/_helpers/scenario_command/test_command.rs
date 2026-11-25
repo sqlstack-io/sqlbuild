@@ -538,11 +538,11 @@ fn since_base(request: &Bound<'_, PyAny>, run: &TestRun<'_>) -> PyResult<Option<
 }
 
 /// The scenarios of `scenarios` whose name is in `names`, in order.
-fn named<'py>(scenarios: &Bound<'py, PyTuple>, names: &[String]) -> PyResult<Bound<'py, PyTuple>> {
+fn named<'py>(scenarios: &Bound<'py, PyTuple>, names: &[&str]) -> PyResult<Bound<'py, PyTuple>> {
     let mut kept: Vec<Bound<'py, PyAny>> = Vec::new();
     for scenario in scenarios.iter() {
         let name: String = native_field(&scenario, "name")?.extract()?;
-        if names.contains(&name) {
+        if names.contains(&name.as_str()) {
             kept.push(scenario);
         }
     }
@@ -608,15 +608,10 @@ pub(crate) fn run_scenario_test_command(
             })
             .collect::<PyResult<_>>()?
     };
-    let local_names: Vec<String> = decisions
+    let local_names: Vec<&str> = decisions
         .iter()
         .filter(|decision| mode == RunOn::Local || decision.local())
-        .map(|decision| decision.name.clone())
-        .collect();
-    let mut warehouse_names: Vec<String> = decisions
-        .iter()
-        .filter(|decision| mode != RunOn::Local && !decision.local())
-        .map(|decision| decision.name.clone())
+        .map(|decision| decision.name.as_str())
         .collect();
     let section: SectionStatus<'_> = begin_section(
         &run.stream,
@@ -638,11 +633,14 @@ pub(crate) fn run_scenario_test_command(
             (&pipeline, &named(&scenarios, &local_names)?),
             (&section, mode == RunOn::Auto),
         )?;
-        let (kept, fallbacks) = split_scenario_fallbacks(ran, (&mut decisions, mode))?;
-        results.extend(kept);
-        warehouse_names.extend(fallbacks);
+        results.extend(split_scenario_fallbacks(ran, (&mut decisions, mode))?);
         local_statements = statement_summary_delta(&before, &statement_summary(py)?);
     }
+    let warehouse_names: Vec<&str> = decisions
+        .iter()
+        .filter(|decision| mode != RunOn::Local && !decision.local())
+        .map(|decision| decision.name.as_str())
+        .collect();
     let reporting: TestRun<'_> = if warehouse_names.is_empty() || !run.local {
         if !run.local {
             results.extend(execute_batch(

@@ -8,6 +8,7 @@ from tests.unit.src.sqlbuild.executor.local._helpers._test_types import (
     FailureTextRefusalTestCase,
     LocalRunRefusalTestCase,
     OwnFailureTestCase,
+    OwnFailureTextTestCase,
 )
 
 
@@ -95,11 +96,6 @@ def test_given_an_error_snowflake_would_raise_too_when_classifying_then_it_is_th
             message="local model 'orders' failed: INTERNAL Error: unexpected plan\nStack Trace:",
             expected_title="DuckDB internal error: unexpected plan",
         ),
-        FailureTextRefusalTestCase(
-            description="a model step that failed as Snowflake would",
-            message="local model 'orders' failed: Binder Error: Referenced column a not found",
-            expected_title=None,
-        ),
     ],
     ids=lambda case: case.description,
 )
@@ -108,8 +104,27 @@ def test_given_a_scenario_step_failure_when_classifying_its_text_then_guards_and
 ) -> None:
     refused: LocalRunRefusedError | None = local_failure_refusal(test_case.message)
 
-    title: str | None = None if refused is None else f"{refused.category}: {refused.construct}"
-    assert title == test_case.expected_title
+    assert refused is not None
+    assert f"{refused.category}: {refused.construct}" == test_case.expected_title
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        OwnFailureTextTestCase(
+            description="a model step that failed as Snowflake would",
+            message="local model 'orders' failed: Binder Error: Referenced column a not found",
+            expected_refused=False,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_scenario_step_that_failed_as_snowflake_would_when_classifying_then_it_is_its_own(
+    test_case: OwnFailureTextTestCase,
+) -> None:
+    refused: LocalRunRefusedError | None = local_failure_refusal(test_case.message)
+
+    assert (refused is not None) is test_case.expected_refused
 
 
 if __name__ == "__main__":
