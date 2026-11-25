@@ -292,7 +292,7 @@ impl ServerHealth {
     /// The opened store, which names the database and whose pool tells a full pool from an unreachable database.
     pub fn attach_store(&self, store: &ControlStore) {
         let mut state = self.state();
-        state.target = crate::health::main::control_target::store_target(store);
+        state.target = crate::health::_helpers::store_target::store_target(store);
         state.store = Some(store.clone());
     }
 

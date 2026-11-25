@@ -47,8 +47,7 @@ pub(crate) async fn start_api(
             stopped(shutdown.clone()),
         ),
     ));
-    // The API accepts on the same socket from here; the standby finishes what it has and stops.
-    end.send(()).ok();
+    end.send(()).unwrap_or_default();
     start_platform_roles(
         &mut tasks,
         (store, shutdown),

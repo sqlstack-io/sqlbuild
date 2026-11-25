@@ -4397,6 +4397,7 @@ dependencies = [
 name = "sqlbuild-cli"
 version = "0.261.0"
 dependencies = [
+ "axum",
  "blake3",
  "chrono",
  "ctrlc",

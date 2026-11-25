@@ -1,5 +1,4 @@
-//! Each named control database failure reaches the API by its own sentence, case, since when and request ID, and an
-//! unknown one by its own message; the server's health records the failures that make the database unavailable.
+//! Each control database failure reaches the API by its own sentence, case, since and request ID; health records it.
 
 use axum::routing::get;
 use axum::{Router, middleware};
@@ -7,7 +6,7 @@ use tower::ServiceExt;
 
 use crate::api::_helpers::resources::request_ids::identify_request;
 use crate::api::errors::ApiError;
-use crate::health::main::health_details::health_details;
+use crate::health::_helpers::details::health_details;
 use crate::health::models::{ControlCauseCase, ServerHealth};
 use crate::health::tests::helpers::{coded, io, sqlite_busy, target};
 use crate::health::tests::test_types::CauseResponseTestCase;

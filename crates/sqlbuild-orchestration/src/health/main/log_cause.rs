@@ -3,7 +3,7 @@
 use crate::health::models::ControlCause;
 
 /// One log line for `cause`, naming the request that met it when one did.
-pub(crate) fn log_cause(request_id: Option<uuid::Uuid>, cause: &ControlCause) {
+pub fn log_cause(request_id: Option<uuid::Uuid>, cause: &ControlCause) {
     let request: String = request_id.map_or_else(String::new, |id| format!(" (request {id})"));
     eprintln!("{}{request}: {}", cause.message, cause.chain.join(": "));
 }

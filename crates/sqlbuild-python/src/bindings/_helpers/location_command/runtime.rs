@@ -150,6 +150,7 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                             Err(error) => {
                                 busy = error.to_string().contains(DUCKDB_LOCK_CONFLICT);
                                 if !busy {
+                                    unconnected.connection = true;
                                     unconnected.reason = failure_reason(&error);
                                     write_stderr(
                                         py,
@@ -177,6 +178,7 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                             .map_err(|error| WarehouseHistoryFailure {
                                 reason: failure_reason(&error),
                                 page_size: error.is_instance_of::<PyMemoryError>(py),
+                                connection: false,
                             }),
                         None => Err(unconnected),
                     };

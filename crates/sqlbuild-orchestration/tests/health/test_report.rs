@@ -1,40 +1,11 @@
-//! The health report answers from memory: the control database decides unavailable, any other part degraded, and a
-//! success after a failure clears it.
+//! The control database decides unavailable, any other part degraded, and a success after a failure clears it.
 
 use chrono::{DateTime, TimeDelta, Utc};
-use uuid::Uuid;
 
-use crate::health::main::control_cause::control_cause;
 use crate::health::main::health_report::health_report;
-use crate::health::models::{HealthStatus, ServerHealth, StoredLocationReport};
-use crate::health::tests::helpers::{io, target};
-use crate::health::tests::test_types::ReportTestCase;
-
-const DNS: &str = "Can't reach the control database: db.internal doesn't resolve (DNS)";
-
-fn unresolved(health: &ServerHealth, at: DateTime<Utc>) {
-    let error = io(
-        std::io::ErrorKind::Other,
-        "failed to lookup address information: Name or service not known",
-    );
-    let cause = control_cause(&error, (&target(), false)).expect("a database cause");
-    health.control_failed(&cause, (at, None));
-}
-
-fn locations(health: &ServerHealth, at: DateTime<Utc>) {
-    health.locations_seen(vec![
-        StoredLocationReport {
-            location_id: Uuid::from_u128(1),
-            name: "orders".into(),
-            last_seen_at: Some(at - TimeDelta::seconds(20)),
-        },
-        StoredLocationReport {
-            location_id: Uuid::from_u128(2),
-            name: "finance".into(),
-            last_seen_at: Some(at - TimeDelta::minutes(20)),
-        },
-    ]);
-}
+use crate::health::models::{HealthStatus, ServerHealth};
+use crate::health::tests::helpers::{DNS, locations, unresolved};
+use crate::health::tests::test_types::{FailingStreakTestCase, ReportTestCase};
 
 #[test]
 fn given_component_events_when_reporting_health_then_the_worst_component_decides() {
@@ -146,10 +117,23 @@ fn given_component_events_when_reporting_health_then_the_worst_component_decides
 
 #[test]
 fn given_a_failing_database_when_it_keeps_failing_then_since_stays_at_the_first_failure() {
-    let health = ServerHealth::new("1.0.0", false);
+    let test_cases = [FailingStreakTestCase {
+        description: "half an hour of failures since the first",
+        failures_after: vec![0, 30],
+        expected_since_minutes: 0,
+    }];
     let first: DateTime<Utc> = "2026-11-25T14:05:00Z".parse().expect("time");
-    health.control_succeeded(first - TimeDelta::minutes(1));
-    unresolved(&health, first);
-    unresolved(&health, first + TimeDelta::minutes(30));
-    assert_eq!(health.control_failing_since(), Some(first));
+    for test_case in test_cases {
+        let health = ServerHealth::new("1.0.0", false);
+        health.control_succeeded(first - TimeDelta::minutes(1));
+        for minutes in &test_case.failures_after {
+            unresolved(&health, first + TimeDelta::minutes(*minutes));
+        }
+        assert_eq!(
+            health.control_failing_since(),
+            Some(first + TimeDelta::minutes(test_case.expected_since_minutes)),
+            "{}",
+            test_case.description
+        );
+    }
 }

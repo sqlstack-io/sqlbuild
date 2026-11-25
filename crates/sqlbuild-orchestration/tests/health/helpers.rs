@@ -1,6 +1,5 @@
-use std::borrow::Cow;
-
 use crate::health::models::ControlTarget;
+use crate::health::tests::test_types::CodedError;
 use crate::store::errors::ControlError;
 
 /// The control database the tests' sentences name.
@@ -11,47 +10,6 @@ pub(crate) fn target() -> ControlTarget {
         user: Some("sqb".into()),
         connections: 10,
         wait_seconds: 30,
-    }
-}
-
-/// A database error with a SQLSTATE, as PostgreSQL returns one.
-#[derive(Debug)]
-pub(crate) struct CodedError {
-    pub(crate) code: &'static str,
-    pub(crate) message: &'static str,
-}
-
-impl std::fmt::Display for CodedError {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(self.message)
-    }
-}
-
-impl std::error::Error for CodedError {}
-
-impl sqlx_core::error::DatabaseError for CodedError {
-    fn message(&self) -> &str {
-        self.message
-    }
-
-    fn code(&self) -> Option<Cow<'_, str>> {
-        Some(Cow::Borrowed(self.code))
-    }
-
-    fn as_error(&self) -> &(dyn std::error::Error + Send + Sync + 'static) {
-        self
-    }
-
-    fn as_error_mut(&mut self) -> &mut (dyn std::error::Error + Send + Sync + 'static) {
-        self
-    }
-
-    fn into_error(self: Box<Self>) -> Box<dyn std::error::Error + Send + Sync + 'static> {
-        self
-    }
-
-    fn kind(&self) -> sqlx_core::error::ErrorKind {
-        sqlx_core::error::ErrorKind::Other
     }
 }
 
@@ -71,4 +29,39 @@ pub(crate) fn sqlite_busy() -> ControlError {
         rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY),
         Some("database is locked".into()),
     ))
+}
+
+pub(crate) const DNS: &str = "Can't reach the control database: db.internal doesn't resolve (DNS)";
+
+/// Record a failure to resolve the control database's host at `at`.
+pub(crate) fn unresolved(
+    health: &crate::health::models::ServerHealth,
+    at: chrono::DateTime<chrono::Utc>,
+) {
+    let error = io(
+        std::io::ErrorKind::Other,
+        "failed to lookup address information: Name or service not known",
+    );
+    let cause = crate::health::main::control_cause::control_cause(&error, (&target(), false))
+        .expect("a database cause");
+    health.control_failed(&cause, (at, None));
+}
+
+/// Two active locations: one that reported 20 seconds ago, one silent for 20 minutes.
+pub(crate) fn locations(
+    health: &crate::health::models::ServerHealth,
+    at: chrono::DateTime<chrono::Utc>,
+) {
+    health.locations_seen(vec![
+        crate::health::models::StoredLocationReport {
+            location_id: uuid::Uuid::from_u128(1),
+            name: "orders".into(),
+            last_seen_at: Some(at - chrono::TimeDelta::seconds(20)),
+        },
+        crate::health::models::StoredLocationReport {
+            location_id: uuid::Uuid::from_u128(2),
+            name: "finance".into(),
+            last_seen_at: Some(at - chrono::TimeDelta::minutes(20)),
+        },
+    ]);
 }

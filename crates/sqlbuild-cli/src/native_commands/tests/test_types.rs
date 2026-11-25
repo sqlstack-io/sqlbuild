@@ -513,3 +513,22 @@ pub(super) struct LookupFailureHealthTestCase {
     pub(super) answered: Option<i64>,
     pub(super) expected_generation: i64,
 }
+
+pub(super) struct UnreachedReadsTestCase {
+    pub(super) description: &'static str,
+    pub(super) unreached: usize,
+    pub(super) reached: usize,
+    /// The waits of the unreached reads, then of the reads that reached the warehouse.
+    pub(super) expected_waits: (Vec<Option<u64>>, Vec<Option<u64>>),
+    pub(super) expected_halted: bool,
+}
+
+pub(super) struct ServerRecoveryTestCase {
+    pub(super) description: &'static str,
+    /// What the server answers in turn before it answers 200.
+    pub(super) statuses: &'static [u16],
+    pub(super) attempts: usize,
+    /// Whether the sync was failing after each attempt.
+    pub(super) expected_failing: Vec<bool>,
+    pub(super) expected_line: &'static str,
+}

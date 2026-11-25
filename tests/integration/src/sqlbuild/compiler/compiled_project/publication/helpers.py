@@ -2561,21 +2561,27 @@ def listening_address(process: subprocess.Popen[bytes], log: Path) -> str:
     return "http://" + log.read_text().partition("Control API listening: ")[2].splitlines()[0]
 
 
-def http_reply(url: str) -> tuple[int, dict[str, str], Any]:
-    """A GET's status, headers and body, JSON when it is JSON, whatever the status."""
+def http_reply(url: str) -> tuple[int, dict[str, str], str]:
+    """A GET's status, headers and body text, whatever the status."""
     try:
         with urlopen(url, timeout=10) as response:
-            status: int = response.status
-            headers: dict[str, str] = {
-                key.lower(): value for key, value in response.headers.items()
-            }
-            body: bytes = response.read()
+            return (
+                response.status,
+                {key.lower(): value for key, value in response.headers.items()},
+                response.read().decode(),
+            )
     except HTTPError as error:
-        status = error.code
-        headers = {key.lower(): value for key, value in error.headers.items()}
-        body = error.read()
-    json_body: bool = headers.get("content-type", "").startswith("application/json")
-    return status, headers, json.loads(body) if json_body else body.decode()
+        return (
+            error.code,
+            {key.lower(): value for key, value in error.headers.items()},
+            error.read().decode(),
+        )
+
+
+def health_report(url: str) -> dict[str, Any]:
+    """The server's health report, which it answers with 200 or 503."""
+    report: dict[str, Any] = json.loads(http_reply(f"{url}/api/health")[2])
+    return report
 
 
 def wait_for_health(
@@ -2583,22 +2589,18 @@ def wait_for_health(
 ) -> dict[str, Any]:
     """The first health report `wanted` accepts, read every half second."""
     deadline: float = time.monotonic() + seconds
-    report: dict[str, Any] = {}
-    while time.monotonic() < deadline:
-        report = http_reply(f"{url}/api/health")[2]
-        if wanted(report):
-            return report
+    report: dict[str, Any] = health_report(url)
+    while not wanted(report) and time.monotonic() < deadline:
         time.sleep(0.5)
-    raise AssertionError(f"health never became what was wanted: {report}")
+        report = health_report(url)
+    assert wanted(report), f"health never became what was wanted: {report}"
+    return report
 
 
 def control_database_row(report: dict[str, Any]) -> dict[str, Any]:
     """The control database's row of a health report, by what anyone may see of it."""
-    row: dict[str, Any] = next(
-        component
-        for component in report["components"]
-        if component["component"] == "control_database"
-    )
+    rows: dict[str, dict[str, Any]] = {row["component"]: row for row in report["components"]}
+    row: dict[str, Any] = rows["control_database"]
     return {"status": row["status"], "reason": row["reason"], "case": row.get("case")}
 
 

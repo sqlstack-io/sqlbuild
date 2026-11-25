@@ -68,7 +68,7 @@ use crate::native_commands::models::AdminDone;
 use crate::native_commands::models::{
     CommandOutput, DevControlState, InstalledPackage, LocationCompileRequest, LocationCompiler,
     LocationMetadataPage, LocationMetadataSync, LocationServe, LocationWatch, LostStdout,
-    MetadataReply, NativeCommand, NativeInvocation, ProjectLocation, ScanToken,
+    MetadataReply, NativeCommand, NativeInvocation, ProjectLocation, ScanToken, SyncStreak,
 };
 use crate::native_commands::models::{LoadedGeneration, PendingRepublish};
 use crate::native_commands::models::{
@@ -584,6 +584,7 @@ pub(crate) fn metadata_sync(
         safety_seconds,
         safety_at: Instant::now() + Duration::from_secs(safety_seconds),
         failed_reads: 0,
+        streak: SyncStreak::default(),
         halted: false,
         change_tokens: HashMap::new(),
         scan_token: None,
@@ -1519,6 +1520,7 @@ async fn exchange_metadata_read(
     let failed = |reason: &str, page_size| WarehouseHistoryFailure {
         reason: reason.into(),
         page_size,
+        connection: false,
     };
     let result = async {
         let written: std::io::Result<()> = async {

@@ -28,6 +28,7 @@ pub(crate) fn retry_metadata(
     error: ClientError,
 ) -> Result<Option<LocationMetadataSync>, ControlError> {
     refuse_rejected_sign_in(&error)?;
+    state.note_failure(chrono::Utc::now());
     state.next_at = Instant::now() + Duration::from_secs(METADATA_POLL_SECONDS);
     state.reader = None;
     location_warning(
@@ -56,7 +57,8 @@ pub(crate) async fn failed_read(
     } else {
         WarehouseSyncFailure::Read
     };
-    let halts: bool = !busy && state.halts(failure.page_size());
+    let unreached: bool = failure.unreached();
+    let halts: bool = !busy && state.halts((failure.page_size(), unreached));
     tokio::select! {
         result = stopped => { result?; return Ok(None); },
         () = report_metadata_health(&state, (client, poll), (started, Some(stage), Some((&failure, halts)))) => {},
@@ -66,8 +68,18 @@ pub(crate) async fn failed_read(
         return Ok(Some(state));
     }
     let line: String = read_failure_line(&state, &failure);
-    let shrinks: bool = state.shrinks(failure.page_size());
-    let outcome: String = match state.fail_read(failure.page_size()) {
+    let shrinks: bool = !unreached && state.shrinks(failure.page_size());
+    let outcome: String = match state.fail_read((failure.page_size(), unreached)) {
+        Some(wait) if unreached => {
+            location_warning(
+                "warehouse unreachable",
+                format!("retrying in {}s: {}", wait.as_secs(), failure.reason()),
+            );
+            format!(
+                " Run history can't reach the warehouse; no compute ran. Retrying in {} s; this never stops the sync.\n",
+                wait.as_secs()
+            )
+        }
         Some(wait) if shrinks => {
             format!(
                 " Sync incomplete; retaining mirror and retrying a smaller page in {} s.\n",
@@ -140,6 +152,9 @@ pub(crate) async fn deliver_metadata_page(
     tokio::select! {
         result = &mut stopped => { result?; return Ok(None); },
         () = metadata_health(&state, (client, poll), (started, None)) => {},
+    }
+    if state.pending.is_some() {
+        state.note_delivered();
     }
     finish_metadata_page(acknowledge_metadata_page(state), stopped).await
 }

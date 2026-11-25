@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::authorization::main::decisions::begin_authorized::begin_authorized;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
-use crate::health::main::health_details::health_details;
+use crate::health::_helpers::details::health_details;
 use crate::health::models::{HealthDetails, ServerHealth};
 use crate::store::errors::ControlError;
 use crate::store::main::commit::commit;

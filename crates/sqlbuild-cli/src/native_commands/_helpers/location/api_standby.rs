@@ -1,5 +1,4 @@
-//! Bind the server's address first and answer there while the control store opens, waiting out a database that can't
-//! be reached yet; liveness, health and the UI say why meanwhile.
+//! Bind first and answer health and the UI while the control store opens, waiting out a database it can't reach yet.
 
 use std::net::SocketAddr;
 

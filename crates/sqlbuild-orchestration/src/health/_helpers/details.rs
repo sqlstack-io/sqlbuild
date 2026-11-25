@@ -7,7 +7,7 @@ use crate::health::models::{
 
 /// The failing components' details, read from memory only; callers decide who may read them.
 #[must_use]
-pub fn health_details(health: &ServerHealth) -> HealthDetails {
+pub(crate) fn health_details(health: &ServerHealth) -> HealthDetails {
     let state = health.state();
     let host: Option<String> = state
         .target

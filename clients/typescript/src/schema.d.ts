@@ -2643,6 +2643,36 @@ export interface components {
             state: components["schemas"]["LocationState"];
             target: string;
         };
+        /** @description A checking-in location whose run-history sync is failing: since when, why, and when it tries again. */
+        FailingSync: {
+            /** @description Failed reads stopped the sync; it resumes on request, after the next run or a publish. */
+            halted: boolean;
+            /**
+             * Format: date-time
+             * @description The newest report of a sync that worked.
+             */
+            last_success_at?: string | null;
+            /** Format: uuid */
+            location_id: string;
+            location_name: string;
+            /** @description What failed, redacted. */
+            reason: string;
+            /**
+             * Format: date-time
+             * @description When the location tries again, and how many seconds it waits between tries.
+             */
+            retry_at?: string | null;
+            /** Format: int64 */
+            retry_seconds?: number | null;
+            /**
+             * Format: date-time
+             * @description The first failure in a row.
+             */
+            since: string;
+            target: string;
+            /** @description The location couldn't reach the warehouse, so no compute ran. */
+            unreachable: boolean;
+        };
         /** @description Build evidence only: no SQL, arbitrary metadata, or inference about live relation existence. */
         FingerprintObservation: {
             definition_hash: string;
@@ -2897,6 +2927,11 @@ export interface components {
             elapsed_millis: number;
             /** @description A failed read's warehouse error, redacted and bounded; absent otherwise. */
             error?: string | null;
+            /**
+             * Format: date-time
+             * @description While the sync fails, when its first failure in a row was; absent once it works and from older locations.
+             */
+            failing_since?: string | null;
             failure?: null | components["schemas"]["WarehouseSyncFailure"];
             /** Format: int64 */
             generation: number;
@@ -2922,6 +2957,13 @@ export interface components {
             read_failure?: null | components["schemas"]["WarehouseReadFailure"];
             /** Format: int64 */
             records_sent: number;
+            /**
+             * Format: date-time
+             * @description On a failure the sync retries, when it tries again and how many seconds it waits.
+             */
+            retry_at?: string | null;
+            /** Format: int64 */
+            retry_seconds?: number | null;
             table: components["schemas"]["WarehouseHistoryKind"];
         };
         /** @description Receipt time belongs to the server; consumers derive freshness rather than storing availability. */
@@ -3881,6 +3923,8 @@ export interface components {
             dropped_calendar_times?: components["schemas"]["DroppedCalendarTimes"][];
             /** @description Checking-in locations whose latest load, plan of what changed, discovery or connection check failed. */
             failing_locations?: components["schemas"]["FailingLocation"][];
+            /** @description Checking-in locations whose run-history sync is failing, until a sync report succeeds. */
+            failing_syncs?: components["schemas"]["FailingSync"][];
             /** @description Running calendar schedules whose dates run out within a day. */
             low_calendars?: components["schemas"]["LowCalendar"][];
             overdue_ticks: components["schemas"]["OverdueTick"][];
@@ -5543,6 +5587,9 @@ export interface components {
         WarehouseReadFailure: {
             /** @enum {string} */
             kind: "read_error";
+        } | {
+            /** @enum {string} */
+            kind: "unreachable";
         } | {
             /** @enum {string} */
             kind: "timed_out";

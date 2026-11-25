@@ -78,6 +78,8 @@ export type WarehouseSync = {
 	syncing?: { position: number; kinds: number; table: string; rows: number } | null;
 	/** The newest completed sync among recent reports; null when none completed in them. */
 	completed?: { at: Iso; kinds: number; rows: number; elapsedMs: number } | null;
+	/** While the newest report is a failure: since when, why, and how it retries; null while the sync works. */
+	failing?: { since: Iso; reason: string; halted: boolean; unreachable: boolean; retrySeconds: number | null; retryAt: Iso | null } | null;
 };
 
 /** The one target a location is deployed against, e.g. `prod` on Snowflake. */
@@ -154,6 +156,8 @@ export type PlatformEvent = {
 	 * stopped scheduler's expired lease or a broken location's last check-in.
 	 */
 	occurrence?: string;
+	/** A failing run-history sync: whether failed reads stopped it, so Resume restarts it, and when it tries again. */
+	sync?: { halted: boolean; unreachable: boolean; retrySeconds: number | null; retryAt: Iso | null; lastSuccessAt: Iso | null };
 };
 
 // ---- navigation ----

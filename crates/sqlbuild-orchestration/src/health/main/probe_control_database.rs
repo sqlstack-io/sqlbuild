@@ -3,9 +3,9 @@
 use chrono::Utc;
 use tokio::sync::watch;
 
-use crate::health::_helpers::log_cause::log_cause;
 use crate::health::constants::HEALTH_PROBE_INTERVAL;
 use crate::health::main::control_cause::control_cause;
+use crate::health::main::log_cause::log_cause;
 use crate::health::models::{ServerHealth, StoredLocationReport};
 use crate::store::errors::ControlError;
 use crate::store::main::query_records::query_records;

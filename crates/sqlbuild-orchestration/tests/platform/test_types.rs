@@ -121,3 +121,10 @@ pub(crate) struct FailingLocationTestCase {
     pub(crate) backend: crate::store::tests::store_test_types::Backend,
     pub(crate) expected_error: &'static str,
 }
+
+pub(crate) struct FailingSyncTestCase {
+    pub(crate) description: &'static str,
+    /// Newest first, as `recent_health` returns them.
+    pub(crate) observations: Vec<crate::platform::models::LocationHealthObservation>,
+    pub(crate) expected_sync: Option<crate::platform::models::FailingSync>,
+}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { toPlatformEventRecords, toPlatformEvents, toPlatformHealth } from './http-problems';
+import { formatClock } from '$lib/format/time';
 
 const NOW = Date.parse('2026-11-08T12:00:00Z');
 const tick = (name: string, location: string, scheduledFor: string) => ({
@@ -19,6 +20,27 @@ describe('toPlatformEvents', () => {
 		expect([failed.kind, failed.severity, failed.active, failed.occurredAt]).toEqual(['location_failing', 'critical', true, '2026-11-08T11:59:00Z']);
 		expect(failed.message).toMatch(/^orders · production: latest code failed to load: job loaders_job: path selectors require an explicit root\. Serving generation 11, published /);
 		expect([degraded.severity, degraded.message.split('. ')[0]]).toEqual(['warning', 'orders · production: the warehouse connection check failed']);
+	});
+
+	it('makes a failing run-history sync a problem since its first failure, with its reason and how it retries', () => {
+		const sync = (unreachable: boolean, halted: boolean) => ({
+			location_id: 'l1',
+			location_name: 'orders',
+			target: 'production',
+			since: '2026-11-08T11:42:00Z',
+			reason: '250001 Could not connect to Snowflake backend after 2 attempt(s)',
+			unreachable,
+			halted,
+			retry_at: halted ? null : '2026-11-08T12:00:40Z',
+			retry_seconds: halted ? null : 60,
+			last_success_at: '2026-11-08T11:40:00Z'
+		});
+		const events = toPlatformEvents({ scheduler_leader: true, broken_locations: [], overdue_ticks: [], failing_syncs: [sync(true, false), sync(false, true)] }, NOW);
+		const since = formatClock('2026-11-08T11:42:00Z', NOW);
+		expect(events.map((e) => [e.kind, e.severity, e.occurredAt, e.locationId, e.message, e.sync?.halted])).toEqual([
+			['warehouse_sync_failed', 'warning', '2026-11-08T11:42:00Z', 'l1:production', `orders · production: run history can't reach the warehouse since ${since} · retrying every 60 s: 250001 Could not connect to Snowflake backend after 2 attempt(s)`, false],
+			['warehouse_sync_failed', 'warning', '2026-11-08T11:42:00Z', 'l1:production', `orders · production: run history sync stopped after failed reads in a row since ${since}: 250001 Could not connect to Snowflake backend after 2 attempt(s). Resume it once the cause is fixed.`, true]
+		]);
 	});
 
 	it('reports nothing while the scheduler leads and nothing is late', () => {

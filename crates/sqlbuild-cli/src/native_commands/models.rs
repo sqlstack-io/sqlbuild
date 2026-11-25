@@ -23,7 +23,9 @@ use sqlbuild_orchestration::warehouse_metadata::models::{
 use uuid::{NoContext, Timestamp, Uuid};
 
 use crate::argv::models::Namespace;
-use crate::native_commands::constants::{METADATA_FAILURE_LIMIT, METADATA_POLL_SECONDS};
+use crate::native_commands::constants::{
+    METADATA_FAILURE_LIMIT, METADATA_POLL_SECONDS, METADATA_RETRY_MAX_SECONDS,
+};
 
 /// Privileged local operations require direct ownership of the control database.
 pub(crate) enum ControlAdmin {
@@ -411,6 +413,8 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) safety_at: tokio::time::Instant,
     /// Failed reads in a row that did not shrink the page; a delivered page resets it.
     pub(crate) failed_reads: u32,
+    /// The failing streak, and the recovery after one.
+    pub(crate) streak: SyncStreak,
     /// Failed reads in a row stopped the sync; it rests idle until a run, a request, a publish or a safety sync.
     pub(crate) halted: bool,
     /// Per scan index: the table's change token after its last complete read.
@@ -497,10 +501,23 @@ impl ReadFailure {
         }
     }
 
+    /// Whether the reader never reached the warehouse, so no billed compute ran.
+    pub(crate) fn unreached(&self) -> bool {
+        let Self::Read(failure) = self else {
+            return false;
+        };
+        let reason: String = failure.reason.to_ascii_lowercase();
+        failure.connection
+            || crate::native_commands::constants::UNREACHED_WAREHOUSE_MESSAGES
+                .iter()
+                .any(|fragment| reason.contains(fragment))
+    }
+
     /// The closed cause a health report carries; a busy warehouse file is no failure.
     pub(crate) fn cause(&self) -> Option<WarehouseReadFailure> {
         match self {
             Self::Busy => None,
+            Self::Read(_) if self.unreached() => Some(WarehouseReadFailure::Unreachable {}),
             Self::ReaderStart(_) | Self::Read(_) => Some(WarehouseReadFailure::ReadError {}),
             Self::TimedOut(seconds) => Some(WarehouseReadFailure::TimedOut { seconds: *seconds }),
         }
@@ -613,14 +630,47 @@ impl LocationMetadataSync {
         page_size && limit > 1
     }
 
-    /// Whether a failed read stops the sync: it does not shrink the page and is the last failure allowed.
-    pub(crate) fn halts(&self, page_size: bool) -> bool {
-        !self.shrinks(page_size) && self.failed_reads + 1 >= METADATA_FAILURE_LIMIT
+    /// Whether a failed read stops the sync: it reached the warehouse, can't shrink the page and is the last allowed.
+    pub(crate) fn halts(&self, (page_size, unreached): (bool, bool)) -> bool {
+        !unreached && !self.shrinks(page_size) && self.failed_reads + 1 >= METADATA_FAILURE_LIMIT
     }
 
-    /// Record a failed read and return the wait before the next one; `None` once failures stop the sync.
-    pub(crate) fn fail_read(&mut self, page_size: bool) -> Option<std::time::Duration> {
-        let shrinks: bool = self.shrinks(page_size);
+    /// Start the failing streak at server time `now`, unless one is already running.
+    pub(crate) fn note_failure(&mut self, now: DateTime<Utc>) {
+        self.streak
+            .failing_since
+            .get_or_insert(now + self.server_offset);
+        self.streak.recovering = None;
+    }
+
+    /// A page was delivered: the streak ends, and the pages caught up since are counted for the recovery line.
+    pub(crate) fn note_delivered(&mut self) {
+        if let Some(since) = self.streak.failing_since.take() {
+            self.streak.recovering = Some((since, 0));
+        }
+        if let Some((_, pages)) = self.streak.recovering.as_mut() {
+            *pages += 1;
+        }
+        self.streak.unreached_reads = 0;
+    }
+
+    /// Once a sync completes after a failing streak, the line saying how long it failed and what it caught up.
+    pub(crate) fn take_recovery_line(&mut self, now: DateTime<Utc>) -> Option<String> {
+        let (since, pages) = self.streak.recovering.take()?;
+        let minutes: i64 = ((now + self.server_offset) - since).num_minutes().max(0);
+        let noun: &str = if pages == 1 { "page" } else { "pages" };
+        Some(format!(
+            "Run history sync recovered after {minutes} min; {pages} {noun} caught up.\n"
+        ))
+    }
+
+    /// Record a failed read and return the wait, at most a minute; `None` once reads that reached the warehouse stop it.
+    pub(crate) fn fail_read(
+        &mut self,
+        (page_size, unreached): (bool, bool),
+    ) -> Option<std::time::Duration> {
+        self.note_failure(Utc::now());
+        let shrinks: bool = !unreached && self.shrinks(page_size);
         self.statistics = None;
         let statistics = self.kind() == WarehouseHistoryKind::Statistics;
         if statistics {
@@ -635,7 +685,10 @@ impl LocationMetadataSync {
         } else {
             &mut self.limit
         };
-        let seconds = if shrinks {
+        let seconds = if unreached {
+            self.streak.unreached_reads += 1;
+            METADATA_POLL_SECONDS << (self.streak.unreached_reads - 1).min(1)
+        } else if shrinks {
             *limit /= 2;
             METADATA_POLL_SECONDS
         } else {
@@ -648,9 +701,9 @@ impl LocationMetadataSync {
                     + std::time::Duration::from_secs(self.safety_seconds);
                 return None;
             }
-            METADATA_POLL_SECONDS << (self.failed_reads - 1)
+            METADATA_POLL_SECONDS << (self.failed_reads - 1).min(1)
         };
-        let wait = std::time::Duration::from_secs(seconds);
+        let wait = std::time::Duration::from_secs(seconds.min(METADATA_RETRY_MAX_SECONDS));
         self.next_at = tokio::time::Instant::now() + wait;
         Some(wait)
     }
@@ -877,9 +930,21 @@ impl GenerationLookups {
 }
 
 /// The server's bound address while its standby answers there, until the control API takes it over.
+#[derive(Debug)]
 pub(crate) struct ApiStandby {
     /// The API's own handle on the bound socket.
     pub(crate) listener: tokio::net::TcpListener,
     /// Ends the standby, which finishes its open requests first.
     pub(crate) end: tokio::sync::oneshot::Sender<()>,
+}
+
+/// A run-history sync's failing streak: since when, unreached reads, and the pages caught up after it.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) struct SyncStreak {
+    /// Reads in a row that never reached the warehouse; they back off but never stop the sync.
+    pub(crate) unreached_reads: u32,
+    /// The first failure of the streak, by server time; `None` while the sync works.
+    pub(crate) failing_since: Option<DateTime<Utc>>,
+    /// After a streak: when it began and the pages delivered since it ended, for the recovery line.
+    pub(crate) recovering: Option<(DateTime<Utc>, u64)>,
 }

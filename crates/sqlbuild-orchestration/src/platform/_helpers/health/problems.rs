@@ -92,7 +92,8 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
             .into_iter()
             .map(decode_row)
             .collect::<Result<_, _>>()?,
-        failing,
+        failing: failing.locations,
+        failing_syncs: failing.syncs,
         late_targets: late_targets
             .into_iter()
             .map(|row| {

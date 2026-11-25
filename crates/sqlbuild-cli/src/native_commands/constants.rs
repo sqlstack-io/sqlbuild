@@ -178,6 +178,20 @@ pub(crate) const SENSOR_RESULT_BYTES: u64 = 1_048_576;
 
 /// Read timeout, and the delay before retrying a failed page of an unfinished synchronization.
 pub(crate) const METADATA_POLL_SECONDS: u64 = 30;
+/// The longest wait between attempts of a failing run-history sync, whatever failed.
+pub(crate) const METADATA_RETRY_MAX_SECONDS: u64 = 60;
+/// Fragments of connector and resolver messages for a warehouse the reader never reached, lowercase.
+pub(crate) const UNREACHED_WAREHOUSE_MESSAGES: [&str; 9] = [
+    "250001",
+    "could not connect",
+    "failed to lookup address",
+    "name or service not known",
+    "temporary failure in name resolution",
+    "nodename nor servname",
+    "connection refused",
+    "network is unreachable",
+    "no route to host",
+];
 
 /// Failed reads in a row, waiting twice as long after each, that stop a sync until one is requested.
 pub(crate) const METADATA_FAILURE_LIMIT: u32 = 5;

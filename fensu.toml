@@ -2048,6 +2048,12 @@ symbols = ["warn_plain_http"]
 reason = "Locations, workers and remote publication share this client; it warns once per process on stderr, before any request, when a bearer token would travel over plain HTTP to a non-loopback host."
 
 [[targets.rust.rule_exceptions]]
+rule = "FPRSH011"
+path = "crates/sqlbuild-orchestration/src/health/main/log_cause.rs"
+symbols = ["log_cause"]
+reason = "The server log is where operators find a control database failure: the request it failed, the sentence the API returned, and each cause's own message, never a password or stack trace. Requests and the health probe that meet the failure have no caller to return it to beyond the response."
+
+[[targets.rust.rule_exceptions]]
 rule = "FPRSS130"
 path = "crates/sqlbuild-orchestration/src/warehouse_history/_helpers/audit_repeats.rs"
 symbols = ["audit_due", "record_audit"]

@@ -112,6 +112,14 @@ pub enum LocationHealth {
         /// On the report of a table's last delivered page, the records the server then mirrored of that table across the target's state locations.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         mirrored_records: Option<u64>,
+        /// While the sync fails, when its first failure in a row was; absent once it works and from older locations.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        failing_since: Option<DateTime<Utc>>,
+        /// On a failure the sync retries, when it tries again and how many seconds it waits.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        retry_at: Option<DateTime<Utc>>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        retry_seconds: Option<u64>,
     },
 }
 
@@ -710,6 +718,9 @@ pub struct PlatformProblems {
     /// Checking-in locations whose latest load, plan of what changed, discovery or connection check failed.
     #[serde(default)]
     pub failing_locations: Vec<FailingLocation>,
+    /// Checking-in locations whose run-history sync is failing, until a sync report succeeds.
+    #[serde(default)]
+    pub failing_syncs: Vec<FailingSync>,
     pub overdue_ticks: Vec<OverdueTick>,
     /// Running calendar schedules whose dates run out within a day.
     #[serde(default)]
@@ -831,6 +842,34 @@ pub struct FailingLocation {
     pub serving: Option<SnapshotRecord>,
 }
 
+/// Every checking-in location's failing load, plan, discovery or connection check, and failing run-history sync.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct LocationFailures {
+    pub(crate) locations: Vec<FailingLocation>,
+    pub(crate) syncs: Vec<FailingSync>,
+}
+
+/// A checking-in location whose run-history sync is failing: since when, why, and when it tries again.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct FailingSync {
+    pub location_id: Uuid,
+    pub location_name: String,
+    pub target: String,
+    /// The first failure in a row.
+    pub since: DateTime<Utc>,
+    /// What failed, redacted.
+    pub reason: String,
+    /// The location couldn't reach the warehouse, so no compute ran.
+    pub unreachable: bool,
+    /// Failed reads stopped the sync; it resumes on request, after the next run or a publish.
+    pub halted: bool,
+    /// When the location tries again, and how many seconds it waits between tries.
+    pub retry_at: Option<DateTime<Utc>>,
+    pub retry_seconds: Option<u64>,
+    /// The newest report of a sync that worked.
+    pub last_success_at: Option<DateTime<Utc>>,
+}
+
 /// A running schedule whose next tick is more than 30 seconds late.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct OverdueTick {
@@ -860,6 +899,7 @@ pub(crate) struct ProblemScan {
     pub(crate) lease: Option<SchedulerLease>,
     pub(crate) broken: Vec<BrokenLocation>,
     pub(crate) failing: Vec<FailingLocation>,
+    pub(crate) failing_syncs: Vec<FailingSync>,
     pub(crate) late_targets: std::collections::BTreeSet<(Uuid, String)>,
     pub(crate) low_calendars: Vec<LowCalendar>,
     pub(crate) skipped_triggers: Vec<SkippedTrigger>,
@@ -941,8 +981,10 @@ pub struct WarehouseSyncProgress {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum WarehouseReadFailure {
-    /// The reader did not start or connect to the warehouse, or the read raised an error.
+    /// The reader did not start, or the read raised an error after connecting.
     ReadError {},
+    /// The reader could not reach the warehouse, so no compute ran; these never stop the sync.
+    Unreachable {},
     /// The reader did not answer within this many seconds.
     TimedOut { seconds: u64 },
 }

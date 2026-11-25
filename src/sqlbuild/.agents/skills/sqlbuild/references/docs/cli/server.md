@@ -899,11 +899,17 @@ Details:
 - On Snowflake, a sync skips state tables that haven't changed since the last sync, the pause
   table included, so a sync with nothing new doesn't resume the warehouse.
 - When a read fails, the Connections page shows the warehouse error. A read that ran out of memory
-  or time retries a smaller page. Any other error, such as a missing permission or table, retries
-  after 30 seconds, then waits twice as long after each failure in a row. After 5 failures in a row
-  the sync stops until a run ends, you request one, the location publishes again, or the next safety
-  sync is due (`sync_at_least_every`). It then starts again from the first kind of history, and
-  failed reads back off again before they stop it.
+  or time retries a smaller page. A read that never reached the warehouse, such as a host that
+  doesn't resolve, a refused connection or Snowflake's `250001 Could not connect`, spent no
+  compute: it retries after 30 seconds, then every 60 seconds, and never stops the sync. Any other
+  error, such as a missing permission or table, retries after 30 seconds, then every 60 seconds.
+  After 5 such failures in a row the sync stops until a run ends, you request one (**Resume** on
+  the Overview's attention item), the location publishes again, or the next safety sync is due
+  (`sync_at_least_every`). It then starts again from the first kind of history.
+- A request to the server that fails, for example while its control database is unreachable,
+  keeps the page and retries it every 30 seconds; it never stops the sync. After a failing streak,
+  the location logs `Run history sync recovered after N min; M pages caught up.` once the sync
+  completes.
 - `[control]` holds no secrets. The session stays in the login `sqb login` saved for that server.
 - When a state table holds two rows with the same ID, such as one check result written twice, the
   server keeps the row with the earlier time. Estimated query costs are the exception: when two
@@ -945,13 +951,15 @@ Warehouse history synchronization completed: 14 kinds, 31,204 rows in 12.8 s.
 
 A page holds up to 2,000 rows and ends early at 8 MiB, so wide rows make smaller pages. A failed
 read prints which kind failed, the page size and why, then what the location does next. A read that
-ran out of time or memory retries a smaller page; any other failure retries the same page after a
-wait that doubles each time, and the fifth in a row stops the sync:
+ran out of time or memory retries a smaller page; any other failure retries the same page after 30
+seconds, then every 60 seconds. One that never reached the warehouse never stops the sync; the
+fifth other failure in a row does:
 
 ```text
 Warehouse history read failed for statistics (100-relation page): no reply within 130 s. Sync incomplete; retaining mirror and retrying a smaller page in 30 s.
 Warehouse history read failed for catalog (2000-row page): permission denied for table _sqlbuild_catalog. Sync incomplete; retaining mirror and retrying in 60 s.
 Warehouse history read failed for catalog (2000-row page): permission denied for table _sqlbuild_catalog. Synchronization stopped after 5 failed reads in a row; it resumes after the next run, on request or after a publish.
+Warehouse history read failed for catalog (2000-row page): 250001 Could not connect to Snowflake backend after 2 attempt(s). Run history can't reach the warehouse; no compute ran. Retrying in 60 s; this never stops the sync.
 ```
 
 | Cause | Printed as |
@@ -971,6 +979,12 @@ the server's copy of the warehouse, so until the location's first sync completes
 The location's page shows a failing sync as **failing** with when it last synced; its tooltip lists
 each failing kind with the cause, the page size and the warehouse's message, shortened and with
 secrets removed. The Connections page shows a stopped sync as **stopped after failed reads**.
+
+While the sync fails, the top bar says what stands, since when, how it retries and why, for example
+`Run history can't reach the warehouse since 17:42 · retrying every 60 s · 250001 Could not
+connect…`, and links to the location's page; its tooltip has the last success and the next
+attempt. The Overview lists it as needing attention with the same reason, and drops it once a sync
+report succeeds. A sync that failed reads stopped has a **Resume** action there.
 
 ## Skip overlapping runs and retry failures
 

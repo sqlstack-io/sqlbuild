@@ -1038,3 +1038,13 @@ class UnknownTagTestCase:
     edits: dict[str, str]
     expected_nodes: frozenset[str]
     expected_error: str
+
+
+@dataclass(frozen=True)
+class ServerOutageTestCase:
+    """A server whose control database can't be reached: its URL and what health says."""
+
+    description: str
+    database_url: str
+    expected_reason: str
+    expected_case: str

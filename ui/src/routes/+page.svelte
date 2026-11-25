@@ -18,6 +18,7 @@
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
+	import { errorMessage } from '$lib/platform/labels';
 	import RunTimeline from '$lib/components/timeline/run-timeline.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
@@ -93,6 +94,22 @@
 	let acknowledging = $state<string | null>(null);
 	let acknowledgeError = $state<string | null>(null);
 	/** Acknowledges an item, or undoes that: a run by its ID, a condition as it looks now. */
+	let resuming = $state<string | null>(null);
+	/** Restart a run-history sync that failed reads stopped; the attention item clears once a sync succeeds. */
+	async function resume(key: string) {
+		const scope = app.scope;
+		if (!scope || resuming) return;
+		resuming = key;
+		acknowledgeError = null;
+		try {
+			await app.client.requestWarehouseSync(scope);
+		} catch (error) {
+			acknowledgeError = errorMessage(error);
+		} finally {
+			resuming = null;
+		}
+	}
+
 	async function acknowledge(item: AttentionItem, key: string, acknowledged: boolean) {
 		const scope = app.scope;
 		const condition = conditionFor(item);
@@ -277,6 +294,9 @@
 										{/if}
 									</span>
 									<span class="issue-actions">
+										{#if item.kind === 'platform_event' && item.event.sync?.halted}
+											<GatedButton requires="connection.test" size="sm" variant="outline" busy={resuming === view.key} onclick={() => resume(view.key)} hint="Start the run-history sync again now"><span data-testid="attention-resume">Resume</span></GatedButton>
+										{/if}
 										{#if view.build}
 											{@const build = view.build}
 											<GatedButton requires="run.adhoc" size="sm" variant={build.variant} hint={build.tooltip ?? undefined} onclick={() => goto(to(build.href))}

@@ -339,3 +339,29 @@ pub(crate) fn answered(lookups: &mut crate::native_commands::models::GenerationL
     lookups.answered(4);
     false
 }
+
+/// A server on a local port that answers `statuses` in turn, then `200`, each with `{"applied": true}`, and how many it answered.
+pub(super) async fn answering_server(
+    statuses: &'static [u16],
+) -> (String, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("local port");
+    let url = format!("http://{}", listener.local_addr().expect("address"));
+    let answered = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let counter = answered.clone();
+    let application = axum::Router::new().fallback(move || {
+        let seen = counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let status = statuses.get(seen).copied().unwrap_or(200);
+        async move {
+            (
+                axum::http::StatusCode::from_u16(status).expect("status"),
+                axum::Json(json!({ "applied": true })),
+            )
+        }
+    });
+    drop(tokio::spawn(async move {
+        axum::serve(listener, application).await
+    }));
+    (url, answered)
+}

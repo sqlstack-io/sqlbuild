@@ -26,6 +26,8 @@ mod project_facts;
 mod provider_secrets;
 #[path = "tests/test_rules.rs"]
 mod rules;
+#[path = "tests/test_sync_recovery.rs"]
+mod sync_recovery;
 #[path = "tests/test_sync_schedule.rs"]
 mod sync_schedule;
 #[path = "tests/test_terminal.rs"]

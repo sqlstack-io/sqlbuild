@@ -7,7 +7,7 @@ import type { Page, Route } from '@playwright/test';
 export const LOCATIONS = { shop: '0190d1a0-0000-7000-8000-000000000001', returns: '0190d1a0-0000-7000-8000-000000000002' } as const;
 export type TargetName = keyof typeof LOCATIONS;
 const SNAPSHOT = '0190d1a0-0000-7000-8000-0000000000aa';
-const ACTIONS = ['view', 'view.sql', 'view.evidence', 'job.run', 'run.cancel', 'run.rerun', 'run.adhoc', 'audit.view'];
+const ACTIONS = ['view', 'view.sql', 'view.evidence', 'job.run', 'run.cancel', 'run.rerun', 'run.adhoc', 'audit.view', 'connection.test'];
 
 type Ack = { event_id: string; key: string; shape: unknown; acknowledged_at: string };
 /** One request the page wrote: an acknowledgement, a withdrawal or a run's acknowledgement. */
@@ -34,12 +34,17 @@ export type TargetState = {
 	healthDelayMs: number;
 	/** Published jobs and groups, with the concurrency limit their runs get. */
 	jobs: FakeJob[];
+	/** A failing run-history sync: whether it reaches the warehouse and whether failed reads stopped it. */
+	failingSync: { unreachable: boolean; halted: boolean } | null;
 };
 
 /** A published job or group: its key, kind, own `concurrency` setting and the limit its runs get; a group's members are the target's jobs. */
 export type FakeJob = { key: string; kind: 'job' | 'group'; concurrency: number | null; limit: number };
 
 const MODELS = ['orders', 'order_items', 'customers', 'payments', 'refunds'];
+/** A failing sync's first failure, and its reason as the location reports it. */
+export const SYNC_FAILING_SINCE = new Date(Date.now() - 50 * 60_000).toISOString();
+export const SYNC_REASON = '250001 Could not connect to Snowflake backend after 2 attempt(s)';
 
 /** A part of the server's health report, as the server sends it. */
 export type FakeHealthPart = { component: 'server' | 'control_database' | 'scheduler' | 'location'; name: string; status: 'healthy' | 'degraded' | 'unavailable'; reason?: string; case?: string; since?: string; location_id?: string };
@@ -67,7 +72,7 @@ export class FakeControl {
 	healthReads = 0;
 
 	constructor(overrides: Partial<Record<TargetName, Partial<TargetState>>> = {}) {
-		const base = (): TargetState => ({ changed: [], sync: 'settled', schedulerLeader: true, acks: [], failedRun: false, readDelayMs: 0, failReads: false, failWithdrawals: false, healthDelayMs: 0, jobs: [] });
+		const base = (): TargetState => ({ changed: [], sync: 'settled', schedulerLeader: true, acks: [], failedRun: false, readDelayMs: 0, failReads: false, failWithdrawals: false, healthDelayMs: 0, jobs: [], failingSync: null });
 		this.targets = { shop: { ...base(), ...overrides.shop }, returns: { ...base(), ...overrides.returns } };
 	}
 
@@ -121,7 +126,18 @@ export class FakeControl {
 		}
 		if (path === '/api/control/platform/problems') {
 			// Answered as things stood when the request arrived, however long the reply takes.
-			const answer = { scheduler_leader: Object.values(this.targets).every((t) => t.schedulerLeader), scheduler_lease_expires_at: this.#lease, broken_locations: [], overdue_ticks: [], low_calendars: [] };
+			const answer = {
+				scheduler_leader: Object.values(this.targets).every((t) => t.schedulerLeader),
+				scheduler_lease_expires_at: this.#lease,
+				broken_locations: [],
+				overdue_ticks: [],
+				low_calendars: [],
+				failing_syncs: (Object.keys(LOCATIONS) as TargetName[]).flatMap((name) => {
+					const failing = this.targets[name].failingSync;
+					if (!failing) return [];
+					return [{ location_id: LOCATIONS[name], location_name: name, target: 'dev', since: SYNC_FAILING_SINCE, reason: SYNC_REASON, unreachable: failing.unreachable, halted: failing.halted, retry_at: failing.halted ? null : new Date(Date.now() + 40_000).toISOString(), retry_seconds: failing.halted ? null : 60, last_success_at: '2026-11-01T00:00:00Z' }];
+				})
+			};
 			const delay = Math.max(...Object.values(this.targets).map((t) => t.readDelayMs));
 			if (delay) await later(delay);
 			return json(route, answer);
@@ -230,6 +246,25 @@ export class FakeControl {
 
 	#health(target: TargetState) {
 		const at = new Date().toISOString();
+		if (target.failingSync) {
+			const failing = target.failingSync;
+			const report = {
+				kind: 'warehouse_sync',
+				generation: 1,
+				location: { database: null, schema: 'dev' },
+				table: 'catalog',
+				failure: 'read',
+				records_sent: 0,
+				elapsed_millis: 10,
+				error: SYNC_REASON,
+				read_failure: { kind: failing.unreachable ? 'unreachable' : 'read_error' },
+				progress: { position: 1, kinds: 2, rows: 0, elapsed_millis: 20, completed: false, halted: failing.halted },
+				failing_since: SYNC_FAILING_SINCE,
+				retry_at: failing.halted ? null : new Date(Date.now() + 40_000).toISOString(),
+				retry_seconds: failing.halted ? null : 60
+			};
+			return { state: 'healthy', observations: [{ received_at: at, report: { event_id: '0190d1a0-0000-7000-8000-0000000000de', session_id: '0190d1a0-0000-7000-8000-0000000000ee', target: 'dev', health: report } }] };
+		}
 		const health = {
 			kind: 'warehouse_sync',
 			generation: 1,

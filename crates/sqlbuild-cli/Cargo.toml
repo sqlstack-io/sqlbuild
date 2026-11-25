@@ -51,6 +51,7 @@ ctrlc.workspace = true
 same-file.workspace = true
 
 [dev-dependencies]
+axum.workspace = true
 rusqlite.workspace = true
 tempfile.workspace = true
 

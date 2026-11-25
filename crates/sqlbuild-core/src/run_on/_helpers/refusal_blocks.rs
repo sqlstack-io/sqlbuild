@@ -44,8 +44,7 @@ fn refusal_place(refusal: &LocalRefusal) -> RefusalPlace {
     }
 }
 
-/// One refusal in SQLQuack's layout, notes, help and the items it blocks: an `error` where it stops them running,
-/// a `note` where they run on the warehouse instead.
+/// One refusal in SQLQuack's layout: an `error` where it stops its items running, a `note` where they fall back.
 pub(crate) fn refusal_block(
     refusal: &LocalRefusal,
     names: &[String],

@@ -25,6 +25,7 @@ use crate::native_commands::_helpers::location::execution::{
 };
 use crate::native_commands::_helpers::location::republish::start_republish;
 use crate::native_commands::_helpers::location::shutdown::shutdown_signal;
+use crate::native_commands::_helpers::location::sync_report::report_recovery;
 use crate::native_commands::_helpers::location::work::next_work_check;
 use crate::native_commands::constants::LOCATION_WORK_IDLE_POLL;
 use crate::native_commands::main::_location_changed_build::report_changed_build;
@@ -207,6 +208,7 @@ async fn poll_location(
             };
             let unsynced: bool = state.locations.is_empty();
             let completed: bool = syncing && state.idle && !state.halted;
+            report_recovery(state, completed);
             if (completed || unsynced) && state.take_replan() {
                 let Some(reported) = report_changed_build(
                     (options, runtime, &watch),

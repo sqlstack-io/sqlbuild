@@ -1,5 +1,4 @@
-//! Answer on the server's address before its control database can be opened: liveness, health and the UI work, and
-//! every other API request is refused with the database's cause, until the full API takes the listener over.
+//! Before the control database opens, answer liveness, health and the UI, and refuse other API requests with its cause.
 
 use axum::http::{Method, StatusCode, Uri};
 use axum::response::{IntoResponse, Response};

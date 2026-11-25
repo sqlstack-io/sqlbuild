@@ -111,6 +111,13 @@ pub(crate) fn metadata_health_of(
         completed_sync_next_at(state, failure, now)
     };
     let read_failure = read.and_then(|(read, _)| read.cause());
+    let waits: u64 = state
+        .next_at
+        .saturating_duration_since(Instant::now())
+        .as_secs();
+    let retry_at = (failure.is_some_and(|failure| failure != WarehouseSyncFailure::Busy)
+        && !halted)
+        .then(|| (now + chrono::TimeDelta::seconds(waits as i64), waits));
     LocationHealth::WarehouseSync {
         generation: state.generation,
         location: state.location().clone(),
@@ -132,6 +139,9 @@ pub(crate) fn metadata_health_of(
         }),
         next_sync_at,
         mirrored_records: state.progress.scan_mirrored,
+        failing_since: state.streak.failing_since.filter(|_| failure.is_some()),
+        retry_at: retry_at.map(|(at, _)| at),
+        retry_seconds: retry_at.map(|(_, seconds)| seconds),
     }
 }
 
@@ -211,4 +221,15 @@ pub(crate) fn read_failure_line(state: &LocationMetadataSync, failure: &ReadFail
         page_limit(state),
         failure.reason(),
     )
+}
+
+/// Log that the sync recovered, once it `completed` after a failing streak.
+pub(crate) fn report_recovery(state: &mut LocationMetadataSync, completed: bool) {
+    let Some(line) = completed
+        .then(|| state.take_recovery_line(Utc::now()))
+        .flatten()
+    else {
+        return;
+    };
+    drop(write_output(&[(Stream::Stderr, &line)]));
 }

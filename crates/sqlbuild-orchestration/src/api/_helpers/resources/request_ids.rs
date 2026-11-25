@@ -10,11 +10,10 @@ use uuid::Uuid;
 
 use crate::api::constants::REQUEST_ID_HEADER;
 use crate::api::models::{ErrorCause, ErrorReply, RequestId};
-use crate::health::_helpers::log_cause::log_cause;
+use crate::health::main::log_cause::log_cause;
 use crate::health::models::ServerHealth;
 
-/// Name the request in its response's `x-request-id`; an error names it in its body too, and a control database
-/// error names the database, is recorded in `health` and written to the server log.
+/// Name the request in `x-request-id` and an error body; a control database error is also named, recorded and logged.
 pub(crate) async fn identify_request(
     State(health): State<ServerHealth>,
     mut request: Request,
