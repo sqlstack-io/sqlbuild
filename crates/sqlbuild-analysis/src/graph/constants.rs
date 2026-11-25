@@ -19,6 +19,16 @@ pub(crate) const TAG_KIND: &str = "tag";
 pub(crate) const PATH_KIND: &str = "path";
 pub(crate) const TEST_KIND: &str = "test";
 pub(crate) const JOB_KIND: &str = "job";
+/// `audit:<name>` selects an audit by name, as its key `("audit", name)`.
+pub const AUDIT_KIND: &str = "audit";
+/// `run:<id>` selects what a past run selected.
+pub const RUN_KIND: &str = "run";
+/// `failed:<id>` selects what didn't succeed in a past run: nodes and audits.
+pub const FAILED_KIND: &str = "failed";
+/// `skipped:<id>` selects what a past run skipped.
+pub const SKIPPED_KIND: &str = "skipped";
+/// The selector kinds that name a past run.
+pub const RUN_SELECTOR_KINDS: [&str; 3] = [RUN_KIND, FAILED_KIND, SKIPPED_KIND];
 pub(crate) const NODE_KIND_KIND: &str = "kind";
 /// The node kinds `kind:` selects, as the catalog names them: SQL resources, then Python nodes.
 pub(crate) const SELECTABLE_NODE_KINDS: [&str; 9] = [

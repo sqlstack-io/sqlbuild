@@ -4,15 +4,17 @@ use std::collections::{BTreeSet, HashSet};
 use std::convert::Infallible;
 
 use crate::assembly::project::types::ObjectKey;
+use crate::graph::_helpers::run_selectors::{audit, run_results};
 use crate::graph::constants::{
-    EMPTY_SELECTOR_CODE, EMPTY_VALUE_CODE, EXPANSION_MARKER, FOLDER_SEPARATOR, FUNCTION_KIND_ALIAS,
-    INTERSECTION_SEPARATOR, JOB_KIND, KIND_SEPARATOR, MISPLACED_MARKER_CODE, MISSING_NAME_CODE,
-    MODEL_RESOURCE, MODEL_ROOT, MODEL_ROOT_PREFIX, NAME_KIND, NODE_KIND_KIND, PATH_KIND,
-    PATH_ROOT_CODE, PATH_ROOT_ERROR, PATH_SELECTOR_CODE, PATH_SEPARATOR, PATTERN_CHARACTERS,
-    PLANNER_DEFAULT_CODE, SEED_RESOURCE, SELECTABLE_NODE_KINDS, SOURCE_RESOURCE, SQL_FILE_SUFFIX,
-    SUGGESTION_CUTOFF, SUGGESTION_LIMIT, TABLE_FUNCTION_RESOURCE, TAG_KIND, TEST_KIND,
-    UDF_RESOURCE, UNIT_TEST_CODE, UNIT_TEST_ONLY_TEST_AND_BUILD, UNKNOWN_KIND_CODE,
-    UNKNOWN_NAME_CODE, UNKNOWN_PATH_CODE, UNKNOWN_TAG_CODE, UNMAPPED_KIND_CODE, UNMAPPED_KINDS,
+    AUDIT_KIND, EMPTY_SELECTOR_CODE, EMPTY_VALUE_CODE, EXPANSION_MARKER, FOLDER_SEPARATOR,
+    FUNCTION_KIND_ALIAS, INTERSECTION_SEPARATOR, JOB_KIND, KIND_SEPARATOR, MISPLACED_MARKER_CODE,
+    MISSING_NAME_CODE, MODEL_RESOURCE, MODEL_ROOT, MODEL_ROOT_PREFIX, NAME_KIND, NODE_KIND_KIND,
+    PATH_KIND, PATH_ROOT_CODE, PATH_ROOT_ERROR, PATH_SELECTOR_CODE, PATH_SEPARATOR,
+    PATTERN_CHARACTERS, PLANNER_DEFAULT_CODE, RUN_SELECTOR_KINDS, SEED_RESOURCE,
+    SELECTABLE_NODE_KINDS, SOURCE_RESOURCE, SQL_FILE_SUFFIX, SUGGESTION_CUTOFF, SUGGESTION_LIMIT,
+    TABLE_FUNCTION_RESOURCE, TAG_KIND, TEST_KIND, UDF_RESOURCE, UNIT_TEST_CODE,
+    UNIT_TEST_ONLY_TEST_AND_BUILD, UNKNOWN_KIND_CODE, UNKNOWN_NAME_CODE, UNKNOWN_PATH_CODE,
+    UNKNOWN_TAG_CODE, UNMAPPED_KIND_CODE, UNMAPPED_KINDS,
 };
 use crate::graph::errors::SelectorError;
 use crate::graph::models::{
@@ -25,7 +27,7 @@ use sqlbuild_core::text::main::glob_match::glob_match;
 pub(crate) type Keys = BTreeSet<ObjectKey>;
 type Resolved = Result<Keys, SelectorError>;
 
-fn error(code: &'static str, message: String) -> SelectorError {
+pub(crate) fn error(code: &'static str, message: String) -> SelectorError {
     SelectorError {
         code,
         message,
@@ -282,8 +284,10 @@ fn is_selector_kind(prefix: &str) -> bool {
         TEST_KIND,
         JOB_KIND,
         NODE_KIND_KIND,
+        AUDIT_KIND,
     ]
     .contains(&prefix)
+        || RUN_SELECTOR_KINDS.contains(&prefix)
         || UNMAPPED_KINDS.contains(&prefix)
 }
 
@@ -302,6 +306,8 @@ pub(crate) fn matched(graph: &ProjectGraph, kind: &str, value: &str) -> Resolved
         }
         PATH_KIND => folder(graph, value),
         JOB_KIND => job(graph, value),
+        AUDIT_KIND => audit(graph, value),
+        kind if RUN_SELECTOR_KINDS.contains(&kind) => run_results(graph, (kind, value)),
         NODE_KIND_KIND => of_kind(graph, value),
         TEST_KIND => Err(error(
             UNIT_TEST_CODE,
@@ -514,6 +520,6 @@ impl ProjectGraph {
 }
 
 /// Python's `fnmatch.fnmatchcase`: `*`, `?`, `[seq]` and `[!seq]` over characters.
-fn glob_matches(pattern: &str, name: &str) -> bool {
+pub(crate) fn glob_matches(pattern: &str, name: &str) -> bool {
     glob_match(name, pattern)
 }

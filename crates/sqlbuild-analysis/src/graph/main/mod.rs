@@ -1,5 +1,7 @@
+pub mod attach_audits;
 pub mod attach_jobs;
 pub mod attach_jobs_with;
+pub mod attach_run_results;
 pub mod build_project_graph;
 pub mod build_resources;
 pub mod downstream_edges;
@@ -13,6 +15,8 @@ pub mod reachable_graph_keys;
 pub mod reachable_keys;
 pub mod resolve_selector_tokens;
 pub mod resolve_selectors;
+pub mod run_selector_ids;
 pub mod selector_name_help;
 pub mod selectors_need_jobs;
+pub mod split_audit_keys;
 pub mod unique_id_edges;
