@@ -2521,6 +2521,33 @@
        },
        {
         "kind": "store",
+        "options": [
+         "--server"
+        ],
+        "dest": "login_server",
+        "help": "HTTPS SQLBuild server to read the runs that run:, failed: and skipped: name from, signed in with sqb login; without it, local Recall history",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--ca-cert"
+        ],
+        "dest": "login_ca",
+        "help": "additional trusted PEM CA certificate for --server",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--location-id"
+        ],
+        "dest": "person_location",
+        "help": "published location UUID; required with --server",
+        "group": 1
+       },
+       {
+        "kind": "store",
         "dest": "positional_select",
         "nargs": "*",
         "default": [],
@@ -3142,6 +3169,33 @@
        },
        {
         "kind": "store",
+        "options": [
+         "--server"
+        ],
+        "dest": "login_server",
+        "help": "HTTPS SQLBuild server to read the runs that run:, failed: and skipped: name from, signed in with sqb login; without it, local Recall history",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--ca-cert"
+        ],
+        "dest": "login_ca",
+        "help": "additional trusted PEM CA certificate for --server",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--location-id"
+        ],
+        "dest": "person_location",
+        "help": "published location UUID; required with --server",
+        "group": 1
+       },
+       {
+        "kind": "store",
         "dest": "positional_select",
         "nargs": "*",
         "default": [],
@@ -3674,6 +3728,33 @@
        },
        {
         "kind": "store",
+        "options": [
+         "--server"
+        ],
+        "dest": "login_server",
+        "help": "HTTPS SQLBuild server to read the runs that run:, failed: and skipped: name from, signed in with sqb login; without it, local Recall history",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--ca-cert"
+        ],
+        "dest": "login_ca",
+        "help": "additional trusted PEM CA certificate for --server",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--location-id"
+        ],
+        "dest": "person_location",
+        "help": "published location UUID; required with --server",
+        "group": 1
+       },
+       {
+        "kind": "store",
         "dest": "positional_select",
         "nargs": "*",
         "default": [],
@@ -3874,6 +3955,33 @@
         "dest": "exclude",
         "nargs": "+",
         "default": [],
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--server"
+        ],
+        "dest": "login_server",
+        "help": "HTTPS SQLBuild server to read the runs that run:, failed: and skipped: name from, signed in with sqb login; without it, local Recall history",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--ca-cert"
+        ],
+        "dest": "login_ca",
+        "help": "additional trusted PEM CA certificate for --server",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--location-id"
+        ],
+        "dest": "person_location",
+        "help": "published location UUID; required with --server",
         "group": 1
        },
        {
@@ -4095,6 +4203,33 @@
         "dest": "exclude",
         "nargs": "+",
         "default": [],
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--server"
+        ],
+        "dest": "login_server",
+        "help": "HTTPS SQLBuild server to read the runs that run:, failed: and skipped: name from, signed in with sqb login; without it, local Recall history",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--ca-cert"
+        ],
+        "dest": "login_ca",
+        "help": "additional trusted PEM CA certificate for --server",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--location-id"
+        ],
+        "dest": "person_location",
+        "help": "published location UUID; required with --server",
         "group": 1
        },
        {

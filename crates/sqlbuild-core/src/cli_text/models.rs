@@ -436,6 +436,8 @@ pub struct PlanTextReport {
     pub ignore_audit_failure_jobs: Vec<String>,
     /// Each named job whose nodes run on its own warehouse, and that warehouse.
     pub job_warehouses: Vec<(String, String)>,
+    /// Audits selected by name, with `audit:` or as a past run's failed audits, sorted.
+    pub audits: Vec<String>,
 }
 
 /// The structural kind of a rendered plan line.

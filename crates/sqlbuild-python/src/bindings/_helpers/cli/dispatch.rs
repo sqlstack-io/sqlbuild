@@ -58,7 +58,7 @@ use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_compile::compile_command::main::invocation::run_compile::run_compile;
 use sqlbuild_python_front::discovery::models::MissingSecretsScope;
 use sqlbuild_python_output::recall::models::InvocationRecall;
-use sqlbuild_python_project::job_settings::main::with_job_scope::with_job_scope;
+use sqlbuild_python_project::planner_selection::main::with_command_scope::with_command_scope;
 
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::within::within;
@@ -536,13 +536,9 @@ fn routed_command<'py>(
                 return Err(user_error(py, failure));
             }
             let project_dir: PathBuf = invocation.value(Source::EffectiveProjectDir)?.extract()?;
-            let selected_target: Option<String> = match invocation.value(Source::Attr("target")) {
-                Ok(target) => optional_text(&target)?,
-                Err(_) => None,
-            };
-            with_job_scope((project_dir, selected_target), || {
+            with_command_scope(args, (project_dir, &recall.settings), || {
                 call_route(&invocation, route, handler, recall)
-            })
+            })?
         }
     }
 }

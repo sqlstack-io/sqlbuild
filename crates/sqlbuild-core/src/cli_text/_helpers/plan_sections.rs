@@ -83,6 +83,11 @@ pub(crate) fn ready_summary(report: &PlanTextReport, full_refresh: bool) -> Stri
         let noun: &str = if python == 1 { "node" } else { "nodes" };
         parts.push(format!("{python} Python {noun}"));
     }
+    let audits: usize = report.audits.len();
+    if audits > 0 {
+        let noun: &str = if audits == 1 { "audit" } else { "audits" };
+        parts.push(format!("{audits} {noun}"));
+    }
     parts.join(", ")
 }
 
@@ -698,6 +703,16 @@ pub(crate) fn seed_lines(report: &PlanTextReport) -> Vec<String> {
             return vec![format!("  {}", seed.name)];
         }
         vec![format!("  {}  ({label})", seed.name)]
+    })
+}
+
+/// `Audits (N)`: the audits selected by name, which run whether or not their targets build.
+pub(crate) fn audit_lines(report: &PlanTextReport) -> Vec<String> {
+    if report.audits.is_empty() {
+        return Vec::new();
+    }
+    section_lines("Audits", &report.audits, &report.display, |audit| {
+        vec![format!("  {audit}")]
     })
 }
 

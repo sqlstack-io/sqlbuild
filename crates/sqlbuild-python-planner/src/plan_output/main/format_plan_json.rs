@@ -97,6 +97,14 @@ pub fn format_plan_json(py: Python<'_>, options: Option<Bound<'_, PyDict>>) -> P
                 mapped(&native_field(&plan, "function_entries")?, function_json)?,
             ),
             ("python_nodes", PyList::new(py, python_nodes)?.into_any()),
+            (
+                "audits",
+                PyList::new(
+                    py,
+                    native_field(&plan, "selected_audit_names")?.extract::<Vec<String>>()?,
+                )?
+                .into_any(),
+            ),
             ("providers", providers_json(&plan, &python_entries)?),
             (
                 "warnings",

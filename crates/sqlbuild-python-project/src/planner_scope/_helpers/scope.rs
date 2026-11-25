@@ -12,7 +12,7 @@ use crate::planner_scope::main::keys::keys;
 use crate::planner_scope::main::project_graph::project_graph;
 use crate::planner_scope::models::ScopeData;
 use crate::planner_selection::main::py_strings::py_strings;
-use crate::planner_selection::main::resolve_graph_keys::resolve_graph_keys;
+use crate::planner_selection::main::resolve_planner_keys::resolve_planner_keys;
 use crate::planner_selection::models::Carrier;
 use crate::references::main::native_execution_gate_edges::native_execution_gate_edges;
 use crate::references::types::ExecutionGates;
@@ -62,10 +62,11 @@ pub(crate) fn build_planner_scope<'py>(
         native_field(&project, "lineage_graph")?.cast_into()?;
     let lineage = lineage.borrow();
     let selected = args.value("selected_keys")?;
-    let mut selected = if selected.is_none() {
-        resolve_graph_keys(lineage.graph(), (&select, &exclude))?
+    let (mut selected, audits) = if selected.is_none() {
+        resolve_planner_keys(&project, lineage.graph(), (&select, &exclude))?
     } else {
-        keys(&selected)?
+        let (_, audits) = resolve_planner_keys(&project, lineage.graph(), (&select, &exclude))?;
+        (keys(&selected)?, audits)
     };
     let names = &lineage.graph().names;
     let texts = py_strings(&select)?;
@@ -147,6 +148,7 @@ pub(crate) fn build_planner_scope<'py>(
         tests: tests.extract()?,
         load_sources: auto_load,
         end_audit_sources,
+        audits: audits.into_iter().collect(),
     }
     .object(py)
 }

@@ -4755,6 +4755,7 @@ dependencies = [
  "sqlbuild-pysource",
  "sqlbuild-python-base",
  "sqlbuild-python-front",
+ "sqlbuild-recall",
  "sqlbuild-rules",
  "sqlbuild-sqltext",
  "sqlbuild-state",

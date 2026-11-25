@@ -607,5 +607,6 @@ pub(crate) fn report(arguments: &KeywordArguments<'_>) -> PyResult<PlanTextRepor
             JOB_IGNORED_AUDIT_FAILURES_KEY,
         )?))?,
         job_warehouses: job_warehouses(&metadata)?,
+        audits: native_field(&plan, "selected_audit_names")?.extract()?,
     })
 }
