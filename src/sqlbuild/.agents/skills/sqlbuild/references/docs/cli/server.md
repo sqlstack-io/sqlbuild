@@ -1103,8 +1103,19 @@ runs. A `build` loads the managed sources its models read, as `sqb build` does, 
 alone; `--no-load` turns that off.
 A `test` or `audit` run reports each selected node with the worst result of its tests or audits.
 
-Selectors use the CLI grammar: names, `seed:`, `source:`, `tag:`, `path:`, `test:` and `job:`,
-with `+` for upstream or downstream nodes. Positional selectors work as on the command line.
+Selectors use the CLI grammar: names, `seed:`, `source:`, `tag:`, `path:`, `test:`, `job:` and
+`audit:`, with `+` for upstream or downstream nodes. Positional selectors work as on the command line.
+[`run:`, `failed:` and `skipped:`](../concepts/selectors.md#selecting-from-a-past-run) select from
+a run of the same location and target, by full ID or a unique prefix of at least 8 characters. The
+server resolves them when the run is requested and freezes the nodes and audits they select with
+it, so later runs don't change what it runs.
+
+In the web UI, Rerun on a run opens the rerun plan on `failed:<id>+`; rerunning the whole run opens
+on `run:<id>`, and one node or audit on its own name or `audit:<name>`. The box holds the whole
+selection: its suggestions only rewrite the text, and Run starts the ad-hoc run
+`sqb build -s <selection>` shown beside it, against the current publication. The run it starts shows
+`from run <id>` for each past run its selection names. Reruns of several runs at once, and retries,
+still repeat each run's own frozen version and settings.
 
 A `build` whose selection names a job takes the job's settings, exactly as `sqb build` and the
 job's own runs do; see

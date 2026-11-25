@@ -86,6 +86,7 @@ own option. `--version` works only directly after `sqb`, as in `sqb --version`:
 | `SELECTOR ...` | Positional selectors, the same as `--select` |
 | `--select`, `-s` | Select specific models, or unit tests by name (`test:<name>`); selecting only unit tests runs them without building models |
 | `--exclude` | Exclude specific models |
+| `--server`, `--location-id`, `--ca-cert` | Read the runs that [`run:`, `failed:` and `skipped:`](../concepts/selectors.md#selecting-from-a-past-run) name from this server's runs of the location, with your [`sqb login`](login.md) session, instead of the local Recall history |
 | `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `build` [warehouse group](../concepts/adapters/snowflake.md#command-group-warehouses) and the connection warehouse |
 
 ## Fast iteration
