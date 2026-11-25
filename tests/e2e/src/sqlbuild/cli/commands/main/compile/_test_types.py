@@ -1271,8 +1271,8 @@ class BenchmarkProjectTestPlanTestCase:
 
     description: str
     project_dir: Path
-    expected_final_line_prefix: str
-    expected_final_line_suffix: str
+    # The summary line; with --inspect, SQLQuack's full refusal diagnostics may follow it.
+    expected_summary_pattern: str
 
 
 @dataclass(frozen=True)

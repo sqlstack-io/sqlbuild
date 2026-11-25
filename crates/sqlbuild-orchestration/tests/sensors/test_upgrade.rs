@@ -111,7 +111,7 @@ fn given_a_snapshot_with_an_old_form_sensor_when_the_store_upgrades_then_its_job
                 test_case.description
             );
 
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

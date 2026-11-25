@@ -26,6 +26,7 @@ Positional `SELECTOR` arguments work like `--select`, and both forms can be comb
 | `--select`, `-s` | Select audits attached to specific models |
 | `--select-file` | Read selectors from a file |
 | `--exclude` | Exclude audits attached to specific models |
+| `--server`, `--location-id`, `--ca-cert` | Read the runs that [`run:`, `failed:` and `skipped:`](../concepts/selectors.md#selecting-from-a-past-run) name from this server's runs of the location, with your [`sqb login`](login.md) session, instead of the local Recall history |
 | `--concurrency` | Maximum number of audits to run concurrently (default: `1`) |
 | `--json` | Print structured audit results |
 | `--json-output` | Write structured audit results to a file |

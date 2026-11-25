@@ -42,7 +42,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     ],
     ids=lambda case: case.description,
 )
-def test_given_a_partial_group_when_retrying_from_failure_then_successful_nodes_are_not_rewritten(
+def test_given_a_failed_group_when_retrying_from_failure_then_successful_nodes_are_not_rewritten(
     test_case: WorkerExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     test_case = replace(
@@ -83,7 +83,7 @@ def test_given_a_partial_group_when_retrying_from_failure_then_successful_nodes_
         source: dict[str, Any] = wait_for_run(
             worker.api, worker.process, worker.log, job_key="annual_orders_job_group"
         )
-        assert source["status"] == "partial", worker.log.read_text()
+        assert source["status"] == "failed", worker.log.read_text()
         with duckdb.connect(str(worker.project / "warehouse.duckdb")) as warehouse:
             warehouse.execute("CREATE TABLE retry_ready AS SELECT 1 AS id")
             warehouse.execute("UPDATE orders SET amount=99")

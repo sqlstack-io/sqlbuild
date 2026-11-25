@@ -38,6 +38,8 @@ pub struct ScopeData {
     pub tests: Py<NativeRecord>,
     pub load_sources: bool,
     pub end_audit_sources: HashSet<ObjectKey>,
+    /// Audits selected by name, with `audit:` or as a past run's failed audits, whatever their targets.
+    pub audits: HashSet<String>,
 }
 
 /// Internal carrier, never returned in place of a supported public PlannerScope record.
@@ -89,6 +91,7 @@ impl ScopeData {
             tests: self.tests.clone_ref(py),
             load_sources: self.load_sources,
             end_audit_sources: self.end_audit_sources.clone(),
+            audits: self.audits.clone(),
         }
     }
 
@@ -107,6 +110,7 @@ impl ScopeData {
             "selected_keys" => key_set(&self.selected),
             "user_selected_keys" => key_set(&self.user_selected),
             "end_audit_source_keys" => key_set(&self.end_audit_sources),
+            "selected_audit_names" => Ok(PyFrozenSet::new(py, &self.audits)?.into_any()),
             "execution_order" => Ok(PyTuple::new(py, cache.keys(&self.order)?)?.into_any()),
             "all_keys" => {
                 let values = PyDict::new(py);

@@ -9,6 +9,7 @@ export function toSelectionEvaluation(wire: Wire['SelectionEvaluation']): Select
 	return {
 		snapshotId: wire.snapshot_id ?? null,
 		count: wire.count,
+		audits: wire.audits ?? 0,
 		keys: wire.keys,
 		nextOffset: wire.next_offset ?? null,
 		error: toSelectionProblem(wire.error)
@@ -44,6 +45,7 @@ export function toSelectionVocabulary(wire: Wire['SelectionVocabulary']): Select
 		jobs: entries(wire.jobs),
 		sources: entries(wire.sources),
 		seeds: entries(wire.seeds),
-		kinds: entries(wire.kinds)
+		kinds: entries(wire.kinds),
+		audits: entries(wire.audits ?? [])
 	};
 }

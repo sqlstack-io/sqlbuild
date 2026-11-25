@@ -88,7 +88,7 @@ def test_given_long_statement_when_interrupted_then_stops_promptly_and_cleans_up
     [
         ScenarioInterruptE2ETestCase(
             description="local replay cancels the in-flight statement with clean json stdout",
-            args=("test", "--local", "--json"),
+            args=("test", "--run-on", "local", "--json"),
             trigger="order_totals START",
             long_model=True,
         ),

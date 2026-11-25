@@ -136,7 +136,7 @@ fn given_a_member_job_watched_by_a_sensor_when_its_group_runs_then_the_member_ou
             )
             .await
             .expect("request group");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -310,7 +310,7 @@ fn given_a_member_retried_inside_its_group_when_sensors_watch_it_then_only_its_f
             )
             .await
             .expect("request group");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -338,7 +338,7 @@ fn given_a_member_retried_inside_its_group_when_sensors_watch_it_then_only_its_f
                 },
                 node_finished("customers", NodeOutcome::Failed),
                 RunChange::Finished {
-                    outcome: RunOutcome::Partial,
+                    outcome: RunOutcome::Failed,
                     reason: "customers failed".into(),
                     exit_code: Some(1),
                 },
@@ -503,7 +503,7 @@ fn given_a_member_the_group_skips_when_sensors_and_alerts_watch_it_then_it_is_sk
             )
             .await
             .expect("request group");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

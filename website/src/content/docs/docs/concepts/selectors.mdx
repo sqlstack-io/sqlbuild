@@ -117,6 +117,25 @@ sqb test "test:orders_*" stg_customers
 Test selectors are unioned with other selectors and cannot use `+` or `,`. Other commands reject
 them with `S013`.
 
+### Audit
+
+`audit:` selects an audit by name, the end-of-build singular audits included, and accepts glob
+patterns:
+
+```bash
+sqb build audit:orders_match_payments
+sqb audit "audit:not_null_*"
+sqb build daily_revenue audit:revenue_reconciles
+```
+
+An audit has no upstream or downstream nodes, so `+` adds nothing to it, and it composes with `,`
+and `--exclude` like any other selector. An audit selected by name runs whether or not its target
+is in the selection: when the build doesn't build the target, the audit runs after everything else,
+against the target as it is. `sqb plan` lists audits selected by name under `Audits`, and its
+`--json` output under `audits`.
+
+`plan`, `build`, `test`, `audit` and `check` accept `audit:`; other commands reject it with `S010`.
+
 ## Graph expansion
 
 ### Upstream
@@ -194,6 +213,49 @@ sqb build --select path:sql/models/marts --exclude daily_revenue
 sqb build --select +fact_orders --exclude tag:staging
 ```
 
+## Selecting from a past run
+
+Three selectors select from a run that already happened:
+
+| Selector | Selects |
+| --- | --- |
+| `run:<id>` | Every node the run selected |
+| `failed:<id>` | The nodes that failed, were cancelled or never ran, and the audits that failed, not counting ignored audit failures |
+| `skipped:<id>` | The nodes the run skipped |
+
+They compose like any other selector, so `failed:<id>+` reruns what didn't succeed and everything
+downstream of it, and `run:<id> --exclude skipped:<id>` repeats what the run didn't skip:
+
+```bash
+sqb plan failed:20261125T142600Z_1732548e8aea+
+sqb build failed:20261125T1426+
+sqb build model_a model_b failed:20261125T1426+
+```
+
+The last command builds `model_a` and `model_b` too, for example when a failed audit read them
+and they don't exist in the target yet.
+
+`<id>` is the run's full ID or a prefix of at least 8 characters that only one run starts with;
+wildcards are not accepted. A prefix that more runs start with is an error that lists them.
+
+Without `--server`, the run comes from the project's local [Recall](/docs/cli/recall) history,
+which needs the default SQLite store. To list the latest local runs:
+
+```bash
+sqb recall query "SELECT run_id, MIN(occurred_at) AS started FROM events
+  WHERE run_id IS NOT NULL GROUP BY run_id ORDER BY started DESC LIMIT 5"
+```
+
+With `--server`, `--location-id` and an [`sqb login`](/docs/cli/login) session, the run comes from
+the server's runs of that location on the command's target, as the web UI shows them:
+
+```bash
+sqb plan failed:0192c1a4+ --server https://control.example.com --location-id <uuid>
+```
+
+`plan`, `build`, `test`, `audit` and `check` read past runs; other commands reject run selectors with
+`S010`.
+
 ## Error handling
 
 Unknown resource names, name patterns with no matches, empty paths, and malformed selectors produce
@@ -207,6 +269,17 @@ error[S000]: no SQL resources or Python nodes found with tag 'nonexistent_tag'
 error[S007]: unknown node kind 'modle'
 error[S003]: path selector 'fact_orders~' requires names on both sides of '~'
 error[S013]: selector 'order_status_rules' selects a unit test; only `sqb test` and `sqb build` accept unit-test selectors
+error[S007]: unknown audit name 'orders_match_payment'
+error[S010]: selector 'failed:20261125T1426' selects from a past run; only plan, build, test, audit and check read past runs
+```
+
+A run ID that is too short, names no run, or starts more than one is refused before anything is
+planned:
+
+```
+error[S000]: run ID '2026112' is too short: give the full ID or at least 8 characters of it
+error[S000]: no run '20261124' in the local Recall history
+error[S000]: run ID '20261125' is ambiguous: it starts 20261125T142600Z_1732548e8aea, 20261125T153329Z_746e30e62302; give more of the ID
 ```
 
 Unknown names suggest the closest selectable names, including unit tests:

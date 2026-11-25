@@ -13,3 +13,4 @@ pub mod model_resource_type;
 pub mod old_name_rows;
 pub mod plan_section_page;
 pub mod plan_summary;
+pub mod plan_summary_parts;

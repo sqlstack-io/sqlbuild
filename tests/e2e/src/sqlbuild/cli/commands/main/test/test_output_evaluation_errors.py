@@ -157,10 +157,10 @@ def test_given_output_store_failure_when_testing_then_only_storage_problems_fall
     )
 
     tested: subprocess.CompletedProcess[str] = run_sqb(
-        command=("--no-color", "test"), project_dir=project_dir
+        command=("--no-color", "test", "--run-on", "warehouse"), project_dir=project_dir
     )
     as_json: subprocess.CompletedProcess[str] = run_sqb(
-        command=("--no-color", "test", "--json"), project_dir=project_dir
+        command=("--no-color", "test", "--run-on", "warehouse", "--json"), project_dir=project_dir
     )
     payload: dict[str, Any] = json.loads(as_json.stdout)
 

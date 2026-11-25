@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { toPlatformEventRecords, toPlatformEvents, toPlatformHealth } from './http-problems';
+import { formatClock } from '$lib/format/time';
 
 const NOW = Date.parse('2026-11-08T12:00:00Z');
 const tick = (name: string, location: string, scheduledFor: string) => ({
@@ -19,6 +20,38 @@ describe('toPlatformEvents', () => {
 		expect([failed.kind, failed.severity, failed.active, failed.occurredAt]).toEqual(['location_failing', 'critical', true, '2026-11-08T11:59:00Z']);
 		expect(failed.message).toMatch(/^orders · production: latest code failed to load: job loaders_job: path selectors require an explicit root\. Serving generation 11, published /);
 		expect([degraded.severity, degraded.message.split('. ')[0]]).toEqual(['warning', 'orders · production: the warehouse connection check failed']);
+	});
+
+	it('makes a failing run-history sync a problem since its first failure, with its reason and how it retries', () => {
+		const sync = (unreachable: boolean, halted: boolean) => ({
+			location_id: 'l1',
+			location_name: 'orders',
+			target: 'production',
+			since: '2026-11-08T11:42:00Z',
+			reason: '250001 Could not connect to Snowflake backend after 2 attempt(s)',
+			unreachable,
+			halted,
+			retry_at: halted ? null : '2026-11-08T12:00:40Z',
+			retry_seconds: halted ? null : 60,
+			last_success_at: '2026-11-08T11:40:00Z'
+		});
+		const events = toPlatformEvents({ scheduler_leader: true, broken_locations: [], overdue_ticks: [], failing_syncs: [sync(true, false), sync(false, true)] }, NOW);
+		const since = formatClock('2026-11-08T11:42:00Z', NOW);
+		expect(events.map((e) => [e.kind, e.severity, e.occurredAt, e.locationId, e.message, e.sync?.halted])).toEqual([
+			['warehouse_sync_failed', 'warning', '2026-11-08T11:42:00Z', 'l1:production', `orders · production: run history can't reach the warehouse since ${since} · retrying every 60 s: 250001 Could not connect to Snowflake backend after 2 attempt(s)`, false],
+			['warehouse_sync_failed', 'warning', '2026-11-08T11:42:00Z', 'l1:production', `orders · production: run history sync stopped after failed reads in a row since ${since}: 250001 Could not connect to Snowflake backend after 2 attempt(s). Resume it once the cause is fixed.`, true]
+		]);
+	});
+
+	it('makes a sink that loses events, and a webhook the server can’t deliver to, problems since they began', () => {
+		const sink = { location_id: 'l1', location_name: 'orders', target: 'production', sink: 'kafka', since: '2026-11-08T11:42:00Z', reason: '8 of 8 events not delivered (8 failed)', run_id: 'r-9', last_success_at: null };
+		const forwarding = { name: 'Platform event forwarding', since: '2026-11-08T11:50:00Z', reason: 'Can’t deliver platform events: the webhook answered HTTP 503; they are kept and retried every 5 s', last_success_at: null };
+		const events = toPlatformEvents({ scheduler_leader: true, broken_locations: [], overdue_ticks: [], failing_sinks: [sink], failing_forwarding: [forwarding] }, NOW);
+		const at = (iso: string) => formatClock(iso, NOW);
+		expect(events.map((e) => [e.kind, e.severity, e.locationId, e.subject, e.message])).toEqual([
+			['event_sink_failed', 'warning', 'l1:production', 'kafka', `orders · production: event sink kafka losing events since ${at(sink.since)}: 8 of 8 events not delivered (8 failed).`],
+			['event_forwarding_failed', 'warning', null, 'Platform event forwarding', `Platform event forwarding failing since ${at(forwarding.since)}: ${forwarding.reason}.`]
+		]);
 	});
 
 	it('reports nothing while the scheduler leads and nothing is late', () => {
@@ -157,7 +190,7 @@ describe('toPlatformEventRecords', () => {
 			open,
 			[
 				{ storage_id: 9, event_id: 'e9', occurred_at: '2026-11-08T11:00:00Z', location_id: 'l1', target: 'development', event: { kind: 'launch_failed', run_id: 'r1', claim_id: 'c1', code: 'image_missing' } },
-				{ storage_id: 7, event_id: 'e7', occurred_at: '2026-11-08T10:30:00Z', event: { kind: 'run_failed', run_id: 'r2', run_kind: 'job', job_key: 'orders_daily', location_id: 'l1', target: 'development', outcome: 'failed', failed_nodes: [{ node_key: 'model:orders' }], failed_node_count: 1 } },
+				{ storage_id: 7, event_id: 'e7', occurred_at: '2026-11-08T10:30:00Z', event: { kind: 'run_failed', run_id: 'r2', run_kind: 'job', job_key: 'orders_daily', location_id: 'l1', target: 'development', outcome: 'failed', trigger: { kind: 'schedule' }, failed_nodes: [{ node_key: 'model:orders' }], failed_node_count: 1, failed_audits: [], failed_audit_count: 0, succeeded_node_count: 3, skipped_nodes: [], skipped_node_count: 0 } },
 				{ storage_id: 4, event_id: 'e4', occurred_at: '2026-11-08T10:00:00Z', event: { kind: 'scheduler_no_leader' } }
 			],
 			new Map([['l1:development', 'orders']])

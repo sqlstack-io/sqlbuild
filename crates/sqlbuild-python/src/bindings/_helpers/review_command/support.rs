@@ -16,6 +16,7 @@ use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::attribute_text::attribute_text as attribute;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_front::execution_history::main::nullable_text::nullable_text;
@@ -50,14 +51,6 @@ pub(crate) fn review_error(py: Python<'_>, code: &str, message: &str, help: Opti
 
 pub(crate) fn plan_error(py: Python<'_>, error: &ReviewPlanError) -> PyErr {
     review_error(py, &error.code, &error.message, error.help.as_deref())
-}
-
-/// `name` of `value` as text, or `None` when it is absent or `None`.
-pub(crate) fn attribute(value: &Bound<'_, PyAny>, name: &str) -> PyResult<Option<String>> {
-    match value.getattr_opt(name)? {
-        Some(item) if !item.is_none() => Ok(Some(item.str()?.extract()?)),
-        Some(_) | None => Ok(None),
-    }
 }
 
 /// The code, message and help of `error`, as the report records it.

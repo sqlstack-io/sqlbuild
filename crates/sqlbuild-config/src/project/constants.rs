@@ -65,7 +65,14 @@ pub(crate) const PARENT_SEGMENT: &str = "..";
 /// Whether each run records the machine it ran on in the runs state table.
 pub(crate) const RECORD_RUN_HOST_KEY: &str = "record_run_host";
 pub(crate) const DEFAULT_TEST_TIMEOUT: &str = "30s";
-pub(crate) const SETTINGS_KEYS: [&str; 19] = [
+/// Where unit tests run: `auto`, `local` or `warehouse`; `[settings]` and each target may set it.
+pub(crate) const TEST_RUN_ON_KEY: &str = "test_run_on";
+/// Where scenarios run, as `test_run_on` does for unit tests.
+pub(crate) const SCENARIO_RUN_ON_KEY: &str = "scenario_run_on";
+/// The places a test or scenario may run; `auto` picks per test.
+pub(crate) const RUN_ON_CHOICES: [&str; 3] = ["auto", "local", "warehouse"];
+pub(crate) const DEFAULT_RUN_ON: &str = "auto";
+pub(crate) const SETTINGS_KEYS: [&str; 21] = [
     "sql_analysis",
     "require_sql_analysis",
     "query_change_tracking",
@@ -85,6 +92,8 @@ pub(crate) const SETTINGS_KEYS: [&str; 19] = [
     "allow_warehouse_round_trips",
     IGNORE_AUDIT_FAILURES_KEY,
     RECORD_RUN_HOST_KEY,
+    TEST_RUN_ON_KEY,
+    SCENARIO_RUN_ON_KEY,
 ];
 pub(crate) const DEFAULTS_KEYS: [&str; 34] = [
     "append_cursor_inclusive",
@@ -207,7 +216,7 @@ pub(crate) const MAX_POOL_LIMIT: i64 = 10_000;
 pub(crate) const PLAN_FROM_KEY: &str = "plan_from";
 /// What `plan_from` may name; `live` is the default.
 pub(crate) const PLAN_FROM_SOURCES: [&str; 2] = ["live", "synced_state"];
-pub(crate) const TARGET_KEYS: [&str; 27] = [
+pub(crate) const TARGET_KEYS: [&str; 29] = [
     "connection",
     "catalog_connection",
     "vars",
@@ -235,6 +244,8 @@ pub(crate) const TARGET_KEYS: [&str; 27] = [
     PAUSE_DYNAMIC_KEY,
     ENV_FILE_KEY,
     ALLOW_MISSING_SECRETS_KEY,
+    TEST_RUN_ON_KEY,
+    SCENARIO_RUN_ON_KEY,
 ];
 pub(crate) const CONTROL_KEYS: [&str; 3] = ["location", "server", "sync_at_least_every"];
 pub(crate) const CHANGES_KEYS: [&str; 2] = ["counts", "reach"];

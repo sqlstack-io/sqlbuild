@@ -1,4 +1,4 @@
-//! `sqb scenario test --local --sync-snapshots` and `--refresh`: capture stale snapshots first.
+//! `sqb scenario test --sync-snapshots` and `--refresh`: capture stale snapshots before local runs.
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyString, PyTuple, PyTupleMethods};

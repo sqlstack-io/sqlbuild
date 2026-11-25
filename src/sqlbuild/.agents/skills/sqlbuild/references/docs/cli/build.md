@@ -86,6 +86,7 @@ own option. `--version` works only directly after `sqb`, as in `sqb --version`:
 | `SELECTOR ...` | Positional selectors, the same as `--select` |
 | `--select`, `-s` | Select specific models, or unit tests by name (`test:<name>`); selecting only unit tests runs them without building models |
 | `--exclude` | Exclude specific models |
+| `--server`, `--location-id`, `--ca-cert` | Read the runs that [`run:`, `failed:` and `skipped:`](../concepts/selectors.md#selecting-from-a-past-run) name from this server's runs of the location, with your [`sqb login`](login.md) session, instead of the local Recall history |
 | `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `build` [warehouse group](../concepts/adapters/snowflake.md#command-group-warehouses) and the connection warehouse |
 
 ## Fast iteration
@@ -301,6 +302,12 @@ skipped as for any other failure. Its row shows `TIMEOUT`. In the summary line, 
 `summary.failure_count` still includes them, and `summary.timeout_count` reports how many of those
 failures were timeouts. A timeout is a failure for the exit code: the build exits non-zero and its
 JSON `status` is `failed`.
+
+A singular audit whose references don't all exist in the target is not run. Its row shows
+`NOT RUN`, the summary line counts it under `NOT_RUN=` (shown only when there is one) and in no
+other count, and a `Not run` section names what each one reads that is missing. In `--json`
+output, `summary.not_run_count` counts them. The build still succeeds; see
+[Singular audits](../concepts/audits.md#singular-audits).
 
 ## Limits
 

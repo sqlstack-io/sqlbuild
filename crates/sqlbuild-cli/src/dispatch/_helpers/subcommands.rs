@@ -36,21 +36,8 @@ pub(crate) fn dbt_dispatch(subcommand: &str) -> Dispatch {
     Dispatch::Run(route, None)
 }
 
-pub(crate) fn scenario_dispatch(facts: &CommandFacts, subcommand: &str) -> Dispatch {
+pub(crate) fn scenario_dispatch(subcommand: &str) -> Dispatch {
     match subcommand {
-        "test" if facts.scenario_local && facts.scenario_retain => Dispatch::Fail(failure(
-            "scenario test --local does not support --retain",
-            "C452",
-            Some("Local scenario DuckDB files are always kept under target/run/scenarios/."),
-        )),
-        "test" if !facts.scenario_local && facts.scenario_snapshot_sync => Dispatch::Fail(failure(
-            "scenario snapshot sync flags require --local",
-            "C454",
-            Some(
-                "Use sqb scenario test --local --sync-snapshots or sqb scenario test --local \
-                     --refresh.",
-            ),
-        )),
         "test" => Dispatch::Run(&SCENARIO_TEST_ROUTE, None),
         "capture" => Dispatch::Run(&SCENARIO_CAPTURE_ROUTE, None),
         _ => Dispatch::Fail(failure(

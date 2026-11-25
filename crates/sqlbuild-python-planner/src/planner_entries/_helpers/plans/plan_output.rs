@@ -28,6 +28,7 @@ use sqlbuild_python_project::compiled_views::main::project::sql_tests::sql_tests
 use sqlbuild_python_project::compiled_views::models::NativeProjectView;
 use sqlbuild_python_project::planner_phases::main::object::object;
 use sqlbuild_python_project::planner_scope::main::build_source_load_entries::build_source_load_entries;
+use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use sqlbuild_python_project::planner_scope::main::upstream_loader_dependency_names::upstream_loader_dependency_names;
 use sqlbuild_python_project::planner_strategy::main::planning_context::planning_context;
 use sqlbuild_python_project::resource_views::main::function_reads::arguments::arguments;
@@ -702,6 +703,7 @@ pub(crate) fn plan_output_fields<'py>(
         model_warnings,
         reload_sources,
         extras,
+        audits_not_run,
     } = inputs;
     let py = project.py();
     let extras = if extras.is_none() {
@@ -815,6 +817,11 @@ pub(crate) fn plan_output_fields<'py>(
             "end_audit_source_keys",
             native_field(&scope, "end_audit_source_keys")?,
         ),
+        ("selected_audit_names", selected_audit_names(&scope)?),
+        (
+            "audits_not_run",
+            pyo3::IntoPyObject::into_pyobject(audits_not_run, py)?.into_any(),
+        ),
         ("upstream_deps", native_field(&scope, "upstream_deps")?),
         ("downstream_deps", native_field(&scope, "downstream_deps")?),
         (
@@ -856,6 +863,13 @@ pub(crate) fn plan_output_fields<'py>(
             native_field(&snapshot, "fingerprints")?,
         ),
     ])
+}
+
+/// The audits the scope selects by name, sorted.
+fn selected_audit_names<'py>(scope: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+    let mut names: Vec<String> = scope_data(scope)?.audits.iter().cloned().collect();
+    names.sort();
+    Ok(PyTuple::new(scope.py(), names)?.into_any())
 }
 
 /// Plan SQL tests selected by name or overlapping one selection into a reusable result.

@@ -411,7 +411,7 @@ pub(crate) async fn seed_logged_runs(
     scope: (Uuid, Uuid),
     ended_hours_ago: &[Value],
 ) {
-    let lease = acquire_lease(store, Uuid::now_v7())
+    let lease = acquire_lease(store, (Uuid::now_v7(), None))
         .await
         .expect("elect")
         .expect("leader");
@@ -563,4 +563,46 @@ pub(crate) async fn age_stored_requests(store: &ControlStore) {
         .expect("age the stored request");
         commit(transaction).await.expect("commit");
     }
+}
+
+/// Set a queued run's node to `status`, as a worker's report would have left it.
+pub(crate) async fn set_node_status(
+    store: &ControlStore,
+    (run_id, node_key): (Uuid, &str),
+    status: &str,
+) {
+    let transaction = begin(store, TransactionMode::Write).await.expect("begin");
+    let (transaction, _) = query(
+        transaction,
+        "UPDATE sqb_run_nodes SET status=$3 WHERE run_id=$1 AND node_key=$2",
+        vec![
+            Parameter::Id(run_id),
+            Parameter::Text(node_key.to_owned()),
+            Parameter::Text(status.to_owned()),
+        ],
+    )
+    .await
+    .expect("set the node status");
+    commit(transaction).await.expect("commit");
+}
+
+/// Record an attached check of `run_id` that finished with `status`, as a worker's check result does.
+pub(crate) async fn insert_check(
+    store: &ControlStore,
+    (run_id, node_key): (Uuid, &str),
+    status: &str,
+) {
+    let transaction = begin(store, TransactionMode::Write).await.expect("begin");
+    let (transaction, _) = query(
+        transaction,
+        "INSERT INTO sqb_run_nodes (run_id, node_key, status, writes, kind) VALUES ($1,$2,$3,FALSE,'check')",
+        vec![
+            Parameter::Id(run_id),
+            Parameter::Text(node_key.to_owned()),
+            Parameter::Text(status.to_owned()),
+        ],
+    )
+    .await
+    .expect("record the check");
+    commit(transaction).await.expect("commit");
 }

@@ -5,6 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde_json::json;
 use sqlbuild_orchestration::runs::models::PlannerResource;
 use sqlbuild_orchestration::runs::models::PublishedJobs;
+use sqlbuild_orchestration::runs::types::PastRuns;
 
 use crate::adhoc::main::adhoc_planner::adhoc_planner;
 use crate::adhoc::tests::helpers::{owned_plan, resource};
@@ -334,7 +335,7 @@ fn given_ad_hoc_commands_when_planned_then_flags_follow_the_allowlist_and_select
             .map(|token| (*token).to_owned())
             .collect();
         let actual = publication
-            .plan(&command)
+            .plan(&command, &PastRuns::new())
             .map(|plan| {
                 (
                     plan.selection.into_iter().collect::<Vec<String>>(),
@@ -572,7 +573,7 @@ fn given_published_python_nodes_when_planned_then_selectors_resolve_as_on_the_co
             .map(|token| (*token).to_owned())
             .collect();
         let actual = publication
-            .plan(&command)
+            .plan(&command, &PastRuns::new())
             .map(|plan| {
                 (
                     plan.selection.into_iter().collect::<Vec<String>>(),

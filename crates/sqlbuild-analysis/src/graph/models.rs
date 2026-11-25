@@ -40,6 +40,21 @@ pub struct ProjectGraph {
     pub(crate) name_index: HashMap<String, usize>,
     /// Each job and job group's resolved selection, or why it fails; `None` until a command attaches jobs.
     pub jobs: Option<BTreeMap<String, Result<BTreeSet<ObjectKey>, SelectorError>>>,
+    /// The audit names `audit:` selects; `None` where a command cannot select audits.
+    pub audits: Option<BTreeSet<String>>,
+    /// What each run named by `run:`, `failed:` or `skipped:` selected, by the ID as typed; `None` until a command attaches them.
+    pub runs: Option<BTreeMap<String, RunResults>>,
+}
+
+/// A past run's results as selector keys; audits are `("audit", name)` keys.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct RunResults {
+    /// Everything the run selected.
+    pub selected: BTreeSet<ObjectKey>,
+    /// What didn't succeed: failed, cancelled and never-reached nodes, and failed audits.
+    pub failed: BTreeSet<ObjectKey>,
+    /// What the run skipped because something it depends on failed.
+    pub skipped: BTreeSet<ObjectKey>,
 }
 
 /// What one job or job group selects: its own selector tokens, its member jobs, or resolved keys.

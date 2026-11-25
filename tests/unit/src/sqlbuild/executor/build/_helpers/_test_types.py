@@ -20,6 +20,9 @@ class AuditExecutionIndexTestCase:
     description: str
     expected_model_audit_count: int
     expected_end_audit_count: int
+    attachment_kind: str = "end"
+    # Audits the plan selects by name, as audit: or a past run's failed audits select them.
+    selected_audit_names: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

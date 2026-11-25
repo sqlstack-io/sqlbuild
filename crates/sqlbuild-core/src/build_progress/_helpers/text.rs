@@ -1,9 +1,9 @@
 //! Python formatting idioms and small labels shared by build progress rows.
 
 use crate::build_progress::constants::{
-    ERROR, FAILED, INSUFFICIENT, PASS, ROW_COUNT_ABBREVIATION_THRESHOLD, ROW_COUNT_BILLION,
-    ROW_COUNT_MILLION, ROW_COUNT_THOUSAND, SECONDS_PER_MINUTE, SKIPPED, SUCCESS, TIMEOUT_CODE,
-    TIMEOUT_OUTCOME, WARN,
+    ERROR, FAILED, INSUFFICIENT, NOT_RUN, PASS, ROW_COUNT_ABBREVIATION_THRESHOLD,
+    ROW_COUNT_BILLION, ROW_COUNT_MILLION, ROW_COUNT_THOUSAND, SECONDS_PER_MINUTE, SKIPPED, SUCCESS,
+    TIMEOUT_CODE, TIMEOUT_OUTCOME, WARN,
 };
 use crate::build_progress::models::SkipText;
 use crate::number_text::main::format_thousands::format_thousands;
@@ -75,6 +75,7 @@ pub(crate) fn audit_outcome_display(outcome: &str) -> String {
         ERROR => "FAIL".to_owned(),
         INSUFFICIENT => "INSUFFICIENT".to_owned(),
         SKIPPED => "SKIP".to_owned(),
+        NOT_RUN => "NOT RUN".to_owned(),
         other => other.to_owned(),
     }
 }

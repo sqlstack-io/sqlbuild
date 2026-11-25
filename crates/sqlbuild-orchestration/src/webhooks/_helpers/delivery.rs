@@ -35,10 +35,10 @@ pub(crate) async fn deliver_webhook(
             .json(&event)
             .send()
             .await
-            .map_err(|_| ControlError::Invalid("webhook delivery failed; event retained".into()))?;
+            .map_err(|error| ControlError::Invalid(transport_failure(&error).into()))?;
         if !response.status().is_success() {
             return Err(ControlError::Invalid(format!(
-                "webhook returned HTTP {}; event retained",
+                "the webhook answered HTTP {}",
                 response.status().as_u16()
             )));
         }
@@ -61,4 +61,15 @@ pub(crate) async fn deliver_webhook(
         commit(transaction).await?;
     }
     Ok(count)
+}
+
+/// A failed request in words that never name the endpoint, which may hold credentials.
+fn transport_failure(error: &reqwest::Error) -> &'static str {
+    if error.is_timeout() {
+        "the webhook didn't answer in time"
+    } else if error.is_connect() {
+        "can't connect to the webhook"
+    } else {
+        "the request to the webhook failed"
+    }
 }

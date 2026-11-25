@@ -43,12 +43,12 @@ use std::collections::HashSet;
 /// Relation keys needed to render selected audits without selecting those relations.
 fn selected_audit_relation_keys(
     project: &Bound<'_, PyAny>,
-    selected_keys: &HashSet<ObjectKey>,
+    selected: (&HashSet<ObjectKey>, &HashSet<String>),
 ) -> PyResult<HashSet<ObjectKey>> {
     let mut keys: HashSet<ObjectKey> = HashSet::new();
     for audit in audits(project)?.try_iter()? {
         let audit = audit?;
-        if audit_is_selected(&audit, selected_keys)? {
+        if audit_is_selected(&audit, selected)? {
             for dependency in scope_deps(&audit)?.try_iter()? {
                 keys.insert(native_key(&dependency?)?);
             }
@@ -136,7 +136,8 @@ pub(crate) fn planner_relations_context<'py>(
     }
     let scope = scope_data(&scope)?;
     let load_keys = if relation_keys.is_none() {
-        let mut relevant = selected_audit_relation_keys(&project, &scope.selected)?;
+        let mut relevant =
+            selected_audit_relation_keys(&project, (&scope.selected, &scope.audits))?;
         relevant.extend(scope.selected.iter().cloned());
         relevant.into_iter().collect()
     } else {

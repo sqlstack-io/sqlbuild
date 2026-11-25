@@ -1,5 +1,6 @@
 pub mod advance_groups;
 pub mod change_run;
+pub mod change_run_linked;
 pub mod claim_next_run;
 pub mod heartbeat_run;
 pub mod monitor_runs;

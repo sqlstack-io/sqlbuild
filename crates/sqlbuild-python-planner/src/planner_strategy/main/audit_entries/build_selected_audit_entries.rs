@@ -22,7 +22,7 @@ pub fn build_selected_audit_entries<'py>(
     let mut selected: Vec<Bound<'py, PyAny>> = Vec::new();
     for audit in audits(&project)?.try_iter()? {
         let audit = audit?;
-        if audit_is_selected(&audit, &scope.selected)? {
+        if audit_is_selected(&audit, (&scope.selected, &scope.audits))? {
             selected.push(audit);
         }
     }

@@ -310,16 +310,18 @@ fn given_scenario_test_flags_when_validating_then_rejects_unsupported_combinatio
             expected_code: Some("C452"),
         },
         FlagsTestCase {
-            description: "sync without local",
+            description: "sync on the warehouse",
             flags: ScenarioTestFlags {
+                warehouse: true,
                 sync_snapshots: true,
                 ..ScenarioTestFlags::default()
             },
             expected_code: Some("C454"),
         },
         FlagsTestCase {
-            description: "refresh without local",
+            description: "refresh on the warehouse",
             flags: ScenarioTestFlags {
+                warehouse: true,
                 refresh: true,
                 ..ScenarioTestFlags::default()
             },
@@ -330,6 +332,15 @@ fn given_scenario_test_flags_when_validating_then_rejects_unsupported_combinatio
             flags: ScenarioTestFlags {
                 local: true,
                 refresh: true,
+                ..ScenarioTestFlags::default()
+            },
+            expected_code: None,
+        },
+        FlagsTestCase {
+            description: "auto sync and retain",
+            flags: ScenarioTestFlags {
+                retain: true,
+                sync_snapshots: true,
                 ..ScenarioTestFlags::default()
             },
             expected_code: None,
@@ -357,7 +368,7 @@ fn given_sql_analysis_off_when_checking_scenario_command_then_explains_how_to_tu
             disabled_by_flag: true,
             guidance: None,
             expected_error: Some((
-                "scenario test --local requires SQL analysis, but `--no-sql-analysis` turns it off",
+                "scenario test --run-on local requires SQL analysis, but `--no-sql-analysis` turns it off",
                 "run the command without `--no-sql-analysis`",
             )),
         },

@@ -13,6 +13,7 @@ Online: https://sqlbuild.com/docs/concepts/testing-reference/
 - Cursor windows in tests
 - Empty-input tests
 - Cost guards
+- Running tests locally
 - Skipping SQL analysis
 - Details
 
@@ -428,6 +429,71 @@ to change it, without the scenario advice.
 
 Scenarios have their own limit, `scenario_timeout`; see
 [Scenario timeouts](project-configuration.md#unit-test-and-scenario-limits).
+
+## Running tests locally
+
+`sqb test` runs each SQL unit test either locally, in a run-scoped in-memory DuckDB database, or on
+the warehouse. Unit test fixtures are inline, so a local test needs no captured data and no
+credentials.
+
+| Setting | Where each test runs |
+| --- | --- |
+| `auto` (default) | Locally when [SQLQuack](https://github.com/sqlstack-io/sqlquack) converts its comparison SQL to DuckDB, otherwise on the warehouse |
+| `local` | Locally. A test SQLQuack refuses is an `ERROR` (`T007`, `can't run locally`); it is never skipped or sent to the warehouse |
+| `warehouse` | On the warehouse, as every test ran before |
+
+The setting comes from, in order: `--run-on`, the selected target's `test_run_on` (a target in
+`sqlbuild_local.toml` replaces the project file's), `[settings] test_run_on` in
+`sqlbuild_local.toml`, then in `sqlbuild_project.toml`, then `auto`.
+
+```toml
+[settings]
+test_run_on = "auto"
+
+[targets.ci]
+test_run_on = "local"
+```
+
+How SQLBuild decides, at compile time, before anything runs:
+
+- **Snowflake projects.** SQLQuack converts the test's comparison SQL: every real model in its
+  chain, its fixtures, expected rows and assertions. SQLQuack converts only constructs whose rules
+  were verified against recorded Snowflake results, and refuses anything else. SQLBuild gives
+  SQLQuack the declared columns of the project's sources, seeds and models.
+- **DuckDB projects.** The SQL is already DuckDB SQL, so tests run locally as written.
+- **Project functions.** A local run makes temporary copies of the functions a test calls. A
+  function whose body reads a table or view, or any function in a project that isn't DuckDB, needs
+  the warehouse (reason `project function: <name>`).
+- **Unmocked relations.** A test whose SQL still reads a relation the local database doesn't have,
+  rather than one of its fixtures, needs the warehouse (reason `warehouse relation: <name>`). In a
+  Snowflake project SQLQuack refuses names the project doesn't declare, and a declared relation the
+  converted SQL reads by name, such as a table a model names directly, is one only the warehouse has.
+- **Work per run.** Each distinct test statement is converted once, in worker processes, and the
+  test run reuses those conversions. Conversions are kept in `target/sqlquack-cache/`, keyed by the
+  SQL, the declared relations it reads, the session and the SQLQuack version, so a later run
+  converts only the statements that changed. At the end of a run, SQLBuild deletes the conversions
+  no run has used for 7 days. Deleting the folder is always safe.
+- **Other adapters.** SQLQuack converts Snowflake SQL only, so tests run on the warehouse (reason
+  `dialect: <adapter>`).
+- **Time zone.** Local runs use a UTC session. When the target's connection sets another
+  `TIMEZONE` in `session_parameters`, SQLQuack refuses SQL whose result depends on the time zone,
+  and those tests go to the warehouse.
+
+`sqb test --inspect` adds one line per test: `runs on: local`, or
+`runs on: warehouse  (<reason>)`, where the reason is SQLQuack's refusal label
+`<category>: <construct>`, such as `missing rule: node:method_call` or
+`a known difference that isn't allowed: fn:HASH`. The full diagnostics follow the plan.
+
+In `auto`, when the warehouse connection cannot be made, the local tests still run and each
+warehouse test is an `ERROR` (`T008`, `needs the warehouse (no connection)`).
+
+Some problems only show when a test runs. SQLQuack's converted SQL raises, instead of returning a
+different value, for inputs DuckDB would read differently from Snowflake, and DuckDB can fail with
+an internal error on SQL it accepted. In `auto` such a test runs again on the warehouse, with the
+reason `SQLQuack guard: <name>`, such as `SQLQuack guard: array_agg_order`, or
+`DuckDB internal error: <message>`. The local attempt prints nothing; the test's row shows
+`warehouse  (<reason>)`. With `--run-on local` it is an `ERROR` (`T007`) that names the guard. An error Snowflake would raise too, such as a value that isn't a number, is the test's
+own result wherever it runs.
 
 ## Skipping SQL analysis
 

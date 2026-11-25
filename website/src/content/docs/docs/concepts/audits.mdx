@@ -348,9 +348,27 @@ singular audit must live under the nearest folder containing everything it refer
 directly under `sql/audits/` or in any other `sql/audits/` child are compile errors.
 
 SQLBuild infers where a singular audit runs from its references. When one referenced model is
-downstream of every other referenced model, the audit attaches to that model. Otherwise it runs at
-the end of the build, after the resources it references are published. Only singular audits run at
-the end of the build; attached audits always gate their target.
+downstream of every other referenced model and the build builds it, the audit attaches to that
+model. Otherwise it runs at the end of the build, after the resources it references are published.
+Only singular audits run at the end of the build; attached audits always gate their target.
+
+A build selects a singular audit when it builds anything the audit references. The audit runs when
+everything it references exists: built in this run, or already in the target. When something it
+references doesn't exist in the target, the audit is not run. That is neither a pass nor a failure,
+and the build still succeeds. The plan lists the audit under `Audits not run` with what is
+missing, the build shows it as `NOT RUN` and counts it under `NOT_RUN=`, and the run page shows it
+as not run with the same reason:
+
+```
+✓ Completed successfully  PASS=1  WARN=0  FAIL=0  INSUFFICIENT=0  SKIP=0  NOT_RUN=1  TOTAL=2  (0.35s)
+
+Not run (1):
+  orders_have_payments  (audit) reads payments, which doesn't exist in the target
+```
+
+Selecting the audit itself, with `audit:orders_have_payments` or a past run's failed audits, fails
+planning with `S301` instead, naming what it reads that doesn't exist; see
+[Missing upstream dependencies](/docs/cli/plan#missing-upstream-dependencies).
 
 ## Source audits
 

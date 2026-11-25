@@ -22,6 +22,8 @@ use sqlbuild_analysis::python_selection::models::{
 
 use crate::graph::models::{CompiledProjectGraph, NativeProjectGraph, PythonAwareSelection};
 use crate::job_settings::main::needed_jobs::needed_jobs;
+use crate::planner_selection::main::graph_with_audits_and_runs::graph_with_audits_and_runs;
+use sqlbuild_analysis::graph::constants::AUDIT_KIND;
 use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
@@ -180,6 +182,12 @@ impl<'g> PythonAwareSelection<'g> {
             )),
             None => Cow::Borrowed(native),
         };
+        let graph: Cow<'g, ProjectGraph> =
+            match graph_with_audits_and_runs(project_graph.get().project(py), &graph, selectors)? {
+                Ok(Cow::Owned(attached)) => Cow::Owned(attached),
+                Ok(Cow::Borrowed(_)) => graph,
+                Err(error) => return Err(planner_error(py, error)),
+            };
         Ok(Self {
             graph,
             sources,
@@ -218,7 +226,7 @@ impl<'g> PythonAwareSelection<'g> {
         Ok(keys)
     }
 
-    /// The SQL keys and Python node names `select` minus `exclude` resolve to.
+    /// The SQL keys and Python node names `select` minus `exclude` resolve to; audits are left to the planner, which reads them by name.
     pub fn resolve(
         &self,
         select: &[String],
@@ -229,7 +237,9 @@ impl<'g> PythonAwareSelection<'g> {
             sources: &self.sources,
             allow_warehouse_round_trips: self.allow_warehouse_round_trips,
         };
-        run_selection(sql, &self.nodes, select, exclude)
+        let mut selection = run_selection(sql, &self.nodes, select, exclude)?;
+        selection.sql_keys.retain(|key| key.0 != AUDIT_KIND);
+        Ok(selection)
     }
 }
 

@@ -17,3 +17,5 @@ pub const CONNECTED_PHASE: &str = "connected";
 pub const INSPECTED_PHASE: &str = "inspected";
 /// The plan was generated.
 pub const PLANNED_PHASE: &str = "planned";
+/// Execution began, before any of its work ran.
+pub const STARTED_EXECUTION_PHASE: &str = "started_execution";

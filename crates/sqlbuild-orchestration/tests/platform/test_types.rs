@@ -121,3 +121,33 @@ pub(crate) struct FailingLocationTestCase {
     pub(crate) backend: crate::store::tests::store_test_types::Backend,
     pub(crate) expected_error: &'static str,
 }
+
+pub(crate) struct FailingSyncTestCase {
+    pub(crate) description: &'static str,
+    /// Newest first, as `recent_health` returns them.
+    pub(crate) observations: Vec<crate::platform::models::LocationHealthObservation>,
+    pub(crate) expected_sync: Option<crate::platform::models::FailingSync>,
+}
+
+pub(crate) struct FailingSinkTestCase {
+    pub(crate) description: &'static str,
+    /// Newest first, as the scan reads them.
+    pub(crate) reports: Vec<crate::platform::models::SinkReport>,
+    pub(crate) expected_sinks: Vec<crate::platform::models::FailingSink>,
+}
+
+pub(crate) struct StoredSinkTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: crate::store::tests::store_test_types::Backend,
+    /// Each failing sink with its reason.
+    pub(crate) expected_sinks: Vec<(String, String)>,
+}
+
+pub(crate) struct LocationSinkTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: crate::store::tests::store_test_types::Backend,
+    /// Each reported interval's accepted, dropped and failed events, oldest first.
+    pub(crate) intervals: Vec<(u64, u64, u64)>,
+    /// Each failing sink with its reason and run.
+    pub(crate) expected_sinks: Vec<(String, String, Option<uuid::Uuid>)>,
+}

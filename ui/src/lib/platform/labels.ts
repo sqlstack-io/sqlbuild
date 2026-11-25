@@ -78,6 +78,8 @@ export const eventKindLabel: Record<PlatformEventKind, string> = {
 	launch_failed: 'Couldn’t start runs',
 	connection_test_failed: 'Connection test failed',
 	warehouse_sync_failed: 'Warehouse sync failing',
+	event_sink_failed: 'Event sink losing events',
+	event_forwarding_failed: 'Event forwarding failing',
 	heartbeat: 'Server heartbeat'
 };
 

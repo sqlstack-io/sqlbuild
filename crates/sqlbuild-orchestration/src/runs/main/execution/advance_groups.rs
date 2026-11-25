@@ -44,7 +44,14 @@ pub async fn advance_groups<'a>(
                 .map_err(|error| ControlError::Invalid(error.to_string()))?;
             let transaction =
                 check_lease(begin(store, TransactionMode::Write).await?, lease).await?;
-            match advance_group(transaction, run_id, limits, dispatch.eligible).await {
+            match advance_group(
+                transaction,
+                (run_id, lease.origin.as_deref()),
+                limits,
+                dispatch.eligible,
+            )
+            .await
+            {
                 Ok(transaction) => commit(check_lease(transaction, lease).await?).await?,
                 Err(ControlError::UnreadableSnapshot { .. }) => {
                     fail_unreadable_group(store, lease, run_id).await?;

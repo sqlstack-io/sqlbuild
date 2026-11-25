@@ -6,6 +6,10 @@ mod helpers;
 mod test_compile_failure;
 #[path = "test_failing_locations.rs"]
 mod test_failing_locations;
+#[path = "test_failing_sinks.rs"]
+mod test_failing_sinks;
+#[path = "test_failing_syncs.rs"]
+mod test_failing_syncs;
 #[path = "test_installation.rs"]
 mod test_installation;
 #[path = "test_location_state.rs"]

@@ -1,5 +1,5 @@
 use crate::runs::models::{NodeOutcome, RunOutcome, RunStatus};
-use crate::sensors::models::SensorFunctionOutcome;
+use crate::sensors::models::{RunEventKind, SensorFunctionOutcome};
 use crate::store::tests::store_test_types::Backend;
 
 pub(crate) struct SensorTestCase {
@@ -131,4 +131,17 @@ pub(crate) struct UnreadableTickTestCase {
     pub(crate) expected_ticks: [(&'static str, bool); 2],
     /// `None` when not failing, else the reason shown on the page and in the trigger list.
     pub(crate) expected_failing: Option<Option<&'static str>>,
+}
+
+pub(crate) struct PartialOutcomeUpgradeTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) dialect: &'static crate::store::tests::schema::test_types::StoreDialect,
+    /// Marks the finished run and its stored Recall facts `partial`, as a store before 0012 has them.
+    pub(crate) mark_partial: &'static str,
+    /// Each sensor's watched kinds before the upgrade, as stored.
+    pub(crate) watched: &'static [(&'static str, &'static [&'static str])],
+    /// The run's status, its terminal fact's and run_failed event's outcomes after the upgrade.
+    pub(crate) expected_outcomes: [&'static str; 3],
+    /// Each sensor's watched kinds after the upgrade, in its snapshot document and its trigger row.
+    pub(crate) expected_watched: &'static [(&'static str, &'static [RunEventKind])],
 }

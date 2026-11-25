@@ -75,7 +75,7 @@ fn given_independent_check_failures_when_nondecisive_results_arrive_then_only_ex
                     .await
                     .expect("isolated snapshot");
             }
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

@@ -30,7 +30,7 @@ pub(crate) async fn scheduler_cycle(
     let phase = Instant::now();
     let renewal = match state.lease.as_ref() {
         Some(lease) => renew_lease(store, lease).await.map(Some),
-        None => acquire_lease(store, state.holder).await,
+        None => acquire_lease(store, (state.holder, state.origin.as_deref())).await,
     };
     state.lease = match renewal {
         Ok(lease) => lease,

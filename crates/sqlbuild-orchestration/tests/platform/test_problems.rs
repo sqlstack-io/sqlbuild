@@ -114,7 +114,7 @@ fn given_broken_locations_and_late_ticks_when_people_read_problems_then_only_lis
             .await
             .expect("developer on inventory only");
             for _ in 0..test_case.leaders {
-                acquire_lease(store, Uuid::now_v7())
+                acquire_lease(store, (Uuid::now_v7(), None))
                     .await
                     .expect("acquire lease")
                     .expect("leader");

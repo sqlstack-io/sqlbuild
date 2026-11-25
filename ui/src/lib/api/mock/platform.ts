@@ -6,6 +6,9 @@ import { CAPABILITIES } from '../types';
 import type { PlatformApi } from '../platform-client';
 import type { LocalChangeBus } from '../signals';
 import type {
+	HealthComponent,
+	HealthComponentDetails,
+	ServerHealth,
 	AccessDecision,
 	AccessExplanation,
 	AccessOverview,
@@ -639,6 +642,32 @@ export class MockPlatformApi implements PlatformApi {
 	}
 
 	// ---- health ----
+
+	/** Every part working; a browser test fakes an outage through the server client instead. */
+	async readHealth(): Promise<ServerHealth> {
+		const { now } = this.#ctx;
+		const at = new Date(now).toISOString();
+		const started = new Date(now - 2 * 1440 * MIN).toISOString();
+		const healthy = (component: HealthComponent['component'], name: string, locationId: string | null = null): HealthComponent => ({
+			component, name, locationId, status: 'healthy', since: started, reason: null, case: null, lastSuccess: at, lastFailure: null
+		});
+		return this.#ctx.reply({
+			status: 'healthy',
+			checkedAt: at,
+			retrySeconds: 10,
+			server: { version: this.#ctx.serverVersion, startedAt: started, uptimeSeconds: 2 * 86_400 },
+			components: [
+				healthy('server', 'Server'),
+				healthy('control_database', 'Control database'),
+				healthy('scheduler', 'Scheduler'),
+				...this.#ctx.locations.map((l) => healthy('location', l.name, l.id))
+			]
+		});
+	}
+
+	async readHealthDetails(): Promise<HealthComponentDetails[]> {
+		return this.#ctx.reply([{ component: 'control_database', locationId: null, host: 'control-db.internal:5432', errorChain: [], requestIds: [] }]);
+	}
 
 	async platformHealth(): Promise<PlatformHealth> {
 		const { now, events } = this.#ctx;

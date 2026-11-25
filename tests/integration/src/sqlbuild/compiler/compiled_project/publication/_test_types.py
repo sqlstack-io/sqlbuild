@@ -145,6 +145,8 @@ class WorkerExecutionTestCase:
     )
     # Whether the build compiles again instead of planning from the compile the worker verified.
     expected_compiles_again: bool = False
+    # Each failed run node as (key, the phase its worker reported it failed in).
+    expected_failed_phases: list[tuple[str, str | None]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -154,6 +156,13 @@ class NodeResultsTestCase(WorkerExecutionTestCase):
     expected_node_results: list[tuple[str, str, int | None, int | None, int | None, str | None]] = (
         field(default_factory=list)
     )
+
+
+@dataclass(frozen=True)
+class CheckResultsTestCase(WorkerExecutionTestCase):
+    description: str
+    # Each attached check the run reported, as (key, status).
+    expected_checks: list[tuple[str, str]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -196,8 +205,17 @@ class NulLogTestCase(WorkerExecutionTestCase):
 class PhaseEventsTestCase(WorkerExecutionTestCase):
     description: str
     backend: Literal["sqlite", "postgres"] = "sqlite"
-    # Each phase in order, and whether it reports a duration.
+    # Each phase in order up to the first node event, and whether it reports a duration.
     expected_phases: tuple[tuple[str, bool], ...] = ()
+    # What the planned phase says the plan runs.
+    expected_planned: str = ""
+
+
+@dataclass(frozen=True)
+class SinkDeliveryTestCase(WorkerExecutionTestCase):
+    description: str
+    # Each sink's name, and whether it failed every event it accepted.
+    expected_sinks: tuple[tuple[str, bool], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -1029,3 +1047,23 @@ class UnknownTagTestCase:
     edits: dict[str, str]
     expected_nodes: frozenset[str]
     expected_error: str
+
+
+@dataclass(frozen=True)
+class ServerOutageTestCase:
+    """A server whose control database can't be reached: its URL and what health says."""
+
+    description: str
+    database_url: str
+    expected_reason: str
+    expected_case: str
+
+
+@dataclass(frozen=True)
+class RuntimeSinkTestCase:
+    """A location interpreter's sinks and what it says each delivered."""
+
+    description: str
+    sink_source: str
+    # Each sink's name, and whether it failed every event it accepted.
+    expected_sinks: tuple[tuple[str, bool], ...]

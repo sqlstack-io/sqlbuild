@@ -6,12 +6,16 @@
 	import { formatAgo, formatDuration, formatStamp } from '$lib/format/time';
 	import { narrowingText, shortRunId } from '$lib/operate/labels';
 	import { app } from '$lib/state/app.svelte';
+	import { runsNamed } from '$lib/selection/command';
 	import { runKindLabel, runOriginLabel } from '$lib/status';
 	import RunSummary from './run-summary.svelte';
+	import RerunMenu from './rerun-menu.svelte';
+	import PanelRightIcon from '@lucide/svelte/icons/panel-right';
 	import { retriedMembers } from './utils';
 	import type { RunDetailState } from './state.svelte';
 
 	let { view, runId }: { view: RunDetailState; runId: string } = $props();
+
 
 	const run = $derived(view.run);
 	const what = $derived(run?.jobKey ?? (view.detail?.selection.join(' ') || 'whole project'));
@@ -20,6 +24,10 @@
 	/** A group's member that never started: "not started", never "skipped". */
 	const notStarted = $derived(!!run?.parentRunId && run.status === 'skipped' && !run.startedAt);
 	type Fact = { text: string; href?: string; title?: string; live?: boolean };
+	/** A full run ID links to its run; a typed prefix is shown as written. */
+	const FULL_RUN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+	/** The past runs an ad-hoc run's command reran from, read from its command alone. */
+	const fromRuns = $derived(run?.command ? runsNamed(run.command.join(' ')) : []);
 	/** The first line's facts, in order; a missing one leaves no separator behind. */
 	const facts = $derived.by((): Fact[] => {
 		if (!run) return [];
@@ -31,6 +39,7 @@
 					? { text: `rerun of ${shortRunId(run.rerunOfRunId)}`, href: `/runs/${run.rerunOfRunId}` }
 					: { text: runOriginLabel[run.origin].toLowerCase() },
 			run.narrowing ? { text: `part: ${narrowingText(run.narrowing)}`, title: `Ran part of ${run.jobKey}` } : null,
+			...fromRuns.map((written): Fact => ({ text: `from run ${shortRunId(written)}`, href: FULL_RUN_ID.test(written) ? `/runs/${written}` : undefined, title: `sqb ${run.command?.join(' ')}` })),
 			run.window ? { text: `window ${run.window.start} → ${run.window.end}` } : null,
 			retried ? { text: `${retried} retried`, title: 'Member jobs the group retried inside this run' } : null,
 			{ text: `by ${run.requestedBy.displayName}`, title: run.requestedBy.name },
@@ -51,22 +60,43 @@
 			<CopyButton value={runId} label="Copy run ID" />
 		</nav>
 		{#if run}
-			<!-- Two lines: what ran and how it ended, then what it did. The rest is under Details. -->
+			<!-- One line: what ran, how it ended, its facts and what it did; the actions on the right. On a
+			     narrow page the facts wrap under the title and the actions stay right. The rest is under Details. -->
 			<div class="title-row">
-				<h2>
-					{#if run.jobKey}<a href={to(`/jobs/${run.jobKey}`)}>{run.jobKey}</a>{:else}<span class="adhoc">ad hoc: <code>{what}</code></span>{/if}
-				</h2>
-				<RunStatusPill status={run.status} size="md" ignored={run.ignoredAuditFailures} notStarted={notStarted} />
-				<span class="meta">
-					{#each facts as f, i (i)}
-						{#if i}<span class="sep">{' · '}</span>{/if}
-						{#if f.href}<a href={to(f.href)} title={f.title}>{f.text}</a>{:else}<span class:live={f.live} title={f.title}>{f.text}</span>{/if}
-					{/each}
-				</span>
-			</div>
-			<div class="summary-row">
-				<RunSummary {view} />
-				<Button variant="link" size="inline" class="details-toggle" onclick={() => view.toggleDetails()} aria-expanded={view.showDetails} title="Command, version, nodes, cost, related runs and technical details">Details {view.showDetails ? '▴' : '▾'}</Button>
+				<div class="title">
+					<h2>
+						{#if run.jobKey}<a href={to(`/jobs/${run.jobKey}`)}>{run.jobKey}</a>{:else}<span class="adhoc">ad hoc: <code>{what}</code></span>{/if}
+					</h2>
+					<RunStatusPill status={run.status} size="md" ignored={run.ignoredAuditFailures} notStarted={notStarted} />
+					<span class="meta">
+						{#each facts as f, i (i)}
+							{#if i}<span class="sep">{' · '}</span>{/if}
+							{#if f.href}<a href={to(f.href)} title={f.title}>{f.text}</a>{:else}<span class:live={f.live} title={f.title}>{f.text}</span>{/if}
+						{/each}
+						<span class="sep before-figures">{' · '}</span><RunSummary {view} />
+					</span>
+				</div>
+				<div class="actions">
+					{#if !view.active}<RerunMenu {view} />{/if}
+					{#if view.active}
+						<span title={!app.can('run.cancel') ? "You don't have permission to cancel (run.cancel)" : cancelRequested ? 'Cancel already requested; see the progress below' : 'Stops the run: running queries are cancelled, then the run is stopped'}>
+							<Button
+								variant={view.cancelArmed ? 'destructive' : 'outline'}
+								size="sm"
+								disabled={!app.can('run.cancel') || cancelRequested || view.busy !== null}
+								aria-busy={view.busy === 'cancel'}
+								onclick={() => view.cancel()}
+								onblur={() => view.disarmCancel()}
+							>
+								{cancelRequested ? 'Cancelling…' : view.cancelArmed ? 'Confirm cancel' : 'Cancel run'}
+							</Button>
+						</span>
+					{/if}
+					<!-- Quiet: an icon and a label, coloured only when hovered or focused. -->
+					<Button variant="ghost" size="sm" onclick={() => view.toggleDetails()} aria-expanded={view.showDetails} title="Command, version, worker, cost and related runs">
+						<PanelRightIcon />Details
+					</Button>
+				</div>
 			</div>
 		{:else if view.detailRes.error}
 			<p class="err">Couldn't load this run: {view.detailRes.error}</p>
@@ -74,23 +104,6 @@
 			<p class="faint">There's no run {runId} in this location. It may belong to another location.</p>
 		{/if}
 	</div>
-	{#if run}
-		<div class="actions">
-			{#if view.active}
-				<span title={!app.can('run.cancel') ? "You don't have permission to cancel (run.cancel)" : cancelRequested ? 'Cancel already requested; see the progress below' : 'Stops the run: running queries are cancelled, then the run is stopped'}>
-					<Button
-						variant={view.cancelArmed ? 'destructive' : 'outline'}
-						disabled={!app.can('run.cancel') || cancelRequested || view.busy !== null}
-						aria-busy={view.busy === 'cancel'}
-						onclick={() => view.cancel()}
-						onblur={() => view.disarmCancel()}
-					>
-						{cancelRequested ? 'Cancelling…' : view.cancelArmed ? 'Confirm cancel' : 'Cancel run'}
-					</Button>
-				</span>
-			{/if}
-		</div>
-	{/if}
 </div>
 {#if view.actionError}<div class="action-error" role="alert">{view.actionError}</div>{/if}
 
@@ -126,10 +139,17 @@
 	}
 	.title-row {
 		display: flex;
+		align-items: flex-start;
+		gap: 16px;
+		margin-top: 4px;
+	}
+	.title {
+		display: flex;
+		min-width: 0;
+		flex: 1;
 		flex-wrap: wrap;
 		align-items: center;
-		gap: 10px;
-		margin-top: 4px;
+		gap: 4px 10px;
 	}
 	h2 {
 		font-family: var(--font-display);
@@ -142,7 +162,10 @@
 	.adhoc {
 		font-size: 15px;
 	}
+	/* Stays beside the title while it has room, wrapping inside itself; below that it wraps under the title. */
 	.meta {
+		min-width: 0;
+		flex: 1 1 360px;
 		display: inline-flex;
 		flex-wrap: wrap;
 		align-items: center;
@@ -157,15 +180,9 @@
 	.sep {
 		color: var(--sb-text-faint);
 	}
-	.summary-row {
-		display: flex;
-		align-items: baseline;
-		gap: 14px;
-		margin-top: 8px;
-	}
-	.summary-row :global(.details-toggle) {
-		margin-left: auto;
-		font-size: 12.5px;
+	/* Clear of the first figure's reserved pill room, as between the figures. */
+	.before-figures {
+		margin-right: 6px;
 	}
 	.live {
 		color: var(--sb-running);
@@ -173,9 +190,9 @@
 	}
 	.actions {
 		display: flex;
+		flex: none;
 		align-items: center;
-		gap: 8px;
-		padding-top: 18px;
+		gap: 6px;
 	}
 	.err,
 	.action-error {

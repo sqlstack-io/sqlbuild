@@ -50,8 +50,8 @@ pub(crate) async fn leadership_contract(backend: Backend) -> Option<i64> {
         .expect("migrate leadership store");
     let second = second_store(store).await;
     let (first, other) = tokio::join!(
-        acquire_lease(store, Uuid::now_v7()),
-        acquire_lease(&second, Uuid::now_v7())
+        acquire_lease(store, (Uuid::now_v7(), None)),
+        acquire_lease(&second, (Uuid::now_v7(), None))
     );
     let first = first.expect("first contender completes");
     let other = other.expect("second contender completes");
@@ -67,7 +67,7 @@ pub(crate) async fn leadership_contract(backend: Backend) -> Option<i64> {
     assert_eq!(renewed.epoch, lease.epoch);
     assert!(renewed.expires_at >= lease.expires_at);
     assert!(
-        acquire_lease(store, lease.holder)
+        acquire_lease(store, (lease.holder, None))
             .await
             .expect("duplicate acquisition completes")
             .is_none()
@@ -83,7 +83,7 @@ pub(crate) async fn leadership_contract(backend: Backend) -> Option<i64> {
         matches!(renew_lease(store, &lease).await, Err(ControlError::Fenced)),
         "even an uncontested expired holder must reacquire a new epoch"
     );
-    let successor = acquire_lease(&second, Uuid::now_v7())
+    let successor = acquire_lease(&second, (Uuid::now_v7(), None))
         .await
         .expect("acquire expired lease")
         .expect("successor elected");
@@ -254,6 +254,7 @@ pub(crate) async fn report_run(
                 error_code: None,
                 skipped_because_of: None,
                 error_message: None,
+                phase: None,
             }),
     );
     changes.push(RunChange::Finished {

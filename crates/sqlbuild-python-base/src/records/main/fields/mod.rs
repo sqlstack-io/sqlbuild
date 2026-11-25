@@ -1,4 +1,5 @@
 pub mod all_specs;
+pub mod attribute_text;
 pub mod by_attribute;
 pub mod cached_value;
 pub mod enum_member_value;

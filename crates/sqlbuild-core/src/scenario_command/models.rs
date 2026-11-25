@@ -21,7 +21,10 @@ pub struct NamespaceCandidates {
 /// The `sqb scenario test` flags validated before the project is read.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct ScenarioTestFlags {
+    /// The run replays every scenario locally (`--run-on local`).
     pub local: bool,
+    /// The run sends every scenario to the warehouse (`--run-on warehouse`).
+    pub warehouse: bool,
     pub retain: bool,
     pub sync_snapshots: bool,
     pub refresh: bool,

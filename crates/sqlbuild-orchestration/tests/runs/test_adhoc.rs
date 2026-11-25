@@ -4,6 +4,7 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::credentials::models::AuditContext;
+use crate::runs::main::listings::list_runs::list_runs;
 use crate::runs::main::requests::check_adhoc_run::check_adhoc_run;
 use crate::runs::main::requests::request_person_run::request_person_run;
 use crate::runs::models::PersonRunRequest;
@@ -358,6 +359,27 @@ fn given_ad_hoc_commands_when_people_check_and_launch_them_then_each_gated_flag_
                 commands,
                 vec![None, None, Some(json!("test"))],
                 "{backend:?}: the worker receives the command, a load runs as a build, and a build request is serialized as before"
+            );
+            let listed = list_runs(store, (location_id, "development"), 100)
+                .await
+                .expect("list runs");
+            let typed = [run_ids[0], run_ids[position("test")]].map(|run_id| {
+                listed
+                    .iter()
+                    .find(|run| run.run_id == run_id)
+                    .and_then(|run| run.command.clone())
+            });
+            assert_eq!(
+                typed,
+                [
+                    Some(vec![
+                        "build".to_owned(),
+                        "model:orders".to_owned(),
+                        "source:shop.orders".to_owned()
+                    ]),
+                    Some(vec!["test".to_owned(), "model:orders".to_owned()]),
+                ],
+                "{backend:?}: an ad-hoc run's record carries its command as the person typed it"
             );
             let audit = rows(
                 store,

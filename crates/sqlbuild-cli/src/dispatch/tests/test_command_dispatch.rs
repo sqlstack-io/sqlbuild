@@ -3,7 +3,7 @@ use crate::dispatch::constants::{
     SCENARIO_CAPTURE_ROUTE,
 };
 use crate::dispatch::main::command_dispatch::command_dispatch;
-use crate::dispatch::models::{CommandFacts, Dispatch, DispatchFailure};
+use crate::dispatch::models::{CommandFacts, Dispatch};
 use crate::dispatch::tests::helpers::{facts, failure, runs};
 use crate::dispatch::tests::test_types::CommandDispatchTestCase;
 
@@ -67,35 +67,6 @@ fn given_parsed_command_when_dispatching_then_selects_python_dispatcher_route() 
                     "C112",
                 )),
             ),
-        },
-        CommandDispatchTestCase {
-            description: "scenario test --local --retain fails",
-            facts: CommandFacts {
-                scenario_local: true,
-                scenario_retain: true,
-                ..facts("scenario", Some("test"))
-            },
-            expected_dispatch: Dispatch::Fail(DispatchFailure {
-                message: "scenario test --local does not support --retain".to_owned(),
-                code: "C452",
-                help: Some(
-                    "Local scenario DuckDB files are always kept under target/run/scenarios/.",
-                ),
-            }),
-        },
-        CommandDispatchTestCase {
-            description: "scenario sync flags need --local",
-            facts: CommandFacts {
-                scenario_snapshot_sync: true,
-                ..facts("scenario", Some("test"))
-            },
-            expected_dispatch: Dispatch::Fail(DispatchFailure {
-                message: "scenario snapshot sync flags require --local".to_owned(),
-                code: "C454",
-                help: Some(
-                    "Use sqb scenario test --local --sync-snapshots or sqb scenario test --local --refresh.",
-                ),
-            }),
         },
         CommandDispatchTestCase {
             description: "scenario capture runs the capture slot",

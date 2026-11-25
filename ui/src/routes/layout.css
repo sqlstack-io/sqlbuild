@@ -580,3 +580,15 @@
 		animation: none;
 	}
 }
+
+/* A filter control while its filter is on (a run's header figure, the log's Errors chip): held down,
+   in its own colour (`--pressed-tone`). One class, so every filter control reads as pressed alike. */
+.sb-pressed {
+	--pressed-tone: var(--primary);
+	border-radius: 2px;
+	background: color-mix(in srgb, var(--pressed-tone) 18%, transparent);
+	box-shadow:
+		inset 0 0 0 1px color-mix(in srgb, var(--pressed-tone) 55%, transparent),
+		inset 0 1px 3px color-mix(in srgb, black 35%, transparent);
+	/* Pressed is a background and an inset line only: never a border or a weight, so nothing moves. */
+}

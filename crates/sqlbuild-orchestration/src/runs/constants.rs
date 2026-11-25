@@ -56,6 +56,8 @@ pub(crate) const SUPERSEDED_CHILD: &str = "EXISTS(SELECT 1 FROM sqb_runs s WHERE
 pub(crate) const MEMBER_RETRYING_EVENT: &str = "run_member_retrying";
 /// The scheduler's launch fact, which names the container a worker started in, if any.
 pub(crate) const RUN_LAUNCHED_EVENT: &str = "run_launched";
+/// A run's report of what its lifecycle event sinks delivered.
+pub(crate) const SINK_DELIVERIES_EVENT: &str = "run_sink_deliveries";
 /// The group run event recorded when a retried member succeeds.
 pub(crate) const MEMBER_RECOVERED_EVENT: &str = "run_member_recovered";
 
@@ -65,6 +67,8 @@ pub(crate) const PUBLICATIONS_PER_TARGET: usize = 2;
 /// Selected keys per page of a selection evaluation, and the most a request may ask for.
 pub(crate) const SELECTION_PAGE_DEFAULT: u32 = 1_000;
 pub(crate) const SELECTION_PAGE_MAX: u32 = 10_000;
+/// The key prefix of an audit a selection picks, singular or attached.
+pub(crate) const AUDIT_KEY_PREFIX: &str = "audit:";
 
 /// A followed run's repeated output reads are audited at most once per person, run and kind in this window, on each server.
 pub(crate) const REPEATED_READ_AUDIT: std::time::Duration = std::time::Duration::from_secs(600);
@@ -74,3 +78,17 @@ pub(crate) const MISSING_SECRET_ERROR_CODE: &str = "D012";
 /// How a worker's message for such a node starts, and the phrase after its variables.
 pub(crate) const MISSING_SECRET_PREFIX: &str = "provider ";
 pub(crate) const MISSING_SECRET_PHRASE: &str = " not set (missing from ";
+/// The fewest characters of a run ID `run:`, `failed:` and `skipped:` take, like a short git hash.
+pub(crate) const MIN_RUN_ID_PREFIX: usize = 8;
+/// How many runs an ambiguous run ID prefix lists.
+pub(crate) const MAX_LISTED_RUN_MATCHES: usize = 5;
+/// The most failed audits `failed:` reads from one run.
+pub(crate) const PAST_RUN_AUDIT_LIMIT: usize = 10_000;
+/// Run node statuses `failed:` selects: what failed, was cancelled or was never reached.
+pub(crate) const FAILED_RUN_NODE_STATUSES: [&str; 3] = ["failed", "cancelled", "not_run"];
+/// The run node status `skipped:` selects.
+pub(crate) const SKIPPED_RUN_NODE_STATUS: &str = "skipped";
+/// An audit check that was not run because the target lacks a read: neither run nor failed, so run selectors leave it out.
+pub(crate) const NOT_RUN_STATUS: &str = "not_run";
+/// The kind of a run node row that records an attached check.
+pub(crate) const CHECK_KIND: &str = "check";

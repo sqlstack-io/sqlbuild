@@ -23,6 +23,7 @@ Positional `SELECTOR` arguments work like `--select`, and both forms can be comb
 | `SELECTOR ...` | Positional selectors, the same as `--select` |
 | `--select`, `-s` | Select checks to run (by name, `check:`, `tag:`, or graph expansion) |
 | `--exclude` | Exclude checks from the selection |
+| `--server`, `--location-id`, `--ca-cert` | Read the runs that [`run:`, `failed:` and `skipped:`](../concepts/selectors.md#selecting-from-a-past-run) name from this server's runs of the location, with your [`sqb login`](login.md) session, instead of the local Recall history |
 | `--no-sql-analysis` | Disable compile-time SQL analysis (`--no-sql-validation` is an alias) |
 | `--json` | Print check results as JSON |
 | `--json-output` | Write check results JSON to a file path |

@@ -4,6 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Value, json};
 use sqlbuild_orchestration::runs::models::PublishedJobs;
+use sqlbuild_orchestration::runs::types::PastRuns;
 
 use crate::adhoc::main::adhoc_planner::adhoc_planner;
 use crate::adhoc::tests::helpers::{expected_pins, nightly_pin, resource, weekly_pin};
@@ -176,7 +177,7 @@ fn given_a_build_naming_jobs_when_planned_then_each_is_pinned_to_the_nodes_it_gi
             .map(|token| (*token).to_owned())
             .collect();
         let planned = publication
-            .plan(&command)
+            .plan(&command, &PastRuns::new())
             .map(|plan| {
                 (
                     plan.selection.into_iter().collect::<Vec<String>>(),

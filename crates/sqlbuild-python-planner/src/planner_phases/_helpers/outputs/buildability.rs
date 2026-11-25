@@ -3,9 +3,10 @@
 use crate::planner_phases::_helpers::inputs::contexts::class_field;
 use crate::planner_phases::_helpers::inputs::runtime::runtime_field;
 use crate::planner_phases::_helpers::inputs::runtime::warehouse_field;
-use crate::planner_phases::constants::MISSING_UPSTREAM_CODE;
+use crate::planner_phases::constants::{AUDIT_KIND, MISSING_UPSTREAM_CODE};
 use crate::planner_phases::main::inputs::runtime_dialect::runtime_dialect;
 use crate::planner_phases::main::inputs::runtime_reads::runtime_reads;
+use crate::planner_strategy::main::audit_entries::audit_is_selected::audit_is_selected;
 use crate::planner_warehouse::main::sources::check_selected_source_tables_exist::check_selected_source_tables_exist;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
@@ -19,20 +20,28 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
 use sqlbuild_python_front::contracts::main::resolve_target_name::resolve_target_name;
+use sqlbuild_python_project::compiled_views::main::project::audits::audits;
 use sqlbuild_python_project::compiled_views::main::project::seeds::seeds;
 use sqlbuild_python_project::graph::main::nodes::native_key::native_key;
 use sqlbuild_python_project::planner_identity::main::execution_origins::execution_origins;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use sqlbuild_python_project::planner_scope::models::PlannerScopeResolution;
+use sqlbuild_python_project::planner_scope::models::ScopeData;
+use sqlbuild_python_project::resource_views::main::audit_reads::attached_target_kind::attached_target_kind;
+use sqlbuild_python_project::resource_views::main::audit_reads::attached_target_name::attached_target_name;
+use sqlbuild_python_project::resource_views::main::audit_reads::name::name;
+use sqlbuild_python_project::resource_views::main::audit_reads::scope_deps::scope_deps;
 use sqlbuild_python_project::resource_views::main::seed_reads::external::external;
 use sqlbuild_python_project::resource_views::main::seed_reads::key::key;
+use std::collections::{BTreeMap, HashMap};
 
+/// Refuse a selected scope whose reads don't exist; the end-of-build audits whose reads don't exist and that aren't selected by name are returned as not run, by name with what they miss.
 pub(crate) fn check_selected_scope_buildability<'py>(
     runtime: &Bound<'py, PyAny>,
     scopes: &Bound<'py, PyAny>,
     warehouse: &Bound<'py, PyAny>,
     deferral: &Bound<'py, PyAny>,
-) -> PyResult<()> {
+) -> PyResult<BTreeMap<String, Vec<String>>> {
     let py = runtime.py();
     let project = runtime_field(runtime, |runtime| &runtime.project)?;
     let selected_scope = class_field(scopes, |s: &PlannerScopeResolution| &s.selected_scope)?;
@@ -64,13 +73,39 @@ pub(crate) fn check_selected_scope_buildability<'py>(
             )
         })
         .collect();
-    let missing = missing_upstreams(&selected, &deps, &available);
+    let mut missing = missing_upstreams(&selected, &deps, &available);
+    let mut origins: std::collections::HashMap<(GraphKey, GraphKey), String> =
+        execution_origins(&project)?
+            .into_iter()
+            .map(|((key, read), label)| ((GraphKey::from(&key), GraphKey::from(&read)), label))
+            .collect();
+    let mut not_run: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    let mut built = available.clone();
+    built.satisfied_keys.extend(selected.iter().cloned());
+    for audit in end_audits(&project, &scope)? {
+        let reads = HashMap::from([(audit.key.clone(), audit.reads)]);
+        let misses = missing_upstreams(std::slice::from_ref(&audit.key), &reads, &built);
+        if misses.is_empty() {
+            continue;
+        }
+        if !audit.named {
+            let names: Vec<String> = misses.iter().map(|miss| miss.key.name.clone()).collect();
+            not_run.insert(audit.key.name.clone(), names);
+            continue;
+        }
+        for miss in &misses {
+            let label: String = match &audit.target {
+                Some(target) => format!(
+                    "audit '{}' on '{target}' reads '{}'",
+                    audit.key.name, miss.key.name
+                ),
+                None => format!("audit '{}' reads '{}'", audit.key.name, miss.key.name),
+            };
+            origins.insert((audit.key.clone(), miss.key.clone()), label);
+        }
+        missing.extend(misses);
+    }
     if !missing.is_empty() {
-        let origins: std::collections::HashMap<(GraphKey, GraphKey), String> =
-            execution_origins(&project)?
-                .into_iter()
-                .map(|((key, read), label)| ((GraphKey::from(&key), GraphKey::from(&read)), label))
-                .collect();
         let message = missing_upstream_message(
             &missing,
             &origins,
@@ -89,7 +124,54 @@ pub(crate) fn check_selected_scope_buildability<'py>(
         (&runtime_dialect(runtime)?, &runtime_reads(runtime)?),
         &selected_scope,
         &warehouse_field(warehouse, |warehouse| &warehouse.inspection_relations)?,
-    )
+    )?;
+    Ok(not_run)
+}
+
+/// An audit that runs after the build, with what it reads and whether it was selected by name.
+pub(crate) struct EndAudit {
+    key: GraphKey,
+    target: Option<String>,
+    pub(crate) reads: Vec<GraphKey>,
+    named: bool,
+}
+
+/// The selected audits that run after the build: singular audits, and attached audits selected by name whose target isn't built.
+pub(crate) fn end_audits(project: &Bound<'_, PyAny>, scope: &ScopeData) -> PyResult<Vec<EndAudit>> {
+    let mut out: Vec<EndAudit> = Vec::new();
+    for audit in audits(project)?.try_iter()? {
+        let audit = audit?;
+        if !audit_is_selected(&audit, (&scope.selected, &scope.audits))? {
+            continue;
+        }
+        let audit_name: String = name(&audit)?.extract()?;
+        let named: bool = scope.audits.contains(&audit_name);
+        let target: Option<String> = attached_target_name(&audit)?.extract()?;
+        if let Some(target) = &target {
+            let kind = attached_target_kind(&audit)?;
+            let kind: String = match kind.getattr_opt("value")? {
+                Some(value) => value.extract()?,
+                None => kind.extract()?,
+            };
+            if !named || scope.selected.contains(&(kind, target.clone())) {
+                continue;
+            }
+        }
+        let mut reads: Vec<GraphKey> = Vec::new();
+        for read in scope_deps(&audit)?.try_iter()? {
+            reads.push(GraphKey::from(&native_key(&read?)?));
+        }
+        out.push(EndAudit {
+            key: GraphKey {
+                kind: AUDIT_KIND.to_owned(),
+                name: audit_name,
+            },
+            target,
+            reads,
+            named,
+        });
+    }
+    Ok(out)
 }
 
 /// The models and seeds whose deferred location, under an alias or a `migrate_from` origin, the deferred target lists.

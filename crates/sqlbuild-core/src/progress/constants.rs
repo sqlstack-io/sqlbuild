@@ -114,12 +114,13 @@ pub(crate) const STATUS_ELLIPSIS: &str = "...";
 pub(crate) const AUDIT_RESOURCE_KIND: &str = "audit";
 pub(crate) const AUDIT_RESOURCE_PREFIX: &str = "audit:";
 /// Audit outcomes and the status words their rows show.
-pub(crate) const AUDIT_OUTCOME_STATUSES: [(&str, &str); 5] = [
+pub(crate) const AUDIT_OUTCOME_STATUSES: [(&str, &str); 6] = [
     ("pass", "PASS"),
     ("warn", "WARN"),
     ("error", "FAIL"),
     ("insufficient", "INSUFFICIENT"),
     ("skipped", "SKIP"),
+    ("not_run", "NOT RUN"),
 ];
 
 /// Where reported statement compile and execution time comes from.

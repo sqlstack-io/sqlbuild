@@ -8,6 +8,7 @@ use sqlbuild_orchestration::api::main::parse_origin::parse_origin;
 use sqlbuild_orchestration::api::models::{ApiErrorBody, MutationResponse};
 use sqlbuild_orchestration::credentials::models::SessionIdentity;
 use sqlbuild_orchestration::platform::models::{PersonWorkRequest, RepublishCall, RepublishStatus};
+use sqlbuild_orchestration::runs::models::PastRunsRead;
 use sqlbuild_orchestration::sensors::models::{SensorEventChoice, SensorTrialEvents};
 use sqlbuild_orchestration::snapshots::models::NodeSql;
 use uuid::Uuid;
@@ -250,6 +251,28 @@ async fn send_json<T: serde::de::DeserializeOwned>(
         .json()
         .await
         .map_err(|_| std::io::Error::other(format!("server returned an invalid {result}")))
+}
+
+/// What each run `ids` names selected, didn't finish and skipped in the location and target, or why one can't be read.
+pub(crate) async fn past_runs(
+    client: &PersonClient,
+    credential: &PersonCredential,
+    (location, target): (Uuid, &str),
+    ids: &[String],
+) -> Result<PastRunsRead, std::io::Error> {
+    let path = target_path(client, (location, target), &["selection", "runs"])?;
+    let response = authorized(client, reqwest::Method::GET, &path, credential)?
+        .query(&[("ids", ids.join(","))])
+        .send()
+        .await
+        .map_err(|_| std::io::Error::other("could not read past runs from the server"))?;
+    if !response.status().is_success() {
+        return Err(rejection(response, "Reading past runs").await);
+    }
+    response
+        .json()
+        .await
+        .map_err(|_| std::io::Error::other("server returned invalid past runs"))
 }
 
 /// Each segment is percent-encoded, so a target or node key cannot change the route.

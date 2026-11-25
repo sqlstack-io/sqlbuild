@@ -27,10 +27,11 @@ fn change_payload(request: &RunChangeRequest) -> Value {
     payload
 }
 
+/// `origin` is the address people reach the UI at, which a run failure links under.
 pub(crate) async fn publish_change(
     transaction: ControlTransaction,
-    request: &RunChangeRequest,
-    state: &ChangingRun,
+    (request, state): (&RunChangeRequest, &ChangingRun),
+    origin: Option<&str>,
 ) -> Result<ControlTransaction, ControlError> {
     let (mut transaction, mut cursor) = append_run_event(
         transaction,
@@ -71,13 +72,13 @@ pub(crate) async fn publish_change(
     let mut transaction = project_change(transaction, request, state).await?;
     match request.change {
         RunChange::Finished {
-            outcome: outcome @ (RunOutcome::Failed | RunOutcome::Partial),
+            outcome: outcome @ RunOutcome::Failed,
             ..
         } => {
             let retried;
             (transaction, retried) = queue_retry(transaction, request.run_id).await?;
             if retried != QueuedRetry::Member {
-                transaction = publish_run_failure(transaction, request, outcome).await?;
+                transaction = publish_run_failure(transaction, (request, outcome), origin).await?;
             }
         }
         RunChange::Finished {

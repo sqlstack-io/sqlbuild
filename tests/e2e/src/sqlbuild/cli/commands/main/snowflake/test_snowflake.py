@@ -576,7 +576,7 @@ def test_given_existing_snapshot_targets_when_building_on_snowflake_then_apply_s
             expected_stdout_fragments=(
                 "transpilable_event_rollup",
                 "PASS",
-                "PASS=1  FAIL=0  ERROR=0  SKIP=0  TOTAL=1",
+                "PASS=1  FAIL=0  TOTAL=1",
             ),
             expected_local_rows=((10, 1500, 2),),
             local_rows_sql=(
@@ -607,7 +607,7 @@ def test_given_existing_snapshot_targets_when_building_on_snowflake_then_apply_s
                 "local_transpile_error",
                 "ERROR",
                 "error[X607]",
-                "PASS=0  FAIL=0  ERROR=1  SKIP=0  TOTAL=1",
+                "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
             ),
             expected_return_code=1,
             corrupt_capture_dialect=True,
@@ -637,7 +637,7 @@ def test_given_existing_snapshot_targets_when_building_on_snowflake_then_apply_s
                 "local_execution_error",
                 "ERROR",
                 "error[X608]",
-                "PASS=0  FAIL=0  ERROR=1  SKIP=0  TOTAL=1",
+                "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
             ),
             expected_return_code=1,
         ),
@@ -682,7 +682,14 @@ def test_given_snowflake_scenario_capture_when_replaying_locally_then_transpilab
         )
 
         replay_result: subprocess.CompletedProcess[str] = run_sqb(
-            command=("--no-color", "scenario", "test", test_case.scenario_name, "--local"),
+            command=(
+                "--no-color",
+                "scenario",
+                "test",
+                test_case.scenario_name,
+                "--run-on",
+                "local",
+            ),
             project_dir=project_dir,
         )
 
@@ -712,7 +719,7 @@ def test_given_snowflake_scenario_capture_when_replaying_locally_then_transpilab
             expected_stdout_fragments=(
                 "dbt_event_rollup",
                 "expect    expected event_rollup",
-                "PASS=1  FAIL=0  ERROR=0  SKIP=0  TOTAL=1",
+                "PASS=1  FAIL=0  TOTAL=1",
             ),
             expected_local_rows=((10, 2),),
             local_rows_sql=(
@@ -727,7 +734,7 @@ def test_given_snowflake_scenario_capture_when_replaying_locally_then_transpilab
                 "dbt_event_rollup",
                 "ERROR",
                 "error[X607]",
-                "PASS=0  FAIL=0  ERROR=1  SKIP=0  TOTAL=1",
+                "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
             ),
             expected_return_code=1,
             corrupt_capture_dialect=True,
@@ -783,7 +790,15 @@ def test_given_snowflake_dbt_scenario_capture_when_replaying_locally_then_transp
         )
 
         replay_result: subprocess.CompletedProcess[str] = run_sqb(
-            command=("--no-color", "dbt", "scenario", "test", test_case.scenario_name, "--local"),
+            command=(
+                "--no-color",
+                "dbt",
+                "scenario",
+                "test",
+                test_case.scenario_name,
+                "--run-on",
+                "local",
+            ),
             project_dir=sqlbuild_project_dir,
         )
 

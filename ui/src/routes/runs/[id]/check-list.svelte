@@ -54,8 +54,8 @@
 		}
 	}
 	const statementOf = (c: CheckResult) => statements.find((s) => s.id === c.statementId) ?? null;
-	const GLYPH = { failed: '✗', warned: '⚠', passed: '✓', skipped: '–' } as const;
-	const SEVERITY = { failed: 'error', warned: 'warn', passed: '', skipped: '' } as const;
+	const GLYPH = { failed: '✗', warned: '⚠', passed: '✓', skipped: '–', 'not-run': '○' } as const;
+	const SEVERITY = { failed: 'error', warned: 'warn', passed: '', skipped: '', 'not-run': '' } as const;
 </script>
 
 <div class="checks">
@@ -64,7 +64,7 @@
 		<div class="check {c.outcome}">
 			<span class="glyph">{GLYPH[c.outcome]}</span>
 			<span class="name">{c.name}</span>
-			<span class="what">{c.outcome}{#if c.count != null}{` · ${c.count.toLocaleString('en-GB')} ${c.noun} (${SEVERITY[c.outcome]})`}{/if}</span>
+			<span class="what">{c.outcome === 'not-run' ? `not run${c.reason ? ` · ${c.reason}` : ''}` : c.outcome}{#if c.count != null}{` · ${c.count.toLocaleString('en-GB')} ${c.noun} (${SEVERITY[c.outcome]})`}{/if}</span>
 			<span class="acts">
 				{#if c.statementId}<Button variant="link" size="inline" class="text-[12px]" onclick={() => showSql(c)} aria-expanded={openSql.has(c.id)}>SQL {openSql.has(c.id) ? '▾' : '▸'}</Button>{/if}
 				{#if (c.outcome === 'failed' || c.outcome === 'warned') && c.statementId && app.client.getCheckSample}<Button variant="link" size="inline" class="text-[12px]" onclick={() => showRows(c)} aria-expanded={openRows.has(c.id)}>rows {openRows.has(c.id) ? '▾' : '▸'}</Button>{/if}

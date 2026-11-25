@@ -14,11 +14,11 @@ use crate::store::main::decode_row::decode_row;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 
-/// Use authenticated authority and record unclaimed cancellation as terminal in the same transaction.
+/// Use authenticated authority, terminal unclaimed cancellation and `origin` (else the lease's) for failure links, in one transaction.
 pub(crate) async fn change_run_in(
     mut transaction: ControlTransaction,
-    authority: RunAuthority<'_>,
-    request: &RunChangeRequest,
+    (authority, request): (RunAuthority<'_>, &RunChangeRequest),
+    origin: Option<&str>,
 ) -> Result<(ControlTransaction, bool), ControlError> {
     validate_authority(authority, request)?;
     if let RunAuthority::Scheduler(lease) = authority {
@@ -51,7 +51,11 @@ pub(crate) async fn change_run_in(
     } else {
         validate_change(&state, request)?;
     }
-    let mut transaction = publish_change(transaction, request, &state).await?;
+    let origin = match authority {
+        RunAuthority::Scheduler(lease) => lease.origin.as_deref().or(origin),
+        _ => origin,
+    };
+    let mut transaction = publish_change(transaction, (request, &state), origin).await?;
     if let (RunAuthority::Operator(context), RunChange::CancelRequested { reason, .. }) =
         (authority, &request.change)
     {

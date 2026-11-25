@@ -161,7 +161,7 @@ def test_given_retained_compiler_data_when_publishing_then_http_updates_atomical
         assert by_name["edge_job_outcomes_sensor"]["definition_json"]["when"] == {
             "kind": "run_event",
             "job_key": "edge_snapshot_orders_job",
-            "kinds": ["warn", "partial"],
+            "kinds": ["warn", "failed"],
         }
         assert by_name["edge_group_outcomes_sensor"]["definition_json"]["when"] == {
             "kind": "run_event",

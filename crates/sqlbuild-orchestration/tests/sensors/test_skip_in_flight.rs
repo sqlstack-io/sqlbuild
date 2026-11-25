@@ -60,7 +60,7 @@ fn given_a_tick_in_flight_on_the_stuck_event_when_an_operator_skips_it_then_the_
                 .await
                 .expect("triggers")
                 .remove(0);
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

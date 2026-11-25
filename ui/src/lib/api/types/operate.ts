@@ -15,7 +15,6 @@ export const RUN_STATUSES = [
 	'unresponsive',
 	'success',
 	'warn',
-	'partial',
 	'failed',
 	'cancelled',
 	'skipped',
@@ -74,6 +73,8 @@ export type Run = {
 	memberAttempt: number | null;
 	/** How a person narrowed this run of a job, as typed; null when it runs the whole job. */
 	narrowing: { select: string[]; exclude: string[] } | null;
+	/** An ad-hoc run's command as typed, as the argument tokens after `sqb`; null for every other run. */
+	command: string[] | null;
 	/** The cursor window a backfill processes, inclusive; null for every other run. */
 	window: { start: string; end: string } | null;
 	requestedBy: Principal;
@@ -112,7 +113,7 @@ export type RunListQuery = {
 
 // ---- runs list (cursor-paged rows with a plain status line) ----
 
-/** Status tabs of the runs list. `active` is queued, launched, running or unresponsive; `failed` includes partial and lost runs. */
+/** Status tabs of the runs list. `active` is queued, launched, running or unresponsive; `failed` includes lost runs. */
 export const RUN_TABS = ['all', 'active', 'queued', 'failed', 'cancelled'] as const;
 export type RunTab = (typeof RUN_TABS)[number];
 
@@ -316,7 +317,8 @@ export type RunEventPhase = {
 /** A check's result in a run: its name as declared, its outcome, the rows it found, and its identity for its evidence. */
 export type RunEventCheck = {
 	name: string;
-	outcome: 'passed' | 'warned' | 'failed' | 'skipped';
+	/** `not-run`: an end-of-build audit whose reads the target doesn't have; its event's message says which. */
+	outcome: 'passed' | 'warned' | 'failed' | 'skipped' | 'not-run';
 	rows: number | null;
 	/** The check's ID on the Checks page and this result's, to read the rows it found once they are synced. */
 	bindingKey: string | null;
@@ -742,7 +744,10 @@ export type SelectionProblem = {
 /** What `sqb build --select … --exclude …` selects in the current publication: one page of keys and the total. */
 export type SelectionEvaluation = {
 	snapshotId: string | null;
+	/** Every selected node and audit. */
 	count: number;
+	/** How many of them are audits (`audit:<name>[:…]` keys). */
+	audits: number;
 	keys: string[];
 	nextOffset: number | null;
 	error: SelectionProblem | null;
@@ -761,6 +766,8 @@ export type SelectionVocabulary = {
 	sources: VocabularyEntry[];
 	seeds: VocabularyEntry[];
 	kinds: VocabularyEntry[];
+	/** Audit names an `audit:` selector takes, counting the targets each is attached to. */
+	audits: VocabularyEntry[];
 };
 
 // ---- ad-hoc runs (the plan page) ----
@@ -1054,7 +1061,7 @@ export type RerunMode = 'all' | 'from_failure' | 'selected';
 
 /** What a schedule tick or sensor request does while a run of the job is active; people's runs always queue. */
 export type OverlapPolicy = 'queue' | 'skip';
-/** A job's `[retry]`: a failed or partial run reruns from failure up to `retries` times (`attempts` is one more, counting the first run), `retryDelaySeconds` (`delay_seconds`) after the last ended. */
+/** A job's `[retry]`: a failed run reruns from failure up to `retries` times (`attempts` is one more, counting the first run), `retryDelaySeconds` (`delay_seconds`) after the last ended. */
 export type OnFailure = { retries: number; retryDelaySeconds: number };
 export type JobKind = 'job' | 'group';
 

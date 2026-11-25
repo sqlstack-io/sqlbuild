@@ -10,12 +10,14 @@ Online: https://sqlbuild.com/docs/cli/server/
 
 - Configure the server
 - Stop the server
+- Check the server's health
 - Serve over HTTPS
 - Add people who sign in with passwords
 - Administer the server with sqb admin
 - Call the server from scripts with service accounts
 - Sign in through a reverse proxy
 - Receive platform events
+- See lost lifecycle events
 - Acknowledge attention items
 - Back up the control database
 - Upgrade
@@ -103,6 +105,55 @@ statements and record their runs, and releases their claims. Each local worker r
 process group, so Ctrl+C in the server's terminal reaches only the server. A second SIGINT or
 SIGTERM while the workers stop kills their process groups at once; the server still records the
 runs and releases their claims before it exits.
+
+## Check the server's health
+
+Each server keeps its own health in memory, so it can answer while its control database can't be
+reached:
+
+| Path | Sign-in | Answers |
+| --- | --- | --- |
+| `/livez` | None | `200 ok` while the process runs; it checks nothing else |
+| `/api/health` | None | Each part's state, since when and a short reason; `200` when every part is healthy, `503` otherwise |
+| `/api/health/details` | People who may manage people | Where the control database is, each cause's own message and the IDs of requests that failed |
+
+The parts are the server (version and uptime), the control database (checked every 10 seconds),
+the scheduler on servers that run one, each location, which is degraded once it hasn't
+reported for 90 seconds, and each event webhook the server forwards to (see
+[Receive platform events](#receive-platform-events)). The report's `status` is `unavailable` while the control database is,
+`degraded` while any other part isn't healthy, and `healthy` otherwise. Point a load balancer's
+liveness check at `/livez`, and monitoring at `/api/health`.
+
+When a request fails because of the control database, the error says why instead of a generic
+"busy":
+
+| `cause.case` | Message |
+| --- | --- |
+| `name_lookup` | Can't reach the control database: `<host>` doesn't resolve (DNS) |
+| `unreachable` | Can't reach the control database at `<host>:<port>` |
+| `login_rejected` | The control database rejected the login for `<user>` |
+| `no_free_connections` | The control database has no free connections |
+| `restarting` | The control database is restarting |
+| `pool_exhausted` | All 10 control database connections were busy for 30 s |
+| `locked` | The control database is locked by another process |
+| `other` | Control database error: `<the error's own message>` |
+
+The response body carries `error` (the message), `cause` with `case` and `since`, and
+`request_id`, which every response also sends as `x-request-id`. The server log has each failure
+with its request ID and every cause's own message, never the password. Any other unknown path
+under `/api/` is a JSON `404`, never the UI's page.
+
+`sqb server` listens before it opens its control database. While the database can't be reached,
+for example because its host doesn't resolve, the server answers `/livez`, `/api/health` and the
+UI, refuses other API requests with `503` and the cause, and tries again with a wait that doubles
+up to 30 seconds. It then starts the full API on the same address without a restart. A failure that
+retrying can't fix, such as a rejected login or a schema it can't migrate, stops the server.
+
+The UI reads the same health. The top bar says **Live**, **Degraded** or **Unavailable**, and
+links to **Status**, which shows every part without signing in. While the control database is
+unavailable, every page keeps its address and says it isn't available, with the reason, since
+when and the parts, and loads by itself when the database is back. While a part is degraded, pages
+work and a banner names it.
 
 ## Serve over HTTPS
 
@@ -338,16 +389,30 @@ receive the URL.
       "job_key": "daily_orders",
       "location_id": "01a1d38b-e214-7151-8c8e-8606917c3ee6",
       "target": "production",
-      "outcome": "partial",
+      "outcome": "failed",
+      "url": "https://sqlbuild.example.com/runs/01a1d3b9-2c4e-7f10-8a3b-1d2e3f4a5b6c",
+      "trigger": { "kind": "schedule", "name": "daily_orders", "person": null },
+      "started_at": "2026-11-13T06:52:51.204Z",
+      "ended_at": "2026-11-13T07:12:04.112Z",
+      "duration_ms": 1152908,
+      "error": null,
       "failed_nodes": [
         {
           "node_key": "model:fct_orders",
           "error_code": "E100",
           "message": "Conversion Error: Could not convert string 'n/a' to INT32",
-          "path": "sql/models/marts/fct_orders.sql"
+          "path": "sql/models/marts/fct_orders.sql",
+          "phase": "post_hook",
+          "url": "https://sqlbuild.example.com/runs/01a1d3b9-2c4e-7f10-8a3b-1d2e3f4a5b6c?node=model%3Afct_orders",
+          "logs_url": "https://sqlbuild.example.com/runs/01a1d3b9-2c4e-7f10-8a3b-1d2e3f4a5b6c/output/model%3Afct_orders"
         }
       ],
-      "failed_node_count": 1
+      "failed_node_count": 1,
+      "failed_audits": [],
+      "failed_audit_count": 0,
+      "succeeded_node_count": 194,
+      "skipped_nodes": ["model:fct_order_margin", "model:order_summary"],
+      "skipped_node_count": 2
     }
   }
 }
@@ -356,6 +421,13 @@ receive the URL.
 Delivery is at least once and in order. A response other than `2xx`, or no response within 10
 seconds, stops delivery and retries the same event. Deduplicate by `event_id`, which the
 `Idempotency-Key` header repeats.
+
+While the webhook fails, **Platform event forwarding** is degraded in the server's health, with
+since when and why, such as `the webhook answered HTTP 503` or `can't connect to the webhook`, and
+it is an item on every Overview's attention list. Events are kept and retried every 5 seconds, and
+the item clears with the first delivery. The security audit webhook
+(`SQLBUILD_SECURITY_AUDIT_WEBHOOK_URL`) is reported the same way, as **Security audit event
+forwarding**.
 
 | `kind` | Sent when | Fields |
 | --- | --- | --- |
@@ -366,7 +438,7 @@ seconds, stops delivery and retries the same event. Deduplicate by `event_id`, w
 | `location_broken` | Every instance of a location and target has stopped reporting for over 90 seconds | `location_id`, `target`, `last_seen_at` |
 | `location_failing` | A location and target that checks in failed its latest load (`falling_back`), its plan of what changed (`change_plan_failed`), a discover function (`discovery_failed`) or the connection check after its last load (`degraded`) | `location_id`, `target`, `state`, `failed_at`, `error`, `serving_generation` (the generation runs use instead) |
 | `launch_failed` | Starting a worker failed; it may still start | `run_id`, `claim_id`, `code` |
-| `run_failed` | A job, group or ad-hoc run ends `failed` or `partial` | `run_id`, `run_kind`, `job_key`, `location_id`, `target`, `outcome`, `failed_nodes`, `failed_node_count` |
+| `run_failed` | A job, group or ad-hoc run ends `failed` | See [Fields of `run_failed`](#fields-of-run_failed) |
 | `trigger_skipped` | The scheduler skips a trigger whose stored job or snapshot can't be read, or a sensor whose check failed; the sensor is checked again a minute later | `trigger_id`, `snapshot_id`, `reason` |
 | `sensor_rechecked` | A sensor's last check can't be read, so it is checked again from scratch | `trigger_id`, `snapshot_id`, `evaluation_id` |
 | `calendar_times_dropped` | A publish drops a calendar schedule's due times | `trigger_id`, `snapshot_id`, `times` |
@@ -380,12 +452,51 @@ completed check in that snapshot: a later attempt that fails differently sends n
 doesn't replace it. Everyone who can view the target sees the reason, and it can quote stored
 values.
 
-`run_failed` lists at most 20 failed nodes, ordered by node key; `failed_node_count` is the full
-number. A `partial` run is included because some of its nodes failed. `job_key` is `null` for
-ad-hoc runs. Each `message` is the node's error text with credentials redacted, cut to 2,000
-characters, and `null` when the worker reported none. It can quote warehouse data, so treat the
-webhook like other run evidence. `run_failed` events appear only in the webhook, not in the
-server's platform history.
+### Fields of `run_failed`
+
+`run_failed` carries what an alert needs to say what failed, where, and to link to it:
+
+| Field | Meaning |
+| --- | --- |
+| `run_id`, `run_kind`, `job_key`, `location_id`, `target` | The run, its kind (`job`, `group`, `adhoc`), its job (`null` for ad-hoc runs), and where it ran |
+| `outcome` | `failed` |
+| `url` | The run's page in the UI |
+| `trigger` | What started the run: `kind` is `schedule`, `sensor`, `manual` (a person) or `api` (a service account); `name` is the schedule's or sensor's name; `person` is who asked for a manual or API run |
+| `started_at`, `ended_at`, `duration_ms` | When the run's worker started and the run ended; `null` for a run that never started |
+| `error` | Why the run failed when no node or audit says, such as a project that can't load: `phase` (`launch`, `worker_start`, `load`, `planning` or `build`), `code` (the error's type) and `message`; `null` when `failed_nodes` or `failed_audits` say why |
+| `failed_nodes` | The first 20 failed nodes, ordered by key, each with `node_key`, `error_code`, `message`, `path` (the node's file), `phase` (where a model failed: `pre_hook`, `staging`, `contract`, `audit`, `post_hook` and so on; `null` for other nodes), `url` (the node on the run's page) and `logs_url` (its output) |
+| `failed_node_count` | Every failed node |
+| `failed_audits` | The first 20 error-severity audit failures the run didn't let through, ordered by name, each with `name`, `node_key` (`null` for an end-of-build singular audit), `sqlstate` and `message` (the warehouse's error when the audit's query couldn't run) and `failing_rows` (when it ran) |
+| `failed_audit_count` | Every such audit failure |
+| `succeeded_node_count`, `skipped_node_count` | How many nodes built and how many were skipped |
+| `skipped_nodes` | The first 20 skipped nodes, ordered by key |
+
+The links (`url`, and each failed node's `url` and `logs_url`) are `null` when the server has no
+sign-in origin, such as `[server] password_origin`. `job_key` is `null` for ad-hoc runs. Each
+`message` is the error text with credentials redacted, cut to 2,000 characters, and `null` when the
+worker reported none. It can quote warehouse data, so treat the webhook like other run evidence.
+`run_failed` events appear in the webhook and to
+[`platform_event` sensors](../concepts/orchestration.md#react-with-a-sensor), not in the server's
+platform history.
+
+## See lost lifecycle events
+
+A worker counts what each of the project's lifecycle event sinks delivered when its run's command
+closes, and reports it with the run. A location's own interpreters, which compile, read run history
+and evaluate sensors, run the same sinks: once a minute, each idle one says what its sinks
+delivered, and the location reports what changed since the last report.
+
+A sink that dropped or failed events in the newest run or location report of a location and target
+is an item on that target's attention list, such as `event sink kafka losing events since 17:42:
+116 of 116 events not delivered (116 failed)`, from its first lossy run or report in a row. A sink
+provider whose teardown raised at the end of a run is listed as `sink providers`, because events it
+still held may not have been delivered. The item clears once a run, or a minute in which the sink
+took events, delivers every event. Reports from the last 7 days count.
+
+SQLBuild counts what a sink function does: an event it raised on is failed, and one it never got
+is dropped. A sink that hands events to a client which sends them later, such as a Kafka producer,
+reports a send that fails afterwards only if it raises, from a later call or when its provider
+closes.
 
 ## Acknowledge attention items
 
@@ -816,11 +927,17 @@ Details:
 - On Snowflake, a sync skips state tables that haven't changed since the last sync, the pause
   table included, so a sync with nothing new doesn't resume the warehouse.
 - When a read fails, the Connections page shows the warehouse error. A read that ran out of memory
-  or time retries a smaller page. Any other error, such as a missing permission or table, retries
-  after 30 seconds, then waits twice as long after each failure in a row. After 5 failures in a row
-  the sync stops until a run ends, you request one, the location publishes again, or the next safety
-  sync is due (`sync_at_least_every`). It then starts again from the first kind of history, and
-  failed reads back off again before they stop it.
+  or time retries a smaller page. A read that never reached the warehouse, such as a host that
+  doesn't resolve, a refused connection or Snowflake's `250001 Could not connect`, spent no
+  compute: it retries after 30 seconds, then every 60 seconds, and never stops the sync. Any other
+  error, such as a missing permission or table, retries after 30 seconds, then every 60 seconds.
+  After 5 such failures in a row the sync stops until a run ends, you request one (**Resume** on
+  the Overview's attention item), the location publishes again, or the next safety sync is due
+  (`sync_at_least_every`). It then starts again from the first kind of history.
+- A request to the server that fails, for example while its control database is unreachable,
+  keeps the page and retries it every 30 seconds; it never stops the sync. After a failing streak,
+  the location logs `Run history sync recovered after N min; M pages caught up.` once the sync
+  completes.
 - `[control]` holds no secrets. The session stays in the login `sqb login` saved for that server.
 - When a state table holds two rows with the same ID, such as one check result written twice, the
   server keeps the row with the earlier time. Estimated query costs are the exception: when two
@@ -862,13 +979,15 @@ Warehouse history synchronization completed: 14 kinds, 31,204 rows in 12.8 s.
 
 A page holds up to 2,000 rows and ends early at 8 MiB, so wide rows make smaller pages. A failed
 read prints which kind failed, the page size and why, then what the location does next. A read that
-ran out of time or memory retries a smaller page; any other failure retries the same page after a
-wait that doubles each time, and the fifth in a row stops the sync:
+ran out of time or memory retries a smaller page; any other failure retries the same page after 30
+seconds, then every 60 seconds. One that never reached the warehouse never stops the sync; the
+fifth other failure in a row does:
 
 ```text
 Warehouse history read failed for statistics (100-relation page): no reply within 130 s. Sync incomplete; retaining mirror and retrying a smaller page in 30 s.
 Warehouse history read failed for catalog (2000-row page): permission denied for table _sqlbuild_catalog. Sync incomplete; retaining mirror and retrying in 60 s.
 Warehouse history read failed for catalog (2000-row page): permission denied for table _sqlbuild_catalog. Synchronization stopped after 5 failed reads in a row; it resumes after the next run, on request or after a publish.
+Warehouse history read failed for catalog (2000-row page): 250001 Could not connect to Snowflake backend after 2 attempt(s). Run history can't reach the warehouse; no compute ran. Retrying in 60 s; this never stops the sync.
 ```
 
 | Cause | Printed as |
@@ -888,6 +1007,12 @@ the server's copy of the warehouse, so until the location's first sync completes
 The location's page shows a failing sync as **failing** with when it last synced; its tooltip lists
 each failing kind with the cause, the page size and the warehouse's message, shortened and with
 secrets removed. The Connections page shows a stopped sync as **stopped after failed reads**.
+
+While the sync fails, the top bar says what stands, since when, how it retries and why, for example
+`Run history can't reach the warehouse since 17:42 · retrying every 60 s · 250001 Could not
+connect…`, and links to the location's page; its tooltip has the last success and the next
+attempt. The Overview lists it as needing attention with the same reason, and drops it once a sync
+report succeeds. A sync that failed reads stopped has a **Resume** action there.
 
 ## Skip overlapping runs and retry failures
 
@@ -912,7 +1037,7 @@ delay_seconds = 600
 | --- | --- | --- | --- |
 | `owner` | Any non-blank text | None | Shown on the job's page and in the job list |
 | `overlap` | `queue` or `skip` | `queue` | With `skip`, a schedule tick or sensor request that arrives while a run of the job is queued or running starts no run |
-| `retry` | `attempts` from 2 to 11, `delay_seconds` from 0 to 86400 | None | A failed or partial run nobody cancelled reruns its failed, cancelled and skipped nodes, and those it never reached, after the delay, until it succeeds or has run `attempts` times in all |
+| `retry` | `attempts` from 2 to 11, `delay_seconds` from 0 to 86400 | None | A failed run nobody cancelled reruns its failed, cancelled and skipped nodes, and those it never reached, after the delay, until it succeeds or has run `attempts` times in all |
 
 A skipped tick shows as **skipped** in the trigger's tick log, with the run it yielded to, and
 creates no run. A sensor tick lists the requests it skipped the same way.
@@ -933,7 +1058,7 @@ Details:
 - A member job's `[retry]` also applies inside a group run. When the member fails, the group runs it
   again after `delay_seconds`, inside the same group run, and the jobs that depend on it wait
   instead of skipping. The group keeps its pool slots meanwhile.
-- A group's own `[retry]` is a final sweep: after the group run ends `failed` or `partial`, it
+- A group's own `[retry]` is a final sweep: after the group run ends `failed`, it
   queues one new linked rerun of the group's failed, cancelled and skipped nodes, and those it never reached.
 - So a retry of a whole run, a job's or a group's, is a new linked run, and a retry of a member
   stays inside its group run.
@@ -1069,8 +1194,19 @@ runs. A `build` loads the managed sources its models read, as `sqb build` does, 
 alone; `--no-load` turns that off.
 A `test` or `audit` run reports each selected node with the worst result of its tests or audits.
 
-Selectors use the CLI grammar: names, `seed:`, `source:`, `tag:`, `path:`, `test:` and `job:`,
-with `+` for upstream or downstream nodes. Positional selectors work as on the command line.
+Selectors use the CLI grammar: names, `seed:`, `source:`, `tag:`, `path:`, `test:`, `job:` and
+`audit:`, with `+` for upstream or downstream nodes. Positional selectors work as on the command line.
+[`run:`, `failed:` and `skipped:`](../concepts/selectors.md#selecting-from-a-past-run) select from
+a run of the same location and target, by full ID or a unique prefix of at least 8 characters. The
+server resolves them when the run is requested and freezes the nodes and audits they select with
+it, so later runs don't change what it runs.
+
+In the web UI, Rerun on a run opens the rerun plan on `failed:<id>+`; rerunning the whole run opens
+on `run:<id>`, and one node or audit on its own name or `audit:<name>`. The box holds the whole
+selection: its suggestions only rewrite the text, and Run starts the ad-hoc run
+`sqb build -s <selection>` shown beside it, against the current publication. The run it starts shows
+`from run <id>` for each past run its selection names. Reruns of several runs at once, and retries,
+still repeat each run's own frozen version and settings.
 
 A `build` whose selection names a job takes the job's settings, exactly as `sqb build` and the
 job's own runs do; see

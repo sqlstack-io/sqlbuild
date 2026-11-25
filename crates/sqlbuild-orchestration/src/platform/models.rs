@@ -5,7 +5,10 @@ use crate::credentials::models::AuditRetention;
 use crate::declarations::models::TriggerDefinition;
 use crate::discovered_sets::models::DiscoveredSetStatus;
 use crate::platform::_helpers::health::current_instance::{CurrentInstance, current_instance};
-use crate::runs::models::{RunKind, RunLogRetention, RunNodeFailure, RunOutcome};
+use crate::runs::models::{
+    RunAuditFailure, RunFailureCause, RunKind, RunLogRetention, RunNodeFailure, RunOutcome,
+    RunTrigger,
+};
 use crate::sensors::models::{SensorEvaluationRequest, SensorFunctionOutcome};
 use crate::snapshots::models::{SnapshotRecord, SnapshotRetention};
 use crate::warehouse_metadata::models::StateHistoryRetention;
@@ -79,6 +82,10 @@ pub enum LocationHealth {
         generation: i64,
         reason: String,
     },
+    /// What each lifecycle event sink of one of the location's interpreters delivered since its last report.
+    SinkDeliveries {
+        sinks: Vec<crate::runs::models::SinkDelivery>,
+    },
     /// Jobs and groups this server's `pool_caps` clamp, derived by the server, never reported by a location.
     PoolCapped {
         generation: i64,
@@ -109,6 +116,14 @@ pub enum LocationHealth {
         /// On the report of a table's last delivered page, the records the server then mirrored of that table across the target's state locations.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         mirrored_records: Option<u64>,
+        /// While the sync fails, when its first failure in a row was; absent once it works and from older locations.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        failing_since: Option<DateTime<Utc>>,
+        /// On a failure the sync retries, when it tries again and how many seconds it waits.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        retry_at: Option<DateTime<Utc>>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        retry_seconds: Option<u64>,
     },
 }
 
@@ -547,18 +562,8 @@ pub enum PlatformEvent {
         claim_id: Uuid,
         code: String,
     },
-    /// A job, group or ad-hoc run ended failed or partial; only the webhook receives it, never person reads.
-    RunFailed {
-        run_id: Uuid,
-        run_kind: RunKind,
-        job_key: Option<String>,
-        location_id: Uuid,
-        target: String,
-        outcome: RunOutcome,
-        /// The first failed nodes by key, with redacted and bounded error text.
-        failed_nodes: Vec<RunNodeFailure>,
-        failed_node_count: i64,
-    },
+    /// A job, group or ad-hoc run ended failed; only the webhook and platform sensors receive it, never person reads.
+    RunFailed(Box<RunFailureEvent>),
     /// A trigger was skipped because its stored job or pinned snapshot can't be read, or a sensor because its check failed; `reason` says which.
     TriggerSkipped {
         trigger_id: Uuid,
@@ -579,6 +584,35 @@ pub enum PlatformEvent {
     },
 }
 
+/// What a `run_failed` event says: the run, what started it, when, what failed and why, with UI links.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RunFailureEvent {
+    pub run_id: Uuid,
+    pub run_kind: RunKind,
+    pub job_key: Option<String>,
+    pub location_id: Uuid,
+    pub target: String,
+    pub outcome: RunOutcome,
+    /// The run's UI page; null when the server has no origin.
+    pub url: Option<String>,
+    pub trigger: RunTrigger,
+    pub started_at: Option<DateTime<Utc>>,
+    pub ended_at: Option<DateTime<Utc>>,
+    pub duration_ms: Option<i64>,
+    /// Why the run failed outside any node; null when its failed nodes or audits say why.
+    pub error: Option<RunFailureCause>,
+    /// The first failed nodes by key, with redacted and bounded error text.
+    pub failed_nodes: Vec<RunNodeFailure>,
+    pub failed_node_count: i64,
+    /// The first error-severity audit failures by name.
+    pub failed_audits: Vec<RunAuditFailure>,
+    pub failed_audit_count: i64,
+    pub succeeded_node_count: i64,
+    /// The first skipped nodes by key.
+    pub skipped_nodes: Vec<String>,
+    pub skipped_node_count: i64,
+}
+
 impl PlatformEvent {
     #[must_use]
     pub const fn kind(&self) -> PlatformEventKind {
@@ -590,7 +624,7 @@ impl PlatformEvent {
             Self::LocationBroken { .. } => PlatformEventKind::LocationBroken,
             Self::LocationFailing { .. } => PlatformEventKind::LocationFailing,
             Self::LaunchFailed { .. } => PlatformEventKind::LaunchFailed,
-            Self::RunFailed { .. } => PlatformEventKind::RunFailed,
+            Self::RunFailed(_) => PlatformEventKind::RunFailed,
             Self::TriggerSkipped { .. } => PlatformEventKind::TriggerSkipped,
             Self::SensorRechecked { .. } => PlatformEventKind::SensorRechecked,
             Self::CalendarTimesDropped { .. } => PlatformEventKind::CalendarTimesDropped,
@@ -607,7 +641,7 @@ impl PlatformEvent {
             Self::LocationBroken { .. } => "platform_location_broken",
             Self::LocationFailing { .. } => "platform_location_failing",
             Self::LaunchFailed { .. } => "platform_launch_failed",
-            Self::RunFailed { .. } => "platform_run_failed",
+            Self::RunFailed(_) => "platform_run_failed",
             Self::TriggerSkipped { .. } => "platform_trigger_skipped",
             Self::SensorRechecked { .. } => "platform_sensor_rechecked",
             Self::CalendarTimesDropped { .. } => "platform_calendar_times_dropped",
@@ -688,6 +722,15 @@ pub struct PlatformProblems {
     /// Checking-in locations whose latest load, plan of what changed, discovery or connection check failed.
     #[serde(default)]
     pub failing_locations: Vec<FailingLocation>,
+    /// Checking-in locations whose run-history sync is failing, until a sync report succeeds.
+    #[serde(default)]
+    pub failing_syncs: Vec<FailingSync>,
+    /// Lifecycle event sinks whose newest run lost events, until a run delivers all of its events.
+    #[serde(default)]
+    pub failing_sinks: Vec<FailingSink>,
+    /// This server's event webhooks that can't deliver, until one delivers again.
+    #[serde(default)]
+    pub failing_forwarding: Vec<FailingForwarding>,
     pub overdue_ticks: Vec<OverdueTick>,
     /// Running calendar schedules whose dates run out within a day.
     #[serde(default)]
@@ -809,6 +852,125 @@ pub struct FailingLocation {
     pub serving: Option<SnapshotRecord>,
 }
 
+/// Every checking-in location's failing load, plan, discovery or connection check, and failing run-history sync.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct LocationFailures {
+    pub(crate) locations: Vec<FailingLocation>,
+    pub(crate) syncs: Vec<FailingSync>,
+}
+
+/// A checking-in location whose run-history sync is failing: since when, why, and when it tries again.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct FailingSync {
+    pub location_id: Uuid,
+    pub location_name: String,
+    pub target: String,
+    /// The first failure in a row.
+    pub since: DateTime<Utc>,
+    /// What failed, redacted.
+    pub reason: String,
+    /// The location couldn't reach the warehouse, so no compute ran.
+    pub unreachable: bool,
+    /// Failed reads stopped the sync; it resumes on request, after the next run or a publish.
+    pub halted: bool,
+    /// When the location tries again, and how many seconds it waits between tries.
+    pub retry_at: Option<DateTime<Utc>>,
+    pub retry_seconds: Option<u64>,
+    /// The newest report of a sync that worked.
+    pub last_success_at: Option<DateTime<Utc>>,
+}
+
+/// An event webhook this server can't deliver to: since when, and why; its events stay queued.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct FailingForwarding {
+    /// Such as `Platform event forwarding`.
+    pub name: String,
+    pub since: DateTime<Utc>,
+    pub reason: String,
+    pub last_success_at: Option<DateTime<Utc>>,
+}
+
+/// A lifecycle event sink whose runs lose events: since its first lossy run in a row, and why.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct FailingSink {
+    pub location_id: Uuid,
+    pub location_name: String,
+    pub target: String,
+    /// The sink's name in the project.
+    pub sink: String,
+    /// The first run in a row whose events it lost.
+    pub since: DateTime<Utc>,
+    /// What it lost, such as `8 of 8 events not delivered (8 failed)`.
+    pub reason: String,
+    /// The newest run whose events it lost; `None` when the location's own interpreter lost them.
+    pub run_id: Option<Uuid>,
+    /// The newest run before that whose events it all delivered.
+    pub last_success_at: Option<DateTime<Utc>>,
+}
+
+/// A run's report of its sinks' deliveries, with where the run ran.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct SinkReport {
+    pub(crate) location_id: Uuid,
+    pub(crate) location_name: String,
+    pub(crate) target: String,
+    pub(crate) run_id: Option<Uuid>,
+    pub(crate) at: DateTime<Utc>,
+    pub(crate) sinks: Vec<crate::runs::models::SinkDelivery>,
+    pub(crate) teardown_failures: Vec<String>,
+}
+
+/// A stored sink delivery report and where its run ran.
+#[derive(Debug, Deserialize)]
+pub(crate) struct SinkReportRow {
+    pub(crate) occurred_at: DateTime<Utc>,
+    pub(crate) payload: SinkReportPayload,
+    pub(crate) location_id: Uuid,
+    pub(crate) location_name: String,
+    pub(crate) target: String,
+}
+
+/// A location's stored sink delivery report and its location.
+#[derive(Debug, Deserialize)]
+pub(crate) struct LocationSinkRow {
+    pub(crate) occurred_at: DateTime<Utc>,
+    pub(crate) payload: LocationSinkPayload,
+}
+
+/// A stored location health event's payload.
+#[derive(Debug, Deserialize)]
+pub(crate) struct LocationSinkPayload {
+    pub(crate) location_id: Uuid,
+    pub(crate) report: LocationHealthReport,
+}
+
+/// An active location's ID and name.
+#[derive(Debug, Deserialize)]
+pub(crate) struct ActiveLocation {
+    pub(crate) location_id: Uuid,
+    pub(crate) name: String,
+}
+
+/// A location interpreter's reply to `sink_deliveries`: each sink's totals since the interpreter started.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SinkDeliveryTotals {
+    pub sinks: Vec<crate::runs::models::SinkDelivery>,
+}
+
+/// A stored run change's payload.
+#[derive(Debug, Deserialize)]
+pub(crate) struct SinkReportPayload {
+    pub(crate) change: crate::runs::models::RunChangeRequest,
+}
+
+/// A sink's reports read newest first: failing so far, failing before a lossless report, or never failing.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum SinkStreak {
+    Failing(FailingSink),
+    Ended(FailingSink),
+    Clear,
+}
+
 /// A running schedule whose next tick is more than 30 seconds late.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct OverdueTick {
@@ -838,6 +1000,8 @@ pub(crate) struct ProblemScan {
     pub(crate) lease: Option<SchedulerLease>,
     pub(crate) broken: Vec<BrokenLocation>,
     pub(crate) failing: Vec<FailingLocation>,
+    pub(crate) failing_syncs: Vec<FailingSync>,
+    pub(crate) failing_sinks: Vec<FailingSink>,
     pub(crate) late_targets: std::collections::BTreeSet<(Uuid, String)>,
     pub(crate) low_calendars: Vec<LowCalendar>,
     pub(crate) skipped_triggers: Vec<SkippedTrigger>,
@@ -919,8 +1083,10 @@ pub struct WarehouseSyncProgress {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum WarehouseReadFailure {
-    /// The reader did not start or connect to the warehouse, or the read raised an error.
+    /// The reader did not start, or the read raised an error after connecting.
     ReadError {},
+    /// The reader could not reach the warehouse, so no compute ran; these never stop the sync.
+    Unreachable {},
     /// The reader did not answer within this many seconds.
     TimedOut { seconds: u64 },
 }

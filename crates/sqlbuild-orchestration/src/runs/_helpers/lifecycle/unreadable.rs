@@ -30,13 +30,16 @@ pub(crate) async fn fail_unreadable_run(
     let transaction = check_lease(begin(store, TransactionMode::Write).await?, lease).await?;
     let (transaction, _) = change_run_in(
         transaction,
-        RunAuthority::Scheduler(lease),
-        &RunChangeRequest {
-            event_id: Uuid::new_v5(&run_id, b"unreadable-snapshot"),
-            run_id,
-            claim_id: None,
-            change: failed(),
-        },
+        (
+            RunAuthority::Scheduler(lease),
+            &RunChangeRequest {
+                event_id: Uuid::new_v5(&run_id, b"unreadable-snapshot"),
+                run_id,
+                claim_id: None,
+                change: failed(),
+            },
+        ),
+        None,
     )
     .await?;
     commit(check_lease(transaction, lease).await?).await
@@ -62,11 +65,14 @@ pub(crate) async fn fail_unreadable_group(
             .map_err(|error| ControlError::Invalid(error.to_string()))?;
         transaction = group_change(
             transaction,
-            member_id,
-            RunChange::CancelRequested {
-                actor: "system:group".into(),
-                reason: UNREADABLE_SNAPSHOT.into(),
-            },
+            (
+                member_id,
+                RunChange::CancelRequested {
+                    actor: "system:group".into(),
+                    reason: UNREADABLE_SNAPSHOT.into(),
+                },
+            ),
+            lease.origin.as_deref(),
         )
         .await?;
     }
@@ -80,7 +86,8 @@ pub(crate) async fn fail_unreadable_group(
     )
     .await?;
     if !open.is_empty() {
-        transaction = group_change(transaction, group_id, failed()).await?;
+        transaction =
+            group_change(transaction, (group_id, failed()), lease.origin.as_deref()).await?;
     }
     commit(check_lease(transaction, lease).await?).await
 }

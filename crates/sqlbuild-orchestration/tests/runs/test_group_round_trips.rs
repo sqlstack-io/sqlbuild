@@ -139,7 +139,7 @@ fn given_a_round_trip_split_across_jobs_when_the_group_runs_then_members_follow_
             )
             .await
             .expect("request group");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

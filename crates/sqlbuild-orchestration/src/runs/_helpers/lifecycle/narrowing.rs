@@ -57,6 +57,23 @@ pub(crate) fn frozen_member_attempt<'de, D: Deserializer<'de>>(
         .transpose()
 }
 
+/// The command tokens of a stored authored request, or of an already projected record; `None` when the request has none.
+pub(crate) fn authored_command<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<Vec<String>>, D::Error> {
+    let value: Value = frozen(deserializer)?;
+    let command: &Value = value
+        .get("request")
+        .and_then(|request| request.get("command"))
+        .unwrap_or(&value);
+    Ok(command.as_array().and_then(|tokens| {
+        tokens
+            .iter()
+            .map(|token| token.as_str().map(str::to_owned))
+            .collect()
+    }))
+}
+
 /// A JSON column, which SQLite returns as text and PostgreSQL as JSON.
 fn frozen<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Value, D::Error> {
     let value: Value = Option::<Value>::deserialize(deserializer)?.unwrap_or(Value::Null);

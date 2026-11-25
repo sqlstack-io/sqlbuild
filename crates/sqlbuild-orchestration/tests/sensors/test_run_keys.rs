@@ -62,7 +62,7 @@ fn given_two_jobs_sharing_a_run_key_when_a_sensor_requests_them_twice_then_each_
                 .await
                 .expect("triggers")
                 .remove(0);
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

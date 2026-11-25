@@ -1,7 +1,7 @@
 //! `sqb` command dispatch: the native route table applied to a parsed namespace.
 
-use crate::bindings::_helpers::review_command::support::attribute;
 use sqlbuild_python_base::records::main::construct::new_error::new_error;
+use sqlbuild_python_base::records::main::fields::attribute_text::attribute_text as attribute;
 use std::path::PathBuf;
 
 use crate::bindings::_helpers::audit_command::command::run_audit_command;
@@ -58,7 +58,7 @@ use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_compile::compile_command::main::invocation::run_compile::run_compile;
 use sqlbuild_python_front::discovery::models::MissingSecretsScope;
 use sqlbuild_python_output::recall::models::InvocationRecall;
-use sqlbuild_python_project::job_settings::main::with_job_scope::with_job_scope;
+use sqlbuild_python_project::planner_selection::main::with_command_scope::with_command_scope;
 
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::within::within;
@@ -536,13 +536,9 @@ fn routed_command<'py>(
                 return Err(user_error(py, failure));
             }
             let project_dir: PathBuf = invocation.value(Source::EffectiveProjectDir)?.extract()?;
-            let selected_target: Option<String> = match invocation.value(Source::Attr("target")) {
-                Ok(target) => optional_text(&target)?,
-                Err(_) => None,
-            };
-            with_job_scope((project_dir, selected_target), || {
+            with_command_scope(args, (project_dir, &recall.settings), || {
                 call_route(&invocation, route, handler, recall)
-            })
+            })?
         }
     }
 }
@@ -612,9 +608,6 @@ pub(crate) fn command_facts(args: &Bound<'_, PyAny>) -> PyResult<CommandFacts> {
         format_diff: flag("format_diff")?,
         format_fix: flag("format_fix")?,
         format_fixtures_only: flag("format_fixtures_only")?,
-        scenario_local: flag("scenario_local")?,
-        scenario_retain: flag("scenario_retain")?,
-        scenario_snapshot_sync: flag("scenario_sync_snapshots")? || flag("scenario_refresh")?,
         raw_query_diff,
         ignores_failures_of_no_audits: attr("ignore_audit_failures")?.is_truthy()?
             && !flag("run_audits")?,

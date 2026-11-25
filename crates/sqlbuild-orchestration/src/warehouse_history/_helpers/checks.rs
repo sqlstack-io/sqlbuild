@@ -1,5 +1,6 @@
 //! Check reads over the audit-result mirror, keyed by binding key on its own index.
 
+use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
 use std::collections::BTreeSet;
 
 use serde::Deserialize;
@@ -90,6 +91,7 @@ pub(crate) fn evidence(row: AuditRow) -> Result<CheckEvidence, ControlError> {
         columns,
         rows,
         truncated: row.record.evidence_truncated,
+        execution_error: row.record.execution_error.as_deref().map(redact_error_text),
     })
 }
 

@@ -2099,3 +2099,73 @@ def build_arguments(project: Path) -> list[str]:
         "build",
         "--discover",
     ]
+
+
+RUN_SELECTOR_PROJECT_FILES: dict[str, str] = {
+    "sqlbuild_project.toml": (
+        'name = "demo"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+        '[connection]\ndatabase = "demo.duckdb"\n\n[targets.dev]\nschema = "dev"\n'
+    ),
+    "sql/models/a.sql": "MODEL (description 'A.', materialized table);\nSELECT 1 AS id\n",
+    "sql/models/b.sql": (
+        "MODEL (description 'B.', materialized table);\nSELECT CAST('x' AS INTEGER) AS id\n"
+    ),
+    "sql/models/c.sql": (
+        "MODEL (description 'C.', materialized table);\nSELECT id FROM __ref(\"a\")\n"
+    ),
+    "sql/models/d.sql": (
+        "MODEL (description 'D.', materialized table);\nSELECT id FROM __ref(\"b\")\n"
+    ),
+    "sql/audits/singular/a_matches_c.sql": (
+        'AUDIT (name "a_matches_c", severity error);\n'
+        'SELECT a.id FROM __ref("a") a JOIN __ref("c") c ON a.id = c.id\n'
+    ),
+}
+
+
+def write_run_selector_project(project_dir: Path) -> None:
+    """A project whose build fails `b`, fails `c` on an error audit and skips `d`, reading `b`."""
+
+    for relative_path, contents in RUN_SELECTOR_PROJECT_FILES.items():
+        destination: Path = project_dir / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(contents, encoding="utf-8")
+
+
+def recalled_run_ids(project_dir: Path) -> list[str]:
+    """The run IDs the project's local Recall history holds, oldest first."""
+
+    with sqlite3.connect(
+        f"file:{project_dir / 'logs' / 'recall.sqlite3'}?mode=ro", uri=True
+    ) as store:
+        rows: list[tuple[str]] = store.execute(
+            "SELECT run_id FROM recall_events WHERE run_id IS NOT NULL "
+            "GROUP BY run_id ORDER BY MIN(occurred_at)"
+        ).fetchall()
+    return [row[0] for row in rows]
+
+
+NOT_RUN_AUDIT_PROJECT_FILES: dict[str, str] = {
+    "sqlbuild_project.toml": (
+        'name = "demo"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+        '[connection]\ndatabase = "demo.duckdb"\n\n[targets.dev]\nschema = "dev"\n'
+    ),
+    "sql/models/orders.sql": "MODEL (description 'Orders.', materialized table);\nSELECT 1 AS id\n",
+    "sql/models/payments.sql": (
+        "MODEL (description 'Payments.', materialized table);\nSELECT 1 AS id\n"
+    ),
+    "sql/audits/singular/orders_have_payments.sql": (
+        'AUDIT (name "orders_have_payments", severity error);\n'
+        'SELECT o.id FROM __ref("orders") o LEFT JOIN __ref("payments") p ON o.id = p.id '
+        "WHERE p.id IS NULL\n"
+    ),
+}
+
+
+def write_not_run_audit_project(project_dir: Path) -> None:
+    """Two unrelated models and a singular audit that reads both."""
+
+    for relative_path, contents in NOT_RUN_AUDIT_PROJECT_FILES.items():
+        destination: Path = project_dir / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(contents, encoding="utf-8")

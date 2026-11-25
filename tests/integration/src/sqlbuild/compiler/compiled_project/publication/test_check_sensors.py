@@ -64,7 +64,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.sensor
                 "orders with a failing SQL test",
                 "SELECT 3 AS amount",
                 "SELECT count(*) FROM duckdb_tables() WHERE table_name = 'stg_orders'",
-                "partial",
+                "failed",
                 [(0,)],
                 files={
                     "sql/models/raw_orders.sql": (

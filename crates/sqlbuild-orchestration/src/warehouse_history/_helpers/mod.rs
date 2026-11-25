@@ -6,4 +6,5 @@ pub(crate) mod costs;
 pub(crate) mod coverage;
 pub(crate) mod maintenance;
 pub(crate) mod node_runs;
+pub(crate) mod run_failures;
 pub(crate) mod run_recall;

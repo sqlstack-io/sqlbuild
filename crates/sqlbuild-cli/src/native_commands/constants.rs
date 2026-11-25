@@ -93,6 +93,9 @@ pub(crate) const ADMIN_OPEN_NOTICE: std::time::Duration = std::time::Duration::f
 pub(crate) const OPENING_STORE: &str = "Opening control store...\n";
 /// Printed when the control store is open.
 pub(crate) const STORE_READY: &str = "Control store ready\n";
+/// The first wait before opening an unreachable control store again; each retry doubles it up to `STORE_RETRY_MAX`.
+pub(crate) const STORE_RETRY_FIRST: std::time::Duration = std::time::Duration::from_secs(1);
+pub(crate) const STORE_RETRY_MAX: std::time::Duration = std::time::Duration::from_secs(30);
 /// An admin command committed, and its result didn't reach stdout.
 pub(crate) const ADMIN_DELIVERY_FAILED: &str =
     "Control administration result delivery failed; changes may already be committed\n";
@@ -175,6 +178,20 @@ pub(crate) const SENSOR_RESULT_BYTES: u64 = 1_048_576;
 
 /// Read timeout, and the delay before retrying a failed page of an unfinished synchronization.
 pub(crate) const METADATA_POLL_SECONDS: u64 = 30;
+/// The longest wait between attempts of a failing run-history sync, whatever failed.
+pub(crate) const METADATA_RETRY_MAX_SECONDS: u64 = 60;
+/// Fragments of connector and resolver messages for a warehouse the reader never reached, lowercase.
+pub(crate) const UNREACHED_WAREHOUSE_MESSAGES: [&str; 9] = [
+    "250001",
+    "could not connect",
+    "failed to lookup address",
+    "name or service not known",
+    "temporary failure in name resolution",
+    "nodename nor servname",
+    "connection refused",
+    "network is unreachable",
+    "no route to host",
+];
 
 /// Failed reads in a row, waiting twice as long after each, that stop a sync until one is requested.
 pub(crate) const METADATA_FAILURE_LIMIT: u32 = 5;
@@ -283,3 +300,9 @@ pub(crate) const LOOKUP_FAILURES_REPORTED: u32 = 3;
 
 /// The most characters of a failed load's error a location reports; the server refuses more.
 pub(crate) const MAX_LOAD_ERROR_CHARS: usize = 4000;
+
+/// How often a location asks each idle interpreter what its event sinks delivered.
+pub(crate) const SINK_CHECK_SECONDS: u64 = 60;
+
+/// How long an interpreter may take to say what its event sinks delivered.
+pub(crate) const SINK_CHECK_TIMEOUT_SECONDS: u64 = 10;

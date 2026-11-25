@@ -10,6 +10,7 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyString};
 
 use crate::plan_output::_helpers::cursor_details::{CursorDetails, cursor_details, owner};
+use crate::plan_output::_helpers::plan_text::audits_not_run;
 use crate::plan_output::_helpers::plan_text::entry_wait_changes;
 use crate::plan_output::_helpers::plan_text::{model_config_diff, model_query_diff};
 use crate::plan_output::_helpers::python_identity::{
@@ -774,4 +775,19 @@ pub(crate) fn table_type_json<'py>(plan: &Bound<'py, PyAny>) -> PyResult<Bound<'
         )?
         .into_any())
     })
+}
+
+/// `[{"name": …, "missing": […]}]`, by name: the end-of-build audits that won't run and the reads they miss.
+pub(crate) fn audits_not_run_json<'py>(
+    py: Python<'py>,
+    plan: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let items = PyList::empty(py);
+    for (name, missing) in audits_not_run(plan)? {
+        let item = PyDict::new(py);
+        item.set_item("name", name)?;
+        item.set_item("missing", missing)?;
+        items.append(item)?;
+    }
+    Ok(items.into_any())
 }

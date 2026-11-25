@@ -192,6 +192,7 @@ pub(crate) fn aggregated_build_result<'py>(
             "ignored_audit_failure_count",
             counts.ignored_audit_failures.into_bound_py_any(py)?,
         ),
+        ("not_run_count", counts.not_run.into_bound_py_any(py)?),
     ]);
     call_with(
         &host_entry(py, ExecutorHost::BuildExecutionResult)?,

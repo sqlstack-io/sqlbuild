@@ -5,7 +5,9 @@ use std::sync::Arc;
 
 use serde_json::{Value as Json, json};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
+use sqlbuild_analysis::graph::constants::AUDIT_KIND;
 use sqlbuild_analysis::graph::errors::SelectorError;
+use sqlbuild_analysis::graph::main::run_selector_ids::run_selector_ids;
 use sqlbuild_analysis::graph::main::selectors_need_jobs::selectors_need_jobs;
 use sqlbuild_analysis::planner_selection::main::split_unit_test_selectors::split_unit_test_selectors;
 use sqlbuild_analysis::planner_selection::models::SelectorGroups;
@@ -17,10 +19,12 @@ use sqlbuild_orchestration::runs::models::{
     CommandPlan, PinnedJob, PlannerResource, PublicationCache, PublishedJobs, SelectionProblem,
     SelectionVocabulary,
 };
+use sqlbuild_orchestration::runs::types::PastRuns;
 use sqlbuild_orchestration::runs::types::{CommandPlanner, PreparedPublication};
 
 use crate::adhoc::_helpers::evaluation::{evaluate, vocabulary};
 use crate::adhoc::_helpers::job_pins::{named_job_settings, pinned_jobs};
+use crate::adhoc::_helpers::past_runs::{with_audits_and_runs, with_past_runs};
 use crate::adhoc::_helpers::publication::{IndexedPublication, python_kind};
 use crate::adhoc::models::Refusal;
 
@@ -64,7 +68,30 @@ impl CommandPlanner for CliPlanner {
 }
 
 impl PreparedPublication for IndexedPublication {
-    fn plan(&self, command: &[String]) -> Result<CommandPlan, String> {
+    fn run_selector_ids(&self, texts: &[String]) -> BTreeSet<String> {
+        run_selector_ids(texts)
+    }
+
+    fn plan(&self, command: &[String], past: &PastRuns) -> Result<CommandPlan, String> {
+        with_past_runs(past, || self.planned(command))
+    }
+
+    fn evaluate(
+        &self,
+        (select, exclude): (&str, &str),
+        past: &PastRuns,
+    ) -> Result<Vec<String>, Box<SelectionProblem>> {
+        with_past_runs(past, || evaluate(self, (select, exclude)))
+    }
+
+    fn vocabulary(&self) -> SelectionVocabulary {
+        self.vocabulary.get_or_init(|| vocabulary(self)).clone()
+    }
+}
+
+impl IndexedPublication {
+    /// [`PreparedPublication::plan`] with the past runs in place.
+    fn planned(&self, command: &[String]) -> Result<CommandPlan, String> {
         let (verb, mut selectors, settings) = command_parts(command)?;
         let mut select: Vec<String> = selectors.remove("select").unwrap_or_default();
         select.extend(selectors.remove("positional_select").unwrap_or_default());
@@ -107,14 +134,6 @@ impl PreparedPublication for IndexedPublication {
             jobs,
             job_settings,
         })
-    }
-
-    fn evaluate(&self, select: &str, exclude: &str) -> Result<Vec<String>, Box<SelectionProblem>> {
-        evaluate(self, (select, exclude))
-    }
-
-    fn vocabulary(&self) -> SelectionVocabulary {
-        self.vocabulary.get_or_init(|| vocabulary(self)).clone()
     }
 }
 
@@ -345,8 +364,16 @@ fn resolved(
 ) -> Result<BTreeSet<String>, Refusal> {
     Ok(selected_keys(publication, select, exclude, include_python)?
         .iter()
-        .map(|key| key_text(publication, key))
+        .flat_map(|key| node_keys(publication, key))
         .collect())
+}
+
+/// The node keys a selected graph key freezes as: an audit's under each of its targets, else one.
+fn node_keys(publication: &IndexedPublication, key: &ObjectKey) -> Vec<String> {
+    if key.0 == AUDIT_KIND {
+        return publication.audits.get(&key.1).cloned().unwrap_or_default();
+    }
+    vec![key_text(publication, key)]
 }
 
 /// A selected graph key as a frozen node key; a loader's Python key names the source it loads.
@@ -372,6 +399,8 @@ pub(crate) fn selected_keys(
     } else {
         &publication.graph
     };
+    let graph = with_audits_and_runs(publication, graph, (&selectors, include_python));
+    let graph = graph.as_ref();
     let sources = &publication.sources;
     let selection = resolve_python_sql_run_selection(
         SqlSelectionGraph {

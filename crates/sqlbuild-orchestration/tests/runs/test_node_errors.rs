@@ -18,7 +18,7 @@ use crate::store::main::migrate_store::migrate_store;
 use crate::store::models::Parameter;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
-use crate::warehouse_history::main::read_person_run_node_error::read_person_run_node_error;
+use crate::warehouse_history::main::runs::read_person_run_node_error::read_person_run_node_error;
 
 const EXPECTED_MESSAGE: &str = "Conversion Error: could not convert 'n/a' to INT32 \
      (password=[REDACTED], url=postgres://orders:[REDACTED]@warehouse.example.test/orders, \
@@ -71,7 +71,7 @@ fn given_a_failed_node_when_people_read_its_error_then_only_evidence_on_that_nod
                 ),
             )
             .await;
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -230,7 +230,7 @@ fn given_a_nul_in_a_failed_nodes_error_when_reported_then_its_failure_and_messag
                 ),
             )
             .await;
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

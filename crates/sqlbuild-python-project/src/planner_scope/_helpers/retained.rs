@@ -55,6 +55,7 @@ pub(crate) fn scope_data(value: &Bound<'_, PyAny>) -> PyResult<Arc<ScopeData>> {
         end_audit_sources: keys(&field(value, "end_audit_source_keys")?)?
             .into_iter()
             .collect(),
+        audits: field(value, "selected_audit_names")?.extract()?,
     }))
 }
 
@@ -79,6 +80,7 @@ pub(crate) fn project_scope<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'p
                 "sql_test_selection",
                 "load_sources",
                 "end_audit_source_keys",
+                "selected_audit_names",
             ];
             let fields = names
                 .iter()

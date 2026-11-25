@@ -34,6 +34,8 @@ pub(crate) const PASS: &str = "pass";
 pub(crate) const WARN: &str = "warn";
 pub(crate) const ERROR: &str = "error";
 pub(crate) const INSUFFICIENT: &str = "insufficient";
+/// An end-of-build audit that reads something the target doesn't have: neither a pass nor a failure.
+pub(crate) const NOT_RUN: &str = "not_run";
 pub(crate) const DELTA_AND_FINAL: &str = "delta_and_final";
 pub(crate) const TIMEOUT_OUTCOME: &str = "timeout";
 pub(crate) const TIMEOUT_CODE: &str = "C417";

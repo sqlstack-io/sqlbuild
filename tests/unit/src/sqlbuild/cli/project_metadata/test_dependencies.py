@@ -22,8 +22,14 @@ DEPENDENCY_SPECIFIER_PATTERN: re.Pattern[str] = re.compile(r"[\[<>=!~]")
             expected_optional_extra_absent=True,
         ),
         ProjectDependencyTestCase(
-            description="maintained polyglot fork is a core dependency",
+            description="the polyglot fork's Python package is not a dependency: analysis is native",
             dependency_name="polyglot-sql-chio",
+            expected_in_core_dependencies=False,
+            expected_optional_extra_absent=True,
+        ),
+        ProjectDependencyTestCase(
+            description="SQLQuack, which converts local test SQL, is a core dependency",
+            dependency_name="sqlquack",
             expected_in_core_dependencies=True,
             expected_optional_extra_absent=True,
         ),

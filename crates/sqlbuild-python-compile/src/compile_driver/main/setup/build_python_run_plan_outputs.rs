@@ -4,6 +4,7 @@ use crate::compile_driver::_helpers::setup::python_plan_entries::NodeKinds;
 use crate::compile_driver::_helpers::setup::python_plan_entries::node_graph;
 use crate::compile_driver::_helpers::setup::python_plan_entries::plan_entries;
 use crate::compile_driver::_helpers::setup::python_plan_entries::skipped_ingress_warnings;
+use crate::compile_driver::main::setup::publish_plan_summary::publish_plan_summary;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyTuple};
@@ -39,6 +40,7 @@ pub fn build_python_run_plan_outputs<'py>(
     let run_selection: Bound<'py, PyAny> = arguments.value("run_selection")?;
     let selected: Bound<'py, PyAny> = arguments.value("selected_python_node_names")?;
     if run_selection.is_none() {
+        publish_plan_summary(&plan_output, PyTuple::empty(py).as_any())?;
         return new_record_with(
             py,
             RecordId::PythonRunPlanOutputs,
@@ -77,6 +79,7 @@ pub fn build_python_run_plan_outputs<'py>(
         (&graph, &kinds),
         &native_field(&plan_output, "python_identity_fingerprints")?,
     )?;
+    publish_plan_summary(&plan_output, entries.as_any())?;
     new_record_with(
         py,
         RecordId::PythonRunPlanOutputs,

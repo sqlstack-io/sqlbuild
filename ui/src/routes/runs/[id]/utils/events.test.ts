@@ -49,6 +49,19 @@ describe('run log', () => {
 		expect(entries[3].details).toEqual([['Connections', '9']]);
 	});
 
+	it('says what a plan runs, Python nodes included, and reads an older run by its count', () => {
+		const planned = (id: string, p: Partial<NonNullable<RunEvent['phase']>>) =>
+			event(id, '2026-11-23T10:00:12Z', { type: 'invocation_phase', nodeKey: null, phase: { phase: 'planned', durationMs: 1500, count: null, name: null, detail: null, ...p } });
+		const cases = [
+			{ description: 'a job of one Python asset', phase: { count: 1, name: '1 Python node' }, expected: 'Planned · 1 Python node · 1.5 s' },
+			{ description: 'models and a Python node', phase: { count: 4, name: '3 selected · 1 Python node' }, expected: 'Planned · 3 selected · 1 Python node · 1.5 s' },
+			{ description: 'an older run that reported a count', phase: { count: 93 }, expected: 'Planned · 93 selected · 1.5 s' }
+		];
+		for (const testCase of cases) {
+			expect(logEntries([planned('p', testCase.phase)], [])[0].text, testCase.description).toBe(testCase.expected);
+		}
+	});
+
 	it('says when the worker became ready and how long it took, with the command behind the row', () => {
 		const entries = logEntries(
 			[

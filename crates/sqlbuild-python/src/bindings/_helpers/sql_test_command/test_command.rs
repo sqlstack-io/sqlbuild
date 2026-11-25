@@ -3,7 +3,7 @@
 use sqlbuild_python_base::native_host::models::Dialect;
 use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Instant;
 
 use pyo3::prelude::{
@@ -13,6 +13,15 @@ use pyo3::types::{PyBool, PyDict, PyDictMethods, PyInt, PyString, PyTuple};
 use pyo3::{pyclass, pyfunction, pymethods, wrap_pyfunction};
 use sqlbuild_analysis::definition_changes::models::{ExecutedItem, SelectedItem};
 use sqlbuild_core::cli_text::models::CliStyle;
+use sqlbuild_core::progress::main::statement_summary_delta::statement_summary_delta;
+use sqlbuild_core::progress::models::StatementSummary;
+use sqlbuild_core::run_on::main::apply_local_refusals::apply_local_refusals;
+use sqlbuild_core::run_on::main::read_run_on_decisions::read_run_on_decisions;
+use sqlbuild_core::run_on::main::render_local_refusals::render_local_refusals;
+use sqlbuild_core::run_on::main::render_warehouse_census::render_warehouse_census;
+use sqlbuild_core::run_on::main::run_on_column::run_on_column;
+use sqlbuild_core::run_on::main::with_run_on_json::with_run_on_json;
+use sqlbuild_core::run_on::models::{LocalRefusal, RunOn, RunOnDecision};
 use sqlbuild_core::test_command::main::render_test_completion::render_test_completion;
 use sqlbuild_core::test_command::main::render_test_inspection::render_test_inspection;
 use sqlbuild_core::test_command::main::render_test_ready::render_test_ready;
@@ -49,9 +58,11 @@ use crate::bindings::_helpers::sql_test_command::timeouts::TimeoutKind;
 use crate::bindings::_helpers::sql_test_command::timeouts::resolve_run_timeout;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::main::value_error::value_error;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::build_command::main::emit::emit;
 use sqlbuild_python_base::build_progress::main::progress::current_native_progress_projector::current_native_progress_projector;
+use sqlbuild_python_base::build_progress::main::progress::current_projector::current_projector;
 use sqlbuild_python_base::build_progress::main::transient_status::status_reporter::status_reporter;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::native_host::types::ReadResult;
@@ -63,16 +74,21 @@ use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_compile::compile_driver::main::setup::build_static_pipeline_result::build_static_pipeline_result;
+use sqlbuild_python_compile::compile_outputs::main::planned_sql_test_path::planned_sql_test_path;
 use sqlbuild_python_compile::compile_outputs::main::write_test_runtime_target::write_test_runtime_target;
 use sqlbuild_python_front::command_runtime::main::resolve_concurrency::resolve_concurrency;
+use sqlbuild_python_front::command_runtime::main::resolve_run_on::resolve_run_on;
 use sqlbuild_python_output::build_progress::main::format_expectation_detail::format_expectation_detail;
 use sqlbuild_python_output::build_progress::main::format_expectation_name::format_expectation_name;
+use sqlbuild_python_output::build_progress::main::local_attempt::local_attempt;
 use sqlbuild_python_output::build_progress::main::test_label::test_label;
 use sqlbuild_python_output::build_progress::main::test_result_label::test_result_label;
 use sqlbuild_python_output::build_progress::main::write_execution_header::write_execution_header;
 use sqlbuild_python_output::build_progress::models::ConnectionProgressReporter;
+use sqlbuild_python_output::build_progress::models::LocalAttemptStep;
 use sqlbuild_python_output::build_progress::models::NestedCommandProgressCallbacks;
 use sqlbuild_python_output::result_output::main::events::sql_test_identity::sql_test_identity;
+use sqlbuild_python_output::result_output::main::results::local_refusal::local_refusal;
 use sqlbuild_python_output::result_output::main::results::test_execution_json::test_execution_json;
 use sqlbuild_python_output::result_output::main::results::write_execution_json_output::write_execution_json_output;
 use sqlbuild_python_output::result_output::models::ExecutionEventWriter;
@@ -88,6 +104,16 @@ const EXPECT_LABEL: &str = "expect";
 const UNKNOWN_GROUP: &str = "(unknown)";
 const EXECUTION_COMMAND: &str = "sqb test";
 const UNKNOWN_CASE_CODE: &str = "S008";
+const RUN_ON_SETTING: &str = "test_run_on";
+const TEST_NOUNS: (&str, &str) = ("test", "tests");
+const LOCAL_RUN_ON: &str = "local";
+const WAREHOUSE_RUN_ON: &str = "warehouse";
+const CANNOT_RUN_LOCALLY_CODE: &str = "T007";
+const CANNOT_RUN_LOCALLY_MESSAGE: &str = "can't run locally";
+const NEEDS_WAREHOUSE_CODE: &str = "T008";
+const NEEDS_WAREHOUSE_MESSAGE: &str = "needs the warehouse (no connection)";
+const COMPILED_TESTS_DIR: &str = "target/run/tests";
+const JSON_CHECK_NAME_KEYS: [&str; 3] = ["test_name", "name", "resource_name"];
 
 fn text<'py>(py: Python<'py>, value: &str) -> Bound<'py, PyAny> {
     PyString::new(py, value).into_any()
@@ -192,6 +218,10 @@ fn entry_group(entry: &Bound<'_, PyAny>) -> PyResult<String> {
 #[pyclass(module = "sqlbuild._native", frozen)]
 struct TestCallbackRelay {
     worker: Option<Arc<WorkerBuild>>,
+    /// Where each test runs, by test name; a local test that falls back becomes `warehouse`.
+    run_on: Mutex<HashMap<String, String>>,
+    /// In `auto`, a local test DuckDB can't run as the warehouse would runs there instead, unreported.
+    fallback: bool,
     progress: Py<PyAny>,
     event_writer: Py<PyAny>,
     plan_output: Py<PyAny>,
@@ -216,6 +246,14 @@ impl TestCallbackRelay {
     }
 
     fn on_test_complete(&self, py: Python<'_>, result: &Bound<'_, PyAny>) -> PyResult<()> {
+        if let (true, Some((name, refusal))) = (self.fallback, refused(result)?) {
+            let mut run_on = self.run_on.lock().unwrap_or_else(PoisonError::into_inner);
+            if run_on.get(&name).map(String::as_str) == Some(LOCAL_RUN_ON) {
+                run_on.insert(name, format!("{WAREHOUSE_RUN_ON}  ({})", refusal.title()));
+                let step = LocalAttemptStep::Abandon(self.progress.bind(py), result);
+                return local_attempt(step).map(drop);
+            }
+        }
         let mut group: String = String::new();
         if let Some(step) = result.getattr("step_results")?.try_iter()?.next() {
             group = step?.getattr("model_name")?.extract()?;
@@ -242,7 +280,7 @@ impl TestCallbackRelay {
                 ("item_name", text(py, &test_label(result, "test_name")?)),
                 ("status_text", text(py, status)),
                 ("child_rows", expectation_rows(result)?.into_any()),
-                ("detail", text(py, &real_model_detail(result)?)),
+                ("detail", text(py, &self.detail(result)?)),
                 ("error_code", result.getattr("error_code")?),
                 ("error_help", result.getattr("error_help")?),
                 ("error_message", result.getattr("error_message")?),
@@ -289,6 +327,19 @@ impl TestCallbackRelay {
 }
 
 impl TestCallbackRelay {
+    /// The run-on column, then `N real models`.
+    fn detail(&self, result: &Bound<'_, PyAny>) -> PyResult<String> {
+        let name: String = result.getattr("test_name")?.extract()?;
+        let real: String = real_model_detail(result)?;
+        let run_on = self.run_on.lock().unwrap_or_else(PoisonError::into_inner);
+        Ok(match run_on.get(&name) {
+            Some(run_on) => format!("  {}{real}", run_on_column(run_on))
+                .trim_end()
+                .to_owned(),
+            None => real,
+        })
+    }
+
     fn connection_call(
         &self,
         py: Python<'_>,
@@ -303,6 +354,11 @@ impl TestCallbackRelay {
             .call_method(method, (), Some(&options))?;
         Ok(())
     }
+}
+
+/// The test that ran locally and failed where the warehouse would not, and why, when it did.
+fn refused(result: &Bound<'_, PyAny>) -> PyResult<Option<(String, LocalRefusal)>> {
+    local_refusal(&native_field(result, "local_refusal")?)
 }
 
 fn unknown_case(py: Python<'_>, message: String) -> PyErr {
@@ -442,6 +498,7 @@ fn inspection_entry(entry: &Bound<'_, PyAny>) -> PyResult<TestInspectionEntry> {
         real_models,
         expected_models,
         selection_reasons: Vec::new(),
+        run_on: None,
     })
 }
 
@@ -449,13 +506,20 @@ fn inspection_entry(entry: &Bound<'_, PyAny>) -> PyResult<TestInspectionEntry> {
 fn inspect(
     stream: &Bound<'_, PyAny>,
     plan_output: &Bound<'_, PyAny>,
-    reasons: &HashMap<String, Vec<String>>,
+    (reasons, decisions): (&HashMap<String, Vec<String>>, &[RunOnDecision]),
 ) -> PyResult<i32> {
+    let by_name: HashMap<&str, &RunOnDecision> = decisions
+        .iter()
+        .map(|decision| (decision.name.as_str(), decision))
+        .collect();
     let entries: Vec<TestInspectionEntry> = native_field(plan_output, "test_entries")?
         .try_iter()?
         .map(|entry| {
-            let mut entry: TestInspectionEntry = inspection_entry(&entry?)?;
+            let entry: Bound<'_, PyAny> = entry?;
+            let name: String = entry.getattr("name")?.extract()?;
+            let mut entry: TestInspectionEntry = inspection_entry(&entry)?;
             entry.selection_reasons = reasons.get(&entry.label).cloned().unwrap_or_default();
+            entry.run_on = by_name.get(name.as_str()).copied().cloned();
             Ok(entry)
         })
         .collect::<PyResult<_>>()?;
@@ -519,12 +583,34 @@ fn select_changed<'py>(
     ))
 }
 
-/// Write the ready header and run the tests with nested progress; returns the results.
+/// Where each selected test goes: an error row, the local DuckDB batch, or the warehouse batch.
+pub(crate) struct TestPlacement<'py> {
+    /// Tests that do not run, with the code and message of their error row.
+    unplaced: Vec<(Bound<'py, PyAny>, &'static str, &'static str)>,
+    local: Vec<Bound<'py, PyAny>>,
+    /// The local tests' names, in the same order.
+    local_names: Vec<String>,
+    warehouse: Vec<Bound<'py, PyAny>>,
+    /// Where each test runs, by name, for its row.
+    run_on: HashMap<String, String>,
+    /// In `auto`, warehouse tests without a connection become error rows instead of failing the run.
+    warehouse_optional: bool,
+}
+
+/// Results in plan order, local statements, and each local test failing where the warehouse wouldn't.
+type RanTests<'py> = (
+    Vec<SqlTestExecutionResult<Bound<'py, PyAny>>>,
+    StatementSummary,
+    Vec<(String, LocalRefusal)>,
+);
+
+/// Run the tests with nested progress, local ones first; in `auto`, those that fall back after.
 fn run_tests<'py>(
     invocation: &Bound<'py, PyAny>,
     pipeline: &Bound<'py, PyAny>,
     (concurrency, timeout, worker): (i64, &RunTimeout, Option<Arc<WorkerBuild>>),
-) -> PyResult<Vec<SqlTestExecutionResult<Bound<'py, PyAny>>>> {
+    placement: TestPlacement<'py>,
+) -> PyResult<RanTests<'py>> {
     let py: Python<'py> = invocation.py();
     let stream: Bound<'py, PyAny> = invocation.getattr("progress_stream")?;
     let use_color: Bound<'py, PyAny> = invocation.getattr("use_color")?;
@@ -594,60 +680,212 @@ fn run_tests<'py>(
     let preflight: Bound<'py, PyAny> = status_reporter(&stream, use_color.is_truthy()?)?;
     let event_writer: Bound<'py, PyAny> =
         Bound::new(py, ExecutionEventWriter::new(py, None)?)?.into_any();
+    let TestPlacement {
+        unplaced,
+        local,
+        local_names,
+        mut warehouse,
+        run_on,
+        warehouse_optional,
+    } = placement;
+    let mut refused_locally: Vec<(String, LocalRefusal)> = Vec::new();
     let relay: Bound<'py, TestCallbackRelay> = Bound::new(
         py,
         TestCallbackRelay {
             worker,
+            run_on: Mutex::new(run_on),
+            fallback: warehouse_optional,
             progress: progress.unbind(),
             event_writer: event_writer.clone().unbind(),
             plan_output: plan_output.clone().unbind(),
             connection: connection.clone().unbind(),
         },
     )?;
-    let executed: PyResult<Vec<SqlTestExecutionResult<Bound<'py, PyAny>>>> = (|| {
-        let callbacks: Bound<'py, PyAny> = call_with(
-            &host_entry(py, ExecutorHost::TestPipelineCallbacks)?,
-            &[
-                (
-                    "on_connection_start",
-                    connection.getattr("on_connection_start")?,
-                ),
-                (
-                    "on_connection_complete",
-                    relay.getattr("on_connection_complete")?,
-                ),
-                ("on_connection_error", relay.getattr("on_connection_error")?),
+    let mut local_statements: StatementSummary = StatementSummary::default();
+    let executed: PyResult<Vec<Bound<'py, PyAny>>> = (|| {
+        let mut results: Vec<Bound<'py, PyAny>> = Vec::new();
+        for (code, message) in [
+            (CANNOT_RUN_LOCALLY_CODE, CANNOT_RUN_LOCALLY_MESSAGE),
+            (NEEDS_WAREHOUSE_CODE, NEEDS_WAREHOUSE_MESSAGE),
+        ] {
+            let entries: Vec<Bound<'py, PyAny>> = unplaced
+                .iter()
+                .filter(|(_, unplaced_code, _)| *unplaced_code == code)
+                .map(|(entry, _, _)| entry.clone())
+                .collect();
+            results.extend(report_unplaced(
+                &relay,
+                pipeline,
+                &entries,
+                (code, message),
+            )?);
+        }
+        let callbacks = |reporting_connection: bool| -> PyResult<Bound<'py, PyAny>> {
+            let mut hooks: Vec<(&str, Bound<'py, PyAny>)> = vec![
                 (
                     "on_progress",
                     preflight.getattr("report_preflight_progress")?,
                 ),
                 ("on_test_start", relay.getattr("on_test_start")?),
                 ("on_test_complete", relay.getattr("on_test_complete")?),
-            ],
-        )?;
-        call_with(
-            &host_entry(py, ExecutorHost::RunTestPipeline)?,
-            &[
-                ("plan", plan_output),
+            ];
+            if reporting_connection {
+                hooks.extend([
+                    (
+                        "on_connection_start",
+                        connection.getattr("on_connection_start")?,
+                    ),
+                    (
+                        "on_connection_complete",
+                        relay.getattr("on_connection_complete")?,
+                    ),
+                    ("on_connection_error", relay.getattr("on_connection_error")?),
+                ]);
+            }
+            call_with(
+                &host_entry(py, ExecutorHost::TestPipelineCallbacks)?,
+                &hooks,
+            )
+        };
+        let run = |batch: &[Bound<'py, PyAny>],
+                   (adapter, connection_config): (Bound<'py, PyAny>, Bound<'py, PyAny>),
+                   reporting_connection: bool|
+         -> PyResult<Vec<Bound<'py, PyAny>>> {
+            call_with(
+                &host_entry(py, ExecutorHost::RunTestPipeline)?,
+                &[
+                    (
+                        "plan",
+                        replaced(
+                            &plan_output,
+                            &[("test_entries", PyTuple::new(py, batch)?.into_any())],
+                        )?,
+                    ),
+                    ("connection_config", connection_config),
+                    ("adapter", adapter),
+                    ("max_concurrency", PyInt::new(py, concurrency).into_any()),
+                    ("callbacks", callbacks(reporting_connection)?),
+                    ("run_id", pipeline.getattr("project")?.getattr("run_id")?),
+                    ("timeouts", timeout_record(py, timeout)?),
+                ],
+            )?
+            .try_iter()?
+            .collect()
+        };
+        if !local.is_empty() {
+            let before: StatementSummary = statement_summary(py)?;
+            let adapter: Bound<'py, PyAny> = call_with(
+                &host_entry(py, ExecutorHost::LocalTestAdapter)?,
+                &[
+                    ("project", native_field(pipeline, "project")?),
+                    ("adapter", invocation.getattr("adapter")?),
+                ],
+            )?;
+            let memory: Bound<'py, PyDict> = PyDict::new(py);
+            memory.set_item("database", ":memory:")?;
+            let progress: &Bound<'py, PyAny> = relay.get().progress.bind(py);
+            local_attempt(LocalAttemptStep::Hold(progress, warehouse_optional))?;
+            let ran: PyResult<Vec<Bound<'py, PyAny>>> =
+                run(&local, (adapter, memory.into_any()), false);
+            local_attempt(LocalAttemptStep::Release(progress))?;
+            for result in ran? {
+                let Some((name, refusal)) = refused(&result)? else {
+                    results.push(result);
+                    continue;
+                };
+                let entry = local_names
+                    .iter()
+                    .position(|test| *test == name)
+                    .map(|at| &local[at]);
+                refused_locally.push((name, refusal));
+                match (warehouse_optional, entry) {
+                    (true, Some(entry)) => warehouse.push(entry.clone()),
+                    _ => results.push(result),
+                }
+            }
+            local_statements = statement_summary_delta(&before, &statement_summary(py)?);
+        }
+        if !warehouse.is_empty() {
+            match run(
+                &warehouse,
                 (
-                    "connection_config",
+                    invocation.getattr("adapter")?,
                     invocation.getattr("connection_config")?,
                 ),
-                ("adapter", invocation.getattr("adapter")?),
-                ("max_concurrency", PyInt::new(py, concurrency).into_any()),
-                ("callbacks", callbacks),
-                ("run_id", pipeline.getattr("project")?.getattr("run_id")?),
-                ("timeouts", timeout_record(py, timeout)?),
-            ],
-        )?
-        .try_iter()?
-        .map(|result| SqlTestExecutionResult::read(&result?))
-        .collect()
+                true,
+            ) {
+                Ok(ran) => results.extend(ran),
+                Err(error)
+                    if warehouse_optional
+                        && error.is_instance(
+                            py,
+                            &host_entry(py, ExecutorHost::WarehouseConnectionError)?,
+                        ) =>
+                {
+                    results.extend(report_unplaced(
+                        &relay,
+                        pipeline,
+                        &warehouse,
+                        (NEEDS_WAREHOUSE_CODE, NEEDS_WAREHOUSE_MESSAGE),
+                    )?);
+                }
+                Err(error) => return Err(error),
+            }
+        }
+        Ok(results)
     })();
     let closed: PyResult<Bound<'py, PyAny>> = event_writer.call_method0("close");
-    let results: Vec<SqlTestExecutionResult<Bound<'py, PyAny>>> = executed?;
+    let ran: Vec<Bound<'py, PyAny>> = executed?;
     closed?;
-    Ok(results)
+    let mut by_name: HashMap<String, Bound<'py, PyAny>> = HashMap::new();
+    for result in ran {
+        by_name.insert(result.getattr("test_name")?.extract()?, result);
+    }
+    let mut results: Vec<SqlTestExecutionResult<Bound<'py, PyAny>>> = Vec::new();
+    for entry in entries.try_iter()? {
+        let name: String = entry?.getattr("name")?.extract()?;
+        if let Some(result) = by_name.remove(&name) {
+            results.push(SqlTestExecutionResult::read(&result)?);
+        }
+    }
+    for result in by_name.into_values() {
+        results.push(SqlTestExecutionResult::read(&result)?);
+    }
+    Ok((results, local_statements, refused_locally))
+}
+
+/// Error rows for tests that do not run, reported as the run reports every other test.
+fn report_unplaced<'py>(
+    relay: &Bound<'py, TestCallbackRelay>,
+    pipeline: &Bound<'py, PyAny>,
+    entries: &[Bound<'py, PyAny>],
+    (code, message): (&str, &str),
+) -> PyResult<Vec<Bound<'py, PyAny>>> {
+    let py: Python<'py> = relay.py();
+    if entries.is_empty() {
+        return Ok(Vec::new());
+    }
+    call_with(
+        &host_entry(py, ExecutorHost::ReportUnplacedSqlTests)?,
+        &[
+            ("test_entries", PyTuple::new(py, entries)?.into_any()),
+            ("code", text(py, code)),
+            ("message", text(py, message)),
+            ("run_id", pipeline.getattr("project")?.getattr("run_id")?),
+            ("on_test_start", relay.getattr("on_test_start")?),
+            ("on_test_complete", relay.getattr("on_test_complete")?),
+        ],
+    )?
+    .try_iter()?
+    .collect()
+}
+
+/// The statements the installed projector has counted so far.
+fn statement_summary(py: Python<'_>) -> PyResult<StatementSummary> {
+    match current_projector(py)? {
+        Some(projector) => projector.get().statement_summary(),
+        None => Ok(StatementSummary::default()),
+    }
 }
 
 /// The executor's `RunItemTimeouts` for a resolved run limit.
@@ -658,16 +896,33 @@ pub(crate) fn timeout_record<'py>(
     host_entry(py, ExecutorHost::RunItemTimeouts)?.call((), Some(&timeout.keywords(py)?))
 }
 
-/// Write the summary and failures; returns the exit code and the `--json` document.
+/// Where the run sent its tests, for the summary, the refusal report and `--json`.
+struct RunOnReport {
+    mode: RunOn,
+    decisions: Vec<RunOnDecision>,
+    local_statements: StatementSummary,
+    verbose: bool,
+}
+
+/// Write the summary, failures, statements and refusals; returns the exit code and the `--json` document.
 fn complete(
     invocation: &Bound<'_, PyAny>,
     (results, since_json): (&[SqlTestExecutionResult<Bound<'_, PyAny>>], Option<&str>),
     started: Instant,
+    report: &RunOnReport,
 ) -> PyResult<(i32, String)> {
     let py: Python<'_> = invocation.py();
     let mut failures: Vec<TestFailure> = Vec::new();
+    let mut failed: usize = 0;
     for result in results {
         if result.outcome == SqlTestOutcome::Pass {
+            continue;
+        }
+        failed += 1;
+        if matches!(
+            result.error_code.as_deref(),
+            Some(CANNOT_RUN_LOCALLY_CODE | NEEDS_WAREHOUSE_CODE)
+        ) {
             continue;
         }
         failures.push(TestFailure {
@@ -677,25 +932,55 @@ fn complete(
             error_help: result.error_help.clone(),
         });
     }
-    let passed: usize = results.len() - failures.len();
+    let passed: usize = results.len() - failed;
+    let local: usize = report
+        .decisions
+        .iter()
+        .filter(|decision| decision.run_on == LOCAL_RUN_ON)
+        .count();
+    let split: (usize, usize) = (local, report.decisions.len() - local);
     let stream: Bound<'_, PyAny> = invocation.getattr("progress_stream")?;
     let style: CliStyle = CliStyle {
         use_color: invocation.getattr("use_color")?.is_truthy()?,
     };
-    let completion: String = render_test_completion((passed, results.len()), &failures, style);
+    let completion: String =
+        render_test_completion((passed, results.len()), &failures, Some(split), style);
     emit(&stream, &completion)?;
-    let report: Option<StatementReport> = StatementReport::of_invocation(invocation, started)?;
-    if let Some(line) = report.as_ref().and_then(StatementReport::line) {
+    let statements: Option<StatementReport> =
+        StatementReport::of_invocation(invocation, started, &report.local_statements)?;
+    if let Some(line) = statements.as_ref().and_then(StatementReport::line) {
         emit(&stream, &format!("\n{line}\n"))?;
     }
-    let payload: String = with_since_section(test_execution_json(py, results)?, since_json)?;
+    let refusals: String = refusal_report(report, style);
+    if !refusals.is_empty() {
+        emit(&stream, &refusals)?;
+    }
+    let payload: String = with_run_on_json(
+        &with_since_section(test_execution_json(py, results)?, since_json)?,
+        ("checks", &JSON_CHECK_NAME_KEYS),
+        &report.decisions,
+        split,
+    )
+    .map_err(value_error)?;
     Ok((
         test_exit_code(passed, results.len()),
-        match report {
-            Some(report) => report.with_section(&payload)?,
+        match statements {
+            Some(statements) => statements.with_section(&payload)?,
             None => payload,
         },
     ))
+}
+
+/// `local`: every refusal as a diagnostic; `auto`: a census, or the diagnostics with `--verbose`.
+fn refusal_report(report: &RunOnReport, style: CliStyle) -> String {
+    match report.mode {
+        RunOn::Warehouse => String::new(),
+        RunOn::Local => render_local_refusals(&report.decisions, true, TEST_NOUNS, style),
+        RunOn::Auto if report.verbose => {
+            render_local_refusals(&report.decisions, false, TEST_NOUNS, style)
+        }
+        RunOn::Auto => render_warehouse_census(&report.decisions, TEST_NOUNS, style),
+    }
 }
 
 /// Run one `sqb test` request.
@@ -741,11 +1026,30 @@ pub(crate) fn run_test<'py>(
             ),
         ));
     }
-    let invocation: Bound<'_, PyAny> = resolve_reported_command_invocation(
-        request,
-        &record_class(py, RecordId::TestInvocation)?,
-        (!inspect_only, discovered),
-    )?;
+    let wants_connection: bool = !inspect_only
+        && native_field(request, "run_on")?
+            .extract::<Option<String>>()?
+            .as_deref()
+            != Some(LOCAL_RUN_ON);
+    let invocation_class: Bound<'_, PyAny> = record_class(py, RecordId::TestInvocation)?;
+    let (invocation, connection_error): (Bound<'_, PyAny>, Option<PyErr>) =
+        match resolve_reported_command_invocation(
+            request,
+            &invocation_class,
+            (wants_connection, discovered),
+        ) {
+            Ok(invocation) => (invocation, None),
+            Err(error) if wants_connection => (
+                resolve_reported_command_invocation(
+                    request,
+                    &invocation_class,
+                    (false, discovered),
+                )
+                .map_err(|_| error.clone_ref(py))?,
+                Some(error),
+            ),
+            Err(error) => return Err(error),
+        };
     let python: bool = worker.is_none()
         && !inspect_only
         && !native_field(request, "sql_only")?.is_truthy()?
@@ -771,7 +1075,12 @@ pub(crate) fn run_test<'py>(
                 Some(test_execution_json(py, &[])?),
             )
         }
-        modules => run_sql_tests(request, &invocation, worker, (modules, resolve))?,
+        modules => run_sql_tests(
+            request,
+            (&invocation, connection_error),
+            worker,
+            (modules, resolve),
+        )?,
     };
     if python_tests.is_empty() {
         write_json(request, payload)?;
@@ -805,7 +1114,7 @@ fn write_json(request: &Bound<'_, PyAny>, payload: Option<String>) -> PyResult<(
 /// Compile, inspect or run the selected SQL tests and pick the Python test `modules` to run after.
 fn run_sql_tests<'py>(
     request: &Bound<'py, PyAny>,
-    invocation: &Bound<'py, PyAny>,
+    (invocation, connection_error): (&Bound<'py, PyAny>, Option<PyErr>),
     worker: Option<Arc<WorkerBuild>>,
     (modules, resolve): (Option<Vec<String>>, bool),
 ) -> PyResult<(i32, Vec<String>, Option<String>)> {
@@ -850,12 +1159,35 @@ fn run_sql_tests<'py>(
         )?;
         since_json = Some(json);
     }
+    let mode: RunOn = resolve_run_on(
+        &request.getattr("run_on")?,
+        &native_field(invocation, "discovered_inputs")?,
+        &request.getattr("selected_target")?,
+        RUN_ON_SETTING,
+    )?;
+    if mode == RunOn::Warehouse
+        && !inspect_only
+        && let Some(error) = connection_error.as_ref()
+    {
+        return Err(error.clone_ref(py));
+    }
+    let decisions: Vec<RunOnDecision> = decide(invocation, &pipeline, mode)?;
     if inspect_only {
-        return Ok((
-            inspect(&stream, &pipeline.getattr("plan_output")?, &reasons)?,
-            python_tests,
-            None,
-        ));
+        let style: CliStyle = CliStyle {
+            use_color: invocation.getattr("use_color")?.is_truthy()?,
+        };
+        let code: i32 = inspect(
+            &stream,
+            &pipeline.getattr("plan_output")?,
+            (&reasons, &decisions),
+        )?;
+        if mode != RunOn::Warehouse {
+            emit(
+                &stream,
+                &render_local_refusals(&decisions, mode == RunOn::Local, TEST_NOUNS, style),
+            )?;
+        }
+        return Ok((code, python_tests, None));
     }
     if !python_tests.is_empty()
         && !pipeline
@@ -894,8 +1226,18 @@ fn run_sql_tests<'py>(
         request.getattr("test_timeout")?.extract()?,
         TimeoutKind::Test,
     )?;
-    let results: Vec<SqlTestExecutionResult<Bound<'_, PyAny>>> =
-        run_tests(invocation, &pipeline, (concurrency, &timeout, worker))?;
+    let (placement, mut decisions): (TestPlacement<'_>, Vec<RunOnDecision>) = place_tests(
+        &pipeline.getattr("plan_output")?.getattr("test_entries")?,
+        (mode, decisions),
+        connection_error.is_some(),
+    )?;
+    let (results, local_statements, refused_locally): RanTests<'_> = run_tests(
+        invocation,
+        &pipeline,
+        (concurrency, &timeout, worker),
+        placement,
+    )?;
+    apply_local_refusals(&mut decisions, refused_locally, mode);
     write_test_runtime_target(
         (
             &native_field(invocation, "effective_project_dir")?
@@ -905,9 +1247,110 @@ fn run_sql_tests<'py>(
         &pipeline.getattr("plan_output")?,
         &results,
     )?;
-    let (code, payload): (i32, String) =
-        complete(invocation, (&results, since_json.as_deref()), started)?;
+    let (code, payload): (i32, String) = complete(
+        invocation,
+        (&results, since_json.as_deref()),
+        started,
+        &RunOnReport {
+            mode,
+            decisions,
+            local_statements,
+            verbose: native_field(request, "verbose")?.is_truthy()?,
+        },
+    )?;
     Ok((code, python_tests, Some(payload)))
+}
+
+/// Each selected test's run-on decision, from the local runner.
+fn decide(
+    invocation: &Bound<'_, PyAny>,
+    pipeline: &Bound<'_, PyAny>,
+    mode: RunOn,
+) -> PyResult<Vec<RunOnDecision>> {
+    let py: Python<'_> = invocation.py();
+    let entries: Bound<'_, PyAny> = pipeline.getattr("plan_output")?.getattr("test_entries")?;
+    let paths: Bound<'_, PyDict> = PyDict::new(py);
+    for entry in entries.try_iter()? {
+        let entry: Bound<'_, PyAny> = entry?;
+        let path: String = planned_sql_test_path(&entry)?.str()?.extract()?;
+        paths.set_item(
+            entry.getattr("name")?,
+            format!("{COMPILED_TESTS_DIR}/{}", path.replace('\\', "/")),
+        )?;
+    }
+    let json: String = call_with(
+        &host_entry(py, ExecutorHost::DecideSqlTestRunOn)?,
+        &[
+            ("project", native_field(pipeline, "project")?),
+            ("test_entries", entries),
+            ("adapter", invocation.getattr("adapter")?),
+            (
+                "project_dir",
+                native_field(invocation, "effective_project_dir")?,
+            ),
+            ("compiled_paths", paths.into_any()),
+            ("run_on", text(py, mode.as_str())),
+        ],
+    )?
+    .extract()?;
+    read_run_on_decisions(&json).map_err(value_error)
+}
+
+/// Split the tests by `mode` and their decisions, and say where each one ran.
+fn place_tests<'py>(
+    entries: &Bound<'py, PyAny>,
+    (mode, decisions): (RunOn, Vec<RunOnDecision>),
+    no_connection: bool,
+) -> PyResult<(TestPlacement<'py>, Vec<RunOnDecision>)> {
+    let mut placement: TestPlacement<'py> = TestPlacement {
+        unplaced: Vec::new(),
+        local: Vec::new(),
+        local_names: Vec::new(),
+        warehouse: Vec::new(),
+        run_on: HashMap::new(),
+        warehouse_optional: mode == RunOn::Auto,
+    };
+    let mut placed: Vec<RunOnDecision> = Vec::with_capacity(decisions.len());
+    for entry in entries.try_iter()? {
+        let entry: Bound<'py, PyAny> = entry?;
+        let name: String = entry.getattr("name")?.extract()?;
+        let mut decision: RunOnDecision = decisions
+            .iter()
+            .find(|decision| decision.name == name)
+            .cloned()
+            .unwrap_or_else(|| RunOnDecision {
+                name: name.clone(),
+                run_on: WAREHOUSE_RUN_ON.to_owned(),
+                refusals: Vec::new(),
+            });
+        match mode {
+            RunOn::Warehouse => {
+                decision.run_on = WAREHOUSE_RUN_ON.to_owned();
+                placement.warehouse.push(entry);
+            }
+            _ if decision.local() => {
+                placement.local_names.push(name.clone());
+                placement.local.push(entry);
+            }
+            RunOn::Local => {
+                decision.run_on = LOCAL_RUN_ON.to_owned();
+                placement.unplaced.push((
+                    entry,
+                    CANNOT_RUN_LOCALLY_CODE,
+                    CANNOT_RUN_LOCALLY_MESSAGE,
+                ));
+            }
+            RunOn::Auto if no_connection => {
+                placement
+                    .unplaced
+                    .push((entry, NEEDS_WAREHOUSE_CODE, NEEDS_WAREHOUSE_MESSAGE))
+            }
+            RunOn::Auto => placement.warehouse.push(entry),
+        }
+        placement.run_on.insert(name, decision.run_on.clone());
+        placed.push(decision);
+    }
+    Ok((placement, placed))
 }
 
 /// Add source and safe typed values only for parameterized test rows.

@@ -29,6 +29,7 @@ sqlbuild-project.workspace = true
 sqlbuild-pysource.workspace = true
 sqlbuild-python-base.workspace = true
 sqlbuild-python-front.workspace = true
+sqlbuild-recall.workspace = true
 sqlbuild-rules.workspace = true
 sqlbuild-sqltext.workspace = true
 sqlbuild-state.workspace = true

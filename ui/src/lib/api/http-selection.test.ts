@@ -3,9 +3,10 @@ import { toSelectionEvaluation, toSelectionVocabulary } from './http-selection';
 
 describe('selection mapping', () => {
 	it('keeps a page of keys and the total, with no error', () => {
-		expect(toSelectionEvaluation({ snapshot_id: 'snap-1', count: 3, keys: ['model:customers', 'model:orders'], next_offset: 2, error: null })).toEqual({
+		expect(toSelectionEvaluation({ snapshot_id: 'snap-1', count: 3, audits: 2, keys: ['model:customers', 'model:orders'], next_offset: 2, error: null })).toEqual({
 			snapshotId: 'snap-1',
 			count: 3,
+			audits: 2,
 			keys: ['model:customers', 'model:orders'],
 			nextOffset: 2,
 			error: null
@@ -63,7 +64,8 @@ describe('selection mapping', () => {
 				jobs: [entry('nightly_orders', 12)],
 				sources: [entry('shop.orders', 1)],
 				seeds: [entry('currencies', 1)],
-				kinds: [entry('model', 4)]
+				kinds: [entry('model', 4)],
+				audits: [entry('not_null_orders_id', 1)]
 			})
 		).toEqual({
 			snapshotId: null,
@@ -72,7 +74,8 @@ describe('selection mapping', () => {
 			jobs: [entry('nightly_orders', 12)],
 			sources: [entry('shop.orders', 1)],
 			seeds: [entry('currencies', 1)],
-			kinds: [entry('model', 4)]
+			kinds: [entry('model', 4)],
+			audits: [entry('not_null_orders_id', 1)]
 		});
 	});
 });

@@ -11,6 +11,7 @@ use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::runs::_helpers::lifecycle::pinned_jobs::build_settings;
 use crate::runs::_helpers::lifecycle::publications::{cached_publication, current_publication};
+use crate::runs::_helpers::requests::past_runs::read_past_runs;
 use crate::runs::_helpers::requests::permissions::{
     authorize_execution, execution_scopes, job_denial,
 };
@@ -59,7 +60,10 @@ pub(crate) async fn frozen_publication_request(
     (snapshot_id, publication): (Uuid, &CachedPublication),
     (request, run_id): (&AdhocCheckRequest, Uuid),
 ) -> Result<(ControlTransaction, Result<(String, RunRequest), String>), ControlError> {
-    let plan = match publication.prepared.plan(&request.command) {
+    let ids = publication.prepared.run_selector_ids(&request.command);
+    let (transaction, past) =
+        read_past_runs(transaction, (request.location_id, &request.target), &ids).await?;
+    let plan = match past.and_then(|past| publication.prepared.plan(&request.command, &past)) {
         Ok(plan) => plan,
         Err(refusal) => return Ok((transaction, Err(refusal))),
     };
@@ -137,7 +141,12 @@ pub(crate) async fn publication_plan(
 ) -> Result<(ControlTransaction, Result<CommandPlan, String>), ControlError> {
     let (transaction, publication) =
         cached_publication(transaction, planner, (scope, snapshot_id)).await?;
-    Ok((transaction, publication.prepared.plan(command)))
+    let ids = publication.prepared.run_selector_ids(command);
+    let (transaction, past) = read_past_runs(transaction, scope, &ids).await?;
+    Ok((
+        transaction,
+        past.and_then(|past| publication.prepared.plan(command, &past)),
+    ))
 }
 
 /// Every permission launching `frozen` needs, decided as the launch would but without recording a denial.

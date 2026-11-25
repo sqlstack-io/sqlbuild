@@ -122,7 +122,31 @@ describe('warehouseSyncOf', () => {
 			sync('2026-11-08T12:01:00Z', 'catalog', null),
 			sync('2026-11-08T12:00:00Z', 'statistics', 'delivery')
 		]);
-		expect(result).toEqual({ lastSyncedAt: '2026-11-08T12:02:00Z', lastError: 'catalog: failed while reading the warehouse', lastReportedAt: '2026-11-08T12:03:00Z', syncing: null, completed: null });
+		expect(result).toEqual({
+			lastSyncedAt: '2026-11-08T12:02:00Z',
+			lastError: 'catalog: failed while reading the warehouse',
+			lastReportedAt: '2026-11-08T12:03:00Z',
+			syncing: null,
+			completed: null,
+			failing: { since: '2026-11-08T12:03:00Z', reason: 'failed while reading the warehouse', halted: false, unreachable: false, retrySeconds: null, retryAt: null }
+		});
+	});
+
+	it('says since when a failing sync has failed, why, whether the warehouse was reached and when it tries again', () => {
+		const failed = (at: string) => {
+			const report = sync(at, 'catalog', 'read', '250001 Could not connect to Snowflake backend');
+			const health = { ...report.report.health, read_failure: { kind: 'unreachable' as const }, failing_since: '2026-11-08T11:42:00Z', retry_at: '2026-11-08T12:04:00Z', retry_seconds: 60 };
+			return { ...report, report: { ...report.report, health } };
+		};
+		expect(warehouseSyncOf([failed('2026-11-08T12:03:00Z'), failed('2026-11-08T12:02:00Z'), sync('2026-11-08T11:40:00Z', 'catalog', null)])?.failing).toEqual({
+			since: '2026-11-08T11:42:00Z',
+			reason: '250001 Could not connect to Snowflake backend',
+			halted: false,
+			unreachable: true,
+			retrySeconds: 60,
+			retryAt: '2026-11-08T12:04:00Z'
+		});
+		expect(warehouseSyncOf([sync('2026-11-08T12:05:00Z', 'catalog', null), failed('2026-11-08T12:03:00Z')])?.failing).toBeNull();
 	});
 
 	it("gives each table its newest sync, the time it last synced cleanly, and where the state tables are read from", () => {
@@ -206,7 +230,7 @@ describe('warehouseSyncOf', () => {
 		const location = { id: 'loc:development', name: 'Orders', health: null, lastSeenAt: null, target: { name: 'development', adapter: null, connectionSummary: null }, warehouseSync: { lastSyncedAt: null, lastError: null } };
 		const observations = [sync('2026-11-08T12:03:00Z', 'catalog', 'busy'), sync('2026-11-08T12:01:00Z', 'catalog', null)];
 		expect(toWarehouseConnection(location, observations).tables.map((t) => [t.failure, t.waiting, t.lastSyncedAt])).toEqual([['Waiting for a build that holds the warehouse file', true, '2026-11-08T12:01:00Z']]);
-		expect(warehouseSyncOf(observations)).toEqual({ lastSyncedAt: '2026-11-08T12:01:00Z', lastError: null, lastReportedAt: '2026-11-08T12:03:00Z', syncing: null, completed: null });
+		expect(warehouseSyncOf(observations)).toEqual({ lastSyncedAt: '2026-11-08T12:01:00Z', lastError: null, lastReportedAt: '2026-11-08T12:03:00Z', syncing: null, completed: null, failing: null });
 	});
 
 	it('says why a read failed and on what page size, without the warehouse message', () => {

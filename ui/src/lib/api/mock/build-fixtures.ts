@@ -3,6 +3,7 @@
 // state itself (last builds, outcomes, staleness) is derived in mock/build.ts
 // from the OPERATE run history plus a few builds made outside the scheduler.
 
+import { ORDERS_MATCH_PAYMENTS_SQL, SEED_AUDIT_CHECK } from './seed-audit-run';
 import type {
 	CheckAttachment,
 	CheckKind,
@@ -450,7 +451,9 @@ export const CHECK_SPECS: CheckSpec[] = [
 	{ id: 'chk-cc-unique', name: 'unique(code)', definition: 'unique', kind: 'audit', attachment: 'seed', node: 'country_codes', column: 'code', severity: 'error', runScopePhase: 'final', evaluationMode: 'violations', thresholds: [], description: null, latest: { outcome: 'pass', violations: 0 }, history: {}, sql: 'SELECT code, count(*) AS n FROM {relation} GROUP BY 1 HAVING count(*) > 1' },
 	{ id: 'chk-end-reconcile', name: 'revenue_reconciles', definition: null, kind: 'sql_test', attachment: 'end', node: null, column: null, severity: 'error', runScopePhase: 'final', evaluationMode: 'measurement', thresholds: [{ level: 'warn', operator: 'above', value: 0.05 }, { level: 'error', operator: 'above', value: 0.1 }], description: 'Mart revenue matches successful payments within 0.1%.', latest: { outcome: 'pass', measured: 0.02 }, history: { measuredBase: 0.03, warnEvery: 8 }, sql: `SELECT 100 * abs(m.total - p.total) / nullif(p.total, 0) AS measured_value
 FROM (SELECT sum(total_revenue_cents) AS total FROM "WAFFLE_SHOP"."MARTS"."DAILY_REVENUE") m,
-     (SELECT sum(amount_cents) AS total FROM "WAFFLE_SHOP"."STAGING"."STG_PAYMENTS" WHERE status = 'success') p` }
+     (SELECT sum(amount_cents) AS total FROM "WAFFLE_SHOP"."STAGING"."STG_PAYMENTS" WHERE status = 'success') p` },
+	// The run-page failure mock-up's singular audit: it reads two models never built in prod.
+	{ id: 'chk-end-orders-payments', name: SEED_AUDIT_CHECK, definition: null, kind: 'audit', attachment: 'end', node: null, column: null, severity: 'error', runScopePhase: 'final', evaluationMode: 'violations', thresholds: [], description: 'Every order has a payment of the same amount.', latest: { outcome: 'error', violations: 0 }, history: {}, sql: ORDERS_MATCH_PAYMENTS_SQL }
 ];
 
 // ---- snapshot change feed (one entry per deploy) ----

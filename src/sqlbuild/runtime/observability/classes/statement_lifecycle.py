@@ -32,7 +32,10 @@ from sqlbuild.runtime.observability.classes.event_dispatcher import EventDispatc
 from sqlbuild.runtime.observability.classes.statement_monitor import (
     StatementMonitor,
 )
-from sqlbuild.runtime.observability.constants import STATEMENT_HEARTBEAT_THRESHOLD_SECONDS
+from sqlbuild.runtime.observability.constants import (
+    LOCAL_RUN_ON,
+    STATEMENT_HEARTBEAT_THRESHOLD_SECONDS,
+)
 from sqlbuild.runtime.observability.exceptions import ObservabilityValidationError
 from sqlbuild.runtime.observability.models import ExecutionIdentity
 from sqlbuild.runtime.observability.types import JSONValue, StatementListener
@@ -44,6 +47,7 @@ _STATEMENT_LIFECYCLE_OWNER: ContextVar[StatementLifecycle | None] = ContextVar(
     "sqlbuild_statement_lifecycle_owner", default=None
 )
 _STATEMENT_PURPOSE: ContextVar[str | None] = ContextVar("sqlbuild_statement_purpose", default=None)
+_STATEMENT_RUN_ON: ContextVar[str | None] = ContextVar("sqlbuild_statement_run_on", default=None)
 _HANDLED_FAILURE: ContextVar[Callable[[BaseException], bool] | None] = ContextVar(
     "sqlbuild_statement_handled_failure", default=None
 )
@@ -90,6 +94,7 @@ class StatementLifecycle:
         self._pending_failure: tuple[BaseException, str | None, str | None] | None = None
         self._statement_facts: tuple[str, str] | None = None
         self._purpose: str | None = _STATEMENT_PURPOSE.get()
+        self._run_on: str | None = _STATEMENT_RUN_ON.get()
         self._is_handled: Callable[[BaseException], bool] | None = _HANDLED_FAILURE.get()
         self._item_deadline: ItemDeadline | None = None
         self._terminal_query_id: str | None = None
@@ -112,6 +117,17 @@ class StatementLifecycle:
             yield
         finally:
             _STATEMENT_PURPOSE.reset(token)
+
+    @staticmethod
+    @contextmanager
+    def run_on_scope(run_on: str) -> Iterator[None]:
+        """Label statements in the block with where they run; local ones keep no SQL text."""
+
+        token: Token[str | None] = _STATEMENT_RUN_ON.set(run_on)
+        try:
+            yield
+        finally:
+            _STATEMENT_RUN_ON.reset(token)
 
     @staticmethod
     @contextmanager
@@ -153,9 +169,10 @@ class StatementLifecycle:
         self._started_monotonic = self._clock()
         self._execution_owner_key = execution_owner_key
         self._publish(event_type="statement_started", payload=self._base_payload())
-        dispatcher.publish_sql_artifact(
-            sql=self._sql, statement_id=self._statement_id, resource_id=identity.resource_id
-        )
+        if self._run_on != LOCAL_RUN_ON:
+            dispatcher.publish_sql_artifact(
+                sql=self._sql, statement_id=self._statement_id, resource_id=identity.resource_id
+            )
         self._item_deadline = current_item_deadline()
         if self._item_deadline is not None:
             self._item_deadline.statement_started()
@@ -339,6 +356,8 @@ class StatementLifecycle:
             payload["batch_size"] = self._batch_size
         if self._purpose is not None:
             payload["purpose"] = self._purpose
+        if self._run_on is not None:
+            payload["run_on"] = self._run_on
         return payload
 
     def _terminal_payload(self) -> dict[str, JSONValue]:

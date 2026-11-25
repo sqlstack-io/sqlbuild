@@ -3,6 +3,9 @@
 use uuid::Uuid;
 
 use crate::platform::constants::{LOCATION_RETENTION_DAYS, RECENT_HEALTH_LIMIT};
+
+/// Sink delivery reports say nothing of the location's state and would crowd out the reports that do.
+const SINK_REPORTS_EXCLUDED: &str = " AND payload->'report'->'health'->>'kind'<>'sink_deliveries'";
 use crate::platform::models::{LocationHealth, LocationHealthObservation, LocationHealthReport};
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
@@ -33,7 +36,7 @@ pub(crate) async fn recent_health(
         .clone()
         .map(|day| {
             format!("SELECT * FROM (SELECT occurred_at AS received_at, invocation_sequence, payload FROM recall_events \
-                WHERE invocation_id=${} AND event_type='location_health'{event_target} ORDER BY invocation_sequence DESC LIMIT 100) day_{day}", day + 1)
+                WHERE invocation_id=${} AND event_type='location_health'{event_target}{SINK_REPORTS_EXCLUDED} ORDER BY invocation_sequence DESC LIMIT 100) day_{day}", day + 1)
         })
         .collect::<Vec<_>>()
         .join(" UNION ALL ");

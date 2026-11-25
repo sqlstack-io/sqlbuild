@@ -14,11 +14,13 @@
 	import { formatStamp } from '$lib/format/time';
 	import { nodeLabel, shortRunId } from '$lib/operate/labels';
 	import type { LogEntry } from './utils';
+	import { describeQuery, holdsText, kindOf, outcomeOf, OUTCOMES, QUICK, QUICK_LIST, toggleText } from './utils/log-query';
 	import { CHECK_FAILED_CODE, fullStamp, tracebackOf } from './utils';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import LogFilter, { type FilterOption } from './log-filter.svelte';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
+	import ActiveFilter from './active-filter.svelte';
 	import { cn } from '$lib/utils';
 	import { buttonVariants } from '$lib/components/ui/button/button.svelte';
 
@@ -26,7 +28,6 @@
 		entries,
 		grouped,
 		runId,
-		filteredBy,
 		printed = $bindable(false),
 		memberOf = () => null,
 		memory,
@@ -34,12 +35,17 @@
 		onquery,
 		onframe,
 		onnode,
-		onstatement
+		onstatement,
+		query = $bindable('')
 	}: {
+		/**
+		 * The log's one filter: the text in its box. The page's quick filters (header figures, Pick chips)
+		 * and this tab's Errors chip, Levels and Kinds only write words into it.
+		 */
+		query?: string;
 		entries: LogEntry[];
 		grouped: boolean;
 		runId: string;
-		filteredBy: string[];
 		/** Whether what the run printed is shown; a failing run's last printed block always is. */
 		printed?: boolean;
 		/** A node name clicked: the log shows only that node. */
@@ -70,8 +76,6 @@
 	// `level:` and `kind:` into it.
 	// Back to the page restores the log as it was: its filter, stream and open rows.
 	const mem = <T>(key: string, fallback: T): T => (memory && key in memory ? (memory[key] as T) : fallback);
-	// svelte-ignore state_referenced_locally
-	let query = $state(mem('logQuery', ''));
 	// Long printed blocks fold to their first lines.
 	const FOLD = 4;
 	// svelte-ignore state_referenced_locally
@@ -86,7 +90,7 @@
 	const modeEntries = $derived(entries.filter(inMode));
 	// svelte-ignore state_referenced_locally
 	let stream = $state<'all' | 'stdout' | 'stderr'>(mem('logStream', 'all'));
-	const kindOf = (e: LogEntry) => e.tag?.text.replace(/ /g, '-') ?? null;
+	// `kind:` is what a row is (node, audit, query, run, log…); `outcome:` how it ended (built, failed…).
 	type Term = { key: string; value: string };
 	const terms = $derived(
 		query
@@ -94,15 +98,18 @@
 			.split(/\s+/)
 			.filter(Boolean)
 			.map((t): Term => {
-				const m = t.match(/^(node|kind|level|job|stream):(.*)$/i);
+				const m = t.match(/^(node|kind|outcome|level|job|stream):(.*)$/i);
 				return m ? { key: m[1].toLowerCase(), value: m[2].toLowerCase() } : { key: 'text', value: t.toLowerCase() };
 			})
 	);
 	const holds = (e: LogEntry, t: Term) => {
 		if (!t.value) return true;
 		if (t.key === 'node') return !!e.nodeKey && nodeLabel(e.nodeKey).toLowerCase() === t.value;
-		if (t.key === 'kind') return kindOf(e) === t.value;
-		if (t.key === 'level') return e.level === (t.value === 'warning' ? 'warn' : t.value);
+		if (t.key === 'kind') return t.value.split(',').includes(kindOf(e));
+		// `outcome:failed,cancelled` is any of them.
+		if (t.key === 'outcome') return t.value.split(',').includes(outcomeOf(e) ?? '');
+		// Errors are failures: a failed node, check or query, not the run's own summary line.
+		if (t.key === 'level') return e.level === (t.value === 'warning' ? 'warn' : t.value) && (t.value !== 'error' || e.category !== 'run');
 		if (t.key === 'job') return memberOf(e.runId)?.toLowerCase() === t.value;
 		if (t.key === 'stream') return e.stream === t.value;
 		return [e.nodeKey ?? '', e.text, e.title, ...e.queries.map((x) => x.text)].join(' ').toLowerCase().includes(t.value);
@@ -112,6 +119,12 @@
 	const termValue = (key: string) => terms.find((t) => t.key === key && t.value)?.value ?? null;
 	const level = $derived((termValue('level') === 'warning' ? 'warn' : termValue('level')) ?? 'all');
 	const kind = $derived(termValue('kind') ?? 'all');
+	/** The Errors chip: `level:error` into the text, or out again; whatever else is typed stays. */
+	const errorsOn = $derived(holdsText(query, QUICK.errors.text));
+	const warningsOn = $derived(holdsText(query, QUICK.warnings.text));
+	const toggleErrors = () => (query = toggleText(query, QUICK.errors.text));
+	/** The one "Showing …" line, read from the text alone: typed or clicked, the same words read the same. */
+	const showing = $derived(describeQuery(query, QUICK_LIST));
 	/** Writes `key:value` into the filter text, in place of any earlier one; null takes it out. */
 	function setTerm(key: string, value: string | null) {
 		const kept = query.split(/\s+/).filter((t) => t && !t.toLowerCase().startsWith(`${key}:`));
@@ -121,17 +134,20 @@
 	const kindValues = $derived(printed ? [] : uniq(modeEntries.map(kindOf)));
 	const filterOptions = $derived<FilterOption[]>([
 		{ prefix: 'node', hint: 'a node', values: uniq(entries.map((e) => (e.nodeKey ? nodeLabel(e.nodeKey) : null))) },
-		{ prefix: 'kind', hint: 'built, merged, failed, check, log…', values: kindValues },
+		{ prefix: 'kind', hint: 'node, audit, query, run, log', values: kindValues },
+		{ prefix: 'outcome', hint: 'built, failed, skipped, not-run, passed…; a,b for either', values: OUTCOMES.filter((o) => modeEntries.some((e) => outcomeOf(e) === o)) },
 		{ prefix: 'level', hint: 'error, warn, info', values: uniq(modeEntries.map((e) => e.level)) },
 		{ prefix: 'job', hint: 'a member job', values: grouped ? uniq(entries.map((e) => memberOf(e.runId))) : [] },
 		{ prefix: 'stream', hint: 'stdout or stderr', values: printed ? uniq(entries.map((e) => e.stream)) : [] }
 	]);
 	// Counts for each menu choice: what the rest of the filter leaves, by level or by kind.
-	const levelCounts = $derived(countBy(modeEntries.filter((e) => matchesExcept(e, 'level')), (e) => e.level));
-	const kindCounts = $derived(countBy(modeEntries.filter((e) => matchesExcept(e, 'kind')), (e) => kindOf(e) ?? ''));
+	const levelCounts = $derived(countBy(modeEntries.filter((e) => matchesExcept(e, 'level') && !(e.level === 'error' && e.category === 'run')), (e) => e.level));
+	const kindCounts = $derived(countBy(modeEntries.filter((e) => matchesExcept(e, 'kind')), (e): string => kindOf(e)));
 	// A count shows only when it matters: errors and warnings in what the switch shows, none when zero.
-	const errors = $derived(levelCounts.get('error') ?? 0);
-	const warnings = $derived(levelCounts.get('warn') ?? 0);
+	// Counted over the whole stream, not what the filter leaves: the chips and their counts never come and go as it changes.
+	const streamLevels = $derived(countBy(modeEntries.filter((e) => !(e.level === 'error' && e.category === 'run')), (e) => e.level));
+	const errors = $derived(streamLevels.get('error') ?? 0);
+	const warnings = $derived(streamLevels.get('warn') ?? 0);
 	const levelText = $derived(LEVELS.find((l) => l.value === level)?.label ?? 'Levels');
 	const levelOptions = $derived(LEVELS.map((l) => ({ ...l, count: l.value === 'all' ? [...levelCounts.values()].reduce((a, b) => a + b, 0) : (levelCounts.get(l.value) ?? 0) })));
 	const kindOptions = $derived([{ value: 'all', label: 'All kinds', count: [...kindCounts.values()].reduce((a, b) => a + b, 0) }, ...kindValues.map((k) => ({ value: k, label: k, count: kindCounts.get(k) ?? 0 }))]);
@@ -141,7 +157,7 @@
 	// svelte-ignore state_referenced_locally
 	let longOpen = $state<Set<string>>(new Set(mem<string[]>('logLong', [])));
 	$effect(() => {
-		if (memory) Object.assign(memory, { logQuery: query, logStream: stream, logFolded: [...open], logQueries: [...expanded], logDetails: [...detailOpen], logLong: [...longOpen] });
+		if (memory) Object.assign(memory, { logStream: stream, logFolded: [...open], logQueries: [...expanded], logDetails: [...detailOpen], logLong: [...longOpen] });
 	});
 
 	/** A node line's queries (its build statements, not its checks'), or a query row's own statement. */
@@ -164,7 +180,8 @@
 		const url = URL.createObjectURL(new Blob([text + '\n'], { type: 'text/plain' }));
 		const a = document.createElement('a');
 		a.href = url;
-		a.download = `${runId}${filteredBy.length ? `-${filteredBy.join('-')}` : ''}.log`;
+		const node = termValue('node');
+		a.download = `${runId}${node ? `-${node}` : ''}.log`;
 		a.click();
 		URL.revokeObjectURL(url);
 	}
@@ -179,6 +196,7 @@
 </script>
 
 <!-- Controls right after what they act on, from the left: what to show, then narrow it. -->
+<div class="log-head">
 <div class="filters">
 	{#if hasOutput}
 		<SegmentedFilter
@@ -221,10 +239,19 @@
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>
 	{/if}
-	{#if errors}<Button variant="link" size="inline" class="count err" onclick={() => setTerm('level', level === 'error' ? null : 'error')} title="Show only errors">Errors {errors}</Button>{/if}
-	{#if warnings}<Button variant="link" size="inline" class="count warn" onclick={() => setTerm('level', level === 'warn' ? null : 'warn')} title="Show only warnings">Warnings {warnings}</Button>{/if}
+	<!-- The same button pressed or not: pressed is a background only, so the toolbar never moves. -->
+	{#if errors}<Button variant="ghost" size="sm" class={errorsOn ? 'count err on sb-pressed' : 'count err'} aria-pressed={errorsOn} onclick={toggleErrors} title={errorsOn ? 'Take level:error out of the filter' : 'Filter the log: level:error'}>Errors {errors}</Button>{/if}
+	{#if warnings}<Button variant="ghost" size="sm" class={warningsOn ? 'count warn on sb-pressed' : 'count warn'} aria-pressed={warningsOn} onclick={() => (query = toggleText(query, QUICK.warnings.text))} title={warningsOn ? 'Take level:warn out of the filter' : 'Filter the log: level:warn'}>Warnings {warnings}</Button>{/if}
 	<span class="grow"></span>
 	<Button variant="ghost" size="sm" onclick={download} disabled={!shown.length} title="Download the rows shown as a text file"><DownloadIcon />Download</Button>
+</div>
+
+<!-- The Showing line's own slot, there whether or not a filter is on, so nothing above or below it moves. -->
+<div class="filter-slot">
+	{#if showing}
+		<ActiveFilter what={showing.label} typed={showing.typed} shown={shown.length} total={modeEntries.length} noun="event" onclear={() => (query = '')} testid="log-filter-active" />
+	{/if}
+</div>
 </div>
 
 <DataTable class="static compact log" embedded columns={logColumns} rows={shown} key={(e) => e.id} empty={entries.length ? 'Nothing in the log matches these filters.' : 'Nothing logged yet.'}>
@@ -328,10 +355,19 @@
 
 <style>
 	/* Calmer: no rules between rows, one text size, muted secondary text, room around the toolbar. */
-	.filters {
+	.log-head {
 		position: sticky;
 		top: 0;
 		z-index: 6;
+		background: var(--background);
+	}
+	.filter-slot {
+		height: 26px;
+	}
+	.filter-slot > :global(.active-filter) {
+		height: 100%;
+	}
+	.filters {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
@@ -339,8 +375,12 @@
 		padding: 10px 24px;
 		background: var(--background);
 	}
+	/* A fixed width, so a label that changes (Levels → Errors, Kinds → audit) moves nothing after it. */
 	.filters :global(.menu-trigger) {
 		display: inline-flex;
+		width: 84px;
+		justify-content: space-between;
+		overflow: hidden;
 		align-items: center;
 		gap: 4px;
 		padding: 3px 4px;
@@ -362,6 +402,14 @@
 	.filters :global(.count.err) {
 		color: var(--sb-error);
 	}
+	/* Pressed (`sb-pressed`), in the error colour. */
+	.filters :global(.count.err.on) {
+		--pressed-tone: var(--sb-error);
+	}
+	.filters :global(.count.warn.on) {
+		--pressed-tone: var(--sb-warning);
+	}
+
 	.filters :global(.count.warn) {
 		color: var(--sb-warning);
 	}

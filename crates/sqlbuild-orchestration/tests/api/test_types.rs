@@ -312,6 +312,8 @@ pub(crate) struct UiAssetTestCase {
     pub(crate) expected_status: u16,
     pub(crate) expected_body: &'static str,
     pub(crate) expected_cache: Option<&'static str>,
+    /// Whether the response carries the UI's content security policy.
+    pub(crate) expected_policy: bool,
 }
 
 pub(crate) struct UiPathTestCase {

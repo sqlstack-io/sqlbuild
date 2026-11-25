@@ -83,7 +83,6 @@ pub enum RunEventKind {
     Completed,
     Success,
     Warn,
-    Partial,
     Failed,
     Cancelled,
     /// A group member the group did not run because a job it depends on failed.
@@ -97,7 +96,6 @@ impl RunEventKind {
             Self::Completed => "completed",
             Self::Success => "success",
             Self::Warn => "warn",
-            Self::Partial => "partial",
             Self::Failed => "failed",
             Self::Cancelled => "cancelled",
             Self::Skipped => "skipped",
@@ -111,7 +109,6 @@ impl RunEventKind {
             (Self::Completed, _)
                 | (Self::Success, RunOutcome::Success)
                 | (Self::Warn, RunOutcome::Warn)
-                | (Self::Partial, RunOutcome::Partial)
                 | (Self::Failed, RunOutcome::Failed)
                 | (Self::Cancelled, RunOutcome::Cancelled)
                 | (Self::Skipped, RunOutcome::Skipped)

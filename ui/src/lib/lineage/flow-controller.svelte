@@ -15,8 +15,11 @@
 		setViewport = $bindable(),
 		fitted = $bindable(false),
 		fitFloor,
-		readable = false
+		readable = false,
+		minFitZoom
 	}: {
+		/** The lowest zoom the readable fit opens at, whatever the graph's size: a page that wants names to read. */
+		minFitZoom?: number;
 		fitView?: (opts?: { duration?: number }) => void;
 		viewport?: Viewport;
 		setViewport?: (v: Viewport) => void;
@@ -54,7 +57,7 @@
 		const anchorId = focus ? rects.find((r) => r.box && r.x === focus.x && r.y === focus.y)?.id : start?.id;
 		store.domNode?.setAttribute('data-fit-anchor', anchorId ?? '');
 		// A modest graph is shown whole; a larger one opens readable on its start card.
-		const minZoom = all.length <= WHOLE_FIT_CARDS ? LABEL_MIN_ZOOM : fitFloor;
+		const minZoom = Math.max((all.length <= WHOLE_FIT_CARDS ? LABEL_MIN_ZOOM : fitFloor) ?? 0, minFitZoom ?? 0);
 		void flow.setViewport(fitViewport(bounds, width, height, { minZoom, focus, start }), { duration });
 		return true;
 	}
