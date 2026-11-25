@@ -232,7 +232,7 @@ export class MockBuild {
 		const count = Math.min(evaluation.evidenceCount ?? 0, 10);
 		const rows = Array.from({ length: count }, (_, i) => columns.map((col) => evidenceValue(col, hash(`${evaluationId}/${i}`))));
 		this.#ctx.platform.recordEvidenceRead(scope, checkId, `Read ${count} evidence rows of ${spec.name} (${evaluationId})`);
-		return this.#ctx.reply({ evaluationId, columns, rows, truncated: evaluation.evidenceTruncated || (evaluation.evidenceCount ?? 0) > count });
+		return this.#ctx.reply({ evaluationId, columns, rows, truncated: evaluation.evidenceTruncated || (evaluation.evidenceCount ?? 0) > count, executionError: null });
 	}
 
 	// ---- change feed ----

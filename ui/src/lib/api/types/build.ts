@@ -338,6 +338,8 @@ export type CheckEvidence = {
 	/** JSON cells: scalars, or objects and arrays from structured warehouse columns. */
 	rows: unknown[][];
 	truncated: boolean;
+	/** The warehouse's error when the audit's query could not run, SQLSTATE included; null when it ran. */
+	executionError: string | null;
 };
 
 // ---- change feed (snapshot diffs per deploy) ----

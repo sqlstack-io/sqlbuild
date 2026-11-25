@@ -2112,6 +2112,11 @@ export interface components {
             columns: string[];
             /** Format: uuid */
             event_id: string;
+            /**
+             * @description The warehouse's error when the audit's query could not run, SQLSTATE included, redacted and
+             *     bounded like a node's error text; `None` when it ran.
+             */
+            execution_error?: string | null;
             /** @description Scalar cells aligned to `columns`; a row without a key holds null there. */
             rows: Record<string, never>[][];
             truncated?: string | null;

@@ -52,7 +52,9 @@ describe('check mapping', () => {
 
 	it('keeps evidence cells aligned to their columns', () => {
 		const evidence = toCheckEvidence({ binding_key: 'b', event_id: 'e1', columns: ['id', 'note'], rows: [[7, null]] as never, truncated: 'true' });
-		expect([evidence.rows, evidence.truncated]).toEqual([[[7, null]], true]);
+		expect([evidence.rows, evidence.truncated, evidence.executionError]).toEqual([[[7, null]], true, null]);
+		const errored = toCheckEvidence({ binding_key: 'b', event_id: 'e2', columns: [], rows: [], truncated: 'false', execution_error: "002003 (42S02): Object 'X' does not exist" });
+		expect(errored.executionError).toBe("002003 (42S02): Object 'X' does not exist");
 	});
 
 	it('shortens an sqb run id to its random suffix, not its date', () => {

@@ -98,6 +98,9 @@ pub struct CheckEvidence {
     #[schema(value_type = Vec<Vec<Object>>)]
     pub rows: Vec<Vec<serde_json::Value>>,
     pub truncated: Option<String>,
+    /// The warehouse's error when the audit's query could not run, SQLSTATE included, redacted and
+    /// bounded like a node's error text; `None` when it ran.
+    pub execution_error: Option<String>,
 }
 
 /// One old-name view step as people read it: copied grants are counted, never returned as statements.
