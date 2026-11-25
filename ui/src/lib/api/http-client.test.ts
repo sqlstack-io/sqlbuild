@@ -583,7 +583,7 @@ describe('locations', () => {
 						overdue_ticks: []
 					});
 				if (path.includes('/targets/preview/')) return Response.json({ error: 'refused' }, { status: 403 });
-				if (path.endsWith('/health')) return Response.json([report('s-2', 10), report('s-1', 400), report('s-2', 20)]);
+				if (path.endsWith('/health')) return Response.json({ state: 'healthy', observations: [report('s-2', 10), report('s-1', 400), report('s-2', 20)] });
 				return Response.json([]);
 			})
 		);
@@ -608,7 +608,7 @@ describe('locations', () => {
 		expect(paths.some((p) => p.endsWith('/health'))).toBe(false);
 	});
 
-	it('counts open problems per location target', async () => {
+	it("counts open problems per location target, with the server's state of each", async () => {
 		const listed = await server().client.listLocations();
 		expect(listed.map((l) => [l.id, l.activeProblems, l.health])).toEqual([
 			['0191f0aa-orders:development', 1, 'healthy'],
@@ -1093,7 +1093,7 @@ describe('listWarehouseConnections', () => {
 				if (path.endsWith('/bootstrap')) return Response.json({ login_mode: 'password', access: { name: 'ada', principal_id: 'p', actions: [], locations: [access('development'), access('preview')] } });
 				if (path.endsWith('/health')) {
 					health.push(path);
-					return path.includes('/targets/preview/') ? Response.json({ error: 'refused' }, { status: 403 }) : Response.json([]);
+					return path.includes('/targets/preview/') ? Response.json({ error: 'refused' }, { status: 403 }) : Response.json({ state: 'healthy', observations: [] });
 				}
 				return Response.json([]);
 			})

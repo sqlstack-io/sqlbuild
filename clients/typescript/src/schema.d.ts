@@ -3387,6 +3387,12 @@ export interface components {
             /** Format: uuid */
             principal_id: string;
         };
+        /** @description A target's health as people read it: its state, computed only here, and the newest observations it was computed from. */
+        PersonLocationHealth: {
+            /** @description Newest first, with this server's pool-cap warning on the current snapshot. */
+            observations: components["schemas"]["LocationHealthObservation"][];
+            state: components["schemas"]["LocationState"];
+        };
         /** @description A stored platform event a person may see; the location target is absent for server-wide events. */
         PersonPlatformEvent: {
             event: components["schemas"]["PlatformEvent"];
@@ -7178,13 +7184,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description This target's newest health observations and instance check-ins */
+            /** @description This target's state and the newest health observations and instance check-ins it was computed from */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["LocationHealthObservation"][];
+                    "application/json": components["schemas"]["PersonLocationHealth"];
                 };
             };
             /** @description Session rejected */

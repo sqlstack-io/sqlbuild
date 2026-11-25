@@ -12,64 +12,16 @@ function latestOf<K extends Wire['LocationHealth']['kind']>(observations: Wire['
 	return observations.find((o) => o.report.health.kind === kind) as (Wire['LocationHealthObservation'] & { report: { health: Extract<Wire['LocationHealth'], { kind: K }> } }) | undefined;
 }
 
-/** The most observations a health read keeps, and how long location reports are kept. */
-const HEALTH_READ_LIMIT = 100;
-const RETENTION_MS = 7 * 24 * 3_600_000;
-
-/** When the process that made a time-ordered (v7) session ID started, or null for another ID. */
-function sessionStarted(session: string): number | null {
-	const hex = session.replaceAll('-', '');
-	return /^[0-9a-f]{32}$/i.test(hex) && hex[12] === '7' ? parseInt(hex.slice(0, 12), 16) : null;
-}
-
-const isLoad = (o: Wire['LocationHealthObservation']) => o.report.health.kind === 'compile_failed' || o.report.health.kind === 'connection';
-
 /**
- * The newest live instance's own observations, `'starting'` until its first load ends, or all of them
- * when the history can't tell (an instance whose start is no longer kept). As the server's `LocationState`.
+ * How many instances checked in within the live window, and the newest check-in. The server's own
+ * pool-cap warning and failed-plan record are not check-ins. The target's health is the server's
+ * `state`; it is never worked out here.
  */
-function currentInstance(observations: Wire['LocationHealthObservation'][], live: Set<string>, now: number): Wire['LocationHealthObservation'][] | 'starting' {
-	const session = [...live].sort().at(-1);
-	if (!session) return observations;
-	const own = observations.filter((o) => o.report.session_id === session);
-	if (own.some(isLoad)) return own;
-	const started = sessionStarted(session);
-	if (started === null || now - started > RETENTION_MS) return observations;
-	const covered = observations.length < HEALTH_READ_LIMIT || observations.some((o) => o.report.health.kind !== 'heartbeat' && Date.parse(o.received_at) <= started);
-	return covered ? 'starting' : observations;
-}
-
-/** Health from the newest observations: down without a recent check-in, then starting until the newest instance's first load ends, then from that instance's own reports load failures, missing provider secrets, a failed plan of what changed, failed discover functions, then connection failures. */
-export function healthOf(observations: Wire['LocationHealthObservation'][], now: number): { health: LocationHealth; liveInstances: number; lastSeenAt: string | null } {
-	// The server's own pool-cap warning and failed-plan record are not location check-ins.
-	const derived = (o: Wire['LocationHealthObservation']) => o.report.health.kind === 'pool_capped' || o.report.health.kind === 'change_plan_failed';
-	const reported = observations.filter((o) => !derived(o));
+export function checkInsOf(observations: Wire['LocationHealthObservation'][], now: number): { liveInstances: number; lastSeenAt: string | null } {
+	const reported = observations.filter((o) => o.report.health.kind !== 'pool_capped' && o.report.health.kind !== 'change_plan_failed');
 	const live = new Set(reported.filter((o) => now - Date.parse(o.received_at) <= LIVE_WINDOW_MS).map((o) => o.report.session_id));
 	const lastSeenAt = reported.reduce<string | null>((latest, o) => (!latest || o.received_at > latest ? o.received_at : latest), null);
-	const liveSessions = new Set(reported.filter((o) => o.report.health.kind === 'heartbeat' && now - Date.parse(o.received_at) <= LIVE_WINDOW_MS).map((o) => o.report.session_id));
-	const own = live.size ? currentInstance(reported, liveSessions, now) : reported;
-	if (own === 'starting') return { health: 'starting', liveInstances: live.size, lastSeenAt };
-	// The newest load report by arrival decides (observations come newest first): a failed load, or the
-	// connection check after a publication. Failed loads keep the generation they tried, so generations can't order them.
-	const load = own.find(isLoad);
-	const connection = load?.report.health.kind === 'connection' ? load.report.health : null;
-	const secrets = latestOf(own, 'provider_secrets');
-	const discovery = latestOf(own, 'discovery');
-	const planFailed = observations.some((o) => o.report.health.kind === 'change_plan_failed');
-	const health: LocationHealth = !live.size
-		? 'broken'
-		: load?.report.health.kind === 'compile_failed'
-			? 'falling_back'
-			: secrets && secrets.report.health.missing > 0
-				? 'missing_secrets'
-				: planFailed
-					? 'change_plan_failed'
-					: discovery && discovery.report.health.sets.some((set) => set.status === 'failed')
-						? 'discovery_failed'
-						: connection && !connection.healthy
-							? 'degraded'
-							: 'healthy';
-	return { health, liveInstances: live.size, lastSeenAt };
+	return { liveInstances: live.size, lastSeenAt };
 }
 
 /** The providers the newest provider check found missing secrets, problems before those the target allows. */
@@ -166,15 +118,16 @@ export function snapshotOf(published: Wire['PublishedSnapshot'] | null): Snapsho
 		: null;
 }
 
-/** `observations` is null when the person may not list the whole target; `activeProblems` counts the problems read's events. */
+/** `read` is null when the person may not list the whole target; `activeProblems` counts the problems read's events. */
 export function toLocationSummary(
 	location: Location,
-	observations: Wire['LocationHealthObservation'][] | null,
+	read: Wire['PersonLocationHealth'] | null,
 	published: Wire['PublishedSnapshot'] | null,
 	activeProblems: number,
 	now: number
 ): LocationSummary {
-	const known = observations ? healthOf(observations, now) : { health: null, liveInstances: 0, lastSeenAt: null };
+	const observations = read?.observations ?? null;
+	const known = read ? { health: read.state, ...checkInsOf(read.observations, now) } : { health: null, liveInstances: 0, lastSeenAt: null };
 	return {
 		id: location.id,
 		name: location.name,
@@ -217,8 +170,8 @@ export function loadErrorOf(observations: Wire['LocationHealthObservation'][], h
 	return [`Compile failed: ${rules.finding_count} ${noun}`, ...lines, ...(more > 0 ? [`… and ${more} more`] : [])].join('\n');
 }
 
-export function toLocationDetail(location: Location, observations: Wire['LocationHealthObservation'][], published: Wire['PublishedSnapshot'] | null, now: number): LocationDetail {
-	const { health } = healthOf(observations, now);
+export function toLocationDetail(location: Location, read: Wire['PersonLocationHealth'], published: Wire['PublishedSnapshot'] | null, now: number): LocationDetail {
+	const { observations, state: health } = read;
 	return {
 		id: location.id,
 		name: location.name,

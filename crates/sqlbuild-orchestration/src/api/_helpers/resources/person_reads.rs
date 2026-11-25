@@ -30,9 +30,7 @@ use crate::node_states::models::{NodeStateCache, NodeStatesRecord};
 use crate::platform::main::health::read_person_location_health::read_person_location_health;
 use crate::platform::main::person_reads::list_person_platform_events::list_person_platform_events;
 use crate::platform::main::person_reads::read_person_problems::read_person_problems;
-use crate::platform::models::{
-    LocationHealthObservation, PersonPlatformEventPage, PlatformProblems,
-};
+use crate::platform::models::{PersonLocationHealth, PersonPlatformEventPage, PlatformProblems};
 use crate::run_output::main::download_person_output::download_person_output;
 use crate::run_output::main::read_person_output_index::read_person_output_index;
 use crate::run_output::main::read_person_output_page::read_person_output_page;
@@ -820,7 +818,7 @@ pub(crate) async fn snapshots(
 
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/health", operation_id = "readPersonLocationHealth",
     params(("location_id" = Uuid, Path), ("target" = String, Path)),
-    responses((status = 200, body = Vec<LocationHealthObservation>, description = "This target's newest health observations and instance check-ins"),
+    responses((status = 200, body = PersonLocationHealth, description = "This target's state and the newest health observations and instance check-ins it was computed from"),
         (status = 401, description = "Session rejected"),
         (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn health(
@@ -828,7 +826,7 @@ pub(crate) async fn health(
     (Extension(default_role), Extension(facts)): (Extension<DefaultRole>, Extension<ServerFacts>),
     Path((location_id, target)): Path<(Uuid, String)>,
     Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
-) -> Result<Json<Vec<LocationHealthObservation>>, ApiError> {
+) -> Result<Json<PersonLocationHealth>, ApiError> {
     Ok(Json(
         read_person_location_health(
             &store,

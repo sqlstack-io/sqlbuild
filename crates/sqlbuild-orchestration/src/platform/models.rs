@@ -198,6 +198,14 @@ pub struct LocationHealthObservation {
     pub report: LocationHealthReport,
 }
 
+/// A target's health as people read it: its state, computed only here, and the newest observations it was computed from.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PersonLocationHealth {
+    pub state: LocationState,
+    /// Newest first, with this server's pool-cap warning on the current snapshot.
+    pub observations: Vec<LocationHealthObservation>,
+}
+
 /// One target's state from its newest health observations, as the web UI shows it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
