@@ -15,7 +15,6 @@ use sqlbuild_core::audit_command::models::AuditCounts;
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::{AuditExecutionResult, AuditOutcome};
-use sqlbuild_orchestration::runs::models::NodeOutcome;
 
 use crate::bindings::_helpers::command_runtime::invocation::resolve_reported_command_invocation;
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
@@ -33,11 +32,11 @@ use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_compile::compile_driver::main::setup::build_static_pipeline_result::build_static_pipeline_result;
 use sqlbuild_python_front::command_runtime::main::resolve_concurrency::resolve_concurrency;
 use sqlbuild_python_front::cost_context::models::CostContext;
+use sqlbuild_python_output::build_progress::main::audit_check::audit_check;
 use sqlbuild_python_output::build_progress::main::write_execution_header::write_execution_header;
 use sqlbuild_python_output::build_progress::models::AuditProgressReporter;
 use sqlbuild_python_output::build_progress::models::ConnectionProgressReporter;
 use sqlbuild_python_output::result_output::main::events::audit_identity::audit_identity;
-use sqlbuild_python_output::result_output::main::results::audit_check_id::audit_check_id;
 use sqlbuild_python_output::result_output::main::results::audit_execution_json::audit_execution_json;
 use sqlbuild_python_output::result_output::main::results::audit_projection::audit_projection;
 use sqlbuild_python_output::result_output::main::results::write_execution_json_output::write_execution_json_output;
@@ -74,14 +73,8 @@ struct AuditCallbackRelay {
 impl AuditCallbackRelay {
     fn on_result(&self, py: Python<'_>, result: Bound<'_, PyAny>) -> PyResult<()> {
         if let Some(worker) = &self.worker {
-            let outcome = match AuditExecutionResult::read(&result)?.outcome {
-                AuditOutcome::Pass => NodeOutcome::Success,
-                AuditOutcome::Warn | AuditOutcome::Insufficient => NodeOutcome::Warn,
-                AuditOutcome::Skipped => NodeOutcome::Skipped,
-                AuditOutcome::NotRun => NodeOutcome::NotRun,
-                AuditOutcome::Error => NodeOutcome::Failed,
-            };
-            worker.finish_attached(py, &audit_check_id(&result)?, outcome)?;
+            let (key, outcome) = audit_check(worker, &result)?;
+            worker.finish_attached(py, &key, outcome)?;
         }
         call_with(
             &self.event_writer.bind(py).getattr("write_build_result")?,

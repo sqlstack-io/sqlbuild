@@ -1,3 +1,4 @@
+pub mod audit_check;
 pub mod batch_complete_callback;
 pub mod build_result_text;
 pub mod check_callback;

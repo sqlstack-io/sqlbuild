@@ -1,15 +1,14 @@
 //! A worker build reports each audit and SQL test it ran as a check result, as `sqb audit` and `sqb test` do, without checking for a cancel: the build is already finishing.
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
-use sqlbuild_host::models::{AuditExecutionResult, AuditOutcome, SqlTestOutcome};
+use sqlbuild_host::models::SqlTestOutcome;
 use sqlbuild_host::types::ResultEnum;
 use sqlbuild_orchestration::runs::models::NodeOutcome;
-use sqlbuild_python_base::native_host::types::ReadResult;
 use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
 
+use crate::build_progress::main::audit_check::audit_check;
 use crate::result_output::main::events::sql_test_identity::sql_test_identity;
-use crate::result_output::main::results::audit_check_id::audit_check_id;
 
 /// Record the outcome of every audit and SQL unit test in `executor_result`, the build's result, so check sensors and run events see them; a singular audit reports under its own `audit:<name>`, and a check the snapshot doesn't record is skipped.
 pub fn report_build_checks(
@@ -33,19 +32,7 @@ pub fn report_build_checks(
         );
     }
     for audit in audits {
-        let outcome = match AuditExecutionResult::read(&audit)?.outcome {
-            AuditOutcome::Pass => NodeOutcome::Success,
-            AuditOutcome::Warn | AuditOutcome::Insufficient => NodeOutcome::Warn,
-            AuditOutcome::Skipped => NodeOutcome::Skipped,
-            AuditOutcome::NotRun => NodeOutcome::NotRun,
-            AuditOutcome::Error => NodeOutcome::Failed,
-        };
-        let attached: String = audit_check_id(&audit)?;
-        let key: String = if worker.records_check(&attached) {
-            attached
-        } else {
-            format!("audit:{}", field(&audit, "audit_name")?.str()?)
-        };
+        let (key, outcome) = audit_check(worker, &audit)?;
         worker.report_attached(py, &key, outcome)?;
     }
     for test in field(executor_result, "test_results")?.try_iter()? {
