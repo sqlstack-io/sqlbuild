@@ -694,6 +694,17 @@ class RunOnTextE2ETestCase:
 
 
 @dataclass(frozen=True)
+class RunOnFallbackProgressE2ETestCase:
+    """An `auto` run whose local attempt falls back: its final row and how often lines appear."""
+
+    description: str
+    concurrency: str
+    expected_row: str
+    expected_starts: int
+    expected_assertion_lines: int
+
+
+@dataclass(frozen=True)
 class ScenarioRunOnFlagsE2ETestCase:
     """A `sqb scenario test` flag combination the command refuses."""
 

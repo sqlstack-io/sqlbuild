@@ -491,8 +491,8 @@ Some problems only show when a test runs. SQLQuack's converted SQL raises, inste
 different value, for inputs DuckDB would read differently from Snowflake, and DuckDB can fail with
 an internal error on SQL it accepted. In `auto` such a test runs again on the warehouse, with the
 reason `SQLQuack guard: <name>`, such as `SQLQuack guard: array_agg_order`, or
-`DuckDB internal error: <message>`. With `--run-on local` it is an `ERROR` (`T007`) that names
-the guard. An error Snowflake would raise too, such as a value that isn't a number, is the test's
+`DuckDB internal error: <message>`. The local attempt prints nothing; the test's row shows
+`warehouse  (<reason>)`. With `--run-on local` it is an `ERROR` (`T007`) that names the guard. An error Snowflake would raise too, such as a value that isn't a number, is the test's
 own result wherever it runs.
 
 ## Skipping SQL analysis

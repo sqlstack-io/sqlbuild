@@ -11,6 +11,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.scenario.helpers import (
     build_scenario_project_files,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.test._test_types import (
+    RunOnFallbackProgressE2ETestCase,
     RunOnLocalJsonE2ETestCase,
     RunOnPrecedenceE2ETestCase,
     RunOnTextE2ETestCase,
@@ -310,6 +311,60 @@ def test_given_snowflake_test_whose_guard_raises_when_testing_then_it_needs_the_
     output: str = _DURATION.sub("", result.stdout + result.stderr)
     assert result.returncode == test_case.expected_exit_code, output
     assert test_case.expected_text in output, output
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    (
+        RunOnFallbackProgressE2ETestCase(
+            description="one test at a time",
+            concurrency="1",
+            expected_row=(
+                "test_order_statuses                                ERROR  warehouse"
+                "  (SQLQuack guard: array_agg_order)  1 real model\n"
+            ),
+            expected_starts=1,
+            expected_assertion_lines=0,
+        ),
+        RunOnFallbackProgressE2ETestCase(
+            description="four tests at a time",
+            concurrency="4",
+            expected_row=(
+                "test_order_statuses                                ERROR  warehouse"
+                "  (SQLQuack guard: array_agg_order)  1 real model\n"
+            ),
+            expected_starts=1,
+            expected_assertion_lines=0,
+        ),
+    ),
+    ids=lambda case: case.description,
+)
+def test_given_auto_test_that_falls_back_when_testing_then_only_its_warehouse_attempt_shows(
+    tmp_path: Path, test_case: RunOnFallbackProgressE2ETestCase
+) -> None:
+    project: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="run_on_snowflake_fallback_progress",
+        repo_files={**SNOWFLAKE_FILES, **GUARDED_FILES},
+    )
+
+    result: CompletedProcess[str] = run_sqb(
+        command=(
+            "--no-color",
+            "test",
+            "--sql",
+            "--concurrency",
+            test_case.concurrency,
+            "--select",
+            "test_order_statuses",
+        ),
+        project_dir=project,
+    )
+
+    output: str = _DURATION.sub("", result.stdout + result.stderr)
+    assert test_case.expected_row in output, output
+    assert output.count("test_order_statuses START") == test_case.expected_starts, output
+    assert output.count("SQL test assertion") == test_case.expected_assertion_lines, output
 
 
 @pytest.mark.parametrize(

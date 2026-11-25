@@ -49,6 +49,7 @@ use sqlbuild_core::progress::models::ProgressProjection;
 use sqlbuild_core::progress::models::ProgressSettings;
 use sqlbuild_core::progress::models::StatementSummary;
 use sqlbuild_core::terminal_events::models::TerminalRequest;
+use std::collections::HashMap;
 use std::sync::Mutex;
 use std::sync::MutexGuard;
 use std::sync::PoisonError;
@@ -62,6 +63,15 @@ pub struct NativeProgressProjector {
     pub(crate) coordinator: Py<PyAny>,
     /// The lines held back instead of written, while something holds them.
     pub(crate) held: Mutex<Option<Vec<String>>>,
+    /// Each resource's lines held back until its result is known, while resources are held.
+    pub(crate) held_by_resource: Mutex<Option<HeldResourceLines>>,
+}
+
+/// Lines held back per resource, in the order resources first wrote one.
+#[derive(Debug, Default)]
+pub(crate) struct HeldResourceLines {
+    pub(crate) order: Vec<String>,
+    pub(crate) lines: HashMap<String, Vec<String>>,
 }
 
 impl NativeProgressProjector {
@@ -96,6 +106,47 @@ impl NativeProgressProjector {
         Ok(())
     }
 
+    fn held_by_resource(&self) -> MutexGuard<'_, Option<HeldResourceLines>> {
+        self.held_by_resource
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// Hold back each resource's lines from now on until `release_resource` or `discard_resource`.
+    pub fn hold_resources(&self) {
+        *self.held_by_resource() = Some(HeldResourceLines::default());
+    }
+
+    /// Write the lines held back for `resource_id`, as they would have been written.
+    pub fn release_resource(&self, py: Python<'_>, resource_id: &str) -> PyResult<()> {
+        let lines: Vec<String> = match self.held_by_resource().as_mut() {
+            Some(held) => held.lines.remove(resource_id).unwrap_or_default(),
+            None => Vec::new(),
+        };
+        self.write_held(py, &lines)
+    }
+
+    /// Drop the lines held back for `resource_id`, and never render that attempt's terminal.
+    pub fn discard_resource(&self, resource_id: &str) -> PyResult<()> {
+        if let Some(held) = self.held_by_resource().as_mut() {
+            held.lines.remove(resource_id);
+        }
+        self.locked()?.forget_resource_attempts(resource_id);
+        Ok(())
+    }
+
+    /// Write lines as they come again, first writing every resource's lines still held back.
+    pub fn stop_holding_resources(&self, py: Python<'_>) -> PyResult<()> {
+        let Some(mut held) = self.held_by_resource().take() else {
+            return Ok(());
+        };
+        for resource_id in std::mem::take(&mut held.order) {
+            let lines: Vec<String> = held.lines.remove(&resource_id).unwrap_or_default();
+            self.write_held(py, &lines)?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn locked(&self) -> PyResult<MutexGuard<'_, ProgressProjection>> {
         self.state
             .lock()
@@ -106,6 +157,16 @@ impl NativeProgressProjector {
     pub(crate) fn write_with<T>(
         &self,
         py: Python<'_>,
+        update: impl FnOnce(ProgressProjection) -> (ProgressProjection, Vec<String>, T),
+    ) -> PyResult<T> {
+        self.write_for(py, None, update)
+    }
+
+    /// `write_with` for lines about `resource_id`, which wait while resources are held.
+    pub(crate) fn write_for<T>(
+        &self,
+        py: Python<'_>,
+        resource_id: Option<&str>,
         update: impl FnOnce(ProgressProjection) -> (ProgressProjection, Vec<String>, T),
     ) -> PyResult<T> {
         let coordinator: &Bound<'_, PyAny> = self.coordinator.bind(py);
@@ -120,6 +181,18 @@ impl NativeProgressProjector {
             };
             for line in lines {
                 let text: String = format!("{line}\n");
+                if let (Some(resource_id), Some(held)) =
+                    (resource_id, self.held_by_resource().as_mut())
+                {
+                    if !held.lines.contains_key(resource_id) {
+                        held.order.push(resource_id.to_owned());
+                    }
+                    held.lines
+                        .entry(resource_id.to_owned())
+                        .or_default()
+                        .push(text);
+                    continue;
+                }
                 if let Some(held) = self.held().as_mut() {
                     held.push(text);
                     continue;
@@ -158,6 +231,7 @@ impl NativeProgressProjector {
             stream: stream.unbind(),
             coordinator: coordinator.unbind(),
             held: Mutex::new(None),
+            held_by_resource: Mutex::new(None),
         })
     }
 
@@ -215,7 +289,7 @@ impl NativeProgressProjector {
     /// Consume one known lifecycle fact idempotently.
     pub(crate) fn consume(&self, py: Python<'_>, event: &Bound<'_, PyAny>) -> PyResult<()> {
         let event: ProgressEvent = progress_event(event)?;
-        self.write_with(py, |projection| {
+        self.write_for(py, event.resource_id.as_deref(), |projection| {
             let (projection, lines) = consume_progress_event(projection, &event);
             (projection, lines, ())
         })

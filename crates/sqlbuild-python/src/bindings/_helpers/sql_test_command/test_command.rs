@@ -81,10 +81,12 @@ use sqlbuild_python_front::command_runtime::main::resolve_concurrency::resolve_c
 use sqlbuild_python_front::command_runtime::main::resolve_run_on::resolve_run_on;
 use sqlbuild_python_output::build_progress::main::format_expectation_detail::format_expectation_detail;
 use sqlbuild_python_output::build_progress::main::format_expectation_name::format_expectation_name;
+use sqlbuild_python_output::build_progress::main::local_attempt::local_attempt;
 use sqlbuild_python_output::build_progress::main::test_label::test_label;
 use sqlbuild_python_output::build_progress::main::test_result_label::test_result_label;
 use sqlbuild_python_output::build_progress::main::write_execution_header::write_execution_header;
 use sqlbuild_python_output::build_progress::models::ConnectionProgressReporter;
+use sqlbuild_python_output::build_progress::models::LocalAttemptStep;
 use sqlbuild_python_output::build_progress::models::NestedCommandProgressCallbacks;
 use sqlbuild_python_output::result_output::main::events::sql_test_identity::sql_test_identity;
 use sqlbuild_python_output::result_output::main::results::test_execution_json::test_execution_json;
@@ -244,11 +246,11 @@ impl TestCallbackRelay {
     }
 
     fn on_test_complete(&self, py: Python<'_>, result: &Bound<'_, PyAny>) -> PyResult<()> {
-        if let (true, Some((name, _))) = (self.fallback, local_refusal(result)?) {
+        if let (true, Some((name, refusal))) = (self.fallback, local_refusal(result)?) {
             let mut run_on = self.run_on.lock().unwrap_or_else(PoisonError::into_inner);
             if run_on.get(&name).map(String::as_str) == Some(LOCAL_RUN_ON) {
-                run_on.insert(name, WAREHOUSE_RUN_ON.to_owned());
-                return Ok(());
+                run_on.insert(name, format!("{WAREHOUSE_RUN_ON}  ({})", refusal.title()));
+                return local_attempt(self.progress.bind(py), LocalAttemptStep::Abandon(result));
             }
         }
         let mut group: String = String::new();
@@ -782,7 +784,12 @@ fn run_tests<'py>(
             )?;
             let memory: Bound<'py, PyDict> = PyDict::new(py);
             memory.set_item("database", ":memory:")?;
-            for result in run(&local, (adapter, memory.into_any()), false)? {
+            let progress: &Bound<'py, PyAny> = relay.get().progress.bind(py);
+            local_attempt(progress, LocalAttemptStep::Hold(warehouse_optional))?;
+            let ran: PyResult<Vec<Bound<'py, PyAny>>> =
+                run(&local, (adapter, memory.into_any()), false);
+            local_attempt(progress, LocalAttemptStep::Release)?;
+            for result in ran? {
                 let Some((name, refusal)) = local_refusal(&result)? else {
                     results.push(result);
                     continue;
