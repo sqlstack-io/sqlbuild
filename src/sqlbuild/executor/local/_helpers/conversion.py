@@ -19,7 +19,7 @@ from sqlquack.api.constants import DEFAULT_PATH
 
 from sqlbuild.executor.local.classes.empty_duckdb import EmptyDuckDb
 from sqlbuild.executor.local.constants import TIMEZONE_PARAMETER, UTC_TIME_ZONE
-from sqlbuild.executor.local.models import LocalConversion, LocalSqlCheck, LocalWorkCounts
+from sqlbuild.executor.local.models import ConvertedSql, LocalSqlCheck, LocalWorkCounts
 
 _PARALLEL_MINIMUM: int = 8
 _MAX_WORKERS: int = 4
@@ -137,10 +137,10 @@ def use_conversion_cache(directory: Path | None) -> None:
 
 def converted(
     *, sql: str, schema: Mapping[str, Any] | None, time_zone: str | None, path: str
-) -> LocalConversion:
+) -> ConvertedSql:
     """SQLQuack's conversion of `sql`: DuckDB SQL and its macros, or the refusals."""
 
-    conversion: LocalConversion | None = local_check(
+    conversion: ConvertedSql | None = local_check(
         sql=sql, schema=schema, time_zone=time_zone, path=path
     ).conversion
     assert conversion is not None
@@ -227,7 +227,7 @@ def check_all(
 
 
 def warehouse_relations(
-    *, sql: str, schema: Mapping[str, Any] | None, conversion: LocalConversion
+    *, sql: str, schema: Mapping[str, Any] | None, conversion: ConvertedSql
 ) -> tuple[str, ...]:
     """Declared relations the converted SQL names in full, not via a fixture CTE: warehouse-only."""
 
@@ -271,7 +271,7 @@ def _check(job: _CheckJob, *, empty: EmptyDuckDb, path: str) -> LocalSqlCheck:
         path=path,
     )
     return LocalSqlCheck(
-        conversion=LocalConversion(
+        conversion=ConvertedSql(
             converted=conversion.converted,
             sql=conversion.sql,
             macros=tuple(conversion.macros),
@@ -309,7 +309,7 @@ def _stored(job: _CheckJob) -> LocalSqlCheck | None:
     except (OSError, ValueError):
         return None
     return LocalSqlCheck(
-        conversion=LocalConversion(
+        conversion=ConvertedSql(
             converted=bool(kept["converted"]),
             sql=str(kept["sql"]),
             macros=tuple(kept["macros"]),
@@ -327,7 +327,7 @@ def _keep(job: _CheckJob, check: LocalSqlCheck) -> None:
     path: Path | None = _cache_file(job)
     if path is None or check.conversion is None:
         return
-    conversion: LocalConversion = check.conversion
+    conversion: ConvertedSql = check.conversion
     partial: Path = path.with_suffix(f".{os.getpid()}.{threading.get_ident()}.tmp")
     try:
         path.parent.mkdir(parents=True, exist_ok=True)

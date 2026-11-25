@@ -14,7 +14,7 @@ from sqlbuild.executor.local.main._convert_local_sql import (
     convert_local_sql,
     file_placed_refusal,
 )
-from sqlbuild.executor.local.models import LocalConversion
+from sqlbuild.executor.local.models import ConvertedSql
 from sqlbuild.executor.scenario.exceptions import LocalSqlRefusedError
 from sqlbuild.executor.scenario.models import LocalSql
 
@@ -45,7 +45,7 @@ def convert_sql_for_local_duckdb(
                 },
             ),
         )
-    conversion: LocalConversion = convert_local_sql(
+    conversion: ConvertedSql = convert_local_sql(
         sql=sql,
         schema=schema,
         time_zone=time_zone,

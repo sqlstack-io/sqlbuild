@@ -91,7 +91,7 @@ class DecisionContext:
 
 
 @dataclass(frozen=True)
-class LocalConversion:
+class ConvertedSql:
     """What SQLBuild keeps of a SQLQuack conversion: its DuckDB SQL and macros, or its refusals."""
 
     converted: bool
@@ -105,7 +105,7 @@ class LocalConversion:
 class LocalSqlCheck:
     """One statement's SQLQuack conversion, when asked for, and the relation DuckDB lacks for it."""
 
-    conversion: LocalConversion | None
+    conversion: ConvertedSql | None
     missing: str | None
     bound: bool = True
 

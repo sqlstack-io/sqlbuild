@@ -3,7 +3,7 @@
 import pytest
 
 from sqlbuild.executor.local._helpers.conversion import converted, warehouse_relations
-from sqlbuild.executor.local.models import LocalConversion
+from sqlbuild.executor.local.models import ConvertedSql
 from tests.unit.src.sqlbuild.executor.local._helpers._test_types import WarehouseRelationsTestCase
 from tests.unit.src.sqlbuild.executor.local._helpers.helpers import ORDERS_SCHEMA_RELATIONS
 
@@ -39,7 +39,7 @@ def test_given_converted_test_sql_when_finding_warehouse_relations_then_fixtures
     test_case: WarehouseRelationsTestCase,
 ) -> None:
     schema: dict[str, object] = {"relations": dict(ORDERS_SCHEMA_RELATIONS)}
-    conversion: LocalConversion = converted(
+    conversion: ConvertedSql = converted(
         sql=test_case.sql, schema=schema, time_zone=None, path="test.sql"
     )
 

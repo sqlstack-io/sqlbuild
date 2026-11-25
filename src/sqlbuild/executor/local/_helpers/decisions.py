@@ -30,8 +30,8 @@ from sqlbuild.executor.local.constants import (
     RUN_ON_WAREHOUSE,
 )
 from sqlbuild.executor.local.models import (
+    ConvertedSql,
     DecisionContext,
-    LocalConversion,
     LocalRefusal,
     LocalSqlCheck,
     RunOnDecision,
@@ -174,7 +174,7 @@ def _converted_decision(*, entry: SqlTestPlanEntry, context: DecisionContext) ->
         time_zone=context.time_zone,
         path=context.compiled_paths.get(entry.name, ""),
     )
-    conversion: LocalConversion | None = check.conversion
+    conversion: ConvertedSql | None = check.conversion
     if conversion is None:
         return _bound_decision(name=entry.name, missing=check.missing)
     if conversion.converted:

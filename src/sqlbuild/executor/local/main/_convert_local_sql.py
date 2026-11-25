@@ -12,12 +12,12 @@ from sqlbuild.executor.local._helpers.positions import (
 )
 from sqlbuild.executor.local._helpers.session import session_time_zone as session_time_zone
 from sqlbuild.executor.local.constants import CONVERSION_CACHE_DIR
-from sqlbuild.executor.local.models import LocalConversion
+from sqlbuild.executor.local.models import ConvertedSql
 
 
 def convert_local_sql(
     *, sql: str, schema: Mapping[str, Any] | None, time_zone: str | None, path: str
-) -> LocalConversion:
+) -> ConvertedSql:
     """SQLQuack's conversion of `sql` in the target's time zone: DuckDB SQL, or its refusals."""
 
     return converted(sql=sql, schema=schema, time_zone=time_zone, path=path)
