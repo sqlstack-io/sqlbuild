@@ -108,7 +108,7 @@ pub(crate) const FORBIDDEN_STATEMENT_PAYLOAD_FIELDS: [&str; 8] = [
     "statement_sql",
 ];
 
-pub(crate) const STRING_PAYLOAD_FIELDS: [&str; 56] = [
+pub(crate) const STRING_PAYLOAD_FIELDS: [&str; 57] = [
     "adapter",
     "attached_column_name",
     "attached_target_kind",
@@ -142,6 +142,7 @@ pub(crate) const STRING_PAYLOAD_FIELDS: [&str; 56] = [
     "measurement_sql",
     "microbatch_run_type",
     "microbatch_strategy",
+    "not_run_reason",
     "operation_kind",
     "operation_name",
     "outcome",
@@ -574,6 +575,7 @@ pub(crate) const LIFECYCLE_EVENT_CATALOG_V1: [EventDefinition; 20] = [
             "measured_value",
             "measurement_sql",
             "minimum_samples",
+            "not_run_reason",
             "outcome",
             "result_id",
             "reused",
@@ -959,6 +961,7 @@ pub(crate) const LIFECYCLE_EVENT_CATALOG_V2: [EventDefinition; 24] = [
             "measured_value",
             "measurement_sql",
             "minimum_samples",
+            "not_run_reason",
             "outcome",
             "result_id",
             "reused",

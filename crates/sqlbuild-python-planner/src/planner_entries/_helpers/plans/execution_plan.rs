@@ -170,7 +170,7 @@ pub(crate) fn planned_output<'py>(
         (scopes, &snapshot),
         native_field(&policies, "selection_diagnostics")?.extract()?,
     )?;
-    check_selected_scope_buildability(runtime, scopes, &warehouse, &deferral)?;
+    let audits_not_run = check_selected_scope_buildability(runtime, scopes, &warehouse, &deferral)?;
     let (changes, stale_warning_changes) = change_results(
         &project,
         (scopes, &snapshot, &identities),
@@ -216,6 +216,7 @@ pub(crate) fn planned_output<'py>(
             warehouse: &warehouse,
             identities: &identities,
             overrides,
+            audits_not_run: &audits_not_run,
         },
         PlannedModelEntries {
             execution_scope: &inspection_scope,

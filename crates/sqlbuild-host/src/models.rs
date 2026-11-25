@@ -320,6 +320,8 @@ pub enum AuditOutcome {
     Error,
     Insufficient,
     Skipped,
+    /// An end-of-build audit that reads something the target doesn't have: neither a pass nor a failure.
+    NotRun,
 }
 
 impl ResultEnum for AuditOutcome {
@@ -329,6 +331,7 @@ impl ResultEnum for AuditOutcome {
         Self::Error,
         Self::Insufficient,
         Self::Skipped,
+        Self::NotRun,
     ];
 
     fn value(self) -> &'static str {
@@ -338,6 +341,7 @@ impl ResultEnum for AuditOutcome {
             Self::Error => "error",
             Self::Insufficient => "insufficient",
             Self::Skipped => "skipped",
+            Self::NotRun => "not_run",
         }
     }
 }

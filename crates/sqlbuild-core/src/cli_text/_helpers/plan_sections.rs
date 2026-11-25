@@ -88,6 +88,11 @@ pub(crate) fn ready_summary(report: &PlanTextReport, full_refresh: bool) -> Stri
         let noun: &str = if audits == 1 { "audit" } else { "audits" };
         parts.push(format!("{audits} {noun}"));
     }
+    let not_run: usize = report.audits_not_run.len();
+    if not_run > 0 {
+        let noun: &str = if not_run == 1 { "audit" } else { "audits" };
+        parts.push(format!("{not_run} {noun} not run"));
+    }
     parts.join(", ")
 }
 
@@ -714,6 +719,29 @@ pub(crate) fn audit_lines(report: &PlanTextReport) -> Vec<String> {
     section_lines("Audits", &report.audits, &report.display, |audit| {
         vec![format!("  {audit}")]
     })
+}
+
+/// `Audits not run (N)`: end-of-build audits that read something the target doesn't have, each naming what.
+pub(crate) fn not_run_audit_lines(report: &PlanTextReport) -> Vec<String> {
+    if report.audits_not_run.is_empty() {
+        return Vec::new();
+    }
+    section_lines(
+        "Audits not run",
+        &report.audits_not_run,
+        &report.display,
+        |(audit, missing)| {
+            let verb: &str = if missing.len() == 1 {
+                "which doesn't"
+            } else {
+                "which don't"
+            };
+            vec![format!(
+                "  {audit}  reads {}, {verb} exist in the target",
+                missing.join(", ")
+            )]
+        },
+    )
 }
 
 /// `Full refresh (N)` with one count row per materialization label, most common first.

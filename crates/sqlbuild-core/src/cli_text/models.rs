@@ -438,6 +438,8 @@ pub struct PlanTextReport {
     pub job_warehouses: Vec<(String, String)>,
     /// Audits selected by name, with `audit:` or as a past run's failed audits, sorted.
     pub audits: Vec<String>,
+    /// End-of-build audits that won't run, each with the reads that don't exist in the target, sorted.
+    pub audits_not_run: Vec<(String, Vec<String>)>,
 }
 
 /// The structural kind of a rendered plan line.

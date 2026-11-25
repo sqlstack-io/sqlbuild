@@ -1689,3 +1689,14 @@ class RunSelectorRefusalTestCase:
     # The plan's selectors; `{short}` is the failed run's first 7 characters.
     selectors: tuple[str, ...]
     expected_error: str
+
+
+@dataclass(frozen=True)
+class NotRunAuditTestCase:
+    description: str
+    # Builds run first, each as its sqb arguments, to put reads in the target.
+    setup: tuple[tuple[str, ...], ...]
+    command: tuple[str, ...]
+    expected_exit_code: int
+    expected_texts: tuple[str, ...]
+    expected_absent: tuple[str, ...] = ()

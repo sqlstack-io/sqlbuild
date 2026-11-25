@@ -86,6 +86,7 @@ pub(crate) fn base_plan_output<'py>(
         warehouse,
         identities,
         overrides,
+        audits_not_run,
     }: PlanOutputContext<'_, 'py>,
     PlannedModelEntries {
         execution_scope,
@@ -126,6 +127,7 @@ pub(crate) fn base_plan_output<'py>(
             model_warnings: entries.warnings,
             reload_sources: native_field(overrides, "reload_sources")?,
             extras,
+            audits_not_run: audits_not_run.clone(),
         })?,
         metadata: Vec::new(),
     };

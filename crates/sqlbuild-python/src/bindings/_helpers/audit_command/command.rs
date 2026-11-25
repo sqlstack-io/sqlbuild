@@ -78,6 +78,7 @@ impl AuditCallbackRelay {
                 AuditOutcome::Pass => NodeOutcome::Success,
                 AuditOutcome::Warn | AuditOutcome::Insufficient => NodeOutcome::Warn,
                 AuditOutcome::Skipped => NodeOutcome::Skipped,
+                AuditOutcome::NotRun => NodeOutcome::NotRun,
                 AuditOutcome::Error => NodeOutcome::Failed,
             };
             worker.finish_attached(py, &audit_check_id(&result)?, outcome)?;
@@ -508,7 +509,7 @@ fn complete(
             AuditOutcome::Warn => counts.warned += 1,
             AuditOutcome::Error => counts.failed += 1,
             AuditOutcome::Insufficient => counts.insufficient += 1,
-            AuditOutcome::Skipped => {}
+            AuditOutcome::Skipped | AuditOutcome::NotRun => {}
         }
     }
     let stream: Bound<'_, PyAny> = native_field(invocation, "progress_stream")?;

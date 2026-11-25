@@ -45,6 +45,8 @@ pub struct PlanOutputContext<'a, 'py> {
     pub warehouse: &'a Bound<'py, PyAny>,
     pub identities: &'a Bound<'py, PyAny>,
     pub overrides: &'a Bound<'py, PyAny>,
+    /// End-of-build audits that won't run, by name with the reads that don't exist.
+    pub audits_not_run: &'a BTreeMap<String, Vec<String>>,
 }
 
 /// The execution scope, reconciled changes, planned entries and source freshness of a plan.

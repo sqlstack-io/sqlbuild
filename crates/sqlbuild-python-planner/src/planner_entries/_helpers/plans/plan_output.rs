@@ -703,6 +703,7 @@ pub(crate) fn plan_output_fields<'py>(
         model_warnings,
         reload_sources,
         extras,
+        audits_not_run,
     } = inputs;
     let py = project.py();
     let extras = if extras.is_none() {
@@ -817,6 +818,10 @@ pub(crate) fn plan_output_fields<'py>(
             native_field(&scope, "end_audit_source_keys")?,
         ),
         ("selected_audit_names", selected_audit_names(&scope)?),
+        (
+            "audits_not_run",
+            pyo3::IntoPyObject::into_pyobject(audits_not_run, py)?.into_any(),
+        ),
         ("upstream_deps", native_field(&scope, "upstream_deps")?),
         ("downstream_deps", native_field(&scope, "downstream_deps")?),
         (

@@ -41,12 +41,6 @@ from tests.integration.src.sqlbuild.cli.commands.main.helpers import (
             expected_models=["a", "b", "c"],
             expected_audits=[],
         ),
-        RunSelectorPlanTestCase(
-            description="audit: plans one audit and no models",
-            selectors=("audit:a_matches_c",),
-            expected_models=[],
-            expected_audits=["a_matches_c"],
-        ),
     ],
     ids=lambda case: case.description,
 )
@@ -83,6 +77,11 @@ def test_given_a_failed_local_build_when_planning_with_run_selectors_then_its_re
             description="a run ID shorter than 8 characters is refused",
             selectors=("failed:{short}",),
             expected_error="is too short: give the full ID or at least 8 characters of it",
+        ),
+        RunSelectorRefusalTestCase(
+            description="audit: whose read the failed build never built is refused with S301",
+            selectors=("audit:a_matches_c",),
+            expected_error="audit 'a_matches_c' reads 'c', which is not selected",
         ),
     ],
     ids=lambda case: case.description,

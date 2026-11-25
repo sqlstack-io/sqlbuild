@@ -633,7 +633,9 @@ impl WorkerBuild {
 
     /// A test or audit finished; a check the snapshot does not record is not reported.
     pub fn finish_attached(&self, py: Python<'_>, key: &str, outcome: NodeOutcome) -> PyResult<()> {
-        if outcome != NodeOutcome::Skipped && self.attached.contains_key(key) {
+        if !matches!(outcome, NodeOutcome::Skipped | NodeOutcome::NotRun)
+            && self.attached.contains_key(key)
+        {
             self.check_cancelled(py)?;
         }
         self.report_attached(py, key, outcome)
@@ -644,7 +646,7 @@ impl WorkerBuild {
         let Some(nodes) = self.attached.get(key) else {
             return Ok(());
         };
-        if outcome != NodeOutcome::Skipped {
+        if !matches!(outcome, NodeOutcome::Skipped | NodeOutcome::NotRun) {
             self.record_attached_start(py, key)?;
         }
         let outcome = if outcome == NodeOutcome::Failed
@@ -659,7 +661,7 @@ impl WorkerBuild {
         } else {
             self.finish_check(py, key, outcome)?;
         }
-        if outcome == NodeOutcome::Skipped {
+        if matches!(outcome, NodeOutcome::Skipped | NodeOutcome::NotRun) {
             return Ok(());
         }
         let mut checked = self.checked.lock().map_err(|_| poisoned())?;

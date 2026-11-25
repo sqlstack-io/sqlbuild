@@ -35,5 +35,7 @@ pub struct BuildCounts {
     pub insufficient: usize,
     /// Error-severity audit failures that held nothing back, counted in no other field.
     pub ignored_audit_failures: usize,
+    /// End-of-build audits whose reads the target doesn't have, counted in no other field.
+    pub not_run: usize,
     pub failed: bool,
 }

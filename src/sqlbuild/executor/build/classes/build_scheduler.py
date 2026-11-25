@@ -348,16 +348,14 @@ class BuildScheduler:
 
         end_audit_results: tuple[AuditExecutionResult, ...] = ()
         runnable_end_audits: tuple[AuditPlanEntry, ...] = tuple(
-            audit
-            for audit in self._indexes.end_audits
-            if self._unbuilt_keys.isdisjoint(audit.scope_deps)
+            audit for audit in self._indexes.end_audits if self._can_run_end_audit(audit=audit)
         )
         skipped_end_audits: tuple[AuditExecutionResult, ...] = ()
         if self._run_audits:
             skipped_end_audits = tuple(
                 self._skipped_end_audit(audit=audit)
                 for audit in self._indexes.end_audits
-                if not self._unbuilt_keys.isdisjoint(audit.scope_deps)
+                if not self._can_run_end_audit(audit=audit)
             )
         if self._run_audits and runnable_end_audits:
             end_audit_results = run_end_audits(
@@ -924,26 +922,43 @@ class BuildScheduler:
             return
         self._unbuilt_keys.add(key)
 
-    def _skipped_end_audit(self, *, audit: AuditPlanEntry) -> AuditExecutionResult:
-        """The SKIPPED result of an end-of-build audit that reads a resource not built this run."""
+    def _can_run_end_audit(self, *, audit: AuditPlanEntry) -> bool:
+        """Whether every read of an end-of-build audit exists: built this run or in the target."""
 
+        return audit.name not in self._plan.audits_not_run and self._unbuilt_keys.isdisjoint(
+            audit.scope_deps
+        )
+
+    def _skip_reason(self, *, audit: AuditPlanEntry) -> str:
+        """Why an end-of-build audit doesn't run: a read the target lacks, or one not built."""
+
+        missing: tuple[str, ...] = self._plan.audits_not_run.get(audit.name, ())
+        if missing:
+            verb: str = "which doesn't" if len(missing) == 1 else "which don't"
+            return f"reads {', '.join(missing)}, {verb} exist in the target"
         unbuilt: CompiledObjectKey = next(
             key for key in audit.scope_deps if key in self._unbuilt_keys
         )
+        return f"reads {unbuilt.name}, which was not built"
+
+    def _skipped_end_audit(self, *, audit: AuditPlanEntry) -> AuditExecutionResult:
+        """NOT_RUN when the target lacks a read of an end-of-build audit; SKIPPED when unbuilt."""
+
+        not_run: bool = audit.name in self._plan.audits_not_run
         result: AuditExecutionResult = AuditExecutionResult(
             audit_name=audit.name,
             audit_definition_name=audit.definition_name,
             attachment_kind=audit.attachment_kind,
             severity=audit.severity,
-            outcome=AuditOutcome.SKIPPED,
+            outcome=AuditOutcome.NOT_RUN if not_run else AuditOutcome.SKIPPED,
             row_count=0,
-            executed_sql="",
+            executed_sql=audit.resolved_sql if not_run else "",
             attached_target_kind=audit.attached_target_kind,
             attached_target_name=audit.attached_target_name,
             attached_column_name=audit.attached_column_name,
             audit_description=audit.description,
             audit_meta=audit.meta,
-            skip_reason=f"reads {unbuilt.name}, which was not built",
+            skip_reason=self._skip_reason(audit=audit),
         )
         with ResourceAttemptLifecycle(
             resource_id=audit_resource_id(
@@ -960,7 +975,8 @@ class BuildScheduler:
             record_audit_progress_outcome(
                 resource_attempt_id=lifecycle.resource_attempt_id, result=result
             )
-            lifecycle.skipped(skip_code="scheduler")
+            if not not_run:
+                lifecycle.skipped(skip_code="scheduler")
         return result
 
     def _unloaded_selected_sources(self) -> tuple[CompiledObjectKey, ...]:

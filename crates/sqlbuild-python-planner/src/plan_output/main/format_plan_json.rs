@@ -1,6 +1,7 @@
 //! The plan as one JSON document, `json.dumps(indent=2)`.
 
 use crate::plan_output::_helpers::plan_json::IGNORE_AUDIT_FAILURES_KEY;
+use crate::plan_output::_helpers::plan_json::audits_not_run_json;
 use crate::plan_output::_helpers::plan_json::column_migrations_json;
 use crate::plan_output::_helpers::plan_json::function_json;
 use crate::plan_output::_helpers::plan_json::migrations_json;
@@ -105,6 +106,7 @@ pub fn format_plan_json(py: Python<'_>, options: Option<Bound<'_, PyDict>>) -> P
                 )?
                 .into_any(),
             ),
+            ("audits_not_run", audits_not_run_json(py, &plan)?),
             ("providers", providers_json(&plan, &python_entries)?),
             (
                 "warnings",

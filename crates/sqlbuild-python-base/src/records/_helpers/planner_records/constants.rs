@@ -950,6 +950,7 @@ const R_PLAN_OUTPUT: RecordSpec = RecordSpec {
         FieldSpec::new("end_audit_source_keys", FieldDefault::EmptyFrozenset),
         FieldSpec::new("ignore_audit_failures", FieldDefault::False),
         FieldSpec::new("selected_audit_names", FieldDefault::EmptyTuple),
+        FieldSpec::new("audits_not_run", FieldDefault::EmptyDict),
     ],
 };
 

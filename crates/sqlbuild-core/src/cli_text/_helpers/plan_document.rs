@@ -2,9 +2,10 @@
 
 use crate::cli_text::_helpers::layout::surface_header;
 use crate::cli_text::_helpers::plan_sections::{
-    audit_lines, full_refresh_count_lines, functions_lines, plan_name_width, provider_usage_lines,
-    pruned_lines, python_entry_lines, ready_summary, reason_group_lines, remaining_stale_lines,
-    routine_model_lines, seed_lines, source_freshness_lines, source_load_lines, warning_lines,
+    audit_lines, full_refresh_count_lines, functions_lines, not_run_audit_lines, plan_name_width,
+    provider_usage_lines, pruned_lines, python_entry_lines, ready_summary, reason_group_lines,
+    remaining_stale_lines, routine_model_lines, seed_lines, source_freshness_lines,
+    source_load_lines, warning_lines,
 };
 use crate::cli_text::_helpers::tree_rows::treeify;
 use crate::cli_text::constants::{
@@ -64,6 +65,7 @@ pub(crate) fn full_refresh_lines(
     lines.extend(full_refresh_count_lines(active));
     lines.extend(seed_lines(report));
     lines.extend(audit_lines(report));
+    lines.extend(not_run_audit_lines(report));
     lines.extend(python_entry_lines(
         (report, READ_SIDE_PHASE, PYTHON_READ_SIDE_TITLE),
         width,
@@ -95,6 +97,7 @@ pub(crate) fn incremental_lines(report: &PlanTextReport, active: &[&ModelPlanTex
     lines.extend(functions_lines(report, false, width));
     lines.extend(seed_lines(report));
     lines.extend(audit_lines(report));
+    lines.extend(not_run_audit_lines(report));
     lines.extend(python_entry_lines(
         (report, READ_SIDE_PHASE, PYTHON_READ_SIDE_TITLE),
         width,

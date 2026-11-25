@@ -3,8 +3,8 @@
 use crate::build_progress::_helpers::error_rows::failure_error_block;
 use crate::build_progress::_helpers::text::pad;
 use crate::build_progress::constants::{
-    DELTA_SUFFIX, ERROR, FAILED, PASS, PYTHON_NODE_NAME_WIDTH, SKIPPED, SKIPPED_ROLLUP_CAP,
-    SUCCESS, TIMEOUT_CODE, TIMEOUT_OUTCOME, WARN,
+    DELTA_SUFFIX, ERROR, FAILED, NOT_RUN, PASS, PYTHON_NODE_NAME_WIDTH, SKIPPED,
+    SKIPPED_ROLLUP_CAP, SUCCESS, TIMEOUT_CODE, TIMEOUT_OUTCOME, WARN,
 };
 use crate::build_progress::models::{AuditResultText, BuildResultText, ErrorText, PythonNodeText};
 use crate::cli_text::models::CliStyle;
@@ -19,6 +19,8 @@ pub(crate) struct FooterCounts {
     pub(crate) skip: i64,
     /// Error-severity audit failures the build let through; not counted as failures.
     pub(crate) ignored: i64,
+    /// End-of-build audits whose reads the target doesn't have; neither passes nor failures.
+    pub(crate) not_run: i64,
 }
 
 impl FooterCounts {
@@ -58,6 +60,7 @@ pub(crate) fn count_results(result: &BuildResultText, python: &[PythonNodeText])
             ERROR if audit.ignored => counts.ignored += 1,
             ERROR => counts.fail += 1,
             SKIPPED => counts.skip += 1,
+            NOT_RUN => counts.not_run += 1,
             _ => {}
         }
     }
@@ -331,6 +334,28 @@ pub(crate) fn python_failure_details(python: &[PythonNodeText], style: CliStyle)
             pad(&node.kind, 10),
             pad(&node.name, PYTHON_NODE_NAME_WIDTH),
             style.error(message)
+        ));
+    }
+    lines
+}
+
+/// `Not run (N):` with each end-of-build audit whose reads the target doesn't have, and what it reads.
+pub(crate) fn not_run_details(result: &BuildResultText, style: CliStyle) -> Vec<String> {
+    let not_run: Vec<&AuditResultText> = build_audits(result)
+        .filter(|audit| audit.outcome == NOT_RUN)
+        .collect();
+    if not_run.is_empty() {
+        return Vec::new();
+    }
+    let mut lines: Vec<String> = vec![
+        String::new(),
+        style.warning_strong(&format!("Not run ({}):", not_run.len())),
+    ];
+    for audit in not_run {
+        lines.push(format!(
+            "  {}  (audit) {}",
+            audit.audit_name,
+            audit.skip_reason.as_deref().unwrap_or_default()
         ));
     }
     lines

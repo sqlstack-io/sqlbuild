@@ -42,6 +42,7 @@ use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_project::planner_strategy::constants::AUDIT_TYPES_MODULE;
 use sqlbuild_python_project::planner_strategy::constants::COMPILE_TYPES_MODULE;
+use sqlbuild_python_project::planner_strategy::constants::END_ATTACHMENT;
 use sqlbuild_python_project::planner_strategy::constants::MODEL_ATTACHMENT;
 use sqlbuild_python_project::planner_strategy::constants::SOURCE_ATTACHMENT;
 use sqlbuild_python_project::planner_strategy::models::AuditPlanning;
@@ -161,6 +162,16 @@ pub(crate) fn plan_audit<'py>(
     };
     let lineage = request.lineage.bind(py).borrow();
     let (kind_text, target_name) = attachment(&audit, lineage.graph())?;
+    let (kind_text, target_name) = match &target_name {
+        Some(model)
+            if attached_target_kind(&audit)?.is_none()
+                && kind_text == MODEL_ATTACHMENT
+                && !request.model_materializations.contains(model)? =>
+        {
+            (END_ATTACHMENT.to_owned(), None)
+        }
+        _ => (kind_text, target_name),
+    };
     let kind = audit_enum(
         PyString::new(py, &kind_text).into_any(),
         "AuditAttachmentKind",

@@ -2143,3 +2143,29 @@ def recalled_run_ids(project_dir: Path) -> list[str]:
             "GROUP BY run_id ORDER BY MIN(occurred_at)"
         ).fetchall()
     return [row[0] for row in rows]
+
+
+NOT_RUN_AUDIT_PROJECT_FILES: dict[str, str] = {
+    "sqlbuild_project.toml": (
+        'name = "demo"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+        '[connection]\ndatabase = "demo.duckdb"\n\n[targets.dev]\nschema = "dev"\n'
+    ),
+    "sql/models/orders.sql": "MODEL (description 'Orders.', materialized table);\nSELECT 1 AS id\n",
+    "sql/models/payments.sql": (
+        "MODEL (description 'Payments.', materialized table);\nSELECT 1 AS id\n"
+    ),
+    "sql/audits/singular/orders_have_payments.sql": (
+        'AUDIT (name "orders_have_payments", severity error);\n'
+        'SELECT o.id FROM __ref("orders") o LEFT JOIN __ref("payments") p ON o.id = p.id '
+        "WHERE p.id IS NULL\n"
+    ),
+}
+
+
+def write_not_run_audit_project(project_dir: Path) -> None:
+    """Two unrelated models and a singular audit that reads both."""
+
+    for relative_path, contents in NOT_RUN_AUDIT_PROJECT_FILES.items():
+        destination: Path = project_dir / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(contents, encoding="utf-8")

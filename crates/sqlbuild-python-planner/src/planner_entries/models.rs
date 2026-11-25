@@ -51,6 +51,8 @@ pub struct PlanOutputInputs<'py> {
     pub(crate) model_warnings: Vec<Bound<'py, PyAny>>,
     pub(crate) reload_sources: Bound<'py, PyAny>,
     pub(crate) extras: Bound<'py, PyAny>,
+    /// End-of-build audits that won't run, by name with the reads that don't exist.
+    pub(crate) audits_not_run: std::collections::BTreeMap<String, Vec<String>>,
 }
 
 /// Resolved relation and source inputs for plan entry construction.

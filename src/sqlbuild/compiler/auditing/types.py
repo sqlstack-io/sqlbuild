@@ -39,3 +39,4 @@ class AuditOutcome(StrEnum):
     ERROR = "error"
     INSUFFICIENT = "insufficient"
     SKIPPED = "skipped"
+    NOT_RUN = "not_run"

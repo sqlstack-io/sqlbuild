@@ -37,6 +37,7 @@ pub fn report_build_checks(
             AuditOutcome::Pass => NodeOutcome::Success,
             AuditOutcome::Warn | AuditOutcome::Insufficient => NodeOutcome::Warn,
             AuditOutcome::Skipped => NodeOutcome::Skipped,
+            AuditOutcome::NotRun => NodeOutcome::NotRun,
             AuditOutcome::Error => NodeOutcome::Failed,
         };
         worker.report_attached(py, &audit_check_id(&audit)?, outcome)?;

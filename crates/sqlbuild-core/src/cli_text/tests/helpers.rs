@@ -59,6 +59,7 @@ pub(super) fn plan_report(models: Vec<ModelPlanText>) -> PlanTextReport {
         ignore_audit_failure_jobs: Vec::new(),
         job_warehouses: Vec::new(),
         audits: Vec::new(),
+        audits_not_run: Vec::new(),
     }
 }
 

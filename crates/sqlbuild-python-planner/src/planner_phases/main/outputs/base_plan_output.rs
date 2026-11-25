@@ -12,6 +12,7 @@ pub fn base_plan_output<'py>(
         warehouse,
         identities,
         overrides,
+        audits_not_run,
     }: PlanOutputContext<'_, 'py>,
     PlannedModelEntries {
         execution_scope,
@@ -27,6 +28,7 @@ pub fn base_plan_output<'py>(
             warehouse,
             identities,
             overrides,
+            audits_not_run,
         },
         PlannedModelEntries {
             execution_scope,

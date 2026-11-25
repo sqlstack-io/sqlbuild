@@ -14684,6 +14684,7 @@ class PlanOutput(NativeRecord):
     end_audit_source_keys: frozenset[CompiledObjectKey]
     ignore_audit_failures: bool
     selected_audit_names: tuple[str, ...]
+    audits_not_run: dict[str, tuple[str, ...]]
     def __init__(
         self,
         execution_order: tuple[CompiledObjectKey, ...] = ...,
@@ -14722,6 +14723,7 @@ class PlanOutput(NativeRecord):
         end_audit_source_keys: frozenset[CompiledObjectKey] = ...,
         ignore_audit_failures: bool = ...,
         selected_audit_names: tuple[str, ...] = ...,
+        audits_not_run: dict[str, tuple[str, ...]] = ...,
     ) -> None: ...
     @property
     def python_source_entries(self) -> dict[str, SourceEntry]: ...
