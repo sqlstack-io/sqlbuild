@@ -2,7 +2,7 @@
 // output) from its record and the clock, the way the server projects it from
 // facts. Pure: the same record and clock always give the same detail.
 
-import { SEED_AUDIT_RUN_ID, seedAuditExecution } from './seed-audit-run';
+import { NOT_RUN_AUDIT_RUN_ID, SEED_AUDIT_RUN_ID, seedAuditExecution } from './seed-audit-run';
 import type {
 	RunEventCheck,
 	CancelProgress,
@@ -459,8 +459,8 @@ export function execution(record: RunRecord, nodes: RunNode[], now?: number): Ru
 	}
 	if (script.cancel) fact('cancel_requested', script.cancel.requestedAt, `Cancel requested by ${script.cancel.requestedBy.displayName}`);
 
-	if (inv && run.startedAt && run.endedAt && run.id === SEED_AUDIT_RUN_ID) {
-		seedAuditExecution(Date.parse(run.startedAt), Date.parse(run.endedAt), nodes, { push: (d) => drafts.push(d), statements, output, inv, runId: run.id, command: commandOf(record) });
+	if (inv && run.startedAt && run.endedAt && (run.id === SEED_AUDIT_RUN_ID || run.id === NOT_RUN_AUDIT_RUN_ID)) {
+		seedAuditExecution(Date.parse(run.startedAt), Date.parse(run.endedAt), nodes, { push: (d) => drafts.push(d), statements, output, inv, runId: run.id, command: commandOf(record), notRun: run.id === NOT_RUN_AUDIT_RUN_ID });
 	} else if (inv && run.startedAt && PROTO.test(run.id)) {
 		protoExecution(record, nodes, now ?? Date.now(), { ev, out, statements, inv });
 	} else if (inv && run.startedAt) {

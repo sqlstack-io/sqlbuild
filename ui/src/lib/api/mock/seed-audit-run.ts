@@ -4,6 +4,8 @@
 import type { RunEvent, RunEventCheck, RunEventLevel, RunEventPhase, RunNode, RunOutputLine, RunStatement } from '../types';
 
 export const SEED_AUDIT_RUN_ID = 'run-pa93';
+/** The same job run since audits whose reads the target lacks are not run: it succeeds, with the audit not run. */
+export const NOT_RUN_AUDIT_RUN_ID = 'run-nr41';
 export const SEED_AUDIT_JOB = 'load_reference';
 export const SEED_AUDIT_CHECK = 'orders_match_payments';
 /** The audit's ID on the Checks page. */
@@ -23,12 +25,12 @@ const WIRE_ERROR = 'ProgrammingError: 002003';
 export const MISSING_OBJECT_ERROR = `002003 (42S02): SQL compilation error:\nObject '${DATABASE}.RECONCILIATION.FCT_ORDER_PAYMENTS' does not exist or not authorized.`;
 
 type Draft = Omit<RunEvent, 'id' | 'storageId' | 'level' | 'runId' | 'producer'> & { producer?: RunEvent['producer']; level?: RunEventLevel; check?: RunEventCheck };
-type Emit = { push: (d: Draft) => void; statements: RunStatement[]; output: RunOutputLine[]; inv: string; runId: string; command: string };
+type Emit = { push: (d: Draft) => void; statements: RunStatement[]; output: RunOutputLine[]; inv: string; runId: string; command: string; notRun?: boolean };
 
 const iso = (ms: number) => new Date(ms).toISOString();
 
 /** What the run's worker did and printed: preparation, its seed loads, then the failed end-of-build audit. */
-export function seedAuditExecution(start: number, end: number, nodes: readonly RunNode[], { push, statements, output, inv, runId, command }: Emit): void {
+export function seedAuditExecution(start: number, end: number, nodes: readonly RunNode[], { push, statements, output, inv, runId, command, notRun = false }: Emit): void {
 	const ev = (type: Draft['type'], at: number, message: string, extra: Partial<Draft> = {}) =>
 		push({ type, occurredAt: iso(at), invocationId: inv, nodeKey: null, statementId: null, attempt: null, message, ...extra });
 	const out = (stream: RunOutputLine['stream'], at: number, text: string, error = false) => output.push({ invocationId: inv, stream, at: iso(at), text, error });
@@ -60,8 +62,17 @@ export function seedAuditExecution(start: number, end: number, nodes: readonly R
 		out('stdout', e, `  ✓ ${n.nodeKey}  seed  ${((e - s) / 1000).toFixed(1)}s`);
 	}
 
-	// The end-of-build singular audit: its query can't run, as the models it reads were never built here.
 	const auditAt = end - 2_400;
+	if (notRun) {
+		// Its reads don't exist in the target, so the audit is not run and the run succeeds.
+		const reason = `reads ${UNBUILT_INPUTS.join(', ')}, which don't exist in the target`;
+		ev('audit_completed', auditAt, reason, { level: 'info', check: { name: SEED_AUDIT_CHECK, outcome: 'not-run', rows: null, bindingKey: SEED_AUDIT_BINDING, resultId: null } });
+		out('stdout', auditAt, `  audit     ${SEED_AUDIT_CHECK} NOT RUN 0.00s`);
+		ev('invocation_completed', end - 400, `${nodes.length} built · 1 audit not run`);
+		out('stdout', end - 400, `✓ Completed successfully  PASS=${nodes.length}  NOT_RUN=1`);
+		return;
+	}
+	// The end-of-build singular audit: its query can't run, as the models it reads were never built here.
 	const auditId = 'stmt-pa93-audit-orders_match_payments';
 	statement({ id: auditId, nodeKey: '', kind: 'audit', status: 'failed', startedAt: iso(auditAt - 350), endedAt: iso(auditAt), rowsAffected: null, queryId: '01b8e2a3-0000-4c1f-0000-00000000a93e', error: WIRE_ERROR });
 	ev('statement_failed', auditAt, WIRE_ERROR, { statementId: auditId });

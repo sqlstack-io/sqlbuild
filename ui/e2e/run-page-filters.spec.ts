@@ -147,6 +147,19 @@ test('a rerun started from the rerun plan says which run it came from', async ({
 	await expect(page.getByText('from run pa93')).toBeVisible({ timeout: 20_000 });
 });
 
+// An audit whose reads the target doesn't have is not run: the run succeeds, the summary counts it on its
+// own, and its figure filters the log to it, with why.
+test('an audit that was not run is counted and filtered on its own', async ({ page }) => {
+	await open(page, '/runs/run-nr41?mock');
+	const figure = page.getByRole('link', { name: '1 audit not run' });
+	await expect(figure).toBeVisible({ timeout: 20_000 });
+	await figure.click();
+	await expect(logFilter(page)).toHaveValue(/kind:audit outcome:not-run/);
+	await expect(page.getByText("reads fct_order_payments, fct_payment_totals, which don't exist in the target").first()).toBeVisible();
+	await logFilter(page).fill('outcome:not-run ');
+	await expect(page.getByText("reads fct_order_payments, fct_payment_totals, which don't exist in the target").first()).toBeVisible();
+});
+
 // A failed audit's warehouse error is read from its result (behind view.evidence), not from the run's
 // listings: the summary line gives the cause, and opened, the SQLSTATE and the warehouse's sentence.
 test('the failure summary shows a failed audit’s warehouse error', async ({ page }) => {
