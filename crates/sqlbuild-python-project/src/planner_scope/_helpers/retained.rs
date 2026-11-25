@@ -4,7 +4,7 @@ use crate::planner_scope::main::edges::edges;
 use crate::planner_scope::main::keys::keys;
 use crate::planner_scope::models::RetainedScope;
 use crate::planner_scope::models::ScopeData;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
@@ -55,10 +55,7 @@ pub(crate) fn scope_data(value: &Bound<'_, PyAny>) -> PyResult<Arc<ScopeData>> {
         end_audit_sources: keys(&field(value, "end_audit_source_keys")?)?
             .into_iter()
             .collect(),
-        audits: match value.getattr_opt("selected_audit_names")? {
-            Some(names) if !names.is_none() => names.extract()?,
-            _ => HashSet::new(),
-        },
+        audits: field(value, "selected_audit_names")?.extract()?,
     }))
 }
 
@@ -83,6 +80,7 @@ pub(crate) fn project_scope<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'p
                 "sql_test_selection",
                 "load_sources",
                 "end_audit_source_keys",
+                "selected_audit_names",
             ];
             let fields = names
                 .iter()

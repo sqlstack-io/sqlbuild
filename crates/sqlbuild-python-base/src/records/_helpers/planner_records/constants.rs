@@ -53,6 +53,7 @@ const R_PLANNER_SCOPE: RecordSpec = RecordSpec {
         ),
         FieldSpec::new("load_sources", FieldDefault::True),
         FieldSpec::new("end_audit_source_keys", FieldDefault::EmptyFrozenset),
+        FieldSpec::new("selected_audit_names", FieldDefault::EmptyFrozenset),
     ],
 };
 const R_SQL_TEST_ASSERTION_STEP: RecordSpec = RecordSpec {
