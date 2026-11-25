@@ -15,7 +15,7 @@ use uuid::Uuid;
 
 use crate::dev_screen::models::{ScreenAction, ScreenMessage};
 use crate::dev_screen::types::DevScreenParts;
-use crate::dev_session::_helpers::child::{publish_record, relay_logs, send_control};
+use crate::dev_session::_helpers::child::{relay_logs, send_control};
 use crate::dev_session::_helpers::foreground::connect_in_foreground;
 use crate::dev_session::_helpers::runs::{SeenRuns, run_messages};
 use crate::dev_session::_helpers::triggers::trigger_summary;
@@ -71,8 +71,7 @@ pub(crate) async fn run_dev_session(
                     drop(screen.send(ScreenMessage::Log(line)));
                     continue;
                 };
-                if let DevEvent::Published { record, .. } = &event {
-                    publish_record(record);
+                if let DevEvent::Published { .. } = &event {
                     drop(screen.send(ScreenMessage::Triggers(
                         trigger_summary(&list_triggers(&store, location_id, &dev.target).await?),
                     )));

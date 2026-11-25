@@ -27,13 +27,10 @@ pub async fn report_changed_build(
         ));
     }
     if report.failing.as_ref().is_some_and(|reason| {
-        reason.trim().is_empty()
-            || reason.chars().count() > MAX_FAILING_REASON_CHARS
-            || !report.changed.is_empty()
-            || !report.downstream.is_empty()
+        reason.trim().is_empty() || reason.chars().count() > MAX_FAILING_REASON_CHARS
     }) {
         return Err(ControlError::Invalid(
-            "a failing changed build carries a bounded reason and no nodes".into(),
+            "a failing changed build carries a bounded reason".into(),
         ));
     }
     let mut transaction = begin_ingestion(

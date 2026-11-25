@@ -109,7 +109,7 @@ def test_given_benchmark_project_when_inspecting_test_plan_then_every_unit_test_
             expected_errors=0,
             expected_warnings=0,
             expected_compiled_checksum=(
-                "7661e2ad98b33b8230c9df9c6c780e959cb7e18398b14a2cef36e12d19bd0bb6"
+                "6ca545b44f2e75e2473d716ebabbf439ccb080c1cc22671f0a3fbce7e557125c"
             ),
         )
     ],

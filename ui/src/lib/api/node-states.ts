@@ -10,7 +10,9 @@ export function stateOf(node: CatalogNode): NodeState {
 		lastBuild: node.lastBuild,
 		lastOutcome: node.lastOutcome,
 		definitionChanged: !!node.stale?.some((r) => r.reason === 'changed'),
-		checks: node.checks
+		checks: node.checks,
+		status: node.status,
+		statusAt: node.statusAt
 	};
 }
 
@@ -24,7 +26,7 @@ function changedReason(node: CatalogNode, state: NodeState): StaleReason[] {
 /** A node with `state` in place of its own; behind is left to `withBehind`, which needs every node. */
 function withState(node: CatalogNode, state: NodeState): CatalogNode {
 	const kept = (node.stale ?? []).filter((r) => r.reason !== 'changed');
-	return { ...node, lastBuild: state.lastBuild, lastOutcome: state.lastOutcome, checks: state.checks, stale: [...changedReason(node, state), ...kept] };
+	return { ...node, lastBuild: state.lastBuild, lastOutcome: state.lastOutcome, checks: state.checks, status: state.status, statusAt: state.statusAt, stale: [...changedReason(node, state), ...kept] };
 }
 
 /**
@@ -69,7 +71,8 @@ function behindOf(node: CatalogNode, dataAt: (key: string) => number | null): St
 const behindKey = (reasons: StaleReason[]) => JSON.stringify(reasons.filter((r) => r.reason === 'behind'));
 
 /**
- * Nodes with "behind" worked out again from upstream build times. A node whose behind reasons
+ * Nodes with the "behind" reason worked out again from upstream build times, for its explanation
+ * (which upstream, since when); whether a node is behind is the server's `status`. A node whose behind reasons
  * did not change is returned as it was, so views keyed on it do not redraw.
  */
 export function withBehind(nodes: CatalogNode[]): CatalogNode[] {

@@ -36,6 +36,10 @@ pub struct TimestampGrainFacts {
 /// A plan section a summary counts and the rows endpoint pages, in the order the plan reads.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PlanPageSection {
+    /// Models that couldn't be planned, with their errors.
+    PlanningError,
+    /// Models an explicit cursor window skips, as it ends before their `cursor_start`.
+    WindowBeforeCursorStart,
     /// Built models the plan rebuilds in full.
     FullRefresh,
     QueryChanged,

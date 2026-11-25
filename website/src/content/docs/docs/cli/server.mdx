@@ -338,6 +338,7 @@ seconds, stops delivery and retries the same event. Deduplicate by `event_id`, w
 | `tick_overdue` | A schedule tick is late | `trigger_id`, `scheduled_for` |
 | `calendar_horizon_low` | A running calendar schedule has a day or less of dates left | `trigger_id`, `refresh_at`, `horizon_end` |
 | `location_broken` | Every instance of a location and target has stopped reporting for over 90 seconds | `location_id`, `target`, `last_seen_at` |
+| `location_failing` | A location and target that checks in failed its latest load (`falling_back`), its plan of what changed (`change_plan_failed`), a discover function (`discovery_failed`) or the connection check after its last load (`degraded`) | `location_id`, `target`, `state`, `failed_at`, `error`, `serving_generation` (the generation runs use instead) |
 | `launch_failed` | Starting a worker failed; it may still start | `run_id`, `claim_id`, `code` |
 | `run_failed` | A job, group or ad-hoc run ends `failed` or `partial` | `run_id`, `run_kind`, `job_key`, `location_id`, `target`, `outcome`, `failed_nodes`, `failed_node_count` |
 | `trigger_skipped` | The scheduler skips a trigger whose stored job or snapshot can't be read, or a sensor whose check failed; the sensor is checked again a minute later | `trigger_id`, `snapshot_id`, `reason` |

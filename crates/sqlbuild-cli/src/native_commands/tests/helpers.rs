@@ -328,3 +328,14 @@ pub(super) fn scripted_compiler(script: &str) -> crate::native_commands::models:
         python_sources: Vec::new(),
     }
 }
+
+/// A lookup that failed, as the location loop counts it; true when it is the one to report.
+pub(crate) fn failed(lookups: &mut crate::native_commands::models::GenerationLookups) -> bool {
+    lookups.failed()
+}
+
+/// A lookup the server answered with generation 4; never reported.
+pub(crate) fn answered(lookups: &mut crate::native_commands::models::GenerationLookups) -> bool {
+    lookups.answered(4);
+    false
+}

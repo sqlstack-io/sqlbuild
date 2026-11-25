@@ -31,9 +31,9 @@ export function largeProjectNodes(template: CatalogNode): CatalogNode[] {
 			const staging = Array.from({ length: PER_SUBFOLDER }, (_, i) => `${folder}__stg__${NOUNS[i % NOUNS.length]}`);
 			const mart = Array.from({ length: PER_SUBFOLDER }, (_, i) => `${folder}__mart__${NOUNS[i % NOUNS.length]}`);
 			staging.forEach((key, i) =>
-				nodes.push({ ...template, key, group: `${folder}/staging`, path: `models/${folder}/staging/${key}.sql`, upstream: feeds.length ? [feeds[i % feeds.length]] : [], description: `Staged ${folder} data` })
+				nodes.push({ ...template, key, group: `${folder}/staging`, path: `sql/models/${folder}/staging/${key}.sql`, upstream: feeds.length ? [feeds[i % feeds.length]] : [], description: `Staged ${folder} data` })
 			);
-			mart.forEach((key, i) => nodes.push({ ...template, key, group: `${folder}/marts`, path: `models/${folder}/marts/${key}.sql`, upstream: [staging[i], staging[(i + 1) % staging.length]], description: `${folder} mart` }));
+			mart.forEach((key, i) => nodes.push({ ...template, key, group: `${folder}/marts`, path: `sql/models/${folder}/marts/${key}.sql`, upstream: [staging[i], staging[(i + 1) % staging.length]], description: `${folder} mart` }));
 			marts.set(folder, mart);
 			// Finance also reconciles against the orders marts directly, a read across five layers.
 			if (folder === 'finance') nodes.find((n) => n.key === staging[0])!.upstream.push(marts.get('orders')![0]);

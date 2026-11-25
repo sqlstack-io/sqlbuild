@@ -189,8 +189,27 @@ Cursors define the incremental replay boundary. SQLBuild queries `MAX(cursor)` f
 | `cursor` | Output column used to track incremental position |
 | `cursor_type` | `timestamp` or `integer` |
 | `cursor_grain` | Time grain for timestamp cursors: `second`, `minute`, `hour`, `day`, `month`, `year` |
-| `cursor_start` | Lower bound floor; the cursor will never replay before this value |
+| `cursor_start` | Lower bound floor; the cursor will never replay before this value, even inside an [explicit cursor window](#explicit-cursor-windows) |
 | `cursor_inputs` | Map of upstream ref/source names to their cursor columns |
+
+### Explicit cursor windows
+
+`--start-cursor-ts` and `--end-cursor-ts` (or the `-int` forms, or `--start-cursor` and
+`--end-cursor`) give every selected cursor model the same window, and each model fits it to its own
+`cursor_start`:
+
+- A window that starts before a model's `cursor_start` and ends after it starts that model at its
+  `cursor_start`. The plan warns on that model:
+  `explicit start 2020-06-01 is before cursor_start 2021-01-01; the window starts at 2021-01-01`.
+- A window that ends at or before a model's `cursor_start` skips that model. The plan lists it under
+  **Window before cursor_start** with the reason `window ends before cursor_start 2021-01-01`; in
+  `sqb plan --json` its row has `"action": "skip"`, `"reason": "window_before_cursor_start"` and
+  that reason as `skip_reason`.
+- When the window skips every selected cursor model, there is nothing to build and the plan fails
+  with `P001`, naming the window and each model's `cursor_start`. Selected models without a cursor
+  don't count.
+
+A window that reaches a model's exclusive `cursor_end` still fails the plan with `P001`.
 
 ### cursor_inputs
 
@@ -263,7 +282,9 @@ WHERE ordered_at >= __cursor_start()
   AND ordered_at < __cursor_end()
 ```
 
-`__cursor_start()` is the effective inclusive start and `__cursor_end()` is the effective exclusive end after cursor floors, lookback, replay policy, and command-line overrides have been applied. The intrinsics accept no arguments and are only valid in built-in cursor incremental model query SQL. They are rejected in functions, hooks, audits, SQL tests and scenarios, source expressions, non-incremental or cursorless models, custom materializations, and non-microbatch full refreshes. A non-microbatch model planned as a FULL backfill, for example by `--full-refresh`, fails planning with `S204`, naming the cause; pass an explicit interval with `--start-cursor-ts` and `--end-cursor-ts` (or the `-int` forms) to rebuild it.
+`__cursor_start()` is the effective inclusive start and `__cursor_end()` is the effective exclusive end after cursor floors, lookback, replay policy, and command-line overrides have been applied. The intrinsics accept no arguments and are only valid in built-in cursor incremental model query SQL. They are rejected in functions, hooks, audits, SQL tests and scenarios, source expressions, non-incremental or cursorless models, and custom materializations.
+
+A non-microbatch full build (the first run, `--full-refresh`, or `replay_on_change full`) has no cursor interval, so the intrinsics span every value: `__cursor_start()` is the model's `cursor_start` floor, or the cursor type's lowest value without one, and `__cursor_end()` is the type's highest value. They render as typed literals, each unbounded end followed by `/* (unbounded) */` in the compiled SQL, and `sqb plan` shows the range as `(unbounded)`. Timestamps span `0001-01-01 00:00:00` to `9999-12-31 23:59:59.999999`, except on ClickHouse, where DateTime64 spans `1900-01-01 00:00:00` to `2299-12-31 23:59:59.999999`; integers span the 64-bit range. Because `__cursor_end()` is exclusive, a row whose cursor is exactly the highest value is left out. An explicit interval (`--start-cursor-ts` and `--end-cursor-ts`, or the `-int` forms) still bounds a full build.
 
 In microbatch mode, the intrinsics resolve to each batch's concrete bounds. A microbatch full refresh discovers its range from current inputs while ignoring the old destination watermark.
 

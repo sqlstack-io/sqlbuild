@@ -25,6 +25,7 @@ use crate::plan_output::_helpers::display::format_waiting_on_empty_inputs;
 use crate::plan_output::_helpers::display::model_materialization_label;
 use crate::plan_output::_helpers::migrations::pre_build_lines;
 use crate::plan_output::_helpers::plan_json::unified_diff;
+use crate::plan_output::_helpers::plan_json::{ERROR_ACTION, PLANNING_ERROR_REASON};
 use crate::plan_output::_helpers::python_identity::definition_source_text;
 use crate::plan_output::_helpers::python_identity::dependency_source_text;
 use crate::plan_output::_helpers::values::optional_text;
@@ -43,6 +44,10 @@ const SKIP_ACTION: &str = "skip";
 const QUERY_CHANGED: &str = "query_changed";
 const CONFIG_CHANGED: &str = "config_changed";
 const MICROBATCH_MODE: &str = "microbatch";
+const ERROR_SEVERITY: &str = "error";
+const CREATE_TABLE_ACTION: &str = "create_table";
+/// An unbounded end of a full build's cursor range.
+const UNBOUNDED_RANGE_END: &str = "(unbounded)";
 const CHANGED_IDENTITY: &str = "changed";
 pub(crate) const PLAN_OPTIONS: (&[&str], &[&str]) = (
     &["plan"],
@@ -94,6 +99,19 @@ fn cursor_range(entry: &Bound<'_, PyAny>, bounds: &Bound<'_, PyAny>) -> PyResult
     Ok(format!("{start} \u{2192} {end}"))
 }
 
+/// A non-microbatch full build's range: its `cursor_start` floor, or unbounded, to unbounded; `None` for other builds.
+fn full_build_range(entry: &Bound<'_, PyAny>, runtime_owned: bool) -> PyResult<Option<String>> {
+    if runtime_owned
+        || native_field(entry, "incremental_mode")?.eq(MICROBATCH_MODE)?
+        || !native_field(&native_field(entry, "action")?, "value")?.eq(CREATE_TABLE_ACTION)?
+    {
+        return Ok(None);
+    }
+    let start: String = optional_text(&native_field(entry, "cursor_start")?)?
+        .unwrap_or_else(|| UNBOUNDED_RANGE_END.to_owned());
+    Ok(Some(format!("{start} \u{2192} {UNBOUNDED_RANGE_END}")))
+}
+
 fn cursor_text(entry: &Bound<'_, PyAny>, details: CursorDetails<'_>) -> PyResult<CursorPlanText> {
     let empty_inputs_window: Option<String> = if details.empty_inputs.is_truthy()? {
         Some(if details.waiting_on_empty_inputs {
@@ -104,11 +122,10 @@ fn cursor_text(entry: &Bound<'_, PyAny>, details: CursorDetails<'_>) -> PyResult
     } else {
         None
     };
-    let range: Option<String> = details
-        .resolved_bounds
-        .as_ref()
-        .map(|bounds| cursor_range(entry, bounds))
-        .transpose()?;
+    let range: Option<String> = match &details.resolved_bounds {
+        Some(bounds) => Some(cursor_range(entry, bounds)?),
+        None => full_build_range(entry, details.runtime_owned)?,
+    };
     Ok(CursorPlanText {
         column: optional_text(&native_field(entry, "cursor_column")?)?.unwrap_or_default(),
         cursor_type: optional_text(&native_field(entry, "cursor_type")?)?,
@@ -209,15 +226,43 @@ fn coloured(diff: Option<Vec<String>>) -> Option<Vec<String>> {
     diff.map(|lines| format_query_diff(&lines, CliStyle { use_color: true }))
 }
 
+/// A model's planning error as `sqb` prints errors: `error[CODE]: message`, then its help.
+fn planning_error_text(warning: &Bound<'_, PyAny>) -> PyResult<PlanWarningText> {
+    let message: String = text(&native_field(warning, "message")?)?;
+    let code: Option<String> = optional_text(&native_field(warning, "code")?)?;
+    let help: Option<String> = optional_text(&native_field(warning, "help")?)?;
+    let mut lines: String = match code {
+        Some(code) => format!("error[{code}]: {message}"),
+        None => message,
+    };
+    if let Some(help) = help {
+        lines.push_str(&format!("\nhelp: {help}"));
+    }
+    Ok(PlanWarningText {
+        severity: ERROR_SEVERITY.to_owned(),
+        message: lines,
+        model_name: optional_text(&native_field(warning, "model_name")?)?,
+    })
+}
+
 fn model_text(entry: &Bound<'_, PyAny>) -> PyResult<ModelPlanText> {
     let action: String = text(&native_field(&native_field(entry, "action")?, "value")?)?;
     let reason: String = text(&native_field(&native_field(entry, "reason")?, "value")?)?;
     let name: String = text(&native_field(entry, "name")?)?;
+    if !native_field(entry, "planning_error")?.is_none() {
+        return Ok(ModelPlanText {
+            name,
+            action: ERROR_ACTION.to_owned(),
+            reason: PLANNING_ERROR_REASON.to_owned(),
+            ..ModelPlanText::default()
+        });
+    }
     if action == SKIP_ACTION {
         return Ok(ModelPlanText {
             name,
             action,
             reason,
+            skip_reason: optional_text(&native_field(entry, "skip_reason")?)?,
             ..ModelPlanText::default()
         });
     }
@@ -256,6 +301,7 @@ fn model_text(entry: &Bound<'_, PyAny>) -> PyResult<ModelPlanText> {
         query_diff: coloured(model_query_diff(entry, &reason)?),
         reinitialised_by: optional_text(&native_field(entry, "reinitialised_by")?)?,
         paused: native_field(entry, "dynamic_paused")?.is_truthy()?,
+        skip_reason: None,
         name,
         action,
         reason,
@@ -493,7 +539,18 @@ pub(crate) fn report(arguments: &KeywordArguments<'_>) -> PyResult<PlanTextRepor
     };
     let metadata: Bound<'_, PyAny> = native_field(&plan, "metadata")?;
     let mut warnings: Vec<PlanWarningText> = Vec::new();
+    let mut planning_errors: Vec<Bound<'_, PyAny>> = Vec::new();
+    for entry in items(&native_field(&plan, "model_entries")?)? {
+        let planning_error: Bound<'_, PyAny> = native_field(&entry, "planning_error")?;
+        if !planning_error.is_none() {
+            planning_errors.push(planning_error);
+        }
+    }
     for warning in items(&native_field(&plan, "warnings")?)? {
+        if planning_errors.iter().any(|error| error.is(&warning)) {
+            warnings.push(planning_error_text(&warning)?);
+            continue;
+        }
         warnings.push(PlanWarningText {
             severity: text(&native_field(
                 &native_field(&warning, "severity")?,

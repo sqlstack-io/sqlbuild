@@ -12,6 +12,12 @@ from sqlbuild.adapter.contract.classes.diff import DiffMixin
 from sqlbuild.adapter.contract.classes.materialization import MaterializationMixin
 from sqlbuild.adapter.contract.classes.schema import SchemaMixin
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
+from sqlbuild.adapter.contract.constants import (
+    HIGHEST_INTEGER_CURSOR,
+    HIGHEST_TIMESTAMP_CURSOR,
+    LOWEST_INTEGER_CURSOR,
+    LOWEST_TIMESTAMP_CURSOR,
+)
 from sqlbuild.adapter.contract.exceptions import AdapterUserError
 from sqlbuild.adapter.contract.models import (
     ColumnInfo,
@@ -31,6 +37,7 @@ from sqlbuild.adapter.contract.models import (
     TemporaryFunction,
 )
 from sqlbuild.adapter.contract.types import (
+    CursorKind,
     DynamicListing,
     DynamicOperation,
     FrameworkType,
@@ -180,6 +187,13 @@ class StrictAdapter(
 
         del cursor_type
         return f"CAST({expression} AS VARCHAR)"
+
+    def cursor_type_range(self, *, cursor_type: str | None) -> tuple[str, str]:
+        """Optional: the lowest and highest `cursor_type` values a full build's intrinsics span."""
+
+        if cursor_type == CursorKind.INTEGER:
+            return (LOWEST_INTEGER_CURSOR, HIGHEST_INTEGER_CURSOR)
+        return (LOWEST_TIMESTAMP_CURSOR, HIGHEST_TIMESTAMP_CURSOR)
 
     def render_create_temporary_function(
         self, *, name: str, definition: FunctionDefinition

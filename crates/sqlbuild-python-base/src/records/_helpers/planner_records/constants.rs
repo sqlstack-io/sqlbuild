@@ -675,6 +675,8 @@ const R_MODEL_PLAN_ENTRY: RecordSpec = RecordSpec {
         FieldSpec::new("refresh_on_build", FieldDefault::False),
         FieldSpec::new("dynamic_readers", FieldDefault::EmptyTuple),
         FieldSpec::new("dynamic_paused", FieldDefault::False),
+        FieldSpec::new("planning_error", FieldDefault::None),
+        FieldSpec::new("skip_reason", FieldDefault::None),
     ],
 };
 const R_CLONE_SOURCE_PLAN_ENTRY: RecordSpec = RecordSpec {
@@ -1248,6 +1250,7 @@ const R_PLAN_WARNING: RecordSpec = RecordSpec {
         FieldSpec::required("severity"),
         FieldSpec::required("message"),
         FieldSpec::new("code", FieldDefault::None),
+        FieldSpec::new("help", FieldDefault::None),
     ],
 };
 const R_COLUMN_RENAME_HINT: RecordSpec = RecordSpec {

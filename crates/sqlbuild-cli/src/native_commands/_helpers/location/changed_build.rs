@@ -38,3 +38,20 @@ pub(in crate::native_commands) fn changed_build_nodes(
     }
     Ok((changed, downstream))
 }
+
+/// `Can't plan N models: name: error; ...` for the plan's models that couldn't be planned; `None` when every model planned.
+pub(in crate::native_commands) fn model_errors(document: &Value) -> Option<String> {
+    let mut errors: Vec<String> = Vec::new();
+    for model in document["models"].as_array().into_iter().flatten() {
+        let Some(message) = model["error"]["message"].as_str() else {
+            continue;
+        };
+        let name: &str = model["name"].as_str().unwrap_or("a model");
+        errors.push(format!("{name}: {message}"));
+    }
+    match errors.len() {
+        0 => None,
+        1 => Some(format!("Can't plan 1 model: {}", errors[0])),
+        count => Some(format!("Can't plan {count} models: {}", errors.join("; "))),
+    }
+}

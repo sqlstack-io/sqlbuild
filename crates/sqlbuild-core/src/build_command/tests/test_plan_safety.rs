@@ -1,5 +1,6 @@
 use crate::build_command::models::{
-    ColumnMigrationFact, ModelMigrationFact, PlanSafetyFacts, PlanSafetyGates, PlanWarningFact,
+    ColumnMigrationFact, ModelErrorFact, ModelMigrationFact, PlanSafetyFacts, PlanSafetyGates,
+    PlanWarningFact,
 };
 use crate::build_command::tests::helpers::{
     build_gates, described_steps, missing_origin, retention, snapshot, table_type,
@@ -15,6 +16,48 @@ fn given_plan_facts_when_applying_safety_gates_then_refuses_or_confirms_in_order
             gates: build_gates(),
             max_models: None,
             expected_steps: Vec::new(),
+        },
+        PolicyTestCase {
+            description: "a model that can't be planned refuses before any migration, with its own error",
+            facts: PlanSafetyFacts {
+                model_errors: vec![ModelErrorFact {
+                    code: Some("S203".to_owned()),
+                    message: "model 'orders' sets full_refresh false".to_owned(),
+                    help: Some("allow the rebuild".to_owned()),
+                }],
+                model_migrations: vec![ModelMigrationFact {
+                    blocks_build: true,
+                    decision: "conflict".to_owned(),
+                    ..missing_origin("orders")
+                }],
+                ..PlanSafetyFacts::default()
+            },
+            gates: build_gates(),
+            max_models: None,
+            expected_steps: vec!["refuse:S203:model 'orders' sets full_refresh false".to_owned()],
+        },
+        PolicyTestCase {
+            description: "several models that can't be planned are joined under the first code",
+            facts: PlanSafetyFacts {
+                model_errors: vec![
+                    ModelErrorFact {
+                        code: Some("S203".to_owned()),
+                        message: "model 'orders' sets full_refresh false".to_owned(),
+                        help: None,
+                    },
+                    ModelErrorFact {
+                        code: Some("S302".to_owned()),
+                        message: "model 'customers' has empty inputs".to_owned(),
+                        help: None,
+                    },
+                ],
+                ..PlanSafetyFacts::default()
+            },
+            gates: build_gates(),
+            max_models: None,
+            expected_steps: vec![
+                "refuse:S203:model 'orders' sets full_refresh false; model 'customers' has empty inputs".to_owned(),
+            ],
         },
         PolicyTestCase {
             description: "a hidden blocking origin refuses first",

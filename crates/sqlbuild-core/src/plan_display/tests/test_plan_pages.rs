@@ -15,6 +15,16 @@ use crate::plan_display::tests::test_types::{
 fn given_a_plan_when_paging_each_section_then_every_section_pages_its_rows_in_plan_order() {
     let test_cases = [
         SectionTestCase {
+            description: "models that can't be planned, though --changed doesn't run them",
+            section: PlanPageSection::PlanningError,
+            expected_rows: &["unplannable"],
+        },
+        SectionTestCase {
+            description: "models an explicit window skips, though skipped and not run by --changed",
+            section: PlanPageSection::WindowBeforeCursorStart,
+            expected_rows: &["late_feed"],
+        },
+        SectionTestCase {
             description: "full refresh",
             section: PlanPageSection::FullRefresh,
             expected_rows: &["archive"],
@@ -339,28 +349,38 @@ fn given_model_pages_when_read_then_rows_carry_diff_counts_runs_warnings_and_win
 fn given_a_plan_when_summarised_then_sections_are_counts_and_no_row_list_is_left() {
     let test_cases = [
         SummaryFieldTestCase {
-            description: "the first section",
+            description: "models that can't be planned first",
             pointer: "/sections/0/section",
+            expected_value: json!("planning_error"),
+        },
+        SummaryFieldTestCase {
+            description: "then models the window skips",
+            pointer: "/sections/1/section",
+            expected_value: json!("window_before_cursor_start"),
+        },
+        SummaryFieldTestCase {
+            description: "then full refresh",
+            pointer: "/sections/2/section",
             expected_value: json!("full_refresh"),
         },
         SummaryFieldTestCase {
             description: "routine models after the changes",
-            pointer: "/sections/7/section",
+            pointer: "/sections/9/section",
             expected_value: json!("routine_models"),
         },
         SummaryFieldTestCase {
             description: "warnings last",
-            pointer: "/sections/24/section",
+            pointer: "/sections/26/section",
             expected_value: json!("warnings"),
         },
         SummaryFieldTestCase {
             description: "no section beyond the plan's",
-            pointer: "/sections/25",
+            pointer: "/sections/27",
             expected_value: Value::Null,
         },
         SummaryFieldTestCase {
             description: "a section's size",
-            pointer: "/sections/5/total",
+            pointer: "/sections/7/total",
             expected_value: json!(2),
         },
         SummaryFieldTestCase {

@@ -412,10 +412,14 @@ Rename model  stg_orders -> stg_orders_clean
 ## Errors
 
 Every problem with an orchestration file is a `D017` error at its file, line and column, reported by
-`sqb compile` and every other command that reads the project.
+`sqb compile` and every other command that reads the project. `sqb compile` resolves every job's
+`select` and `exclude`, and every sensor condition's selectors, for the target it compiles, as a
+location does when it publishes, so a selector the location would refuse fails the compile first.
 
 | Error | Fix |
 | --- | --- |
+| `orchestration/jobs/orders_job.toml:3:10: job orders_job: path selectors require an explicit root: use 'sql/models/' or 'python/nodes/'` | Start the path at `sql/models/` or `python/nodes/` |
+| `orchestration/sensors/raw_sensor.py:4: sensor raw_sensor: source_new_data: path selectors require an explicit root: use 'sql/models/' or 'python/nodes/'` | The same, in the sensor's condition |
 | ``orchestration/jobs/nightly_orders_job.toml:4:11: unknown variant `coalesce`, expected `queue` or `skip` `` | Use one of the listed values |
 | `files cannot sit directly in orchestration/` | Move jobs and groups to TOML files in `orchestration/jobs/` or `orchestration/job_groups/` |
 | `` `job` was removed from sqlbuild.orchestration`` | Declare the job in TOML and start it with `RunRequest(job="...")` |

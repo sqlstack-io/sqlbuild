@@ -11,7 +11,7 @@ _DATE_TIME: re.Pattern[str] = re.compile(DATE_TIME_PATTERN)
 
 
 def canonical_timestamp_text(value: str) -> str:
-    """Rewrite an ISO-8601 date-time so text comparison orders it like SQLite timestamps."""
+    """Rewrite an ISO-8601 date-time, its year padded to four digits, to sort like SQLite's."""
 
     if _DATE_TIME.match(value) is None:
         return value
@@ -21,7 +21,7 @@ def canonical_timestamp_text(value: str) -> str:
         return value
     if parsed.tzinfo is not None:
         parsed = parsed.astimezone(UTC).replace(tzinfo=None)
-    text: str = parsed.strftime(TIMESTAMP_TEXT_FORMAT)
+    text: str = f"{parsed.year:04d}" + parsed.strftime(TIMESTAMP_TEXT_FORMAT.removeprefix("%Y"))
     if parsed.microsecond:
         text += f".{parsed.microsecond:06d}".rstrip("0")
     return text

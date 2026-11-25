@@ -11,9 +11,9 @@ pub(crate) type Settled = (
     Option<(Vec<WarehouseStateLocation>, i64)>,
 );
 
-/// The next compile, if a generation number was issued, with the metadata sync and the inputs it saw.
+/// The next compile, or why no generation number was issued, with the metadata sync and the inputs it saw.
 pub(crate) type NextGeneration = (
-    Option<(LoadOutcome, i64)>,
+    Result<(LoadOutcome, i64), String>,
     Option<LocationMetadataSync>,
     Option<Vec<sqlbuild_cache::project_snapshot::models::PathStamp>>,
 );
@@ -49,4 +49,17 @@ pub(crate) type PlanSettings<'a> = (
 pub(crate) type DiscoveryControls<'a> = (
     &'a tokio::sync::watch::Sender<crate::native_commands::models::DevControlState>,
     (&'a str, uuid::Uuid),
+);
+
+/// What the location carries from one compile to the next: its settled state and the inputs it last compiled.
+pub(crate) type CompileState = (
+    Settled,
+    Option<Vec<sqlbuild_cache::project_snapshot::models::PathStamp>>,
+);
+
+/// A serving location's sign-in, its work client and its poll.
+pub(crate) type LocationSession<'a> = (
+    &'a str,
+    &'a sqlbuild_orchestration::platform::models::LocationWorkClient,
+    &'a sqlbuild_orchestration::platform::models::LocationWorkPoll,
 );

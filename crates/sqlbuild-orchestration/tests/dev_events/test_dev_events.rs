@@ -36,11 +36,10 @@ fn given_each_event_when_encoding_then_one_prefixed_line_reads_back_unchanged() 
             expected_newlines: 1,
         },
         RoundTripTestCase {
-            description: "a publication keeps its whole record on the same line",
+            description: "a publication keeps its generation and snapshot",
             event: DevEvent::Published {
                 generation: 2,
                 snapshot_id: "b429729b".to_owned(),
-                record: serde_json::json!({"snapshot_id": "b429729b", "generation": 2}),
             },
             expected_newlines: 1,
         },

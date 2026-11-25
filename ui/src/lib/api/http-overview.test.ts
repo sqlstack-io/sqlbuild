@@ -1,3 +1,4 @@
+import { withServerStatus } from '$lib/build-area/status-fixtures';
 import { describe, expect, it } from 'vitest';
 import { overviewOf } from './http-overview';
 import type { CatalogNode, Check, NodeChange, PlatformEvent, Run, SnapshotChange, StaleReason } from './types';
@@ -10,7 +11,7 @@ function run(id: string, status: Run['status'], queuedHoursAgo: number, endedHou
 }
 
 const node = (key: string, kind: CatalogNode['kind'], path: string, stale: StaleReason['reason'][] = [], extra: Partial<CatalogNode> = {}) =>
-	({ key, kind, path, group: null, lastOutcome: null, lastBuild: null, stale: stale.map((reason) => ({ reason })), ...extra }) as CatalogNode;
+	withServerStatus({ key, kind, path, group: null, lastOutcome: null, lastBuild: null, stale: stale.map((reason) => ({ reason })), ...extra } as CatalogNode);
 const built = { lastBuild: { builtAt: hoursAgo(1) } } as Partial<CatalogNode>;
 const check = (id: string, outcome: string | null) => ({ id, latest: outcome ? { outcome } : null }) as unknown as Check;
 const change = (publishedHoursAgo: number, nodes: [NodeChange['op'], string][]) =>
@@ -42,12 +43,12 @@ describe('overview from live reads', () => {
 		runs,
 		checks: [check('a', 'pass'), check('b', 'fail'), check('c', 'error'), check('d', 'warn'), check('e', null)],
 		nodes: [
-			node('model:orders', 'table', 'models/marts/core/orders.sql', ['changed', 'behind'], built),
-			node('model:totals', 'view', 'models/marts/totals.sql', [], built),
-			node('model:returns', 'table', 'models/marts/returns.sql', [], { ...built, lastOutcome: 'failed' }),
-			node('model:events', 'incremental', 'models/staging/events.sql', ['behind'], built),
-			node('source:raw', 'source', 'models/staging/sources.yml'),
-			node('seed:regions', 'seed', 'seeds/regions.csv')
+			node('model:orders', 'table', 'sql/models/marts/core/orders.sql', ['changed', 'behind'], built),
+			node('model:totals', 'view', 'sql/models/marts/totals.sql', [], built),
+			node('model:returns', 'table', 'sql/models/marts/returns.sql', [], { ...built, lastOutcome: 'failed' }),
+			node('model:events', 'incremental', 'sql/models/staging/events.sql', ['behind'], built),
+			node('source:raw', 'source', 'sql/sources/raw.yml'),
+			node('seed:regions', 'seed', 'sql/seeds/regions.csv')
 		],
 		changes: [change(1, [['added', 'model:orders'], ['added', 'seed:regions'], ['removed', 'model:old']]), change(24 * 8, [['added', 'model:totals']])],
 		events: [event('scheduler', true), event('cleared', false)],
@@ -59,7 +60,8 @@ describe('overview from live reads', () => {
 
 	it('counts the nodes it builds by top-level folder, leaving sources out', () => {
 		expect(overview.groups).toEqual([
-			{ group: 'marts', total: 3, current: 1, changed: 1, behind: 1, failed: 1 },
+			// Each node counts once, by its status: orders is changed, whatever else it is.
+			{ group: 'marts', total: 3, current: 1, changed: 1, behind: 0, failed: 1 },
 			{ group: 'seeds', total: 1, current: 0, changed: 0, behind: 0, failed: 0 },
 			{ group: 'staging', total: 1, current: 0, changed: 0, behind: 1, failed: 0 }
 		]);
@@ -103,7 +105,7 @@ describe('overview from live reads', () => {
 	});
 
 	it('leaves parts without a server read empty instead of zero', () => {
-		const unknown = overviewOf({ runs: [], checks: [], nodes: [{ ...node('model:a', 'table', 'models/a.sql'), stale: null }], changes: [], events: [], triggers: [], acknowledgements: new Map(), conditions: { snoozeSeconds: 86_400, acknowledgements: [] }, scopeKey: 'loc-1:dev', now });
+		const unknown = overviewOf({ runs: [], checks: [], nodes: [{ ...node('model:a', 'table', 'sql/models/a.sql'), stale: null }], changes: [], events: [], triggers: [], acknowledgements: new Map(), conditions: { snoozeSeconds: 86_400, acknowledgements: [] }, scopeKey: 'loc-1:dev', now });
 		expect(unknown.groups).toBeNull();
 	});
 });

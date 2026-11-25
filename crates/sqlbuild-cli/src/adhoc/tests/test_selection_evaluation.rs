@@ -112,17 +112,15 @@ fn given_a_publication_when_its_vocabulary_is_read_then_each_value_counts_the_no
             expected_entries: &[("orders", 4)],
         },
         VocabularyTestCase {
-            description: "a folder counts the nodes below it at any depth",
+            description: "a folder a path selector accepts counts the nodes below it at any depth",
             entries_of: |vocabulary| &vocabulary.paths,
             expected_entries: &[
-                ("python", 4),
                 ("python/nodes", 4),
                 ("python/nodes/fulfillment", 1),
                 ("python/nodes/fulfillment/carrier_sync", 1),
                 ("python/nodes/loaders", 2),
                 ("python/nodes/orders", 1),
                 ("python/nodes/orders/partner_export", 1),
-                ("sql", 4),
                 ("sql/models", 4),
                 ("sql/models/marts", 3),
                 ("sql/models/staging", 1),

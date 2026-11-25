@@ -6,6 +6,7 @@
 	import type { CatalogNode } from '$lib/api';
 	import { folderPaths, folderTree, visibleTreeRows, type FolderNode, type FolderSort, type TreeRow } from '$lib/build-area/folder-tree';
 	import { needsAttention } from '$lib/build-area/overview-panels';
+	import { statusLabel } from '$lib/build-area/node-status';
 	import { nodeIcon, nodeIconKey, shortName } from '$lib/build-area/labels';
 	import DataTable from '$lib/components/list/data-table.svelte';
 	import type { TableColumn } from '$lib/components/list/table-columns';
@@ -80,16 +81,7 @@
 	}
 	/** A folder's own nodes as a selection: the folder itself when it has no subfolders. */
 	const ownSelection = (f: FolderNode) => (f.children.length ? [...new Set(f.members.map((n) => shortName(n.key)))].join(' ') : f.selection);
-	const nodeState = (n: CatalogNode): { label: string; tone: string } =>
-		n.lastOutcome === 'failed'
-			? { label: 'Failed', tone: 'var(--sb-error)' }
-			: n.stale?.some((s) => s.reason !== 'behind')
-				? { label: 'Changed', tone: 'var(--sb-stale)' }
-				: n.stale?.length
-					? { label: 'Behind', tone: 'var(--sb-behind)' }
-					: n.lastBuild
-						? { label: 'Current', tone: 'var(--sb-success)' }
-						: { label: 'Not built', tone: 'var(--muted-foreground)' };
+	const nodeState = (n: CatalogNode): { label: string; tone: string } => statusLabel(n) ?? { label: '—', tone: 'var(--muted-foreground)' };
 	const rowKey = (r: TreeRow) => (r.kind === 'folder' ? `f:${r.folder.path}` : r.kind === 'node' ? `n:${r.node.key}` : `m:${r.folder.path}`);
 </script>
 

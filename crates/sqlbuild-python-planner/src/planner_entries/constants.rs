@@ -24,3 +24,6 @@ pub const GETTERS: &[GetterEntry] = &[
         read: read_planner_relations_context,
     },
 ];
+
+/// The code family of source checks against the warehouse (a missing source, a contract the source breaks); they validate the project, so they fail the plan rather than one model's row.
+pub const SOURCE_VALIDATION_CODE_PREFIX: &str = "S4";

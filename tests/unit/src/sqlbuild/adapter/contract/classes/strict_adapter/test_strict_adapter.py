@@ -88,6 +88,7 @@ def test_given_first_class_adapters_when_checking_contract_then_no_method_comes_
             expected_optional_methods=frozenset(
                 {
                     "create_sql_test_output",
+                    "cursor_type_range",
                     "drop_sql_test_output",
                     "dynamic_listing",
                     "render_alter_dynamic",
