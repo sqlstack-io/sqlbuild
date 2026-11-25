@@ -247,6 +247,27 @@ error[S301]: cannot build selected scope: audit 'relationships' on 'stg_orders' 
 Load or build the resource first (for a seed, `sqb seed`), or add it to the selection. When both
 kinds are missing, the error lists the missing upstream resources and then the audit reads.
 
+The same applies to a singular audit selected by name, with `audit:` or a past run's failed audits:
+
+```
+error[S301]: cannot build selected scope: audit 'orders_have_payments' reads 'payments', which is not selected and does not exist in the warehouse; select it or build it first
+```
+
+A singular audit the plan selects only because the build builds something it references is not
+refused. When something it references doesn't exist in the target, the plan lists it as not run,
+and the build succeeds without running it; see [Singular audits](../concepts/audits.md#singular-audits):
+
+```
+Plan ready  1 selected, 1 audit not run
+Models (1)
+└── orders                   table
+Audits not run (1)
+└── orders_have_payments  reads payments, which doesn't exist in the target
+```
+
+`sqb plan --json` lists these audits under `audits_not_run`, each with its `name` and the
+`missing` resources it reads.
+
 ## Missing source tables
 
 When a selected model reads an external source whose table does not exist in the warehouse,

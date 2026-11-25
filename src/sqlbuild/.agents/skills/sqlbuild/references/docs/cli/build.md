@@ -303,6 +303,12 @@ skipped as for any other failure. Its row shows `TIMEOUT`. In the summary line, 
 failures were timeouts. A timeout is a failure for the exit code: the build exits non-zero and its
 JSON `status` is `failed`.
 
+A singular audit whose references don't all exist in the target is not run. Its row shows
+`NOT RUN`, the summary line counts it under `NOT_RUN=` (shown only when there is one) and in no
+other count, and a `Not run` section names what each one reads that is missing. In `--json`
+output, `summary.not_run_count` counts them. The build still succeeds; see
+[Singular audits](../concepts/audits.md#singular-audits).
+
 ## Limits
 
 A target's [`execution_limits`](../concepts/project-configuration.md#execution-limits) cap a whole
