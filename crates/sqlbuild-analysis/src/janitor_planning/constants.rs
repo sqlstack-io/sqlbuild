@@ -2,10 +2,7 @@
 
 use sqlbuild_core::constants::STATE_TABLE_NAMES;
 
-/// Relations SQLLoad owns beside the tables it loads: its run log, unfinished loads and CDC
-/// snapshots (`_sqlload_*`), its Snowflake stage probe (`__sqlload_*`), the staging tables of a
-/// load with their swap, aside and copy tables (`<table>__sqlload_staging_<id>...`), and CDC
-/// tombstones (`<table>__sqlload_deletes`).
+/// SQLLoad's own relations: run log and state, stage probe, a load's staging tables and CDC tombstones.
 pub const SQLLOAD_TABLE_PATTERNS: [&str; 4] = [
     "_sqlload_*",
     "__sqlload_*",

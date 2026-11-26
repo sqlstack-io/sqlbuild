@@ -11,3 +11,4 @@ pub mod resolve_effective_collection_rendering;
 pub mod resolve_effective_scenario_config;
 pub mod resolve_target_config;
 pub mod resolve_target_name;
+pub mod target_connection_problem;

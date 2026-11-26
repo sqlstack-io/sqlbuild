@@ -32,6 +32,13 @@ from tests.unit.src.sqlbuild.compiler.discovery._test_types import (
 )
 from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
+_WAREHOUSE_AND_SHOP: str = (
+    'name = "demo"\nadapter = "duckdb"\n\n'
+    '[connections.local]\ndatabase = "demo.duckdb"\n\n'
+    '[connections.shop]\nkind = "http"\nbase_url = "https://shop.example"\n'
+    'auth = { kind = "bearer" }\ntoken = "${env:SHOP_TOKEN_NOT_SET}"\nrate_limit = "10/s"\n\n'
+)
+
 
 @pytest.mark.parametrize(
     "test_case",
@@ -834,14 +841,6 @@ def test_given_target_connection_that_cant_hold_models_when_discovering_then_con
     assert error_info.value.code == "D001"
     assert test_case.expected_error_fragment in str(error_info.value)
     assert str(tmp_path / "sqlbuild_project.toml") in str(error_info.value)
-
-
-_WAREHOUSE_AND_SHOP: str = (
-    'name = "demo"\nadapter = "duckdb"\n\n'
-    '[connections.local]\ndatabase = "demo.duckdb"\n\n'
-    '[connections.shop]\nkind = "http"\nbase_url = "https://shop.example"\n'
-    'auth = { kind = "bearer" }\ntoken = "${env:SHOP_TOKEN_NOT_SET}"\nrate_limit = "10/s"\n\n'
-)
 
 
 @pytest.mark.parametrize(

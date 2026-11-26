@@ -1,6 +1,5 @@
 //! Validate loaded project and local configuration before discovery reads project files.
 
-use crate::compile_driver::_helpers::connection_roles::target_connection_problem;
 use crate::compile_driver::main::session_warehouse_support::session_warehouse_support;
 use crate::compile_driver::models::ProjectConfiguration;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
@@ -10,6 +9,7 @@ use sqlbuild_python_base::records::main::construct::new_error::new_error;
 
 use crate::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 use crate::contracts::main::resolve_target_config::resolve_target_config;
+use crate::contracts::main::target_connection_problem::target_connection_problem;
 use crate::discovery::main::project::resolve_config_file_path::resolve_config_file_path;
 use crate::discovery::main::project::validate_local_sql_analysis::validate_local_sql_analysis;
 use pyo3::IntoPyObjectExt;
@@ -149,7 +149,11 @@ pub(crate) fn reject_invalid_target_connections(
         );
         let error: PyErr = match resolved {
             Ok(resolved) => {
-                let Some(problem) = target_connection_problem(config, (&name, &resolved))? else {
+                let Some(problem) = target_connection_problem(
+                    (config.project_config, config.local_config),
+                    (&name, &resolved),
+                )?
+                else {
                     continue;
                 };
                 let config_path: Bound<'_, PyAny> =

@@ -7,8 +7,7 @@ use sqlload::project::main::parse_project::parse_project;
 use sqlload::project::models::ConnectionConfig;
 
 use crate::source_connections::_helpers::literal::literal;
-
-const CONNECTIONS: &str = "connections";
+use crate::source_connections::constants::CONNECTIONS;
 
 /// Each of `connections` as SQLLoad's connection of its `kind`, every string taken literally, or SQLLoad's message.
 pub fn source_connections(
