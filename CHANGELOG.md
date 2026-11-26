@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.262.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.261.0...v0.262.0) (2026-11-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* a run with any failure is failed; the partial outcome and RunEventKind.PARTIAL are removed
+* unit tests and scenarios run locally in DuckDB when SQLQuack can convert them (--run-on auto|local|warehouse), falling back to the warehouse otherwise
+* runs say what failed and how to rerun it, unit tests run locally in DuckDB, health that works through outages ([#1628](https://github.com/sqlstack-io/sqlbuild/issues/1628))
+
+### Features
+
+* a run with any failure is failed; the partial outcome and RunEventKind.PARTIAL are removed ([49b4934](https://github.com/sqlstack-io/sqlbuild/commit/49b49346f6738409a899b883cff3e2f929dce8ff))
+* a singular audit whose reads the target doesn't have is not run, counted on its own, instead of failing the job ([49b4934](https://github.com/sqlstack-io/sqlbuild/commit/49b49346f6738409a899b883cff3e2f929dce8ff))
+* audit:, run:, failed: and skipped: selectors in plan, build, test, audit and check, from local history or a server ([49b4934](https://github.com/sqlstack-io/sqlbuild/commit/49b49346f6738409a899b883cff3e2f929dce8ff))
+* failing event sinks, webhooks and run-history syncs are attention items ([49b4934](https://github.com/sqlstack-io/sqlbuild/commit/49b49346f6738409a899b883cff3e2f929dce8ff))
+* **location:** run-history sync retries within a minute and never stops for an unreached warehouse ([49b4934](https://github.com/sqlstack-io/sqlbuild/commit/49b49346f6738409a899b883cff3e2f929dce8ff))
+* run_failed events and alerts carry the run URL, the run-level error, failed audits with their warehouse error, duration, trigger and counts ([49b4934](https://github.com/sqlstack-io/sqlbuild/commit/49b49346f6738409a899b883cff3e2f929dce8ff))
+* runs say what failed and how to rerun it, unit tests run locally in DuckDB, health that works through outages ([#1628](https://github.com/sqlstack-io/sqlbuild/issues/1628)) ([49b4934](https://github.com/sqlstack-io/sqlbuild/commit/49b49346f6738409a899b883cff3e2f929dce8ff))
+* **server:** name the control database's real cause, and health that answers without it (/livez, /api/health, /status) ([49b4934](https://github.com/sqlstack-io/sqlbuild/commit/49b49346f6738409a899b883cff3e2f929dce8ff))
+* the rerun page runs its selection as sqb build, with no hidden rerun state ([49b4934](https://github.com/sqlstack-io/sqlbuild/commit/49b49346f6738409a899b883cff3e2f929dce8ff))
+* the run page leads with what failed, one text filter for the log, quieter header and Details drawer ([49b4934](https://github.com/sqlstack-io/sqlbuild/commit/49b49346f6738409a899b883cff3e2f929dce8ff))
+* **ui:** health and outages in the shell, a public Status page ([49b4934](https://github.com/sqlstack-io/sqlbuild/commit/49b49346f6738409a899b883cff3e2f929dce8ff))
+* unit tests and scenarios run locally in DuckDB when SQLQuack can convert them (--run-on auto|local|warehouse), falling back to the warehouse otherwise ([49b4934](https://github.com/sqlstack-io/sqlbuild/commit/49b49346f6738409a899b883cff3e2f929dce8ff))
+
+
+### Bug Fixes
+
+* an audit whose query couldn't run keeps the warehouse's error ([49b4934](https://github.com/sqlstack-io/sqlbuild/commit/49b49346f6738409a899b883cff3e2f929dce8ff))
+* **cli:** an audit that isn't run shows only its NOT RUN row ([49b4934](https://github.com/sqlstack-io/sqlbuild/commit/49b49346f6738409a899b883cff3e2f929dce8ff))
+* **cli:** the plan line leaves out zero counts ([49b4934](https://github.com/sqlstack-io/sqlbuild/commit/49b49346f6738409a899b883cff3e2f929dce8ff))
+* Started execution is published before the Python phase, and no warehouse connection opens when the SQL phase has nothing to run ([49b4934](https://github.com/sqlstack-io/sqlbuild/commit/49b49346f6738409a899b883cff3e2f929dce8ff))
+* **worker:** sqb audit reports a singular audit under its own check ([49b4934](https://github.com/sqlstack-io/sqlbuild/commit/49b49346f6738409a899b883cff3e2f929dce8ff))
+
 ## [0.261.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.260.0...v0.261.0) (2026-11-25)
 
 
