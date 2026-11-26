@@ -3,7 +3,7 @@
 use crate::cli_text::main::format_surface_header::format_surface_header;
 use crate::cli_text::models::CliStyle;
 use crate::run_output::constants::{
-    BRANCH_GLYPH, EXPLAIN_HINT, LAST_GLYPH, ON_THE_WAREHOUSE, RUN_ON_TITLE,
+    BRANCH_GLYPH, EXPLAIN_HINT, HEADER_CAUSE_LIMIT, LAST_GLYPH, ON_THE_WAREHOUSE, RUN_ON_TITLE,
 };
 use crate::run_output::models::RunHeader;
 use crate::text::main::text_wrap::text_wrap;
@@ -52,8 +52,15 @@ pub fn render_run_header(header: &RunHeader, columns: usize, style: CliStyle) ->
                 style.muted(&detail)
             ));
         }
-        for (index, cause) in header.causes.iter().enumerate() {
-            let glyph: &str = if index + 1 == causes {
+        let shown: usize = causes.min(HEADER_CAUSE_LIMIT);
+        let width: usize = header.causes[..shown]
+            .iter()
+            .map(|cause| cause.label.chars().count() + 1)
+            .max()
+            .unwrap_or(0)
+            .max(LABEL_WIDTH - 4);
+        for (index, cause) in header.causes[..shown].iter().enumerate() {
+            let glyph: &str = if index + 1 == shown && shown == causes {
                 LAST_GLYPH
             } else {
                 BRANCH_GLYPH
@@ -64,16 +71,29 @@ pub fn render_run_header(header: &RunHeader, columns: usize, style: CliStyle) ->
                 cause.label,
                 cause.count,
                 style.muted(&cause.detail),
-                width = LABEL_WIDTH - 4
+            ));
+        }
+        if shown < causes {
+            lines.push(format!(
+                "    {} {}",
+                style.muted(LAST_GLYPH),
+                style.muted(&format!("... and {} more", causes - shown))
             ));
         }
     }
     if !header.local_only && !header.causes.is_empty() {
-        let causes: Vec<String> = header
+        let mut causes: Vec<String> = header
             .causes
             .iter()
+            .take(HEADER_CAUSE_LIMIT)
             .map(|cause| format!("{} {}", cause.label, cause.count))
             .collect();
+        if header.causes.len() > HEADER_CAUSE_LIMIT {
+            causes.push(format!(
+                "+{} more",
+                header.causes.len() - HEADER_CAUSE_LIMIT
+            ));
+        }
         let text: String = format!(
             "{} {} run on the warehouse: {} {EXPLAIN_HINT}",
             header.warehouse,

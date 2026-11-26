@@ -1134,8 +1134,22 @@ impl NestedCommandProgressCallbacks {
         Ok(())
     }
 
+    /// The group a row is shown under: its own, when that group has more than one item, else none.
+    pub(crate) fn headed_group(&self, group: &str) -> String {
+        match self.group_counts.get(group) {
+            Some(count) if *count > 1 => group.to_owned(),
+            _ => String::new(),
+        }
+    }
+
     pub(crate) fn write_group_header(&self, py: Python<'_>, group: &str) -> PyResult<()> {
-        if group.is_empty() || self.state().printed_group.as_deref() == Some(group) {
+        if group.is_empty() {
+            if self.state().printed_group.take().is_some() {
+                write(self.stream.bind(py), "\n")?;
+            }
+            return Ok(());
+        }
+        if self.state().printed_group.as_deref() == Some(group) {
             return Ok(());
         }
         self.state().printed_group = Some(group.to_owned());
@@ -1170,6 +1184,7 @@ impl NestedCommandProgressCallbacks {
             return Ok(None);
         }
         if reporter.is_tty {
+            reporter.clear_live_row(py)?;
             reporter.state().line_active = false;
             release(reporter.lines.bind(py), slf.as_any())?;
             reporter.set_cursor(py, false)?;
@@ -1416,12 +1431,13 @@ impl NestedCommandProgressCallbacks {
                     },
                     child_rows: child_rows(&arguments)?,
                 };
+                let shown_group: String = reporter.headed_group(&item_group);
                 reporter.clear_live_row(py)?;
-                reporter.write_group_header(py, &item_group)?;
+                reporter.write_group_header(py, &shown_group)?;
                 release(&held)?;
                 write(
                     reporter.stream.bind(py),
-                    &render_nested_item(&item, &item_group, &reporter.layout(py)?, reporter.style),
+                    &render_nested_item(&item, &shown_group, &reporter.layout(py)?, reporter.style),
                 )?;
             } else {
                 release(&held)?;

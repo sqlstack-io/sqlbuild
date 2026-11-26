@@ -120,6 +120,8 @@ const NEEDS_WAREHOUSE_CODE: &str = "T008";
 const NEEDS_WAREHOUSE_MESSAGE: &str = "needs the warehouse (no connection)";
 const COMPILED_TESTS_DIR: &str = "target/run/tests";
 const CANNOT_RUN_LOCALLY_TITLE: &str = "Can't run locally";
+/// The rollup line after the rows names at most this many causes.
+const ROLLUP_CAUSES: usize = 5;
 const ASSERTION_PREFIX: &str = "assertion ";
 const ASSERTION_LABEL: &str = "assertion";
 const EXPECTED_LABEL: &str = "expected";
@@ -135,12 +137,18 @@ fn strings(values: Bound<'_, PyAny>) -> PyResult<Vec<String>> {
     values.try_iter()?.map(|value| value?.extract()).collect()
 }
 
-/// The widest name a test row shows, without its group's prefix.
+/// The widest name a test row shows: without its group's prefix when the group has a header.
 fn name_width(entries: &Bound<'_, PyAny>) -> PyResult<usize> {
+    let counts: HashMap<String, usize> = group_counts(entries)?;
     let mut labels: Vec<(String, String)> = Vec::new();
     for entry in entries.try_iter()? {
         let entry: Bound<'_, PyAny> = entry?;
-        labels.push((test_label(&entry, "name")?, entry_group(&entry)?));
+        let group: String = entry_group(&entry)?;
+        let headed: bool = counts.get(&group).copied().unwrap_or(0) > 1;
+        labels.push((
+            test_label(&entry, "name")?,
+            if headed { group } else { String::new() },
+        ));
     }
     Ok(test_name_width(&labels))
 }
@@ -1048,10 +1056,15 @@ fn complete(
     let mut text: String = String::new();
     let causes: Vec<HeaderCause> = refusal_causes(&report.decisions);
     if !not_run.is_empty() && report.mode == RunOn::Local {
-        let causes: Vec<String> = causes
+        let mut causes: Vec<String> = causes
             .iter()
+            .take(ROLLUP_CAUSES)
             .map(|cause| format!("{} {}", cause.label, cause.count))
             .collect();
+        let all: usize = refusal_causes(&report.decisions).len();
+        if all > ROLLUP_CAUSES {
+            causes.push(format!("+{} more", all - ROLLUP_CAUSES));
+        }
         text.push_str(&format!(
             "\n{}\n",
             style.muted(&format!(

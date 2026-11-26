@@ -28,3 +28,5 @@ pub(crate) const ON_THE_WAREHOUSE: &str = "On the warehouse";
 pub(crate) const EXPLAIN_HINT: &str = "(--explain for where)";
 pub(crate) const SHORT_REASON_WIDTH: usize = 48;
 pub(crate) const ENGINE_ERROR_MARK: &str = " Error:";
+/// The header and the rollup line name at most this many causes.
+pub(crate) const HEADER_CAUSE_LIMIT: usize = 5;

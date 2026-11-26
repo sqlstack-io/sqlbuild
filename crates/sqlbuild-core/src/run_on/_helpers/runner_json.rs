@@ -35,12 +35,15 @@ fn refusal(value: &Value) -> LocalRefusal {
         snippet_column: number(value, "snippet_column"),
         expanded_from: text(value, "expanded_from"),
         macro_name: text(value, "macro_name"),
-        macro_place: value.get("macro_place").map(|place| MacroPlace {
-            path: text(place, "path").unwrap_or_default(),
-            line: number(place, "line").unwrap_or(0),
-            column: number(place, "column").unwrap_or(0),
-            snippet: text(place, "snippet").unwrap_or_default(),
-        }),
+        macro_place: value
+            .get("macro_place")
+            .filter(|place| place.is_object())
+            .map(|place| MacroPlace {
+                path: text(place, "path").unwrap_or_default(),
+                line: number(place, "line").unwrap_or(0),
+                column: number(place, "column").unwrap_or(0),
+                snippet: text(place, "snippet").unwrap_or_default(),
+            }),
     }
 }
 
