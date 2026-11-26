@@ -2222,6 +2222,7 @@ crate_names = [
     "sqlbuild-python-planner",
     "sqlbuild-python-compile",
     "sqlbuild-python-output",
+    "sqlbuild-python-load",
     "sqlbuild-python",
     "sqlbuild-recall",
     "sqlbuild-refactor",

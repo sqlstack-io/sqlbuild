@@ -6662,13 +6662,13 @@ dependencies = [
  "sqlbuild-core",
  "sqlbuild-discovery",
  "sqlbuild-host",
- "sqlbuild-load",
  "sqlbuild-model-config",
  "sqlbuild-orchestration",
  "sqlbuild-pysource",
  "sqlbuild-python-base",
  "sqlbuild-python-compile",
  "sqlbuild-python-front",
+ "sqlbuild-python-load",
  "sqlbuild-python-output",
  "sqlbuild-python-planner",
  "sqlbuild-python-project",
@@ -6766,6 +6766,17 @@ dependencies = [
  "tokio",
  "toml",
  "uuid",
+]
+
+[[package]]
+name = "sqlbuild-python-load"
+version = "0.0.0"
+dependencies = [
+ "pyo3",
+ "serde_json",
+ "sqlbuild-load",
+ "sqlload",
+ "tokio",
 ]
 
 [[package]]

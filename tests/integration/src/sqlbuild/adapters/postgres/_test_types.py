@@ -94,3 +94,10 @@ class PostgresSeedTestCase:
     description: str
     csv_text: str
     expected_rows: tuple[tuple[object, ...], ...]
+
+
+@dataclass(frozen=True)
+class PostgresLoadSessionTestCase:
+    description: str
+    files: tuple[tuple[str, str], ...]
+    expected_rows: tuple[tuple[object, ...], ...]
