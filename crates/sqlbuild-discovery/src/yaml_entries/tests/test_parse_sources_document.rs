@@ -1,5 +1,7 @@
 use crate::yaml_entries::_helpers::freshness::freshness_minutes;
-use crate::yaml_entries::tests::helpers::{dlt_group, map, sources, sources_outcome, text};
+use crate::yaml_entries::tests::helpers::{
+    dlt_group, loaded_sources, map, sources, sources_outcome, text,
+};
 use crate::yaml_entries::tests::test_types::{
     FreshnessDurationTestCase, Node, SourcesDocumentTestCase, lines, parse_error,
 };
@@ -106,6 +108,60 @@ fn given_sources_documents_when_parsing_then_matches_python_sources_and_errors()
             ]),
             expected_sources: parse_error(
                 "/project/sources/shop.yml source freshness type and filter require column or query",
+            ),
+        },
+        SourcesDocumentTestCase {
+            description: "a load fills the sources named after it, and no others",
+            document: loaded_sources(
+                vec![
+                    ("name", text("shop")),
+                    ("kind", text("postgres")),
+                    ("connection", text("shop_db")),
+                ],
+                vec![
+                    vec![
+                        ("name", text("shop__orders")),
+                        ("description", text("Orders")),
+                    ],
+                    vec![("name", text("shopping__carts"))],
+                    vec![("name", text("shop__"))],
+                ],
+            ),
+            expected_sources: lines(&[
+                "load shop",
+                "shop__orders loader=- managed=false schema=- table=- load=shop",
+                "shopping__carts loader=- managed=false schema=- table=-",
+                "shop__ loader=- managed=false schema=- table=-",
+            ]),
+        },
+        SourcesDocumentTestCase {
+            description: "a source a load fills can't set what the load decides",
+            document: loaded_sources(
+                vec![("name", text("shop"))],
+                vec![vec![
+                    ("name", text("shop__orders")),
+                    ("write_strategy", text("merge")),
+                ]],
+            ),
+            expected_sources: parse_error(
+                "/project/sources/shop.yml source 'shop__orders' is filled by the load 'shop', \
+                 so it can't set write_strategy; set it in the load, with SQLLoad's keys, under \
+                 `load` or `load.tables`",
+            ),
+        },
+        SourcesDocumentTestCase {
+            description: "a load needs a name",
+            document: loaded_sources(vec![("kind", text("postgres"))], Vec::new()),
+            expected_sources: parse_error(
+                "/project/sources/shop.yml load must define non-empty string 'name'",
+            ),
+        },
+        SourcesDocumentTestCase {
+            description: "a load is a mapping",
+            document: map(vec![("load", text("shop"))]),
+            expected_sources: parse_error(
+                "/project/sources/shop.yml load must be a mapping of SQLLoad source settings \
+                 with a name",
             ),
         },
     ];

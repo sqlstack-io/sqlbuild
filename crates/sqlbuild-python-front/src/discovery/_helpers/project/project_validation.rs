@@ -1,5 +1,7 @@
 //! Cross-file validation of one discovery's inputs.
 
+use crate::compile_driver::main::reject_invalid_loads::reject_invalid_loads;
+use crate::compile_driver::models::ProjectConfiguration;
 use crate::discovery::main::project::project_facts::project_facts;
 use crate::discovery::main::project::validation_error::validation_error;
 use crate::discovery::main::sources::orchestration_declarations::orchestration_declarations;
@@ -39,5 +41,16 @@ pub(crate) fn validate_discovered_project_inputs(
         let inventory = orchestration_declarations(&project_dir)?;
         facts.orchestration = inventory.names();
     }
-    validate_project_inputs(&facts).map_err(|failure| validation_error(py, failure))
+    validate_project_inputs(&facts).map_err(|failure| validation_error(py, failure))?;
+    if project_dir.is_none() {
+        return Ok(());
+    }
+    reject_invalid_loads(
+        &ProjectConfiguration {
+            project_dir: &project_dir,
+            project_config: &native_field(&inputs, "project_config")?,
+            local_config: &native_field(&inputs, "local_config")?,
+        },
+        &native_field(&inputs, "source_files")?,
+    )
 }

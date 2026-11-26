@@ -9,8 +9,10 @@ import pytest
 from sqlbuild._native import (
     DiscoveredProjectInputs,
     DiscoveredSqlTestBlock,
+    DiscoveryConflictError,
     ProjectConfigError,
     ProjectLayoutError,
+    SourceParseError,
     TargetConfig,
     discover_project_inputs,
     resolve_target_config,
@@ -27,11 +29,36 @@ from tests.unit.src.sqlbuild.compiler.discovery._test_types import (
     DiscoverUniqueTestNameTestCase,
     DiscoveryLifecycleTestCase,
     DiscoveryRelevantCountTestCase,
+    LoadDiscoveryTestCase,
+    LoadErrorTestCase,
     ProjectPythonPathAcceptanceTestCase,
     SourceConnectionErrorTestCase,
 )
 from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
+_SHOP_PROJECT: str = (
+    'name = "demo"\nadapter = "duckdb"\n\n'
+    '[connections.local]\ndatabase = "demo.duckdb"\n\n'
+    '[connections.shop_db]\nkind = "postgres"\nhost = "db"\nuser = "reader"\n'
+    'database = "shop"\npassword = "${ENV:SHOP_PASSWORD_NOT_SET}"\n\n'
+    '[targets.dev]\nconnection = "local"\nschema = "dev"\n'
+)
+_SHOP_LOAD: str = """load:
+  name: shop
+  kind: postgres
+  connection: shop_db
+  include: [public.orders]
+  write_strategy: merge
+  tables:
+    public.orders:
+      unique_key: id
+sources:
+  - name: shop__orders
+    description: Orders
+    columns:
+      - name: id
+        type: INTEGER
+"""
 _WAREHOUSE_AND_SHOP: str = (
     'name = "demo"\nadapter = "duckdb"\n\n'
     '[connections.local]\ndatabase = "demo.duckdb"\n\n'
@@ -841,6 +868,111 @@ def test_given_target_connection_that_cant_hold_models_when_discovering_then_con
     assert error_info.value.code == "D001"
     assert test_case.expected_error_fragment in str(error_info.value)
     assert str(tmp_path / "sqlbuild_project.toml") in str(error_info.value)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        LoadDiscoveryTestCase(
+            description="a load fills the sources the file lists under its name",
+            repo_files={"sqlbuild_project.toml": _SHOP_PROJECT, "sql/sources/shop.yml": _SHOP_LOAD},
+            expected_loads=(("shop__orders", "shop"),),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_load_when_discovering_then_its_sources_name_it(
+    test_case: LoadDiscoveryTestCase,
+    tmp_path: Path,
+    write_repo_files: Callable[[Path, dict[str, str]], None],
+) -> None:
+    write_repo_files(tmp_path, test_case.repo_files)
+
+    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
+
+    loads: tuple[tuple[str, str | None], ...] = tuple(
+        (entry.name, entry.load) for entry in discovered.source_files[0].source_entries
+    )
+    assert loads == test_case.expected_loads, test_case.description
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        LoadErrorTestCase(
+            description="SQLLoad refuses a setting, named at its line under load",
+            repo_files={
+                "sqlbuild_project.toml": _SHOP_PROJECT,
+                "sql/sources/shop.yml": _SHOP_LOAD.replace("unique_key: id", "unique_keys: id"),
+            },
+            expected_error_class=SourceParseError,
+            expected_error_fragment=(
+                "shop.yml:9 load 'shop': unknown key \"unique_keys\" in "
+                '[load.tables."public.orders"]'
+            ),
+        ),
+        LoadErrorTestCase(
+            description="a load can't read a warehouse connection",
+            repo_files={
+                "sqlbuild_project.toml": _SHOP_PROJECT,
+                "sql/sources/shop.yml": _SHOP_LOAD.replace(
+                    "connection: shop_db", "connection: local"
+                ),
+            },
+            expected_error_class=SourceParseError,
+            expected_error_fragment=(
+                "shop.yml:4 load 'shop': connection 'local' sets no kind; loads and loaders read "
+                "source connections"
+            ),
+        ),
+        LoadErrorTestCase(
+            description="a listed source the literal include doesn't load",
+            repo_files={
+                "sqlbuild_project.toml": _SHOP_PROJECT,
+                "sql/sources/shop.yml": _SHOP_LOAD
+                + "  - name: shop__carts\n    description: Carts\n",
+            },
+            expected_error_class=SourceParseError,
+            expected_error_fragment=(
+                "shop.yml:5 load 'shop': source 'shop__carts' matches no table the load 'shop' "
+                "includes; its tables load into shop__orders"
+            ),
+        ),
+        LoadErrorTestCase(
+            description="two files declare one load",
+            repo_files={
+                "sqlbuild_project.toml": _SHOP_PROJECT,
+                "sql/sources/shop.yml": _SHOP_LOAD,
+                "sql/sources/shop_again.yml": "load:\n  name: shop\n  kind: postgres\n",
+            },
+            expected_error_class=DiscoveryConflictError,
+            expected_error_fragment="Duplicate load 'shop' in sql/sources/shop.yml and sql/sources/shop_again.yml",
+        ),
+        LoadErrorTestCase(
+            description="the project's warehouse can't hold loaded tables",
+            repo_files={
+                "sqlbuild_project.toml": _SHOP_PROJECT.replace(
+                    'adapter = "duckdb"', 'adapter = "sqlite"'
+                ),
+                "sql/sources/shop.yml": _SHOP_LOAD,
+            },
+            expected_error_class=SourceParseError,
+            expected_error_fragment="shop.yml load: loads and loaders can't write to sqlite yet",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_load_sqlload_refuses_when_discovering_then_its_file_and_line_are_named(
+    test_case: LoadErrorTestCase,
+    tmp_path: Path,
+    write_repo_files: Callable[[Path, dict[str, str]], None],
+) -> None:
+    write_repo_files(tmp_path, test_case.repo_files)
+
+    with pytest.raises(test_case.expected_error_class) as error_info:
+        discover_project_inputs(project_dir=tmp_path)
+
+    assert test_case.expected_error_fragment in str(error_info.value), test_case.description
 
 
 @pytest.mark.parametrize(

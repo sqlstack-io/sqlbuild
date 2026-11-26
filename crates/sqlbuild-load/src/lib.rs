@@ -2,4 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod literal_settings;
+pub mod loads;
 pub mod source_connections;
+pub mod warehouses;

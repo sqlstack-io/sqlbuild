@@ -28,6 +28,21 @@ pub(crate) fn validate_loaders(facts: &ProjectFacts) -> Result<(), ValidationFai
              asset, and check names must be globally unique"
         )
     })?;
+    let mut load_paths: Vec<NamedPath> = Vec::new();
+    for file in &facts.sources {
+        if let Some(name) = &file.load {
+            load_paths.push(NamedPath {
+                name: name.clone(),
+                path: file.path.clone(),
+            });
+        }
+    }
+    unique_named(&load_paths, |name, existing, path| {
+        format!(
+            "Duplicate load '{name}' in {existing} and {path}; each sources file declares at \
+             most one load, and load names are unique"
+        )
+    })?;
     source_loader_name_collisions(&facts.sources, &loaders)?;
     validate_loader_dependencies(&facts.nodes)?;
     validate_python_node_dependencies(&facts.nodes)?;

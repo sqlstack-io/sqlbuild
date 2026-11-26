@@ -45,7 +45,7 @@ pub(crate) fn resource_nodes(
                     "columns": columns(attached.host.columns.bind(py).as_any())?,
                     "meta": plain_value(attached.host.meta.bind(py))?,
                     "entry": metadata(attached.host.entry.bind(py), &[
-                        "loader", "write_strategy", "cursor_column", "unique_key",
+                        "loader", "load", "write_strategy", "cursor_column", "unique_key",
                         "final", "load_batch_size", "freshness",
                     ])?,
                 }),

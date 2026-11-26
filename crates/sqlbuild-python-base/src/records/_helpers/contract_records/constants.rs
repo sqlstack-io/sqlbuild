@@ -730,6 +730,7 @@ const R_SOURCE_ENTRY: RecordSpec = RecordSpec {
         FieldSpec::new("table", FieldDefault::None),
         FieldSpec::new("final", FieldDefault::False),
         FieldSpec::new("loader", FieldDefault::None),
+        FieldSpec::new("load", FieldDefault::None),
         FieldSpec::new("managed", FieldDefault::False),
         FieldSpec::new("freshness", FieldDefault::None),
         FieldSpec::new("write_strategy", FieldDefault::None),

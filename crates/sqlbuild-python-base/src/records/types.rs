@@ -221,6 +221,7 @@ pub enum RecordId {
     DiscoveredRuntimeExtensions,
     DiscoveredSchemaFile,
     DiscoveredSeedFile,
+    DiscoveredLoad,
     DiscoveredSourceFile,
     DiscoveredSqlFunctionFile,
     DiscoveredSqlHookFile,

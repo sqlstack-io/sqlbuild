@@ -81,6 +81,8 @@ pub struct ParsedSourceEntry<N> {
     /// Whether reads of the source add `FINAL`, so replacing engines return one row per key.
     pub read_final: bool,
     pub loader: Option<String>,
+    /// The name of the file's `load:` that fills this source, when its name is `{load}__{table}`.
+    pub load: Option<String>,
     pub managed: bool,
     pub freshness: Option<ParsedFreshness<N>>,
     /// `append`, `delete_insert`, `merge` or `table`.
@@ -108,6 +110,7 @@ impl<N> ParsedSourceEntry<N> {
             table: None,
             read_final: false,
             loader: None,
+            load: None,
             managed: false,
             freshness: None,
             write_strategy: None,
@@ -123,4 +126,19 @@ impl<N> ParsedSourceEntry<N> {
             audits: Vec::new(),
         }
     }
+}
+
+/// A sources file's `load:`: a SQLLoad source under SQLBuild's name, its settings kept as authored for SQLLoad to read.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ParsedLoad<N> {
+    pub name: String,
+    /// The whole `load:` mapping, `name` included.
+    pub block: N,
+}
+
+/// What one sources file declares: its sources, and the load that fills some of them.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ParsedSourcesDocument<N> {
+    pub sources: Vec<ParsedSourceEntry<N>>,
+    pub load: Option<ParsedLoad<N>>,
 }

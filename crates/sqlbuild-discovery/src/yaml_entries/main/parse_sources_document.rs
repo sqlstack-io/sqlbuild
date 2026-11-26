@@ -1,19 +1,20 @@
-//! Python's `parse_loaded_sources_yml`: the source declarations of one loaded sources YAML file.
+//! Python's `parse_loaded_sources_yml`: the source declarations and the load of one loaded sources YAML file.
 
 use sqlbuild_model_config::errors::ConfigError;
 use sqlbuild_model_config::types::{AuthoredNode, NodeKind};
 
 use crate::yaml_entries::_helpers::fields::{Site, get, reject_unknown_keys};
+use crate::yaml_entries::_helpers::loads::{filling_load, sources_load};
 use crate::yaml_entries::_helpers::removed_integrations::reject_dlt_sources;
 use crate::yaml_entries::_helpers::sources::source_entry;
 use crate::yaml_entries::constants::SOURCE_FILE_KEYS;
-use crate::yaml_entries::models::ParsedSourceEntry;
+use crate::yaml_entries::models::{ParsedLoad, ParsedSourceEntry, ParsedSourcesDocument};
 
-/// Parse a loaded sources document's `sources`.
+/// Parse a loaded sources document's `sources` and `load`, linking each source the load fills to it.
 pub fn parse_sources_document<N: AuthoredNode>(
     loaded: &N,
     path: &str,
-) -> Result<Vec<ParsedSourceEntry<N>>, ConfigError> {
+) -> Result<ParsedSourcesDocument<N>, ConfigError> {
     let payload: Vec<(N, N)> = match loaded.kind() {
         NodeKind::Null => Vec::new(),
         NodeKind::Map => loaded.entries(),
@@ -32,6 +33,8 @@ pub fn parse_sources_document<N: AuthoredNode>(
             label: "sources file",
         },
     )?;
+    let load: Option<ParsedLoad<N>> = sources_load(&payload, path)?;
+    let load_name: Option<&str> = load.as_ref().map(|load| load.name.as_str());
     let mut sources: Vec<ParsedSourceEntry<N>> = Vec::new();
     if let Some(raw) = get(&payload, "sources") {
         if raw.kind() != NodeKind::List {
@@ -45,8 +48,15 @@ pub fn parse_sources_document<N: AuthoredNode>(
                     "{path} sources must contain only mappings"
                 )));
             }
-            sources.push(source_entry(&item.entries(), path)?);
+            let entries: Vec<(N, N)> = item.entries();
+            let name: String = get(&entries, "name")
+                .and_then(AuthoredNode::text)
+                .unwrap_or_default();
+            let load: Option<String> = filling_load(&entries, (&name, load_name), path)?;
+            let mut source: ParsedSourceEntry<N> = source_entry(&entries, path)?;
+            source.load = load;
+            sources.push(source);
         }
     }
-    Ok(sources)
+    Ok(ParsedSourcesDocument { sources, load })
 }

@@ -9,7 +9,7 @@ use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 
-use crate::compile_driver::models::ProjectConfiguration;
+use crate::compile_driver::models::{ConnectionRoles, ProjectConfiguration, SourceConnection};
 
 const LOCAL_CONFIG_FILENAME: &str = "sqlbuild_local.toml";
 
@@ -18,6 +18,28 @@ pub(crate) fn reject_invalid_source_connections(
     config: &ProjectConfiguration<'_, '_>,
 ) -> PyResult<()> {
     let py: Python<'_> = config.project_dir.py();
+    for connection in connection_roles(config)?.sources {
+        let mut table = toml::Table::new();
+        table.insert(
+            connection.name.clone(),
+            toml::Value::Table(connection.settings),
+        );
+        if let Err(message) = source_connections(table) {
+            let path: Bound<'_, PyAny> = config.project_dir.div(connection.file)?;
+            let message: String = format!("{} {}", path.str()?, message.trim_end());
+            return Err(new_error(
+                py,
+                ErrorId::ProjectConfig,
+                &message,
+                (None, None),
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// The project's connections by use: each source connection's merged settings and defining file, and each SQLBuild connection.
+pub(crate) fn connection_roles(config: &ProjectConfiguration<'_, '_>) -> PyResult<ConnectionRoles> {
     let used: Vec<String> = sqlbuild_connection_names(config)?;
     let project = native_field(config.project_config, "connections")?.downcast_into::<PyDict>()?;
     let local = native_field(config.local_config, "connections")?.downcast_into::<PyDict>()?;
@@ -27,6 +49,7 @@ pub(crate) fn reject_invalid_source_connections(
             names.push(name);
         }
     }
+    let mut roles = ConnectionRoles::default();
     for name in names {
         let entries: Vec<Bound<'_, PyDict>> = [project.get_item(&name)?, local.get_item(&name)?]
             .into_iter()
@@ -41,27 +64,22 @@ pub(crate) fn reject_invalid_source_connections(
                 }
             }
         }
-        if used.contains(&name) || !settings.contains_key(CONNECTION_KIND_KEY) {
+        let sets_kind: bool = settings.contains_key(CONNECTION_KIND_KEY);
+        if used.contains(&name) || !sets_kind {
+            roles.warehouses.push((name, sets_kind));
             continue;
         }
-        let mut table = toml::Table::new();
-        table.insert(name.clone(), toml::Value::Table(settings));
-        if let Err(message) = source_connections(table) {
-            let file: &str = match project.contains(&name)? {
-                true => PROJECT_CONFIG_FILENAME,
-                false => LOCAL_CONFIG_FILENAME,
-            };
-            let path: Bound<'_, PyAny> = config.project_dir.div(file)?;
-            let message: String = format!("{} {}", path.str()?, message.trim_end());
-            return Err(new_error(
-                py,
-                ErrorId::ProjectConfig,
-                &message,
-                (None, None),
-            ));
-        }
+        let file: &'static str = match project.contains(&name)? {
+            true => PROJECT_CONFIG_FILENAME,
+            false => LOCAL_CONFIG_FILENAME,
+        };
+        roles.sources.push(SourceConnection {
+            name,
+            file,
+            settings,
+        });
     }
-    Ok(())
+    Ok(roles)
 }
 
 /// Every connection a target, its catalog or Recall names in either file: SQLBuild connections, whatever their `kind`.
@@ -85,7 +103,7 @@ fn sqlbuild_connection_names(config: &ProjectConfiguration<'_, '_>) -> PyResult<
 }
 
 /// A loaded setting as TOML, `None` for an unset one; other values keep their text.
-fn toml_value(value: &Bound<'_, PyAny>) -> PyResult<Option<toml::Value>> {
+pub(crate) fn toml_value(value: &Bound<'_, PyAny>) -> PyResult<Option<toml::Value>> {
     if value.is_none() {
         return Ok(None);
     }

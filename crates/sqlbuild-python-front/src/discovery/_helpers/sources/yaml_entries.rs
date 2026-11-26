@@ -1,13 +1,13 @@
 //! Loaded schema and source YAML documents parsed natively into the Python contract objects.
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
-use pyo3::types::{PyDict, PyDictMethods, PyTuple};
+use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
 use pyo3::{FromPyObject, pyfunction};
 use sqlbuild_discovery::yaml_entries::main::parse_schema_document::parse_schema_document as parse_schema;
 use sqlbuild_discovery::yaml_entries::main::parse_sources_document::parse_sources_document as parse_sources;
 use sqlbuild_discovery::yaml_entries::models::{
     ParsedCsvSettings, ParsedFreshness, ParsedNaValues, ParsedSeedEntry, ParsedSourceEntry,
-    ParsedYamlColumn,
+    ParsedSourcesDocument, ParsedYamlColumn,
 };
 use sqlbuild_model_config::errors::{ConfigError, ErrorClass};
 
@@ -16,7 +16,8 @@ use crate::model_config::main::model_nodes::yaml_entry_classes::yaml_entry_class
 use crate::model_config::models::ContractClasses;
 use crate::model_config::models::PyNode;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
-use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::types::{ErrorId, RecordId};
 
 /// The directory whose schema YAML files may declare seeds.
 const SEEDS_DIRECTORY: &str = "seeds";
@@ -225,6 +226,7 @@ fn source_entry<'py>(
     fields.set_item("table", optional(py, source.table.as_ref()))?;
     fields.set_item("final", source.read_final)?;
     fields.set_item("loader", source.loader.as_deref())?;
+    fields.set_item("load", source.load.as_deref())?;
     fields.set_item("managed", source.managed)?;
     let freshness_config: Bound<'py, PyAny> = match &source.freshness {
         Some(config) => freshness(py, classes, config)?,
@@ -269,19 +271,29 @@ pub(crate) fn parse_sources_document<'py>(
     loaded: Bound<'py, PyAny>,
     path: &str,
 ) -> PyResult<Bound<'py, PyTuple>> {
+    Ok(parsed_sources_file(py, loaded, path)?.0)
+}
+
+/// One loaded sources YAML document's source entries and its load, or the parse error Python raises.
+pub(crate) fn parsed_sources_file<'py>(
+    py: Python<'py>,
+    loaded: Bound<'py, PyAny>,
+    path: &str,
+) -> PyResult<(Bound<'py, PyTuple>, Bound<'py, PyAny>)> {
     let classes: YamlClasses<'py> = yaml_entry_classes(py)?.extract()?;
-    let sources: Vec<ParsedSourceEntry<PyNode<'py>>> = parse_sources(&PyNode(loaded), path)
+    let document: ParsedSourcesDocument<PyNode<'py>> = parse_sources(&PyNode(loaded), path)
         .map_err(|error| {
             parse_error(py, error, SOURCE_PARSE_ERROR).unwrap_or_else(|error| error)
         })?;
+    let sources: &[ParsedSourceEntry<PyNode<'py>>] = &document.sources;
     let referenced: Option<std::collections::BTreeSet<String>> =
         sqlbuild_python_base::compile_context::main::delta::injection::injection()
             .and_then(|injection| injection.source_names.clone());
     sqlbuild_python_base::compile_context::main::delta::record_source_reads::record_source_reads(
-        loaded_sources(&sources).iter().map(String::as_str),
+        loaded_sources(sources).iter().map(String::as_str),
     );
     let mut built: Vec<Bound<'py, PyAny>> = Vec::with_capacity(sources.len());
-    for source in &sources {
+    for source in sources {
         if let Some(referenced) = &referenced
             && let Ok(name) = source.name.0.extract::<String>()
             && !referenced.contains(&name)
@@ -290,14 +302,25 @@ pub(crate) fn parse_sources_document<'py>(
         }
         built.push(source_entry(py, &classes, source)?);
     }
-    PyTuple::new(py, built)
+    let load: Bound<'py, PyAny> = match &document.load {
+        Some(load) => new_record_with(
+            py,
+            RecordId::DiscoveredLoad,
+            &[
+                ("name", PyString::new(py, &load.name).into_any()),
+                ("settings", load.block.0.clone()),
+            ],
+        )?,
+        None => py.None().into_bound(py),
+    };
+    Ok((PyTuple::new(py, built)?, load))
 }
 
 /// The sources a loader fills, which own that loader wherever the project is compiled.
 fn loaded_sources(sources: &[ParsedSourceEntry<PyNode<'_>>]) -> Vec<String> {
     sources
         .iter()
-        .filter(|source| source.managed || source.loader.is_some())
+        .filter(|source| source.managed || source.loader.is_some() || source.load.is_some())
         .filter_map(|source| {
             let Ok(name) = source.name.0.extract::<String>() else {
                 return None;

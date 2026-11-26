@@ -6,7 +6,7 @@ use sqlload::project::errors::ProjectError;
 use sqlload::project::main::parse_project::parse_project;
 use sqlload::project::models::ConnectionConfig;
 
-use crate::source_connections::_helpers::literal::literal;
+use crate::literal_settings::main::literal_settings::literal_settings;
 use crate::source_connections::constants::CONNECTIONS;
 
 /// Each of `connections` as SQLLoad's connection of its `kind`, every string taken literally, or SQLLoad's message.
@@ -16,7 +16,7 @@ pub fn source_connections(
     let mut project = toml::Table::new();
     project.insert(
         CONNECTIONS.to_owned(),
-        literal(toml::Value::Table(connections)),
+        literal_settings(toml::Value::Table(connections)),
     );
     let text: String = toml::to_string(&project).map_err(|error| error.to_string())?;
     match parse_project(&text, &|_| None) {

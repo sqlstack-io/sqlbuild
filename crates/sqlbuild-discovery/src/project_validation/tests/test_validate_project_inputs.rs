@@ -43,6 +43,29 @@ fn given_discovered_facts_when_validating_then_reports_python_first_conflict() {
             ),
         },
         ValidationTestCase {
+            description: "two sources files declare loads of one name",
+            facts: ProjectFacts {
+                sources: vec![
+                    SourceFileFact {
+                        path: "sql/sources/shop.yml".to_owned(),
+                        entries: Vec::new(),
+                        load: Some("shop".to_owned()),
+                    },
+                    SourceFileFact {
+                        path: "sql/sources/more_shop.yml".to_owned(),
+                        entries: Vec::new(),
+                        load: Some("shop".to_owned()),
+                    },
+                ],
+                ..ProjectFacts::default()
+            },
+            expected_failure: failure(
+                FailureKind::Conflict,
+                "Duplicate load 'shop' in sql/sources/shop.yml and sql/sources/more_shop.yml; \
+                 each sources file declares at most one load, and load names are unique",
+            ),
+        },
+        ValidationTestCase {
             description: "a source and a model share a logical relation name",
             facts: ProjectFacts {
                 models: vec![model("orders")],
@@ -52,6 +75,7 @@ fn given_discovered_facts_when_validating_then_reports_python_first_conflict() {
                         name: "orders".to_owned(),
                         ..SourceFact::default()
                     }],
+                    load: None,
                 }],
                 ..ProjectFacts::default()
             },

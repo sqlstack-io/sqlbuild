@@ -135,3 +135,18 @@ class InvalidRecallSinkTestCase:
     expected_error: type[Exception]
     expected_code: str
     expected_message: str
+
+
+@dataclass(frozen=True)
+class LoadDiscoveryTestCase:
+    description: str
+    repo_files: dict[str, str]
+    expected_loads: tuple[tuple[str, str | None], ...]
+
+
+@dataclass(frozen=True)
+class LoadErrorTestCase:
+    description: str
+    repo_files: dict[str, str]
+    expected_error_class: type[Exception]
+    expected_error_fragment: str

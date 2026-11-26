@@ -849,7 +849,13 @@ const R_DISCOVERED_SOURCE_FILE: RecordSpec = RecordSpec {
         FieldSpec::required("relative_path"),
         FieldSpec::required("contents"),
         FieldSpec::required("source_entries"),
+        FieldSpec::new("load", FieldDefault::None),
     ],
+};
+const R_DISCOVERED_LOAD: RecordSpec = RecordSpec {
+    name: "DiscoveredLoad",
+    doc: "A sources file's load: a SQLLoad source under SQLBuild's name, with its settings as authored.",
+    fields: &[FieldSpec::required("name"), FieldSpec::required("settings")],
 };
 const R_DISCOVERED_SQL_TEST_FILE: RecordSpec = RecordSpec {
     name: "DiscoveredSqlTestFile",
@@ -1694,6 +1700,7 @@ pub(crate) const COMPILE_VALUE_RECORDS: &[RecordSpec] = &[
     R_PYTHON_HOOK_ENTRY,
     R_ENUM_DECLARATION,
     R_CONSTANT_DECLARATION,
+    R_DISCOVERED_LOAD,
     R_DISCOVERED_SOURCE_FILE,
     R_DISCOVERED_SQL_TEST_FILE,
     R_SQL_TEST_PARAMETER_DECLARATION,

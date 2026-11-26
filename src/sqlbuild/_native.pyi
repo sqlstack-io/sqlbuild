@@ -12870,6 +12870,7 @@ class SourceEntry(NativeRecord):
     table: str | None
     final: bool
     loader: str | None
+    load: str | None
     managed: bool
     freshness: SourceFreshnessConfig | None
     write_strategy: SourceWriteStrategy | None
@@ -12891,6 +12892,7 @@ class SourceEntry(NativeRecord):
         table: str | None = ...,
         final: bool = ...,
         loader: str | None = ...,
+        load: str | None = ...,
         managed: bool = ...,
         freshness: SourceFreshnessConfig | None = ...,
         write_strategy: SourceWriteStrategy | None = ...,
@@ -14893,6 +14895,13 @@ class ConstantDeclaration(NativeRecord):
     @property
     def scalar_type(self) -> str: ...
 
+class DiscoveredLoad(NativeRecord):
+    """A sources file's load: a SQLLoad source under SQLBuild's name, with its settings as authored."""
+
+    name: str
+    settings: dict[str, object]
+    def __init__(self, name: str, settings: dict[str, object]) -> None: ...
+
 class DiscoveredSourceFile(NativeRecord):
     """A discovered source declaration file and its raw contents."""
 
@@ -14900,12 +14909,14 @@ class DiscoveredSourceFile(NativeRecord):
     relative_path: Path
     contents: str
     source_entries: tuple[SourceEntry, ...]
+    load: DiscoveredLoad | None
     def __init__(
         self,
         file_path: Path,
         relative_path: Path,
         contents: str,
         source_entries: tuple[SourceEntry, ...],
+        load: DiscoveredLoad | None = ...,
     ) -> None: ...
 
 class DiscoveredSqlTestFile(NativeRecord):
