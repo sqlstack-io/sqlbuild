@@ -1,5 +1,6 @@
 //! Project discovery: configuration, declaration files and imported project Python, validated.
 
+use crate::compile_driver::_helpers::stages::implicit_sources::with_implicit_load_sources;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PySet, PySetMethods, PyTuple};
 use pyo3::{IntoPyObject, pyfunction};
@@ -355,6 +356,8 @@ fn discovered_inputs<'py>(
         &lifecycle(py, "discovery_declaration_parse")?,
         |declaration_lifecycle| {
             let declarations: Bound<'py, PyDict> = declaration_files(project_dir, flags)?;
+            let adapter: Option<String> = native_field(project_config, "adapter")?.extract()?;
+            with_implicit_load_sources(&declarations, adapter.as_deref().unwrap_or_default())?;
             let mut item_count: usize = 0;
             for field in DECLARATION_COLLECTIONS {
                 item_count += declarations.as_any().get_item(field)?.len()?;

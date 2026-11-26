@@ -59,6 +59,13 @@ sources:
       - name: id
         type: INTEGER
 """
+_CUSTOMER_IDS_MODEL: str = """MODEL (
+  materialized view,
+  description "Customer ids"
+);
+
+select id from __source("shop__customers")
+"""
 _WAREHOUSE_AND_SHOP: str = (
     'name = "demo"\nadapter = "duckdb"\n\n'
     '[connections.local]\ndatabase = "demo.duckdb"\n\n'
@@ -878,6 +885,29 @@ def test_given_target_connection_that_cant_hold_models_when_discovering_then_con
             repo_files={"sqlbuild_project.toml": _SHOP_PROJECT, "sql/sources/shop.yml": _SHOP_LOAD},
             expected_loads=(("shop__orders", "shop"),),
         ),
+        LoadDiscoveryTestCase(
+            description="a model reading an unlisted table of a load makes a source it fills",
+            repo_files={
+                "sqlbuild_project.toml": _SHOP_PROJECT,
+                "sql/sources/shop.yml": _SHOP_LOAD.replace(
+                    "include: [public.orders]", "include: [public.orders, public.customers]"
+                ),
+                "sql/models/customer_ids.sql": _CUSTOMER_IDS_MODEL,
+            },
+            expected_loads=(("shop__orders", "shop"), ("shop__customers", "shop")),
+        ),
+        LoadDiscoveryTestCase(
+            description="a commented-out reference makes no source",
+            repo_files={
+                "sqlbuild_project.toml": _SHOP_PROJECT,
+                "sql/sources/shop.yml": _SHOP_LOAD,
+                "sql/models/customer_ids.sql": _CUSTOMER_IDS_MODEL.replace(
+                    'select id from __source("shop__customers")',
+                    '-- __source("shop__customers")\nselect 1 as id',
+                ),
+            },
+            expected_loads=(("shop__orders", "shop"),),
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -936,6 +966,19 @@ def test_given_a_load_when_discovering_then_its_sources_name_it(
             expected_error_fragment=(
                 "shop.yml:5 load 'shop': source 'shop__carts' matches no table the load 'shop' "
                 "includes; its tables load into shop__orders"
+            ),
+        ),
+        LoadErrorTestCase(
+            description="a model reads a table the literal include doesn't load",
+            repo_files={
+                "sqlbuild_project.toml": _SHOP_PROJECT,
+                "sql/sources/shop.yml": _SHOP_LOAD,
+                "sql/models/customer_ids.sql": _CUSTOMER_IDS_MODEL,
+            },
+            expected_error_class=SourceParseError,
+            expected_error_fragment=(
+                "source 'shop__customers' matches no table the load 'shop' includes; its "
+                "tables load into shop__orders"
             ),
         ),
         LoadErrorTestCase(
