@@ -4205,3 +4205,11 @@ reason = "Each collapses runs of one character class into a single marker for it
 [[dupes.allowlist]]
 paths = ["crates/sqlbuild-orchestration/src/declarations/_helpers/reads.rs", "crates/sqlbuild-orchestration/src/run_output/_helpers/views.rs", "crates/sqlbuild-orchestration/src/warehouse_history/_helpers/checks.rs"]
 reason = "Each lists its own rows by its own key: triggers, latest ticks, a node's output marks and latest check results. Only the keyed query_records call is alike."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-output/src/output_capture/_helpers/values.rs", "crates/sqlbuild-python-planner/src/lifecycle_events/_helpers/payloads.rs"]
+reason = "Each freezes Python values into its own crate's records: captured output values and lifecycle event payloads. They were alike before the pyo3 0.29 upgrade, which only renamed their downcast calls to cast; sharing one freezer would move it into sqlbuild-python-base."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-compile/src/rules/_helpers/fact/fact_replay.rs"]
+reason = "project_attribute falls back to a record field or getattr, project_field to the fact encoder's record field; only the native project view lookup before the fallback is alike. The pyo3 0.29 upgrade only renamed its downcast call to cast."
