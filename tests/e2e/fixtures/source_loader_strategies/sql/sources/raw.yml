@@ -26,7 +26,7 @@ sources:
       - name: event_id
         type: INTEGER
       - name: event_at
-        type: TIMESTAMP
+        type: timestamp_ntz
       - name: amount_cents
         type: INTEGER
 
@@ -39,7 +39,7 @@ sources:
       - name: plan_name
         type: VARCHAR
       - name: updated_at
-        type: TIMESTAMP
+        type: timestamp_ntz
 
   - name: raw_loader_status
     description: Test source raw_loader_status.

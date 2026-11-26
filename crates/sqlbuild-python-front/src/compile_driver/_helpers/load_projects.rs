@@ -26,37 +26,50 @@ pub(crate) fn load_project_text(
     (load, settings): (&str, &Bound<'_, PyAny>),
     target: &LoadTarget,
 ) -> PyResult<String> {
-    let py: Python<'_> = config.project_dir.py();
     let Some(toml::Value::Table(settings)) = toml_value(settings)? else {
         return Err(PyValueError::new_err(format!(
             "load '{load}' has no settings"
         )));
     };
-    let roles: ConnectionRoles = connection_roles(config)?;
+    let named: Option<String> = match settings.get(CONNECTION_KEY) {
+        Some(toml::Value::String(name)) => Some(name.clone()),
+        _ => None,
+    };
+    let connections = named_connection(config, effective_vars, named.as_deref())?;
+    run_project_text(Some((load, settings)), connections, target).map_err(PyValueError::new_err)
+}
+
+/// The source connection `name`, its templates expanded with the project's vars, as SQLLoad's `[connections]`; empty without one.
+pub(crate) fn named_connection(
+    config: &ProjectConfiguration<'_, '_>,
+    effective_vars: &Bound<'_, PyDict>,
+    name: Option<&str>,
+) -> PyResult<toml::Table> {
+    let py: Python<'_> = config.project_dir.py();
     let mut connections = toml::Table::new();
-    if let Some(toml::Value::String(name)) = settings.get(CONNECTION_KEY)
-        && let Some(connection) = roles
-            .sources
-            .into_iter()
-            .find(|source| &source.name == name)
-    {
-        let authored: serde_json::Value = serde_json::to_value(connection.settings)
-            .map_err(|error| PyValueError::new_err(error.to_string()))?;
-        let expanded: Bound<'_, PyAny> = expanded_template_data(
-            &json_value_to_python(py, &authored)?,
-            (effective_vars, &PyDict::new(py)),
-            (
-                TemplateOptions {
-                    allow_context: false,
-                    preserve_context_tokens: false,
-                    preserve_unknown_context: false,
-                },
-                CONNECTION_LABEL,
-            ),
-        )?;
-        if let Some(expanded) = toml_value(&expanded)? {
-            connections.insert(name.clone(), expanded);
-        }
+    let Some(name) = name else {
+        return Ok(connections);
+    };
+    let roles: ConnectionRoles = connection_roles(config)?;
+    let Some(connection) = roles.sources.into_iter().find(|source| source.name == name) else {
+        return Ok(connections);
+    };
+    let authored: serde_json::Value = serde_json::to_value(connection.settings)
+        .map_err(|error| PyValueError::new_err(error.to_string()))?;
+    let expanded: Bound<'_, PyAny> = expanded_template_data(
+        &json_value_to_python(py, &authored)?,
+        (effective_vars, &PyDict::new(py)),
+        (
+            TemplateOptions {
+                allow_context: false,
+                preserve_context_tokens: false,
+                preserve_unknown_context: false,
+            },
+            CONNECTION_LABEL,
+        ),
+    )?;
+    if let Some(expanded) = toml_value(&expanded)? {
+        connections.insert(name.to_owned(), expanded);
     }
-    run_project_text((load, settings), connections, target).map_err(PyValueError::new_err)
+    Ok(connections)
 }

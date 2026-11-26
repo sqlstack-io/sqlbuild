@@ -13,7 +13,7 @@ sources:
       - name: email
         type: VARCHAR
       - name: created_at
-        type: TIMESTAMP
+        type: timestamp_ntz
 
   - name: raw__orders
     description: Raw order records loaded by the Python loader
@@ -29,7 +29,7 @@ sources:
       - name: quantity
         type: INTEGER
       - name: ordered_at
-        type: TIMESTAMP
+        type: timestamp_ntz
       - name: status
         type: VARCHAR
 

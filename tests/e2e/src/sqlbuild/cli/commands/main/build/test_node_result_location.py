@@ -155,7 +155,7 @@ def test_given_target_location_when_building_and_loading_then_node_results_stay_
     ) == [
         ("asset", "announce_orders", test_case.expected_runs_per_node),
         ("check", "check_orders_announced", test_case.expected_runs_per_node),
-        ("loader", "raw_order_copies", test_case.expected_runs_per_node),
+        ("loader", "raw_order_copies", test_case.expected_runs_per_node + 1),
         ("loader", "raw_orders", test_case.expected_runs_per_node),
     ]
     assert query_duckdb(db_path=db_path, sql="SELECT order_id FROM raw.raw_order_copies") == [(1,)]

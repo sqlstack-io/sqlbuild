@@ -148,7 +148,7 @@ def test_given_non_contract_loader_when_late_column_appears_then_existing_target
                     "from sqlbuild.loaders import loader\n\n"
                     "@loader(write_strategy='append', cursor_column='load_seq')\n"
                     "def raw_events(ctx):\n"
-                    "    '''Test loader raw_events.'''\n    if ctx.current_cursor_value is None:\n"
+                    "    '''Test loader raw_events.'''\n    if ctx.cursor_value is None:\n"
                     "        return [{'event_id': 1, 'load_seq': 1}]\n"
                     "    return [{'event_id': 2, 'load_seq': 2, 'note': 'late-note'}]\n"
                 ),
@@ -328,10 +328,10 @@ def test_given_two_terminal_sources_when_sharing_intermediate_then_intermediate_
                     "])\n"
                     "def fetch_orders(ctx):\n"
                     "    '''Test loader fetch_orders.'''\n"
-                    "    if ctx.current_cursor_value is None:\n"
+                    "    if ctx.cursor_value is None:\n"
                     "        next_seq = 1\n"
                     "    else:\n"
-                    "        next_seq = ctx.current_cursor_value + 1\n"
+                    "        next_seq = ctx.cursor_value + 1\n"
                     "    return [{'event_id': next_seq, 'load_seq': next_seq}]\n"
                 ),
                 "python/nodes/loaders/source_rows/raw_orders/loader.py": (
@@ -1292,7 +1292,7 @@ def test_given_chained_loader_project_when_intermediate_has_custom_target_then_r
                 "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
                 "])\n"
                 "def fetch_events(ctx):\n"
-                "    '''Test loader fetch_events.'''\n    if ctx.current_cursor_value is None:\n"
+                "    '''Test loader fetch_events.'''\n    if ctx.cursor_value is None:\n"
                 "        return [\n"
                 "            {'event_id': 1, 'amount': 100, 'load_seq': 1},\n"
                 "            {'event_id': 2, 'amount': 200, 'load_seq': 1},\n"
@@ -1324,7 +1324,7 @@ def test_given_chained_loader_project_when_intermediate_has_custom_target_then_r
                 "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
                 "])\n"
                 "def fetch_events(ctx):\n"
-                "    '''Test loader fetch_events.'''\n    if ctx.current_cursor_value "
+                "    '''Test loader fetch_events.'''\n    if ctx.cursor_value "
                 "is not None:\n"
                 "        return [\n"
                 "            {'event_id': 2, 'amount': 250, 'load_seq': 1},\n"
@@ -1825,7 +1825,7 @@ def test_given_loader_dependency_failure_when_loading_json_then_reports_skipped_
                         "@loader(write_strategy='append', cursor_column='load_seq')\n"
                         "def raw_events(ctx):\n"
                         "    '''Test loader raw_events.'''\n    if "
-                        "ctx.current_cursor_value is None:\n"
+                        "ctx.cursor_value is None:\n"
                         "        return [{'event_id': 1, 'load_seq': 1, 'amount': 100}]\n"
                         "    return [{'event_id': 2, 'load_seq': 2, 'amount': 'one hundred'}]\n"
                     ),

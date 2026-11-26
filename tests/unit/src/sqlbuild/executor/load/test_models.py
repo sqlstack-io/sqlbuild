@@ -62,7 +62,6 @@ def test_given_loader_context_when_using_helpers_then_records_and_qualifies_name
         vars={},
         is_reload=False,
         use_color=False,
-        current_cursor_value=None,
         logger=logging.getLogger(test_case.expected_logger_name),
         statement_recorder=statement_recorder,
     )
@@ -152,7 +151,6 @@ def test_given_loader_context_when_resolving_relation_refs_then_returns_cursor_v
         vars={},
         is_reload=False,
         use_color=False,
-        current_cursor_value=None,
         logger=logging.getLogger(test_case.expected_logger_name),
         statement_recorder=statement_recorder,
         loader_refs={fetch_events: loader_ref},
@@ -208,7 +206,6 @@ def test_given_a_non_loader_when_passed_to_ctx_loader_then_the_error_names_what_
         vars={},
         is_reload=False,
         use_color=False,
-        current_cursor_value=None,
         logger=logging.getLogger("sqlbuild.loader.partner_scores"),
         statement_recorder=StatementRecorder(),
     )

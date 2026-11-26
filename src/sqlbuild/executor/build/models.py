@@ -87,6 +87,7 @@ class BuildRuntimeParams:
     default_schema: str | None = None
     effective_vars: dict[str, object] | None = None
     load_projects: dict[str, tuple[str, str]] = field(default_factory=dict)
+    loader_projects: dict[str, tuple[str, str]] = field(default_factory=dict)
     use_color: bool = False
     providers: ProviderContainer | None = None
     microbatch_concurrency: bool = False

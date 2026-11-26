@@ -11,6 +11,7 @@ use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::{BuildExecutionResult, BuildStatus, ExecutionStatus};
 use sqlbuild_python_front::compile_driver::main::planned_load_projects::planned_load_projects;
+use sqlbuild_python_front::compile_driver::main::planned_loader_projects::planned_loader_projects;
 
 use crate::bindings::_helpers::build_command::invocation::BuildContext;
 use crate::bindings::_helpers::build_command::lifecycle::DirectPythonLifecycle;
@@ -388,6 +389,20 @@ pub(crate) fn execute_build_plan<'py>(
                                 .extract::<Option<String>>()?
                                 .unwrap_or_default(),
                             target_config.loader_schema(),
+                        ),
+                    )?
+                    .into_any(),
+                ),
+                (
+                    "loader_projects",
+                    planned_loader_projects(
+                        &discovered,
+                        &project,
+                        (
+                            native_field(&project, "effective_target_name")?
+                                .extract::<Option<String>>()?
+                                .as_deref(),
+                            default_schema.extract::<Option<String>>()?.as_deref(),
                         ),
                     )?
                     .into_any(),

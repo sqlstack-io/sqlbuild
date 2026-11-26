@@ -4065,6 +4065,14 @@ def run_sqlload_project(
     tables: tuple[list[str], list[str]],
     reload: bool = False,
 ) -> str: ...
+def loader_projects(
+    *,
+    discovered_inputs: DiscoveredProjectInputs,
+    project: CompiledProjectView,
+    target: str | None = None,
+    schema: str | None = None,
+) -> dict[str, tuple[str, str]]: ...
+def run_sqlload_loader(*, loader: object, sessions: dict[str, dict[str, object]]) -> str: ...
 def plan_sqlload_project(
     *,
     project: str,

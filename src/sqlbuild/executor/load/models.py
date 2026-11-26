@@ -13,8 +13,7 @@ from sqlbuild._native import DiscoveredLoaderFunction, SourceEntry, TargetSettin
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.classes.node_logger import NodeLogger
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
-from sqlbuild.adapter.contract.models import ColumnInfo, LifeCycleEvent
-from sqlbuild.adapter.contract.types import LoaderLogicalType
+from sqlbuild.adapter.contract.models import LifeCycleEvent
 from sqlbuild.adapter.relations.main.resolve_qualified_name_parts import (
     resolve_qualified_name_parts,
 )
@@ -28,41 +27,6 @@ from sqlbuild.provider.main.runtime import ProviderContainer, _empty_provider_co
 from sqlbuild.python_nodes.models import SqlResourceRef
 from sqlbuild.python_nodes.types import SqlResourceRefKind
 from sqlbuild.runtime.contracts.types import ExecutionResourceKind
-
-
-@dataclass(frozen=True)
-class DecimalShape:
-    """The digits a decimal column keeps before and after its point."""
-
-    integer_digits: int
-    scale: int
-
-    @property
-    def precision(self) -> int:
-        """The total digits, at least one."""
-
-        return max(self.integer_digits + self.scale, 1)
-
-    def widened(self, other: DecimalShape) -> DecimalShape:
-        """The narrowest shape holding the values of both."""
-
-        return DecimalShape(
-            integer_digits=max(self.integer_digits, other.integer_digits),
-            scale=max(self.scale, other.scale),
-        )
-
-    def __str__(self) -> str:
-        return f"DECIMAL({self.precision}, {self.scale})"
-
-
-@dataclass(frozen=True)
-class LoaderRowsSchema:
-    """Tracked schema state for one or more loader row batches."""
-
-    column_names: tuple[str, ...]
-    inferred_types: dict[str, LoaderLogicalType]
-    added_columns: tuple[ColumnInfo, ...]
-    decimal_shapes: dict[str, DecimalShape]
 
 
 @dataclass(frozen=True)
@@ -135,13 +99,8 @@ class LoaderContext(DependencyResultReader):
     vars: dict[str, object]
     is_reload: bool
     use_color: bool
-    current_cursor_value: object | None
     logger: logging.Logger
     statement_recorder: StatementRecorder
-    start_cursor_ts: datetime | None = None
-    end_cursor_ts: datetime | None = None
-    start_cursor_int: int | None = None
-    end_cursor_int: int | None = None
     loader_refs: Mapping[Callable[..., object], LoaderRelationRef] = field(default_factory=dict)
     source_refs: Mapping[str, LoaderRelationRef] = field(default_factory=dict)
     providers: ProviderContainer = field(default_factory=_empty_provider_container)
@@ -307,6 +266,21 @@ class LoadRuntimeParams:
     schema_prepared: bool = False
     project_relations: Mapping[SqlResourceRef, str] | None = None
     on_rows_written: Callable[[int], None] | None = None
+    loader_projects: Mapping[str, tuple[str, str]] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class EngineLoaderInputs:
+    """What one loader's engine run loads: its project, Python source and cursor window."""
+
+    name: str
+    project: str
+    source: str
+    reload: bool
+    start_cursor_ts: str | None = None
+    end_cursor_ts: str | None = None
+    start_cursor_int: str | None = None
+    end_cursor_int: str | None = None
 
 
 @dataclass(frozen=True)

@@ -33,8 +33,13 @@ pub(crate) fn run_sqlload_project(
     let project: String = project.to_owned();
     let run: ProjectRun = sessions
         .py()
-        .detach(move || run_project(&project, connections, (options, require)))
+        .detach(move || run_project((&project, Vec::new()), connections, (options, require)))
         .map_err(PyRuntimeError::new_err)?;
+    Ok(run_report(run))
+}
+
+/// `run` as the JSON report Python reads: `{tables, planned, missing}`, each table's rows or error.
+pub(crate) fn run_report(run: ProjectRun) -> String {
     let rows: Vec<Value> = run
         .tables
         .into_iter()
@@ -48,7 +53,7 @@ pub(crate) fn run_sqlload_project(
             })
         })
         .collect();
-    Ok(json!({"tables": rows, "planned": run.planned, "missing": run.missing}).to_string())
+    json!({"tables": rows, "planned": run.planned, "missing": run.missing}).to_string()
 }
 
 /// Each of `sessions`, `{adapter, database, opener, description}` by name, as SQLLoad's session connection.

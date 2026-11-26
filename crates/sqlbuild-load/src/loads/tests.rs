@@ -6,6 +6,8 @@ mod check_loader;
 mod helpers;
 #[path = "tests/test_load_message.rs"]
 mod load_message;
+#[path = "tests/test_loader_source.rs"]
+mod loader_source;
 #[path = "tests/test_types.rs"]
 mod test_types;
 #[path = "tests/test_yaml_line.rs"]

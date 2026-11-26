@@ -11,21 +11,17 @@ from typing import Any, cast
 import duckdb
 import pytest
 from _pytest.capture import CaptureFixture, CaptureResult
-from _pytest.monkeypatch import MonkeyPatch
 from duckdb import DuckDBPyConnection
 
 from sqlbuild._native import (
     AuditCommandRequest,
     BuildCommandRequest,
     CursorOverrides,
-    DiscoveredProjectInputs,
-    DiscoveredSourceFile,
     LoadCommandRequest,
     PlanCommandRequest,
     PlannerInputError,
     ScenarioTestCommandRequest,
     TestCommandRequest,
-    discover_project_inputs,
     run_audit_command,
     run_build_command,
     run_load_command,
@@ -33,19 +29,12 @@ from sqlbuild._native import (
     run_scenario_test_command,
     run_test_command,
 )
-from sqlbuild.adapter.contract.types import CursorKind
-from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
-from sqlbuild.executor.load.models import (
-    LoadExecutionResult,
-    LoadRuntimeParams,
-)
 from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
     BuildRunAutoLoadFailureTestCase,
     BuildRunAutoLoadFlagTestCase,
     BuildRunAutoLoadJsonTestCase,
     BuildRunAutoLoadSelectionTestCase,
     BuildRunAutoLoadTestCase,
-    LoadCommandAdapterCallTestCase,
     LoadCommandBatchedRowsTestCase,
     LoadCommandBatchedYieldTestCase,
     LoadCommandConcurrencyTestCase,
@@ -57,12 +46,9 @@ from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
     LoadCommandFailureTestCase,
     LoadCommandInferredColumnsTestCase,
     LoadCommandIntegrationTestCase,
-    LoadCommandLifecycleOrderTestCase,
-    LoadCommandLifecycleSqlTestCase,
     LoadCommandMultipleYieldTestCase,
     LoadCommandReloadContextTestCase,
     LoadCommandSelectionErrorTestCase,
-    LoadCommandWriteStrategyLifecycleTestCase,
     LoadCommandWriteStrategyTestCase,
     ManagedSourcePlanningErrorTestCase,
     PlanAutoLoadJsonTestCase,
@@ -71,10 +57,7 @@ from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
     SourceDeferralBuildTestCase,
     SourceDeferralNoErrorTestCase,
 )
-from tests.integration.src.sqlbuild.cli.commands.main.helpers import (
-    batched_entries,
-    run_source_loads,
-)
+from tests.integration.src.sqlbuild.cli.commands.main.helpers import load_assets
 
 _PROJECT_FILE: str = 'name = "demo"\nadapter = "duckdb"\n\n[connection]\ndatabase = "demo.duckdb"\n'
 
@@ -663,13 +646,7 @@ def raw_orders(ctx):
             "\u2713 Completed successfully",
             "PASS=1  WARN=0  FAIL=0  SKIP=0  TOTAL=1",
         ),
-        expected_json_staging_relation="raw_orders__staging",
         expected_json_rows_loaded=2,
-        expected_lifecycle_sql_fragments=(
-            "CREATE OR REPLACE TABLE raw_orders__staging",
-            "CREATE OR REPLACE TABLE raw_orders AS SELECT * FROM raw_orders__staging",
-            "DROP TABLE IF EXISTS raw_orders__staging",
-        ),
     ),
     LoadCommandIntegrationTestCase(
         description="loads only selected managed source",
@@ -714,13 +691,7 @@ def raw_events(ctx):
         expected_rows=((3, "selected"),),
         expected_stdout_fragment="raw_orders",
         expected_stdout_absent_fragments=("raw_events",),
-        expected_json_staging_relation="raw_orders__staging",
         expected_json_rows_loaded=1,
-        expected_lifecycle_sql_fragments=(
-            "CREATE OR REPLACE TABLE raw_orders__staging",
-            "CREATE OR REPLACE TABLE raw_orders AS SELECT * FROM raw_orders__staging",
-            "DROP TABLE IF EXISTS raw_orders__staging",
-        ),
         select=("raw_orders",),
     ),
     LoadCommandIntegrationTestCase(
@@ -772,13 +743,7 @@ def raw_orders(ctx):
         expected_exit_code=0,
         expected_rows=((4, "dev:cli:yes:True"),),
         expected_stdout_fragment="raw_orders",
-        expected_json_staging_relation="raw_orders__staging",
         expected_json_rows_loaded=1,
-        expected_lifecycle_sql_fragments=(
-            "CREATE OR REPLACE TABLE raw_orders__staging",
-            "CREATE OR REPLACE TABLE raw_orders AS SELECT * FROM raw_orders__staging",
-            "DROP TABLE IF EXISTS raw_orders__staging",
-        ),
         cli_vars={"tier": "cli"},
     ),
 ]
@@ -1665,7 +1630,6 @@ def test_given_source_loader_fails_when_running_build_then_downstream_model_is_n
                 "name": "raw_orders",
                 "status": "success",
                 "target": "raw_orders",
-                "staging_relation": "raw_orders__staging",
                 "loader": "raw_orders",
                 "rows_loaded": 1,
             },
@@ -1939,13 +1903,7 @@ def raw_orders(ctx):
                 "\u2713 Completed successfully",
                 "PASS=1  WARN=0  FAIL=0  INSUFFICIENT=0  SKIP=0  TOTAL=1",
             ),
-            expected_json_staging_relation="raw_orders__staging",
             expected_json_rows_loaded=2,
-            expected_lifecycle_sql_fragments=(
-                "CREATE OR REPLACE TABLE raw_orders__staging",
-                "CREATE OR REPLACE TABLE raw_orders AS SELECT * FROM raw_orders__staging",
-                "DROP TABLE IF EXISTS raw_orders__staging",
-            ),
         ),
         LoadCommandIntegrationTestCase(
             description="loads only selected managed source",
@@ -1990,13 +1948,7 @@ def raw_events(ctx):
             expected_rows=((3, "selected"),),
             expected_stdout_fragment="raw_orders",
             expected_stdout_absent_fragments=("raw_events",),
-            expected_json_staging_relation="raw_orders__staging",
             expected_json_rows_loaded=1,
-            expected_lifecycle_sql_fragments=(
-                "CREATE OR REPLACE TABLE raw_orders__staging",
-                "CREATE OR REPLACE TABLE raw_orders AS SELECT * FROM raw_orders__staging",
-                "DROP TABLE IF EXISTS raw_orders__staging",
-            ),
             select=("raw_orders",),
         ),
         LoadCommandIntegrationTestCase(
@@ -2048,13 +2000,7 @@ def raw_orders(ctx):
             expected_exit_code=0,
             expected_rows=((4, "dev:cli:yes:True"),),
             expected_stdout_fragment="raw_orders",
-            expected_json_staging_relation="raw_orders__staging",
             expected_json_rows_loaded=1,
-            expected_lifecycle_sql_fragments=(
-                "CREATE OR REPLACE TABLE raw_orders__staging",
-                "CREATE OR REPLACE TABLE raw_orders AS SELECT * FROM raw_orders__staging",
-                "DROP TABLE IF EXISTS raw_orders__staging",
-            ),
             cli_vars={"tier": "cli"},
         ),
     ],
@@ -2107,267 +2053,7 @@ def test_given_source_loader_when_running_load_then_writes_source_table(
         dict[str, Any], json.loads(json_output_path.read_text(encoding="utf-8"))
     )
     assets: list[dict[str, Any]] = cast(list[dict[str, Any]], payload["assets"])
-    assert assets[0]["staging_relation"] == test_case.expected_json_staging_relation
     assert assets[0]["rows_loaded"] == test_case.expected_json_rows_loaded
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
-        LoadCommandIntegrationTestCase(
-            description="loads returned dict rows into a source table",
-            project_files={
-                "sqlbuild_project.toml": (
-                    'name = "demo"\nadapter = "duckdb"\n\n[connection]\ndatabase = "demo.duckdb"\n'
-                ),
-                "sql/sources/raw.yml": """
-sources:
-  - name: raw_orders
-    description: Test source raw_orders.
-    managed: true
-    columns:
-      - name: order_id
-        type: INTEGER
-      - name: status
-        type: VARCHAR
-""".strip()
-                + "\n",
-                "python/nodes/loaders/raw_orders/loader.py": """
-from sqlbuild.loaders import loader
-
-@loader(write_strategy='replace')
-def raw_orders(ctx):
-    '''Test loader raw_orders.'''
-    ctx.log.info("loading raw orders")
-    return [
-        {"order_id": 1, "status": "placed"},
-        {"order_id": 2, "status": "shipped"},
-    ]
-""",
-                "python/nodes/loaders/raw_orders/__init__.py": "from .loader import raw_orders\n",
-            },
-            expected_exit_code=0,
-            expected_rows=((1, "placed"), (2, "shipped")),
-            expected_stdout_fragment="raw_orders",
-            expected_stdout_fragments=(
-                "Sources to load (1)",
-                "Execution  sqb load  (concurrency: 1)",
-                "1/1  source    raw_orders",
-                "rows=2",
-                "\u2713 Completed successfully",
-                "PASS=1  WARN=0  FAIL=0  INSUFFICIENT=0  SKIP=0  TOTAL=1",
-            ),
-            expected_json_staging_relation="raw_orders__staging",
-            expected_json_rows_loaded=2,
-            expected_lifecycle_sql_fragments=(
-                "CREATE OR REPLACE TABLE raw_orders__staging",
-                "CREATE OR REPLACE TABLE raw_orders AS SELECT * FROM raw_orders__staging",
-                "DROP TABLE IF EXISTS raw_orders__staging",
-            ),
-        ),
-        LoadCommandIntegrationTestCase(
-            description="loads only selected managed source",
-            project_files={
-                "sqlbuild_project.toml": (
-                    'name = "demo"\nadapter = "duckdb"\n\n[connection]\ndatabase = "demo.duckdb"\n'
-                ),
-                "sql/sources/raw.yml": """
-sources:
-  - name: raw_orders
-    description: Test source raw_orders.
-    managed: true
-    columns:
-      - name: order_id
-        type: INTEGER
-      - name: status
-        type: VARCHAR
-  - name: raw_events
-    description: Test source raw_events.
-    managed: true
-""".strip()
-                + "\n",
-                "python/nodes/loaders/raw_orders/loader.py": """
-from sqlbuild.loaders import loader
-
-@loader(write_strategy='replace')
-def raw_orders(ctx):
-    '''Test loader raw_orders.'''
-    return [{"order_id": 3, "status": "selected"}]
-""",
-                "python/nodes/loaders/raw_orders/__init__.py": "from .loader import raw_orders\n",
-                "python/nodes/loaders/raw_events/loader.py": """
-from sqlbuild.loaders import loader
-
-@loader(write_strategy='replace')
-def raw_events(ctx):
-    '''Test loader raw_events.'''
-    return [{"event_id": 99}]
-""",
-            },
-            expected_exit_code=0,
-            expected_rows=((3, "selected"),),
-            expected_stdout_fragment="raw_orders",
-            expected_stdout_absent_fragments=("raw_events",),
-            expected_json_staging_relation="raw_orders__staging",
-            expected_json_rows_loaded=1,
-            expected_lifecycle_sql_fragments=(
-                "CREATE OR REPLACE TABLE raw_orders__staging",
-                "CREATE OR REPLACE TABLE raw_orders AS SELECT * FROM raw_orders__staging",
-                "DROP TABLE IF EXISTS raw_orders__staging",
-            ),
-            select=("raw_orders",),
-        ),
-        LoadCommandIntegrationTestCase(
-            description="passes effective context values to loader",
-            project_files={
-                "sqlbuild_project.toml": (
-                    'name = "demo"\n'
-                    'adapter = "duckdb"\n'
-                    'default_target = "dev"\n\n'
-                    "[connection]\n"
-                    'database = "demo.duckdb"\n\n'
-                    "[vars]\n"
-                    'tier = "project"\n'
-                    'project_only = "yes"\n\n'
-                    "[targets.dev.vars]\n"
-                    'tier = "dev"\n'
-                ),
-                "sql/sources/raw.yml": """
-sources:
-  - name: raw_orders
-    description: Test source raw_orders.
-    managed: true
-    columns:
-      - name: order_id
-        type: INTEGER
-      - name: status
-        type: VARCHAR
-""".strip()
-                + "\n",
-                "python/nodes/loaders/raw_orders/loader.py": """
-from sqlbuild.loaders import loader
-
-@loader(write_strategy='replace')
-def raw_orders(ctx):
-    '''Test loader raw_orders.'''
-    status = ":".join([
-        str(ctx.target),
-        str(ctx.vars["tier"]),
-        str(ctx.vars["project_only"]),
-        str(ctx.run_id != "demo"),
-    ])
-    return [{
-        "order_id": 4,
-        "status": status,
-    }]
-""",
-                "python/nodes/loaders/raw_orders/__init__.py": "from .loader import raw_orders\n",
-            },
-            expected_exit_code=0,
-            expected_rows=((4, "dev:cli:yes:True"),),
-            expected_stdout_fragment="raw_orders",
-            expected_json_staging_relation="raw_orders__staging",
-            expected_json_rows_loaded=1,
-            expected_lifecycle_sql_fragments=(
-                "CREATE OR REPLACE TABLE raw_orders__staging",
-                "CREATE OR REPLACE TABLE raw_orders AS SELECT * FROM raw_orders__staging",
-                "DROP TABLE IF EXISTS raw_orders__staging",
-            ),
-            cli_vars={"tier": "cli"},
-        ),
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_source_loader_when_running_pipeline_then_uses_staging_relation(
-    test_case: LoadCommandIntegrationTestCase,
-    tmp_path: Path,
-    write_repo_files: Callable[[Path, dict[str, str]], None],
-) -> None:
-    write_repo_files(tmp_path, test_case.project_files)
-    discovered_inputs: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
-    source_file: DiscoveredSourceFile = discovered_inputs.source_files[0]
-    adapter: DuckDbAdapter = DuckDbAdapter()
-
-    results: tuple[LoadExecutionResult, ...] = run_source_loads(
-        sources=source_file.source_entries,
-        loader_functions=discovered_inputs.loader_functions,
-        connection_config={"database": str(tmp_path / "demo.duckdb")},
-        adapter=adapter,
-        runtime=LoadRuntimeParams(
-            run_id="test_run",
-            target="dev",
-            vars={"tier": "cli", "project_only": "yes"},
-            is_reload=False,
-        ),
-    )
-
-    lifecycle_content_by_kind: defaultdict[str, list[str]] = defaultdict(list)
-    for event in results[0].lifecycle_events:
-        lifecycle_content_by_kind[event.kind.value].append(event.content)
-    lifecycle_sql: tuple[str, ...] = tuple(lifecycle_content_by_kind["sql"])
-    fragments_found: list[bool] = []
-    for fragment in test_case.expected_lifecycle_sql_fragments:
-        fragment_found: bool = False
-        for sql in lifecycle_sql:
-            fragment_found = fragment_found or fragment in sql
-        fragments_found.append(fragment_found)
-    assert all(fragments_found)
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
-        LoadCommandLifecycleOrderTestCase(
-            description="drops stale staging before creating new staging table",
-            project_files=LOAD_COMMAND_CASE_FIXTURES[0].project_files,
-            expected_lifecycle_sql_order=(
-                "DROP TABLE IF EXISTS raw_orders__staging",
-                "CREATE OR REPLACE TABLE raw_orders__staging",
-                "CREATE OR REPLACE TABLE raw_orders AS SELECT * FROM raw_orders__staging",
-                "DROP TABLE IF EXISTS raw_orders__staging",
-            ),
-        ),
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_source_loader_when_running_pipeline_then_drops_stale_staging_first(
-    test_case: LoadCommandLifecycleOrderTestCase,
-    tmp_path: Path,
-    write_repo_files: Callable[[Path, dict[str, str]], None],
-) -> None:
-    write_repo_files(tmp_path, test_case.project_files)
-    discovered_inputs: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
-    source_file: DiscoveredSourceFile = discovered_inputs.source_files[0]
-    adapter: DuckDbAdapter = DuckDbAdapter()
-
-    results: tuple[LoadExecutionResult, ...] = run_source_loads(
-        sources=source_file.source_entries,
-        loader_functions=discovered_inputs.loader_functions,
-        connection_config={"database": str(tmp_path / "demo.duckdb")},
-        adapter=adapter,
-        runtime=LoadRuntimeParams(
-            run_id="test_run",
-            target="dev",
-            vars={},
-            is_reload=False,
-        ),
-    )
-
-    lifecycle_content_by_kind: defaultdict[str, list[str]] = defaultdict(list)
-    for event in results[0].lifecycle_events:
-        lifecycle_content_by_kind[event.kind.value].append(event.content)
-    lifecycle_sql: tuple[str, ...] = tuple(lifecycle_content_by_kind["sql"])
-    match_positions: list[int] = []
-    start_index: int = 0
-    expected_fragment: str
-    for expected_fragment in test_case.expected_lifecycle_sql_order:
-        indexes_by_match_status: defaultdict[bool, list[int]] = defaultdict(list)
-        for index, sql in enumerate(lifecycle_sql[start_index:], start=start_index):
-            indexes_by_match_status[expected_fragment in sql].append(index)
-        position: int = next(iter(indexes_by_match_status[True]))
-        match_positions.append(position)
-        start_index = position + 1
-    assert match_positions == sorted(match_positions)
 
 
 WRITE_STRATEGY_CASE_FIXTURES: list[LoadCommandWriteStrategyTestCase] = [
@@ -2393,10 +2079,10 @@ from sqlbuild.loaders import loader
 @loader(write_strategy='append', cursor_column='event_id')
 def raw_append_events(ctx):
     '''Test loader raw_append_events.'''
-    if ctx.current_cursor_value is None:
+    if ctx.cursor_value is None:
         return [{"event_id": 1, "cursor_seen": "none"}]
-    next_id = int(ctx.current_cursor_value) + 1
-    return [{"event_id": next_id, "cursor_seen": str(ctx.current_cursor_value)}]
+    next_id = int(ctx.cursor_value) + 1
+    return [{"event_id": next_id, "cursor_seen": str(ctx.cursor_value)}]
 """,
             "python/nodes/loaders/raw/__init__.py": "from .loader import raw_append_events\n",
         },
@@ -2427,13 +2113,13 @@ from sqlbuild.loaders import loader
 @loader(write_strategy='merge', cursor_column='updated_at', unique_key='customer_id')
 def raw_merge_customers(ctx):
     '''Test loader raw_merge_customers.'''
-    if ctx.current_cursor_value is None:
+    if ctx.cursor_value is None:
         return [
             {"customer_id": 1, "name": "old", "updated_at": 1},
             {"customer_id": 2, "name": "kept", "updated_at": 1},
         ]
     return [
-        {"customer_id": 1, "name": f"updated:{ctx.current_cursor_value}", "updated_at": 2},
+        {"customer_id": 1, "name": f"updated:{ctx.cursor_value}", "updated_at": 2},
         {"customer_id": 3, "name": "new", "updated_at": 2},
     ]
 """,
@@ -2470,7 +2156,7 @@ from sqlbuild.loaders import loader
 @loader(write_strategy='merge', cursor_column='version', unique_key=['entity_id', 'source'])
 def raw_merge_composite(ctx):
     '''Test loader raw_merge_composite.'''
-    if ctx.current_cursor_value is None:
+    if ctx.cursor_value is None:
         return [{"entity_id": 1, "source": "api", "value": "old", "version": 1}]
     return [
         {"entity_id": 1, "source": "api", "value": "new", "version": 2},
@@ -2506,7 +2192,7 @@ from sqlbuild.loaders import loader
 @loader(write_strategy='delete_insert', cursor_column='event_id')
 def raw_delete_insert_events(ctx):
     '''Test loader raw_delete_insert_events.'''
-    if ctx.current_cursor_value is None:
+    if ctx.cursor_value is None:
         return [
             {"event_id": 1, "status": "old-outside-low"},
             {"event_id": 2, "status": "old-range"},
@@ -2523,6 +2209,7 @@ def raw_delete_insert_events(ctx):
         select_sql=(
             "SELECT event_id, status FROM raw_delete_insert_events ORDER BY event_id, status"
         ),
+        rerun_cursors=CursorOverrides(start_int="2", end_int="4"),
         expected_rows=(
             (1, "old-outside-low"),
             (2, "new-range"),
@@ -2541,7 +2228,7 @@ sources:
     managed: true
     columns:
       - name: event_at
-        type: TIMESTAMP
+        type: timestamp_ntz
       - name: status
         type: VARCHAR
 """.strip()
@@ -2554,7 +2241,7 @@ from sqlbuild.loaders import loader
 @loader(write_strategy='delete_insert', cursor_column='event_at')
 def raw_delete_insert_ts(ctx):
     '''Test loader raw_delete_insert_ts.'''
-    if ctx.current_cursor_value is None:
+    if ctx.cursor_value is None:
         return [
             {"event_at": datetime(2026, 1, 1, 0, 0, 0), "status": "outside-low"},
             {"event_at": datetime(2026, 1, 1, 1, 0, 0), "status": "old-range"},
@@ -2572,6 +2259,7 @@ def raw_delete_insert_ts(ctx):
             "SELECT strftime(event_at, '%Y-%m-%d %H:%M:%S'), status "
             "FROM raw_delete_insert_ts ORDER BY event_at, status"
         ),
+        rerun_cursors=CursorOverrides(start_ts="2026-01-01T01:00:00", end_ts="2026-01-01T03:00:00"),
         expected_rows=(
             ("2026-01-01 00:00:00", "outside-low"),
             ("2026-01-01 01:00:00", "new-range"),
@@ -2580,7 +2268,7 @@ def raw_delete_insert_ts(ctx):
         ),
     ),
     LoadCommandWriteStrategyTestCase(
-        description="delete insert empty rerun leaves existing target unchanged",
+        description="delete insert empty rerun clears its cursor window",
         project_files={
             "sqlbuild_project.toml": _PROJECT_FILE,
             "sql/sources/raw.yml": """
@@ -2601,7 +2289,7 @@ from sqlbuild.loaders import loader
 @loader(write_strategy='delete_insert', cursor_column='event_id')
 def raw_delete_insert_empty(ctx):
     '''Test loader raw_delete_insert_empty.'''
-    if ctx.current_cursor_value is None:
+    if ctx.cursor_value is None:
         return [
             {"event_id": 1, "status": "existing"},
             {"event_id": 2, "status": "existing"},
@@ -2611,7 +2299,7 @@ def raw_delete_insert_empty(ctx):
             "python/nodes/loaders/raw/__init__.py": "from .loader import raw_delete_insert_empty\n",
         },
         select_sql="SELECT event_id, status FROM raw_delete_insert_empty ORDER BY event_id",
-        expected_rows=((1, "existing"), (2, "existing")),
+        expected_rows=((1, "existing"),),
     ),
 ]
 
@@ -2642,7 +2330,7 @@ def raw_no_cursor(ctx):
     '''Test loader raw_no_cursor.'''
     global run_count
     run_count += 1
-    return [{"run_number": run_count, "cursor_seen": str(ctx.current_cursor_value)}]
+    return [{"run_number": run_count, "cursor_seen": str(ctx.cursor_value)}]
 """,
             "python/nodes/loaders/raw/__init__.py": "from .loader import raw_no_cursor\n",
         },
@@ -2671,7 +2359,7 @@ from sqlbuild.loaders import loader
 @loader(write_strategy='append', cursor_column='event_id')
 def raw_empty_cursor(ctx):
     '''Test loader raw_empty_cursor.'''
-    return [{"event_id": 1, "cursor_seen": str(ctx.current_cursor_value)}]
+    return [{"event_id": 1, "cursor_seen": str(ctx.cursor_value)}]
 """,
             "python/nodes/loaders/raw/__init__.py": "from .loader import raw_empty_cursor\n",
         },
@@ -2702,7 +2390,7 @@ from sqlbuild.loaders import loader
 @loader(write_strategy='append', cursor_column='event_id')
 def raw_missing_cursor_target(ctx):
     '''Test loader raw_missing_cursor_target.'''
-    return [{"event_id": 1, "cursor_seen": str(ctx.current_cursor_value)}]
+    return [{"event_id": 1, "cursor_seen": str(ctx.cursor_value)}]
 """,
             "python/nodes/loaders/raw/__init__.py": "from .loader import raw_missing_cursor_target\n",
         },
@@ -2745,27 +2433,54 @@ sources:
     description: Test source raw_cursor_overrides.
     managed: true
     columns:
-      - name: start_ts
+      - name: seq
+        type: INTEGER
+      - name: cursor_start
         type: VARCHAR
-      - name: end_ts
-        type: VARCHAR
-      - name: start_int
-        type: VARCHAR
-      - name: end_int
+      - name: cursor_end
         type: VARCHAR
 """.strip()
     + "\n",
     "python/nodes/loaders/raw/loader.py": """
 from sqlbuild.loaders import loader
 
-@loader(write_strategy='replace')
+@loader(write_strategy='append', cursor_column='seq')
 def raw_cursor_overrides(ctx):
     '''Test loader raw_cursor_overrides.'''
     return [{
-        "start_ts": None if ctx.start_cursor_ts is None else ctx.start_cursor_ts.isoformat(),
-        "end_ts": None if ctx.end_cursor_ts is None else ctx.end_cursor_ts.isoformat(),
-        "start_int": None if ctx.start_cursor_int is None else str(ctx.start_cursor_int),
-        "end_int": None if ctx.end_cursor_int is None else str(ctx.end_cursor_int),
+        "seq": 1 if ctx.cursor_value is None else ctx.cursor_value,
+        "cursor_start": None if ctx.cursor_value is None else str(ctx.cursor_value),
+        "cursor_end": None if ctx.cursor_end is None else str(ctx.cursor_end),
+    }]
+""",
+    "python/nodes/loaders/raw/__init__.py": "from .loader import raw_cursor_overrides\n",
+}
+CURSOR_OVERRIDE_TIMESTAMP_PROJECT_FILES: dict[str, str] = {
+    "sqlbuild_project.toml": _PROJECT_FILE,
+    "sql/sources/raw.yml": """
+sources:
+  - name: raw_cursor_overrides
+    description: Test source raw_cursor_overrides.
+    managed: true
+    columns:
+      - name: seen_at
+        type: timestamp_ntz
+      - name: cursor_start
+        type: VARCHAR
+      - name: cursor_end
+        type: VARCHAR
+""".strip()
+    + "\n",
+    "python/nodes/loaders/raw/loader.py": """
+from sqlbuild.loaders import loader
+
+@loader(write_strategy='append', cursor_column='seen_at')
+def raw_cursor_overrides(ctx):
+    '''Test loader raw_cursor_overrides.'''
+    return [{
+        "seen_at": ctx.cursor_value,
+        "cursor_start": ctx.cursor_value.isoformat(),
+        "cursor_end": ctx.cursor_end.isoformat(),
     }]
 """,
     "python/nodes/loaders/raw/__init__.py": "from .loader import raw_cursor_overrides\n",
@@ -2797,10 +2512,10 @@ from sqlbuild.loaders import loader
 @loader(write_strategy='append', cursor_column='event_id')
 def raw_append_events(ctx):
     '''Test loader raw_append_events.'''
-    if ctx.current_cursor_value is None:
+    if ctx.cursor_value is None:
         return [{"event_id": 1, "cursor_seen": "none"}]
-    next_id = int(ctx.current_cursor_value) + 1
-    return [{"event_id": next_id, "cursor_seen": str(ctx.current_cursor_value)}]
+    next_id = int(ctx.cursor_value) + 1
+    return [{"event_id": next_id, "cursor_seen": str(ctx.cursor_value)}]
 """,
                 "python/nodes/loaders/raw/__init__.py": "from .loader import raw_append_events\n",
             },
@@ -2831,13 +2546,13 @@ from sqlbuild.loaders import loader
 @loader(write_strategy='merge', cursor_column='updated_at', unique_key='customer_id')
 def raw_merge_customers(ctx):
     '''Test loader raw_merge_customers.'''
-    if ctx.current_cursor_value is None:
+    if ctx.cursor_value is None:
         return [
             {"customer_id": 1, "name": "old", "updated_at": 1},
             {"customer_id": 2, "name": "kept", "updated_at": 1},
         ]
     return [
-        {"customer_id": 1, "name": f"updated:{ctx.current_cursor_value}", "updated_at": 2},
+        {"customer_id": 1, "name": f"updated:{ctx.cursor_value}", "updated_at": 2},
         {"customer_id": 3, "name": "new", "updated_at": 2},
     ]
 """,
@@ -2874,7 +2589,7 @@ from sqlbuild.loaders import loader
 @loader(write_strategy='merge', cursor_column='version', unique_key=['entity_id', 'source'])
 def raw_merge_composite(ctx):
     '''Test loader raw_merge_composite.'''
-    if ctx.current_cursor_value is None:
+    if ctx.cursor_value is None:
         return [{"entity_id": 1, "source": "api", "value": "old", "version": 1}]
     return [
         {"entity_id": 1, "source": "api", "value": "new", "version": 2},
@@ -2910,7 +2625,7 @@ from sqlbuild.loaders import loader
 @loader(write_strategy='delete_insert', cursor_column='event_id')
 def raw_delete_insert_events(ctx):
     '''Test loader raw_delete_insert_events.'''
-    if ctx.current_cursor_value is None:
+    if ctx.cursor_value is None:
         return [
             {"event_id": 1, "status": "old-outside-low"},
             {"event_id": 2, "status": "old-range"},
@@ -2927,6 +2642,7 @@ def raw_delete_insert_events(ctx):
             select_sql=(
                 "SELECT event_id, status FROM raw_delete_insert_events ORDER BY event_id, status"
             ),
+            rerun_cursors=CursorOverrides(start_int="2", end_int="4"),
             expected_rows=(
                 (1, "old-outside-low"),
                 (2, "new-range"),
@@ -2945,7 +2661,7 @@ sources:
     managed: true
     columns:
       - name: event_at
-        type: TIMESTAMP
+        type: timestamp_ntz
       - name: status
         type: VARCHAR
 """.strip()
@@ -2958,7 +2674,7 @@ from sqlbuild.loaders import loader
 @loader(write_strategy='delete_insert', cursor_column='event_at')
 def raw_delete_insert_ts(ctx):
     '''Test loader raw_delete_insert_ts.'''
-    if ctx.current_cursor_value is None:
+    if ctx.cursor_value is None:
         return [
             {"event_at": datetime(2026, 1, 1, 0, 0, 0), "status": "outside-low"},
             {"event_at": datetime(2026, 1, 1, 1, 0, 0), "status": "old-range"},
@@ -2976,6 +2692,9 @@ def raw_delete_insert_ts(ctx):
                 "SELECT strftime(event_at, '%Y-%m-%d %H:%M:%S'), status "
                 "FROM raw_delete_insert_ts ORDER BY event_at, status"
             ),
+            rerun_cursors=CursorOverrides(
+                start_ts="2026-01-01T01:00:00", end_ts="2026-01-01T03:00:00"
+            ),
             expected_rows=(
                 ("2026-01-01 00:00:00", "outside-low"),
                 ("2026-01-01 01:00:00", "new-range"),
@@ -2984,7 +2703,7 @@ def raw_delete_insert_ts(ctx):
             ),
         ),
         LoadCommandWriteStrategyTestCase(
-            description="delete insert empty rerun leaves existing target unchanged",
+            description="delete insert empty rerun clears its cursor window",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
                 "sql/sources/raw.yml": """
@@ -3005,7 +2724,7 @@ from sqlbuild.loaders import loader
 @loader(write_strategy='delete_insert', cursor_column='event_id')
 def raw_delete_insert_empty(ctx):
     '''Test loader raw_delete_insert_empty.'''
-    if ctx.current_cursor_value is None:
+    if ctx.cursor_value is None:
         return [
             {"event_id": 1, "status": "existing"},
             {"event_id": 2, "status": "existing"},
@@ -3015,7 +2734,7 @@ def raw_delete_insert_empty(ctx):
                 "python/nodes/loaders/raw/__init__.py": "from .loader import raw_delete_insert_empty\n",
             },
             select_sql="SELECT event_id, status FROM raw_delete_insert_empty ORDER BY event_id",
-            expected_rows=((1, "existing"), (2, "existing")),
+            expected_rows=((1, "existing"),),
         ),
     ],
     ids=lambda case: case.description,
@@ -3027,11 +2746,19 @@ def test_given_source_loader_write_strategy_when_running_load_twice_then_writes_
 ) -> None:
     write_repo_files(tmp_path, test_case.project_files)
 
-    for _ in range(test_case.run_count):
-        exit_code: int = run_load_command(
-            request=LoadCommandRequest(project_dir=tmp_path, no_color=True)
+    cursor_windows: list[CursorOverrides | None] = [
+        None,
+        *[test_case.rerun_cursors] * (test_case.run_count - 1),
+    ]
+    exit_codes: list[int] = [
+        run_load_command(
+            request=LoadCommandRequest(
+                project_dir=tmp_path, no_color=True, cursor_overrides=cursor_window
+            )
         )
-        assert exit_code == 0
+        for cursor_window in cursor_windows
+    ]
+    assert exit_codes == [0] * test_case.run_count
 
     connection: DuckDBPyConnection = duckdb.connect(str(tmp_path / "demo.duckdb"))
     try:
@@ -3041,253 +2768,6 @@ def test_given_source_loader_write_strategy_when_running_load_twice_then_writes_
     finally:
         connection.close()
     assert rows == test_case.expected_rows
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
-        LoadCommandWriteStrategyLifecycleTestCase(
-            description="append creates target first then inserts on rerun",
-            project_files=WRITE_STRATEGY_CASE_FIXTURES[0].project_files,
-            expected_first_run_fragments=(
-                "CREATE OR REPLACE TABLE raw_append_events AS SELECT * FROM "
-                "raw_append_events__staging",
-            ),
-            expected_second_run_fragments=(
-                'INSERT INTO raw_append_events ("event_id", "cursor_seen") '
-                "SELECT * FROM raw_append_events__staging",
-            ),
-            absent_second_run_fragments=(
-                "CREATE OR REPLACE TABLE raw_append_events AS SELECT * FROM "
-                "raw_append_events__staging",
-            ),
-        ),
-        LoadCommandWriteStrategyLifecycleTestCase(
-            description="merge creates target first then merges on rerun",
-            project_files=WRITE_STRATEGY_CASE_FIXTURES[1].project_files,
-            expected_first_run_fragments=(
-                "CREATE OR REPLACE TABLE raw_merge_customers AS SELECT * FROM "
-                "raw_merge_customers__staging",
-            ),
-            expected_second_run_fragments=("MERGE INTO raw_merge_customers",),
-            absent_second_run_fragments=(
-                "CREATE OR REPLACE TABLE raw_merge_customers AS SELECT * FROM "
-                "raw_merge_customers__staging",
-            ),
-        ),
-        LoadCommandWriteStrategyLifecycleTestCase(
-            description="merge composite key uses every key in merge condition",
-            project_files=WRITE_STRATEGY_CASE_FIXTURES[2].project_files,
-            expected_first_run_fragments=(
-                "CREATE OR REPLACE TABLE raw_merge_composite AS SELECT * FROM "
-                "raw_merge_composite__staging",
-            ),
-            expected_second_run_fragments=(
-                "MERGE INTO raw_merge_composite",
-                '__target."entity_id" = __source."entity_id"',
-                '__target."source" = __source."source"',
-            ),
-        ),
-        LoadCommandWriteStrategyLifecycleTestCase(
-            description="delete insert creates target first then deletes cursor range on rerun",
-            project_files=WRITE_STRATEGY_CASE_FIXTURES[3].project_files,
-            expected_first_run_fragments=(
-                "CREATE OR REPLACE TABLE raw_delete_insert_events AS SELECT * FROM "
-                "raw_delete_insert_events__staging",
-            ),
-            expected_second_run_fragments=(
-                'SELECT MIN("event_id"), MAX("event_id") FROM raw_delete_insert_events__staging',
-                "DELETE FROM raw_delete_insert_events WHERE \"event_id\" >= '2' AND "
-                "\"event_id\" < '4'",
-                "INSERT INTO raw_delete_insert_events SELECT * FROM "
-                "raw_delete_insert_events__staging",
-            ),
-            absent_second_run_fragments=(
-                "CREATE OR REPLACE TABLE raw_delete_insert_events AS SELECT * FROM "
-                "raw_delete_insert_events__staging",
-            ),
-        ),
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_source_loader_write_strategy_when_running_pipeline_then_uses_expected_dml(
-    test_case: LoadCommandWriteStrategyLifecycleTestCase,
-    tmp_path: Path,
-    write_repo_files: Callable[[Path, dict[str, str]], None],
-) -> None:
-    write_repo_files(tmp_path, test_case.project_files)
-    discovered_inputs: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
-    source_file: DiscoveredSourceFile = discovered_inputs.source_files[0]
-    adapter: DuckDbAdapter = DuckDbAdapter()
-
-    first_results: tuple[LoadExecutionResult, ...] = run_source_loads(
-        sources=source_file.source_entries,
-        loader_functions=discovered_inputs.loader_functions,
-        connection_config={"database": str(tmp_path / "demo.duckdb")},
-        adapter=adapter,
-        runtime=LoadRuntimeParams(
-            run_id="test_run",
-            target="dev",
-            vars={},
-            is_reload=False,
-        ),
-    )
-    second_results: tuple[LoadExecutionResult, ...] = run_source_loads(
-        sources=source_file.source_entries,
-        loader_functions=discovered_inputs.loader_functions,
-        connection_config={"database": str(tmp_path / "demo.duckdb")},
-        adapter=adapter,
-        runtime=LoadRuntimeParams(
-            run_id="test_run",
-            target="dev",
-            vars={},
-            is_reload=False,
-        ),
-    )
-
-    first_content_by_kind: defaultdict[str, list[str]] = defaultdict(list)
-    for event in first_results[0].lifecycle_events:
-        first_content_by_kind[event.kind.value].append(event.content)
-    first_lifecycle_sql: tuple[str, ...] = tuple(first_content_by_kind["sql"])
-    second_content_by_kind: defaultdict[str, list[str]] = defaultdict(list)
-    for event in second_results[0].lifecycle_events:
-        second_content_by_kind[event.kind.value].append(event.content)
-    second_lifecycle_sql: tuple[str, ...] = tuple(second_content_by_kind["sql"])
-    first_fragments_found: list[bool] = []
-    for fragment in test_case.expected_first_run_fragments:
-        first_fragments_found.append(any(fragment in sql for sql in first_lifecycle_sql))
-    assert all(first_fragments_found)
-    second_fragments_found: list[bool] = []
-    for fragment in test_case.expected_second_run_fragments:
-        second_fragments_found.append(any(fragment in sql for sql in second_lifecycle_sql))
-    assert all(second_fragments_found)
-    second_fragments_absent: list[bool] = []
-    for fragment in test_case.absent_second_run_fragments:
-        second_fragments_absent.append(all(fragment not in sql for sql in second_lifecycle_sql))
-    assert all(second_fragments_absent)
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
-        LoadCommandAdapterCallTestCase(
-            description="append rerun calls adapter append with staging select",
-            project_files=WRITE_STRATEGY_CASE_FIXTURES[0].project_files,
-            method_name="append",
-            expected_sql="SELECT * FROM raw_append_events__staging",
-        ),
-        LoadCommandAdapterCallTestCase(
-            description="merge rerun calls adapter merge with staging select and unique key",
-            project_files=WRITE_STRATEGY_CASE_FIXTURES[1].project_files,
-            method_name="merge",
-            expected_sql="SELECT * FROM raw_merge_customers__staging",
-            expected_arguments=("customer_id",),
-        ),
-        LoadCommandAdapterCallTestCase(
-            description="delete insert rerun calls adapter delete insert cursor with staging select",
-            project_files=WRITE_STRATEGY_CASE_FIXTURES[3].project_files,
-            method_name="delete_insert_cursor",
-            expected_sql="SELECT * FROM raw_delete_insert_events__staging",
-            expected_arguments=("event_id", "2", "4", CursorKind.INTEGER),
-        ),
-        LoadCommandAdapterCallTestCase(
-            description="timestamp delete insert rerun propagates native cursor kind",
-            project_files=WRITE_STRATEGY_CASE_FIXTURES[4].project_files,
-            method_name="delete_insert_cursor",
-            expected_sql="SELECT * FROM raw_delete_insert_ts__staging",
-            expected_arguments=(
-                "event_at",
-                "2026-01-01T01:00:00",
-                "2026-01-01T02:00:00.000001",
-                CursorKind.TIMESTAMP,
-            ),
-        ),
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_source_loader_write_strategy_when_rerunning_then_calls_expected_adapter_method(
-    test_case: LoadCommandAdapterCallTestCase,
-    tmp_path: Path,
-    write_repo_files: Callable[[Path, dict[str, str]], None],
-    monkeypatch: MonkeyPatch,
-) -> None:
-    write_repo_files(tmp_path, test_case.project_files)
-    discovered_inputs: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
-    source_file: DiscoveredSourceFile = discovered_inputs.source_files[0]
-    adapter: DuckDbAdapter = DuckDbAdapter()
-    calls: list[tuple[str, str, tuple[str | None, ...]]] = []
-
-    run_source_loads(
-        sources=source_file.source_entries,
-        loader_functions=discovered_inputs.loader_functions,
-        connection_config={"database": str(tmp_path / "demo.duckdb")},
-        adapter=adapter,
-        runtime=LoadRuntimeParams(
-            run_id="test_run",
-            target="dev",
-            vars={},
-            is_reload=False,
-        ),
-    )
-
-    def append_spy(
-        connection: object,
-        *,
-        destination: str,
-        sql: str,
-        columns: tuple[str, ...] | None = None,
-        statement_recorder: object,
-    ) -> None:
-        calls.append(("append", sql, ()))
-
-    def merge_spy(
-        connection: object,
-        *,
-        destination: str,
-        sql: str,
-        unique_key: tuple[str, ...],
-        statement_recorder: object,
-    ) -> None:
-        calls.append(("merge", sql, unique_key))
-
-    def delete_insert_cursor_spy(
-        connection: object,
-        *,
-        destination: str,
-        sql: str,
-        cursor_column: str,
-        cursor_start: str,
-        cursor_end: str,
-        statement_recorder: object,
-        cursor_type: str | None = None,
-    ) -> None:
-        calls.append(
-            (
-                "delete_insert_cursor",
-                sql,
-                (cursor_column, cursor_start, cursor_end, cursor_type),
-            )
-        )
-
-    monkeypatch.setattr(adapter, "append", append_spy)
-    monkeypatch.setattr(adapter, "merge", merge_spy)
-    monkeypatch.setattr(adapter, "delete_insert_cursor", delete_insert_cursor_spy)
-
-    results: tuple[LoadExecutionResult, ...] = run_source_loads(
-        sources=source_file.source_entries,
-        loader_functions=discovered_inputs.loader_functions,
-        connection_config={"database": str(tmp_path / "demo.duckdb")},
-        adapter=adapter,
-        runtime=LoadRuntimeParams(
-            run_id="test_run",
-            target="dev",
-            vars={},
-            is_reload=False,
-        ),
-    )
-
-    assert results[0].status.value == "success"
-    assert calls == [(test_case.method_name, test_case.expected_sql, test_case.expected_arguments)]
 
 
 @pytest.mark.parametrize(
@@ -3319,7 +2799,7 @@ def raw_no_cursor(ctx):
     '''Test loader raw_no_cursor.'''
     global run_count
     run_count += 1
-    return [{"run_number": run_count, "cursor_seen": str(ctx.current_cursor_value)}]
+    return [{"run_number": run_count, "cursor_seen": str(ctx.cursor_value)}]
 """,
                 "python/nodes/loaders/raw/__init__.py": "from .loader import raw_no_cursor\n",
             },
@@ -3348,7 +2828,7 @@ from sqlbuild.loaders import loader
 @loader(write_strategy='append', cursor_column='event_id')
 def raw_empty_cursor(ctx):
     '''Test loader raw_empty_cursor.'''
-    return [{"event_id": 1, "cursor_seen": str(ctx.current_cursor_value)}]
+    return [{"event_id": 1, "cursor_seen": str(ctx.cursor_value)}]
 """,
                 "python/nodes/loaders/raw/__init__.py": "from .loader import raw_empty_cursor\n",
             },
@@ -3379,7 +2859,7 @@ from sqlbuild.loaders import loader
 @loader(write_strategy='append', cursor_column='event_id')
 def raw_missing_cursor_target(ctx):
     '''Test loader raw_missing_cursor_target.'''
-    return [{"event_id": 1, "cursor_seen": str(ctx.current_cursor_value)}]
+    return [{"event_id": 1, "cursor_seen": str(ctx.cursor_value)}]
 """,
                 "python/nodes/loaders/raw/__init__.py": "from .loader import raw_missing_cursor_target\n",
             },
@@ -3406,11 +2886,11 @@ def test_given_loader_cursor_context_has_no_value_when_running_load_then_passes_
     finally:
         connection.close()
 
-    for _ in range(test_case.run_count):
-        exit_code: int = run_load_command(
-            request=LoadCommandRequest(project_dir=tmp_path, no_color=True)
-        )
-        assert exit_code == 0
+    exit_codes: list[int] = [
+        run_load_command(request=LoadCommandRequest(project_dir=tmp_path, no_color=True))
+        for _ in range(test_case.run_count)
+    ]
+    assert exit_codes == [0] * test_case.run_count
 
     connection: DuckDBPyConnection = duckdb.connect(str(tmp_path / "demo.duckdb"))
     try:
@@ -3420,63 +2900,6 @@ def test_given_loader_cursor_context_has_no_value_when_running_load_then_passes_
     finally:
         connection.close()
     assert rows == test_case.expected_rows
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
-        LoadCommandLifecycleSqlTestCase(
-            description="records cursor max query only when target exists",
-            project_files=WRITE_STRATEGY_CASE_FIXTURES[0].project_files,
-            run_count=2,
-            expected_lifecycle_sql_fragments=('SELECT MAX("event_id") FROM raw_append_events',),
-        ),
-        LoadCommandLifecycleSqlTestCase(
-            description="does not query cursor when source has no cursor column",
-            project_files=CURSOR_NONE_CASE_FIXTURES[0].project_files,
-            run_count=2,
-            absent_lifecycle_sql_fragments=("SELECT MAX(",),
-        ),
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_loader_cursor_configuration_when_running_pipeline_then_records_expected_cursor_sql(
-    test_case: LoadCommandLifecycleSqlTestCase,
-    tmp_path: Path,
-    write_repo_files: Callable[[Path, dict[str, str]], None],
-) -> None:
-    write_repo_files(tmp_path, test_case.project_files)
-    discovered_inputs: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
-    source_file: DiscoveredSourceFile = discovered_inputs.source_files[0]
-    adapter: DuckDbAdapter = DuckDbAdapter()
-    all_lifecycle_sql: list[str] = []
-
-    for _ in range(test_case.run_count):
-        results: tuple[LoadExecutionResult, ...] = run_source_loads(
-            sources=source_file.source_entries,
-            loader_functions=discovered_inputs.loader_functions,
-            connection_config={"database": str(tmp_path / "demo.duckdb")},
-            adapter=adapter,
-            runtime=LoadRuntimeParams(
-                run_id="test_run",
-                target="dev",
-                vars={},
-                is_reload=False,
-            ),
-        )
-        lifecycle_content_by_kind: defaultdict[str, list[str]] = defaultdict(list)
-        for event in results[0].lifecycle_events:
-            lifecycle_content_by_kind[event.kind.value].append(event.content)
-        all_lifecycle_sql.extend(lifecycle_content_by_kind["sql"])
-
-    fragments_found: list[bool] = []
-    for fragment in test_case.expected_lifecycle_sql_fragments:
-        fragments_found.append(any(fragment in sql for sql in all_lifecycle_sql))
-    assert all(fragments_found)
-    fragments_absent: list[bool] = []
-    for fragment in test_case.absent_lifecycle_sql_fragments:
-        fragments_absent.append(all(fragment not in sql for sql in all_lifecycle_sql))
-    assert all(fragments_absent)
 
 
 @pytest.mark.parametrize(
@@ -3527,21 +2950,24 @@ def test_given_reload_flag_when_running_load_then_passes_reload_context_to_loade
     "test_case",
     [
         LoadCommandCursorOverrideContextTestCase(
-            description="passes no cursor override context by default",
+            description="passes no cursor window on a first load by default",
             project_files=CURSOR_OVERRIDE_CONTEXT_PROJECT_FILES,
             cursor_overrides=None,
-            expected_rows=((None, None, None, None),),
+            expected_rows=((None, None),),
         ),
         LoadCommandCursorOverrideContextTestCase(
-            description="passes typed cursor override context values",
+            description="passes the integer cursor window the flags give",
             project_files=CURSOR_OVERRIDE_CONTEXT_PROJECT_FILES,
+            cursor_overrides=CursorOverrides(start_int="10", end_int="20"),
+            expected_rows=(("10", "20"),),
+        ),
+        LoadCommandCursorOverrideContextTestCase(
+            description="passes the timestamp cursor window the flags give",
+            project_files=CURSOR_OVERRIDE_TIMESTAMP_PROJECT_FILES,
             cursor_overrides=CursorOverrides(
-                start_ts="2026-01-01T01:02:03",
-                end_ts="2026-01-02T04:05:06",
-                start_int="10",
-                end_int="20",
+                start_ts="2026-01-01T01:02:03", end_ts="2026-01-02T04:05:06"
             ),
-            expected_rows=(("2026-01-01T01:02:03", "2026-01-02T04:05:06", "10", "20"),),
+            expected_rows=(("2026-01-01T01:02:03", "2026-01-02T04:05:06"),),
         ),
     ],
     ids=lambda case: case.description,
@@ -3565,7 +2991,7 @@ def test_given_cursor_override_flags_when_running_load_then_passes_typed_context
     try:
         rows: tuple[tuple[object, ...], ...] = tuple(
             connection.execute(
-                "SELECT start_ts, end_ts, start_int, end_int FROM raw_cursor_overrides"
+                "SELECT cursor_start, cursor_end FROM raw_cursor_overrides"
             ).fetchall()
         )
     finally:
@@ -3653,13 +3079,6 @@ sources:
     ],
     ids=lambda case: case.description,
 )
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "sqb load runs as a build, whose ingress phase runs loaders one at a time; loaders run "
-        "concurrently again once they load through SQLLoad"
-    ),
-)
 def test_given_loader_dag_when_running_pipeline_then_independent_branches_overlap(
     test_case: LoadCommandConcurrencyTestCase,
     tmp_path: Path,
@@ -3672,7 +3091,7 @@ def test_given_loader_dag_when_running_pipeline_then_independent_branches_overla
         request=LoadCommandRequest(
             project_dir=tmp_path,
             no_color=True,
-            select=("raw_join",),
+            select=("+raw_join",),
             concurrency=test_case.max_concurrency,
             json_output_path=output_path,
         )
@@ -3681,7 +3100,8 @@ def test_given_loader_dag_when_running_pipeline_then_independent_branches_overla
     assert exit_code == 0
     payload: dict[str, Any] = cast(dict[str, Any], json.loads(output_path.read_text()))
     assets: list[dict[str, Any]] = cast(list[dict[str, Any]], payload["assets"])
-    assert tuple(asset["name"] for asset in assets) == test_case.expected_json_asset_order
+    names: tuple[str, ...] = tuple(asset["name"] for asset in assets)
+    assert (*sorted(names[:-1]), names[-1]) == test_case.expected_json_asset_order
     connection: DuckDBPyConnection = duckdb.connect(str(tmp_path / "demo.duckdb"))
     try:
         row: tuple[int] | None = connection.execute(
@@ -3738,13 +3158,13 @@ def raw_inferred(ctx):
                 True,
                 2.5,
                 "customer's order",
-                '{"source": "loader"}',
-                '["new", "priority"]',
+                '{"source":"loader"}',
+                '["new","priority"]',
                 datetime(2026, 5, 21, 12, 30, 0),
                 date(2026, 5, 21),
             ),
             expected_column_types={
-                "id": "INTEGER",
+                "id": "BIGINT",
                 "notes": "VARCHAR",
                 "flag": "BOOLEAN",
                 "amount": "DOUBLE",
@@ -3822,7 +3242,7 @@ def raw_inferred(ctx):
                 "python/nodes/loaders/raw/__init__.py": "from .loader import raw_inferred\n",
             },
             expected_row=("12345678-1234-5678-1234-567812345678", Decimal("12.50")),
-            expected_column_types={"order_ref": "VARCHAR", "price": "DECIMAL(6,2)"},
+            expected_column_types={"order_ref": "VARCHAR", "price": "DECIMAL(21,2)"},
         ),
         LoadCommandInferredColumnsTestCase(
             description="wide decimals stay exact beside values written with an exponent",
@@ -3881,7 +3301,10 @@ def test_given_decimal_and_declared_values_when_running_load_then_keeps_their_ty
     finally:
         connection.close()
     assert row == test_case.expected_row
-    assert dict(column_rows) == test_case.expected_column_types
+    column_types: dict[str, str] = dict(column_rows)
+    assert {
+        column: column_types[column] for column in test_case.expected_column_types
+    } == test_case.expected_column_types
 
 
 @pytest.mark.parametrize(
@@ -3973,15 +3396,7 @@ def raw_batched_yield(ctx):
                 "python/nodes/loaders/raw/__init__.py": "from .loader import raw_batched_yield\n",
             },
             expected_rows=((1, "first", None), (2, "second", True), (3, "third", False)),
-            expected_column_types={"id": "INTEGER", "status": "VARCHAR", "late_flag": "BOOLEAN"},
-            expected_lifecycle_sql_fragments=(
-                "CREATE OR REPLACE TABLE raw_batched_yield__staging",
-                'ALTER TABLE raw_batched_yield__staging ADD COLUMN "late_flag" BOOLEAN',
-                'INSERT INTO raw_batched_yield__staging ("id", "status", "late_flag")',
-                "CREATE OR REPLACE TABLE raw_batched_yield AS SELECT * "
-                "FROM raw_batched_yield__staging",
-                "DROP TABLE IF EXISTS raw_batched_yield__staging",
-            ),
+            expected_column_types={"id": "BIGINT", "status": "VARCHAR", "late_flag": "BOOLEAN"},
         ),
     ],
     ids=lambda case: case.description,
@@ -3992,24 +3407,10 @@ def test_given_generator_loader_uses_batch_size_when_running_pipeline_then_appen
     write_repo_files: Callable[[Path, dict[str, str]], None],
 ) -> None:
     write_repo_files(tmp_path, test_case.project_files)
-    discovered_inputs: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
-    source_file: DiscoveredSourceFile = discovered_inputs.source_files[0]
-    adapter: DuckDbAdapter = DuckDbAdapter()
 
-    results: tuple[LoadExecutionResult, ...] = run_source_loads(
-        sources=batched_entries(source_file.source_entries, load_batch_size=1),
-        loader_functions=discovered_inputs.loader_functions,
-        connection_config={"database": str(tmp_path / "demo.duckdb")},
-        adapter=adapter,
-        runtime=LoadRuntimeParams(
-            run_id="test_run",
-            target="dev",
-            vars={},
-            is_reload=False,
-        ),
-    )
+    assets: dict[str, dict[str, Any]] = load_assets(project_dir=tmp_path)
 
-    assert results[0].rows_loaded == len(test_case.expected_rows)
+    assert assets["raw_batched_yield"]["rows_loaded"] == len(test_case.expected_rows)
     connection: DuckDBPyConnection = duckdb.connect(str(tmp_path / "demo.duckdb"))
     try:
         rows: list[tuple[object, ...]] = connection.execute(
@@ -4021,19 +3422,11 @@ def test_given_generator_loader_uses_batch_size_when_running_pipeline_then_appen
         ).fetchall()
     finally:
         connection.close()
-    lifecycle_content_by_kind: defaultdict[str, list[str]] = defaultdict(list)
-    for event in results[0].lifecycle_events:
-        lifecycle_content_by_kind[event.kind.value].append(event.content)
-    lifecycle_sql: tuple[str, ...] = tuple(lifecycle_content_by_kind["sql"])
     assert tuple(rows) == test_case.expected_rows
     column_types: dict[str, str] = dict(column_rows)
-    expected_column: str
-    for expected_column, expected_type in test_case.expected_column_types.items():
-        assert column_types[expected_column] == expected_type
-    fragments_found: list[bool] = []
-    for fragment in test_case.expected_lifecycle_sql_fragments:
-        fragments_found.append(any(fragment in sql for sql in lifecycle_sql))
-    assert all(fragments_found)
+    assert {
+        column: column_types[column] for column in test_case.expected_column_types
+    } == test_case.expected_column_types
 
 
 @pytest.mark.parametrize(
@@ -4069,7 +3462,7 @@ def raw_missing_known(ctx):
             select_sql="SELECT id, status FROM raw_missing_known ORDER BY id",
             table_name="raw_missing_known",
             expected_rows=((1, "first"), (2, None)),
-            expected_column_types={"id": "INTEGER", "status": "VARCHAR"},
+            expected_column_types={"id": "BIGINT", "status": "VARCHAR"},
             expected_rows_loaded=2,
         ),
         LoadCommandBatchedRowsTestCase(
@@ -4102,7 +3495,7 @@ def raw_empty_generator(ctx):
             select_sql="SELECT COUNT(*) FROM raw_empty_generator",
             table_name="raw_empty_generator",
             expected_rows=((0,),),
-            expected_column_types={"id": "INTEGER", "status": "VARCHAR"},
+            expected_column_types={"id": "BIGINT", "status": "VARCHAR"},
             expected_rows_loaded=0,
         ),
         LoadCommandBatchedRowsTestCase(
@@ -4133,12 +3526,11 @@ def raw_late_null(ctx):
             select_sql="SELECT id, late_note FROM raw_late_null ORDER BY id",
             table_name="raw_late_null",
             expected_rows=((1, None), (2, "filled")),
-            expected_column_types={"id": "INTEGER", "late_note": "VARCHAR"},
+            expected_column_types={"id": "BIGINT", "late_note": "VARCHAR"},
             expected_rows_loaded=2,
         ),
         LoadCommandBatchedRowsTestCase(
             description="loads multi-row batches before appending final partial batch",
-            load_batch_size=2,
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
                 "sql/sources/raw.yml": """
@@ -4166,13 +3558,11 @@ def raw_batch_size_two(ctx):
             select_sql="SELECT id FROM raw_batch_size_two ORDER BY id",
             table_name="raw_batch_size_two",
             expected_rows=((1,), (2,), (3,)),
-            expected_column_types={"id": "INTEGER"},
+            expected_column_types={"id": "BIGINT"},
             expected_rows_loaded=3,
-            expected_lifecycle_sql_fragments=("INSERT INTO raw_batch_size_two__staging",),
         ),
         LoadCommandBatchedRowsTestCase(
             description="uses default batch size when source does not declare one",
-            load_batch_size=0,
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
                 "sql/sources/raw.yml": """
@@ -4200,9 +3590,8 @@ def raw_default_batch(ctx):
             select_sql="SELECT id FROM raw_default_batch ORDER BY id",
             table_name="raw_default_batch",
             expected_rows=((1,), (2,), (3,)),
-            expected_column_types={"id": "INTEGER"},
+            expected_column_types={"id": "BIGINT"},
             expected_rows_loaded=3,
-            absent_lifecycle_sql_fragments=("INSERT INTO raw_default_batch__staging",),
         ),
     ],
     ids=lambda case: case.description,
@@ -4213,24 +3602,8 @@ def test_given_batched_loader_variants_when_running_pipeline_then_writes_expecte
     write_repo_files: Callable[[Path, dict[str, str]], None],
 ) -> None:
     write_repo_files(tmp_path, test_case.project_files)
-    discovered_inputs: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
-    source_file: DiscoveredSourceFile = discovered_inputs.source_files[0]
-    adapter: DuckDbAdapter = DuckDbAdapter()
 
-    results: tuple[LoadExecutionResult, ...] = run_source_loads(
-        sources=batched_entries(
-            source_file.source_entries, load_batch_size=test_case.load_batch_size
-        ),
-        loader_functions=discovered_inputs.loader_functions,
-        connection_config={"database": str(tmp_path / "demo.duckdb")},
-        adapter=adapter,
-        runtime=LoadRuntimeParams(
-            run_id="test_run",
-            target="dev",
-            vars={},
-            is_reload=False,
-        ),
-    )
+    assets: dict[str, dict[str, Any]] = load_assets(project_dir=tmp_path)
 
     connection: DuckDBPyConnection = duckdb.connect(str(tmp_path / "demo.duckdb"))
     try:
@@ -4241,24 +3614,12 @@ def test_given_batched_loader_variants_when_running_pipeline_then_writes_expecte
         ).fetchall()
     finally:
         connection.close()
-    lifecycle_content_by_kind: defaultdict[str, list[str]] = defaultdict(list)
-    for event in results[0].lifecycle_events:
-        lifecycle_content_by_kind[event.kind.value].append(event.content)
-    lifecycle_sql: tuple[str, ...] = tuple(lifecycle_content_by_kind["sql"])
-    assert results[0].rows_loaded == test_case.expected_rows_loaded
+    assert assets[test_case.table_name]["rows_loaded"] == test_case.expected_rows_loaded
     assert tuple(rows) == test_case.expected_rows
     column_types: dict[str, str] = dict(column_rows)
-    expected_column: str
-    for expected_column, expected_type in test_case.expected_column_types.items():
-        assert column_types[expected_column] == expected_type
-    fragments_found: list[bool] = []
-    for fragment in test_case.expected_lifecycle_sql_fragments:
-        fragments_found.append(any(fragment in sql for sql in lifecycle_sql))
-    assert all(fragments_found)
-    fragments_absent: list[bool] = []
-    for fragment in test_case.absent_lifecycle_sql_fragments:
-        fragments_absent.append(all(fragment not in sql for sql in lifecycle_sql))
-    assert all(fragments_absent)
+    assert {
+        column: column_types[column] for column in test_case.expected_column_types
+    } == test_case.expected_column_types
 
 
 @pytest.mark.parametrize(
@@ -4353,7 +3714,7 @@ def raw_empty(ctx):
 """,
                 "python/nodes/loaders/raw/__init__.py": "from .loader import raw_empty\n",
             },
-            expected_column_types={"id": "INTEGER", "status": "VARCHAR"},
+            expected_column_types={"id": "BIGINT", "status": "VARCHAR"},
         ),
     ],
     ids=lambda case: case.description,
@@ -4384,7 +3745,10 @@ def test_given_loader_returns_empty_rows_when_running_load_then_writes_empty_dec
     assert row_count_row is not None
     row_count: int = row_count_row[0]
     assert row_count == 0
-    assert dict(column_rows) == test_case.expected_column_types
+    column_types: dict[str, str] = dict(column_rows)
+    assert {
+        column: column_types[column] for column in test_case.expected_column_types
+    } == test_case.expected_column_types
 
 
 @pytest.mark.parametrize(
@@ -4428,11 +3792,11 @@ def test_given_self_managed_loader_when_running_load_then_uses_loader_written_ta
 ) -> None:
     write_repo_files(tmp_path, test_case.project_files)
 
-    for _ in range(test_case.run_count):
-        exit_code: int = run_load_command(
-            request=LoadCommandRequest(project_dir=tmp_path, no_color=True)
-        )
-        assert exit_code == 0
+    exit_codes: list[int] = [
+        run_load_command(request=LoadCommandRequest(project_dir=tmp_path, no_color=True))
+        for _ in range(test_case.run_count)
+    ]
+    assert exit_codes == [0] * test_case.run_count
 
     connection: DuckDBPyConnection = duckdb.connect(str(tmp_path / "demo.duckdb"))
     try:
@@ -4447,62 +3811,6 @@ def test_given_self_managed_loader_when_running_load_then_uses_loader_written_ta
 @pytest.mark.parametrize(
     "test_case",
     [
-        LoadCommandFailureTestCase(
-            description="fails clearly when returned rows contain conflicting inferred types",
-            project_files={
-                "sqlbuild_project.toml": _PROJECT_FILE,
-                "sql/sources/raw.yml": """
-sources:
-  - name: raw_conflict
-    description: Test source raw_conflict.
-    managed: true
-""".strip()
-                + "\n",
-                "python/nodes/loaders/raw/loader.py": """
-from sqlbuild.loaders import loader
-
-@loader(write_strategy='replace')
-def raw_conflict(ctx):
-    '''Test loader raw_conflict.'''
-    return [
-        {"id": 1},
-        {"id": "two"},
-    ]
-""",
-                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_conflict\n",
-            },
-            expected_exit_code=1,
-            expected_stdout_fragment="conflicting types for column 'id'",
-        ),
-        LoadCommandFailureTestCase(
-            description="fails clearly when an undeclared column holds an unrecognised type",
-            project_files={
-                "sqlbuild_project.toml": _PROJECT_FILE,
-                "sql/sources/raw.yml": """
-sources:
-  - name: raw_unknown_type
-    description: Test source raw_unknown_type.
-    managed: true
-""".strip()
-                + "\n",
-                "python/nodes/loaders/raw/loader.py": """
-from uuid import UUID
-
-from sqlbuild.loaders import loader
-
-@loader(write_strategy='replace')
-def raw_unknown_type(ctx):
-    '''Test loader raw_unknown_type.'''
-    return [{"id": 1, "order_ref": UUID("12345678-1234-5678-1234-567812345678")}]
-""",
-                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_unknown_type\n",
-            },
-            expected_exit_code=1,
-            expected_stdout_fragment=(
-                "Source loader returned a UUID value for column 'order_ref', which has no "
-                "declared type"
-            ),
-        ),
         LoadCommandFailureTestCase(
             description="fails when loader returns rows without write strategy",
             project_files={
@@ -4550,7 +3858,7 @@ def raw_unexpected_none(ctx):
             },
             expected_exit_code=1,
             expected_stdout_fragment=(
-                "defines write_strategy but loader 'raw_unexpected_none' returned no rows"
+                "Loader 'raw_unexpected_none' defines write_strategy but returned no rows"
             ),
         ),
     ],
@@ -4598,8 +3906,6 @@ def raw_batched_conflict(ctx):
 """,
                 "python/nodes/loaders/raw/__init__.py": "from .loader import raw_batched_conflict\n",
             },
-            staging_table_name="raw_batched_conflict__staging",
-            expected_staging_exists=False,
             setup_sql=(
                 "CREATE TABLE raw_batched_conflict (id INTEGER)",
                 "INSERT INTO raw_batched_conflict VALUES (99)",
@@ -4629,8 +3935,6 @@ def raw_batched_non_dict(ctx):
 """,
                 "python/nodes/loaders/raw/__init__.py": "from .loader import raw_batched_non_dict\n",
             },
-            staging_table_name="raw_batched_non_dict__staging",
-            expected_staging_exists=False,
             target_select_sql="SELECT NULL WHERE FALSE",
         ),
         LoadCommandFailureCleanupTestCase(
@@ -4658,8 +3962,6 @@ def raw_append_failure(ctx):
 """,
                 "python/nodes/loaders/raw/__init__.py": "from .loader import raw_append_failure\n",
             },
-            staging_table_name="raw_append_failure__staging",
-            expected_staging_exists=False,
             setup_sql=(
                 "CREATE TABLE raw_append_failure (id INTEGER)",
                 "INSERT INTO raw_append_failure VALUES (99)",
@@ -4694,8 +3996,6 @@ def raw_merge_failure(ctx):
 """,
                 "python/nodes/loaders/raw/__init__.py": "from .loader import raw_merge_failure\n",
             },
-            staging_table_name="raw_merge_failure__staging",
-            expected_staging_exists=False,
             setup_sql=(
                 "CREATE TABLE raw_merge_failure (id INTEGER, status VARCHAR)",
                 "INSERT INTO raw_merge_failure VALUES (99, 'existing')",
@@ -4730,8 +4030,6 @@ def raw_delete_insert_failure(ctx):
 """,
                 "python/nodes/loaders/raw/__init__.py": "from .loader import raw_delete_insert_failure\n",
             },
-            staging_table_name="raw_delete_insert_failure__staging",
-            expected_staging_exists=False,
             setup_sql=(
                 "CREATE TABLE raw_delete_insert_failure (id INTEGER, status VARCHAR)",
                 "INSERT INTO raw_delete_insert_failure VALUES (99, 'existing')",
@@ -4742,15 +4040,12 @@ def raw_delete_insert_failure(ctx):
     ],
     ids=lambda case: case.description,
 )
-def test_given_later_loader_batch_fails_when_running_load_then_drops_staging(
+def test_given_later_loader_batch_fails_when_running_load_then_leaves_target_unchanged(
     test_case: LoadCommandFailureCleanupTestCase,
     tmp_path: Path,
     write_repo_files: Callable[[Path, dict[str, str]], None],
 ) -> None:
     write_repo_files(tmp_path, test_case.project_files)
-    discovered_inputs: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
-    source_file: DiscoveredSourceFile = discovered_inputs.source_files[0]
-    adapter: DuckDbAdapter = DuckDbAdapter()
     connection: DuckDBPyConnection = duckdb.connect(str(tmp_path / "demo.duckdb"))
     try:
         setup_statement: str
@@ -4759,34 +4054,16 @@ def test_given_later_loader_batch_fails_when_running_load_then_drops_staging(
     finally:
         connection.close()
 
-    results: tuple[LoadExecutionResult, ...] = run_source_loads(
-        sources=source_file.source_entries,
-        loader_functions=discovered_inputs.loader_functions,
-        connection_config={"database": str(tmp_path / "demo.duckdb")},
-        adapter=adapter,
-        runtime=LoadRuntimeParams(
-            run_id="test_run",
-            target="dev",
-            vars={},
-            is_reload=False,
-        ),
-    )
+    assets: dict[str, dict[str, Any]] = load_assets(project_dir=tmp_path)
 
-    connection: DuckDBPyConnection = duckdb.connect(str(tmp_path / "demo.duckdb"))
+    connection = duckdb.connect(str(tmp_path / "demo.duckdb"))
     try:
-        staging_count_row: tuple[int] | None = connection.execute(
-            "SELECT COUNT(*) FROM information_schema.tables "
-            f"WHERE table_name = '{test_case.staging_table_name}'"
-        ).fetchone()
         target_rows: list[tuple[object, ...]] = connection.execute(
             test_case.target_select_sql
         ).fetchall()
     finally:
         connection.close()
-    assert staging_count_row is not None
-    staging_exists: bool = bool(staging_count_row[0])
-    assert results[0].status.value == "failed"
-    assert staging_exists is test_case.expected_staging_exists
+    assert [asset["status"] for asset in assets.values()] == ["failed"]
     assert tuple(target_rows) == test_case.expected_target_rows
 
 

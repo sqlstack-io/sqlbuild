@@ -24,3 +24,10 @@ pub(super) struct CheckLoaderTestCase {
     /// The expected table settings as TOML text, or the message.
     pub(super) expected_result: Result<&'static str, &'static str>,
 }
+
+pub(super) struct LoaderSourceTestCase {
+    pub(super) description: &'static str,
+    pub(super) connection: Option<&'static str>,
+    pub(super) settings: &'static str,
+    pub(super) expected_source: &'static str,
+}

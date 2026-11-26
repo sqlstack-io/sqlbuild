@@ -163,6 +163,8 @@ class PythonNodeRuntime:
     session_warehouses: SessionWarehouses | None = None
     chain_run_id: str | None = None
     on_start: Callable[[str], None] | None = None
+    loader_projects: Mapping[str, tuple[str, str]] = field(default_factory=dict)
+    max_concurrency: int = 1
 
     def __post_init__(self) -> None:
         if self.node_warehouses and self.session_warehouses is None:

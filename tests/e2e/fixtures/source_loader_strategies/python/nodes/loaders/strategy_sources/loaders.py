@@ -28,7 +28,7 @@ def strategy_sources_loaders() -> list[object]:
     @loader(write_strategy="delete_insert", cursor_column="event_at")
     def raw_order_events(ctx: Any) -> list[dict[str, object]]:
         """Test loader raw_order_events."""
-        if ctx.current_cursor_value is None:
+        if ctx.cursor_value is None:
             return [
                 {
                     "event_id": 201,
@@ -57,7 +57,7 @@ def strategy_sources_loaders() -> list[object]:
     @loader(write_strategy="merge", unique_key="customer_id", cursor_column="updated_at")
     def raw_customers(ctx: Any) -> list[dict[str, object]]:
         """Test loader raw_customers."""
-        if ctx.current_cursor_value is None:
+        if ctx.cursor_value is None:
             return [
                 {
                     "customer_id": 1,

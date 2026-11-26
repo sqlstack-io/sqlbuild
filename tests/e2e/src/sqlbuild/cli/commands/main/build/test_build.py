@@ -1824,7 +1824,7 @@ def test_given_prior_loader_result_when_later_task_reads_result_then_uses_loader
             },
             command=("--no-color", "build", "--select", "fact_events"),
             expected_exit_code=1,
-            expected_rows=(("raw_events", "failed", "loader failed"),),
+            expected_rows=(("raw_events", "failed", "RuntimeError: loader failed"),),
         ),
         PythonLoaderStatusResultBuildE2ETestCase(
             description="skipped loader persists skipped result row",
@@ -1894,7 +1894,7 @@ def test_given_loader_status_result_when_building_then_persists_loader_status_ro
             query_duckdb(
                 db_path=project_dir / f"{test_case.project_name}.duckdb",
                 sql=(
-                    "SELECT node_name, status, error_message "
+                    "SELECT node_name, status, split_part(error_message, ' (File ', 1) "
                     "FROM _sqlbuild_node_results WHERE node_type = 'loader' ORDER BY node_name"
                 ),
             )

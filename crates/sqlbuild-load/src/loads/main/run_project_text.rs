@@ -4,9 +4,9 @@ use crate::literal_settings::main::literal_settings::literal_settings;
 use crate::loads::constants::{CONNECTIONS, SOURCES};
 use crate::loads::models::LoadTarget;
 
-/// The project text that loads `settings` as the source `load` into `target`, reading `connections`; every string is taken literally.
+/// The project text that loads `settings` as the source `load` (or only the Python source a host adds, without one) into `target`, reading `connections`; every string is taken literally.
 pub fn run_project_text(
-    (load, settings): (&str, toml::Table),
+    load: Option<(&str, toml::Table)>,
     connections: toml::Table,
     target: &LoadTarget,
 ) -> Result<String, String> {
@@ -17,11 +17,6 @@ pub fn run_project_text(
     }
     let mut targets = toml::Table::new();
     targets.insert(target.name.clone(), toml::Value::Table(target_settings));
-    let mut sources = toml::Table::new();
-    sources.insert(
-        load.to_owned(),
-        literal_settings(toml::Value::Table(settings)),
-    );
     let mut project = toml::Table::new();
     project.insert("default_target".to_owned(), target.name.clone().into());
     project.insert(
@@ -29,6 +24,13 @@ pub fn run_project_text(
         literal_settings(toml::Value::Table(connections)),
     );
     project.insert("targets".to_owned(), toml::Value::Table(targets));
-    project.insert(SOURCES.to_owned(), toml::Value::Table(sources));
+    if let Some((load, settings)) = load {
+        let mut sources = toml::Table::new();
+        sources.insert(
+            load.to_owned(),
+            literal_settings(toml::Value::Table(settings)),
+        );
+        project.insert(SOURCES.to_owned(), toml::Value::Table(sources));
+    }
     toml::to_string(&project).map_err(|error| error.to_string())
 }

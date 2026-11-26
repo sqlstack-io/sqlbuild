@@ -12,7 +12,7 @@ sources:
       - name: email
         type: VARCHAR
       - name: created_at
-        type: TIMESTAMP
+        type: timestamp_ntz
 
   - name: raw_orders
     description: Test source raw_orders.
@@ -27,7 +27,7 @@ sources:
       - name: quantity
         type: INTEGER
       - name: ordered_at
-        type: TIMESTAMP
+        type: timestamp_ntz
       - name: status
         type: VARCHAR
 
