@@ -156,8 +156,13 @@ sources:
 
 The load reads a [source connection](project-configuration.md#warehouse-and-source-connections),
 a `[connections.<name>]` entry with a `kind`. Its tables land in the target's database, in the
-load's `destination_schema` when it sets one and otherwise the target's `loader_schema` (or its
-`schema`).
+first schema of:
+
+1. the load's own `destination_schema`
+2. the target's `loader_schema`
+3. the target's `schema`
+
+This is the order SQLLoad uses, and the sources the load fills read the same schema.
 
 **Sources it fills.** A load names each destination table as SQLLoad does, `{load}__{table}` by
 default, and the source of the same name is filled by it. Listing the source adds what a source
