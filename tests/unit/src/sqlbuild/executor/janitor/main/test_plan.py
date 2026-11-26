@@ -105,11 +105,22 @@ NAMESPACED_ARTIFACT: str = build_scenario_artifact_name(
             relation_infos=(
                 relation_info("_sqlload_runs", created_at=OLD_TIME),
                 relation_info("_SQLLOAD_UNFINISHED", created_at=OLD_TIME),
+                relation_info("__sqlload_stage_probe", created_at=OLD_TIME),
+                relation_info("orders__sqlload_staging_20261126t0300_ab12", created_at=OLD_TIME),
+                relation_info(
+                    "orders__sqlload_staging_20261126t0300_ab12_swap", created_at=OLD_TIME
+                ),
+                relation_info("orders__sqlload_deletes", created_at=OLD_TIME),
+                relation_info("orders_sqlload_archive", created_at=OLD_TIME),
             ),
-            expected_candidate_names=(),
+            expected_candidate_names=("orders_sqlload_archive",),
             expected_skipped_relation_reasons=(
                 "relation matches exclude pattern '_sqlload_*'",
                 "relation matches exclude pattern '_sqlload_*'",
+                "relation matches exclude pattern '__sqlload_*'",
+                "relation matches exclude pattern '*__sqlload_staging_*'",
+                "relation matches exclude pattern '*__sqlload_staging_*'",
+                "relation matches exclude pattern '*__sqlload_deletes'",
             ),
         ),
         JanitorPlanTestCase(

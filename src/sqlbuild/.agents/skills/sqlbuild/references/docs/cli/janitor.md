@@ -72,8 +72,10 @@ A relation is **stale** when all of these are true:
 - SQLBuild tracked it, when `delete_tracked_only = true` (the default);
 - it matches no `exclude_patterns` entry, ignoring case.
 
-The janitor never acts on SQLBuild's state tables or on the `_sqlload_*` tables SQLLoad keeps
-beside the sources it loads, whatever the settings.
+The janitor never acts on SQLBuild's state tables or on the relations SQLLoad keeps beside the
+sources it loads, whatever the settings: names matching `_sqlload_*`, `__sqlload_*`,
+`*__sqlload_staging_*` (a load's staging tables) and `*__sqlload_deletes` (deleted rows of a
+change-data-capture load).
 
 A stale relation goes through two stages:
 

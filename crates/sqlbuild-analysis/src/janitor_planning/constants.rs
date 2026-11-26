@@ -2,15 +2,29 @@
 
 use sqlbuild_core::constants::STATE_TABLE_NAMES;
 
-/// Tables SQLLoad owns beside the tables it loads: its run log, ledgers and stages.
-pub const SQLLOAD_TABLE_PATTERN: &str = "_sqlload_*";
-/// SQLBuild's state tables and SQLLoad's own tables, which the janitor never acts on.
-pub const BUILT_IN_EXCLUDE_PATTERNS: [&str; STATE_TABLE_NAMES.len() + 1] = {
-    let mut patterns = [SQLLOAD_TABLE_PATTERN; STATE_TABLE_NAMES.len() + 1];
+/// Relations SQLLoad owns beside the tables it loads: its run log, unfinished loads and CDC
+/// snapshots (`_sqlload_*`), its Snowflake stage probe (`__sqlload_*`), the staging tables of a
+/// load with their swap, aside and copy tables (`<table>__sqlload_staging_<id>...`), and CDC
+/// tombstones (`<table>__sqlload_deletes`).
+pub const SQLLOAD_TABLE_PATTERNS: [&str; 4] = [
+    "_sqlload_*",
+    "__sqlload_*",
+    "*__sqlload_staging_*",
+    "*__sqlload_deletes",
+];
+/// SQLBuild's state tables and SQLLoad's own relations, which the janitor never acts on.
+pub const BUILT_IN_EXCLUDE_PATTERNS: [&str;
+    STATE_TABLE_NAMES.len() + SQLLOAD_TABLE_PATTERNS.len()] = {
+    let mut patterns = [""; STATE_TABLE_NAMES.len() + SQLLOAD_TABLE_PATTERNS.len()];
     let mut index = 0;
     while index < STATE_TABLE_NAMES.len() {
         patterns[index] = STATE_TABLE_NAMES[index];
         index += 1;
+    }
+    let mut offset = 0;
+    while offset < SQLLOAD_TABLE_PATTERNS.len() {
+        patterns[index + offset] = SQLLOAD_TABLE_PATTERNS[offset];
+        offset += 1;
     }
     patterns
 };
