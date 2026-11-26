@@ -120,6 +120,7 @@ fn given_labels_when_resolving_width_then_measures_names_without_group_prefix() 
         WidthTestCase {
             description: "no labels have no width",
             labels: Vec::new(),
+            child_names: Vec::new(),
             expected_width: 0,
         },
         WidthTestCase {
@@ -131,18 +132,26 @@ fn given_labels_when_resolving_width_then_measures_names_without_group_prefix() 
                 ),
                 ("orders_assert".to_owned(), String::new()),
             ],
+            child_names: Vec::new(),
             expected_width: 13,
         },
         WidthTestCase {
             description: "a label that is only the prefix keeps its full name",
             labels: vec![("fct_orders__".to_owned(), "fct_orders".to_owned())],
+            child_names: Vec::new(),
             expected_width: 12,
+        },
+        WidthTestCase {
+            description: "a long child name widens the column so it fits under its row",
+            labels: vec![("orders_assert".to_owned(), String::new())],
+            child_names: vec!["no_negative_orders".to_owned()],
+            expected_width: 24,
         },
     ];
 
     for test_case in test_cases {
         assert_eq!(
-            test_name_width(&test_case.labels),
+            test_name_width(&test_case.labels, &test_case.child_names),
             test_case.expected_width,
             "{}",
             test_case.description

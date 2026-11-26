@@ -12,6 +12,8 @@ use crate::text::main::text_wrap::text_wrap;
 
 /// How an origin's models are listed: in full, or as a wrapped list that stops at two lines.
 const COMPACT_LINES: usize = 2;
+/// Stands in for a space inside a `code` span while help text is wrapped.
+const CODE_SPACE: char = '\u{1f}';
 const MIN_WIDTH: usize = 30;
 
 /// The text a group's block is rendered with.
@@ -328,15 +330,31 @@ fn group_help(refusal: &LocalRefusal, block: &BlockStyle<'_>) -> Vec<String> {
     }
 }
 
+/// The help under `= help:`, never wrapped inside a `code` span.
 fn help_lines(refusal: &LocalRefusal, style: CliStyle) -> Vec<String> {
     refusal
         .help
         .as_deref()
         .map(|help| {
-            render_help_lines(help, style)
+            render_help_lines(&keep_code_whole(help), style)
                 .into_iter()
-                .map(|line| format!(" {line}"))
+                .map(|line| format!(" {}", line.replace(CODE_SPACE, " ")))
                 .collect()
         })
         .unwrap_or_default()
+}
+
+/// `text` with each space inside a backtick span replaced by a character wrapping never breaks at.
+fn keep_code_whole(text: &str) -> String {
+    let mut inside: bool = false;
+    text.chars()
+        .map(|character| match character {
+            '`' => {
+                inside = !inside;
+                character
+            }
+            ' ' if inside => CODE_SPACE,
+            _ => character,
+        })
+        .collect()
 }

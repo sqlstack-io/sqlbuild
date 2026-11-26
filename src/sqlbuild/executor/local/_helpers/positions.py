@@ -232,6 +232,10 @@ def _expanded_place(
     )
 
 
+_COMMENT_PREFIXES: tuple[str, ...] = ("#", "--")
+"""Lines that only comment on the macro, where a refused construct is never written."""
+
+
 def _macro_place(*, call: str, token: str, macros: Mapping[str, Any]) -> MacroPlace | None:
     """Where macro `call` writes `token` in its own source: its body, for a Python macro."""
 
@@ -257,8 +261,11 @@ def _macro_place(*, call: str, token: str, macros: Mapping[str, Any]) -> MacroPl
             ),
             len(lines),
         )
-    pattern: re.Pattern[str] = re.compile(rf"\b{re.escape(word)}\b", re.IGNORECASE)
+    call_suffix: str = r"\s*\(" if "(" in token else ""
+    pattern: re.Pattern[str] = re.compile(rf"\b{re.escape(word)}\b{call_suffix}", re.IGNORECASE)
     for index in range(start, end):
+        if lines[index].lstrip().startswith(_COMMENT_PREFIXES):
+            continue
         found: re.Match[str] | None = pattern.search(lines[index])
         if found is not None:
             return MacroPlace(

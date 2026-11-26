@@ -33,6 +33,7 @@ pub(super) struct OutcomeTestCase {
 pub(super) struct WidthTestCase {
     pub(super) description: &'static str,
     pub(super) labels: Vec<(String, String)>,
+    pub(super) child_names: Vec<String>,
     pub(super) expected_width: usize,
 }
 

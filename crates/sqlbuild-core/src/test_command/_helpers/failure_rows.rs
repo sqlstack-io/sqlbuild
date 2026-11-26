@@ -2,12 +2,12 @@
 
 use crate::progress::models::ExpectationStep;
 use crate::run_output::models::{FailureField, FailureRow, RowTone};
-use crate::test_command::constants::{ASSERTION_FAILED_REASON, ASSERTION_PREFIX, PASS_OUTCOME};
+use crate::test_command::constants::{ASSERTION_FAILED_REASON, ASSERTION_PREFIX, FAIL_OUTCOME};
 use crate::test_command::main::expectation_summary::expectation_summary;
 
-/// The fields of one step: nothing when it passed, else its error or what differs and the rows.
+/// The fields of one failed step: what differs and the rows; nothing when it passed or errored, whose error says why.
 pub(crate) fn step_fields(step: &ExpectationStep) -> Vec<FailureField> {
-    if step.outcome == PASS_OUTCOME {
+    if step.outcome != FAIL_OUTCOME {
         return Vec::new();
     }
     if let Some(name) = step.model_name.strip_prefix(ASSERTION_PREFIX) {
