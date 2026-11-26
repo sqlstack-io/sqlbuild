@@ -1,4 +1,4 @@
-//! HTTP errors say what failed in the control database by its cause, never by its connection string or credentials.
+//! HTTP errors name the cause when the control database is unavailable; any other error never returns database diagnostics, connection strings or credentials.
 
 use axum::Json;
 use axum::http::{HeaderValue, StatusCode, header};
@@ -31,16 +31,22 @@ pub struct ApiError {
 
 impl From<ControlError> for ApiError {
     fn from(error: ControlError) -> Self {
-        let cause: Option<ControlCause> = control_cause(&error, (&ControlTarget::default(), false));
-        if cause.as_ref().is_some_and(ControlCause::unavailable) {
+        let cause: Option<ControlCause> = control_cause(&error, (&ControlTarget::default(), false))
+            .filter(ControlCause::unavailable);
+        if let Some(cause) = cause {
             return Self {
                 status: StatusCode::SERVICE_UNAVAILABLE,
-                message: cause
-                    .as_ref()
-                    .map(|cause| cause.message.clone())
-                    .unwrap_or_default(),
+                message: cause.message.clone(),
                 decision_id: None,
-                cause,
+                cause: Some(cause),
+            };
+        }
+        if error.transient() {
+            return Self {
+                status: StatusCode::SERVICE_UNAVAILABLE,
+                message: "control store is busy; retry the request".into(),
+                decision_id: None,
+                cause: None,
             };
         }
         let plain = |status: StatusCode, message: String, decision_id: Option<Uuid>| Self {
@@ -62,15 +68,11 @@ impl From<ControlError> for ApiError {
             ControlError::UnreadableSnapshot { .. }
             | ControlError::StaleGeneration
             | ControlError::Fenced => plain(StatusCode::CONFLICT, error.to_string(), None),
-            _ => Self {
-                status: StatusCode::INTERNAL_SERVER_ERROR,
-                message: cause.as_ref().map_or_else(
-                    || "control-store operation failed".to_owned(),
-                    |cause| cause.message.clone(),
-                ),
-                decision_id: None,
-                cause,
-            },
+            _ => plain(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "control-store operation failed".to_owned(),
+                None,
+            ),
         }
     }
 }

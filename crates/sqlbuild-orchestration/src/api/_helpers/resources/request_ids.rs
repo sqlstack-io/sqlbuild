@@ -13,7 +13,7 @@ use crate::api::models::{ErrorCause, ErrorReply, RequestId};
 use crate::health::main::log_cause::log_cause;
 use crate::health::models::ServerHealth;
 
-/// Name the request in `x-request-id` and an error body; a control database error is also named, recorded and logged.
+/// Name every request in `x-request-id`; an error the control database's unavailability caused also names it, its cause and since when in the body, and is recorded and logged.
 pub(crate) async fn identify_request(
     State(health): State<ServerHealth>,
     mut request: Request,
@@ -25,26 +25,22 @@ pub(crate) async fn identify_request(
     if let Ok(value) = HeaderValue::from_str(&request_id.to_string()) {
         response.headers_mut().insert(REQUEST_ID_HEADER, value);
     }
-    let Some(ErrorReply { mut body, cause }) = response.extensions_mut().remove::<ErrorReply>()
+    let Some(ErrorReply {
+        mut body,
+        cause: Some(cause),
+    }) = response.extensions_mut().remove::<ErrorReply>()
     else {
         return response;
     };
+    let cause = health.locate(cause);
+    let since = health.control_failed(&cause, (Utc::now(), Some(request_id)));
+    log_cause(Some(request_id), &cause);
     body.request_id = Some(request_id);
-    if let Some(cause) = cause {
-        let cause = health.locate(cause);
-        let now = Utc::now();
-        let since = if cause.unavailable() {
-            health.control_failed(&cause, (now, Some(request_id)))
-        } else {
-            now
-        };
-        log_cause(Some(request_id), &cause);
-        body.error.clone_from(&cause.message);
-        body.cause = Some(ErrorCause {
-            case: cause.case,
-            since,
-        });
-    }
+    body.error.clone_from(&cause.message);
+    body.cause = Some(ErrorCause {
+        case: cause.case,
+        since,
+    });
     let Ok(bytes) = serde_json::to_vec(&body) else {
         return response;
     };

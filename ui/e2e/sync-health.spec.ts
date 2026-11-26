@@ -10,7 +10,7 @@ test('a sync that can’t reach the warehouse is named in the top bar and needs 
 	await control.install(page);
 	await page.goto('/');
 	const status = page.getByTestId('sync-status');
-	await expect(status).toHaveText(new RegExp(`^Run history can't reach the warehouse since \\d{2}:\\d{2} · retrying every 60 s · ${SYNC_REASON.replace(/[()]/g, '\\$&')}$`), { timeout: 30_000 });
+	await expect(status).toHaveText(new RegExp(`^Run history can't reach the warehouse since (\\d{4}-\\d{2}-\\d{2} )?\\d{2}:\\d{2} · retrying every 60 s · ${SYNC_REASON.replace(/[()]/g, '\\$&')}$`), { timeout: 30_000 });
 	await expect(status).toHaveAttribute('href', /\/locations\//);
 	const issues = page.locator('.issues');
 	await expect(issues).toContainText("run history can't reach the warehouse since", { timeout: 30_000 });

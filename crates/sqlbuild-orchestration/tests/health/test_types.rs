@@ -8,7 +8,7 @@ pub(crate) struct CauseResponseTestCase {
     pub(crate) error: fn() -> ControlError,
     pub(crate) expected_status: u16,
     pub(crate) expected_message: &'static str,
-    pub(crate) expected_case: ControlCauseCase,
+    pub(crate) expected_case: Option<ControlCauseCase>,
     /// Whether the server's health turns unavailable with it.
     pub(crate) expected_unavailable: bool,
 }

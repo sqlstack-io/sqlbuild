@@ -58,7 +58,8 @@ rust-check: rust-lint
 	uv run fensu check
 	$(MAKE) test-native
 
-NATIVE_TEST_ARGS ?= --workspace --all-features
+# Every test binary runs, so one failing crate never hides another crate's failures.
+NATIVE_TEST_ARGS ?= --workspace --all-features --no-fail-fast
 
 .PHONY: test-native
 test-native:

@@ -2,6 +2,8 @@
 	import type { HealthComponentDetails, HealthStatus, ServerHealth } from '$lib/api';
 	import { formatAgo, formatClock, formatStamp } from '$lib/format/time';
 	import { app } from '$lib/state/app.svelte';
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 
 	/** `details` are administrators' only: where the database is, each cause, and the requests that failed. */
 	let { report, details = null }: { report: ServerHealth; details?: HealthComponentDetails[] | null } = $props();
@@ -9,14 +11,18 @@
 	const tone: Record<HealthStatus, string> = { healthy: 'var(--sb-success)', degraded: 'var(--sb-warning)', unavailable: 'var(--sb-error)' };
 	const label: Record<HealthStatus, string> = { healthy: 'Healthy', degraded: 'Degraded', unavailable: 'Unavailable' };
 	const detailOf = (component: string, locationId: string | null) => details?.find((d) => d.component === component && d.locationId === locationId) ?? null;
+	const columns: TableColumn[] = [
+		{ id: 'part', label: 'Part', width: '20%' },
+		{ id: 'state', label: 'State', width: '120px' },
+		{ id: 'since', label: 'Since', width: '150px' },
+		{ id: 'reason', label: 'Reason', truncate: false },
+		{ id: 'worked', label: 'Last worked', width: '120px' }
+	];
 </script>
 
-<table class="health" data-testid="health-table">
-	<thead>
-		<tr><th>Part</th><th>State</th><th>Since</th><th>Reason</th><th>Last worked</th></tr>
-	</thead>
-	<tbody>
-		{#each report.components as part (`${part.component}:${part.locationId ?? ''}`)}
+<div class="health" data-testid="health-table">
+	<DataTable class="static" embedded {columns} rows={report.components} key={(part) => `${part.component}:${part.locationId ?? ''}`} empty="No parts reported.">
+		{#snippet row(part)}
 			{@const detail = detailOf(part.component, part.locationId)}
 			<tr data-component={part.component}>
 				<td>
@@ -37,28 +43,13 @@
 				</td>
 				<td title={formatStamp(part.lastSuccess)}>{part.component === 'server' ? `up ${formatAgo(report.server.startedAt, app.now).replace(/ ago$/, '')}` : part.lastSuccess ? formatAgo(part.lastSuccess, app.now) : 'Not yet'}</td>
 			</tr>
-		{/each}
-	</tbody>
-</table>
+		{/snippet}
+	</DataTable>
+</div>
 
 <style>
 	.health {
-		width: 100%;
-		border-collapse: collapse;
 		font-size: 13px;
-		text-align: left;
-	}
-	th {
-		padding: 6px 10px;
-		border-bottom: 1px solid var(--border);
-		color: var(--muted-foreground);
-		font-size: 12px;
-		font-weight: 500;
-	}
-	td {
-		padding: 8px 10px;
-		border-bottom: 1px solid var(--border);
-		vertical-align: top;
 	}
 	.state {
 		display: inline-flex;
