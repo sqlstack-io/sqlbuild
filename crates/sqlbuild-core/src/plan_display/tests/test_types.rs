@@ -122,3 +122,9 @@ pub(super) struct ConfigChangeTestCase {
     pub(super) model: &'static str,
     pub(super) expected_change: Option<&'static str>,
 }
+
+pub(super) struct PlanSummaryTestCase {
+    pub(super) description: &'static str,
+    pub(super) counts: crate::plan_display::models::PlanSummaryCounts,
+    pub(super) expected_parts: &'static [&'static str],
+}

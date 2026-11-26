@@ -50,7 +50,7 @@ export function bannersFor(detail: RunDetail, now: number, cause: string | null 
 			key: 'lost-final',
 			tone: 'error',
 			title: `Lost contact — marked failed after ${short(live?.presumedFailedAfterSeconds ?? 600)} of silence.`,
-			body: [{ text: 'Rerunning is safe: the run has been stopped. To finish the nodes it didn’t complete, pick Failed + downstream and plan them.' }],
+			body: [{ text: 'Rerunning is safe: the run has been stopped. To finish the nodes it didn’t complete, pick Didn’t succeed and Skipped, or use Rerun failed.' }],
 			detail: run.statusReason ?? undefined
 		});
 	}

@@ -292,7 +292,7 @@ def test_given_copy_refused_when_testing_built_function_then_reports_coded_error
     )
 
     tested: subprocess.CompletedProcess[str] = run_sqb(
-        command=("--no-color", "test"), project_dir=project_dir
+        command=("--no-color", "test", "--run-on", "warehouse"), project_dir=project_dir
     )
 
     output: str = tested.stdout + tested.stderr
@@ -328,7 +328,8 @@ def test_given_connection_refusing_copies_when_testing_concurrently_then_reports
     )
 
     tested: subprocess.CompletedProcess[str] = run_sqb(
-        command=("--no-color", "test", "--concurrency", "2"), project_dir=project_dir
+        command=("--no-color", "test", "--run-on", "warehouse", "--concurrency", "2"),
+        project_dir=project_dir,
     )
 
     output: str = tested.stdout + tested.stderr

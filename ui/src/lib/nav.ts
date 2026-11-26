@@ -91,3 +91,18 @@ export function pageAvailable(client: Pick<ApiClient, 'supports'>, path: string)
 		.sort((a, b) => b.href.length - a.href.length)[0];
 	return !item || client.supports(item.loads);
 }
+
+/** Pages outside the navigation, by path, for what an outage calls them. */
+const OTHER_PAGES: readonly [RegExp, string][] = [
+	[/^\/plan(\/|$)/, 'Plan'],
+	[/^\/settings(\/|$)/, 'Settings'],
+	[/^\/status$/, 'Status']
+];
+
+/** What the person asked for, as a page name: "Runs" for a run, "This page" outside the navigation. */
+export function pageLabel(path: string): string {
+	const item = NAV.flatMap((g) => g.items)
+		.filter((i) => (i.href === '/' ? path === '/' : path === i.href || path.startsWith(`${i.href}/`)))
+		.sort((a, b) => b.href.length - a.href.length)[0];
+	return item?.label ?? OTHER_PAGES.find(([pattern]) => pattern.test(path))?.[1] ?? 'This page';
+}

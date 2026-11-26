@@ -173,7 +173,7 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
                         .applied
                 );
             }
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -372,7 +372,7 @@ fn given_a_source_version_that_returns_after_a_complete_scan_prunes_history_when
             let data: serde_json::Value =
                 serde_json::from_str(&std::fs::read_to_string(path).expect("DuckShop case"))
                     .expect("synthetic source versions");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -506,7 +506,7 @@ fn given_timestamp_observations_when_age_crosses_the_boundary_then_scoped_pages_
             )
             .await
             .expect("registered reader");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

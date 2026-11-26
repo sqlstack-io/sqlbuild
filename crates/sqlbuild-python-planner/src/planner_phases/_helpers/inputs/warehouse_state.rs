@@ -9,6 +9,7 @@ use crate::planner_migrations::models::ColumnMigrationInputs;
 use crate::planner_migrations::models::MigrationPhase;
 use crate::planner_phases::_helpers::inputs::contexts::class_field;
 use crate::planner_phases::_helpers::inputs::runtime::runtime_field;
+use crate::planner_phases::_helpers::outputs::buildability::end_audits;
 use crate::planner_phases::main::inputs::runtime_dialect::runtime_dialect;
 use crate::planner_phases::main::inputs::runtime_reads::runtime_reads;
 use crate::planner_phases::main::rebuilds::effectively_full_refreshed_model_names::effectively_full_refreshed_model_names;
@@ -91,12 +92,17 @@ pub(crate) fn gather_planner_warehouse_state<'py>(
     let stale_scope = scope_data(&class_field(scopes, |s: &PlannerScopeResolution| {
         &s.stale_warning_scope
     })?)?;
+    let audit_reads = end_audits(&project, &*scope_data(&selected_scope)?)?
+        .into_iter()
+        .flat_map(|audit| audit.reads)
+        .map(|read| (read.kind, read.name));
     let stale_keys = compiled_graph_keys(
         py,
         stale_scope
             .names
             .iter()
             .map(|(_, key)| key.clone())
+            .chain(audit_reads)
             .collect(),
     )?
     .into_any();

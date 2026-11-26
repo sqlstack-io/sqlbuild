@@ -15,7 +15,6 @@ from tests.e2e.src.sqlbuild.cli.commands.main.databricks._test_types import (
     DatabricksErrorE2ETestCase,
     DatabricksIntermediateDagStrategyE2ETestCase,
     DatabricksNodeResultE2ETestCase,
-    DatabricksScenarioLocalReplayE2ETestCase,
     DatabricksScenarioRemoteE2ETestCase,
     DatabricksSnapshotApplyE2ETestCase,
     DatabricksSnapshotE2ETestCase,
@@ -44,10 +43,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.load.helpers import (
     build_schema_behavior_project_files,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.scenario.helpers import (
-    assert_optional_local_replay_rows,
-    build_real_warehouse_local_replay_project_files,
     build_real_warehouse_remote_scenario_project_files,
-    maybe_corrupt_scenario_snapshot_dialect,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     assert_dbt_profile_lifecycle,
@@ -598,167 +594,6 @@ def test_given_existing_snapshot_targets_when_building_on_databricks_then_apply_
             expected_current_delete_rows=test_case.expected_current_delete_rows,
             expected_historical_timestamp_rows=test_case.expected_historical_timestamp_rows,
             expected_historical_check_rows=test_case.expected_historical_check_rows,
-        )
-    finally:
-        cleanup_databricks_schema(schema_name=schema_name)
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
-        DatabricksScenarioLocalReplayE2ETestCase(
-            description="captures databricks fixtures and replays transpilable SQL locally",
-            model_sql=(
-                "MODEL (description 'Test model.', materialized table);\n\n"
-                "SELECT\n"
-                "  customer_id,\n"
-                "  date_trunc('DAY', event_ts) AS event_day,\n"
-                "  SUM(if(amount_cents >= 1000, amount_cents, 0)) AS large_amount_cents,\n"
-                "  COUNT(*) AS event_count\n"
-                'FROM __source("raw_events")\n'
-                "GROUP BY customer_id, date_trunc('DAY', event_ts)\n"
-            ),
-            scenario_sql=(
-                "SCENARIO (description 'Test scenario.');\n\n"
-                "WITH\n"
-                "__source__raw_events AS (\n"
-                "  SELECT 10 AS customer_id, TIMESTAMP '2026-01-01 08:15:00' "
-                "AS event_ts, 1500 AS amount_cents\n"
-                "  UNION ALL\n"
-                "  SELECT 10 AS customer_id, TIMESTAMP '2026-01-01 10:30:00' "
-                "AS event_ts, 500 AS amount_cents\n"
-                "),\n"
-                "__expected__event_rollup AS (\n"
-                "  SELECT 10 AS customer_id, "
-                "date_trunc('DAY', TIMESTAMP '2026-01-01 00:00:00') AS event_day, "
-                "1500 AS large_amount_cents, 2 AS event_count\n"
-                ")\n"
-                "SELECT 1\n"
-            ),
-            expected_stdout_fragments=(
-                "transpilable_event_rollup",
-                "PASS",
-                "PASS=1  FAIL=0  ERROR=0  SKIP=0  TOTAL=1",
-            ),
-            expected_local_rows=((10, 1500, 2),),
-            local_rows_sql=(
-                "SELECT customer_id, large_amount_cents, event_count "
-                "FROM __sqb_local__model__event_rollup ORDER BY customer_id"
-            ),
-        ),
-        DatabricksScenarioLocalReplayE2ETestCase(
-            description="reports databricks local transpilation failures as X607",
-            scenario_name="local_transpile_error",
-            model_sql=(
-                "MODEL (description 'Test model.', materialized table);\n\n"
-                "SELECT customer_id, amount_cents\n"
-                'FROM __source("raw_events")\n'
-            ),
-            scenario_sql=(
-                "SCENARIO (description 'Test scenario.');\n\n"
-                "WITH\n"
-                "__source__raw_events AS (\n"
-                "  SELECT 10 AS customer_id, 1500 AS amount_cents\n"
-                "),\n"
-                "__expected__event_rollup AS (\n"
-                "  SELECT 10 AS customer_id, 1500 AS amount_cents\n"
-                ")\n"
-                "SELECT 1\n"
-            ),
-            expected_stdout_fragments=(
-                "local_transpile_error",
-                "ERROR",
-                "error[X607]",
-                "PASS=0  FAIL=0  ERROR=1  SKIP=0  TOTAL=1",
-            ),
-            expected_return_code=1,
-            corrupt_capture_dialect=True,
-        ),
-        DatabricksScenarioLocalReplayE2ETestCase(
-            description="reports databricks local DuckDB execution failures as X608",
-            scenario_name="local_execution_error",
-            model_sql=(
-                "MODEL (description 'Test model.', materialized table);\n\n"
-                "SELECT\n"
-                "  customer_id,\n"
-                "  __sqb_missing_local_function(amount_cents) AS amount_cents\n"
-                'FROM __source("raw_events")\n'
-            ),
-            scenario_sql=(
-                "SCENARIO (description 'Test scenario.');\n\n"
-                "WITH\n"
-                "__source__raw_events AS (\n"
-                "  SELECT 10 AS customer_id, 1500 AS amount_cents\n"
-                "),\n"
-                "__expected__event_rollup AS (\n"
-                "  SELECT 10 AS customer_id, 1500 AS amount_cents\n"
-                ")\n"
-                "SELECT 1\n"
-            ),
-            expected_stdout_fragments=(
-                "local_execution_error",
-                "ERROR",
-                "error[X608]",
-                "PASS=0  FAIL=0  ERROR=1  SKIP=0  TOTAL=1",
-            ),
-            expected_return_code=1,
-        ),
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_databricks_scenario_capture_when_replaying_locally_then_transpilable_sql_passes(
-    tmp_path: Path,
-    test_case: DatabricksScenarioLocalReplayE2ETestCase,
-) -> None:
-    schema_name: str = build_unique_schema_name(prefix="sqlbuild_scenario_local")
-    project_dir: Path = prepare_inline_project(
-        tmp_path=tmp_path,
-        project_name="databricks_scenario_local_replay",
-        repo_files=build_real_warehouse_local_replay_project_files(
-            project_toml=build_databricks_project_toml(
-                project_name="databricks_scenario_local_replay",
-                schema_name=schema_name,
-            ),
-            model_sql=test_case.model_sql,
-            scenario_sql=test_case.scenario_sql,
-            scenario_name=test_case.scenario_name,
-        ),
-    )
-    ensure_databricks_schema_ready(schema_name=schema_name)
-
-    try:
-        capture_result: subprocess.CompletedProcess[str] = run_sqb(
-            command=(
-                "--no-color",
-                "scenario",
-                "capture",
-                test_case.scenario_name,
-            ),
-            project_dir=project_dir,
-        )
-        assert capture_result.returncode == 0, capture_result.stdout + capture_result.stderr
-        maybe_corrupt_scenario_snapshot_dialect(
-            project_dir=project_dir,
-            scenario_name=test_case.scenario_name,
-            enabled=test_case.corrupt_capture_dialect,
-        )
-
-        replay_result: subprocess.CompletedProcess[str] = run_sqb(
-            command=("--no-color", "scenario", "test", test_case.scenario_name, "--local"),
-            project_dir=project_dir,
-        )
-
-        assert replay_result.returncode == test_case.expected_return_code, (
-            replay_result.stdout + replay_result.stderr
-        )
-        fragment: str
-        for fragment in test_case.expected_stdout_fragments:
-            assert fragment in replay_result.stdout
-        assert_optional_local_replay_rows(
-            project_dir=project_dir,
-            scenario_name=test_case.scenario_name,
-            local_rows_sql=test_case.local_rows_sql,
-            expected_local_rows=test_case.expected_local_rows,
         )
     finally:
         cleanup_databricks_schema(schema_name=schema_name)

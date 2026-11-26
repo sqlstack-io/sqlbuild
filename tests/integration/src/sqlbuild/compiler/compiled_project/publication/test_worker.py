@@ -31,6 +31,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     CheckExecutionTestCase,
+    CheckResultsTestCase,
     ClaimedLoadTestCase,
     ClaimedWorker,
     ForcedWorkerStopTestCase,
@@ -78,9 +79,9 @@ ENV_FILE_REGION_FILES: dict[str, str] = {
             "group execution preserves independent downstream work",
             "WITH source(value) AS (VALUES ('invalid')) SELECT CAST(value AS INTEGER) AS amount FROM source",
             "SELECT amount FROM orders",
-            "partial",
+            "failed",
             [(11,)],
-            expected_child_statuses={"staging_job": ("partial",), "marts_job": ("partial",)},
+            expected_child_statuses={"staging_job": ("failed",), "marts_job": ("failed",)},
         ),
         GroupExecutionTestCase(
             "successful jobs honor compiled boundaries",
@@ -121,7 +122,7 @@ ENV_FILE_REGION_FILES: dict[str, str] = {
             "failed",
             [(0,)],
             expected_child_statuses={
-                "staging_job": ("partial", "cancelled"),
+                "staging_job": ("failed", "cancelled"),
                 "marts_job": ("cancelled",),
             },
             expected_totals=("cancelled", None),
@@ -236,7 +237,7 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
             "a failing unit test fails its model, and what reads it is skipped because of it",
             "SELECT 3 AS amount",
             "SELECT count(*) FROM duckdb_tables() WHERE table_name IN ('stg_orders', 'order_totals')",
-            "partial",
+            "failed",
             [(0,)],
             files={
                 "sql/models/raw_orders.sql": (
@@ -278,7 +279,7 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
             "a failing case of a parameterised test fails its model",
             "SELECT 3 AS amount",
             "SELECT count(*) FROM duckdb_tables() WHERE table_name IN ('stg_orders', 'order_totals')",
-            "partial",
+            "failed",
             [(0,)],
             files={
                 "sql/models/raw_orders.sql": (
@@ -320,7 +321,7 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
             "a failing assertion fails the model it reads, with no expected output",
             "SELECT 3 AS amount",
             "SELECT count(*) FROM duckdb_tables() WHERE table_name IN ('stg_orders', 'order_totals')",
-            "partial",
+            "failed",
             [(0,)],
             files={
                 "sql/models/raw_orders.sql": (
@@ -362,7 +363,7 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
             "a failing function test fails its function, and the models calling it are skipped because of it",
             "SELECT 3 AS amount",
             "SELECT count(*) FROM duckdb_tables() WHERE table_name IN ('stg_orders', 'order_totals')",
-            "partial",
+            "failed",
             [(0,)],
             files={
                 "sql/functions/sql/udf__order_band.sql": (
@@ -529,7 +530,7 @@ def test_given_a_failing_unit_test_when_a_worker_builds_then_its_model_fails_and
             "a stale source blocks only its own branch",
             "SELECT 11 AS amount",
             "SELECT amount FROM orders UNION ALL SELECT return_id FROM returns ORDER BY 1",
-            "partial",
+            "failed",
             [(2,), (11,)],
             files={
                 "sql/sources/raw.yml": Path(
@@ -592,7 +593,7 @@ def test_given_a_stale_source_when_a_worker_builds_then_blocked_nodes_finish_ski
             description="a failing seed audit fails its seed, and what reads it is skipped",
             model_sql="SELECT 3 AS amount",
             warehouse_query="SELECT count(*) FROM duckdb_tables() WHERE table_name='coded_orders'",
-            expected_status="partial",
+            expected_status="failed",
             expected_rows=[(0,)],
             files={
                 "sql/seeds/order_codes.csv": "code\nA\nZ\n",
@@ -643,6 +644,45 @@ def test_given_a_failing_seed_audit_when_a_worker_builds_then_its_seed_fails_wit
         ], worker.log.read_text()
         with duckdb.connect(str(worker.project / "warehouse.duckdb"), read_only=True) as warehouse:
             assert warehouse.sql(test_case.warehouse_query).fetchall() == test_case.expected_rows
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        WorkerExecutionTestCase(
+            description="a model failing in its post-hook reports that phase",
+            model_sql="SELECT 1 AS amount",
+            warehouse_query="SELECT 1",
+            expected_status="failed",
+            expected_rows=[],
+            files={
+                "sql/models/orders.sql": (
+                    "MODEL (description 'Orders.', materialized table, "
+                    'post_hooks [inline_sql("SELECT * FROM missing_post_hook_table")]);\n'
+                    "SELECT 1 AS amount\n"
+                ),
+            },
+            expected_failed_phases=[("model:orders", "post_hook")],
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_failing_post_hook_when_a_worker_builds_then_the_node_reports_its_failure_phase(
+    test_case: WorkerExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
+        run: dict[str, Any] = wait_for_run(
+            worker.api, worker.process, worker.log, job_key="annual_orders_job"
+        )
+        assert run["status"] == test_case.expected_status, worker.log.read_text()
+        with sqlite3.connect(worker.control_store) as control:
+            phases: list[tuple[str, str | None]] = control.execute(
+                "SELECT n.node_key, json_extract(e.payload, '$.change.change.phase') "
+                "FROM sqb_run_nodes n JOIN recall_events e ON e.storage_id=n.finished_storage_id "
+                "WHERE n.run_id=? AND n.kind='node' AND n.status='failed' ORDER BY n.node_key",
+                (run["run_id"],),
+            ).fetchall()
+        assert phases == test_case.expected_failed_phases, worker.log.read_text()
 
 
 @pytest.mark.parametrize(
@@ -1682,7 +1722,7 @@ def test_given_an_executing_scheduled_worker_when_cancelled_then_the_statement_s
             "SELECT count(*) AS amount FROM range(500000000) t(value) WHERE value % 7 = 0",
             "SELECT table_name FROM duckdb_tables() "
             "WHERE table_name IN ('orders', 'refunds', 'returns') ORDER BY table_name",
-            "partial",
+            "failed",
             [("orders",)],
             files={
                 "sqlbuild_project.toml": (
@@ -2282,7 +2322,7 @@ NODE_RESULT_FILES: dict[str, str] = {
             "rebuilt tables report their rows and a hard skip names itself to what it blocks",
             "SELECT 11 AS amount",
             "SELECT count(*) FROM events",
-            "partial",
+            "failed",
             [(3,)],
             files=NODE_RESULT_FILES,
             expected_node_results=[
@@ -2339,3 +2379,48 @@ def test_given_a_worker_build_when_it_finishes_then_each_node_reports_what_it_di
                 )
             )
         assert nodes == test_case.expected_node_results, f"{nodes}\n{worker.log.read_text()}"
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        CheckResultsTestCase(
+            "a singular audit reading a model the target doesn't have is not run, and the job succeeds",
+            "SELECT 11 AS amount",
+            "SELECT count(*) FROM orders",
+            "success",
+            [(1,)],
+            files={
+                "sql/models/payments.sql": (
+                    "MODEL (description 'Payments.', materialized table);\nSELECT 11 AS amount\n"
+                ),
+                "sql/audits/singular/orders_have_payments.sql": (
+                    'AUDIT (name "orders_have_payments", severity error);\n'
+                    'SELECT o.amount FROM __ref("orders") o '
+                    'LEFT JOIN __ref("payments") p ON o.amount = p.amount WHERE p.amount IS NULL\n'
+                ),
+            },
+            expected_checks=[("audit:orders_have_payments", "not_run")],
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_worker_build_when_an_audit_read_is_missing_then_the_audit_is_not_run(
+    test_case: CheckResultsTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
+        run: dict[str, Any] = wait_for_run(
+            worker.api, worker.process, worker.log, job_key="annual_orders_job"
+        )
+        with sqlite3.connect(worker.control_store) as control:
+            checks: list[tuple[str, str]] = list(
+                control.execute(
+                    "SELECT node_key, status FROM sqb_run_nodes "
+                    "WHERE run_id=? AND kind='check' ORDER BY node_key",
+                    (run["run_id"],),
+                )
+            )
+        assert (run["status"], checks) == (
+            test_case.expected_status,
+            test_case.expected_checks,
+        ), worker.log.read_text()

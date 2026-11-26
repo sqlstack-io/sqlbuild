@@ -29,7 +29,7 @@ use crate::store::tests::store_helpers::{close_test_store, open_test_store, run}
 use crate::store::tests::store_test_types::Backend;
 
 #[test]
-fn given_a_partial_group_when_rerun_after_redeploy_then_only_unfinished_nodes_retry_atomically() {
+fn given_a_failed_group_when_rerun_after_redeploy_then_only_unfinished_nodes_retry_atomically() {
     let test_cases = [
         RunLifecycleTestCase {
             description: "SQLite pinned group rerun",
@@ -121,7 +121,7 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_unfinished_nodes_re
                     .is_err(),
                 "a live source cannot be rerun"
             );
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -169,6 +169,7 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_unfinished_nodes_re
                         skipped_because_of: (outcome == NodeOutcome::Skipped)
                             .then(|| "orders".into()),
                         error_message: None,
+                        phase: None,
                     });
                 }
                 changes.push(RunChange::Finished {
@@ -205,7 +206,7 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_unfinished_nodes_re
                     .find(|run| run.run_id == source_id)
                     .expect("source exists")
                     .status,
-                RunStatus::Partial
+                RunStatus::Failed
             );
             input.generation = 2;
             input.image_id = Some("sha256:synthetic-orders-image-2".into());
@@ -421,7 +422,7 @@ fn given_cancelled_nodes_when_rerunning_from_failure_then_every_unfinished_node_
                 NodeOutcome::Failed,
                 NodeOutcome::Cancelled,
             ],
-            run_outcome: RunOutcome::Partial,
+            run_outcome: RunOutcome::Failed,
             cancel_requests: 1,
             expected_retried: vec![],
             expected_rerun: vec!["inventory", "orders"],
@@ -439,13 +440,13 @@ fn given_cancelled_nodes_when_rerunning_from_failure_then_every_unfinished_node_
             expected_rerun: vec!["customers", "inventory", "orders"],
         },
         CancelledRerunTestCase {
-            description: "a partial run nobody cancelled retries failed and cancelled nodes",
+            description: "a run with a success nobody cancelled retries failed and cancelled nodes",
             outcomes: [
                 NodeOutcome::Success,
                 NodeOutcome::Failed,
                 NodeOutcome::Cancelled,
             ],
-            run_outcome: RunOutcome::Partial,
+            run_outcome: RunOutcome::Failed,
             cancel_requests: 0,
             expected_retried: vec!["inventory", "orders"],
             expected_rerun: vec!["inventory", "orders"],
@@ -457,7 +458,7 @@ fn given_cancelled_nodes_when_rerunning_from_failure_then_every_unfinished_node_
                 NodeOutcome::Cancelled,
                 NodeOutcome::Cancelled,
             ],
-            run_outcome: RunOutcome::Partial,
+            run_outcome: RunOutcome::Failed,
             cancel_requests: 0,
             expected_retried: vec!["inventory", "orders"],
             expected_rerun: vec!["inventory", "orders"],
@@ -488,7 +489,7 @@ fn given_cancelled_nodes_when_rerunning_from_failure_then_every_unfinished_node_
                         "on_failure": {"retries": 1, "retry_delay_seconds": 0}}}),
                 );
                 publish_snapshot(store, &input).await.expect("publish");
-                let lease = acquire_lease(store, Uuid::now_v7())
+                let lease = acquire_lease(store, (Uuid::now_v7(), None))
                     .await
                     .expect("elect")
                     .expect("leader");
@@ -554,6 +555,7 @@ fn given_cancelled_nodes_when_rerunning_from_failure_then_every_unfinished_node_
                         error_code: None,
                         skipped_because_of: None,
                         error_message: None,
+                        phase: None,
                     };
                     change_run(store, worker(), &change(claimed, finished))
                         .await

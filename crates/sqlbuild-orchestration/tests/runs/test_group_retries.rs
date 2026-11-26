@@ -25,7 +25,7 @@ use crate::store::main::{begin::begin, commit::commit, migrate_store::migrate_st
 use crate::store::models::TransactionMode;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
-use crate::warehouse_history::main::read_person_run_events::read_person_run_events;
+use crate::warehouse_history::main::runs::read_person_run_events::read_person_run_events;
 
 #[test]
 fn given_a_member_with_retry_when_it_fails_in_a_group_then_it_retries_inside_the_group_while_dependents_wait()
@@ -124,7 +124,7 @@ fn given_a_member_with_retry_when_it_fails_in_a_group_then_it_retries_inside_the
             )
             .await
             .expect("request group");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

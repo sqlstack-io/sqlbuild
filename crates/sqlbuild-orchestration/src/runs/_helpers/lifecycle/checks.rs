@@ -44,7 +44,9 @@ pub(crate) async fn check_execution_history(
     let previous = previous.first().and_then(|row| row["status"].as_str());
     let valid = match outcome {
         None => previous.is_none(),
-        Some(NodeOutcome::Skipped) => previous.is_none() || previous == Some(NODE_RUNNING),
+        Some(NodeOutcome::Skipped | NodeOutcome::NotRun) => {
+            previous.is_none() || previous == Some(NODE_RUNNING)
+        }
         Some(_) => previous == Some(NODE_RUNNING),
     };
     if !valid {

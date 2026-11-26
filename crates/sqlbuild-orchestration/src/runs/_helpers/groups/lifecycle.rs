@@ -27,8 +27,8 @@ use crate::store::types::Row;
 /// Callers have already checked leadership; the surrounding transaction fences the entire advance.
 pub(crate) async fn group_change(
     transaction: ControlTransaction,
-    run_id: Uuid,
-    change: RunChange,
+    (run_id, change): (Uuid, RunChange),
+    origin: Option<&str>,
 ) -> Result<ControlTransaction, ControlError> {
     let (transaction, rows) = query(transaction,
         "SELECT r.status, r.cancel_requested_at, r.node_counts_json, r.worker_instance FROM sqb_runs r WHERE r.run_id=$1",
@@ -44,20 +44,24 @@ pub(crate) async fn group_change(
     );
     publish_change(
         transaction,
-        &RunChangeRequest {
-            event_id,
-            run_id,
-            claim_id: state.worker_instance,
-            change,
-        },
-        &state,
+        (
+            &RunChangeRequest {
+                event_id,
+                run_id,
+                claim_id: state.worker_instance,
+                change,
+            },
+            &state,
+        ),
+        origin,
     )
     .await
 }
 
+/// `origin` links the group's run failure, if advancing ends it failed.
 pub(crate) async fn advance_group(
     transaction: ControlTransaction,
-    parent_id: Uuid,
+    (parent_id, origin): (Uuid, Option<&str>),
     limits: &BTreeMap<String, NonZeroU32>,
     eligible: Option<&BTreeSet<(Uuid, String)>>,
 ) -> Result<ControlTransaction, ControlError> {
@@ -73,22 +77,25 @@ pub(crate) async fn advance_group(
             if !child.state.status.is_terminal() && child.state.cancel_requested_at.is_none() {
                 transaction = group_change(
                     transaction,
-                    child.request_json.run_id,
-                    RunChange::CancelRequested {
-                        actor: "system:group".into(),
-                        reason: if stopped {
-                            "group stopped after a child failure"
-                        } else {
-                            "parent group cancellation requested"
-                        }
-                        .into(),
-                    },
+                    (
+                        child.request_json.run_id,
+                        RunChange::CancelRequested {
+                            actor: "system:group".into(),
+                            reason: if stopped {
+                                "group stopped after a child failure"
+                            } else {
+                                "parent group cancellation requested"
+                            }
+                            .into(),
+                        },
+                    ),
+                    origin,
                 )
                 .await?;
             }
         }
     } else if parent.state.status == RunStatus::Running {
-        transaction = skip_blocked_members(transaction, &group).await?;
+        transaction = skip_blocked_members(transaction, &group, origin).await?;
     } else if parent.state.status == RunStatus::Queued && parent.request_json.due(transaction.now) {
         let admission = admitted(
             &parent.request_json,
@@ -114,7 +121,8 @@ pub(crate) async fn advance_group(
             (transaction, _) =
                 query(transaction, "ROLLBACK TO SAVEPOINT group_claim", vec![]).await?;
         } else {
-            transaction = group_change(transaction, parent_id, RunChange::Started).await?;
+            transaction =
+                group_change(transaction, (parent_id, RunChange::Started), origin).await?;
         }
         (transaction, _) = query(transaction, "RELEASE SAVEPOINT group_claim", vec![]).await?;
     }
@@ -123,7 +131,7 @@ pub(crate) async fn advance_group(
             .iter()
             .all(|child| child.state.status.is_terminal())
     {
-        transaction = finish_group(transaction, &group, stopped).await?;
+        transaction = finish_group(transaction, (&group, stopped), origin).await?;
     }
     Ok(transaction)
 }
@@ -132,6 +140,7 @@ pub(crate) async fn advance_group(
 async fn skip_blocked_members(
     mut transaction: ControlTransaction,
     group: &GroupContext,
+    origin: Option<&str>,
 ) -> Result<ControlTransaction, ControlError> {
     let Some(declaration) = group
         .parent
@@ -171,28 +180,35 @@ async fn skip_blocked_members(
         for node_key in &request.selection {
             transaction = group_change(
                 transaction,
-                request.run_id,
-                RunChange::NodeFinished {
-                    node_key: node_key.clone(),
-                    outcome: NodeOutcome::Skipped,
-                    rows_affected: None,
-                    table_rows: None,
-                    no_change_reason: None,
-                    error_code: None,
-                    skipped_because_of: cause.clone(),
-                    error_message: None,
-                },
+                (
+                    request.run_id,
+                    RunChange::NodeFinished {
+                        node_key: node_key.clone(),
+                        outcome: NodeOutcome::Skipped,
+                        rows_affected: None,
+                        table_rows: None,
+                        no_change_reason: None,
+                        error_code: None,
+                        skipped_because_of: cause.clone(),
+                        error_message: None,
+                        phase: None,
+                    },
+                ),
+                origin,
             )
             .await?;
         }
         transaction = group_change(
             transaction,
-            request.run_id,
-            RunChange::Finished {
-                outcome: RunOutcome::Skipped,
-                reason: format!("skipped because {failed_job} did not succeed"),
-                exit_code: None,
-            },
+            (
+                request.run_id,
+                RunChange::Finished {
+                    outcome: RunOutcome::Skipped,
+                    reason: format!("skipped because {failed_job} did not succeed"),
+                    exit_code: None,
+                },
+            ),
+            origin,
         )
         .await?;
     }
@@ -201,8 +217,8 @@ async fn skip_blocked_members(
 
 async fn finish_group(
     transaction: ControlTransaction,
-    group: &GroupContext,
-    stopped: bool,
+    (group, stopped): (&GroupContext, bool),
+    origin: Option<&str>,
 ) -> Result<ControlTransaction, ControlError> {
     let parent = &group.parent;
     let parent_id = parent.request_json.run_id;
@@ -254,30 +270,30 @@ async fn finish_group(
         }
     }
     let mut outcomes: BTreeSet<String> = BTreeSet::new();
-    let mut good = false;
-    let build = parent.request_json.command.is_build();
-    let source_needs_no_run = |key: &str| build && key.starts_with("source:");
     for key in &parent.request_json.selection {
         let node = nodes
             .get(key)
             .ok_or_else(|| ControlError::Invalid("group node has no child evidence".into()))?;
         outcomes.insert(node.status.clone());
-        good |= matches!(node.status.as_str(), "success" | "warn") && !source_needs_no_run(key);
         let outcome: NodeOutcome = serde_json::from_value(serde_json::json!(node.status))
             .map_err(|error| ControlError::Invalid(error.to_string()))?;
         transaction = group_change(
             transaction,
-            parent_id,
-            RunChange::NodeFinished {
-                node_key: key.clone(),
-                outcome,
-                rows_affected: node.rows_affected,
-                table_rows: node.table_rows,
-                no_change_reason: node.no_change_reason.clone(),
-                error_code: node.error_code.clone(),
-                skipped_because_of: node.skipped_because_of.clone(),
-                error_message: None,
-            },
+            (
+                parent_id,
+                RunChange::NodeFinished {
+                    node_key: key.clone(),
+                    outcome,
+                    rows_affected: node.rows_affected,
+                    table_rows: node.table_rows,
+                    no_change_reason: node.no_change_reason.clone(),
+                    error_code: node.error_code.clone(),
+                    skipped_because_of: node.skipped_because_of.clone(),
+                    error_message: None,
+                    phase: None,
+                },
+            ),
+            origin,
         )
         .await?;
     }
@@ -290,11 +306,7 @@ async fn finish_group(
             .any(|status| !matches!(status.as_str(), "success" | "warn"));
     let outcome = if parent.state.cancel_requested_at.is_some() {
         RunOutcome::Cancelled
-    } else if stopped {
-        RunOutcome::Failed
-    } else if bad && good {
-        RunOutcome::Partial
-    } else if bad {
+    } else if stopped || bad {
         RunOutcome::Failed
     } else if outcomes.contains("warn")
         || group
@@ -315,21 +327,27 @@ async fn finish_group(
     if ignored > 0 {
         transaction = group_change(
             transaction,
-            parent_id,
-            RunChange::AuditFailuresIgnored {
-                count: u32::try_from(ignored).unwrap_or(u32::MAX),
-            },
+            (
+                parent_id,
+                RunChange::AuditFailuresIgnored {
+                    count: u32::try_from(ignored).unwrap_or(u32::MAX),
+                },
+            ),
+            origin,
         )
         .await?;
     }
     group_change(
         transaction,
-        parent_id,
-        RunChange::Finished {
-            outcome,
-            reason: "all group children have durable terminal outcomes".into(),
-            exit_code: None,
-        },
+        (
+            parent_id,
+            RunChange::Finished {
+                outcome,
+                reason: "all group children have durable terminal outcomes".into(),
+                exit_code: None,
+            },
+        ),
+        origin,
     )
     .await
 }

@@ -206,7 +206,9 @@ function readCauseOf(health: SyncHealth): string {
 	const reason =
 		cause.kind === 'timed_out'
 			? `no reply within ${cause.seconds} s`
-			: health.error
+			: cause.kind === 'unreachable'
+				? "couldn't reach the warehouse, so no compute ran"
+				: health.error
 				? 'the read failed'
 				: 'the read failed; the location’s log has why';
 	const page = health.page_limit ? `, on a page of ${health.page_limit.toLocaleString('en-US')} ${health.table === 'statistics' ? 'relations' : 'rows'}` : '';
@@ -287,7 +289,25 @@ export function warehouseSyncOf(observations: Wire['LocationHealthObservation'][
 		lastError: failing.length ? failing.sort().join('\n') : null,
 		lastReportedAt: syncs[0].received_at,
 		syncing: running.progress && !running.progress.completed && !running.progress.halted ? { position: running.progress.position, kinds: running.progress.kinds, table: running.table, rows: running.progress.rows } : null,
-		completed: done?.report.health.progress ? { at: done.received_at, kinds: done.report.health.progress.kinds, rows: done.report.health.progress.rows, elapsedMs: done.report.health.progress.elapsed_millis } : null
+		completed: done?.report.health.progress ? { at: done.received_at, kinds: done.report.health.progress.kinds, rows: done.report.health.progress.rows, elapsedMs: done.report.health.progress.elapsed_millis } : null,
+		failing: failingSyncOf(syncs)
+	};
+}
+
+/** The newest sync report's failure: since its first failure in a row, its reason, and how it retries. */
+function failingSyncOf(syncs: Sync[]): WarehouseSync['failing'] {
+	const newest = syncs[0]?.report.health;
+	if (!newest?.failure || newest.failure === 'busy') return null;
+	const end = syncs.findIndex((s) => !s.report.health.failure || s.report.health.failure === 'busy');
+	const streak = end === -1 ? syncs : syncs.slice(0, end);
+	const halted = newest.progress?.halted ?? false;
+	return {
+		since: newest.failing_since ?? streak[streak.length - 1].received_at,
+		reason: newest.error ?? `failed while ${SYNC_STAGE[newest.failure]}`,
+		halted,
+		unreachable: newest.read_failure?.kind === 'unreachable',
+		retrySeconds: halted ? null : (newest.retry_seconds ?? null),
+		retryAt: halted ? null : (newest.retry_at ?? null)
 	};
 }
 

@@ -32,6 +32,8 @@ pub(crate) const FULL_REFRESH_DISABLED_REBUILD_CODE: &str = "S203";
 pub(crate) const UNBOUNDED_CURSOR_MARK: &str = "/* (unbounded) */";
 
 pub(crate) const MISSING_UPSTREAM_CODE: &str = "S301";
+/// The graph kind of an audit, as a missing read's dependent.
+pub(crate) const AUDIT_KIND: &str = "audit";
 
 pub(crate) const RETENTION_DECREASE: &str = "decrease";
 

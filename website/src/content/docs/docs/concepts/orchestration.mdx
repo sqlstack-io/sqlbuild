@@ -282,7 +282,7 @@ Pass `name="..."` to choose another name, which must also end in `_sensor`.
 | Not set | Every `minimum_interval_seconds`: a polling sensor |
 
 `kinds` take the enums `RunEventKind`, `NodeEventKind`, `CheckEventKind` and `PlatformEventKind`
-from `sqlbuild.orchestration`. `RunEventKind` has `SUCCESS`, `WARN`, `PARTIAL`, `FAILED`,
+from `sqlbuild.orchestration`. `RunEventKind` has `SUCCESS`, `WARN`, `FAILED` (a node failed, was skipped or never ran),
 `CANCELLED`, `SKIPPED` (a member its group did not run) and `COMPLETED` for any of them.
 `CheckEventKind` has `FAILED` and `WARN`. `check_event` covers checks inside job runs and manual
 builds, such as one started from the Plan page, where the event's `job` is `None`. It doesn't
@@ -301,6 +301,42 @@ cover standalone `sqb test` or `sqb audit` runs, or `sqb scenario test`.
 | `source_stale` | `SourceStaleEvent` | `id`, `occurred_at`, `source`, `data_version`, `after_seconds`, `target` |
 | `platform_event` | `PlatformEvent` | `id`, `occurred_at`, `event`, `details` |
 | Not set | `None` | None; keep your place between polls in `ctx.cursor` |
+
+A `platform_event` sensor for `PlatformEventKind.RUN_FAILED` gets every field of the server's
+[`run_failed` event](/docs/cli/server#fields-of-run_failed) in `ctx.event.details`, enough to build
+an alert for any failed run. SQLBuild ships no chat integration; this sensor builds a message for a
+`team_chat` provider the project defines:
+
+```python
+# orchestration/sensors/platform/failed_run_alert_sensor.py
+from sqlbuild.orchestration import PlatformEvent, PlatformEventKind, SensorContext, platform_event, sensor
+
+
+@sensor(
+    description="Post every failed run to the team channel",
+    when=platform_event(kinds=[PlatformEventKind.RUN_FAILED]),
+)
+def failed_run_alert_sensor(ctx: SensorContext[PlatformEvent], team_chat):
+    run = ctx.event.details
+    minutes, seconds = divmod((run["duration_ms"] or 0) // 1000, 60)
+    lines = [
+        f"{run['job_key'] or 'Ad-hoc run'} failed in {run['target']}",
+        f"{run['succeeded_node_count']} built, {run['failed_node_count']} failed, "
+        f"{run['skipped_node_count']} skipped · {minutes}m {seconds}s",
+    ]
+    for node in run["failed_nodes"][:3]:
+        where = f" in {node['phase']}" if node["phase"] else ""
+        lines.append(f"• {node['node_key']} failed{where}: {node['message'] or node['error_code']}")
+    for audit in run["failed_audits"][:3]:
+        lines.append(f"• audit {audit['name']} failed: {audit['message'] or audit['failing_rows']}")
+    if run["error"]:
+        lines.append(f"• failed in {run['error']['phase']}: {run['error']['message']}")
+    if run["skipped_nodes"]:
+        lines.append("Skipped: " + ", ".join(run["skipped_nodes"][:5]))
+    if run["url"]:
+        lines.append(run["url"])
+    team_chat.post("\n".join(lines))
+```
 
 `ctx.cursor` is for polling sensors only. A sensor with a `when` condition always sees `None`,
 and a value it assigns is ignored: the server keeps its place in the events.

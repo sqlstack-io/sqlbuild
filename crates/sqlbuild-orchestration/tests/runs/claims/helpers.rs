@@ -154,6 +154,7 @@ async fn finish_reporting(
                 error_code: None,
                 skipped_because_of: None,
                 error_message: None,
+                phase: None,
             }),
     );
     changes.extend(reported);

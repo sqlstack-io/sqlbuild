@@ -191,11 +191,16 @@ pub(crate) struct ExactKeyPublication {
 }
 
 impl crate::runs::types::PreparedPublication for ExactKeyPublication {
+    /// Exact keys never name a past run.
+    fn run_selector_ids(&self, _texts: &[String]) -> std::collections::BTreeSet<String> {
+        std::collections::BTreeSet::new()
+    }
+
     /// Exact keys only: each token names one published key, and an unknown one is refused with its position.
     fn evaluate(
         &self,
-        select: &str,
-        exclude: &str,
+        (select, exclude): (&str, &str),
+        _past: &crate::runs::types::PastRuns,
     ) -> Result<Vec<String>, Box<crate::runs::models::SelectionProblem>> {
         let known = |field: crate::runs::models::SelectionField, text: &str| {
             let mut keys: std::collections::BTreeSet<String> = Default::default();
@@ -249,7 +254,11 @@ impl crate::runs::types::PreparedPublication for ExactKeyPublication {
         }
     }
 
-    fn plan(&self, command: &[String]) -> Result<crate::runs::models::CommandPlan, String> {
+    fn plan(
+        &self,
+        command: &[String],
+        _past: &crate::runs::types::PastRuns,
+    ) -> Result<crate::runs::models::CommandPlan, String> {
         let (resources, jobs) = (&self.resources, &self.jobs);
         let mut plan = crate::runs::models::CommandPlan {
             verb: command.first().cloned().unwrap_or_default(),
@@ -565,6 +574,11 @@ pub(crate) struct NodeEventResourcesTestCase {
     pub(crate) expected_named: [(&'static str, &'static str, &'static str); 4],
     /// The check result's name, check ID, result ID and rows found, as the run's events report them.
     pub(crate) expected_check: CheckFields,
+    /// The check result's outcome, and why it didn't run when it is `not_run`.
+    pub(crate) stored_outcome: &'static str,
+    pub(crate) not_run_reason: Option<&'static str>,
+    /// The check event's summary: the reason a not-run audit gives, never error text.
+    pub(crate) expected_message: Option<&'static str>,
 }
 
 /// A check result's name, check ID, result ID and rows found.
@@ -632,4 +646,44 @@ pub(crate) struct StartMessageTestCase {
     pub(crate) description: &'static str,
     pub(crate) fields: Vec<(&'static str, serde_json::Value)>,
     pub(crate) expected_message: Option<&'static str>,
+}
+
+/// A node the worker reports finished: its key, outcome and failure phase.
+pub(crate) type ReportedNode = (
+    &'static str,
+    crate::runs::models::NodeOutcome,
+    Option<&'static str>,
+);
+
+pub(crate) struct RunFailureEventTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) nodes: &'static [ReportedNode],
+    pub(crate) failed_end_audits: &'static [&'static str],
+    pub(crate) expected_summary: RunFailureSummary,
+}
+
+/// The parts of a `run_failed` event a test compares; node links are relative to the run's page.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct RunFailureSummary {
+    pub(crate) links_to_run: bool,
+    /// The first failed node's phase, link and output link.
+    pub(crate) first_node: Option<(Option<String>, Option<String>, Option<String>)>,
+    /// The first failed audit's name, SQLSTATE and message.
+    pub(crate) first_audit: Option<(String, Option<String>, Option<String>)>,
+    pub(crate) failed_audit_count: i64,
+    pub(crate) succeeded_node_count: i64,
+    pub(crate) error: Option<(crate::runs::models::RunFailurePhase, Option<String>)>,
+}
+
+/// A typed run ID's run, and the keys it selected, failed and skipped.
+pub(crate) type ExpectedPastRun = (&'static str, u128, [&'static [&'static str]; 3]);
+
+pub(crate) struct PastRunLookupTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The run IDs as typed.
+    pub(crate) ids: &'static [&'static str],
+    /// Each typed ID's run, or the refusal.
+    pub(crate) expected_runs: Result<Vec<ExpectedPastRun>, &'static str>,
 }

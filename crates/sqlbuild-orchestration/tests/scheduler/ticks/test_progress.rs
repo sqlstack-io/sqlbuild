@@ -51,7 +51,7 @@ fn given_reset_existing_ticks_when_re_evaluated_then_cursor_and_due_time_are_exa
                 .await
                 .expect("trigger")[0]
                 .trigger_id;
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("election")
                 .expect("lease");

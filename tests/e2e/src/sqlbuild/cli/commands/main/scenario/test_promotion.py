@@ -158,7 +158,7 @@ def test_given_enforced_contract_and_immediate_promotion_when_running_then_fails
             ("plan", ("plan",)),
             ("build", ("build",)),
             ("scenario", ("scenario", "test")),
-            ("scenario_local", ("scenario", "test", "--local")),
+            ("scenario_local", ("scenario", "test", "--run-on", "local")),
         )
     }
 

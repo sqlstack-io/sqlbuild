@@ -14,7 +14,7 @@ use crate::snapshots::models::SnapshotNode;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, ControlTransaction, Parameter, TransactionMode};
-use crate::warehouse_history::main::read_node_check_counts::read_node_check_counts;
+use crate::warehouse_history::main::checks::read_node_check_counts::read_node_check_counts;
 use crate::warehouse_metadata::main::node_reads::{
     catalog_node::catalog_node, definition_evidences::definition_evidences,
     destination::destination, last_outcome::last_outcome, latest_attempts::latest_attempts,

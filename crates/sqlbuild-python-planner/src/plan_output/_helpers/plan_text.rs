@@ -607,5 +607,17 @@ pub(crate) fn report(arguments: &KeywordArguments<'_>) -> PyResult<PlanTextRepor
             JOB_IGNORED_AUDIT_FAILURES_KEY,
         )?))?,
         job_warehouses: job_warehouses(&metadata)?,
+        audits: native_field(&plan, "selected_audit_names")?.extract()?,
+        audits_not_run: audits_not_run(&plan)?,
     })
+}
+
+/// The plan's end-of-build audits that won't run, sorted by name, each with its missing reads.
+pub(crate) fn audits_not_run(plan: &Bound<'_, PyAny>) -> PyResult<Vec<(String, Vec<String>)>> {
+    let mut not_run: Vec<(String, Vec<String>)> = native_field(plan, "audits_not_run")?
+        .extract::<std::collections::HashMap<String, Vec<String>>>()?
+        .into_iter()
+        .collect();
+    not_run.sort();
+    Ok(not_run)
 }

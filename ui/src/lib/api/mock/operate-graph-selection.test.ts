@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { evaluateMockSelection, mockVocabulary } from './operate-graph';
+import { evaluateMockSelection, mockVocabulary, resolveSelection } from './operate-graph';
+import './operate';
 
 describe('mock selection evaluation', () => {
 	it('expands + on its own comma part before intersecting', () => {
@@ -26,9 +27,15 @@ describe('mock selection evaluation', () => {
 		expect(mockVocabulary().kinds).toEqual([
 			{ value: 'asset', count: 46 },
 			{ value: 'loader', count: 2 },
-			{ value: 'model', count: 31 },
+			// 2 from the run-page failure mock-up (seed-audit-run.ts); its 92 seeds load only where it is shown.
+			{ value: 'model', count: 33 },
 			{ value: 'seed', count: 1 },
 			{ value: 'source', count: 6 }
 		]);
+	});
+
+	it("a job run narrowed on the plan page resolves as the server does: job:core_build,fact_orders is fact_orders", () => {
+		expect(resolveSelection(['job:core_build,fact_orders'])).toEqual({ nodes: ['fact_orders'], unknown: [] });
+		expect(resolveSelection(['job:core_build,no_such_node']).unknown).toEqual(['job:core_build,no_such_node']);
 	});
 });

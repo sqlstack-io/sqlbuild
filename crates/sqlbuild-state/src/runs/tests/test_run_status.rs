@@ -16,14 +16,14 @@ fn given_node_counts_when_finishing_a_run_then_the_status_follows_the_server_rul
             expected_status: "succeeded",
         },
         RunStatusTestCase {
-            description: "a failure beside successes is partial",
+            description: "a failure beside successes fails the run",
             counts: RunNodeCounts {
                 succeeded: 2,
                 failed: 1,
                 ..RunNodeCounts::default()
             },
             ending: RunEnding::Completed,
-            expected_status: "partial",
+            expected_status: "failed",
         },
         RunStatusTestCase {
             description: "nodes skipped after the only node failed is a failure",
@@ -43,7 +43,7 @@ fn given_node_counts_when_finishing_a_run_then_the_status_follows_the_server_rul
                 ..RunNodeCounts::default()
             },
             ending: RunEnding::Completed,
-            expected_status: "partial",
+            expected_status: "failed",
         },
         RunStatusTestCase {
             description: "an interrupt cancels, whatever ran",

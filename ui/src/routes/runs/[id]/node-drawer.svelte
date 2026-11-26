@@ -2,6 +2,7 @@
 	import XIcon from '@lucide/svelte/icons/x';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import CodePreview from '$lib/components/code/code-preview.svelte';
+	import RunDrawer from './run-drawer.svelte';
 	import InspectorSection from '$lib/components/lineage/inspector-section.svelte';
 	import OutcomeStrip from '$lib/components/build-area/outcome-strip.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
@@ -73,56 +74,24 @@
 	// "open in warehouse" only where the adapter has a URL for a query; per-adapter URLs come later.
 	const queryHref = $derived(running?.queryId ? warehouseQueryUrl(app.location?.target.adapter, running.queryId) : null);
 
-	// Resizable from its left edge; the page beside it takes the rest.
+	// Resizable from its left edge (the shared drawer); the page beside it takes the rest.
 	let width = $state(480);
-	let dragging = $state(false);
-	const clampWidth = (w: number) => Math.round(Math.min(Math.max(340, w), Math.max(360, window.innerWidth * 0.6)));
-
-	function onkey(e: KeyboardEvent) {
-		if (e.key === 'Escape' && key) view.openDrawer(null);
-	}
 </script>
 
-<svelte:window onkeydown={onkey} />
-
 {#if n && key}
-	<aside class="drawer" style:width="{width}px" aria-label="{name} in this run" data-testid="node-drawer">
-		<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
-		<div
-			class="resize"
-			role="separator"
-			aria-orientation="vertical"
-			aria-label="Resize the drawer"
-			aria-valuenow={width}
-			tabindex="0"
-			onpointerdown={(e) => {
-				dragging = true;
-				(e.target as HTMLElement).setPointerCapture(e.pointerId);
-			}}
-			onpointermove={(e) => dragging && (width = clampWidth(window.innerWidth - e.clientX))}
-			onpointerup={() => (dragging = false)}
-			onkeydown={(e) => {
-				if (e.key === 'ArrowLeft') width = clampWidth(width + 24);
-				if (e.key === 'ArrowRight') width = clampWidth(width - 24);
-			}}
-		></div>
-		<header>
-			<div class="title">
-				<span class="name" title={key}>{name}</span>
-				<div class="links">
-					<a href={to(`/catalog/${key}`)} title="Open {key} in the Catalog">Catalog ↗</a>
-					<a href={to(`/lineage?focus=${encodeURIComponent(key)}`)} title="Open {key} on Lineage">Lineage ↗</a>
-					<Button variant="ghost" size="icon-sm" onclick={() => view.openDrawer(null)} aria-label="Close" title="Close (Esc)"><XIcon /></Button>
-				</div>
-			</div>
+	<RunDrawer label="{name} in this run" testid="node-drawer" onclose={() => view.openDrawer(null)} bind:width>
+		{#snippet header()}
+			<span class="name" title={key}>{name}</span>
 			<div class="meta">
 				<span>{n.kind}</span>
 				{#if d?.group}<span>{d.group}</span>{/if}
 				{#if n.jobKey && view.detail?.children.length}<span><a href={to(`/runs/${n.runId}`)}>{n.jobKey} · {shortRunId(n.runId)}</a></span>{/if}
 			</div>
-		</header>
-
-		<div class="body">
+		{/snippet}
+		{#snippet actions()}
+			<a class="link" href={to(`/catalog/${key}`)} title="Open {key} in the Catalog">Catalog ↗</a>
+			<a class="link" href={to(`/lineage?focus=${encodeURIComponent(key)}`)} title="Open {key} on Lineage">Lineage ↗</a>
+		{/snippet}
 			<InspectorSection title="In this run">
 				<div class="status-top"><StatusLabel tone={nodeStatusTone[n.status]} label={STATUS[n.status] ?? n.status} /></div>
 				<div class="stats">
@@ -218,43 +187,10 @@
 					{#if d.description}<p class="desc">{d.description}</p>{/if}
 				</InspectorSection>
 			{/if}
-		</div>
-	</aside>
+	</RunDrawer>
 {/if}
 
 <style>
-	.drawer {
-		position: relative;
-		display: flex;
-		min-height: 0;
-		flex: none;
-		flex-direction: column;
-		border-left: 1px solid var(--border-subtle);
-		background: var(--card);
-		font-size: 12.5px;
-	}
-	.resize {
-		position: absolute;
-		top: 0;
-		bottom: 0;
-		left: -3px;
-		z-index: 2;
-		width: 6px;
-		cursor: col-resize;
-	}
-	.resize:hover,
-	.resize:focus-visible {
-		background: color-mix(in srgb, var(--primary) 35%, transparent);
-	}
-	header {
-		padding: 14px 16px 12px;
-		border-bottom: 1px solid var(--border-subtle);
-	}
-	.title {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-	}
 	.name {
 		overflow: hidden;
 		min-width: 0;
@@ -264,14 +200,7 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
-	.links {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		margin-left: auto;
-		font-size: 12px;
-	}
-	.links a {
+	.link {
 		color: var(--primary);
 	}
 	.meta {
@@ -286,12 +215,6 @@
 		content: '·';
 		margin-right: 12px;
 		color: var(--sb-text-faint);
-	}
-	.body {
-		overflow-x: hidden;
-		overflow-y: auto;
-		flex: 1;
-		padding: 4px 8px 24px;
 	}
 	.status-top {
 		margin: 2px 0 8px;

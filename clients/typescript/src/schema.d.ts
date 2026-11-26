@@ -1161,6 +1161,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/selection/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPastRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/selection/vocabulary": {
         parameters: {
             query?: never;
@@ -1427,6 +1443,38 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["changeTrigger"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/health/details": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readHealthDetails"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1833,6 +1881,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/livez": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The process answers; nothing else is checked. */
+        get: operations["livez"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1907,12 +1972,18 @@ export interface components {
          */
         AdministratorChange: "grant" | "revoke" | "disable" | "enable";
         ApiErrorBody: {
+            cause?: null | components["schemas"]["ErrorCause"];
             /**
              * Format: uuid
              * @description Existing durable denial audit ID; absent when no decision was recorded.
              */
             decision_id?: string | null;
             error: string;
+            /**
+             * Format: uuid
+             * @description This request's ID, as the server log and the `x-request-id` header name it.
+             */
+            request_id?: string | null;
         };
         /** @description A condition whose latest acknowledgement event marks it handled. */
         AttentionAcknowledgement: {
@@ -1963,6 +2034,21 @@ export interface components {
             error: string;
             /** Format: uuid */
             request_id: string;
+        };
+        BTreeMap: {
+            [key: string]: {
+                /** @description Its failed, cancelled and never-reached nodes, and its failed audits. */
+                failed: string[];
+                /**
+                 * Format: uuid
+                 * @description The run the typed ID names.
+                 */
+                run_id: string;
+                /** @description Every node the run selected. */
+                selected: string[];
+                /** @description The nodes it skipped because something they depend on failed. */
+                skipped: string[];
+            };
         };
         /**
          * @description How one recorded stretch of a microbatch model's cursor stands.
@@ -2112,6 +2198,8 @@ export interface components {
             columns: string[];
             /** Format: uuid */
             event_id: string;
+            /** @description The warehouse's error, SQLSTATE included, when the audit's query could not run; redacted like a node's. */
+            execution_error?: string | null;
             /** @description Scalar cells aligned to `columns`; a row without a key holds null there. */
             rows: Record<string, never>[][];
             truncated?: string | null;
@@ -2195,6 +2283,42 @@ export interface components {
             /** Format: uuid */
             snapshot_id?: string | null;
         };
+        /** @description One component's details for administrators: where it is, each cause's message, and the failed requests. */
+        ComponentDetails: {
+            component: components["schemas"]["HealthComponent"];
+            error_chain: string[];
+            /** @description The control database's host and port. */
+            host?: string | null;
+            /** Format: uuid */
+            location_id?: string | null;
+            request_ids: string[];
+        };
+        /** @description One component as anyone may see it: its state, since when, and a short reason. */
+        ComponentHealth: {
+            case?: null | components["schemas"]["ControlCauseCase"];
+            component: components["schemas"]["HealthComponent"];
+            /** Format: date-time */
+            last_failure?: string | null;
+            /**
+             * Format: date-time
+             * @description When it last worked; for a location, its last report.
+             */
+            last_success?: string | null;
+            /**
+             * Format: uuid
+             * @description The location this row is about.
+             */
+            location_id?: string | null;
+            /** @description What people call it: "Control database", "Scheduler", or a location's name. */
+            name: string;
+            reason?: string | null;
+            /**
+             * Format: date-time
+             * @description When it stopped being healthy.
+             */
+            since?: string | null;
+            status: components["schemas"]["HealthStatus"];
+        };
         /** @description A row whose key was already stored with different content; the first row is kept. */
         ConflictEvidence: {
             existing_sha256: string;
@@ -2233,6 +2357,11 @@ export interface components {
             /** @description Where signing out goes when a trusted proxy owns the sign-in; absent means no sign-out link. */
             logout_url?: string | null;
         };
+        /**
+         * @description Which kind of control database failure an error is; the sentence people read follows from it.
+         * @enum {string}
+         */
+        ControlCauseCase: "name_lookup" | "unreachable" | "login_rejected" | "no_free_connections" | "restarting" | "pool_exhausted" | "locked" | "other";
         /** @description One job's estimated query cost on one node: in the period, and in the period before it. */
         CostFactRecord: {
             /** Format: int64 */
@@ -2482,6 +2611,12 @@ export interface components {
             /** Format: uuid */
             trigger_id: string;
         };
+        /** @description A control database failure as an error response names it: its case and since when it has been failing. */
+        ErrorCause: {
+            case: components["schemas"]["ControlCauseCase"];
+            /** Format: date-time */
+            since: string;
+        };
         ExternalIdentityResponse: {
             csrf_token: string;
             /** Format: date-time */
@@ -2490,6 +2625,16 @@ export interface components {
             principal_id: string;
             /** Format: uuid */
             session_id: string;
+        };
+        /** @description An event webhook this server can't deliver to: since when, and why; its events stay queued. */
+        FailingForwarding: {
+            /** Format: date-time */
+            last_success_at?: string | null;
+            /** @description Such as `Platform event forwarding`. */
+            name: string;
+            reason: string;
+            /** Format: date-time */
+            since: string;
         };
         /** @description A checking-in location whose latest load, plan of what changed, discovery or connection check failed, and what it serves instead. */
         FailingLocation: {
@@ -2507,6 +2652,62 @@ export interface components {
             /** @description `falling_back`, `change_plan_failed`, `discovery_failed` or `degraded`. */
             state: components["schemas"]["LocationState"];
             target: string;
+        };
+        /** @description A lifecycle event sink whose runs lose events: since its first lossy run in a row, and why. */
+        FailingSink: {
+            /**
+             * Format: date-time
+             * @description The newest run before that whose events it all delivered.
+             */
+            last_success_at?: string | null;
+            /** Format: uuid */
+            location_id: string;
+            location_name: string;
+            /** @description What it lost, such as `8 of 8 events not delivered (8 failed)`. */
+            reason: string;
+            /**
+             * Format: uuid
+             * @description The newest run whose events it lost; `None` when the location's own interpreter lost them.
+             */
+            run_id?: string | null;
+            /**
+             * Format: date-time
+             * @description The first run in a row whose events it lost.
+             */
+            since: string;
+            /** @description The sink's name in the project. */
+            sink: string;
+            target: string;
+        };
+        /** @description A checking-in location whose run-history sync is failing: since when, why, and when it tries again. */
+        FailingSync: {
+            /** @description Failed reads stopped the sync; it resumes on request, after the next run or a publish. */
+            halted: boolean;
+            /**
+             * Format: date-time
+             * @description The newest report of a sync that worked.
+             */
+            last_success_at?: string | null;
+            /** Format: uuid */
+            location_id: string;
+            location_name: string;
+            /** @description What failed, redacted. */
+            reason: string;
+            /**
+             * Format: date-time
+             * @description When the location tries again, and how many seconds it waits between tries.
+             */
+            retry_at?: string | null;
+            /** Format: int64 */
+            retry_seconds?: number | null;
+            /**
+             * Format: date-time
+             * @description The first failure in a row.
+             */
+            since: string;
+            target: string;
+            /** @description The location couldn't reach the warehouse, so no compute ran. */
+            unreachable: boolean;
         };
         /** @description Build evidence only: no SQL, arbitrary metadata, or inference about live relation existence. */
         FingerprintObservation: {
@@ -2528,6 +2729,34 @@ export interface components {
             role_key: string;
             target?: string | null;
         };
+        /**
+         * @description A part of the server whose health is reported.
+         * @enum {string}
+         */
+        HealthComponent: "server" | "control_database" | "scheduler" | "location" | "event_forwarding";
+        /** @description `GET /api/health/details`: what administrators see beside the public report. */
+        HealthDetails: {
+            components: components["schemas"]["ComponentDetails"][];
+        };
+        /** @description `GET /api/health`: every component's state, readable without signing in and without the control database. */
+        HealthReport: {
+            /** Format: date-time */
+            checked_at: string;
+            components: components["schemas"]["ComponentHealth"][];
+            /**
+             * Format: int64
+             * @description How often a client should ask again while the server isn't healthy, in seconds.
+             */
+            retry_seconds: number;
+            server: components["schemas"]["ServerSummary"];
+            /** @description The worst component's: unavailable when the control database is, degraded when anything else isn't healthy. */
+            status: components["schemas"]["HealthStatus"];
+        };
+        /**
+         * @description How a component, or the server as a whole, stands.
+         * @enum {string}
+         */
+        HealthStatus: "healthy" | "degraded" | "unavailable";
         HeartbeatResponse: {
             cancel_requested: boolean;
         };
@@ -2724,6 +2953,10 @@ export interface components {
             kind: "change_plan_failed";
             reason: string;
         } | {
+            /** @enum {string} */
+            kind: "sink_deliveries";
+            sinks: components["schemas"]["SinkDelivery"][];
+        } | {
             /** Format: int64 */
             generation: number;
             jobs: components["schemas"]["PoolCapWarning"][];
@@ -2734,6 +2967,11 @@ export interface components {
             elapsed_millis: number;
             /** @description A failed read's warehouse error, redacted and bounded; absent otherwise. */
             error?: string | null;
+            /**
+             * Format: date-time
+             * @description While the sync fails, when its first failure in a row was; absent once it works and from older locations.
+             */
+            failing_since?: string | null;
             failure?: null | components["schemas"]["WarehouseSyncFailure"];
             /** Format: int64 */
             generation: number;
@@ -2759,6 +2997,13 @@ export interface components {
             read_failure?: null | components["schemas"]["WarehouseReadFailure"];
             /** Format: int64 */
             records_sent: number;
+            /**
+             * Format: date-time
+             * @description On a failure the sync retries, when it tries again and how many seconds it waits.
+             */
+            retry_at?: string | null;
+            /** Format: int64 */
+            retry_seconds?: number | null;
             table: components["schemas"]["WarehouseHistoryKind"];
         };
         /** @description Receipt time belongs to the server; consumers derive freshness rather than storing availability. */
@@ -3175,7 +3420,7 @@ export interface components {
              */
             sequences: number;
         };
-        /** @description A failed or partial run reruns from failure up to `retries` times, each `retry_delay_seconds` after the last ended. */
+        /** @description A failed run reruns from failure up to `retries` times, each `retry_delay_seconds` after the last ended. */
         OnFailure: {
             /** Format: int32 */
             retries: number;
@@ -3373,6 +3618,12 @@ export interface components {
         PasswordSessionResponse: {
             csrf_token: string;
             identity: components["schemas"]["SessionIdentity"];
+        };
+        /** @description The past runs read, or why one can't be: too short, unknown or ambiguous. */
+        PastRunsRead: {
+            error?: string | null;
+            /** @description Each run by the ID as given; empty when `error` is set. */
+            runs: components["schemas"]["BTreeMap"];
         };
         /** @description The person's name, the actions allowed server-wide, and the location targets they can view. */
         PersonAccess: {
@@ -3674,22 +3925,10 @@ export interface components {
             kind: "launch_failed";
             /** Format: uuid */
             run_id: string;
-        } | {
-            /** Format: int64 */
-            failed_node_count: number;
-            /** @description The first failed nodes by key, with redacted and bounded error text. */
-            failed_nodes: components["schemas"]["RunNodeFailure"][];
-            job_key?: string | null;
+        } | (components["schemas"]["RunFailureEvent"] & {
             /** @enum {string} */
             kind: "run_failed";
-            /** Format: uuid */
-            location_id: string;
-            outcome: components["schemas"]["RunOutcome"];
-            /** Format: uuid */
-            run_id: string;
-            run_kind: components["schemas"]["RunKind"];
-            target: string;
-        } | {
+        }) | {
             /** @enum {string} */
             kind: "trigger_skipped";
             reason: string;
@@ -3722,8 +3961,14 @@ export interface components {
             broken_locations: components["schemas"]["BrokenLocation"][];
             /** @description Calendars whose pending times a republish dropped, until their next successful tick. */
             dropped_calendar_times?: components["schemas"]["DroppedCalendarTimes"][];
+            /** @description This server's event webhooks that can't deliver, until one delivers again. */
+            failing_forwarding?: components["schemas"]["FailingForwarding"][];
             /** @description Checking-in locations whose latest load, plan of what changed, discovery or connection check failed. */
             failing_locations?: components["schemas"]["FailingLocation"][];
+            /** @description Lifecycle event sinks whose newest run lost events, until a run delivers all of its events. */
+            failing_sinks?: components["schemas"]["FailingSink"][];
+            /** @description Checking-in locations whose run-history sync is failing, until a sync report succeeds. */
+            failing_syncs?: components["schemas"]["FailingSync"][];
             /** @description Running calendar schedules whose dates run out within a day. */
             low_calendars?: components["schemas"]["LowCalendar"][];
             overdue_ticks: components["schemas"]["OverdueTick"][];
@@ -4087,6 +4332,21 @@ export interface components {
             /** Format: uuid */
             run_id: string;
         };
+        /** @description An error-severity audit failure in one run: its name, the warehouse's SQLSTATE and redacted error text, or its failing rows. */
+        RunAuditFailure: {
+            /**
+             * Format: int64
+             * @description The rows that failed it, when its query ran.
+             */
+            failing_rows?: number | null;
+            /** @description The warehouse's error when the query could not run, redacted and bounded like a node's. */
+            message?: string | null;
+            name: string;
+            /** @description The node it checks; null for an end-of-build singular audit. */
+            node_key?: string | null;
+            /** @description The warehouse's SQLSTATE when the audit's query could not run, such as `42S02`. */
+            sqlstate?: string | null;
+        };
         /** @description This is a server-owned instruction, not an arbitrary status supplied by a worker. */
         RunChange: {
             container_id?: string | null;
@@ -4125,6 +4385,8 @@ export interface components {
             no_change_reason?: string | null;
             node_key: string;
             outcome: components["schemas"]["NodeOutcome"];
+            /** @description Where a failed model failed, such as `staging` or `post_hook`; a short lowercase token or absent. */
+            phase?: string | null;
             /** Format: int64 */
             rows_affected?: number | null;
             skipped_because_of?: string | null;
@@ -4171,6 +4433,12 @@ export interface components {
             count: number;
             /** @enum {string} */
             kind: "audit_failures_ignored";
+        } | {
+            /** @enum {string} */
+            kind: "sink_deliveries";
+            sinks: components["schemas"]["SinkDelivery"][];
+            /** @description Each sink provider whose teardown raised, such as `'kafka' (KafkaProducer) raised KafkaException`. */
+            teardown_failures?: string[];
         };
         RunChangeRequest: {
             change: components["schemas"]["RunChange"];
@@ -4199,7 +4467,7 @@ export interface components {
             occurred_at?: string | null;
         };
         /** @enum {string} */
-        RunEventKind: "completed" | "success" | "warn" | "partial" | "failed" | "cancelled" | "skipped";
+        RunEventKind: "completed" | "success" | "warn" | "failed" | "cancelled" | "skipped";
         /** @description Recall event metadata of a run. Payloads are left out: they can carry SQL, request settings and error text. */
         RunEventRecord: {
             /** Format: int64 */
@@ -4217,7 +4485,7 @@ export interface components {
             event_id: string;
             event_type: string;
             invocation_id: string;
-            /** @description A summary of what an event names, such as a member retry or the command a worker started; never error or SQL text. */
+            /** @description A summary of what an event names, such as a member retry, the command a worker started or why an audit was not run; never error or SQL text. */
             message?: string | null;
             occurred_at: string;
             outcome?: string | null;
@@ -4254,6 +4522,52 @@ export interface components {
             };
             sqb_version: string;
         };
+        /** @description Why a run failed outside any node: where, the error's type or code, and its redacted, bounded text. */
+        RunFailureCause: {
+            code?: string | null;
+            message?: string | null;
+            phase: components["schemas"]["RunFailurePhase"];
+        };
+        /** @description What a `run_failed` event says: the run, what started it, when, what failed and why, with UI links. */
+        RunFailureEvent: {
+            /** Format: int64 */
+            duration_ms?: number | null;
+            /** Format: date-time */
+            ended_at?: string | null;
+            error?: null | components["schemas"]["RunFailureCause"];
+            /** Format: int64 */
+            failed_audit_count: number;
+            /** @description The first error-severity audit failures by name. */
+            failed_audits: components["schemas"]["RunAuditFailure"][];
+            /** Format: int64 */
+            failed_node_count: number;
+            /** @description The first failed nodes by key, with redacted and bounded error text. */
+            failed_nodes: components["schemas"]["RunNodeFailure"][];
+            job_key?: string | null;
+            /** Format: uuid */
+            location_id: string;
+            outcome: components["schemas"]["RunOutcome"];
+            /** Format: uuid */
+            run_id: string;
+            run_kind: components["schemas"]["RunKind"];
+            /** Format: int64 */
+            skipped_node_count: number;
+            /** @description The first skipped nodes by key. */
+            skipped_nodes: string[];
+            /** Format: date-time */
+            started_at?: string | null;
+            /** Format: int64 */
+            succeeded_node_count: number;
+            target: string;
+            trigger: components["schemas"]["RunTrigger"];
+            /** @description The run's UI page; null when the server has no origin. */
+            url?: string | null;
+        };
+        /**
+         * @description Where a run failed outside any node.
+         * @enum {string}
+         */
+        RunFailurePhase: "launch" | "worker_start" | "load" | "planning" | "build";
         /** @description One error-severity audit failure a run or one of its current members let through; never its SQL or evidence. */
         RunIgnoredAuditFailure: {
             attached_column_name?: string | null;
@@ -4283,11 +4597,17 @@ export interface components {
         /** @description A node's outcome error in one run: redacted, bounded text and the project file of the node, never its SQL. */
         RunNodeFailure: {
             error_code?: string | null;
+            /** @description The node's output in the UI; null when the server has no origin. */
+            logs_url?: string | null;
             /** @description Null when the worker reported none or the run's history has been pruned. */
             message?: string | null;
             node_key: string;
             /** @description Relative to the project root, with `/` separators; null when the run's snapshot is gone. */
             path?: string | null;
+            /** @description Where a model failed, such as `staging`, `audit` or `post_hook`; null for other nodes or when not reported. */
+            phase?: string | null;
+            /** @description The node in the run's UI page; null when the server has no origin. */
+            url?: string | null;
         };
         RunNodeRecord: {
             /** Format: date-time */
@@ -4326,7 +4646,7 @@ export interface components {
          * @description Terminal outcomes cannot be confused with a request to change an active status.
          * @enum {string}
          */
-        RunOutcome: "success" | "warn" | "partial" | "failed" | "cancelled" | "skipped";
+        RunOutcome: "success" | "warn" | "failed" | "cancelled" | "skipped";
         /** @description Captured output and error text of a run's invocations; both can quote warehouse data. */
         RunOutput: {
             /** @description Invocation failures and error diagnostics, oldest first. */
@@ -4380,6 +4700,8 @@ export interface components {
         RunRecord: {
             /** Format: date-time */
             cancel_requested_at?: string | null;
+            /** @description An ad-hoc run's command as the person typed it, as argument tokens after `sqb`; absent for every other run. */
+            command?: string[] | null;
             /** Format: date-time */
             ended_at?: string | null;
             git_dirty?: boolean | null;
@@ -4545,7 +4867,17 @@ export interface components {
             statement_id: string;
         };
         /** @enum {string} */
-        RunStatus: "queued" | "launched" | "running" | "unresponsive" | "success" | "warn" | "partial" | "failed" | "cancelled" | "skipped";
+        RunStatus: "queued" | "launched" | "running" | "unresponsive" | "success" | "warn" | "failed" | "cancelled" | "skipped";
+        /** @description What started a run: a schedule or sensor by name, or a person or service account (`api`). */
+        RunTrigger: {
+            kind: components["schemas"]["RunTriggerKind"];
+            /** @description The schedule's or sensor's name; null for manual and API runs. */
+            name?: string | null;
+            /** @description Who asked for a manual or API run, by display name. */
+            person?: string | null;
+        };
+        /** @enum {string} */
+        RunTriggerKind: "schedule" | "sensor" | "manual" | "api";
         /** @description Inclusive typed CLI cursor bounds; the native planner derives exclusive execution ends. */
         RunWindow: {
             /** Format: date-time */
@@ -4599,7 +4931,12 @@ export interface components {
         SelectionEvaluation: {
             /**
              * Format: int64
-             * @description Every selected node, across all pages.
+             * @description How many of them are audits, keyed `audit:<name>[:…]`.
+             */
+            audits?: number;
+            /**
+             * Format: int64
+             * @description Every selected node and audit, across all pages.
              */
             count: number;
             error?: null | components["schemas"]["SelectionProblem"];
@@ -4658,6 +4995,8 @@ export interface components {
         };
         /** @description The values each selector type takes in the current publication, with how many nodes each one selects. */
         SelectionVocabulary: {
+            /** @description `audit:` names: the audits each name selects, one per target it is attached to. */
+            audits?: components["schemas"]["VocabularyEntry"][];
             /** @description `job:` names: the nodes each job or job group selects. */
             jobs: components["schemas"]["VocabularyEntry"][];
             /** @description `kind:` values: the nodes of each kind. */
@@ -4888,6 +5227,14 @@ export interface components {
             scheduler: boolean;
             version: string;
         };
+        /** @description The server row of the health report. */
+        ServerSummary: {
+            /** Format: date-time */
+            started_at: string;
+            /** Format: int64 */
+            uptime_seconds: number;
+            version: string;
+        };
         ServiceAccountRole: {
             role: components["schemas"]["BuiltinRole"];
         };
@@ -4956,6 +5303,24 @@ export interface components {
             principal_id: string;
             /** Format: uuid */
             session_id: string;
+        };
+        /** @description One lifecycle event sink's deliveries in a run. */
+        SinkDelivery: {
+            /** Format: int64 */
+            accepted: number;
+            /** Format: int64 */
+            delivered: number;
+            /**
+             * Format: int64
+             * @description Events the sink never got: its queue was full or it was too slow.
+             */
+            dropped: number;
+            /**
+             * Format: int64
+             * @description Events the sink raised on.
+             */
+            failed: number;
+            name: string;
         };
         /** @description A trigger the scheduler skips because its stored job or pinned snapshot can't be read, or a sensor whose check failed; it clears once its location publishes again or, for a sensor, a later check completes. */
         SkippedTrigger: {
@@ -5290,6 +5655,9 @@ export interface components {
         WarehouseReadFailure: {
             /** @enum {string} */
             kind: "read_error";
+        } | {
+            /** @enum {string} */
+            kind: "unreachable";
         } | {
             /** @enum {string} */
             kind: "timed_out";
@@ -8729,6 +9097,47 @@ export interface operations {
             };
         };
     };
+    readPastRuns: {
+        parameters: {
+            query?: {
+                /** @description Comma-separated run IDs, each full or a unique prefix of at least 8 characters */
+                ids?: string;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What each run selected, didn't finish and skipped, or why one can't be read */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PastRunsRead"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
     readSelectionVocabulary: {
         parameters: {
             query?: never;
@@ -9451,6 +9860,69 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every component is healthy */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthReport"];
+                };
+            };
+            /** @description A component is degraded or the control database is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthReport"];
+                };
+            };
+        };
+    };
+    readHealthDetails: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthDetails"];
                 };
             };
             /** @description Session rejected */
@@ -10797,6 +11269,26 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    livez: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The server process is running */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
             };
         };
     };

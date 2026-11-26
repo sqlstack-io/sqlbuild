@@ -275,7 +275,6 @@ def test_given_local_scenario_planning_failure_when_running_then_canonical_attem
             scenarios=pipeline_result.project.sql_scenarios,
             adapter=ScenarioLocalPipelineTestAdapter(),
             project_name="waffle_shop",
-            strict=False,
             replay_source=ScenarioLocalReplaySource(lexical_syntax=SqlLexicalSyntax()),
         )
 
@@ -295,20 +294,8 @@ def test_given_local_scenario_planning_failure_when_running_then_canonical_attem
     "test_case",
     (
         ScenarioLocalPipelineTestCase(
-            description="missing snapshot skips by default",
+            description="missing snapshot is an error",
             snapshot_state="missing",
-            strict=False,
-            load_error_message=None,
-            expected_local_status="SKIP",
-            expected_status="skipped",
-            expected_retained=False,
-            expected_duckdb_exists=False,
-            expected_error_code=SCENARIO_LOCAL_SNAPSHOT_MISSING,
-        ),
-        ScenarioLocalPipelineTestCase(
-            description="missing snapshot errors in strict mode",
-            snapshot_state="missing",
-            strict=True,
             load_error_message=None,
             expected_local_status="ERROR",
             expected_status="failed",
@@ -317,12 +304,11 @@ def test_given_local_scenario_planning_failure_when_running_then_canonical_attem
             expected_error_code=SCENARIO_LOCAL_SNAPSHOT_MISSING,
         ),
         ScenarioLocalPipelineTestCase(
-            description="stale snapshot skips by default",
+            description="stale snapshot is an error",
             snapshot_state="stale",
-            strict=False,
             load_error_message=None,
-            expected_local_status="SKIP",
-            expected_status="skipped",
+            expected_local_status="ERROR",
+            expected_status="failed",
             expected_retained=False,
             expected_duckdb_exists=False,
             expected_error_code=SCENARIO_LOCAL_SNAPSHOT_STALE,
@@ -330,7 +316,6 @@ def test_given_local_scenario_planning_failure_when_running_then_canonical_attem
         ScenarioLocalPipelineTestCase(
             description="fresh snapshot pass keeps DuckDB by default",
             snapshot_state="fresh",
-            strict=False,
             load_error_message=None,
             expected_local_status="PASS",
             expected_status="success",
@@ -341,7 +326,6 @@ def test_given_local_scenario_planning_failure_when_running_then_canonical_attem
         ScenarioLocalPipelineTestCase(
             description="load error retains DuckDB",
             snapshot_state="fresh",
-            strict=False,
             load_error_message="bad jsonl",
             expected_local_status="ERROR",
             expected_status="failed",
@@ -352,7 +336,7 @@ def test_given_local_scenario_planning_failure_when_running_then_canonical_attem
     ),
     ids=lambda case: case.description,
 )
-def test_given_selected_scenarios_when_running_local_scenario_pipeline_then_loads_or_skips(
+def test_given_selected_scenarios_when_running_local_scenario_pipeline_then_loads_or_errors(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     test_case: ScenarioLocalPipelineTestCase,
@@ -400,7 +384,6 @@ def test_given_selected_scenarios_when_running_local_scenario_pipeline_then_load
         scenarios=pipeline_result.project.sql_scenarios,
         adapter=adapter,
         project_name="waffle_shop",
-        strict=test_case.strict,
         replay_source=ScenarioLocalReplaySource(lexical_syntax=SqlLexicalSyntax()),
     )
 

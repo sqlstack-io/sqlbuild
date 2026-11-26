@@ -2541,19 +2541,6 @@ wheels = [
 ]
 
 [[package]]
-name = "polyglot-sql-chio"
-version = "0.13.10"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/18/8c/b48d0fcca36c2e6df0a2ab8aa24e029373264b6dfa9db683eb533f6b6249/polyglot_sql_chio-0.13.10.tar.gz", hash = "sha256:4365617889c3779fd1a3ebdd15ab03c92c517cb1be36dedf82e5853b31d39781", size = 2279296, upload-time = "2026-10-28T23:07:03.083Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/bb/7a/c66b36a40c0931d9647215f315f90e2e0d83328165dce7275d624f694381/polyglot_sql_chio-0.13.10-cp312-abi3-macosx_10_12_x86_64.whl", hash = "sha256:a1abe78cde4b54d145f42356ca4c3a7585775aa4efee954209084ea993633f90", size = 13701198, upload-time = "2026-10-28T23:06:50.006Z" },
-    { url = "https://files.pythonhosted.org/packages/5f/e2/b2ba58e445163b9e29a715d9e3eab5fd9e276e8bbe58f5710bd77aae70d7/polyglot_sql_chio-0.13.10-cp312-abi3-macosx_11_0_arm64.whl", hash = "sha256:a7d01559916bff555fd0c258f4a52a98e3f2fa25b1f4c482ef35cb868704c3b6", size = 12941723, upload-time = "2026-10-28T23:06:52.738Z" },
-    { url = "https://files.pythonhosted.org/packages/c6/08/a9e5cb57c9938551edeb0884cc1b57ef54bbb38eb5f371bb146b663881ab/polyglot_sql_chio-0.13.10-cp312-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:25e5ee843dccffe87501113238ba333c17dce55b31867fcdc1b81e245b9c3eb4", size = 12895624, upload-time = "2026-10-28T23:06:55.52Z" },
-    { url = "https://files.pythonhosted.org/packages/a0/9e/0879b3a267899906c231270d0167d8c32c14dcc2ae346b86834c4f7bb8b2/polyglot_sql_chio-0.13.10-cp312-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:fd2ca982a19c7fbeb460914eceae60d9c5f7e6e631473f0141585b778772c1ce", size = 12661001, upload-time = "2026-10-28T23:06:58.287Z" },
-    { url = "https://files.pythonhosted.org/packages/e7/13/dbdbce022153042edb59abe07e64c51a0e0a9a8f4c86cf2043f1c42a1da7/polyglot_sql_chio-0.13.10-cp312-abi3-win_amd64.whl", hash = "sha256:f366391d63fbf455f71c07fb03e4ac1cf860609de7fd875759647ffe98659320", size = 12301030, upload-time = "2026-10-28T23:07:00.945Z" },
-]
-
-[[package]]
 name = "pre-commit"
 version = "4.6.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3710,10 +3697,10 @@ dependencies = [
     { name = "duckdb" },
     { name = "filelock" },
     { name = "orjson" },
-    { name = "polyglot-sql-chio" },
     { name = "pydantic-settings" },
     { name = "pyyaml" },
     { name = "sqlbuild-cli" },
+    { name = "sqlquack" },
 ]
 
 [package.optional-dependencies]
@@ -3779,7 +3766,6 @@ requires-dist = [
     { name = "google-cloud-bigquery", marker = "extra == 'bigquery'", specifier = ">=3.37.0" },
     { name = "jinja2", marker = "extra == 'dbt'", specifier = ">=3.1" },
     { name = "orjson", specifier = ">=3.11.7" },
-    { name = "polyglot-sql-chio", specifier = "==0.13.10" },
     { name = "psycopg", extras = ["binary"], marker = "extra == 'postgres'", specifier = ">=3.2.0" },
     { name = "pydantic-settings", specifier = ">=2,<3" },
     { name = "pymssql", marker = "extra == 'sqlserver'", specifier = ">=2.3.0" },
@@ -3787,6 +3773,7 @@ requires-dist = [
     { name = "rivers", marker = "extra == 'rivers'", specifier = ">=0.1.4" },
     { name = "snowflake-connector-python", marker = "extra == 'snowflake'", specifier = ">=4.7.1,<5" },
     { name = "sqlbuild-cli", directory = "crates/sqlbuild-cli" },
+    { name = "sqlquack", specifier = "==0.24.1" },
 ]
 provides-extras = ["dbt", "snowflake", "bigquery", "databricks", "dagster", "postgres", "sqlserver", "clickhouse", "rivers"]
 
@@ -3832,6 +3819,35 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/90/76/437d71068094df0726366574cf3432a4ed754217b436eb7429415cf2d480/sqlparse-0.5.5.tar.gz", hash = "sha256:e20d4a9b0b8585fdf63b10d30066c7c94c5d7a7ec47c889a2d83a3caa93ff28e", size = 120815, upload-time = "2025-12-19T07:17:45.073Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/49/4b/359f28a903c13438ef59ebeee215fb25da53066db67b305c125f1c6d2a25/sqlparse-0.5.5-py3-none-any.whl", hash = "sha256:12a08b3bf3eec877c519589833aed092e2444e68240a3577e8e26148acc7b1ba", size = 46138, upload-time = "2025-12-19T07:17:46.573Z" },
+]
+
+[[package]]
+name = "sqlquack"
+version = "0.24.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "sqlquack-cli" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f6/86/2d1c1e0b8dbfca0ed68576a469a2179ac33ef1f24c8070c7958fac3eebd0/sqlquack-0.24.1.tar.gz", hash = "sha256:c9cef6e9ed9adc563c8cd88fa48ea9b65166f4f59766348e67444ead4e61a5d1", size = 2863449, upload-time = "2026-11-25T22:20:20.458Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9e/7f/b6bedc6e98797eb3cf20eb0eb5c38247c65ca51cb9d1846755cbcb857fc9/sqlquack-0.24.1-cp312-abi3-macosx_10_15_x86_64.whl", hash = "sha256:dafbd5edbe576266fa7ef1f5e319ce9b33be8815b6c1305843973ff2f34c48bd", size = 29876339, upload-time = "2026-11-25T22:19:54.384Z" },
+    { url = "https://files.pythonhosted.org/packages/60/84/e0e75923675cc2f1be6daf16418208de23e1dad80b785a1f52b1a0dcb55e/sqlquack-0.24.1-cp312-abi3-macosx_11_0_arm64.whl", hash = "sha256:5e0d9d82cb72308964d095a57bc84a4fec621fc045bdbfacf623005755f0c038", size = 27488445, upload-time = "2026-11-25T22:19:56.906Z" },
+    { url = "https://files.pythonhosted.org/packages/5e/6c/9ec501cbe267f609d6c6e1353384c80ba69f88c8e0354a2fffedcd7e2103/sqlquack-0.24.1-cp312-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:f366a83f9b47449db9f59666d579ed67ea511132b00b6235995fbd8a7a4f6d09", size = 30525363, upload-time = "2026-11-25T22:19:59.643Z" },
+    { url = "https://files.pythonhosted.org/packages/4c/1d/da7e566a70fbadafb4365706dc69ce2b211012777e025ef5a27529e04566/sqlquack-0.24.1-cp312-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:314cc611663220954bcdc271ff82a010a3c02f3a491e68bc8d8891e0e7bc14bd", size = 34844049, upload-time = "2026-11-25T22:20:03.005Z" },
+    { url = "https://files.pythonhosted.org/packages/71/56/a09e4a2a036e4ec4e324fff8284f24f02b01b067ea21f4e3faf3fc10555a/sqlquack-0.24.1-cp312-abi3-win_amd64.whl", hash = "sha256:7fa84842a955709fab4bf90645424456cf28bb58b109e3dcedaebf54bb4a2629", size = 28451971, upload-time = "2026-11-25T22:20:05.624Z" },
+]
+
+[[package]]
+name = "sqlquack-cli"
+version = "0.24.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/35/23/58409317f7f9c23a489cbe9e0469238fee5265a899d172c874e36e304ed7/sqlquack_cli-0.24.1.tar.gz", hash = "sha256:adde8e30804e59dcfc3ce39e6bbc88dd3f55c015dc65be3ae7e4eab9f458058e", size = 2860471, upload-time = "2026-11-25T22:20:22.021Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/be/23/368ee2a21b21679f136a23b02079bfcf76682a7a812e72eaea408e7845e3/sqlquack_cli-0.24.1-py3-none-macosx_10_15_x86_64.whl", hash = "sha256:a077bfb6e5dea7918c0c245020bcca5829b880dcc28f6925ba6a347e25d5269e", size = 32643365, upload-time = "2026-11-25T22:20:08.05Z" },
+    { url = "https://files.pythonhosted.org/packages/6a/94/8b4c2621ab37d25264d4d85b619f700cc0fb4734648d716c3c181c7e69be/sqlquack_cli-0.24.1-py3-none-macosx_11_0_arm64.whl", hash = "sha256:04b99c3de459971f61e92f430b11776c996e1893440c693df8f325d6be2d28c2", size = 30031261, upload-time = "2026-11-25T22:20:10.478Z" },
+    { url = "https://files.pythonhosted.org/packages/6c/5a/8af0e62f054c25e25d43d8c09890e321ffe5b2cb761ab041f0757c0c0c82/sqlquack_cli-0.24.1-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:453c3f665c0c7b6e8d1a5136a090353c2e0aff0a413bac3307c486ba9da33bc8", size = 32459560, upload-time = "2026-11-25T22:20:12.927Z" },
+    { url = "https://files.pythonhosted.org/packages/5b/69/996f2a2ec653874e16013c5bf778207f3118bdc108d66c4dc8b19d91af21/sqlquack_cli-0.24.1-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:98e4d145fbb87a2209ce1a32b72750a49ef3f42940d3ef06bbe09a18bec89edd", size = 36744504, upload-time = "2026-11-25T22:20:15.506Z" },
+    { url = "https://files.pythonhosted.org/packages/de/57/8d4ebc27a5f0397001943a51a4593c7fcfc585b7d75ac9b314074e96ea71/sqlquack_cli-0.24.1-py3-none-win_amd64.whl", hash = "sha256:6017a2874197ca574ec74bfc4021e5641b9d223044398c8bb3374b47ffa9d9c6", size = 30671202, upload-time = "2026-11-25T22:20:18.073Z" },
 ]
 
 [[package]]

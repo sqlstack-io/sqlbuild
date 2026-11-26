@@ -11,6 +11,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import Context, ContextVar, Token, copy_context
 from datetime import UTC, datetime
+from functools import partial
 from typing import Any
 
 from sqlbuild._native import (
@@ -22,7 +23,7 @@ from sqlbuild._native import (
     build_audit_gate_identity,
 )
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
-from sqlbuild.compiler.auditing.types import AuditEvaluationMode, ThresholdOperator
+from sqlbuild.compiler.auditing.types import AuditEvaluationMode, AuditOutcome, ThresholdOperator
 from sqlbuild.executor.audit_results.constants import (
     AUDIT_RESULT_SCHEMA_VERSION,
     IGNORED_FAILURE_METADATA_JSON,
@@ -90,7 +91,12 @@ class _AuditResultPublisher:
                 record: AuditResultRecord | None = self._build(result)
                 self._records[id(result)] = (result, record)
                 if record is not None:
-                    self._context.run(_publish_safely, record)
+                    not_run_reason: str | None = (
+                        result.skip_reason if result.outcome == AuditOutcome.NOT_RUN else None
+                    )
+                    self._context.run(
+                        partial(_publish_safely, record=record, not_run_reason=not_run_reason)
+                    )
 
     def records_for(
         self, results: tuple[AuditExecutionResult, ...]
@@ -371,9 +377,9 @@ def _build_record(  # noqa: PLR0913
     )
 
 
-def _publish_safely(record: AuditResultRecord) -> None:
+def _publish_safely(*, record: AuditResultRecord, not_run_reason: str | None) -> None:
     try:
-        _publish_audit_completed(record)
+        _publish_audit_completed(record=record, not_run_reason=not_run_reason)
     except Exception as error:
         _LOGGER.warning(
             "Audit result lifecycle publication degraded for '%s' (%s)",
@@ -382,7 +388,7 @@ def _publish_safely(record: AuditResultRecord) -> None:
         )
 
 
-def _publish_audit_completed(record: AuditResultRecord) -> None:
+def _publish_audit_completed(*, record: AuditResultRecord, not_run_reason: str | None) -> None:
     payload: dict[str, JSONValue] = {
         "audit_name": record.audit_name,
         "audit_definition_name": record.audit_definition_name,
@@ -403,6 +409,8 @@ def _publish_audit_completed(record: AuditResultRecord) -> None:
     }
     if record.metadata_json == IGNORED_FAILURE_METADATA_JSON:
         payload["ignored"] = True
+    if not_run_reason:
+        payload["not_run_reason"] = not_run_reason
     optional: dict[str, JSONValue | None] = {
         "attached_target_kind": record.attached_target_kind,
         "attached_target_name": record.attached_target_name,

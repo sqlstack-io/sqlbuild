@@ -70,7 +70,7 @@ fn given_silent_and_live_workers_when_the_scheduler_monitors_then_fenced_atomic_
                 .expect("snapshot");
             let scope = (location, published.snapshot_id);
             let holder = Uuid::now_v7();
-            let lease = acquire_lease(store, holder)
+            let lease = acquire_lease(store, (holder, None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -240,7 +240,7 @@ fn given_silent_and_live_workers_when_the_scheduler_monitors_then_fenced_atomic_
                     .expect("fenced monitor"),
                 events
             );
-            let successor = acquire_lease(store, Uuid::now_v7())
+            let successor = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("takeover")
                 .expect("successor");
@@ -286,7 +286,7 @@ fn given_a_silent_worker_backlog_when_monitoring_then_bounded_transactions_conti
                 .await
                 .expect("snapshot");
             let holder = Uuid::now_v7();
-            let elected = acquire_lease(store, holder)
+            let elected = acquire_lease(store, (holder, None))
                 .await
                 .expect("elect")
                 .expect("leader");

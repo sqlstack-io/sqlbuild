@@ -15,6 +15,8 @@ export type RunSummary = {
 	checksPassed: number;
 	checksWarned: number;
 	checksFailed: number;
+	/** End-of-build audits whose reads the target doesn't have: neither passed nor failed. */
+	checksNotRun: number;
 };
 
 /** What the run did, for the line under the header: built nodes and the rows incrementals added, failures, skips and checks. */
@@ -32,8 +34,9 @@ export function summaryOf(nodes: readonly RunNode[], events: readonly RunEvent[]
 		notRun: nodes.filter((n) => n.status === 'not_run' || n.status === 'cancelled' || (!active && n.status === 'pending')).length,
 		running: nodes.filter((n) => n.status === 'running').length,
 		waiting: active ? nodes.filter((n) => n.status === 'pending').length : 0,
-		checksPassed: checks.filter((e) => e.level === 'info').length,
+		checksPassed: checks.filter((e) => e.level === 'info' && e.check?.outcome !== 'not-run').length,
 		checksWarned: checks.filter((e) => e.level === 'warn').length,
-		checksFailed: checks.filter((e) => e.level === 'error').length
+		checksFailed: checks.filter((e) => e.level === 'error').length,
+		checksNotRun: checks.filter((e) => e.check?.outcome === 'not-run').length
 	};
 }

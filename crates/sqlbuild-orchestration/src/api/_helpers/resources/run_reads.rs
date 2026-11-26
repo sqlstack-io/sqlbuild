@@ -100,6 +100,7 @@ pub(crate) async fn recall(
             status: StatusCode::NOT_FOUND,
             message: "run invocation not found".into(),
             decision_id: None,
+            cause: None,
         });
     }
     Ok(Json(

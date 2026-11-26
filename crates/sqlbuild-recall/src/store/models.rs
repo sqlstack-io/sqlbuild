@@ -96,6 +96,18 @@ pub struct MaintenanceOutcome {
     pub complete: bool,
 }
 
+/// One recorded run's resources and audits as node keys, for `run:`, `failed:` and `skipped:`; failed audits are `audit:<name>`.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct RecallRunResults {
+    pub run_id: String,
+    /// Every resource the run attempted or skipped.
+    pub selected: std::collections::BTreeSet<String>,
+    /// Resources whose attempts all failed, and error-severity audit failures it didn't let through.
+    pub failed: std::collections::BTreeSet<String>,
+    /// Resources it skipped.
+    pub skipped: std::collections::BTreeSet<String>,
+}
+
 /// The rows of a read-only query.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct QueryResult {

@@ -23,7 +23,20 @@ from tests.unit.src.sqlbuild.executor.build._helpers._test_types import (
             description="end-scheduled model audit is indexed exactly once at end",
             expected_model_audit_count=0,
             expected_end_audit_count=1,
-        )
+        ),
+        AuditExecutionIndexTestCase(
+            description="a model audit selected by name whose model isn't built runs at the end",
+            expected_model_audit_count=0,
+            expected_end_audit_count=1,
+            attachment_kind="model",
+            selected_audit_names=("cross_model_consistency",),
+        ),
+        AuditExecutionIndexTestCase(
+            description="a model audit not selected by name stays its model's gate",
+            expected_model_audit_count=1,
+            expected_end_audit_count=0,
+            attachment_kind="model",
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -36,7 +49,7 @@ def test_given_end_scheduled_model_audit_when_building_indexes_then_it_is_not_a_
         definition_name="test_audit",
         resolved_sql="SELECT 1 WHERE FALSE",
         unresolved_sql="SELECT 1 WHERE FALSE",
-        attachment_kind=AuditAttachmentKind.END,
+        attachment_kind=AuditAttachmentKind(test_case.attachment_kind),
         attached_target_kind=AttachedAuditTargetKind.MODEL,
         attached_target_name="orders",
         severity=AuditSeverity.ERROR,
@@ -44,10 +57,12 @@ def test_given_end_scheduled_model_audit_when_building_indexes_then_it_is_not_a_
         effective_run_scope=AuditRunScope.FINAL,
     )
 
-    indexes: BuildIndexes = build_execution_indexes(PlanOutput(audit_entries=(audit,)))
-
-    assert sum(len(audits) for audits in indexes.model_audits_by_model.values()) == (
-        test_case.expected_model_audit_count
+    indexes: BuildIndexes = build_execution_indexes(
+        PlanOutput(audit_entries=(audit,), selected_audit_names=test_case.selected_audit_names)
     )
-    assert len(indexes.end_audits) == test_case.expected_end_audit_count
-    assert indexes.end_audits[0].attached_target_name == "orders"
+
+    assert (
+        sum(len(audits) for audits in indexes.model_audits_by_model.values()),
+        len(indexes.end_audits),
+    ) == (test_case.expected_model_audit_count, test_case.expected_end_audit_count)
+    assert all(entry.attached_target_name == "orders" for entry in indexes.end_audits)

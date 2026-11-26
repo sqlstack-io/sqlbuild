@@ -7,14 +7,24 @@ use uuid::Uuid;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, TransactionMode};
 
-/// Status, the headers that could tell cases apart, and the body with its decision ID masked.
+/// Status, the headers that could tell cases apart with the per-request `x-request-id` masked, and the body with its decision ID masked.
 pub(crate) async fn masked(response: reqwest::Response) -> (Value, Uuid) {
     let status = response.status().as_u16();
+    let request_id: String = response.headers()["x-request-id"]
+        .to_str()
+        .expect("request ID")
+        .to_owned();
     let headers: Vec<(String, String)> = response
         .headers()
         .iter()
         .filter(|(name, _)| *name != header::DATE)
-        .map(|(name, value)| (name.to_string(), value.to_str().unwrap_or("").to_owned()))
+        .map(|(name, value)| {
+            let value = value
+                .to_str()
+                .unwrap_or("")
+                .replace(&request_id, "<request>");
+            (name.to_string(), value)
+        })
         .collect();
     let text = response.text().await.expect("denial body");
     let body: Value = serde_json::from_str(&text).expect("JSON denial");

@@ -16,6 +16,7 @@ pub mod preserved_loader_schemas;
 pub mod progress;
 pub mod project_graph;
 pub mod project_target_settings;
+pub mod publish_plan_summary;
 pub mod python_node_count;
 pub mod python_read_source_names_for;
 pub mod register_inputs;

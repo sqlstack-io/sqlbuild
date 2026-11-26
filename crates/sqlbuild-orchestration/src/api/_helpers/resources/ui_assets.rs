@@ -8,6 +8,7 @@ use crate::api::constants::{
     API_PATH, API_PREFIX, AUTH_PREFIX, ROOT_PATH, UI_DOT_SEGMENTS, UI_DOUBLE_SLASH,
     UI_FRAME_POLICY, UI_IMMUTABLE_PREFIX, UI_INDEX_PATH, UI_REFUSED_ENCODINGS,
 };
+use crate::api::errors::ApiError;
 use crate::api::models::UiAsset;
 
 #[cfg(feature = "ui")]
@@ -15,21 +16,33 @@ include!(concat!(env!("OUT_DIR"), "/ui_assets.rs"));
 #[cfg(not(feature = "ui"))]
 pub(crate) static UI_ASSETS: &[UiAsset] = &[];
 
+/// Every path no route takes: an API path is a JSON 404, never the UI's page; anything else is a UI file or the UI's page.
 pub(crate) fn serve_ui(application: Router, assets: &'static [UiAsset]) -> Router {
-    if assets.is_empty() {
-        return application;
-    }
     application.fallback(move |method: Method, uri: Uri| async move {
         respond(assets, &method, uri.path())
     })
 }
 
 fn respond(assets: &'static [UiAsset], method: &Method, path: &str) -> Response {
+    if path == API_PATH || path.starts_with(API_PREFIX) {
+        return ApiError {
+            status: StatusCode::NOT_FOUND,
+            message: "no such API endpoint".into(),
+            decision_id: None,
+            cause: None,
+        }
+        .into_response();
+    }
+    ui_response(assets, method, path)
+}
+
+/// An embedded UI file, or the UI's page for a client route; 404 outside the UI.
+pub(crate) fn ui_response(assets: &'static [UiAsset], method: &Method, path: &str) -> Response {
     let outside_ui = path == API_PATH
         || path.starts_with(API_PREFIX)
         || path.starts_with(AUTH_PREFIX)
         || !canonical(path);
-    if outside_ui || (method != Method::GET && method != Method::HEAD) {
+    if assets.is_empty() || outside_ui || (method != Method::GET && method != Method::HEAD) {
         return StatusCode::NOT_FOUND.into_response();
     }
     let wanted = if path == ROOT_PATH {

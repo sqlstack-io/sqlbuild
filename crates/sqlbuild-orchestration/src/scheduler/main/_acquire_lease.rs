@@ -14,7 +14,7 @@ use crate::store::models::{ControlStore, Parameter, TransactionMode};
 /// An existing live lease is never stolen, including by a duplicate caller with the same holder.
 pub(crate) async fn acquire_lease(
     store: &ControlStore,
-    holder: Uuid,
+    (holder, origin): (Uuid, Option<&str>),
 ) -> Result<Option<SchedulerLease>, ControlError> {
     let transaction = begin(store, TransactionMode::Write).await?;
     let now = transaction.now;
@@ -31,6 +31,7 @@ pub(crate) async fn acquire_lease(
             holder,
             epoch,
             expires_at,
+            origin: origin.map(str::to_owned),
         });
     commit(transaction).await?;
     Ok(lease)

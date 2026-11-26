@@ -9,7 +9,7 @@ import type { Acknowledgement, AttentionAcknowledgement, AttentionItem, Attentio
 
 const DAY = 24 * 60 * 60 * 1000;
 const MODEL_KINDS = new Set(['view', 'table', 'incremental']);
-const PROBLEM_STATUSES = new Set(['failed', 'partial', 'presumed_failed']);
+const PROBLEM_STATUSES = new Set(['failed', 'presumed_failed']);
 const ACTIVE_STATUSES = new Set(['queued', 'launched', 'running', 'unresponsive']);
 
 export type OverviewInputs = {
@@ -106,7 +106,6 @@ export function overviewOf({ runs, checks, nodes, changes, events, triggers, ack
 				total: recent.length,
 				success: count(['success']),
 				warn: count(['warn']),
-				partial: count(['partial']),
 				failed: count(['failed', 'presumed_failed']),
 				active: recent.filter((r) => ACTIVE_STATUSES.has(r.status)).length
 			},

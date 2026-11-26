@@ -134,8 +134,8 @@ schema = "dev"    # uses connections.local, the only named connection
 
 A command that needs the warehouse, such as `build`, `plan`, `query`, `diff`, or `debug`, fails
 with `D001` before connecting when no connection is configured. Commands and modes that don't
-connect, such as `compile`, `format`, `lineage`, `scope`, `rename`, `mv`, `test --inspect`, and
-`scenario test --local`, keep working without one.
+connect, such as `compile`, `format`, `lineage`, `scope`, `rename`, `mv`, `test --inspect`,
+`test --run-on local` and `scenario test --run-on local`, keep working without one.
 SQLBuild never falls back to an implicit in-memory DuckDB database; to use one, set it
 explicitly:
 
@@ -190,6 +190,8 @@ A target is a named build context - the database and schema you build into, plus
 | `missing_migration_origin` | What a build does when a declared `migrate_from` origin does not exist in this target: `allow` (default), `require_confirmation`, or `deny`. See [Missing migration origins](models/migrations.md#missing-migration-origins) |
 | `warehouses` | Snowflake warehouse per command group: `build`, `query` and `sync` (a location's warehouse syncs). See [Command-group warehouses](adapters/snowflake.md#command-group-warehouses) |
 | `concurrency` | Worker limit for commands run against this target, replacing `[settings] concurrency` (see below) |
+| `test_run_on` | Where `sqb test` runs unit tests on this target: `auto`, `local` or `warehouse`; replaces `[settings] test_run_on` |
+| `scenario_run_on` | Where `sqb scenario test` runs scenarios on this target: `auto`, `local` or `warehouse`; replaces `[settings] scenario_run_on` |
 | `ignore_audit_failures` | Whether builds on this target let audit failures through, replacing `[settings] ignore_audit_failures`; see [Ignoring audit failures](audits.md#ignoring-audit-failures) |
 | `plan_from` | Where `sqb plan` and `sqb build` read warehouse state: `live` (default) or `synced_state`; see [Planning from synced state](#planning-from-synced-state) |
 | `pause_dynamic` | `true` keeps this target's [dynamic models](models/dynamic.md) suspended between builds; each build refreshes the ones it selects. Default `false` |
@@ -619,6 +621,8 @@ default_audit_run_scope = "delta_and_final"
 unit_test_max_real_models = 10
 test_timeout = "30s"
 scenario_timeout = "15m"
+test_run_on = "auto"
+scenario_run_on = "auto"
 delta_compile = true
 ```
 
@@ -637,6 +641,8 @@ delta_compile = true
 | `unit_test_max_real_models` | `10` | Most real (unmocked) models one SQL unit test may execute; a larger test fails compilation. See [Unit test and scenario limits](#unit-test-and-scenario-limits). |
 | `test_timeout` | `30s` | Time limit for each SQL unit test, or `"disabled"` |
 | `scenario_timeout` | none | Time limit for each scenario, or `"disabled"` |
+| `test_run_on` | `auto` | Where `sqb test` runs unit tests: `auto` (locally in DuckDB when SQLQuack converts a test, otherwise on the warehouse), `local` or `warehouse`. See [Running tests locally](testing-reference.md#running-tests-locally) |
+| `scenario_run_on` | `auto` | Where `sqb scenario test` runs scenarios: `auto` (locally with a fresh snapshot whose SQL converts, otherwise on the warehouse), `local` or `warehouse`. See [Local scenario testing](scenarios.md#local-scenario-testing) |
 | `delta_compile` | `true` | After an edit to model SQL or SQL test files only, compile just the changed files against the previous compile. See [Compiling after an edit](../cli/compile.md#compiling-after-an-edit). |
 | `allow_missing_secrets` | `false` | Let `compile`, `rules run`, `format`, `dag`, `lineage` and `scope` run without any provider's secrets on this machine. `sqlbuild_local.toml` only; a target lists the providers it expects to miss in [`[targets.<name>] allow_missing_secrets`](#allowed-missing-secrets). See [Secrets](python-nodes/providers.md#allowing-missing-secrets). |
 | `allow_warehouse_round_trips` | `false` | Allow a loader to depend on an asset that reads SQL, so data can leave the warehouse and come back through a source. Project file only. See [The SQL boundary](python-nodes/overview.md#warehouse-round-trips). |

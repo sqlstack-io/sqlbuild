@@ -72,7 +72,7 @@ pub(crate) async fn observe_failing_locations(
 ) -> Result<(), ControlError> {
     let (mut transaction, failing) =
         failing_locations(begin(store, TransactionMode::Write).await?).await?;
-    for location in failing {
+    for location in failing.locations {
         let incident = Some(location.failed_at);
         transaction = observe(
             transaction,

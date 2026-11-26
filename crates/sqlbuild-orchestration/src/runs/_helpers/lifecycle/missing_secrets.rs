@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use uuid::Uuid;
 
-use crate::runs::_helpers::lifecycle::error_text::finished_error_message;
+use crate::runs::_helpers::lifecycle::error_text::finished_failure;
 use crate::runs::constants::{
     MISSING_SECRET_ERROR_CODE, MISSING_SECRET_PHRASE, MISSING_SECRET_PREFIX,
 };
@@ -42,7 +42,7 @@ pub(in crate::runs) async fn with_missing_secrets(
     for row in rows {
         let (Some(key), Ok(Some(message))) = (
             row["node_key"].as_str(),
-            finished_error_message(&row["payload"]),
+            finished_failure(&row["payload"]).map(|(message, _)| message),
         ) else {
             continue;
         };

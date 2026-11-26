@@ -75,7 +75,7 @@ fn given_a_long_failing_streak_when_reading_whether_a_sensor_fails_then_since_is
                 .await
                 .expect("triggers")
                 .remove(0);
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

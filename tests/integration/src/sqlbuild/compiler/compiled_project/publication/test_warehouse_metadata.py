@@ -103,6 +103,8 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
                 "failed": {
                     "reason": "OperationalError: unable to open database file",
                     "page_size": False,
+                    # The read never reached the warehouse, so it never stops the sync.
+                    "connection": True,
                 }
             },
         )

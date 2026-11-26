@@ -144,7 +144,7 @@ function build(now: number) {
 		for (let at = start + rand() * every; at < now; at += every) {
 			const noisy = credits * (0.7 + rand() * 0.6) * (rand() < 0.01 ? 5 + rand() * 4 : 1) * (at > now - 9 * 86_400_000 && job === 'events_hourly' ? 1.45 : 1);
 			const roll = rand();
-			const status: RunStatus = now - at < every && now - at < 1_200_000 ? 'running' : roll < 0.03 ? 'failed' : roll < 0.06 ? 'partial' : 'success';
+			const status: RunStatus = now - at < every && now - at < 1_200_000 ? 'running' : roll < 0.06 ? 'failed' : 'success';
 			const spent = status === 'failed' ? noisy * 0.3 : noisy;
 			runs.push({ id: id(at, 2654435761), job, at, status, credits: spent, seconds: (spent / RATE[size]) * 3600 });
 		}
@@ -255,7 +255,7 @@ function evaluateCostSelection(select: string, exclude: string): SelectionEvalua
 		}
 		return chosen;
 	};
-	const reply = (keys: string[], error: SelectionProblem | null): SelectionEvaluation => ({ snapshotId: 'mock-snapshot', count: keys.length, keys, nextOffset: null, error });
+	const reply = (keys: string[], error: SelectionProblem | null): SelectionEvaluation => ({ snapshotId: 'mock-snapshot', count: keys.length, audits: 0, keys, nextOffset: null, error });
 	const selected = select.trim() ? resolve('select', select) : new Set(catalog().metas.map((m) => m.key));
 	if (!(selected instanceof Set)) return reply([], selected);
 	const excluded = exclude.trim() ? resolve('exclude', exclude) : new Set<string>();
@@ -281,7 +281,8 @@ function costVocabulary(): SelectionVocabulary {
 		jobs: [...jobs].filter(([j]) => j !== MANUAL).map(([value, keys]) => ({ value, count: keys.length })).sort((a, b) => a.value.localeCompare(b.value)),
 		sources: [],
 		seeds: [],
-		kinds: [{ value: 'model', count: metas.length }]
+		kinds: [{ value: 'model', count: metas.length }],
+		audits: []
 	};
 }
 
@@ -335,7 +336,7 @@ function costSelection(query: CostSelectionQuery): CostSelection {
 			j.seconds += r.seconds;
 			j.runs += 1;
 			j.daily[day] += r.credits;
-			if (r.status === 'running' || r.status === 'partial') j.pending += 1;
+			if (r.status === 'running') j.pending += 1;
 		}
 	}
 	const facts: CostFact[] = [];

@@ -13,7 +13,7 @@ pub(crate) fn reported_generation(
         ));
     }
     let generation = match report.health {
-        LocationHealth::Heartbeat {} => None,
+        LocationHealth::Heartbeat {} | LocationHealth::SinkDeliveries { .. } => None,
         LocationHealth::CompileFailed { generation, .. }
         | LocationHealth::Connection { generation, .. }
         | LocationHealth::ProviderSecrets { generation, .. }

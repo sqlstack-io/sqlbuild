@@ -34,6 +34,7 @@ use crate::native_commands::_helpers::command::terminal::{
     finish_lost_stdout, terminal_columns, write_output,
 };
 use crate::native_commands::_helpers::command::terminal::{live_screen, screen_colour};
+use crate::native_commands::_helpers::location::api_start::start_platform_roles;
 use crate::native_commands::_helpers::location::dev_cancel::DevRuns;
 use crate::native_commands::_helpers::location::dev_exposure::{
     allowed_hosts, connect_address, exposure, listens_beyond_loopback,
@@ -68,7 +69,8 @@ use crate::native_commands::models::AdminDone;
 use crate::native_commands::models::{
     CommandOutput, DevControlState, InstalledPackage, LocationCompileRequest, LocationCompiler,
     LocationMetadataPage, LocationMetadataSync, LocationServe, LocationWatch, LostStdout,
-    MetadataReply, NativeCommand, NativeInvocation, ProjectLocation, ScanToken,
+    MetadataReply, NativeCommand, NativeInvocation, ProjectLocation, ScanToken, SinkTally,
+    SyncStreak,
 };
 use crate::native_commands::models::{LoadedGeneration, PendingRepublish};
 use crate::native_commands::models::{
@@ -111,14 +113,13 @@ use sqlbuild_orchestration::dev_events::main::emit_dev_event::emit_dev_event;
 use sqlbuild_orchestration::dev_events::main::parse_dev_control::parse_dev_control;
 use sqlbuild_orchestration::dev_events::main::parse_dev_event::parse_dev_event;
 use sqlbuild_orchestration::dev_events::models::{DevControl, DevEvent};
-use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
+use sqlbuild_orchestration::health::models::ServerHealth;
 use sqlbuild_orchestration::platform::main::health::report_remote_location_health::report_remote_location_health;
-use sqlbuild_orchestration::platform::main::installation::run_maintenance::run_maintenance;
 use sqlbuild_orchestration::platform::models::ConnectionCheckTrigger;
 use sqlbuild_orchestration::platform::models::LocationRuleFailure;
 use sqlbuild_orchestration::platform::models::PublishedGeneration;
 use sqlbuild_orchestration::platform::models::{
-    LocationHealth, LocationHealthReport, LocationWorkClient, LocationWorkPoll, RetentionPolicies,
+    LocationHealth, LocationHealthReport, LocationWorkClient, LocationWorkPoll,
     WarehouseSyncFailure,
 };
 use sqlbuild_orchestration::run_output::main::open_output_store::open_output_store;
@@ -140,10 +141,6 @@ use sqlbuild_orchestration::warehouse_metadata::models::{
     WarehouseWatermarkRead,
 };
 use sqlbuild_orchestration::webhooks::constants::SECURITY_AUDIT_WEBHOOK_VARIABLE;
-use sqlbuild_orchestration::webhooks::main::{
-    connect_webhook::connect_webhook, run_webhook::run_webhook,
-};
-use sqlbuild_orchestration::webhooks::models::{Webhook, WebhookSource};
 use std::collections::{BTreeMap, HashMap};
 use std::future::Future;
 use std::io;
@@ -154,7 +151,6 @@ use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::{mpsc, oneshot, watch};
-use tokio::task::JoinSet;
 use tokio::time::{Instant, Interval, MissedTickBehavior};
 use uuid::Uuid;
 
@@ -180,6 +176,7 @@ pub(crate) async fn run_development_roles(
         (url.clone(), written.clone()),
     )?;
     let (stop, shutdown) = watch::channel(false);
+    let health = ServerHealth::new(env!("CARGO_PKG_VERSION"), scheduler);
     let mut roles: DevRoles = DevRoles::default();
     drop(messages.send(ScreenMessage::Started {
         step: DevStep::Api,
@@ -200,6 +197,7 @@ pub(crate) async fn run_development_roles(
                 ServerFacts {
                     version: env!("CARGO_PKG_VERSION").into(),
                     scheduler,
+                    health: health.clone(),
                     output: Some(output.clone()),
                     ..ServerFacts::default()
                 },
@@ -218,7 +216,11 @@ pub(crate) async fn run_development_roles(
             ),
         ),
     );
-    start_platform_roles(&mut roles.tasks, (&store, &shutdown), Default::default())?;
+    start_platform_roles(
+        &mut roles.tasks,
+        (&store, &shutdown, Some(&health)),
+        Default::default(),
+    )?;
     let (location, pipes) = development_location_role(
         (&project, &executable),
         (location_id, &target),
@@ -257,7 +259,9 @@ pub(crate) async fn run_development_roles(
         roles.spawn(Some("scheduler"), async move {
             run_scheduler(
                 &scheduler_store,
-                SchedulerState::new(Uuid::now_v7()).with_origin(origin),
+                SchedulerState::new(Uuid::now_v7())
+                    .with_origin(origin)
+                    .with_health(health),
                 shutdown,
                 workers,
             )
@@ -579,6 +583,7 @@ pub(crate) fn metadata_sync(
         safety_seconds,
         safety_at: Instant::now() + Duration::from_secs(safety_seconds),
         failed_reads: 0,
+        streak: SyncStreak::default(),
         halted: false,
         change_tokens: HashMap::new(),
         scan_token: None,
@@ -1126,76 +1131,6 @@ pub(crate) fn location_child(options: &LocationServe, script: &Path) -> Command 
     command
 }
 
-/// Health production and delivery remain native and independent of scheduler leadership.
-pub(crate) fn start_platform_roles(
-    tasks: &mut JoinSet<Result<(), ControlError>>,
-    (store, shutdown): (&ControlStore, &watch::Receiver<bool>),
-    retention: RetentionPolicies,
-) -> Result<(), ControlError> {
-    let mut sinks: Vec<(Webhook, &str)> = Vec::new();
-    for (variable, source, label) in [
-        (
-            PLATFORM_WEBHOOK_VARIABLE,
-            WebhookSource::Platform,
-            "Platform",
-        ),
-        (
-            SECURITY_AUDIT_WEBHOOK_VARIABLE,
-            WebhookSource::SecurityAudit,
-            "Security audit",
-        ),
-    ] {
-        match std::env::var(variable) {
-            Ok(endpoint) => sinks.push((connect_webhook(&endpoint, source)?, label)),
-            Err(std::env::VarError::NotPresent) => {}
-            Err(_) => {
-                return Err(ControlError::Invalid(format!(
-                    "{label} webhook configuration must be UTF-8"
-                )));
-            }
-        }
-    }
-    drop(write_output(&[(
-        Stream::Stderr,
-        "Starting platform maintenance...\n",
-    )]));
-    let maintenance_store = store.clone();
-    let maintenance_shutdown = shutdown.clone();
-    let audit_sinks: Vec<Webhook> = sinks.iter().map(|(sink, _)| sink.clone()).collect();
-    tasks.spawn(async move {
-        let report = |retained: i64| {
-            drop(write_output(&[(
-                Stream::Stderr,
-                &format!("Security audit retention: retained past horizon: {retained}\n"),
-            )]));
-        };
-        run_maintenance(
-            (&maintenance_store, Uuid::now_v7()),
-            (retention, &audit_sinks),
-            (report, maintenance_shutdown),
-        )
-        .await
-    });
-    drop(write_output(&[(
-        Stream::Stderr,
-        "Platform maintenance started\n",
-    )]));
-    for (sink, label) in sinks {
-        drop(write_output(&[(
-            Stream::Stderr,
-            &format!("Starting {label} webhook...\n"),
-        )]));
-        let sink_store = store.clone();
-        let sink_shutdown = shutdown.clone();
-        tasks.spawn(async move { run_webhook(&sink_store, sink, sink_shutdown).await });
-        drop(write_output(&[(
-            Stream::Stderr,
-            &format!("{label} webhook started\n"),
-        )]));
-    }
-    Ok(())
-}
-
 /// Dispatch maintenance actions without implicitly initializing or upgrading their store.
 pub(crate) async fn run_control_action(
     namespace: &Namespace,
@@ -1379,6 +1314,7 @@ pub(crate) fn open_location_runtime(
         stdin,
         stdout: BufReader::new(stdout),
         python_sources,
+        sinks: SinkTally::default(),
     })
 }
 
@@ -1514,6 +1450,7 @@ async fn exchange_metadata_read(
     let failed = |reason: &str, page_size| WarehouseHistoryFailure {
         reason: reason.into(),
         page_size,
+        connection: false,
     };
     let result = async {
         let written: std::io::Result<()> = async {

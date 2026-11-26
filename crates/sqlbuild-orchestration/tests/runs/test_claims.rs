@@ -77,7 +77,7 @@ fn given_higher_priority_work_for_other_scopes_when_a_local_launcher_claims_then
             for input in [&wanted, &other_target, &other_location] {
                 queue(store, input).await;
             }
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -187,7 +187,7 @@ fn given_overlapping_priority_queues_when_two_launchers_claim_then_conflicts_rol
                 .await
                 .expect("publish snapshot");
             let scope = (location, published.snapshot_id);
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -314,7 +314,7 @@ fn given_named_group_limits_when_capacity_is_lowered_then_active_high_slots_stil
             let published = publish_snapshot(store, &snapshot(location))
                 .await
                 .expect("publish snapshot");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -400,7 +400,7 @@ fn given_more_than_one_page_of_blocked_runs_when_claiming_then_lower_priority_in
                 .await
                 .expect("snapshot");
             let scope = (location, published.snapshot_id);
-            let elected = acquire_lease(store, Uuid::now_v7())
+            let elected = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -483,7 +483,7 @@ fn given_a_blocked_multi_limit_waiter_when_younger_work_arrives_then_shared_limi
                     .collect();
                 queue(store, &input).await;
             }
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -567,7 +567,7 @@ fn given_claimed_work_here_and_elsewhere_when_listing_the_queue_then_each_run_sh
                 .expect("other snapshot");
             let limits =
                 BTreeMap::from([("warehouse".to_owned(), NonZeroU32::new(2).expect("limit"))]);
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use crate::credentials::models::Action;
 use crate::declarations::models::PoolSlots;
-use crate::runs::constants::RUN_LAUNCHED_EVENT;
+use crate::runs::constants::{RUN_LAUNCHED_EVENT, SINK_DELIVERIES_EVENT};
 use crate::runs::types::{CommandPlanner, PreparedPublication};
 use crate::snapshots::models::WriterNode;
 
@@ -109,7 +109,6 @@ pub enum RunStatus {
     Unresponsive,
     Success,
     Warn,
-    Partial,
     Failed,
     Cancelled,
     /// A group member the group did not run because a job it depends on failed.
@@ -323,6 +322,13 @@ pub struct RunRecord {
         deserialize_with = "crate::runs::_helpers::lifecycle::narrowing::frozen_member_attempt"
     )]
     pub member_attempt: Option<u8>,
+    /// An ad-hoc run's command as the person typed it, as argument tokens after `sqb`; absent for every other run.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::runs::_helpers::lifecycle::narrowing::authored_command"
+    )]
+    pub command: Option<Vec<String>>,
 }
 
 /// A queued run's place in claim order within its location and target, and what holds it back.
@@ -481,7 +487,7 @@ pub struct RunEventRecord {
     pub outcome: Option<String>,
     pub row_count: Option<i64>,
     pub affected_rows: Option<i64>,
-    /// A summary of what an event names, such as a member retry or the command a worker started; never error or SQL text.
+    /// A summary of what an event names, such as a member retry, the command a worker started or why an audit was not run; never error or SQL text.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
     /// For a check's result: its name as declared, its ID and this result's, and the rows it found; never its SQL or rows.
@@ -587,6 +593,69 @@ pub struct RunNodeFailure {
     pub message: Option<String>,
     /// Relative to the project root, with `/` separators; null when the run's snapshot is gone.
     pub path: Option<String>,
+    /// Where a model failed, such as `staging`, `audit` or `post_hook`; null for other nodes or when not reported.
+    pub phase: Option<String>,
+    /// The node in the run's UI page; null when the server has no origin.
+    pub url: Option<String>,
+    /// The node's output in the UI; null when the server has no origin.
+    pub logs_url: Option<String>,
+}
+
+/// An error-severity audit failure in one run: its name, the warehouse's SQLSTATE and redacted error text, or its failing rows.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RunAuditFailure {
+    pub name: String,
+    /// The node it checks; null for an end-of-build singular audit.
+    pub node_key: Option<String>,
+    /// The warehouse's SQLSTATE when the audit's query could not run, such as `42S02`.
+    pub sqlstate: Option<String>,
+    /// The warehouse's error when the query could not run, redacted and bounded like a node's.
+    pub message: Option<String>,
+    /// The rows that failed it, when its query ran.
+    pub failing_rows: Option<i64>,
+}
+
+/// What started a run: a schedule or sensor by name, or a person or service account (`api`).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RunTrigger {
+    pub kind: RunTriggerKind,
+    /// The schedule's or sensor's name; null for manual and API runs.
+    pub name: Option<String>,
+    /// Who asked for a manual or API run, by display name.
+    pub person: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RunTriggerKind {
+    Schedule,
+    Sensor,
+    Manual,
+    Api,
+}
+
+/// Where a run failed outside any node.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RunFailurePhase {
+    /// The launcher could not start a worker.
+    Launch,
+    /// A worker was started but never reported starting the run.
+    WorkerStart,
+    /// The worker failed loading the project, before compiling it.
+    Load,
+    /// The worker failed compiling, inspecting the warehouse or planning.
+    Planning,
+    /// The worker failed while building, outside any node.
+    Build,
+}
+
+/// Why a run failed outside any node: where, the error's type or code, and its redacted, bounded text.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RunFailureCause {
+    pub phase: RunFailurePhase,
+    pub code: Option<String>,
+    pub message: Option<String>,
 }
 
 /// One build attempt of a node by a run in this target; the same metadata as the run's node list.
@@ -638,7 +707,6 @@ pub(crate) struct ExecutionMetadata {
 pub enum RunOutcome {
     Success,
     Warn,
-    Partial,
     Failed,
     Cancelled,
     /// Only a group sets it, on a member it did not run because a job the member depends on failed.
@@ -651,7 +719,6 @@ impl RunOutcome {
         match self {
             Self::Success => "success",
             Self::Warn => "warn",
-            Self::Partial => "partial",
             Self::Failed => "failed",
             Self::Cancelled => "cancelled",
             Self::Skipped => "skipped",
@@ -704,6 +771,13 @@ pub enum RunChange {
             deserialize_with = "crate::runs::_helpers::lifecycle::error_text::bounded_error_text"
         )]
         error_message: Option<String>,
+        /// Where a failed model failed, such as `staging` or `post_hook`; a short lowercase token or absent.
+        #[serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            deserialize_with = "crate::runs::_helpers::lifecycle::error_text::failure_phase"
+        )]
+        phase: Option<String>,
     },
     /// Observational attached-check facts never expand the frozen execution selection.
     CheckStarted {
@@ -733,6 +807,26 @@ pub enum RunChange {
     AuditFailuresIgnored {
         count: u32,
     },
+    /// What each lifecycle event sink delivered, counted when the worker's command closed; sent before `Finished`.
+    SinkDeliveries {
+        sinks: Vec<SinkDelivery>,
+        /// Each sink provider whose teardown raised, such as `'kafka' (KafkaProducer) raised KafkaException`.
+        #[serde(default)]
+        teardown_failures: Vec<String>,
+    },
+}
+
+/// One lifecycle event sink's deliveries in a run.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SinkDelivery {
+    pub name: String,
+    pub accepted: u64,
+    pub delivered: u64,
+    /// Events the sink never got: its queue was full or it was too slow.
+    pub dropped: u64,
+    /// Events the sink raised on.
+    pub failed: u64,
 }
 
 impl RunChange {
@@ -753,6 +847,7 @@ impl RunChange {
             Self::CancelRequested { .. } => "run_cancel_requested",
             Self::Finished { .. } => "run_terminated",
             Self::AuditFailuresIgnored { .. } => "run_audit_failures_ignored",
+            Self::SinkDeliveries { .. } => SINK_DELIVERIES_EVENT,
         }
     }
 
@@ -1110,13 +1205,46 @@ pub struct SelectionQuery {
 pub struct SelectionEvaluation {
     /// The publication evaluated; `None` before the first one.
     pub snapshot_id: Option<Uuid>,
-    /// Every selected node, across all pages.
+    /// Every selected node and audit, across all pages.
     pub count: u64,
+    /// How many of them are audits, keyed `audit:<name>[:…]`.
+    #[serde(default)]
+    pub audits: u64,
     /// One page of the selected `kind:name` keys, sorted.
     pub keys: Vec<String>,
     /// The offset of the next page, when there is one.
     pub next_offset: Option<u32>,
     pub error: Option<SelectionProblem>,
+}
+
+/// A past run's results as node keys, for `run:`, `failed:` and `skipped:`; failed audits are `audit:<name>`.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PastRunResults {
+    /// The run the typed ID names.
+    pub run_id: Uuid,
+    /// Every node the run selected.
+    pub selected: BTreeSet<String>,
+    /// Its failed, cancelled and never-reached nodes, and its failed audits.
+    pub failed: BTreeSet<String>,
+    /// The nodes it skipped because something they depend on failed.
+    pub skipped: BTreeSet<String>,
+}
+
+/// The past runs to read for a command's `run:`, `failed:` and `skipped:` selectors.
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PastRunsQuery {
+    /// Comma-separated run IDs, full or a unique prefix of at least 8 characters.
+    #[serde(default)]
+    pub ids: String,
+}
+
+/// The past runs read, or why one can't be: too short, unknown or ambiguous.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PastRunsRead {
+    /// Each run by the ID as given; empty when `error` is set.
+    pub runs: crate::runs::types::PastRuns,
+    pub error: Option<String>,
 }
 
 /// Why `sqb` refuses a selection, where, and what might have been meant.
@@ -1183,6 +1311,9 @@ pub struct SelectionVocabulary {
     pub seeds: Vec<VocabularyEntry>,
     /// `kind:` values: the nodes of each kind.
     pub kinds: Vec<VocabularyEntry>,
+    /// `audit:` names: the audits each name selects, one per target it is attached to.
+    #[serde(default)]
+    pub audits: Vec<VocabularyEntry>,
 }
 
 /// One selector value and the number of nodes it selects.

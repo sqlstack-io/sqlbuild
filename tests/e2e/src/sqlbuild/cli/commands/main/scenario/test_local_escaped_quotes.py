@@ -84,7 +84,7 @@ _PROJECT_FILES: dict[str, str] = {
                 "'EU' AS region",
                 _NOTE_SQL,
             ),
-            expected_stdout_fragment="PASS=1  FAIL=0  ERROR=0  SKIP=0  TOTAL=1",
+            expected_stdout_fragment="PASS=1  FAIL=0  TOTAL=1",
         ),
     ],
     ids=lambda case: case.description,
@@ -103,7 +103,7 @@ def test_given_snowflake_backslash_escapes_when_compiling_and_replaying_locally_
         command=("--no-color", "compile"), project_dir=project_dir
     )
     replayed: subprocess.CompletedProcess[str] = run_sqb(
-        command=("--no-color", "scenario", "test", "--local", "--strict", test_case.scenario_name),
+        command=("--no-color", "scenario", "test", "--run-on", "local", test_case.scenario_name),
         project_dir=project_dir,
     )
 

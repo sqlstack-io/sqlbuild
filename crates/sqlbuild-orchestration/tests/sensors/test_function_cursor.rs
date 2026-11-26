@@ -46,7 +46,7 @@ fn given_a_stored_scan_position_when_a_tick_calls_the_function_then_only_a_polli
                 .await
                 .expect("triggers")
                 .remove(0);
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

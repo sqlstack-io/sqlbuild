@@ -72,7 +72,7 @@ fn given_a_job_with_on_failure_when_its_runs_fail_then_retries_rerun_failed_work
                 }),
             );
             publish_snapshot(store, &input).await.expect("publish");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

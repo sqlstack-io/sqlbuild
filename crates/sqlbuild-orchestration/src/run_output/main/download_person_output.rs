@@ -10,7 +10,7 @@ use crate::run_output::models::{OutputDownloadQuery, OutputStore, OutputView};
 use crate::run_output::types::PersonRunRead;
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
-use crate::warehouse_history::main::read_run_evidence::read_run_evidence;
+use crate::warehouse_history::main::runs::read_run_evidence::read_run_evidence;
 
 /// `None` when the run is not in this location and target.
 pub async fn download_person_output(

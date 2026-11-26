@@ -6,7 +6,9 @@
 	import { page } from '$app/state';
 	import AppSidebar from '$lib/components/app-sidebar.svelte';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
-	import { pageAvailable } from '$lib/nav';
+	import { pageAvailable, pageLabel } from '$lib/nav';
+	import OutagePanel from '$lib/components/shell/outage-panel.svelte';
+	import { health } from '$lib/state/health.svelte';
 	import { SERVER_DOCS } from '$lib/boot-failure';
 	import { app } from '$lib/state/app.svelte';
 	import { appPath } from '$lib/paths';
@@ -15,7 +17,12 @@
 
 	let { children } = $props();
 
-	const signingIn = $derived(appPath(page.url.pathname) === '/login');
+	const path = $derived(appPath(page.url.pathname));
+	const signingIn = $derived(path === '/login');
+	/** Status is public: it shows without a session, and through an outage. */
+	const statusPage = $derived(path === '/status');
+	/** Nothing that reads the control database works: every page but Status says why and waits. */
+	const blocked = $derived(health.outage !== null || app.bootWaiting);
 
 	onMount(() => {
 		if (!signingIn) void app.start();
@@ -28,6 +35,18 @@
 
 {#if signingIn}
 	{@render children()}
+{:else if blocked || (statusPage && !app.scope)}
+	<div class="flex h-screen overflow-hidden">
+		<AppSidebar {blocked} />
+		<div class="flex min-w-0 flex-1 flex-col">
+			{#if statusPage}
+				{@render children()}
+			{:else}
+				<AppTopbar title={pageLabel(path)} />
+				<OutagePanel page={pageLabel(path)} />
+			{/if}
+		</div>
+	</div>
 {:else if app.bootError}
 	<div class="grid h-screen place-items-center p-8">
 		<div class="max-w-md text-center">

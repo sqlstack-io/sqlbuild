@@ -201,7 +201,7 @@ fn given_independent_http_observers_when_committed_state_changes_then_scoped_sse
                 .await
                 .expect("trigger")[0]
                 .trigger_id;
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("acquire lease")
                 .expect("scheduler elected");

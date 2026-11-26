@@ -513,3 +513,39 @@ pub(super) struct LookupFailureHealthTestCase {
     pub(super) answered: Option<i64>,
     pub(super) expected_generation: i64,
 }
+
+pub(super) struct UnreachedReadsTestCase {
+    pub(super) description: &'static str,
+    pub(super) unreached: usize,
+    pub(super) reached: usize,
+    /// The waits of the unreached reads, then of the reads that reached the warehouse.
+    pub(super) expected_waits: (Vec<Option<u64>>, Vec<Option<u64>>),
+    pub(super) expected_halted: bool,
+}
+
+pub(super) struct ServerRecoveryTestCase {
+    pub(super) description: &'static str,
+    /// What the server answers in turn before it answers 200.
+    pub(super) statuses: &'static [u16],
+    pub(super) attempts: usize,
+    /// Whether the sync was failing after each attempt.
+    pub(super) expected_failing: Vec<bool>,
+    pub(super) expected_line: &'static str,
+}
+
+pub(super) struct SinkCheckTestCase {
+    pub(super) description: &'static str,
+    /// A shell script answering the sink requests in turn.
+    pub(super) script: &'static str,
+    /// Minutes that pass before each check.
+    pub(super) minutes_passed: Vec<u64>,
+    pub(super) expected_reports:
+        Vec<Option<sqlbuild_orchestration::platform::models::LocationHealth>>,
+}
+
+pub(super) struct SinkReportTestCase {
+    pub(super) description: &'static str,
+    pub(super) script: &'static str,
+    /// Whether the interpreter is kept, and how many reports the server got.
+    pub(super) expected_outcome: (bool, usize),
+}

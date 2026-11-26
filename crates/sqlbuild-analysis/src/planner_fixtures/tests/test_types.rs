@@ -74,3 +74,10 @@ pub(crate) struct RequiredColumnsTestCase {
     pub(crate) expected_required: &'static [&'static str],
     pub(crate) expected_completed: &'static [usize],
 }
+
+#[derive(Debug)]
+pub(super) struct FixtureReadPrewarmTestCase {
+    pub description: &'static str,
+    pub sqls: &'static [&'static str],
+    pub expected_misses: u64,
+}

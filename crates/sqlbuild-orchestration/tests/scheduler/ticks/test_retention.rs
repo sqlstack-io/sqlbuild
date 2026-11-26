@@ -65,7 +65,7 @@ fn given_expired_covered_ticks_when_pruned_and_cursor_reset_then_run_linked_and_
                 .await
                 .expect("trigger")[0]
                 .trigger_id;
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("election")
                 .expect("lease");
@@ -243,7 +243,7 @@ fn given_an_old_yearly_schedule_when_first_evaluated_then_latest_catch_up_ticks_
                 .await
                 .expect("trigger")[0]
                 .trigger_id;
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("election")
                 .expect("lease");

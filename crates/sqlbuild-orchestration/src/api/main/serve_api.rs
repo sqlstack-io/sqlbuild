@@ -9,6 +9,7 @@ use crate::api::_helpers::resources::changes;
 use crate::api::main::openapi_document::openapi_document;
 use crate::api::models::{ApiAuthentication, GroupRole, ServerFacts};
 use crate::authorization::main::roles::publish_group_roles::publish_group_roles;
+use crate::health::main::probe_control_database::probe_control_database;
 use crate::node_states::main::start_node_states::start_node_states;
 use crate::runs::types::RunHandoff;
 use crate::store::errors::ControlError;
@@ -31,6 +32,10 @@ pub async fn serve_api(
     prepare_store(&store, &group_roles).await?;
     let (sender, listener_changes) = subscribe_changes(&store).await?;
     let (stop, stopped) = tokio::sync::watch::channel(false);
+    let health = facts.health.clone();
+    health.attach_store(&store);
+    health.control_succeeded(chrono::Utc::now());
+    let probe = probe_control_database(store.clone(), health.clone(), stopped.clone());
     let (node_states, refresh_node_states) = start_node_states(&store, &sender);
     let application = application_router(
         &store,
@@ -42,7 +47,7 @@ pub async fn serve_api(
         "/api/openapi.json",
         get(|| async { Json(openapi_document()) }),
     );
-    let application = development_application(application, development_scope, address);
+    let application = development_application(application, (development_scope, &health), address);
     let server = axum::serve(
         listener,
         application.into_make_service_with_connect_info::<std::net::SocketAddr>(),
@@ -56,6 +61,7 @@ pub async fn serve_api(
         result = async { server.await } => { result?; Ok(()) },
         result = changes::relay(store.clone(), listener_changes, sender) => result,
         () = refresh_node_states => Ok(()),
+        () = probe => Ok(()),
     }
 }
 

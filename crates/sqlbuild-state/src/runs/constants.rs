@@ -49,12 +49,10 @@ pub const STARTED_PHASE: &str = "started";
 pub const FINISHED_PHASE: &str = "finished";
 /// A finished run whose nodes all succeeded, warnings included.
 pub const SUCCEEDED_STATUS: &str = "succeeded";
-/// A finished run in which nothing succeeded and something failed or was skipped.
+/// A finished run in which a node failed, was skipped or never started.
 pub const FAILED_STATUS: &str = "failed";
 /// A finished run stopped by an interrupt or a cancel.
 pub const CANCELLED_STATUS: &str = "cancelled";
-/// A finished run in which some nodes succeeded and others failed or were skipped.
-pub const PARTIAL_STATUS: &str = "partial";
 /// `sqlbuild_user` of a run the scheduler started.
 pub const SYSTEM_SCHEDULE_USER: &str = "system:schedule";
 /// `sqlbuild_user` of a run a sensor started.

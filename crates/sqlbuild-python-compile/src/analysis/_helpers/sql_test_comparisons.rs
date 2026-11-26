@@ -9,7 +9,9 @@ use serde_json::{Value, json};
 use sqlbuild_analysis::compiler::main::missing_expected_columns::missing_expected_columns;
 use sqlbuild_analysis::compiler::main::scenario_expected_comparison_sql::scenario_expected_comparison_sql;
 use sqlbuild_analysis::compiler::main::sql_test_difference_sampling::render_difference_sample_json;
+use sqlbuild_analysis::compiler::main::sql_test_placed_rendering::render_placed_comparison;
 use sqlbuild_analysis::compiler::main::sql_test_rendering::render_json;
+use sqlbuild_analysis::compiler::types::PlacedComparisonSql;
 
 use sqlbuild_python_base::boundary::main::value_error::value_error;
 use sqlbuild_python_base::boundary::models::Request;
@@ -158,6 +160,25 @@ pub(crate) fn chain_step_request(step: &Bound<'_, PyAny>) -> PyResult<Value> {
         "expectedColumns": native_field(step, "expected_columns")?.extract::<Option<Vec<String>>>()?,
         "expectedLiftedCtes": native_field(step, "expected_lifted_ctes")?.extract::<Vec<(String, String)>>()?,
     }))
+}
+
+/// One planned test's comparison SQL and each CTE body's character range and origin in it.
+#[pyfunction]
+#[pyo3(signature = (test_entry, **options))]
+pub(crate) fn render_sql_test_comparison_segments(
+    py: Python<'_>,
+    test_entry: Bound<'_, PyAny>,
+    options: Option<&Bound<'_, PyDict>>,
+) -> PyResult<PlacedComparisonSql> {
+    let settings: RenderSettings = RenderSettings::read(options)?;
+    let request: String = serde_json::to_string(&comparison_request(
+        &test_entry,
+        &settings.set_difference_operator,
+        settings.sql_analysis_dialect.as_deref(),
+    )?)
+    .map_err(value_error)?;
+    py.compiler_detach(|| render_placed_comparison(&request))
+        .map_err(value_error)
 }
 
 /// A bounded query for one direction of an expected-output difference of one chain step.

@@ -1,10 +1,15 @@
 //! The command planner the server is built with; the CLI owns the grammar and the selector resolver.
 
 use crate::credentials::models::PermissionScope;
+use std::collections::{BTreeMap, BTreeSet};
+
 use crate::runs::models::{
-    CommandPlan, PlannerResource, PublicationCache, PublishedJobs, SelectionProblem,
-    SelectionVocabulary,
+    CommandPlan, PastRunResults, PlannerResource, PublicationCache, PublishedJobs,
+    SelectionProblem, SelectionVocabulary,
 };
+
+/// Each past run a command's selectors name, by the run ID as typed.
+pub type PastRuns = BTreeMap<String, PastRunResults>;
 
 /// Index a publication once with the CLI's selector graph, then parse and resolve commands against it.
 pub trait CommandPlanner: Send + Sync {
@@ -21,11 +26,18 @@ pub trait CommandPlanner: Send + Sync {
 
 /// One indexed publication: parse `command` with the CLI's grammar and resolve its selectors over it.
 pub trait PreparedPublication: std::fmt::Debug + Send + Sync {
-    /// The verb, exact node keys and validated settings, or why the command is refused; `job:` selects published jobs.
-    fn plan(&self, command: &[String]) -> Result<CommandPlan, String>;
+    /// The run IDs, as typed, that `run:`, `failed:` and `skipped:` selectors in `texts` name, so the caller can read those runs.
+    fn run_selector_ids(&self, texts: &[String]) -> BTreeSet<String>;
 
-    /// The sorted keys `sqb build --select <select> --exclude <exclude>` selects, or why it refuses them; each text holds space-separated selectors.
-    fn evaluate(&self, select: &str, exclude: &str) -> Result<Vec<String>, Box<SelectionProblem>>;
+    /// The verb, exact node keys and validated settings, or why the command is refused; `job:` selects published jobs and run selectors the `past` runs.
+    fn plan(&self, command: &[String], past: &PastRuns) -> Result<CommandPlan, String>;
+
+    /// The sorted keys `sqb build --select <select> --exclude <exclude>` selects, given `(select, exclude)`, or why it refuses them; each text holds space-separated selectors.
+    fn evaluate(
+        &self,
+        selectors: (&str, &str),
+        past: &PastRuns,
+    ) -> Result<Vec<String>, Box<SelectionProblem>>;
 
     /// Every value each selector type takes here, with its node count; `snapshot_id` is left for the caller.
     fn vocabulary(&self) -> SelectionVocabulary;

@@ -38,7 +38,7 @@ pub(crate) async fn claimed_run(store: &ControlStore) -> (Uuid, RunClaim) {
         &request((location, published.snapshot_id), 61, 0, &["orders"]),
     )
     .await;
-    let lease = acquire_lease(store, Uuid::now_v7())
+    let lease = acquire_lease(store, (Uuid::now_v7(), None))
         .await
         .expect("elect")
         .expect("leader");

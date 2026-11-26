@@ -379,13 +379,13 @@ fn given_a_control_store_when_running_server_migrate_then_dry_run_lists_and_migr
         StoreMigrationCommandTestCase {
             description: "migrate an empty store",
             arguments: &["server", "migrate"],
-            expected_stdout: "The control store is empty: created schema version 11.\n",
+            expected_stdout: "The control store is empty: created schema version 12.\n",
             expected_store: true,
         },
         StoreMigrationCommandTestCase {
             description: "dry run on a current store",
             arguments: &["server", "migrate", "--dry-run"],
-            expected_stdout: "The control store is at schema version 11: nothing to migrate.\n",
+            expected_stdout: "The control store is at schema version 12: nothing to migrate.\n",
             expected_store: true,
         },
     ];

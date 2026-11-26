@@ -12,11 +12,15 @@ use uuid::Uuid;
 
 use crate::argv::models::Stream;
 use crate::native_commands::_helpers::command::terminal::write_output;
-use crate::native_commands::_helpers::location::execution::location_warning;
+use crate::native_commands::_helpers::location::execution::{
+    location_warning, stop_location_runtime,
+};
+use crate::native_commands::_helpers::location::health::sink_check;
 use crate::native_commands::constants::{
     METADATA_ERROR_CHARS, METADATA_POLL_SECONDS, STATISTICS_RELATION_SECONDS,
 };
 use crate::native_commands::models::{LocationMetadataSync, ReadFailure};
+use sqlbuild_orchestration::store::errors::ControlError;
 
 /// One table's line as its scan completes, e.g. `Warehouse history 3/14: audit results, 1,204 rows in 0.8 s`.
 pub(crate) fn scan_line(state: &LocationMetadataSync, scans: usize) -> String {
@@ -111,6 +115,13 @@ pub(crate) fn metadata_health_of(
         completed_sync_next_at(state, failure, now)
     };
     let read_failure = read.and_then(|(read, _)| read.cause());
+    let waits: u64 = state
+        .next_at
+        .saturating_duration_since(Instant::now())
+        .as_secs();
+    let retry_at = (failure.is_some_and(|failure| failure != WarehouseSyncFailure::Busy)
+        && !halted)
+        .then(|| (now + chrono::TimeDelta::seconds(waits as i64), waits));
     LocationHealth::WarehouseSync {
         generation: state.generation,
         location: state.location().clone(),
@@ -132,6 +143,9 @@ pub(crate) fn metadata_health_of(
         }),
         next_sync_at,
         mirrored_records: state.progress.scan_mirrored,
+        failing_since: state.streak.failing_since.filter(|_| failure.is_some()),
+        retry_at: retry_at.map(|(at, _)| at),
+        retry_seconds: retry_at.map(|(_, seconds)| seconds),
     }
 }
 
@@ -211,4 +225,56 @@ pub(crate) fn read_failure_line(state: &LocationMetadataSync, failure: &ReadFail
         page_limit(state),
         failure.reason(),
     )
+}
+
+/// Log that the sync recovered, once it `completed` after a failing streak.
+pub(crate) fn report_recovery(state: &mut LocationMetadataSync, completed: bool) {
+    let Some(line) = completed
+        .then(|| state.take_recovery_line(Utc::now()))
+        .flatten()
+    else {
+        return;
+    };
+    drop(write_output(&[(Stream::Stderr, &line)]));
+}
+
+/// Report what the reader's sinks delivered once due; a reader that can't say is stopped.
+pub(crate) async fn report_reader_sinks(
+    mut state: LocationMetadataSync,
+    (client, poll): (&LocationWorkClient, &LocationWorkPoll),
+) -> Result<LocationMetadataSync, ControlError> {
+    let Some(reader) = state.reader.take() else {
+        return Ok(state);
+    };
+    let (reader, checked) = sink_check(reader).await;
+    let health = match checked {
+        Ok(health) => health,
+        Err(error) => {
+            drop(write_output(&[(
+                Stream::Stderr,
+                &format!(
+                    "Checking event sink deliveries failed: {error}; the location restarts its reader\n"
+                ),
+            )]));
+            stop_location_runtime(Some(reader)).await?;
+            return Ok(state);
+        }
+    };
+    state.reader = Some(reader);
+    let Some(health) = health else {
+        return Ok(state);
+    };
+    let report = LocationHealthReport {
+        event_id: Uuid::now_v7(),
+        session_id: poll.session_id,
+        target: poll.target.clone(),
+        health,
+    };
+    if let Err(error) = client.report_health(&report).await {
+        drop(write_output(&[(
+            Stream::Stderr,
+            &format!("Event sink delivery report failed: {error}\n"),
+        )]));
+    }
+    Ok(state)
 }

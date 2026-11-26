@@ -1,5 +1,10 @@
 //! Control-store limits and schema.
 
+/// The PostgreSQL pool's connection limit.
+pub(crate) const POOL_CONNECTIONS: u32 = 10;
+/// How long a request waits for a pooled PostgreSQL connection, in seconds.
+pub(crate) const POOL_WAIT_SECONDS: u64 = 30;
+
 /// A SQLite WAL past this size is reset right after the commit that grew it.
 pub(crate) const LARGE_WAL_BYTES: u64 = 64 * 1024 * 1024;
 

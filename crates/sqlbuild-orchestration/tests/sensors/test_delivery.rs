@@ -58,7 +58,7 @@ fn given_paged_platform_events_when_sensor_publication_fails_then_retry_is_atomi
                 .await
                 .expect("triggers")
                 .remove(0);
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -244,7 +244,7 @@ fn given_a_skip_overlap_job_with_an_active_run_when_a_sensor_matches_then_it_rec
             )
             .await
             .expect("a person's run queues regardless of overlap");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

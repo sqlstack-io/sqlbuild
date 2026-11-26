@@ -93,6 +93,7 @@ def test_given_microbatch_limit_result_when_formatting_execution_json_then_metad
                 "timeout_count": 0,
                 "skipped_count": 0,
                 "warning_count": 0,
+                "not_run_count": 0,
                 "python_check_pass_count": 0,
                 "python_check_warn_count": 0,
                 "python_check_fail_count": 0,

@@ -26,7 +26,7 @@ describe('overview from live reads', () => {
 		run('adhoc-new', 'failed', 2.2, 2.1, null),
 		run('orders-new', 'failed', 3, 2.5),
 		run('fulfilment-failed', 'failed', 4, 3.5, 'fulfilment'),
-		run('catalogue-partial', 'partial', 5, 4.5, 'catalogue'),
+		run('catalogue-failed', 'failed', 5, 4.5, 'catalogue'),
 		run('orders-old', 'failed', 6, 5.5),
 		// Neither a cancelled run nor a run of part of a job shows the job has recovered.
 		run('catalogue-cancelled', 'cancelled', 4.2, 1, 'catalogue'),
@@ -68,7 +68,7 @@ describe('overview from live reads', () => {
 	});
 
 	it('counts top-level runs queued in the last 24 hours', () => {
-		expect(overview.metrics.runs24h).toEqual({ total: 13, success: 2, warn: 1, partial: 1, failed: 6, active: 2 });
+		expect(overview.metrics.runs24h).toEqual({ total: 13, success: 2, warn: 1, failed: 7, active: 2 });
 	});
 
 	it('lists each job’s latest failure once, and each ad-hoc failure, newest first, then unresponsive runs and active platform events', () => {
@@ -77,7 +77,7 @@ describe('overview from live reads', () => {
 			'run_problem:presumed:-',
 			'run_problem:adhoc-new:-',
 			'run_problem:orders-new:ada',
-			'run_problem:catalogue-partial:-',
+			'run_problem:catalogue-failed:-',
 			'run_problem:adhoc-old:-',
 			'run_unresponsive:stuck:-',
 			'event:scheduler',

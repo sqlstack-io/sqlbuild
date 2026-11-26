@@ -1,6 +1,7 @@
 <script lang="ts">
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import MinusIcon from '@lucide/svelte/icons/minus';
+	import ClearInputButton from '$lib/components/clear-input-button.svelte';
 	import type { SelectionVocabulary } from '$lib/api';
 	import type { ChoiceOption } from '$lib/list/choice';
 	import { backspace, choose, comma, commit, draftToken, fieldOf, finished, type FieldState } from '$lib/selection/field';
@@ -23,6 +24,7 @@
 		vocabulary,
 		names,
 		recent = [],
+		runs = [],
 		problem = null,
 		onrecent,
 		onleave
@@ -34,6 +36,8 @@
 		vocabulary: SelectionVocabulary | null;
 		names: NameEntry[];
 		recent?: RecentSelection[];
+		/** Run selectors to offer first, such as `failed:<id>+` on the rerun plan. */
+		runs?: SuggestionItem[];
 		/** The token and parts `sqb` refuses, and its first fix. */
 		problem?: { token: number; parts: number[]; fix: string | null } | null;
 		onrecent?: (r: RecentSelection) => void;
@@ -55,12 +59,18 @@
 		field = next;
 		value = finished(next);
 	}
+	/** Whether the field holds anything to clear: finished tokens or text being typed. */
+	const holds = $derived(field.tokens.length > 0 || field.parts.length > 0 || field.text.length > 0);
+	function clear() {
+		update(fieldOf(''));
+		input?.focus();
+	}
 	/** A change made by a chip: the finished tokens, keeping what is being typed. */
 	const setTokens = (tokens: string[]) => update({ ...field, tokens });
 
 	const tokens = $derived(field.tokens.map((t) => parseToken(t)));
 	const draftParts = $derived(field.parts.map(parsePart));
-	const groups = $derived<SuggestionGroup[]>(focused ? suggest(field.text, vocabulary, names, field.tokens.length || field.parts.length || tone === 'except' ? [] : recent.map((r) => ({ select: r.exclude ? `${r.select} --exclude ${r.exclude}` : r.select, count: r.count }))) : []);
+	const groups = $derived<SuggestionGroup[]>(focused ? suggest(field.text, vocabulary, names, field.tokens.length || field.parts.length || tone === 'except' ? [] : recent.map((r) => ({ select: r.exclude ? `${r.select} --exclude ${r.exclude}` : r.select, count: r.count })), tone === 'except' ? [] : runs) : []);
 	const items = $derived(groups.flatMap((g) => g.items));
 	const typed = $derived(field.text.replace(/^\+/, '').replace(/^[a-z_]+:/, '').toLowerCase());
 
@@ -90,7 +100,12 @@
 			e.preventDefault();
 			active = (active + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
 		} else if (e.key === 'Escape') {
-			if (focused && items.length) {
+			// Esc clears the field and keeps focus; an empty field's Esc closes its suggestions.
+			if (holds) {
+				e.preventDefault();
+				e.stopPropagation();
+				clear();
+			} else if (focused && items.length) {
 				e.preventDefault();
 				e.stopPropagation();
 				input?.blur();
@@ -188,6 +203,7 @@
 			class="syntax"
 		/>
 	</span>
+	{#if holds}<ClearInputButton label="Clear {label.toLowerCase()}" onclear={clear} />{/if}
 	{#if focused && groups.length}
 		<div class="sel-suggest" role="listbox" aria-label="{label} suggestions" tabindex="-1" onmousedown={(e) => e.preventDefault()}>
 			{#each groups as g (g.name)}

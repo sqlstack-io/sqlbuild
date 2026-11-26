@@ -23,6 +23,8 @@ pub struct TestInspectionEntry {
     pub expected_models: Vec<String>,
     /// Why `--since` selected the test; empty without `--since`.
     pub selection_reasons: Vec<String>,
+    /// Where the test runs and why; `None` when the run did not decide.
+    pub run_on: Option<crate::run_on::models::RunOnDecision>,
 }
 
 /// One plan warning: its severity value and message.

@@ -1,5 +1,5 @@
 import type { components } from '$control/schema.d.ts';
-import { formatStamp } from '$lib/format/time';
+import { formatClock, formatStamp } from '$lib/format/time';
 import { locationKey as keyOf } from './http-client';
 import type { PlatformEvent } from './types';
 import type { PlatformEventRecord, PlatformHealth } from './types/platform';
@@ -71,6 +71,50 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 			locationId: keyOf(location.location_id, location.target),
 			subject: place,
 			message: failingMessage(place, location)
+		});
+	}
+	for (const sync of problems.failing_syncs ?? []) {
+		const place = placeOf(sync.location_name, sync.target);
+		events.push({
+			id: `sync:${keyOf(sync.location_id, sync.target)}`,
+			kind: 'warehouse_sync_failed',
+			severity: 'warning',
+			occurredAt: sync.since,
+			// The first failure in a row tells one failing streak from the next.
+			occurrence: sync.since,
+			active: true,
+			locationId: keyOf(sync.location_id, sync.target),
+			subject: place,
+			message: syncMessage(place, sync, now),
+			sync: { halted: sync.halted, unreachable: sync.unreachable, retrySeconds: sync.retry_seconds ?? null, retryAt: sync.retry_at ?? null, lastSuccessAt: sync.last_success_at ?? null }
+		});
+	}
+	for (const sink of problems.failing_sinks ?? []) {
+		const place = placeOf(sink.location_name, sink.target);
+		events.push({
+			id: `sink:${keyOf(sink.location_id, sink.target)}:${sink.sink}`,
+			kind: 'event_sink_failed',
+			severity: 'warning',
+			occurredAt: sink.since,
+			// The first lossy run in a row tells one failing streak from the next.
+			occurrence: sink.since,
+			active: true,
+			locationId: keyOf(sink.location_id, sink.target),
+			subject: sink.sink,
+			message: `${place}: event sink ${sink.sink} losing events since ${formatClock(sink.since, now)}: ${sink.reason}.`
+		});
+	}
+	for (const forwarding of problems.failing_forwarding ?? []) {
+		events.push({
+			id: `forwarding:${forwarding.name}`,
+			kind: 'event_forwarding_failed',
+			severity: 'warning',
+			occurredAt: forwarding.since,
+			occurrence: forwarding.since,
+			active: true,
+			locationId: null,
+			subject: forwarding.name,
+			message: `${forwarding.name} failing since ${formatClock(forwarding.since, now)}: ${forwarding.reason}.`
 		});
 	}
 	const late = new Map<string, Wire['OverdueTick'][]>();
@@ -254,4 +298,13 @@ function storedRecord(wire: Wire['PersonPlatformEvent'], names: Map<string, stri
 		case 'run_failed':
 			return null;
 	}
+}
+
+/** A failing run-history sync in words: what stands, since when, why, and how it retries. */
+export function syncMessage(place: string, sync: Wire['FailingSync'], now: number): string {
+	const since = formatClock(sync.since, now);
+	const retry = sync.retry_seconds && !sync.halted ? ` · retrying every ${sync.retry_seconds} s` : '';
+	if (sync.halted) return `${place}: run history sync stopped after failed reads in a row since ${since}: ${sync.reason}. Resume it once the cause is fixed.`;
+	if (sync.unreachable) return `${place}: run history can't reach the warehouse since ${since}${retry}: ${sync.reason}`;
+	return `${place}: run history not syncing since ${since}${retry}: ${sync.reason}`;
 }

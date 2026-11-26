@@ -77,7 +77,7 @@ fn given_a_wide_group_when_only_the_last_node_has_not_started_then_all_chunks_mu
             publish_snapshot(store, &input)
                 .await
                 .expect("publish wide predicate");
-            let elected = acquire_lease(store, Uuid::now_v7())
+            let elected = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -136,6 +136,7 @@ fn given_a_wide_group_when_only_the_last_node_has_not_started_then_all_chunks_mu
                         error_code: None,
                         skipped_because_of: None,
                         error_message: None,
+                        phase: None,
                     }))
                     .chain(std::iter::once(RunChange::Finished {
                         outcome: RunOutcome::Success,

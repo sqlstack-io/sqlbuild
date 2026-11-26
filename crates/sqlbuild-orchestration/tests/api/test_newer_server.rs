@@ -136,7 +136,7 @@ fn given_a_newer_server_when_a_worker_fetches_its_execution_then_an_unreadable_p
                 &request((location, publication.snapshot_id), 1, 0, &["orders"]),
             )
             .await;
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("acquire")
                 .expect("leader");

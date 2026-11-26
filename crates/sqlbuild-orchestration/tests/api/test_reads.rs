@@ -9,10 +9,10 @@ use crate::snapshots::main::reads::list_person_snapshots::list_person_snapshots;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{Parameter, TransactionMode};
-use crate::warehouse_history::main::read_person_run_events::read_person_run_events;
-use crate::warehouse_history::main::read_person_run_output::read_person_run_output;
-use crate::warehouse_history::main::read_person_run_statement_sql::read_person_run_statement_sql;
-use crate::warehouse_history::main::read_person_run_statements::read_person_run_statements;
+use crate::warehouse_history::main::runs::read_person_run_events::read_person_run_events;
+use crate::warehouse_history::main::runs::read_person_run_output::read_person_run_output;
+use crate::warehouse_history::main::runs::read_person_run_statement_sql::read_person_run_statement_sql;
+use crate::warehouse_history::main::runs::read_person_run_statements::read_person_run_statements;
 use std::collections::BTreeMap;
 use std::time::Duration;
 
@@ -116,7 +116,7 @@ fn given_published_locations_and_scheduled_work_when_read_through_http_then_reso
             publish_snapshot(store, &another_target)
                 .await
                 .expect("publish second target");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

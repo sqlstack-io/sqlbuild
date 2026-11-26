@@ -1,11 +1,12 @@
-//! The `ctx.log` lines a finished node reports, and the note a worker leaves when run output was lost.
+//! The `ctx.log` lines a finished node reports, the note a worker leaves when run output was lost, and its sinks' deliveries.
 
 use sqlbuild_host::models::{LifeCycleEvent, LifeCycleEventKind, LogLevel};
 use sqlbuild_orchestration::run_output::constants::{
     NODE_LOG_MESSAGE_BYTES, NODE_LOGS_PER_NODE, RUN_OUTPUT_NODE,
 };
 use sqlbuild_orchestration::run_output::models::UploadSummary;
-use sqlbuild_orchestration::runs::models::{NodeLogLevel, RunChange};
+use sqlbuild_orchestration::runs::models::{NodeLogLevel, RunChange, SinkDelivery};
+use sqlbuild_python_base::event_exporting::models::ClosedExport;
 
 const ELLIPSIS: char = '\u{2026}';
 
@@ -70,4 +71,24 @@ fn bounded(message: &str) -> String {
         .find(|index| message.is_char_boundary(*index))
         .unwrap_or(0);
     format!("{}{ELLIPSIS}", &message[..end])
+}
+
+/// What each lifecycle event sink of the worker's command delivered; `None` when it had no sinks.
+pub(crate) fn sink_deliveries(closed: ClosedExport) -> Option<RunChange> {
+    (!closed.per_exporter.is_empty() || !closed.teardown_failures.is_empty()).then(|| {
+        RunChange::SinkDeliveries {
+            sinks: closed
+                .per_exporter
+                .into_iter()
+                .map(|(name, counts)| SinkDelivery {
+                    name,
+                    accepted: counts.accepted,
+                    delivered: counts.delivered,
+                    dropped: counts.dropped,
+                    failed: counts.failed,
+                })
+                .collect(),
+            teardown_failures: closed.teardown_failures,
+        }
+    })
 }

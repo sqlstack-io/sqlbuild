@@ -9,9 +9,10 @@ import { createSelection } from '$lib/state/selection.svelte';
 import { nodeLabel } from '$lib/operate/labels';
 import { planHref } from '$lib/run/command';
 import { pageMemory } from './utils/page-memory';
-import { quickPickText, summaryOf, withNameToggled, type QuickPick } from './utils';
+import { runFailures, summaryOf, withNameToggled, type RunFailure } from './utils';
+import { holdsText, QUICK, toggleText } from './utils/log-query';
 import { isActiveRun } from '$lib/status';
-import type { BottomTab, NodeGroupKey } from './types';
+import type { BottomTab } from './types';
 import { bannersFor, groupNodes, progressOf, runCostOf } from './utils';
 
 function message(error: unknown): string {
@@ -74,16 +75,32 @@ export function createRunDetailState(runId: string) {
 	const nodes = $derived(detail?.nodes ?? []);
 	const active = $derived(!!run && isActiveRun(run.status));
 	const progress = $derived(progressOf(nodes));
-	// ---- the timeline narrowed to one outcome, picked in the panel's summary ----
-	let statusFilter = $state<NodeGroupKey | null>(remembered('statusFilter', null));
 	const nodeGroups = $derived(groupNodes(nodes, active));
-	/** The timeline's nodes: those of the outcome picked, else all; a picked outcome no node has any more shows all. */
-	const shownNodes = $derived.by(() => {
-		const group = statusFilter && nodeGroups.find((g) => g.key === statusFilter);
-		return group ? group.nodes : nodes;
-	});
+	/** The timeline shows every node: quick filters narrow the log, through its filter text, and nothing else. */
+	const shownNodes = $derived(nodes);
+	// ---- the log's one filter: the text in its box ----
+	// The header's figures, the Errors chip and the Pick chips only add their words to it or take them out;
+	// what is shown, what is pressed and the "Showing …" line are read back from it.
+	let logQuery = $state<string>(remembered('logQuery', ''));
 	const cause = $derived(outputRes.data?.find((l) => l.error)?.text ?? null);
-	const banners = $derived(detail ? bannersFor(detail, app.now, cause) : []);
+	// The failure summary leads when it knows what failed; the worker's own end line is never a reason.
+	const housekeeping = (text: string | null) => !!text && /worker executor completed|closed its connections/.test(text);
+	/** What made the run fail, with the error text read so far (behind view.evidence); the summary, the menu and the banners share it. */
+	const failures = $derived(
+		runFailures(nodes, events, statementsRes.data ?? [], run?.target ?? '', {
+			node: (n) => {
+				const read = nodeErrors[`${n.runId}/${n.nodeKey}`];
+				return read && 'nodeKey' in read ? read.message : null;
+			},
+			audit: (eventId) => auditErrors[eventId] ?? null
+		})
+	);
+	const failureCount = $derived(failures.length);
+	const banners = $derived(
+		detail
+			? bannersFor(housekeeping(detail.run.statusReason) ? { ...detail, run: { ...detail.run, statusReason: null } } : detail, app.now, housekeeping(cause) ? null : cause).filter((b) => b.key !== 'failed' || !failureCount)
+			: []
+	);
 	const statements = $derived(statementsRes.data ?? []);
 	const cost = $derived(costRes.data ? runCostOf(costRes.data) : null);
 	// Progress reported by a run with no signal is stale, so the live card only shows while it's running.
@@ -116,23 +133,32 @@ export function createRunDetailState(runId: string) {
 		else selection.exclude = withNameToggled(selection.exclude, name);
 	}
 
-	function pick(quick: QuickPick) {
-		selection.select = quickPickText(quick, nodes, run?.jobKey ?? null);
-		selection.exclude = '';
+	/** A quick filter's click: its words go into the log's filter text, or come out again; the log shows. */
+	function toggleLog(text: string) {
+		logQuery = toggleText(logQuery, text);
+		tab = 'log';
 	}
-
 	function clearSelection() {
 		selection.select = '';
 		selection.exclude = '';
 	}
 
-	// ---- the quick filter: a summary figure's nodes, or a node clicked in the log; apart from the selection ----
-	// A jump's filter belongs to the tab it opened (`tab`); leaving that tab drops it, so the tab left
-	// behind shows what it did before. A summary figure's filter has no tab: it applies everywhere.
+	// ---- Statements and Cost: a node picked for one of them; the log has its filter text instead ----
+	// A jump's filter belongs to the tab it opened (`tab`); leaving that tab drops it.
 	let focus = $state<{ label: string; keys: string[]; tab?: BottomTab } | null>(remembered('focus', null));
 
+	/** The failure summary's Show in log: its words become the log's filter text. */
+	function showInLog(query: string) {
+		logQuery = `${query} `;
+		tab = 'log';
+	}
+
+	/** A node picked for a tab: the log gets `node:<name>` in its text; Statements and Cost follow it as before. */
 	function focusNode(key: string, nextTab: BottomTab) {
-		focus = { label: nodeLabel(key), keys: [key], tab: nextTab };
+		if (nextTab === 'log') {
+			logQuery = toggleText(logQuery.split(/\s+/).filter((w) => w && !w.toLowerCase().startsWith('node:')).join(' '), `node:${nodeLabel(key)}`);
+			focus = null;
+		} else focus = { label: nodeLabel(key), keys: [key], tab: nextTab };
 		tab = nextTab;
 	}
 
@@ -140,18 +166,6 @@ export function createRunDetailState(runId: string) {
 		if (focus?.tab && focus.tab !== next) focus = null;
 		if (next !== 'statements') statementFocus = null;
 		tab = next;
-	}
-
-	/** A summary figure: the timeline and the log show only its nodes; again shows everything. */
-	function focusGroup(key: NodeGroupKey | null, label = '') {
-		if (!key || statusFilter === key) {
-			statusFilter = null;
-			focus = null;
-			return;
-		}
-		statusFilter = key;
-		const group = nodeGroups.find((g) => g.key === key);
-		focus = { label, keys: group?.nodes.map((n) => n.nodeKey) ?? [] };
 	}
 
 	// ---- failed nodes' error text ----
@@ -170,6 +184,26 @@ export function createRunDetailState(runId: string) {
 		}
 	}
 
+	// A failed audit's warehouse error: its result's evidence read, audited like a node's error, once per result.
+	const auditErrorsReadable = $derived(app.client.supports('getCheckEvidence') && app.can('view.evidence'));
+	let auditErrors = $state<Record<string, string | null>>({});
+	const auditsAsked = new Set<string>();
+	async function loadAuditError(eventId: string, bindingKey: string | null) {
+		if (!auditErrorsReadable || !bindingKey || auditsAsked.has(eventId) || !app.scope) return;
+		auditsAsked.add(eventId);
+		try {
+			auditErrors[eventId] = (await app.client.getCheckEvidence(app.scope, bindingKey, eventId)).executionError;
+		} catch {
+			auditErrors[eventId] = null;
+		}
+	}
+	/** Reads a failure's error text, once, when it is shown. */
+	function loadFailureText(f: RunFailure) {
+		if (f.kind === 'check') return void loadAuditError(f.id, f.checkId);
+		const n = nodes.find((x) => `${x.runId}/${x.nodeKey}` === f.id);
+		if (n) void loadNodeError(n);
+	}
+
 	// ---- the node drawer ----
 	let drawer = $state<string | null>(remembered('drawer', null));
 	/** The statement a check's "In Statements" opened. */
@@ -177,7 +211,7 @@ export function createRunDetailState(runId: string) {
 	/** A line of the drawer's node's code to show, from a traceback frame. */
 	let codeLine = $state<number | null>(remembered('codeLine', null));
 	$effect(() => {
-		Object.assign(memory, { select: selection.select, exclude: selection.exclude, tab, focus: $state.snapshot(focus), statusFilter, drawer, codeLine });
+		Object.assign(memory, { select: selection.select, exclude: selection.exclude, tab, focus: $state.snapshot(focus), logQuery, drawer, codeLine });
 	});
 
 	const summary = $derived(summaryOf(nodes, events, active));
@@ -240,12 +274,18 @@ export function createRunDetailState(runId: string) {
 		get shownNodes() {
 			return shownNodes;
 		},
-		get statusFilter() {
-			return nodeGroups.some((g) => g.key === statusFilter) ? statusFilter : null;
+		/** The log's filter text: the one filter the log has. */
+		get logQuery() {
+			return logQuery;
 		},
-		/** Shows only the nodes of `key` on the timeline, or all again when it is already picked. */
-		filterStatus(key: NodeGroupKey | null) {
-			statusFilter = statusFilter === key ? null : key;
+		set logQuery(text: string) {
+			logQuery = text;
+		},
+		/** A quick filter's click: its words in the log's filter text, or out again. */
+		toggleLog,
+		/** Whether a quick filter's words are all in the log's filter text: it reads as pressed. */
+		logHolds(text: string) {
+			return holdsText(logQuery, text);
 		},
 		get active() {
 			return active;
@@ -266,18 +306,21 @@ export function createRunDetailState(runId: string) {
 			return selected;
 		},
 		selection,
-		pick,
 		get focus() {
 			return focus;
 		},
 		clearFocus() {
 			focus = null;
-			statusFilter = null;
 		},
-		focusGroup,
+		showInLog,
 		get errorsReadable() {
 			return errorsReadable;
 		},
+		/** What made the run fail, failed audits and nodes, with the error text read so far. */
+		get failures() {
+			return failures;
+		},
+		loadFailureText,
 		loadNodeError,
 		/** The error read for a failed node, once it has been. */
 		nodeError(n: RunNode): RunNodeError | null {
@@ -294,6 +337,7 @@ export function createRunDetailState(runId: string) {
 		},
 		openDrawer(key: string | null) {
 			drawer = key;
+			if (key) showDetails = false;
 			codeLine = null;
 		},
 		get codeLine() {
@@ -322,6 +366,7 @@ export function createRunDetailState(runId: string) {
 		clickNode(key: string) {
 			selectNode(key);
 			drawer = key;
+			showDetails = false;
 			codeLine = null;
 		},
 		get summary() {
@@ -333,8 +378,10 @@ export function createRunDetailState(runId: string) {
 		get showDetails() {
 			return showDetails;
 		},
+		/** Details and the node drawer share the right-hand panel: opening one closes the other. */
 		toggleDetails() {
 			showDetails = !showDetails;
+			if (showDetails) drawer = null;
 		},
 		get tab() {
 			return tab;

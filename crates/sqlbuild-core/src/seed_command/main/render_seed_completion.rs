@@ -4,13 +4,6 @@ use crate::cli_text::main::format_completion_line::format_completion_line;
 use crate::cli_text::main::format_summary_footer::format_summary_footer;
 use crate::cli_text::models::{CliStyle, CompletionState, SummaryCount};
 
-fn count(label: &str, value: usize) -> SummaryCount {
-    SummaryCount {
-        label: label.to_owned(),
-        value: i64::try_from(value).unwrap_or(i64::MAX),
-    }
-}
-
 /// A blank line and the completion state with PASS, WARN, FAIL, SKIP and TOTAL counts.
 #[must_use]
 pub fn render_seed_completion(
@@ -21,11 +14,11 @@ pub fn render_seed_completion(
     let summary: String = format_summary_footer(
         style,
         &[
-            count("PASS", passed),
-            count("WARN", 0),
-            count("FAIL", failed),
-            count("SKIP", 0),
-            count("TOTAL", total),
+            SummaryCount::of("PASS", passed),
+            SummaryCount::of("WARN", 0),
+            SummaryCount::of("FAIL", failed),
+            SummaryCount::of("SKIP", 0),
+            SummaryCount::of("TOTAL", total),
         ],
         Some(&format!("{elapsed_seconds:.2}s")),
     );

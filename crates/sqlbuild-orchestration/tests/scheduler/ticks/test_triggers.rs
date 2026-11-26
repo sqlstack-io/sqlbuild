@@ -80,7 +80,7 @@ fn given_operator_changes_when_retried_and_republished_then_facts_and_effective_
                 test_case.description
             );
             assert!(paused.next_due_at.is_none());
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("election")
                 .expect("lease");
@@ -316,7 +316,7 @@ fn given_a_calendar_with_unprocessed_due_times_when_refreshed_then_due_ticks_sur
                 test_case.description
             );
             assert_eq!(trigger.next_due_at, Some(calendar_time(0)));
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("election")
                 .expect("lease");

@@ -238,7 +238,7 @@ fn given_a_real_http_server_when_locations_and_workers_report_then_scopes_retrie
                 &request((location_id, published.snapshot_id), 1, 0, &["orders"]),
             )
             .await;
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

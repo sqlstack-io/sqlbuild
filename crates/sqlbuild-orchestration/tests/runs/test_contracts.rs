@@ -1,5 +1,7 @@
 #[path = "claims/helpers.rs"]
 pub(crate) mod claim_helpers;
+#[path = "failure_events/helpers.rs"]
+pub(crate) mod failure_event_helpers;
 #[path = "helpers.rs"]
 pub(crate) mod helpers;
 #[path = "monitor/helpers.rs"]
@@ -44,6 +46,8 @@ mod test_node_errors;
 mod test_node_event_resources;
 #[path = "test_node_results.rs"]
 mod test_node_results;
+#[path = "test_past_runs.rs"]
+mod test_past_runs;
 #[path = "test_permissions.rs"]
 mod test_permissions;
 #[path = "test_pinned_jobs.rs"]
@@ -58,6 +62,8 @@ mod test_requests;
 mod test_reruns;
 #[path = "test_retries.rs"]
 mod test_retries;
+#[path = "test_run_failure_event.rs"]
+mod test_run_failure_event;
 #[path = "test_run_logs.rs"]
 mod test_run_logs;
 #[path = "test_selection.rs"]

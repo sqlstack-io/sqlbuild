@@ -29,6 +29,7 @@ pub(crate) async fn read(
             status: StatusCode::UNAUTHORIZED,
             message: "authenticated active person required".into(),
             decision_id: None,
+            cause: None,
         });
     };
     let profile = profile

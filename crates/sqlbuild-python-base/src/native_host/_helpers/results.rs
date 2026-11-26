@@ -232,12 +232,12 @@ record!(ItemTimeoutReport {
 record!(SqlTestExecutionResult<V> {
     test_name, outcome, source_path, block_index, parent_name, case_name, case_index,
     case_fingerprint, parameter_schema, parameter_values, step_results, error_code, error_help,
-    error_message, real_model_count, timeout,
+    error_message, real_model_count, timeout, local_refusal,
 });
 record!(BuildExecutionResult<V> {
     status, model_results, seed_results, function_results, load_results, test_results,
     source_audit_results, end_audit_results, success_count, failure_count, timeout_count,
-    skipped_count, warning_count, insufficient_count, ignored_audit_failure_count,
+    skipped_count, warning_count, insufficient_count, ignored_audit_failure_count, not_run_count,
     audit_result_projection_attempted_count,
     audit_result_projection_written_count, audit_result_projection_failed_count, timings,
 });
@@ -302,6 +302,7 @@ impl<'py> ReadResult<'py> for ScenarioRunResult<Bound<'py, PyAny>> {
             error_help: ReadResult::read(&field(value, "error_help")?)?,
             error_message: ReadResult::read(&field(value, "error_message")?)?,
             duration_ms: ReadResult::read(&field(value, "duration_ms")?)?,
+            local_refusal: ReadResult::read(&field(value, "local_refusal")?)?,
         })
     }
 }

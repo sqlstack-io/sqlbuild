@@ -47,7 +47,8 @@ pub async fn monitor_runs(
             claim_id: state.worker_instance,
             change: RunChange::Unresponsive,
         };
-        transaction = publish_change(transaction, &request, &state).await?;
+        transaction =
+            publish_change(transaction, (&request, &state), lease.origin.as_deref()).await?;
     }
     commit(check_lease(transaction, lease).await?).await?;
     Ok(observed)

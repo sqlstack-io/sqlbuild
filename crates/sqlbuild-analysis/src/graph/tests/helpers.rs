@@ -2,11 +2,12 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::assembly::project::types::ObjectKey;
 use crate::graph::errors::SelectorError;
+use crate::graph::main::attach_audits_and_runs::attach_audits_and_runs;
 use crate::graph::main::attach_jobs::attach_jobs;
 use crate::graph::main::build_project_graph::build_project_graph;
 use crate::graph::main::resolve_selectors::resolve_selectors;
 use crate::graph::main::selectors_need_jobs::selectors_need_jobs;
-use crate::graph::models::{GraphResource, JobSelection, ParsedSelector, ProjectGraph};
+use crate::graph::models::{GraphResource, JobSelection, ParsedSelector, ProjectGraph, RunResults};
 use crate::graph::tests::test_types::SelectorFailure;
 
 type OwnedFailure = (String, String, Option<String>);
@@ -284,4 +285,49 @@ pub(super) fn job_selection(
 pub(super) fn needs_jobs(selectors: &[&str], also_known: &[&str]) -> bool {
     let selectors: Vec<String> = selectors.iter().map(|value| (*value).to_owned()).collect();
     selectors_need_jobs(&orders_graph(), &selectors, also_known)
+}
+
+/// The audits the run-selector tests may select.
+const ORDERS_AUDITS: [&str; 2] = ["not_null_orders_id", "orders_match_payments"];
+
+/// The orders project with its audits and one past run attached: `orders` and an end-of-build audit failed, `order_items` was skipped.
+pub(super) fn run_selection(
+    attached: bool,
+    select: &[&str],
+    exclude: &[&str],
+) -> Result<BTreeSet<String>, OwnedFailure> {
+    let keys = |pairs: &[(&str, &str)]| pairs.iter().map(key).collect::<BTreeSet<ObjectKey>>();
+    let mut graph: ProjectGraph = attach_audits_and_runs(
+        orders_graph(),
+        (
+            ORDERS_AUDITS
+                .iter()
+                .map(|name| (*name).to_owned())
+                .collect(),
+            BTreeMap::from([(
+                "01a1d3b9".to_owned(),
+                RunResults {
+                    selected: keys(&[
+                        ("model", "orders"),
+                        ("model", "order_items"),
+                        ("model", "customers"),
+                        ("model", "retired"),
+                    ]),
+                    failed: keys(&[
+                        ("model", "orders"),
+                        ("audit", "orders_match_payments"),
+                        ("audit", "retired_audit"),
+                    ]),
+                    skipped: keys(&[("model", "order_items")]),
+                },
+            )]),
+        ),
+    );
+    graph.audits = graph.audits.filter(|_| attached);
+    graph.runs = graph.runs.filter(|_| attached);
+    resolved_in(&graph, select, exclude).map(|keys| {
+        keys.into_iter()
+            .map(|(kind, name)| format!("{kind}:{name}"))
+            .collect()
+    })
 }

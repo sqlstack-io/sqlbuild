@@ -4,10 +4,12 @@ use chrono::TimeDelta;
 use uuid::Uuid;
 
 use crate::discovered_sets::models::DiscoveredSetStatus;
+use crate::platform::_helpers::health::failing_syncs::failing_sync;
 use crate::platform::_helpers::health::recent_health::recent_health;
 use crate::platform::constants::LOCATION_SILENCE_SECONDS;
 use crate::platform::models::{
-    DiscoveryHealth, FailingLocation, LocationHealth, LocationHealthObservation, LocationState,
+    DiscoveryHealth, FailingLocation, FailingSync, LocationFailures, LocationHealth,
+    LocationHealthObservation, LocationState,
 };
 use crate::snapshots::main::reads::read_current_record::read_current_record;
 use crate::store::errors::ControlError;
@@ -21,7 +23,7 @@ const CONNECTION_FAILED: &str = "the warehouse connection check after its last l
 /// Every live location target whose state is a failure, with the report that decided it and the snapshot it serves.
 pub(crate) async fn failing_locations(
     transaction: ControlTransaction,
-) -> Result<(ControlTransaction, Vec<FailingLocation>), ControlError> {
+) -> Result<(ControlTransaction, LocationFailures), ControlError> {
     let now = transaction.now;
     let (mut transaction, rows) = query(
         transaction,
@@ -34,6 +36,7 @@ pub(crate) async fn failing_locations(
     )
     .await?;
     let mut failing: Vec<FailingLocation> = Vec::new();
+    let mut syncs: Vec<FailingSync> = Vec::new();
     for row in rows {
         let LiveTarget {
             location_id,
@@ -43,6 +46,10 @@ pub(crate) async fn failing_locations(
         let target: &str = &target;
         let observations;
         (transaction, observations) = recent_health(transaction, location_id, Some(target)).await?;
+        syncs.extend(failing_sync(
+            &observations,
+            (location_id, &location_name, target),
+        ));
         let state = LocationState::of(&observations, (target, now));
         let Some((failed_at, error)) = deciding_report(&observations, state) else {
             continue;
@@ -59,7 +66,13 @@ pub(crate) async fn failing_locations(
             serving,
         });
     }
-    Ok((transaction, failing))
+    Ok((
+        transaction,
+        LocationFailures {
+            locations: failing,
+            syncs,
+        },
+    ))
 }
 
 /// When the failure that decided `state` was reported and its text; `None` for a state that isn't a failure here.

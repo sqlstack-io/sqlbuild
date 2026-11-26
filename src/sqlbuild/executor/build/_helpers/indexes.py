@@ -8,24 +8,30 @@ from sqlbuild.executor.build.models import BuildIndexes
 
 
 def build_execution_indexes(plan: PlanOutput) -> BuildIndexes:
-    """Build all lookup indexes from a plan output."""
+    """Build lookup indexes from a plan; a named audit on an unbuilt target runs at the end."""
 
     source_audits: dict[str, list[AuditPlanEntry]] = {}
     seed_audits: dict[str, list[AuditPlanEntry]] = {}
     model_audits: dict[str, list[AuditPlanEntry]] = {}
     end_audits: list[AuditPlanEntry] = []
+    by_name: frozenset[str] = frozenset(plan.selected_audit_names)
+    built_models: frozenset[str] = frozenset(entry.name for entry in plan.model_entries)
+    built_seeds: frozenset[str] = frozenset(entry.name for entry in plan.seed_entries)
 
     audit: AuditPlanEntry
     for audit in plan.audit_entries:
+        target: str = audit.attached_target_name or ""
         if audit.attachment_kind == AuditAttachmentKind.SOURCE:
-            source_name: str = audit.attached_target_name or ""
-            source_audits.setdefault(source_name, []).append(audit)
-        elif audit.attachment_kind == AuditAttachmentKind.SEED:
-            seed_audits.setdefault(audit.attached_target_name or "", []).append(audit)
-        elif audit.attachment_kind == AuditAttachmentKind.MODEL:
-            model_name: str = audit.attached_target_name or ""
-            model_audits.setdefault(model_name, []).append(audit)
-        elif audit.attachment_kind == AuditAttachmentKind.END:
+            source_audits.setdefault(target, []).append(audit)
+        elif audit.attachment_kind == AuditAttachmentKind.SEED and (
+            target in built_seeds or audit.name not in by_name
+        ):
+            seed_audits.setdefault(target, []).append(audit)
+        elif audit.attachment_kind == AuditAttachmentKind.MODEL and (
+            target in built_models or audit.name not in by_name
+        ):
+            model_audits.setdefault(target, []).append(audit)
+        else:
             end_audits.append(audit)
 
     return BuildIndexes(

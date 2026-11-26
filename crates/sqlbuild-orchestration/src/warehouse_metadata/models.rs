@@ -729,6 +729,9 @@ pub struct WarehouseHistoryFailure {
     pub reason: String,
     /// The read ran out of memory or time, so a smaller page may succeed; any other error repeats.
     pub page_size: bool,
+    /// The reader never reached the warehouse, such as a host that doesn't resolve, so no billed compute ran.
+    #[serde(default)]
+    pub connection: bool,
 }
 
 /// A dynamic model a completed sync resumed: the run whose hold expired, and its dotted relation.

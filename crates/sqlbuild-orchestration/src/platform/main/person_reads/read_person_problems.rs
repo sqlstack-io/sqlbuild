@@ -79,6 +79,17 @@ pub async fn read_person_problems(
             .into_iter()
             .filter(|location| listed.contains(&(location.location_id, location.target.clone())))
             .collect(),
+        failing_syncs: scan
+            .failing_syncs
+            .into_iter()
+            .filter(|sync| listed.contains(&(sync.location_id, sync.target.clone())))
+            .collect(),
+        failing_sinks: scan
+            .failing_sinks
+            .into_iter()
+            .filter(|sink| listed.contains(&(sink.location_id, sink.target.clone())))
+            .collect(),
+        failing_forwarding: Vec::new(),
         low_calendars: scan
             .low_calendars
             .into_iter()

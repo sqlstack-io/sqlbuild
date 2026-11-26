@@ -14,5 +14,6 @@ pub mod sql_test_difference_sampling;
 pub mod sql_test_extraction;
 pub mod sql_test_fixture_facts;
 pub mod sql_test_glue;
+pub mod sql_test_placed_rendering;
 pub mod sql_test_plan_errors;
 pub mod sql_test_rendering;

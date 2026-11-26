@@ -8,6 +8,7 @@ use sqlbuild_core::text::main::glob_match::glob_match;
 
 use crate::assembly::project::types::ObjectKey;
 use crate::definition_changes::constants::PYTHON_NODE_KINDS;
+use crate::graph::constants::{AUDIT_KIND, RUN_SELECTOR_KINDS};
 use crate::graph::errors::SelectorError;
 use crate::graph::main::build_resources::build_resources;
 use crate::graph::main::edge_keys::edge_keys;
@@ -344,6 +345,8 @@ fn single_side(context: &SelectionContext<'_>, raw: &str) -> Resolved {
         PATH_KIND => resolve_path(context, raw, &value)?,
         SEED_KIND | SOURCE_KIND => resolve_sql(context, raw)?,
         JOB_KIND => resolve_job(context, raw)?,
+        kind if RUN_SELECTOR_KINDS.contains(&kind) => resolve_job(context, raw)?,
+        AUDIT_KIND => resolve_sql(context, raw)?,
         ASSET_KIND | LOADER_KIND | CHECK_KIND => {
             return resolve_typed(context, raw, (&kind, &value));
         }
@@ -379,7 +382,7 @@ fn resolve_sql(context: &SelectionContext<'_>, raw: &str) -> Resolved {
     )?))
 }
 
-/// A job's SQL keys and Python nodes, with `+` also expanding them over the Python node graph.
+/// A job's or past run's SQL keys and Python nodes, with `+` also expanding them over the Python node graph.
 fn resolve_job(context: &SelectionContext<'_>, raw: &str) -> Resolved {
     let ParsedSelector::Kind {
         upstream,

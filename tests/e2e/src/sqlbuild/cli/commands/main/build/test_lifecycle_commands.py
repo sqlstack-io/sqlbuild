@@ -236,7 +236,7 @@ def test_given_waffle_shop_when_running_core_lifecycle_commands_then_outputs_are
             ("seed",),
             ("audit",),
             ("plan",),
-            ("test",),
+            ("test", "--run-on", "warehouse"),
             ("query", "SELECT 1"),
         )
     ],

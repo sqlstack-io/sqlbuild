@@ -34,3 +34,7 @@ pub const DECIMAL_UNITS: [&str; 4] = ["kB", "MB", "GB", "TB"];
 pub const BINARY_UNITS: [&str; 4] = ["KiB", "MiB", "GiB", "TiB"];
 /// The `sqlite_schema.type` of a view.
 pub(crate) const SQLITE_VIEW_TYPE: &str = "view";
+/// The fewest characters of a run ID run selectors take, like a short git hash.
+pub const MIN_RUN_ID_PREFIX: usize = 8;
+/// How many runs an ambiguous run ID prefix lists.
+pub const LISTED_RUN_CANDIDATES: usize = 5;

@@ -53,6 +53,10 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
     Router::new()
         .route("/api/auth/cli/approve", post(super::cli_login::approve))
         .route(
+            "/api/health/details",
+            get(crate::api::_helpers::resources::server_health::details),
+        )
+        .route(
             "/api/control/bootstrap",
             get(crate::api::_helpers::resources::person_bootstrap::read),
         )
@@ -259,6 +263,10 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
         .route(
             "/api/control/locations/{location_id}/targets/{target}/selection/vocabulary",
             get(crate::api::_helpers::resources::person_selection::vocabulary),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/selection/runs",
+            get(crate::api::_helpers::resources::person_selection::past_runs),
         )
         .route(
             "/api/control/locations/{location_id}/targets/{target}/catalog",

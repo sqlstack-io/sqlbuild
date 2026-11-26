@@ -7,8 +7,8 @@ use uuid::Uuid;
 use crate::api::errors::ApiError;
 use crate::credentials::models::{AuditContext, AuthenticatedPerson, DefaultRole};
 use crate::store::models::ControlStore;
-use crate::warehouse_history::main::read_person_maintenance::read_person_maintenance;
-use crate::warehouse_history::main::read_person_microbatch_coverage::read_person_microbatch_coverage;
+use crate::warehouse_history::main::maintenance::read_person_maintenance::read_person_maintenance;
+use crate::warehouse_history::main::maintenance::read_person_microbatch_coverage::read_person_microbatch_coverage;
 use crate::warehouse_history::models::{
     CoverageQuery, MaintenanceHistory, MaintenanceQuery, MicrobatchCoverage,
 };

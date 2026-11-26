@@ -68,7 +68,9 @@ _UNCHANGED_BUILD: dict[str, int] = {
                     _UNCHANGED_BUILD,
                 ),
                 StatementStep("audit", ("audit",), 0, {}),
-                StatementStep("unit tests", ("test",), 0, {"DROP TABLE relation": 2}),
+                StatementStep(
+                    "unit tests", ("test", "--run-on", "warehouse"), 0, {"DROP TABLE relation": 2}
+                ),
                 StatementStep(
                     "scenario",
                     ("scenario", "test"),

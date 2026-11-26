@@ -1672,3 +1672,31 @@ class MidSubmitCancelTestCase:
     sent_signal: signal.Signals
     expected_exit_code: int
     expected_notice: str
+
+
+@dataclass(frozen=True)
+class RunSelectorPlanTestCase:
+    description: str
+    # The plan's selectors; `{run}` is the failed run's ID, `{prefix}` its first 8 characters.
+    selectors: tuple[str, ...]
+    expected_models: list[str]
+    expected_audits: list[str]
+
+
+@dataclass(frozen=True)
+class RunSelectorRefusalTestCase:
+    description: str
+    # The plan's selectors; `{short}` is the failed run's first 7 characters.
+    selectors: tuple[str, ...]
+    expected_error: str
+
+
+@dataclass(frozen=True)
+class NotRunAuditTestCase:
+    description: str
+    # Builds run first, each as its sqb arguments, to put reads in the target.
+    setup: tuple[tuple[str, ...], ...]
+    command: tuple[str, ...]
+    expected_exit_code: int
+    expected_texts: tuple[str, ...]
+    expected_absent: tuple[str, ...] = ()

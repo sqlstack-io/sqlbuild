@@ -33,7 +33,7 @@ pub(crate) async fn scan_run_events(
         transaction,
         &format!("SELECT r.run_id,r.status,r.last_event_storage_id FROM sqb_runs r \
          WHERE r.location_id=$1 AND r.target=$2 AND r.job_key=$3 \
-         AND r.status IN ('success','warn','partial','failed','cancelled','skipped') AND NOT {SUPERSEDED_CHILD} \
+         AND r.status IN ('success','warn','failed','cancelled','skipped') AND NOT {SUPERSEDED_CHILD} \
          AND {clause} LIMIT {EVENT_PAGE_SIZE}"),
         vec![
             Parameter::Id(scope.location_id),

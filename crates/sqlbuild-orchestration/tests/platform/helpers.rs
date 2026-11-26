@@ -183,7 +183,7 @@ pub(crate) async fn publish_platform_impostor(store: &ControlStore, identity: (U
     let mut requested = request(identity, 42, 0, &["orders"]);
     requested.image_id = None;
     queue(store, &requested).await;
-    let lease = acquire_lease(store, Uuid::now_v7())
+    let lease = acquire_lease(store, (Uuid::now_v7(), None))
         .await
         .expect("elect")
         .expect("leader");
@@ -346,5 +346,124 @@ pub(crate) const fn secrets(_generation: i64) -> LocationHealth {
         generation: 1,
         missing: 0,
         providers: Vec::new(),
+    }
+}
+
+pub(crate) const UNREACHED: &str =
+    "250001 Could not connect to Snowflake backend after 2 attempt(s)";
+
+pub(crate) fn at(minutes: i64) -> chrono::DateTime<chrono::Utc> {
+    "2026-11-25T18:29:00Z"
+        .parse::<chrono::DateTime<chrono::Utc>>()
+        .expect("time")
+        + TimeDelta::minutes(minutes)
+}
+
+/// A sync report received at `minutes`, failed by `failure` with `read`, stopped or not.
+pub(crate) fn sync(
+    minutes: i64,
+    failure: Option<crate::platform::models::WarehouseSyncFailure>,
+    (read, halted): (Option<crate::platform::models::WarehouseReadFailure>, bool),
+) -> crate::platform::models::LocationHealthObservation {
+    crate::platform::models::LocationHealthObservation {
+        received_at: at(minutes),
+        report: LocationHealthReport {
+            event_id: uuid::Uuid::now_v7(),
+            session_id: uuid::Uuid::nil(),
+            target: "prod".into(),
+            health: crate::platform::models::LocationHealth::WarehouseSync {
+                generation: 1,
+                location: crate::warehouse_metadata::models::WarehouseStateLocation {
+                    database: None,
+                    schema: "ops".into(),
+                },
+                table: crate::warehouse_metadata::models::WarehouseHistoryKind::ALL[0],
+                failure,
+                records_sent: 0,
+                elapsed_millis: 10,
+                error: read.map(|_| UNREACHED.to_owned()),
+                read_failure: read,
+                page_limit: None,
+                progress: Some(crate::platform::models::WarehouseSyncProgress {
+                    position: 1,
+                    kinds: 14,
+                    rows: 0,
+                    elapsed_millis: 10,
+                    completed: false,
+                    halted,
+                }),
+                next_sync_at: None,
+                mirrored_records: None,
+                failing_since: failure.map(|_| at(0)),
+                retry_at: (failure.is_some() && !halted).then(|| at(minutes + 1)),
+                retry_seconds: (failure.is_some() && !halted).then_some(60),
+            },
+        },
+    }
+}
+
+/// The problem a failing sync of `orders` makes, stopped or not, reaching the warehouse or not.
+pub(crate) fn failing_sync_of(
+    halted: bool,
+    unreachable: bool,
+) -> crate::platform::models::FailingSync {
+    crate::platform::models::FailingSync {
+        location_id: uuid::Uuid::nil(),
+        location_name: "orders".into(),
+        target: "prod".into(),
+        since: at(0),
+        reason: UNREACHED.into(),
+        unreachable,
+        halted,
+        retry_at: (!halted).then(|| at(4)),
+        retry_seconds: (!halted).then_some(60),
+        last_success_at: Some(at(-30)),
+    }
+}
+
+/// A sink that accepted, dropped and failed the given numbers of events.
+pub(crate) fn delivered(
+    name: &str,
+    (accepted, dropped, failed): (u64, u64, u64),
+) -> crate::runs::models::SinkDelivery {
+    crate::runs::models::SinkDelivery {
+        name: name.into(),
+        accepted,
+        delivered: accepted - dropped - failed,
+        dropped,
+        failed,
+    }
+}
+
+/// A run's sink report at `minutes`, from the `orders` location's `prod` target.
+pub(crate) fn report(
+    minutes: i64,
+    sinks: Vec<crate::runs::models::SinkDelivery>,
+    teardown_failures: Vec<String>,
+) -> crate::platform::models::SinkReport {
+    crate::platform::models::SinkReport {
+        location_id: uuid::Uuid::nil(),
+        location_name: "orders".into(),
+        target: "prod".into(),
+        run_id: Some(uuid::Uuid::from_u128(
+            u128::try_from(minutes).unwrap_or_default(),
+        )),
+        at: at(minutes),
+        sinks,
+        teardown_failures,
+    }
+}
+
+/// The problem `sink` of the newest report, at minute 3, makes for `reason`.
+pub(crate) fn failing_sink_of(sink: &str, reason: &str) -> crate::platform::models::FailingSink {
+    crate::platform::models::FailingSink {
+        location_id: uuid::Uuid::nil(),
+        location_name: "orders".into(),
+        target: "prod".into(),
+        sink: sink.into(),
+        since: at(3),
+        reason: reason.into(),
+        run_id: Some(uuid::Uuid::from_u128(3)),
+        last_success_at: None,
     }
 }
