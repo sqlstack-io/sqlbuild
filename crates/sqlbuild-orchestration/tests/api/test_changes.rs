@@ -28,6 +28,7 @@ use crate::store::main::migrate_store::migrate_store;
 use crate::store::models::ControlStore;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
+use crate::tls::main::client_builder::client_builder;
 
 #[test]
 fn given_independent_http_observers_when_committed_state_changes_then_scoped_sse_refetches_real_state_and_stops_on_revocation()
@@ -84,7 +85,7 @@ fn given_independent_http_observers_when_committed_state_changes_then_scoped_sse
                 .expect("initial snapshot");
             let first = start_api(store).await;
             let second = start_api(store).await;
-            let client = reqwest::Client::builder()
+            let client = client_builder()
                 .timeout(Duration::from_secs(30))
                 .build()
                 .expect("HTTP client");
@@ -378,7 +379,7 @@ fn given_terminated_postgres_listeners_when_reconnecting_then_http_survives_and_
             let proxy = reset_proxy(store).await;
             let first = start_api(&proxy.store).await;
             let second = start_api(&proxy.store).await;
-            let client = reqwest::Client::new();
+            let client = client_builder().build().expect("HTTP client");
             let scope = (location_id, "development", token.bearer.as_str());
             let mut a = connect(&client, &first, scope).await;
             let mut b = connect(&client, &second, scope).await;

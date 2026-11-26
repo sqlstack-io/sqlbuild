@@ -25,6 +25,7 @@ use crate::platform::main::health::report_location_health::report_location_healt
 use crate::runs::tests::helpers::snapshot;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
+use crate::tls::main::client_builder::client_builder;
 
 #[test]
 fn given_scoped_location_observations_when_retried_or_read_then_history_and_authority_are_preserved()
@@ -68,7 +69,7 @@ fn given_scoped_location_observations_when_retried_or_read_then_history_and_auth
             .await
             .expect("location token");
             let api = start_api(store).await;
-            let client = reqwest::Client::new();
+            let client = client_builder().build().expect("HTTP client");
             let url = format!("{}/api/locations/{location_id}/health", api.url);
             let other_url = format!("{}/api/locations/{other}/health", api.url);
             let heartbeat = LocationHealthReport {

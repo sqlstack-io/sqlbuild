@@ -9,6 +9,7 @@ use crate::credentials::tests::role_helpers::role_fixture;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
+use crate::tls::main::client_builder::client_builder;
 
 #[test]
 fn given_a_signed_in_browser_when_requesting_then_only_people_reads_are_compressed() {
@@ -77,7 +78,7 @@ fn given_a_signed_in_browser_when_requesting_then_only_people_reads_are_compress
             },
         )
         .await;
-        let client = reqwest::Client::new();
+        let client = client_builder().build().expect("HTTP client");
         let session = format!("__Host-sqb-session={}", roles.administrator.bearer);
         for test_case in test_cases {
             let path = test_case

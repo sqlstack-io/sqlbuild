@@ -30,6 +30,7 @@ use crate::store::main::migrate_store::migrate_store;
 use crate::store::models::{ChangeMessage, ChangeTopic};
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
+use crate::tls::main::client_builder::client_builder;
 use crate::warehouse_metadata::main::ingest::ingest_fingerprints::ingest_fingerprints;
 use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 
@@ -69,7 +70,7 @@ fn given_held_node_states_when_people_revalidate_and_builds_land_then_only_chang
                 },
             )
             .await;
-            let client = reqwest::Client::new();
+            let client = client_builder().build().expect("HTTP client");
             let read = |path: &str, bearer: &str, tag: Option<&str>| {
                 let request = client
                     .get(format!(
@@ -324,7 +325,7 @@ fn given_changed_build_reports_when_people_read_node_states_then_only_the_curren
                 },
             )
             .await;
-            let client = reqwest::Client::new();
+            let client = client_builder().build().expect("HTTP client");
             let admin = roles.administrator.bearer.clone();
             let changed_build = || async {
                 let states: Value = client

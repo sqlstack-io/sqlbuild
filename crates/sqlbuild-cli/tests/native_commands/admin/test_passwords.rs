@@ -8,6 +8,7 @@ use serde_json::{Value, json};
 use crate::admin_helpers::{administer, invoke_admin, invoke_password};
 use crate::helpers::{api_ready, start_control, wait_for_exit};
 use crate::test_types::{AdministratorCliTestCase, PasswordCliTestCase, PasswordOriginTestCase};
+use sqlbuild_orchestration::tls::main::client_builder::client_builder;
 
 #[test]
 fn given_local_store_ownership_when_create_user_runs_then_only_the_first_process_initializes_an_admin()
@@ -32,7 +33,7 @@ fn given_local_store_ownership_when_create_user_runs_then_only_the_first_process
         assert_eq!(count,test_case.expected_administrators,"{}",test_case.description);
         assert_eq!(id,first["principal_id"].as_str().expect("initial administrator UUID"));
         assert_ne!(id,ordinary["principal_id"].as_str().expect("ordinary person UUID"));
-        let client = reqwest::Client::builder().timeout(Duration::from_secs(5)).build().expect("HTTP client");
+        let client = client_builder().timeout(Duration::from_secs(5)).build().expect("HTTP client");
         let mut sessions = Vec::new();
         for person in [&first,&ordinary] {
             let output = invoke_password(&control,person["principal_id"].as_str().expect("person UUID"),b"orders-admin-password-2026");
@@ -130,7 +131,7 @@ fn given_owner_provisioned_passwords_when_a_standalone_server_authenticates_then
             assert!(output.stdout.is_empty());
         }
 
-        let client = reqwest::Client::builder().timeout(Duration::from_secs(5)).build().expect("HTTP client");
+        let client = client_builder().timeout(Duration::from_secs(5)).build().expect("HTTP client");
         let login = |password: &str| client.post(format!("{url}/api/auth/password/login"))
             .header(header::HOST, "control.example.com")
             .header(header::ORIGIN, "https://control.example.com")

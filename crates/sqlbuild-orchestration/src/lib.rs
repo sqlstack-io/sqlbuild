@@ -37,6 +37,8 @@ pub mod warehouse_history;
 
 pub mod warehouse_metadata;
 
+pub mod tls;
+
 pub mod webhooks;
 
 pub mod worker;

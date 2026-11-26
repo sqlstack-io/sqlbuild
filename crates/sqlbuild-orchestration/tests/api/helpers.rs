@@ -5,6 +5,7 @@ use crate::api::models::ApiAuthentication;
 use crate::api::tests::test_types::TestApi;
 use crate::runs::tests::test_types::ExactKeyPlanner;
 use crate::store::models::ControlStore;
+use crate::tls::main::client_builder::client_builder;
 
 pub(crate) async fn start_api(store: &ControlStore) -> TestApi {
     start_api_with_authentication(store, ApiAuthentication::default()).await
@@ -50,7 +51,7 @@ pub(crate) async fn start_api_on(
             let _ = signal.await;
         }),
     ));
-    let client = reqwest::Client::builder()
+    let client = client_builder()
         .timeout(Duration::from_secs(1))
         .build()
         .expect("HTTP client");

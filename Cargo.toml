@@ -161,8 +161,12 @@ rusqlite = { version = "0.37", features = ["bundled", "column_decltype"] }
 rustix = { version = "1.1.4", default-features = false, features = ["event", "fs", "process", "pty", "std", "stdio", "termios"] }
 saphyr-parser = "0.1"
 regex = "1"
-object_store = { version = "0.14", default-features = false, features = ["fs", "aws"] }
-reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
+# aws-base and ring, not aws: object_store's aws feature, like reqwest's rustls feature, compiles in
+# aws-lc-rs beside ring, after which rustls no longer picks its provider by itself. SQLLoad uses ring.
+object_store = { version = "0.14", default-features = false, features = ["fs", "aws-base", "reqwest", "ring"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "query", "rustls-no-provider"] }
+# The ring provider that `sqlbuild_orchestration::tls` installs before any client is built.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 # The loading engine behind loads, loaders and sinks: its library, without its CLI or its own DuckDB.
 # TODO(sqlload-release): a git pin of the unreleased caller-session destination; switch to the
 # crates.io release before the PR. `make check-sqlload-release` (in `make check-ci`) fails on it.

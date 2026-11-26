@@ -24,6 +24,7 @@ use crate::snapshots::models::{SnapshotInput, SnapshotRecord};
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
+use crate::tls::main::client_builder::client_builder;
 
 /// Decoding happens before the store is touched, so one backend covers every encoding case.
 #[test]
@@ -89,7 +90,7 @@ fn given_encoded_snapshot_bodies_when_publishing_then_gzip_is_bounded_after_auth
         .await
         .expect("location credential");
         let api = start_api(store).await;
-        let client = reqwest::Client::builder()
+        let client = client_builder()
             .timeout(Duration::from_secs(120))
             .build()
             .expect("HTTP client");
