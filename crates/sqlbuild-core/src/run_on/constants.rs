@@ -3,8 +3,6 @@
 pub(crate) const AUTO: &str = "auto";
 pub(crate) const LOCAL: &str = "local";
 pub(crate) const WAREHOUSE: &str = "warehouse";
-/// The width of the run-on column: the longer of `local` and `warehouse`.
-pub(crate) const COLUMN_WIDTH: usize = 9;
 pub(crate) const CANNOT_RUN_LOCALLY_TITLE: &str = "Can't run locally";
 pub(crate) const ON_THE_WAREHOUSE_TITLE: &str = "On the warehouse";
 pub(crate) const RUNS_ON_LABEL: &str = "runs on";

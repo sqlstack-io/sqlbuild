@@ -30,3 +30,8 @@ pub(crate) const SHORT_REASON_WIDTH: usize = 48;
 pub(crate) const ENGINE_ERROR_MARK: &str = " Error:";
 /// The header and the rollup line name at most this many causes.
 pub(crate) const HEADER_CAUSE_LIMIT: usize = 5;
+/// What the header says local items run in.
+pub(crate) const LOCAL_NOTE: &str = "DuckDB";
+pub(crate) const NOTE_PREFIX: &str = "  note: ";
+/// The width of the label column of the `Run on` tree.
+pub(crate) const HEADER_LABEL_WIDTH: usize = 22;

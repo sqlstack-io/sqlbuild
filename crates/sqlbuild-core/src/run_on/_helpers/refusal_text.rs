@@ -14,6 +14,8 @@ use crate::text::main::text_wrap::text_wrap;
 const COMPACT_LINES: usize = 2;
 /// Stands in for a space inside a `code` span while help text is wrapped.
 const CODE_SPACE: char = '\u{1f}';
+/// A block's counts sit on its title line only with at least this many spaces before them.
+const MIN_COUNT_GAP: usize = 2;
 const MIN_WIDTH: usize = 30;
 
 /// The text a group's block is rendered with.
@@ -62,7 +64,7 @@ pub(crate) fn group_lines(group: &RefusalGroup, block: &BlockStyle<'_>) -> (Vec<
     let gap: usize = block
         .columns
         .saturating_sub(head_width + counts.chars().count());
-    if gap >= 2 {
+    if gap >= MIN_COUNT_GAP {
         lines.push(format!(
             "{tag} {}{}{}",
             style.section(&message),
@@ -283,13 +285,19 @@ fn construct_rows(group: &RefusalGroup, block: &BlockStyle<'_>) -> Vec<String> {
                 0 | 1 => first,
                 count => format!("{first} +{}", count - 1),
             };
+            let tail: String = if others.is_empty() {
+                String::new()
+            } else {
+                format!(" {}", style.muted(&others))
+            };
             format!(
-                "   {} {:<width$}  {:<8} {}",
+                "   {} {:<width$}  {:<8}{tail}",
                 format_tree_connector(style, index + 1 == group.origins.len()),
                 name(origin),
                 plural(origin.items.len(), block.nouns),
-                style.muted(&others)
             )
+            .trim_end()
+            .to_owned()
         })
         .collect()
 }
@@ -338,10 +346,15 @@ fn help_lines(refusal: &LocalRefusal, style: CliStyle) -> Vec<String> {
         .map(|help| {
             render_help_lines(&keep_code_whole(help), style)
                 .into_iter()
-                .map(|line| format!(" {}", line.replace(CODE_SPACE, " ")))
+                .map(restore_code_spaces)
                 .collect()
         })
         .unwrap_or_default()
+}
+
+/// A wrapped help line, indented one more column, with its code spans' spaces back.
+fn restore_code_spaces(line: String) -> String {
+    format!(" {}", line.replace(CODE_SPACE, " "))
 }
 
 /// `text` with each space inside a backtick span replaced by a character wrapping never breaks at.

@@ -17,15 +17,15 @@ SNAPSHOT_INVALID_CATEGORY: str = "snapshot invalid"
 
 SQLQUACK_SOURCES_HELP: str = "a source file of the project (`sources/*.yml`)"
 SQLBUILD_SOURCES_HELP: str = "a source file of the project (`sql/sources/`)"
+COMMENT_PREFIXES: tuple[str, ...] = ("#", "--")
+CALL_OPEN: str = "("
 SQLQUACK_ALLOW_HELP: str = (
     r"allow it with (?P<key>\w+) = true under \[allow\] in a sqlquack\.toml in the project folder"
 )
-"""SQLQuack's help for a known difference, which SQLBuild's own setting replaces."""
 SQLBUILD_ALLOW_HELP: str = (
     "allow it for local tests in sqlbuild_project.toml with "
     "`[testing.local] allow = {{ {key} = true }}`"
 )
-"""Where SQLBuild allows a known difference for local tests (CHI-1688), formatted with its key."""
 
 TIMEZONE_PARAMETER: str = "TIMEZONE"
 SESSION_PARAMETERS_KEY: str = "session_parameters"

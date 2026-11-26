@@ -85,11 +85,10 @@ def test_given_built_project_when_testing_in_terminal_then_no_spinner_row_surviv
         rendered: str = "\n".join(screen)
         assert result.returncode == 0, rendered
         assert not any(glyph in rendered for glyph in SPINNER_GLYPHS), rendered
-        rows: list[str] = [line for line in screen if _TEST_ROW.match(line)]
-        assert not any("statement" in line for line in rows), rendered
-        assert all(
-            any(f"  {name}  " in row for row in rows) for name in test_case.expected_row_names
-        ), rendered
+        rows: list[str] = list(filter(_TEST_ROW.match, screen))
+        row_text: str = "\n".join(rows)
+        assert "statement" not in row_text, rendered
+        assert all(f"  {name}  " in row_text for name in test_case.expected_row_names), rendered
         assert len(rows) == test_case.expected_test_row_count, rendered
         assert_fragments_in_order(rendered, test_case.expected_screen_fragments)
         assert test_case.expected_summary in rendered

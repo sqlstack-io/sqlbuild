@@ -10,26 +10,28 @@ use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::definition_changes::models::{ExecutedItem, SelectedItem};
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_core::progress::main::statement_summary_delta::statement_summary_delta;
-use sqlbuild_core::progress::models::ExpectationStep;
 use sqlbuild_core::progress::models::StatementSummary;
 use sqlbuild_core::run_on::main::read_run_on_decisions::read_run_on_decisions;
 use sqlbuild_core::run_on::main::refusal_causes::refusal_causes;
-use sqlbuild_core::run_on::main::refusal_explain_rows::refusal_explain_rows;
 use sqlbuild_core::run_on::main::render_refusal_report::render_refusal_report;
+use sqlbuild_core::run_on::main::run_on_header::run_on_header;
 use sqlbuild_core::run_on::main::with_run_on_json::with_run_on_json;
 use sqlbuild_core::run_on::models::{RunOn, RunOnDecision};
+use sqlbuild_core::run_output::main::render_cant_run_rollup::render_cant_run_rollup;
 use sqlbuild_core::run_output::main::render_failed_list::render_failed_list;
 use sqlbuild_core::run_output::main::render_failures::render_failures;
 use sqlbuild_core::run_output::main::render_run_completion::render_run_completion;
 use sqlbuild_core::run_output::main::render_run_header::render_run_header;
-use sqlbuild_core::run_output::models::{
-    FailureEntry, FailureField, HeaderCause, RunCounts, RunHeader,
-};
+use sqlbuild_core::run_output::models::{FailureEntry, FailureField, RunCounts, RunHeader};
+use sqlbuild_core::scenario_command::main::render_namespace_line::render_namespace_line;
+use sqlbuild_core::scenario_command::main::render_retained_section::render_retained_section;
+use sqlbuild_core::scenario_command::main::scenario_steps::scenario_steps;
 use sqlbuild_core::scenario_command::main::validate_scenario_test_flags::validate_scenario_test_flags;
 use sqlbuild_core::scenario_command::models::{
     CodedText, ScenarioNamespace, ScenarioResultRow, ScenarioTestFlags, SqlAnalysisCommand,
 };
 use sqlbuild_core::test_command::main::test_failure_entry::test_failure_entry;
+use sqlbuild_core::test_command::main::test_name_width::test_name_width;
 use sqlbuild_core::test_command::models::TestFailureFacts;
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::ScenarioRunResult;
@@ -79,8 +81,6 @@ const RUN_ON_SETTING: &str = "scenario_run_on";
 const SCENARIO_NOUNS: (&str, &str) = ("scenario", "scenarios");
 const JSON_SCENARIO_NAME_KEYS: [&str; 2] = ["scenario_name", "name"];
 const RETAIN_HINT: &str = "Rerun with --retain to inspect scenario-owned artifacts.";
-/// The rollup line after the rows names at most this many causes.
-const ROLLUP_CAUSES: usize = 5;
 
 /// The resolved adapters, connection and output settings of one scenario test run.
 pub(crate) struct TestRun<'py> {
@@ -204,133 +204,16 @@ struct RunOnReport {
     verbose: bool,
 }
 
-/// The header before a run: how many scenarios run where, the causes, and `--explain`'s rows.
-fn run_header(decisions: &[RunOnDecision], mode: RunOn, explain: bool) -> RunHeader {
-    let refused: usize = decisions
-        .iter()
-        .filter(|decision| !decision.refusals.is_empty())
-        .count();
-    let local: usize = decisions
-        .iter()
-        .filter(|decision| decision.local() && decision.refusals.is_empty())
-        .count();
-    let local_only: bool = mode == RunOn::Local;
-    RunHeader {
-        title: "Scenarios".to_owned(),
-        nouns: (SCENARIO_NOUNS.0.to_owned(), SCENARIO_NOUNS.1.to_owned()),
-        selected: decisions.len(),
-        local: if local_only {
-            decisions.len() - refused
-        } else {
-            local
-        },
-        warehouse: if local_only {
-            0
-        } else {
-            decisions.len() - local
-        },
-        not_run: if local_only { refused } else { 0 },
-        local_only,
-        causes: if mode == RunOn::Warehouse {
-            Vec::new()
-        } else {
-            refusal_causes(decisions)
-        },
-        explain: if explain && mode == RunOn::Auto {
-            refusal_explain_rows(decisions)
-        } else {
-            Vec::new()
-        },
-    }
-}
-
-/// The longest scenario name.
+/// The longest scenario name, widened so each expected model and assertion name fits under it.
 fn name_width(scenarios: &Bound<'_, PyTuple>) -> PyResult<i64> {
-    let mut width: usize = 0;
+    let mut labels: Vec<(String, String)> = Vec::new();
+    let mut children: Vec<String> = Vec::new();
     for scenario in scenarios.iter() {
-        width = width.max(
-            native_field(&scenario, "name")?
-                .extract::<String>()?
-                .chars()
-                .count(),
-        );
+        labels.push((native_field(&scenario, "name")?.extract()?, String::new()));
+        children.extend(native_field(&scenario, "expected_model_names")?.extract::<Vec<String>>()?);
+        children.extend(native_field(&scenario, "assertion_names")?.extract::<Vec<String>>()?);
     }
-    Ok(i64::try_from(width).unwrap_or(i64::MAX))
-}
-
-/// `  namespace  <value> (from <source>)` when the run is namespaced; empty when it isn't.
-fn namespace_line(namespace: &ScenarioNamespace, style: CliStyle) -> String {
-    match &namespace.value {
-        Some(value) => format!(
-            "{}\n",
-            style.muted(&format!("  namespace  {value} (from {})", namespace.source))
-        ),
-        None => String::new(),
-    }
-}
-
-/// Each expected and assertion row of a scenario as the failure detail reads it.
-fn scenario_steps(row: &ScenarioResultRow) -> Vec<ExpectationStep> {
-    let outcome = |failed: bool| if failed { "fail" } else { "pass" }.to_owned();
-    let mut steps: Vec<ExpectationStep> = row
-        .expected
-        .iter()
-        .map(|expected| ExpectationStep {
-            model_name: expected.model_name.clone(),
-            outcome: outcome(expected.failed),
-            actual_row_count: expected.actual_row_count.unwrap_or(0),
-            expected_row_count: expected.expected_row_count.unwrap_or(0),
-            mismatched_row_count: expected.mismatched_row_count.unwrap_or(0),
-            missing_row_count: expected.missing_row_count,
-            ..ExpectationStep::default()
-        })
-        .collect();
-    steps.extend(row.assertions.iter().map(|assertion| {
-        ExpectationStep {
-            model_name: format!("assertion {}", assertion.name),
-            outcome: outcome(assertion.failed),
-            actual_row_count: assertion.failing_row_count.unwrap_or(0),
-            unexpected_samples: assertion
-                .first_sample
-                .iter()
-                .map(|sample| vec![("row".to_owned(), sample.clone())])
-                .collect(),
-            ..ExpectationStep::default()
-        }
-    }));
-    steps
-}
-
-/// `Retained (N):` with each retained scenario's local DuckDB, and its relations under `--retain`; empty with none.
-fn retained_section(rows: &[ScenarioResultRow], relations: bool, style: CliStyle) -> String {
-    let retained: Vec<&ScenarioResultRow> = rows.iter().filter(|row| row.retained).collect();
-    if retained.is_empty() {
-        return String::new();
-    }
-    let mut lines: Vec<String> = vec![
-        String::new(),
-        style.section(&format!("Retained ({}):", retained.len())),
-    ];
-    for row in retained {
-        lines.push(format!("  {}", row.name));
-        if let Some(path) = &row.local_duckdb_path {
-            lines.push(format!("    {}{path}", style.muted("duckdb    ")));
-        }
-        for relation in row
-            .retained_relations
-            .iter()
-            .flatten()
-            .filter(|_| relations)
-        {
-            lines.push(format!(
-                "    {}{} -> {}",
-                style.muted(&format!("{:<10}", relation.kind)),
-                relation.logical_name,
-                relation.physical_name
-            ));
-        }
-    }
-    format!("{}\n", lines.join("\n"))
+    Ok(i64::try_from(test_name_width(&labels, &children)).unwrap_or(i64::MAX))
 }
 
 /// The run's failures, refusals, retained artifacts, failed list and summary, then its JSON document.
@@ -393,7 +276,10 @@ fn finish(
                 text: path.clone(),
             });
         }
-        if error.is_some() && !row.retained && !row.local {
+        let retain_hinted: bool = entry.fields.iter().any(|field| {
+            matches!(field, FailureField::Error { help: Some(help), .. } if help.contains("--retain"))
+        });
+        if error.is_some() && !retain_hinted && !row.retained && !row.local {
             entry.fields.push(FailureField::Labelled {
                 label: "help".to_owned(),
                 text: RETAIN_HINT.to_owned(),
@@ -405,21 +291,10 @@ fn finish(
     let columns: usize = terminal_columns(py)?;
     let mut output: String = String::new();
     if not_run > 0 {
-        let all: Vec<HeaderCause> = refusal_causes(&report.decisions);
-        let mut causes: Vec<String> = all
-            .iter()
-            .take(ROLLUP_CAUSES)
-            .map(|cause| format!("{} {}", cause.label, cause.count))
-            .collect();
-        if all.len() > ROLLUP_CAUSES {
-            causes.push(format!("+{} more", all.len() - ROLLUP_CAUSES));
-        }
-        output.push_str(&format!(
-            "\n{}\n",
-            run.style.muted(&format!(
-                "  Can't run locally ({not_run}): {}; see below",
-                causes.join(", ")
-            ))
+        output.push_str(&render_cant_run_rollup(
+            not_run,
+            &refusal_causes(&report.decisions),
+            run.style,
         ));
     }
     output.push_str(&render_failures(&entries, columns, run.style));
@@ -439,7 +314,7 @@ fn finish(
         ),
         RunOn::Auto => String::new(),
     });
-    output.push_str(&retained_section(
+    output.push_str(&render_retained_section(
         &rows,
         flag(request, "retain")?,
         run.style,
@@ -836,13 +711,17 @@ pub(crate) fn run_scenario_test_command(
         } else {
             None
         };
-    let header: RunHeader = run_header(&decisions, mode, flag(request, "explain")?);
+    let header: RunHeader = run_on_header(
+        &decisions,
+        (mode, flag(request, "explain")?),
+        ("Scenarios", SCENARIO_NOUNS),
+    );
     write(
         &run.stream,
         &format!(
             "\n{}{}",
             render_run_header(&header, terminal_columns(py)?, run.style),
-            namespace_line(&run.project.namespace, run.style)
+            render_namespace_line(&run.project.namespace, run.style)
         ),
     )?;
     write_execution(

@@ -13,6 +13,8 @@ pub(crate) const RUN_ON_WIDTH: usize = 9;
 pub(crate) const SECONDS_WIDTH: usize = 9;
 /// The `N real models` detail shows from this terminal width.
 pub(crate) const DETAIL_MIN_COLUMNS: usize = 120;
+/// The room a wide terminal keeps for a row's detail, as long as `  2 real models`.
+pub(crate) const DETAIL_RESERVE: usize = 15;
 pub(crate) const MIN_ROW_NAME_WIDTH: usize = 20;
 pub(crate) const PASS_STATUS: &str = "PASS";
 /// Where a child row's glyph starts, past the counter.

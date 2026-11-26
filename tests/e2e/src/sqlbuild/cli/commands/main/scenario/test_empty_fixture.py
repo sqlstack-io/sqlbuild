@@ -33,7 +33,7 @@ _TYPED_CUSTOMER_COLUMNS: str = "    contract: enforced\n" + _OPEN_CUSTOMER_COLUM
             customer_columns_yaml=_TYPED_CUSTOMER_COLUMNS,
             expected_exit_code=0,
             expected_fragments=(
-                "expect    assertion no_unmatched_orders",
+                "PASS   warehouse",
                 "PASS=1  FAIL=0  TOTAL=1",
             ),
         ),
@@ -42,7 +42,7 @@ _TYPED_CUSTOMER_COLUMNS: str = "    contract: enforced\n" + _OPEN_CUSTOMER_COLUM
             customer_columns_yaml=_OPEN_CUSTOMER_COLUMNS,
             expected_exit_code=1,
             expected_fragments=(
-                "error[S510]",
+                "[S510]",
                 "mock source 'raw_customers' uses __empty_fixture() but its column schema is "
                 "not authoritative",
             ),

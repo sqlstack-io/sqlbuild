@@ -3,7 +3,7 @@
 use crate::run_output::main::short_reason::short_reason;
 use crate::run_output::models::{FailureEntry, FailureField};
 use crate::test_command::_helpers::failure_rows::{step_fields, step_reason};
-use crate::test_command::constants::{DEFAULT_ERROR, EXPECTATIONS_FAILED_CODE, TIMED_OUT_REASON};
+use crate::test_command::constants::{DEFAULT_ERROR, EXPECTATIONS_FAILED_CODES, TIMED_OUT_REASON};
 use crate::test_command::models::TestFailureFacts;
 
 /// The entry, with the error, any failing expectation's rows, the statement and the files, and the short reason.
@@ -27,7 +27,11 @@ pub fn test_failure_entry(facts: &TestFailureFacts) -> (FailureEntry, String) {
         .as_deref()
         .filter(|message| !message.is_empty())
         .filter(|_| {
-            fields.is_empty() || facts.error_code.as_deref() != Some(EXPECTATIONS_FAILED_CODE)
+            fields.is_empty()
+                || !facts
+                    .error_code
+                    .as_deref()
+                    .is_some_and(|code| EXPECTATIONS_FAILED_CODES.contains(&code))
         });
     if message.is_some() || fields.is_empty() {
         let message: &str = message.unwrap_or(DEFAULT_ERROR);

@@ -605,9 +605,8 @@ def test_given_existing_snapshot_targets_when_building_on_snowflake_then_apply_s
             ),
             expected_stdout_fragments=(
                 "local_transpile_error",
-                "ERROR",
-                "error[X607]",
-                "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
+                "error: dialect",
+                "PASS=0  FAIL=0  NOT_RUN=1  TOTAL=1",
             ),
             expected_return_code=1,
             corrupt_capture_dialect=True,
@@ -636,8 +635,8 @@ def test_given_existing_snapshot_targets_when_building_on_snowflake_then_apply_s
             expected_stdout_fragments=(
                 "local_execution_error",
                 "ERROR",
-                "error[X608]",
-                "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
+                "[X608]",
+                "PASS=0  FAIL=1  TOTAL=1",
             ),
             expected_return_code=1,
         ),
@@ -718,7 +717,7 @@ def test_given_snowflake_scenario_capture_when_replaying_locally_then_transpilab
             scenario_name="dbt_event_rollup",
             expected_stdout_fragments=(
                 "dbt_event_rollup",
-                "expect    expected event_rollup",
+                "PASS   local",
                 "PASS=1  FAIL=0  TOTAL=1",
             ),
             expected_local_rows=((10, 2),),
@@ -732,9 +731,8 @@ def test_given_snowflake_scenario_capture_when_replaying_locally_then_transpilab
             scenario_name="dbt_event_rollup",
             expected_stdout_fragments=(
                 "dbt_event_rollup",
-                "ERROR",
-                "error[X607]",
-                "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
+                "error: dialect",
+                "PASS=0  FAIL=0  NOT_RUN=1  TOTAL=1",
             ),
             expected_return_code=1,
             corrupt_capture_dialect=True,
@@ -937,10 +935,10 @@ def test_given_snapshot_project_when_building_on_snowflake_then_scd2_history_is_
             description="runs snowflake scenario remotely and retains inspectable artifacts",
             expected_stdout_fragments=(
                 "remote_event_rollup",
-                "Retained relations:",
-                "source raw_events -> __sqb_",
-                "model  stg_events -> __sqb_",
-                "model  event_rollup -> __sqb_",
+                "Retained (1):",
+                "source    raw_events -> __sqb_",
+                "model     stg_events -> __sqb_",
+                "model     event_rollup -> __sqb_",
                 "PASS=1  FAIL=0  TOTAL=1",
             ),
             expected_retained_suffix_counts={

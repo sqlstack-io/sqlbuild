@@ -1,5 +1,6 @@
 //! Refusals grouped by code and construct, then by where the construct is written.
 
+use std::cmp::Reverse;
 use std::path::Path;
 
 use crate::run_on::models::{LocalRefusal, OriginUser, RefusalGroup, RefusalOrigin, RunOnDecision};
@@ -42,10 +43,11 @@ fn model_name(refusal: &LocalRefusal) -> String {
         .map_or_else(String::new, |stem| stem.to_string_lossy().into_owned())
 }
 
-fn push_unique(items: &mut Vec<String>, item: &str) {
+fn with_unique(mut items: Vec<String>, item: &str) -> Vec<String> {
     if !items.iter().any(|seen| seen == item) {
         items.push(item.to_owned());
     }
+    items
 }
 
 /// Every refused construct once, most items first, each with its origins in first-seen order.
@@ -68,7 +70,7 @@ pub(crate) fn group_refusals(decisions: &[&RunOnDecision]) -> Vec<RefusalGroup> 
                 }
             };
             let group: &mut RefusalGroup = &mut groups[index];
-            push_unique(&mut group.items, &decision.name);
+            group.items = with_unique(std::mem::take(&mut group.items), &decision.name);
             let origin: String = origin_key(refusal);
             let at: usize = match group
                 .origins
@@ -85,13 +87,15 @@ pub(crate) fn group_refusals(decisions: &[&RunOnDecision]) -> Vec<RefusalGroup> 
                 }
             };
             let entry: &mut RefusalOrigin = &mut group.origins[at];
-            push_unique(&mut entry.items, &decision.name);
+            entry.items = with_unique(std::mem::take(&mut entry.items), &decision.name);
             let model: String = model_name(refusal);
             if model.is_empty() {
                 continue;
             }
             match entry.users.iter_mut().find(|user| user.model == model) {
-                Some(user) => push_unique(&mut user.items, &decision.name),
+                Some(user) => {
+                    user.items = with_unique(std::mem::take(&mut user.items), &decision.name)
+                }
                 None => entry.users.push(OriginUser {
                     model,
                     line: refusal.line.unwrap_or(0),
@@ -101,15 +105,11 @@ pub(crate) fn group_refusals(decisions: &[&RunOnDecision]) -> Vec<RefusalGroup> 
         }
     }
     for group in &mut groups {
-        group
-            .origins
-            .sort_by(|left, right| right.items.len().cmp(&left.items.len()));
+        group.origins.sort_by_key(|item| Reverse(item.items.len()));
         for origin in &mut group.origins {
-            origin
-                .users
-                .sort_by(|left, right| right.items.len().cmp(&left.items.len()));
+            origin.users.sort_by_key(|item| Reverse(item.items.len()));
         }
     }
-    groups.sort_by(|left, right| right.items.len().cmp(&left.items.len()));
+    groups.sort_by_key(|item| Reverse(item.items.len()));
     groups
 }

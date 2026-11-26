@@ -32,7 +32,11 @@ fn hash_refusal(construct: &str, line: i64) -> LocalRefusal {
         message: Some("HASH gives a different value in DuckDB".to_owned()),
         label: Some("DuckDB computes its own hash, never Snowflake's".to_owned()),
         notes: vec!["Equal inputs still get equal hashes within one run.".to_owned()],
-        help: Some("allow it with hash = true under [allow] in a sqlquack.toml".to_owned()),
+        help: Some(
+            "allow it for local tests in sqlbuild_project.toml with \
+             `[testing.local] allow = { hash = true }`; `sqlquack explain hash` says when it is safe"
+                .to_owned(),
+        ),
         path: Some("sql/models/staging/stg_orders.sql".to_owned()),
         line: Some(line),
         column: Some(3),

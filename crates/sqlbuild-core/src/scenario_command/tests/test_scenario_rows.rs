@@ -4,29 +4,26 @@ use crate::cli_text::models::CliStyle;
 use crate::scenario_command::main::build_local_runtime_artifacts::build_local_runtime_artifacts;
 use crate::scenario_command::main::build_runtime_artifacts::build_runtime_artifacts;
 use crate::scenario_command::main::render_capture_result::render_capture_result;
-use crate::scenario_command::main::render_scenario_failures::render_scenario_failures;
-use crate::scenario_command::main::render_scenario_result::render_scenario_result;
+use crate::scenario_command::main::render_namespace_line::render_namespace_line;
+use crate::scenario_command::main::render_retained_section::render_retained_section;
 use crate::scenario_command::main::render_snapshot_sync_result::render_snapshot_sync_result;
+use crate::scenario_command::main::scenario_steps::scenario_steps;
 use crate::scenario_command::models::{
     AssertionRow, CaptureRow, ExpectedRow, FixtureStatements, FunctionStatements, LoadedRelation,
-    LocalRuntimeInputs, ModelArtifactEntry, NamedStatements, RetainedInputs, ScenarioResultRow,
-    WarehouseRuntimeInputs,
+    LocalRuntimeInputs, ModelArtifactEntry, NamedStatements, RetainedInputs, ScenarioNamespace,
+    ScenarioResultRow, WarehouseRuntimeInputs,
 };
 use crate::scenario_command::tests::helpers::{
-    artifact_pairs, coded, expectation_sql, expected_pairs, failing_result_row, relation, retained,
-    statements, strings,
+    artifact_pairs, child, coded, expectation_sql, expected_pairs, failing_result_row, relation,
+    retained, statements, strings,
 };
 use crate::scenario_command::tests::test_types::{
-    CaptureRowTestCase, FailuresTestCase, LocalArtifactsTestCase, ResultRowTestCase,
-    WarehouseArtifactsTestCase,
+    CaptureRowTestCase, ChildRowsTestCase, LocalArtifactsTestCase, NamespaceLineTestCase,
+    RetainedTestCase, WarehouseArtifactsTestCase,
 };
+use crate::test_command::main::expectation_child_rows::expectation_child_rows;
 
-const RA0: &str = "orders_paid                                                      FAIL  warehouse  1.23s\n    error[X506]: expected comparison failed\n    second line\n      = help: Compare the CTE.\n    expect    expected fact_orders                               FAIL  2 mismatched, 1 missing\n              error[X506]: mismatch\n  = help: look\n    expect    expected dim_customers                             PASS\n    expect    assertion no_negative                              FAIL  1 row\n    expect    assertion few                                      FAIL  3 rows\n              plain error\n    expect    assertion ok                                       PASS\n    Retained relations:\n      source raw_orders -> main.__sqb_abc__source__raw_orders\n      model  fact_orders -> main.__sqb_abc__model__fact_orders\n    expected fact_orders: actual=3 expected=2 mismatched=2 missing=1\n    assertion no_negative: failing_rows=1\n    sample: (1, 'a', None)\n    assertion few: failing_rows=3\n";
-const RA1: &str = "orders_paid                                                      \u{1b}[38;5;167mFAIL\u{1b}[0m  warehouse  1.23s\n    \u{1b}[38;5;167m\u{1b}[1merror[X506]:\u{1b}[0m expected comparison failed\n    \u{1b}[2msecond line\u{1b}[0m\n      \u{1b}[2m= help:\u{1b}[0m Compare the CTE.\n    expect    expected fact_orders                               \u{1b}[38;5;167mFAIL\u{1b}[0m  2 mismatched, 1 missing\n              \u{1b}[38;5;167m\u{1b}[1merror[X506]:\u{1b}[0m mismatch\n  \u{1b}[2m= help:\u{1b}[0m look\n    expect    expected dim_customers                             \u{1b}[32mPASS\u{1b}[0m\n    expect    assertion no_negative                              \u{1b}[38;5;167mFAIL\u{1b}[0m  1 row\n    expect    assertion few                                      \u{1b}[38;5;167mFAIL\u{1b}[0m  3 rows\n              plain error\n    expect    assertion ok                                       \u{1b}[32mPASS\u{1b}[0m\n    Retained relations:\n      source raw_orders -> main.__sqb_abc__source__raw_orders\n      model  fact_orders -> main.__sqb_abc__model__fact_orders\n    expected fact_orders: actual=3 expected=2 mismatched=2 missing=1\n    assertion no_negative: failing_rows=1\n    sample: (1, 'a', None)\n    assertion few: failing_rows=3\n";
-const RB0: &str = "orders_local                                                     ERROR  local\n    snapshot missing\n    Retained local DuckDB: /work/target/run/scenarios/orders_local/local.duckdb\n";
-const RC0: &str = "orders_warehouse                                                 FAIL  warehouse\n    boom\n    Rerun with --retain to inspect scenario-owned artifacts.\n";
-const RD1: &str = "orders_ok                                                        \u{1b}[32mPASS\u{1b}[0m  warehouse  0.01s\n    expect    expected m                                         \u{1b}[32mPASS\u{1b}[0m\n";
-const RE0: &str = "orders_errored                                                   FAIL  warehouse\n    expect    expected fact_orders                               ERROR\n              error[X504]: comparison failed to run\n    expect    assertion no_negative                              ERROR\n              error[X507]: assertion failed to run\n";
+const PLAIN: CliStyle = CliStyle { use_color: false };
 const CE0: &str = "orders_paid                                                      PASS  2 relations, 3 rows\n    source   raw_orders                                          PASS  2 rows, 41 B\n    seed     countries                                           PASS  1 row, 1.5 KB\n    snapshot tests/_scenario_snapshots/orders_paid/scenario.json\n";
 const SE0R: &str = "orders_paid                                                      REFRESHED  2 relations, 3 rows\n    source   raw_orders                                          PASS  2 rows, 41 B\n    seed     countries                                           PASS  1 row, 1.5 KB\n    snapshot tests/_scenario_snapshots/orders_paid/scenario.json\n";
 const CF1: &str = "orders_big                                                       \u{1b}[38;5;167mFAIL\u{1b}[0m  0 relations, 0 rows\n    \u{1b}[38;5;167m\u{1b}[1merror[X512]:\u{1b}[0m too many rows\n      \u{1b}[2m= help:\u{1b}[0m narrow it\n    Rerun with --retain to inspect scenario-owned artifacts.\n    source   raw_orders                                          \u{1b}[38;5;167mFAIL\u{1b}[0m  0 rows, 0 B\n    snapshot /elsewhere/scenario.json\n";
@@ -35,102 +32,6 @@ const CG0: &str = "orders_kept                                                  
 const SG0: &str =
     "orders_kept                                                      FAIL\n    no capture\n";
 const ASSERTION_SQL: &str = "SELECT COUNT(*) FROM (SELECT * FROM t WHERE x < 0) AS __scenario_assertion_failures;\n\nSELECT * FROM (SELECT * FROM t WHERE x < 0) AS __scenario_assertion_failures\nLIMIT 10;";
-
-#[test]
-fn given_scenario_result_when_rendering_then_matches_result_row_layout() {
-    let test_cases = [
-        ResultRowTestCase {
-            description: "failing retained run without color",
-            row: failing_result_row(),
-            use_color: false,
-            expected_text: RA0,
-        },
-        ResultRowTestCase {
-            description: "failing retained run styles statuses semantically",
-            row: failing_result_row(),
-            use_color: true,
-            expected_text: RA1,
-        },
-        ResultRowTestCase {
-            description: "local error keeps its DuckDB path without a retain hint",
-            row: ScenarioResultRow {
-                name: "orders_local".to_owned(),
-                status: "ERROR".to_owned(),
-                local: true,
-                retained: true,
-                local_duckdb_path: Some(
-                    "/work/target/run/scenarios/orders_local/local.duckdb".to_owned(),
-                ),
-                error: coded(None, "snapshot missing", None),
-                ..ScenarioResultRow::default()
-            },
-            use_color: false,
-            expected_text: RB0,
-        },
-        ResultRowTestCase {
-            description: "warehouse error suggests retaining",
-            row: ScenarioResultRow {
-                name: "orders_warehouse".to_owned(),
-                status: "FAIL".to_owned(),
-                error: coded(None, "boom", None),
-                ..ScenarioResultRow::default()
-            },
-            use_color: false,
-            expected_text: RC0,
-        },
-        ResultRowTestCase {
-            description: "comparison that did not run shows its error without counts",
-            row: ScenarioResultRow {
-                name: "orders_errored".to_owned(),
-                status: "FAIL".to_owned(),
-                expected: vec![ExpectedRow {
-                    model_name: "fact_orders".to_owned(),
-                    failed: true,
-                    error: coded(Some("X504"), "comparison failed to run", None),
-                    ..ExpectedRow::default()
-                }],
-                assertions: vec![AssertionRow {
-                    name: "no_negative".to_owned(),
-                    failed: true,
-                    error: coded(Some("X507"), "assertion failed to run", None),
-                    ..AssertionRow::default()
-                }],
-                ..ScenarioResultRow::default()
-            },
-            use_color: false,
-            expected_text: RE0,
-        },
-        ResultRowTestCase {
-            description: "passing run rounds its duration",
-            row: ScenarioResultRow {
-                name: "orders_ok".to_owned(),
-                status: "PASS".to_owned(),
-                duration_ms: Some(5.0),
-                expected: vec![ExpectedRow {
-                    model_name: "m".to_owned(),
-                    ..ExpectedRow::default()
-                }],
-                ..ScenarioResultRow::default()
-            },
-            use_color: true,
-            expected_text: RD1,
-        },
-    ];
-
-    for test_case in test_cases {
-        assert_eq!(
-            render_scenario_result(
-                &test_case.row,
-                CliStyle {
-                    use_color: test_case.use_color
-                }
-            ),
-            test_case.expected_text,
-            "{}",
-            test_case.description
-        );
-    }
-}
 
 #[test]
 fn given_capture_result_when_rendering_then_matches_capture_and_sync_rows() {
@@ -364,54 +265,120 @@ fn given_local_replay_when_building_artifacts_then_writes_loads_functions_and_mo
 }
 
 #[test]
-fn given_finished_scenarios_when_summarizing_then_lists_each_failure_with_its_first_line() {
-    let rows = [
-        ScenarioResultRow {
-            name: "orders_ok".to_owned(),
-            status: "PASS".to_owned(),
-            ..ScenarioResultRow::default()
+fn given_scenario_result_when_listing_checks_then_each_names_its_outcome_and_rows() {
+    let test_cases = [
+        ChildRowsTestCase {
+            description: "failed checks count what differed; passing ones say nothing",
+            row: failing_result_row(),
+            expected_rows: vec![
+                child("expected", "fact_orders", "FAIL", "3 rows differ"),
+                child("expected", "dim_customers", "PASS", ""),
+                child("assertion", "no_negative", "FAIL", "1 row"),
+                child("assertion", "few", "FAIL", "3 rows"),
+                child("assertion", "ok", "PASS", ""),
+            ],
         },
-        ScenarioResultRow {
-            name: "orders_unmocked".to_owned(),
-            status: "FAIL".to_owned(),
-            error: coded(Some("S504"), "first line\nsecond line", None),
-            ..ScenarioResultRow::default()
-        },
-        ScenarioResultRow {
-            name: "orders_mismatch".to_owned(),
-            status: "FAIL".to_owned(),
-            expected: vec![ExpectedRow {
-                model_name: "fact_orders".to_owned(),
-                failed: true,
-                mismatched_row_count: Some(2),
-                missing_row_count: Some(1),
-                ..ExpectedRow::default()
-            }],
-            ..ScenarioResultRow::default()
-        },
-        ScenarioResultRow {
-            name: "orders_local".to_owned(),
-            status: "SKIP".to_owned(),
-            local: true,
-            ..ScenarioResultRow::default()
+        ChildRowsTestCase {
+            description: "checks that could not run are errors without counts",
+            row: ScenarioResultRow {
+                name: "orders_errored".to_owned(),
+                status: "FAIL".to_owned(),
+                expected: vec![ExpectedRow {
+                    model_name: "fact_orders".to_owned(),
+                    failed: true,
+                    error: coded(Some("X504"), "comparison failed to run", None),
+                    ..ExpectedRow::default()
+                }],
+                assertions: vec![AssertionRow {
+                    name: "no_negative".to_owned(),
+                    failed: true,
+                    error: coded(Some("X507"), "assertion failed to run", None),
+                    ..AssertionRow::default()
+                }],
+                ..ScenarioResultRow::default()
+            },
+            expected_rows: vec![
+                child("expected", "fact_orders", "ERROR", ""),
+                child("assertion", "no_negative", "ERROR", ""),
+            ],
         },
     ];
+
+    for test_case in test_cases {
+        assert_eq!(
+            expectation_child_rows(&scenario_steps(&test_case.row)),
+            test_case.expected_rows,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_retained_scenarios_when_listing_then_shows_duckdb_and_relations_under_retain() {
+    let local: ScenarioResultRow = ScenarioResultRow {
+        name: "orders_local".to_owned(),
+        status: "PASS".to_owned(),
+        local: true,
+        retained: true,
+        local_duckdb_path: Some("target/run/scenarios/orders_local/local.duckdb".to_owned()),
+        ..ScenarioResultRow::default()
+    };
     let test_cases = [
-        FailuresTestCase {
-            description: "failed scenarios are listed with their first error line",
-            rows: rows.to_vec(),
-            expected_text: "\nFailures:\n\n  orders_unmocked\n    error[S504]: first line\n  orders_mismatch\n    expected fact_orders: 2 mismatched, 1 missing\n",
+        RetainedTestCase {
+            description: "nothing retained renders nothing",
+            rows: vec![ScenarioResultRow::default()],
+            relations: true,
+            expected_text: "",
         },
-        FailuresTestCase {
-            description: "no failures render nothing",
-            rows: rows[..1].to_vec(),
+        RetainedTestCase {
+            description: "--retain lists the warehouse relations",
+            rows: vec![failing_result_row(), local.clone()],
+            relations: true,
+            expected_text: "\nRetained (2):\n  orders_paid\n    source    raw_orders -> main.__sqb_abc__source__raw_orders\n    model     fact_orders -> main.__sqb_abc__model__fact_orders\n  orders_local\n    duckdb    target/run/scenarios/orders_local/local.duckdb\n",
+        },
+        RetainedTestCase {
+            description: "without --retain only the local DuckDB file is listed",
+            rows: vec![failing_result_row(), local],
+            relations: false,
+            expected_text: "\nRetained (1):\n  orders_local\n    duckdb    target/run/scenarios/orders_local/local.duckdb\n",
+        },
+    ];
+
+    for test_case in test_cases {
+        assert_eq!(
+            render_retained_section(&test_case.rows, test_case.relations, PLAIN),
+            test_case.expected_text,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_namespace_when_rendering_header_line_then_names_it_and_its_source() {
+    let test_cases = [
+        NamespaceLineTestCase {
+            description: "a namespaced run names the namespace and where it came from",
+            namespace: ScenarioNamespace {
+                value: Some("ci_42".to_owned()),
+                source: "cli".to_owned(),
+            },
+            expected_text: "  namespace  ci_42 (from cli)\n",
+        },
+        NamespaceLineTestCase {
+            description: "a run without a namespace prints nothing",
+            namespace: ScenarioNamespace {
+                value: None,
+                source: "unset".to_owned(),
+            },
             expected_text: "",
         },
     ];
 
     for test_case in test_cases {
         assert_eq!(
-            render_scenario_failures(&test_case.rows, CliStyle { use_color: false }),
+            render_namespace_line(&test_case.namespace, PLAIN),
             test_case.expected_text,
             "{}",
             test_case.description

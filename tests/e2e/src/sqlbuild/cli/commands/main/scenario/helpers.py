@@ -71,7 +71,7 @@ def run_namespaced_scenario(project: Path, namespace: str, *, retain: bool = Fal
         "scenario_namespace": namespace,
         "scenario_namespace_source": "cli",
     }
-    assert f"Scenario namespace: {namespace} (source: cli)" in result.stderr
+    assert f"namespace  {namespace} (from cli)" in result.stderr
 
 
 def build_scenario_project_files() -> dict[str, str]:
@@ -531,7 +531,7 @@ def assert_local_duckdb_state(
 
     assert db_path.exists() is expected_exists
     for _ in range(int(query_when_exists)):
-        assert f"Retained local DuckDB: {db_path.as_posix()}" in stdout
+        assert f"duckdb    {db_path.as_posix()}" in stdout
         rows: list[tuple[object, ...]] = query_duckdb(db_path=db_path, sql=count_sql)
         assert rows == [(expected_count,)]
         for value_rows_sql in (rows_sql,) * int(rows_sql is not None):
@@ -812,6 +812,7 @@ def interrupt_scenario_run(
     trigger_stream: str,
     interrupt_count: int,
     hook_seconds: float = 0.0,
+    global_args: tuple[str, ...] = (),
 ) -> InterruptedScenarioRun:
     """Interrupt a scenario command once ``trigger`` is printed on ``trigger_stream``."""
 
@@ -819,6 +820,7 @@ def interrupt_scenario_run(
         [
             str(Path(sys.executable).with_name("sqb")),
             "--no-color",
+            *global_args,
             "--project-dir",
             str(project_dir),
             "scenario",

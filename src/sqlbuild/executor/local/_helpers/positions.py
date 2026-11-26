@@ -12,6 +12,8 @@ from typing import Any
 
 from sqlbuild._native import SqlDocument
 from sqlbuild.executor.local.constants import (
+    CALL_OPEN,
+    COMMENT_PREFIXES,
     SQLBUILD_ALLOW_HELP,
     SQLBUILD_SOURCES_HELP,
     SQLQUACK_ALLOW_HELP,
@@ -228,15 +230,11 @@ def _expanded_place(
         macro_name=macro_name,
         macro_place=None
         if macro_name is None
-        else _macro_place(call=macro_name, token=token, macros=sources.macros),
+        else macro_place(call=macro_name, token=token, macros=sources.macros),
     )
 
 
-_COMMENT_PREFIXES: tuple[str, ...] = ("#", "--")
-"""Lines that only comment on the macro, where a refused construct is never written."""
-
-
-def _macro_place(*, call: str, token: str, macros: Mapping[str, Any]) -> MacroPlace | None:
+def macro_place(*, call: str, token: str, macros: Mapping[str, Any]) -> MacroPlace | None:
     """Where macro `call` writes `token` in its own source: its body, for a Python macro."""
 
     name: str = call.split(".", 1)[1]
@@ -245,7 +243,8 @@ def _macro_place(*, call: str, token: str, macros: Mapping[str, Any]) -> MacroPl
     if macro is None or not word:
         return None
     lines: list[str] = str(macro.raw_source).split("\n")
-    start, end = 0, len(lines)
+    start: int = 0
+    end: int = len(lines)
     if call.startswith(_PYTHON_MACRO):
         short: str = name.rsplit(".", 1)[-1]
         start = next(
@@ -261,10 +260,10 @@ def _macro_place(*, call: str, token: str, macros: Mapping[str, Any]) -> MacroPl
             ),
             len(lines),
         )
-    call_suffix: str = r"\s*\(" if "(" in token else ""
+    call_suffix: str = r"\s*\(" if CALL_OPEN in token else ""
     pattern: re.Pattern[str] = re.compile(rf"\b{re.escape(word)}\b{call_suffix}", re.IGNORECASE)
     for index in range(start, end):
-        if lines[index].lstrip().startswith(_COMMENT_PREFIXES):
+        if lines[index].lstrip().startswith(COMMENT_PREFIXES):
             continue
         found: re.Match[str] | None = pattern.search(lines[index])
         if found is not None:

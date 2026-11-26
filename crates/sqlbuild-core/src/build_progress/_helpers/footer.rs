@@ -8,6 +8,7 @@ use crate::build_progress::constants::{
 };
 use crate::build_progress::models::{AuditResultText, BuildResultText, ErrorText, PythonNodeText};
 use crate::cli_text::models::CliStyle;
+use crate::run_output::main::render_failed_list::render_failed_list;
 use crate::run_output::main::short_reason::short_reason;
 
 /// Pass, warn, fail, timeout and skip counts of the footer.
@@ -492,4 +493,28 @@ pub(crate) fn failed_items(
         ));
     }
     items
+}
+
+/// The sections before the completion line: warnings, failures, not run, skipped, then the failed list.
+pub(crate) fn footer_sections(
+    result: &BuildResultText,
+    python: &[PythonNodeText],
+    style: CliStyle,
+) -> Vec<String> {
+    let mut lines: Vec<String> = warning_details(result, python, style);
+    lines.extend(ignored_failure_details(result, style));
+    lines.extend(failure_details(result, style));
+    lines.extend(python_failure_details(python, style));
+    lines.extend(not_run_details(result, style));
+    lines.extend(skipped_rollup(result, python, style));
+    let failed: Vec<(String, String)> = failed_items(result, python);
+    lines.extend(
+        render_failed_list(&failed, false, style)
+            .lines()
+            .map(str::to_owned),
+    );
+    while lines.last().is_some_and(String::is_empty) {
+        lines.pop();
+    }
+    lines
 }

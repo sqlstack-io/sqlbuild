@@ -1,12 +1,11 @@
 //! The few words a failed expectation's child row gives: `3 rows differ`, or `2 rows`.
 
 use crate::progress::models::ExpectationStep;
-use crate::test_command::constants::{ASSERTION_PREFIX, PASS_OUTCOME};
+use crate::test_command::constants::{ASSERTION_PREFIX, FAIL_OUTCOME};
 
-/// How many rows an assertion returned or an expectation got wrong; empty when it passed.
-#[must_use]
-pub fn expectation_summary(step: &ExpectationStep) -> String {
-    if step.outcome == PASS_OUTCOME {
+/// How many rows an assertion returned or an expectation got wrong; empty unless it failed.
+pub(crate) fn expectation_summary(step: &ExpectationStep) -> String {
+    if step.outcome != FAIL_OUTCOME {
         return String::new();
     }
     let rows = |count: i64| {

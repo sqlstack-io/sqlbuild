@@ -78,40 +78,48 @@ pub(super) fn failed_list(count: usize) -> Vec<(String, String)> {
         .collect()
 }
 
-/// A header of 40 tests where `causes` keep some off DuckDB, under `--run-on local` or auto.
-pub(super) fn header(local_only: bool, causes: usize, explain: bool) -> RunHeader {
-    let causes: Vec<HeaderCause> = (0..causes)
+/// `count` causes `fn:FUNCTION_<n>`, keeping 6, 5, 4, 3, 2 then 1 tests off DuckDB.
+pub(super) fn causes(count: usize) -> Vec<HeaderCause> {
+    (0..count)
         .map(|index| HeaderCause {
             label: format!("fn:FUNCTION_{index}"),
             count: 6 - index.min(5),
-            detail: "SQ0002 · 1 model".to_owned(),
+            detail: "SQ0002 \u{b7} 1 model".to_owned(),
         })
-        .collect();
-    let refused: usize = causes.iter().map(|cause| cause.count).sum();
+        .collect()
+}
+
+/// A header of 40 tests: how many run locally, on the warehouse and not at all, and the causes.
+pub(super) fn header(
+    causes: Vec<HeaderCause>,
+    (local, warehouse, not_run): (usize, usize, usize),
+    local_only: bool,
+) -> RunHeader {
     RunHeader {
         title: "Tests".to_owned(),
         nouns: ("test".to_owned(), "tests".to_owned()),
         selected: 40,
-        local: 40 - refused,
-        warehouse: if local_only { 0 } else { refused },
-        not_run: if local_only { refused } else { 0 },
+        local,
+        warehouse,
+        not_run,
         local_only,
         causes,
-        explain: if explain {
-            vec![
-                ExplainRow {
-                    count: 6,
-                    reason: "fn:FUNCTION_0".to_owned(),
-                    place: "sql/models/staging/stg_orders.sql:14".to_owned(),
-                },
-                ExplainRow {
-                    count: 5,
-                    reason: "fn:FUNCTION_1".to_owned(),
-                    place: "macro cents_to_dollars".to_owned(),
-                },
-            ]
-        } else {
-            Vec::new()
-        },
+        explain: Vec::new(),
     }
+}
+
+/// `--explain`'s rows for the first two causes: one in a model, one in a macro.
+pub(super) fn explain_rows() -> Vec<ExplainRow> {
+    vec![
+        ExplainRow {
+            count: 6,
+            reason: "fn:FUNCTION_0".to_owned(),
+            place: "sql/models/staging/stg_orders.sql:14".to_owned(),
+        },
+        ExplainRow {
+            count: 5,
+            reason: "fn:FUNCTION_1".to_owned(),
+            place: "macro cents_to_dollars".to_owned(),
+        },
+    ]
 }

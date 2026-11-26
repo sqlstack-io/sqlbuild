@@ -716,10 +716,10 @@ def test_given_snapshot_project_when_building_on_databricks_then_scd2_history_is
             description="runs databricks scenario remotely and retains inspectable artifacts",
             expected_stdout_fragments=(
                 "remote_event_rollup",
-                "Retained relations:",
-                "source raw_events -> __sqb_",
-                "model  stg_events -> __sqb_",
-                "model  event_rollup -> __sqb_",
+                "Retained (1):",
+                "source    raw_events -> __sqb_",
+                "model     stg_events -> __sqb_",
+                "model     event_rollup -> __sqb_",
                 "PASS=1  FAIL=0  TOTAL=1",
             ),
             expected_retained_suffix_counts={

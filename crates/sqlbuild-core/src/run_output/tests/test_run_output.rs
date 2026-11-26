@@ -2,18 +2,23 @@
 
 use crate::cli_text::models::CliStyle;
 use crate::run_output::main::cut_middle::cut_middle;
+use crate::run_output::main::render_cant_run_rollup::render_cant_run_rollup;
 use crate::run_output::main::render_failed_list::render_failed_list;
 use crate::run_output::main::render_failures::render_failures;
+use crate::run_output::main::render_moved_note::render_moved_note;
 use crate::run_output::main::render_progress_footer::render_progress_footer;
 use crate::run_output::main::render_progress_heartbeat::render_progress_heartbeat;
 use crate::run_output::main::render_run_completion::render_run_completion;
 use crate::run_output::main::render_run_header::render_run_header;
 use crate::run_output::main::short_reason::short_reason;
 use crate::run_output::models::RunCounts;
-use crate::run_output::tests::helpers::{LONG_NAME, failed_list, failure_entry, footer, header};
+use crate::run_output::models::RunHeader;
+use crate::run_output::tests::helpers::{
+    LONG_NAME, causes, explain_rows, failed_list, failure_entry, footer, header,
+};
 use crate::run_output::tests::test_types::{
-    CompletionTestCase, CutTestCase, FailedListTestCase, FailuresTestCase, FooterTestCase,
-    HeaderTestCase, HeartbeatTestCase, ReasonTestCase,
+    CauseLineTestCase, CompletionTestCase, CutTestCase, FailedListTestCase, FailuresTestCase,
+    FooterTestCase, HeaderTestCase, HeartbeatTestCase, ReasonTestCase,
 };
 
 const PLAIN: CliStyle = CliStyle { use_color: false };
@@ -203,31 +208,34 @@ fn given_run_on_split_when_rendering_header_then_explains_what_cant_run_locally(
     let test_cases = [
         HeaderTestCase {
             description: "everything local is one line",
-            header: header(false, 0, false),
+            header: header(causes(0), (40, 0, 0), false),
             columns: 80,
             expected_text: "Tests ready  40 selected, 40 local\n",
         },
         HeaderTestCase {
             description: "--run-on local draws the tree and caps the causes",
-            header: header(true, 6, false),
+            header: header(causes(6), (19, 0, 21), true),
             columns: 80,
             expected_text: "Tests ready  40 selected, 19 local, 21 can't run locally\n\nRun on (40)\n├── local                    19   DuckDB\n└── can't run locally        21   6 causes, listed after the run\n    ├── fn:FUNCTION_0         6   SQ0002 · 1 model\n    ├── fn:FUNCTION_1         5   SQ0002 · 1 model\n    ├── fn:FUNCTION_2         4   SQ0002 · 1 model\n    ├── fn:FUNCTION_3         3   SQ0002 · 1 model\n    ├── fn:FUNCTION_4         2   SQ0002 · 1 model\n    └── ... and 1 more\n",
         },
         HeaderTestCase {
             description: "auto at 80 columns wraps the note",
-            header: header(false, 6, false),
+            header: header(causes(6), (19, 21, 0), false),
             columns: 80,
             expected_text: "Tests ready  40 selected, 19 local, 21 on the warehouse\n  note: 21 tests run on the warehouse: fn:FUNCTION_0 6, fn:FUNCTION_1 5,\n        fn:FUNCTION_2 4, fn:FUNCTION_3 3, fn:FUNCTION_4 2, +1 more (--explain\n        for where)\n",
         },
         HeaderTestCase {
             description: "auto at 160 columns keeps the note on one line",
-            header: header(false, 6, false),
+            header: header(causes(6), (19, 21, 0), false),
             columns: 160,
             expected_text: "Tests ready  40 selected, 19 local, 21 on the warehouse\n  note: 21 tests run on the warehouse: fn:FUNCTION_0 6, fn:FUNCTION_1 5, fn:FUNCTION_2 4, fn:FUNCTION_3 3, fn:FUNCTION_4 2, +1 more (--explain for where)\n",
         },
         HeaderTestCase {
             description: "--explain adds where each cause is",
-            header: header(false, 2, true),
+            header: RunHeader {
+                explain: explain_rows(),
+                ..header(causes(2), (29, 11, 0), false)
+            },
             columns: 160,
             expected_text: "Tests ready  40 selected, 29 local, 11 on the warehouse\n  note: 11 tests run on the warehouse: fn:FUNCTION_0 6, fn:FUNCTION_1 5 (--explain for where)\n\nOn the warehouse (11 tests)\n  [ 6] fn:FUNCTION_0  sql/models/staging/stg_orders.sql:14\n  [ 5] fn:FUNCTION_1  macro cents_to_dollars\n",
         },
@@ -295,6 +303,41 @@ fn given_error_when_shortening_then_names_engine_kind_or_first_clause() {
         let reason = short_reason(test_case.code, test_case.message);
         assert_eq!(
             reason, test_case.expected_reason,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_causes_when_rendering_rollup_and_moved_note_then_names_at_most_five() {
+    let test_cases = [
+        CauseLineTestCase {
+            description: "the rollup counts what could not run locally",
+            causes: causes(2),
+            count: 11,
+            expected_rollup: "\n  Can't run locally (11): fn:FUNCTION_0 6, fn:FUNCTION_1 5; see below\n",
+            expected_note: "\n  note: 11 tests moved to the warehouse while running: fn:FUNCTION_0 6, fn:FUNCTION_1 5 (--verbose for why)\n",
+        },
+        CauseLineTestCase {
+            description: "past five causes the rest are counted",
+            causes: causes(6),
+            count: 1,
+            expected_rollup: "\n  Can't run locally (1): fn:FUNCTION_0 6, fn:FUNCTION_1 5, fn:FUNCTION_2 4, fn:FUNCTION_3 3, fn:FUNCTION_4 2, +1 more; see below\n",
+            expected_note: "\n  note: 1 test moved to the warehouse while running: fn:FUNCTION_0 6, fn:FUNCTION_1 5, fn:FUNCTION_2 4, fn:FUNCTION_3 3, fn:FUNCTION_4 2, +1 more (--verbose for why)\n",
+        },
+    ];
+
+    for test_case in test_cases {
+        assert_eq!(
+            render_cant_run_rollup(test_case.count, &test_case.causes, PLAIN),
+            test_case.expected_rollup,
+            "{}",
+            test_case.description
+        );
+        assert_eq!(
+            render_moved_note(test_case.count, &test_case.causes, ("test", "tests"), PLAIN),
+            test_case.expected_note,
             "{}",
             test_case.description
         );

@@ -1,13 +1,13 @@
 use serde_json::json;
 
 use crate::cli_text::models::CliStyle;
+use crate::run_on::_helpers::explain_rows::refusal_explain_rows;
 use crate::run_on::main::apply_local_refusals::apply_local_refusals;
 use crate::run_on::main::read_local_refusal::read_local_refusal;
 use crate::run_on::main::refusal_causes::refusal_causes;
-use crate::run_on::main::refusal_explain_rows::refusal_explain_rows;
 use crate::run_on::main::render_refusal_report::render_refusal_report;
 use crate::run_on::main::resolve_run_on::resolve_run_on;
-use crate::run_on::main::run_on_column::run_on_column;
+use crate::run_on::main::run_on_header::run_on_header;
 use crate::run_on::main::run_on_inspection_line::run_on_inspection_line;
 use crate::run_on::models::{LocalRefusal, RunOn, RunOnDecision};
 use crate::run_on::tests::helpers::{
@@ -15,7 +15,7 @@ use crate::run_on::tests::helpers::{
     refused_in_macro_source, refused_with_code, run_on_document, unplaced,
 };
 use crate::run_on::tests::test_types::{
-    CausesTestCase, ColumnTestCase, InspectionTestCase, JsonTestCase, LocalRefusalTestCase,
+    CausesTestCase, HeaderTestCase, InspectionTestCase, JsonTestCase, LocalRefusalTestCase,
     ReadTestCase, RenderTestCase, ResolveTestCase,
 };
 
@@ -142,7 +142,7 @@ fn given_refusals_when_rendering_report_then_groups_by_cause_and_lists_origins()
             errors: true,
             verbose: false,
             columns: 80,
-            expected_text: "\nCan't run locally (4 tests):\n\nerror[SQ0008]: HASH gives a different value in DuckDB          2 tests · 1 model\n   = note: Equal inputs still get equal hashes within one run.\n   = help: allow it with hash = true under [allow] in a sqlquack.toml\n     --> sql/models/staging/stg_orders.sql:26:3\n      |\n   26 |   HASH(status) AS status_hash\n      |   ^^^^^^^^^^^^ DuckDB computes its own hash, never Snowflake's\n\nerror[SQ0002]: fn:IS_DOUBLE has no DuckDB equivalent            1 test · 1 model\n   = help: run these tests on the warehouse with --run-on auto\n     --> sql/models/staging/stg_orders.sql:40:3\n      |\n   40 |   IS_DOUBLE(payload) AS is_number\n      |   ^^^^^^^^^^^^^^^^^ no rule converts this function\n\nerror: missing rule                                                       1 test\n   └── node:method_call  1 test   test_fact_orders\n   = note: no rule converts METHOD CALL\n   = help: run these tests on the warehouse with --run-on auto\n",
+            expected_text: "\nCan't run locally (4 tests):\n\nerror[SQ0008]: HASH gives a different value in DuckDB          2 tests · 1 model\n   = note: Equal inputs still get equal hashes within one run.\n   = help: allow it for local tests in sqlbuild_project.toml with\n           `[testing.local] allow = { hash = true }`; `sqlquack explain hash` says when it is safe\n     --> sql/models/staging/stg_orders.sql:26:3\n      |\n   26 |   HASH(status) AS status_hash\n      |   ^^^^^^^^^^^^ DuckDB computes its own hash, never Snowflake's\n\nerror[SQ0002]: fn:IS_DOUBLE has no DuckDB equivalent            1 test · 1 model\n   = help: run these tests on the warehouse with --run-on auto\n     --> sql/models/staging/stg_orders.sql:40:3\n      |\n   40 |   IS_DOUBLE(payload) AS is_number\n      |   ^^^^^^^^^^^^^^^^^ no rule converts this function\n\nerror: missing rule                                                       1 test\n   └── node:method_call  1 test   test_fact_orders\n   = note: no rule converts METHOD CALL\n   = help: run these tests on the warehouse with --run-on auto\n",
         },
         RenderTestCase {
             description: "--run-on local at 160 columns",
@@ -155,7 +155,7 @@ fn given_refusals_when_rendering_report_then_groups_by_cause_and_lists_origins()
             errors: true,
             verbose: false,
             columns: 160,
-            expected_text: "\nCan't run locally (4 tests):\n\nerror[SQ0008]: HASH gives a different value in DuckDB                                                                                          2 tests · 1 model\n   = note: Equal inputs still get equal hashes within one run.\n   = help: allow it with hash = true under [allow] in a sqlquack.toml\n     --> sql/models/staging/stg_orders.sql:26:3\n      |\n   26 |   HASH(status) AS status_hash\n      |   ^^^^^^^^^^^^ DuckDB computes its own hash, never Snowflake's\n\nerror[SQ0002]: fn:IS_DOUBLE has no DuckDB equivalent                                                                                            1 test · 1 model\n   = help: run these tests on the warehouse with --run-on auto\n     --> sql/models/staging/stg_orders.sql:40:3\n      |\n   40 |   IS_DOUBLE(payload) AS is_number\n      |   ^^^^^^^^^^^^^^^^^ no rule converts this function\n\nerror: missing rule                                                                                                                                       1 test\n   └── node:method_call  1 test   test_fact_orders\n   = note: no rule converts METHOD CALL\n   = help: run these tests on the warehouse with --run-on auto\n",
+            expected_text: "\nCan't run locally (4 tests):\n\nerror[SQ0008]: HASH gives a different value in DuckDB                                                                                          2 tests · 1 model\n   = note: Equal inputs still get equal hashes within one run.\n   = help: allow it for local tests in sqlbuild_project.toml with\n           `[testing.local] allow = { hash = true }`; `sqlquack explain hash` says when it is safe\n     --> sql/models/staging/stg_orders.sql:26:3\n      |\n   26 |   HASH(status) AS status_hash\n      |   ^^^^^^^^^^^^ DuckDB computes its own hash, never Snowflake's\n\nerror[SQ0002]: fn:IS_DOUBLE has no DuckDB equivalent                                                                                            1 test · 1 model\n   = help: run these tests on the warehouse with --run-on auto\n     --> sql/models/staging/stg_orders.sql:40:3\n      |\n   40 |   IS_DOUBLE(payload) AS is_number\n      |   ^^^^^^^^^^^^^^^^^ no rule converts this function\n\nerror: missing rule                                                                                                                                       1 test\n   └── node:method_call  1 test   test_fact_orders\n   = note: no rule converts METHOD CALL\n   = help: run these tests on the warehouse with --run-on auto\n",
         },
         RenderTestCase {
             description: "auto --verbose: the tests run on the warehouse, so each cause is a note",
@@ -166,7 +166,7 @@ fn given_refusals_when_rendering_report_then_groups_by_cause_and_lists_origins()
             errors: false,
             verbose: true,
             columns: 80,
-            expected_text: "\nOn the warehouse (2 tests):\n\nnote[SQ0008]: HASH gives a different value in DuckDB            1 test · 1 model\n   = note: Equal inputs still get equal hashes within one run.\n   = help: allow it with hash = true under [allow] in a sqlquack.toml\n     --> sql/models/staging/stg_orders.sql:26:3\n      |\n   26 |   HASH(status) AS status_hash\n      |   ^^^^^^^^^^^^ DuckDB computes its own hash, never Snowflake's\n\nnote: missing rule                                                        1 test\n   └── node:method_call  1 test   test_fact_orders\n   = note: no rule converts METHOD CALL\n",
+            expected_text: "\nOn the warehouse (2 tests):\n\nnote[SQ0008]: HASH gives a different value in DuckDB            1 test · 1 model\n   = note: Equal inputs still get equal hashes within one run.\n   = help: allow it for local tests in sqlbuild_project.toml with\n           `[testing.local] allow = { hash = true }`; `sqlquack explain hash` says when it is safe\n     --> sql/models/staging/stg_orders.sql:26:3\n      |\n   26 |   HASH(status) AS status_hash\n      |   ^^^^^^^^^^^^ DuckDB computes its own hash, never Snowflake's\n\nnote: missing rule                                                        1 test\n   └── node:method_call  1 test   test_fact_orders\n   = note: no rule converts METHOD CALL\n",
         },
         RenderTestCase {
             description: "two places of one cause are one group with both frames",
@@ -177,7 +177,7 @@ fn given_refusals_when_rendering_report_then_groups_by_cause_and_lists_origins()
             errors: true,
             verbose: false,
             columns: 80,
-            expected_text: "\nCan't run locally (2 tests):\n\nerror[SQ0008]: HASH gives a different value in DuckDB\n   2 tests · 1 model · 2 places\n   = note: Equal inputs still get equal hashes within one run.\n   = help: allow it with hash = true under [allow] in a sqlquack.toml\n\n   1. stg_orders  1 test\n        --> sql/models/staging/stg_orders.sql:26:3\n         |\n      26 |   HASH(status) AS status_hash\n         |   ^^^^^^^^^^^^ DuckDB computes its own hash, never Snowflake's\n\n   2. stg_orders  1 test\n        --> sql/models/staging/stg_orders.sql:31:3\n         |\n      31 |   HASH(status) AS status_hash\n         |   ^^^^^^^^^^^^ DuckDB computes its own hash, never Snowflake's\n",
+            expected_text: "\nCan't run locally (2 tests):\n\nerror[SQ0008]: HASH gives a different value in DuckDB\n   2 tests · 1 model · 2 places\n   = note: Equal inputs still get equal hashes within one run.\n   = help: allow it for local tests in sqlbuild_project.toml with\n           `[testing.local] allow = { hash = true }`; `sqlquack explain hash` says when it is safe\n\n   1. stg_orders  1 test\n        --> sql/models/staging/stg_orders.sql:26:3\n         |\n      26 |   HASH(status) AS status_hash\n         |   ^^^^^^^^^^^^ DuckDB computes its own hash, never Snowflake's\n\n   2. stg_orders  1 test\n        --> sql/models/staging/stg_orders.sql:31:3\n         |\n      31 |   HASH(status) AS status_hash\n         |   ^^^^^^^^^^^^ DuckDB computes its own hash, never Snowflake's\n",
         },
     ];
     for test_case in test_cases {
@@ -209,30 +209,6 @@ fn given_decision_when_inspecting_then_names_where_it_runs_and_why() {
         assert_eq!(
             run_on_inspection_line(&test_case.decision),
             test_case.expected_line,
-            "{}",
-            test_case.description
-        );
-    }
-}
-
-#[test]
-fn given_run_on_when_rendering_row_column_then_pads_to_one_width() {
-    let test_cases = [
-        ColumnTestCase {
-            description: "local is padded to warehouse's width",
-            run_on: "local",
-            expected_column: "local    ",
-        },
-        ColumnTestCase {
-            description: "warehouse fills the column",
-            run_on: "warehouse",
-            expected_column: "warehouse",
-        },
-    ];
-    for test_case in test_cases {
-        assert_eq!(
-            run_on_column(test_case.run_on),
-            test_case.expected_column,
             "{}",
             test_case.description
         );
@@ -312,7 +288,7 @@ fn given_refusal_in_macro_when_rendering_then_frames_the_macro_source_or_the_cal
             errors: true,
             verbose: false,
             columns: 80,
-            expected_text: "\nCan't run locally (1 test):\n\nerror[SQ0008]: HASH gives a different value in DuckDB           1 test · 1 model\n   = note: Equal inputs still get equal hashes within one run.\n   = help: allow it with hash = true under [allow] in a sqlquack.toml\n    --> sql/macros/status_hash.sql:3:5\n     |\n   3 |     HASH(status)\n     |     ^^^^^^^^^^^^ DuckDB computes its own hash, never Snowflake's\n    = used by 1 model:\n      stg_orders (1)\n",
+            expected_text: "\nCan't run locally (1 test):\n\nerror[SQ0008]: HASH gives a different value in DuckDB           1 test · 1 model\n   = note: Equal inputs still get equal hashes within one run.\n   = help: allow it for local tests in sqlbuild_project.toml with\n           `[testing.local] allow = { hash = true }`; `sqlquack explain hash` says when it is safe\n    --> sql/macros/status_hash.sql:3:5\n     |\n   3 |     HASH(status)\n     |     ^^^^^^^^^^^^ DuckDB computes its own hash, never Snowflake's\n    = used by 1 model:\n      stg_orders (1)\n",
         },
         RenderTestCase {
             description: "the construct isn't in the macro's file, so the call site is framed",
@@ -320,7 +296,7 @@ fn given_refusal_in_macro_when_rendering_then_frames_the_macro_source_or_the_cal
             errors: true,
             verbose: false,
             columns: 80,
-            expected_text: "\nCan't run locally (1 test):\n\nerror[SQ0008]: HASH gives a different value in DuckDB           1 test · 1 model\n   = note: Equal inputs still get equal hashes within one run.\n   = help: allow it with hash = true under [allow] in a sqlquack.toml\n     --> sql/models/staging/stg_orders.sql:12:5\n      |\n   12 |   status, HASH(status) AS status_hash\n      |           ^^^^^^^^^^^^ DuckDB computes its own hash, never Snowflake's\n      = expanded from @py.status_hash at sql/models/staging/stg_orders.sql:12:5\n",
+            expected_text: "\nCan't run locally (1 test):\n\nerror[SQ0008]: HASH gives a different value in DuckDB           1 test · 1 model\n   = note: Equal inputs still get equal hashes within one run.\n   = help: allow it for local tests in sqlbuild_project.toml with\n           `[testing.local] allow = { hash = true }`; `sqlquack explain hash` says when it is safe\n     --> sql/models/staging/stg_orders.sql:12:5\n      |\n   12 |   status, HASH(status) AS status_hash\n      |           ^^^^^^^^^^^^ DuckDB computes its own hash, never Snowflake's\n      = expanded from @py.status_hash at sql/models/staging/stg_orders.sql:12:5\n",
         },
     ];
     for test_case in test_cases {
@@ -386,6 +362,82 @@ fn given_a_local_test_refused_while_running_when_applied_then_auto_moves_it_and_
         assert_eq!(
             decisions,
             vec![test_case.expected_decision, local("test_customers")],
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_decisions_when_building_header_then_counts_where_tests_run_by_mode() {
+    let decisions: Vec<RunOnDecision> = vec![
+        local("a"),
+        local("b"),
+        refused("c", "fn:HASH", 26),
+        unplaced("d"),
+    ];
+    let local_refused: Vec<RunOnDecision> = decisions
+        .iter()
+        .cloned()
+        .map(|decision| RunOnDecision {
+            run_on: "local".to_owned(),
+            ..decision
+        })
+        .collect();
+    let test_cases = [
+        HeaderTestCase {
+            description: "auto sends refused tests to the warehouse and explains them",
+            decisions: decisions.clone(),
+            mode: RunOn::Auto,
+            explain: true,
+            expected_counts: (2, 2, 0),
+            expected_causes: 2,
+            expected_explain_rows: 2,
+        },
+        HeaderTestCase {
+            description: "--run-on local runs nothing refused and lists the causes",
+            decisions: local_refused,
+            mode: RunOn::Local,
+            explain: true,
+            expected_counts: (2, 0, 2),
+            expected_causes: 2,
+            expected_explain_rows: 0,
+        },
+        HeaderTestCase {
+            description: "--run-on warehouse names no causes",
+            decisions: decisions
+                .iter()
+                .cloned()
+                .map(|decision| RunOnDecision {
+                    run_on: "warehouse".to_owned(),
+                    refusals: Vec::new(),
+                    ..decision
+                })
+                .collect(),
+            mode: RunOn::Warehouse,
+            explain: true,
+            expected_counts: (0, 4, 0),
+            expected_causes: 0,
+            expected_explain_rows: 0,
+        },
+    ];
+    for test_case in test_cases {
+        let header = run_on_header(
+            &test_case.decisions,
+            (test_case.mode, test_case.explain),
+            ("Tests", NOUNS),
+        );
+        assert_eq!(
+            (
+                (header.local, header.warehouse, header.not_run),
+                header.causes.len(),
+                header.explain.len()
+            ),
+            (
+                test_case.expected_counts,
+                test_case.expected_causes,
+                test_case.expected_explain_rows
+            ),
             "{}",
             test_case.description
         );

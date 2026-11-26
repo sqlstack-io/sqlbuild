@@ -30,12 +30,6 @@ pub(super) struct InspectionTestCase {
     pub(super) expected_line: &'static str,
 }
 
-pub(super) struct ColumnTestCase {
-    pub(super) description: &'static str,
-    pub(super) run_on: &'static str,
-    pub(super) expected_column: &'static str,
-}
-
 pub(super) struct JsonTestCase {
     pub(super) description: &'static str,
     pub(super) decisions: Vec<RunOnDecision>,
@@ -54,4 +48,14 @@ pub(super) struct LocalRefusalTestCase {
     pub(super) description: &'static str,
     pub(super) mode: RunOn,
     pub(super) expected_decision: RunOnDecision,
+}
+
+pub(super) struct HeaderTestCase {
+    pub(super) description: &'static str,
+    pub(super) decisions: Vec<RunOnDecision>,
+    pub(super) mode: RunOn,
+    pub(super) explain: bool,
+    pub(super) expected_counts: (usize, usize, usize),
+    pub(super) expected_causes: usize,
+    pub(super) expected_explain_rows: usize,
 }

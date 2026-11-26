@@ -139,7 +139,7 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
         expected_exit_code=0,
         expected_stdout_fragments=(
             "order_totals_pass",
-            "Retained local DuckDB:",
+            "Retained (1):",
             "PASS=1  FAIL=0  TOTAL=1",
         ),
         retained_duckdb_relative_path=Path("target/run/scenarios/order_totals_pass/local.duckdb"),
@@ -157,9 +157,9 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
         expected_stdout_fragments=(
             "order_totals_pass",
             "ERROR",
-            "error[X604]:",
-            "Retained local DuckDB:",
-            "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
+            "[X604]",
+            "Retained (1):",
+            "PASS=0  FAIL=1  TOTAL=1",
         ),
         retained_duckdb_relative_path=Path("target/run/scenarios/order_totals_pass/local.duckdb"),
         retained_count_sql='SELECT COUNT(*) FROM "__sqb_local__source__raw_orders"',
@@ -175,8 +175,8 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
         expected_stdout_fragments=(
             "order_totals_fail",
             "FAIL",
-            "error[X506]:",
-            "expect    expected order_totals",
+            "expected rows of order_totals differ",
+            "expected  order_totals",
             "PASS=0  FAIL=1  TOTAL=1",
         ),
         retained_duckdb_relative_path=Path("target/run/scenarios/order_totals_fail/local.duckdb"),
@@ -194,9 +194,9 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
         expected_stdout_fragments=(
             "local_model_error",
             "ERROR",
-            "error[X608]:",
+            "[X608]",
             "not_a_number_",
-            "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
+            "PASS=0  FAIL=1  TOTAL=1",
         ),
         retained_duckdb_relative_path=Path("target/run/scenarios/local_model_error/local.duckdb"),
         retained_count_sql='SELECT COUNT(*) FROM "__sqb_local__source__raw_orders"',
@@ -282,10 +282,10 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
         expected_stdout_fragments=(
             "local_sql_function_setup_error",
             "ERROR",
-            "error[X609]:",
+            "[X609]",
             "local function 'bad_sql_function' failed",
             "missing_col",
-            "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
+            "PASS=0  FAIL=1  TOTAL=1",
         ),
         retained_duckdb_relative_path=Path(
             "target/run/scenarios/local_sql_function_setup_error/local.duckdb"
@@ -337,10 +337,9 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
         expected_exit_code=1,
         expected_stdout_fragments=(
             "local_sql_function_transpile_error",
-            "ERROR",
-            "error[X607]:",
-            "cannot run locally: SQLQuack converts Snowflake SQL only",
-            "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
+            "error: dialect",
+            "SQLQuack converts Snowflake SQL only, not not_a_sql_analysis_dialect",
+            "PASS=0  FAIL=0  NOT_RUN=1  TOTAL=1",
         ),
         retained_duckdb_relative_path=Path(
             "target/run/scenarios/local_sql_function_transpile_error/local.duckdb"
@@ -389,9 +388,9 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
         expected_stdout_fragments=(
             "local_sql_function_runtime_error",
             "ERROR",
-            "error[X608]:",
+            "[X608]",
             "Could not convert string",
-            "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
+            "PASS=0  FAIL=1  TOTAL=1",
         ),
         retained_duckdb_relative_path=Path(
             "target/run/scenarios/local_sql_function_runtime_error/local.duckdb"
@@ -498,9 +497,9 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
         expected_stdout_fragments=(
             "local_python_function_error",
             "ERROR",
-            "error[X609]:",
-            "cannot set database or schema",
-            "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
+            "[X609]",
+            "database or schema because DuckDB registers Python UDFs",
+            "PASS=0  FAIL=1  TOTAL=1",
         ),
         retained_duckdb_relative_path=Path(
             "target/run/scenarios/local_python_function_error/local.duckdb"
@@ -561,9 +560,9 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
         expected_stdout_fragments=(
             "local_python_function_runtime_error",
             "ERROR",
-            "error[X608]:",
+            "[X608]",
             "python udf exploded",
-            "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
+            "PASS=0  FAIL=1  TOTAL=1",
         ),
         retained_duckdb_relative_path=Path(
             "target/run/scenarios/local_python_function_runtime_error/local.duckdb"
@@ -614,9 +613,9 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
             expected_exit_code=0,
             expected_stdout_fragments=(
                 "Execution  sqb scenario test  (target: order_totals_pass, concurrency: 1)",
-                "Scenario (1 selected)",
+                "Scenarios ready  1 selected",
                 "order_totals_pass",
-                "expect    expected order_totals",
+                "PASS   warehouse",
                 "PASS=1  FAIL=0  TOTAL=1",
             ),
             expected_retained_prefix_count=0,
@@ -626,9 +625,9 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
             command=("--no-color", "scenario", "test", "orders_assert_pass"),
             expected_exit_code=0,
             expected_stdout_fragments=(
-                "Scenario (1 selected)",
+                "Scenarios ready  1 selected",
                 "orders_assert_pass",
-                "expect    assertion no_negative_orders",
+                "PASS   warehouse",
                 "PASS=1  FAIL=0  TOTAL=1",
             ),
             expected_retained_prefix_count=0,
@@ -643,9 +642,9 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
             ),
             expected_exit_code=0,
             expected_stdout_fragments=(
-                "Scenario (1 selected)",
+                "Scenarios ready  1 selected",
                 "orders_assert_pass",
-                "expect    assertion no_negative_orders",
+                "PASS   warehouse",
                 "PASS=1  FAIL=0  TOTAL=1",
             ),
             expected_retained_prefix_count=0,
@@ -661,11 +660,10 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
             ),
             expected_exit_code=0,
             expected_stdout_fragments=(
-                "Scenario (2 selected)",
+                "Scenarios ready  2 selected",
                 "order_totals_pass",
                 "orders_assert_pass",
-                "expect    expected order_totals",
-                "expect    assertion no_negative_orders",
+                "PASS   warehouse",
                 "PASS=2  FAIL=0  TOTAL=2",
             ),
             expected_retained_prefix_count=0,
@@ -675,9 +673,9 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
             command=("--no-color", "scenario", "test", "tests/scenarios/nested"),
             expected_exit_code=0,
             expected_stdout_fragments=(
-                "Scenario (1 selected)",
+                "Scenarios ready  1 selected",
                 "orders_assert_pass",
-                "expect    assertion no_negative_orders",
+                "PASS   warehouse",
                 "PASS=1  FAIL=0  TOTAL=1",
             ),
             expected_retained_prefix_count=0,
@@ -687,9 +685,9 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
             command=("--no-color", "scenario", "test", "orders_assert_pass", "nested"),
             expected_exit_code=0,
             expected_stdout_fragments=(
-                "Scenario (1 selected)",
+                "Scenarios ready  1 selected",
                 "orders_assert_pass",
-                "expect    assertion no_negative_orders",
+                "PASS   warehouse",
                 "PASS=1  FAIL=0  TOTAL=1",
             ),
             expected_retained_prefix_count=0,
@@ -699,13 +697,12 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
             command=("--no-color", "scenario", "test", "order_totals_pass", "--retain"),
             expected_exit_code=0,
             expected_stdout_fragments=(
-                "Scenario (1 selected)",
+                "Scenarios ready  1 selected",
                 "order_totals_pass",
-                "Retained relations:",
-                "expect    expected order_totals",
-                "source raw_orders -> __sqb_",
-                "model  orders -> __sqb_",
-                "model  order_totals -> __sqb_",
+                "Retained (1):",
+                "source    raw_orders -> __sqb_",
+                "model     orders -> __sqb_",
+                "model     order_totals -> __sqb_",
                 "PASS=1  FAIL=0  TOTAL=1",
             ),
             expected_retained_prefix_count=3,
@@ -715,14 +712,12 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
             command=("--no-color", "scenario", "test", "order_totals_fail"),
             expected_exit_code=1,
             expected_stdout_fragments=(
-                "Scenario (1 selected)",
+                "Scenarios ready  1 selected",
                 "order_totals_fail",
-                "error[X506]: scenario 'order_totals_fail' expected comparison for model "
-                "'order_totals' failed: actual=1 expected=1 mismatched=1",
-                "= help: Compare the expected CTE with the retained scenario model relation.",
-                "expect    expected order_totals",
-                "expected order_totals:",
+                "FAIL   2 rows differ",
+                "expected rows of order_totals differ: 1 missing, 1 extra (1 expected, 1 actual)",
                 "Rerun with --retain to inspect scenario-owned artifacts.",
+                "\u2717 order_totals_fail  2 rows differ",
                 "PASS=0  FAIL=1  TOTAL=1",
             ),
             expected_retained_prefix_count=0,
@@ -764,7 +759,7 @@ def test_given_scenario_project_when_running_scenario_test_then_cli_behaves_as_e
             command=("--no-color", "scenario", "test", "order_totals_pass", "--retain"),
             expected_exit_code=0,
             expected_stdout_fragments=(
-                "Scenario (1 selected)",
+                "Scenarios ready  1 selected",
                 "order_totals_pass",
                 "PASS=1  FAIL=0  TOTAL=1",
             ),
@@ -807,8 +802,9 @@ def test_given_scenario_project_with_python_hooks_when_running_cli_then_hooks_ex
             expected_exit_code=0,
             expected_stdout_fragments=(
                 "order_totals_pass",
-                "PASS  warehouse",
-                "PASS=1  FAIL=0  TOTAL=1  (0 local, 1 warehouse",
+                "PASS   warehouse",
+                "  1 on the warehouse\n",
+                "PASS=1  FAIL=0  TOTAL=1",
             ),
         ),
         ScenarioLocalCliE2ETestCase(
@@ -823,10 +819,9 @@ def test_given_scenario_project_with_python_hooks_when_running_cli_then_hooks_ex
             ),
             expected_exit_code=1,
             expected_stdout_fragments=(
-                "order_totals_pass",
-                "ERROR",
-                "error[X601]:",
-                "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
+                "\u2514\u2500\u2500 snapshot missing",
+                "\u2514\u2500\u2500 order_totals_pass  1 scenario\n",
+                "PASS=0  FAIL=0  NOT_RUN=1  TOTAL=1",
             ),
         ),
     ),
@@ -864,7 +859,7 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
             expected_exit_code=0,
             expected_stdout_fragments=(
                 "order_totals_pass",
-                "Retained local DuckDB:",
+                "Retained (1):",
                 "PASS=1  FAIL=0  TOTAL=1",
             ),
             retained_duckdb_relative_path=Path(
@@ -886,9 +881,9 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
             expected_stdout_fragments=(
                 "order_totals_pass",
                 "ERROR",
-                "error[X604]:",
-                "Retained local DuckDB:",
-                "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
+                "[X604]",
+                "Retained (1):",
+                "PASS=0  FAIL=1  TOTAL=1",
             ),
             retained_duckdb_relative_path=Path(
                 "target/run/scenarios/order_totals_pass/local.duckdb"
@@ -906,8 +901,8 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
             expected_stdout_fragments=(
                 "order_totals_fail",
                 "FAIL",
-                "error[X506]:",
-                "expect    expected order_totals",
+                "expected rows of order_totals differ",
+                "expected  order_totals",
                 "PASS=0  FAIL=1  TOTAL=1",
             ),
             retained_duckdb_relative_path=Path(
@@ -929,9 +924,9 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
             expected_stdout_fragments=(
                 "local_model_error",
                 "ERROR",
-                "error[X608]:",
+                "[X608]",
                 "not_a_number_",
-                "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
+                "PASS=0  FAIL=1  TOTAL=1",
             ),
             retained_duckdb_relative_path=Path(
                 "target/run/scenarios/local_model_error/local.duckdb"
@@ -1026,10 +1021,10 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
             expected_stdout_fragments=(
                 "local_sql_function_setup_error",
                 "ERROR",
-                "error[X609]:",
+                "[X609]",
                 "local function 'bad_sql_function' failed",
                 "missing_col",
-                "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
+                "PASS=0  FAIL=1  TOTAL=1",
             ),
             retained_duckdb_relative_path=Path(
                 "target/run/scenarios/local_sql_function_setup_error/local.duckdb"
@@ -1081,10 +1076,9 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
             expected_exit_code=1,
             expected_stdout_fragments=(
                 "local_sql_function_transpile_error",
-                "ERROR",
-                "error[X607]:",
-                "cannot run locally: SQLQuack converts Snowflake SQL only",
-                "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
+                "error: dialect",
+                "SQLQuack converts Snowflake SQL only, not not_a_sql_analysis_dialect",
+                "PASS=0  FAIL=0  NOT_RUN=1  TOTAL=1",
             ),
             retained_duckdb_relative_path=Path(
                 "target/run/scenarios/local_sql_function_transpile_error/local.duckdb"
@@ -1138,9 +1132,9 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
             expected_stdout_fragments=(
                 "local_sql_function_runtime_error",
                 "ERROR",
-                "error[X608]:",
+                "[X608]",
                 "Could not convert string",
-                "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
+                "PASS=0  FAIL=1  TOTAL=1",
             ),
             retained_duckdb_relative_path=Path(
                 "target/run/scenarios/local_sql_function_runtime_error/local.duckdb"
@@ -1247,9 +1241,9 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
             expected_stdout_fragments=(
                 "local_python_function_error",
                 "ERROR",
-                "error[X609]:",
-                "cannot set database or schema",
-                "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
+                "[X609]",
+                "database or schema because DuckDB registers Python UDFs",
+                "PASS=0  FAIL=1  TOTAL=1",
             ),
             retained_duckdb_relative_path=Path(
                 "target/run/scenarios/local_python_function_error/local.duckdb"
@@ -1310,9 +1304,9 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
             expected_stdout_fragments=(
                 "local_python_function_runtime_error",
                 "ERROR",
-                "error[X608]:",
+                "[X608]",
                 "python udf exploded",
-                "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
+                "PASS=0  FAIL=1  TOTAL=1",
             ),
             retained_duckdb_relative_path=Path(
                 "target/run/scenarios/local_python_function_runtime_error/local.duckdb"
@@ -1509,8 +1503,8 @@ def test_given_committed_snapshot_when_running_local_scenario_then_replays_witho
                 "Snapshots are fresh.",
                 "order_totals_pass",
                 "ERROR",
-                "error[X604]:",
-                "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
+                "[X604]",
+                "PASS=0  FAIL=1  TOTAL=1",
             ),
             initial_capture=True,
             corrupt_jsonl=True,
@@ -1626,12 +1620,12 @@ def test_given_local_snapshot_sync_when_running_local_scenario_then_captures_exp
             command=("--no-color", "scenario", "test"),
             expected_exit_code=1,
             expected_stdout_fragments=(
-                "Scenario (3 selected)",
+                "Scenarios ready  3 selected",
                 "order_totals_pass",
                 "orders_assert_pass",
                 "order_totals_fail",
-                "expect    expected order_totals",
-                "expect    assertion no_negative_orders",
+                "expected  order_totals",
+                "\u2717 order_totals_fail  2 rows differ",
                 "PASS=2  FAIL=1  TOTAL=3",
             ),
             expected_retained_prefix_count=0,
@@ -1679,13 +1673,13 @@ def test_given_multiple_scenarios_when_running_without_selector_then_runs_all_sc
             ),
             expected_exit_code=0,
             expected_stdout_fragments=(
-                "Scenario (2 selected)",
+                "Scenarios ready  2 selected",
                 "order_totals_pass",
                 "orders_assert_pass",
-                "Retained relations:",
-                "source raw_orders -> __sqb_",
-                "model  orders -> __sqb_",
-                "model  order_totals -> __sqb_",
+                "Retained (2):",
+                "source    raw_orders -> __sqb_",
+                "model     orders -> __sqb_",
+                "model     order_totals -> __sqb_",
                 "PASS=2  FAIL=0  TOTAL=2",
             ),
             expected_retained_prefix_count=5,
@@ -1868,20 +1862,19 @@ def test_given_local_scenario_command_when_sql_validation_disabled_then_fails_cl
     [
         ScenarioCliE2ETestCase(
             description="waffle shop fixture scenarios pass on duckdb",
-            command=("--no-color", "scenario", "test"),
+            command=("--no-color", "scenario", "test", "--verbose"),
             expected_exit_code=0,
             expected_stdout_fragments=(
-                "Scenario (3 selected)",
+                "Scenarios ready  3 selected",
                 "Connecting to duckdb...",
-                "Running scenarios...",
                 "daily_revenue_minimal",
-                "expect    expected daily_revenue",
-                "expect    assertion no_negative_revenue",
+                "expected  daily_revenue",
+                "assertion no_negative_revenue",
                 "daily_revenue_multi_order",
-                "expect    assertion positive_average_order_value",
+                "assertion positive_average_order_value",
                 "fact_order_retained_artifacts",
-                "expect    expected scenario_order_prices",
-                "expect    assertion positive_line_total",
+                "expected  scenario_order_prices",
+                "assertion positive_line_total",
                 "PASS=3  FAIL=0  TOTAL=3",
             ),
             expected_retained_prefix_count=0,
@@ -1924,16 +1917,15 @@ def test_given_waffle_shop_fixture_when_running_scenario_test_then_scenarios_pas
             ),
             expected_exit_code=0,
             expected_stdout_fragments=(
-                "Scenario (1 selected)",
+                "Scenarios ready  1 selected",
                 "fact_order_retained_artifacts",
-                "expect    expected scenario_order_prices",
-                "expect    assertion positive_line_total",
-                "Retained relations:",
-                "source raw_orders -> __sqb_",
-                "ref    stg_payments -> __sqb_",
-                "seed   waffle_types -> __sqb_",
-                "model  stg_orders -> __sqb_",
-                "model  scenario_order_prices -> __sqb_",
+                "PASS   warehouse",
+                "Retained (1):",
+                "source    raw_orders -> __sqb_",
+                "ref       stg_payments -> __sqb_",
+                "seed      waffle_types -> __sqb_",
+                "model     stg_orders -> __sqb_",
+                "model     scenario_order_prices -> __sqb_",
                 "PASS=1  FAIL=0  TOTAL=1",
             ),
             expected_retained_prefix_count=5,

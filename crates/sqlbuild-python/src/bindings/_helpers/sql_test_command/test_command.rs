@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Instant;
 
+use crate::bindings::_helpers::scenario_command::presentation::child_records;
 use pyo3::IntoPyObject;
 use pyo3::prelude::{
     Bound, Py, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
@@ -20,15 +21,18 @@ use sqlbuild_core::progress::models::StatementSummary;
 use sqlbuild_core::run_on::main::apply_local_refusals::apply_local_refusals;
 use sqlbuild_core::run_on::main::read_run_on_decisions::read_run_on_decisions;
 use sqlbuild_core::run_on::main::refusal_causes::refusal_causes;
-use sqlbuild_core::run_on::main::refusal_explain_rows::refusal_explain_rows;
 use sqlbuild_core::run_on::main::render_refusal_report::render_refusal_report;
+use sqlbuild_core::run_on::main::run_on_header::run_on_header;
 use sqlbuild_core::run_on::main::with_run_on_json::with_run_on_json;
 use sqlbuild_core::run_on::models::{LocalRefusal, RunOn, RunOnDecision};
+use sqlbuild_core::run_output::main::render_cant_run_rollup::render_cant_run_rollup;
 use sqlbuild_core::run_output::main::render_failed_list::render_failed_list;
 use sqlbuild_core::run_output::main::render_failures::render_failures;
+use sqlbuild_core::run_output::main::render_moved_note::render_moved_note;
 use sqlbuild_core::run_output::main::render_run_completion::render_run_completion;
 use sqlbuild_core::run_output::main::render_run_header::render_run_header;
-use sqlbuild_core::run_output::models::{FailureEntry, HeaderCause, RunCounts, RunHeader};
+use sqlbuild_core::run_output::models::{FailureEntry, HeaderCause, RunCounts};
+use sqlbuild_core::test_command::main::expectation_child_rows::expectation_child_rows;
 use sqlbuild_core::test_command::main::render_test_inspection::render_test_inspection;
 use sqlbuild_core::test_command::main::test_exit_code::test_exit_code;
 use sqlbuild_core::test_command::main::test_failure_entry::test_failure_entry;
@@ -37,7 +41,9 @@ use sqlbuild_core::test_command::main::test_name_width::test_name_width;
 use sqlbuild_core::test_command::main::test_outcome_status::test_outcome_status;
 use sqlbuild_core::test_command::models::{TestFailureFacts, TestInspectionEntry, TestPlanWarning};
 use sqlbuild_host::entries::models::ExecutorHost;
-use sqlbuild_host::models::{SqlTestExecutionResult, SqlTestOutcome};
+use sqlbuild_host::models::{
+    SqlTestColumnDifference, SqlTestDifferenceSample, SqlTestExecutionResult, SqlTestOutcome,
+};
 use sqlbuild_host::types::ResultEnum;
 use sqlbuild_orchestration::runs::models::NodeOutcome;
 use sqlbuild_python_base::build_progress::main::terminal::terminal_columns::terminal_columns;
@@ -86,7 +92,6 @@ use sqlbuild_python_compile::compile_outputs::main::planned_sql_test_path::plann
 use sqlbuild_python_compile::compile_outputs::main::write_test_runtime_target::write_test_runtime_target;
 use sqlbuild_python_front::command_runtime::main::resolve_concurrency::resolve_concurrency;
 use sqlbuild_python_front::command_runtime::main::resolve_run_on::resolve_run_on;
-use sqlbuild_python_output::build_progress::main::format_expectation_summary::format_expectation_summary;
 use sqlbuild_python_output::build_progress::main::local_attempt::local_attempt;
 use sqlbuild_python_output::build_progress::main::test_label::test_label;
 use sqlbuild_python_output::build_progress::main::test_result_label::test_result_label;
@@ -121,12 +126,6 @@ const CANNOT_RUN_LOCALLY_MESSAGE: &str = "can't run locally";
 const NEEDS_WAREHOUSE_CODE: &str = "T008";
 const NEEDS_WAREHOUSE_MESSAGE: &str = "needs the warehouse (no connection)";
 const COMPILED_TESTS_DIR: &str = "target/run/tests";
-const CANNOT_RUN_LOCALLY_TITLE: &str = "Can't run locally";
-/// The rollup line after the rows names at most this many causes.
-const ROLLUP_CAUSES: usize = 5;
-const ASSERTION_PREFIX: &str = "assertion ";
-const ASSERTION_LABEL: &str = "assertion";
-const EXPECTED_LABEL: &str = "expected";
 /// The child row name of the expected rows of the model a test is grouped under.
 const JSON_CHECK_NAME_KEYS: [&str; 3] = ["test_name", "name", "resource_name"];
 
@@ -188,30 +187,10 @@ fn test_outcome(outcome: &Bound<'_, PyAny>) -> PyResult<Option<SqlTestOutcome>> 
 
 /// One child row per step: `expected rows`, `expected <model>` for another model, or `assertion <name>`.
 fn expectation_rows<'py>(result: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyTuple>> {
-    let py: Python<'py> = result.py();
-    let mut rows: Vec<Bound<'py, PyAny>> = Vec::new();
-    for step in result.getattr("step_results")?.try_iter()? {
-        let step: Bound<'py, PyAny> = step?;
-        let model: String = step.getattr("model_name")?.extract()?;
-        let (label, name): (&str, String) = match model.strip_prefix(ASSERTION_PREFIX) {
-            Some(assertion) => (ASSERTION_LABEL, assertion.to_owned()),
-            None => (EXPECTED_LABEL, model.clone()),
-        };
-        rows.push(new_record_with(
-            py,
-            RecordId::NestedProgressChildRow,
-            &[
-                ("label", text(py, label)),
-                ("name", text(py, &name)),
-                (
-                    "status_text",
-                    text(py, outcome_status(&step.getattr("outcome")?)?),
-                ),
-                ("detail", text(py, &format_expectation_summary(&step)?)),
-            ],
-        )?);
-    }
-    PyTuple::new(py, rows)
+    child_records(
+        result.py(),
+        &expectation_child_rows(&expectation_steps(&SqlTestExecutionResult::read(result)?)),
+    )
 }
 
 /// `N real models` for a model test, else empty.
@@ -648,7 +627,7 @@ type RanTests<'py> = (
 fn run_tests<'py>(
     invocation: &Bound<'py, PyAny>,
     pipeline: &Bound<'py, PyAny>,
-    (concurrency, timeout, worker, verbose): (i64, &RunTimeout, Option<Arc<WorkerBuild>>, bool),
+    ((concurrency, timeout), worker, verbose): ((i64, &RunTimeout), Option<Arc<WorkerBuild>>, bool),
     placement: TestPlacement<'py>,
 ) -> PyResult<RanTests<'py>> {
     let py: Python<'py> = invocation.py();
@@ -939,6 +918,20 @@ struct RunOnReport {
     header_refused: HashSet<String>,
 }
 
+/// A differing column as its name, actual and expected value.
+fn column_difference(difference: &SqlTestColumnDifference) -> (String, String, String) {
+    (
+        difference.name.clone(),
+        difference.actual.clone(),
+        difference.expected.clone(),
+    )
+}
+
+/// The cells of each differing row sample.
+fn sample_values(samples: &[SqlTestDifferenceSample]) -> Vec<Vec<(String, String)>> {
+    samples.iter().map(|sample| sample.values.clone()).collect()
+}
+
 /// Each step of a result as the failure detail reads it.
 fn expectation_steps(result: &SqlTestExecutionResult<Bound<'_, PyAny>>) -> Vec<ExpectationStep> {
     result
@@ -952,26 +945,12 @@ fn expectation_steps(result: &SqlTestExecutionResult<Bound<'_, PyAny>>) -> Vec<E
             mismatched_row_count: step.mismatched_row_count,
             unexpected_row_count: step.unexpected_row_count,
             missing_row_count: step.missing_row_count,
-            unexpected_samples: step
-                .unexpected_samples
-                .iter()
-                .map(|sample| sample.values.clone())
-                .collect(),
-            missing_samples: step
-                .missing_samples
-                .iter()
-                .map(|sample| sample.values.clone())
-                .collect(),
+            unexpected_samples: sample_values(&step.unexpected_samples),
+            missing_samples: sample_values(&step.missing_samples),
             column_differences: step
                 .column_differences
                 .iter()
-                .map(|difference| {
-                    (
-                        difference.name.clone(),
-                        difference.actual.clone(),
-                        difference.expected.clone(),
-                    )
-                })
+                .map(column_difference)
                 .collect(),
         })
         .collect()
@@ -1075,23 +1054,7 @@ fn complete(
     let mut text: String = String::new();
     let causes: Vec<HeaderCause> = refusal_causes(&report.decisions);
     if !not_run.is_empty() && report.mode == RunOn::Local {
-        let mut causes: Vec<String> = causes
-            .iter()
-            .take(ROLLUP_CAUSES)
-            .map(|cause| format!("{} {}", cause.label, cause.count))
-            .collect();
-        let all: usize = refusal_causes(&report.decisions).len();
-        if all > ROLLUP_CAUSES {
-            causes.push(format!("+{} more", all - ROLLUP_CAUSES));
-        }
-        text.push_str(&format!(
-            "\n{}\n",
-            style.muted(&format!(
-                "  {CANNOT_RUN_LOCALLY_TITLE} ({}): {}; see below",
-                not_run.len(),
-                causes.join(", ")
-            ))
-        ));
+        text.push_str(&render_cant_run_rollup(not_run.len(), &causes, style));
     }
     let moved: Vec<RunOnDecision> = report
         .decisions
@@ -1104,24 +1067,11 @@ fn complete(
         .cloned()
         .collect();
     if !moved.is_empty() {
-        let causes: Vec<String> = refusal_causes(&moved)
-            .iter()
-            .take(ROLLUP_CAUSES)
-            .map(|cause| format!("{} {}", cause.label, cause.count))
-            .collect();
-        let noun: &str = if moved.len() == 1 {
-            TEST_NOUNS.0
-        } else {
-            TEST_NOUNS.1
-        };
-        text.push_str(&format!(
-            "\n  {} {}\n",
-            style.value("note:"),
-            style.muted(&format!(
-                "{} {noun} moved to the warehouse while running: {} (--verbose for why)",
-                moved.len(),
-                causes.join(", ")
-            ))
+        text.push_str(&render_moved_note(
+            moved.len(),
+            &refusal_causes(&moved),
+            TEST_NOUNS,
+            style,
         ));
     }
     if not_run.contains(&NEEDS_WAREHOUSE_CODE) {
@@ -1196,37 +1146,6 @@ fn refusal_report(report: &RunOnReport, (columns, style): (usize, CliStyle)) -> 
             (columns, style),
         ),
         RunOn::Auto => String::new(),
-    }
-}
-
-/// The header before the run: how many tests run where, the causes, and `--explain`'s rows.
-fn run_header(decisions: &[RunOnDecision], mode: RunOn, explain: bool) -> RunHeader {
-    let refused: usize = decisions
-        .iter()
-        .filter(|decision| !decision.refusals.is_empty())
-        .count();
-    let local: usize = decisions
-        .iter()
-        .filter(|decision| decision.run_on == LOCAL_RUN_ON && decision.refusals.is_empty())
-        .count();
-    RunHeader {
-        title: "Tests".to_owned(),
-        nouns: (TEST_NOUNS.0.to_owned(), TEST_NOUNS.1.to_owned()),
-        selected: decisions.len(),
-        local,
-        warehouse: decisions.len() - local - if mode == RunOn::Local { refused } else { 0 },
-        not_run: if mode == RunOn::Local { refused } else { 0 },
-        local_only: mode == RunOn::Local,
-        causes: if mode == RunOn::Warehouse {
-            Vec::new()
-        } else {
-            refusal_causes(decisions)
-        },
-        explain: if explain && mode == RunOn::Auto {
-            refusal_explain_rows(decisions)
-        } else {
-            Vec::new()
-        },
     }
 }
 
@@ -1477,7 +1396,7 @@ fn run_sql_tests<'py>(
         (format!(
             "\n{}\n",
             render_run_header(
-                &run_header(&decisions, mode, explain),
+                &run_on_header(&decisions, (mode, explain), ("Tests", TEST_NOUNS)),
                 terminal_columns(py)?,
                 style
             )
@@ -1502,7 +1421,7 @@ fn run_sql_tests<'py>(
     let (results, local_statements, refused_locally): RanTests<'_> = run_tests(
         invocation,
         &pipeline,
-        (concurrency, &timeout, worker, verbose),
+        ((concurrency, &timeout), worker, verbose),
         placement,
     )?;
     let header_refused: HashSet<String> = decisions

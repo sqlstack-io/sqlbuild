@@ -1757,8 +1757,8 @@ select = [
 
 [[targets.rust.threshold_overrides]]
 paths = ["crates/sqlbuild-python/Cargo.toml"]
-thresholds = { max_crate_code_lines = 51911 }
-reason = "The Python bindings crate is above the code-line limit; this caps it near its current size until it is split into crates by area. The location and plan bindings of the large-project server work and #1560 grew it to 51,122; moving them out would need new cross-crate imports or a policy exception. The dbt event stream moved to sqlbuild-python-output, and the location sync's dynamic-model resume came in (50,945). The CHI-1589 stop handling and dev error fields plus the CHI-1595/CHI-1593 env-file merge took it to 51,210 when combined. The CHI-1443 project layout's exported path constants and its event_sinks and extra_paths keys took it to 51,305, and CHI-1650's older-table read of the two cost price columns to 51,311. CHI-1666's build refusal of models that can't be planned added 8 lines, and CHI-1663's local test placement (local, warehouse and unplaced batches, run-on rows, census and JSON) took it to 51,911. The cap stays near its current size; lower it as code moves out."
+thresholds = { max_crate_code_lines = 52395 }
+reason = "The Python bindings crate is above the code-line limit; this caps it near its current size until it is split into crates by area. The location and plan bindings of the large-project server work and #1560 grew it to 51,122; moving them out would need new cross-crate imports or a policy exception. The dbt event stream moved to sqlbuild-python-output, and the location sync's dynamic-model resume came in (50,945). The CHI-1589 stop handling and dev error fields plus the CHI-1595/CHI-1593 env-file merge took it to 51,210 when combined. The CHI-1443 project layout's exported path constants and its event_sinks and extra_paths keys took it to 51,305, and CHI-1650's older-table read of the two cost price columns to 51,311. CHI-1666's build refusal of models that can't be planned added 8 lines, and CHI-1663's local test placement (local, warehouse and unplaced batches, run-on rows, census and JSON) took it to 51,911. CHI-1699's test and scenario output (the row reporter wiring, failure entries, the refusal report and the scenario run on the shared renderers) took it to 52,395 after its pure renderers, header and step logic moved to sqlbuild-core. The cap stays near its current size; lower it as code moves out."
 
 [[targets.rust.threshold_overrides]]
 paths = ["crates/sqlbuild-python/src/bindings/_helpers"]
@@ -2973,13 +2973,13 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/review_command/support.rs=2",
     "crates/sqlbuild-python/src/bindings/_helpers/scenario_command/capture_command.rs=3",
     "crates/sqlbuild-python/src/bindings/_helpers/scenario_command/conversions.rs=3",
-    "crates/sqlbuild-python/src/bindings/_helpers/scenario_command/presentation.rs=3",
+    "crates/sqlbuild-python/src/bindings/_helpers/scenario_command/presentation.rs=5",
     "crates/sqlbuild-python/src/bindings/_helpers/scenario_command/setup.rs=13",
     "crates/sqlbuild-python/src/bindings/_helpers/scenario_command/snapshot_sync.rs=2",
-    "crates/sqlbuild-python/src/bindings/_helpers/scenario_command/test_command.rs=13",
+    "crates/sqlbuild-python/src/bindings/_helpers/scenario_command/test_command.rs=14",
     "crates/sqlbuild-python/src/bindings/_helpers/scopes/scope_command.rs=8",
     "crates/sqlbuild-python/src/bindings/_helpers/seed_command/command.rs=14",
-    "crates/sqlbuild-python/src/bindings/_helpers/sql_test_command/test_command.rs=115",
+    "crates/sqlbuild-python/src/bindings/_helpers/sql_test_command/test_command.rs=111",
     "crates/sqlbuild-python/src/bindings/_helpers/workspace_commands/commands.rs=5",
 ]
 
@@ -3232,10 +3232,10 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/refactor/refactor_command.rs=4",
     "crates/sqlbuild-python/src/bindings/_helpers/review_command/comparison.rs=8",
     "crates/sqlbuild-python/src/bindings/_helpers/review_command/execution.rs=3",
-    "crates/sqlbuild-python/src/bindings/_helpers/scenario_command/presentation.rs=8",
+    "crates/sqlbuild-python/src/bindings/_helpers/scenario_command/presentation.rs=10",
     "crates/sqlbuild-python/src/bindings/_helpers/scenario_command/setup.rs=7",
     "crates/sqlbuild-python/src/bindings/_helpers/scenario_command/snapshot_sync.rs=1",
-    "crates/sqlbuild-python/src/bindings/_helpers/scenario_command/test_command.rs=4",
+    "crates/sqlbuild-python/src/bindings/_helpers/scenario_command/test_command.rs=7",
     "crates/sqlbuild-python/src/bindings/_helpers/seed_command/command.rs=5",
     "crates/sqlbuild-python/src/bindings/_helpers/sql_test_command/test_command.rs=7",
 ]

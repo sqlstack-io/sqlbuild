@@ -1,12 +1,13 @@
 //! `[N] reason  where`: each place a construct is written and how many items it keeps off DuckDB.
 
+use std::cmp::Reverse;
+
 use crate::run_on::_helpers::refusal_groups::group_refusals;
 use crate::run_on::models::{LocalRefusal, RunOnDecision};
 use crate::run_output::models::ExplainRow;
 
 /// One row per origin, most items first: the construct, then the macro and its file, or the file position.
-#[must_use]
-pub fn refusal_explain_rows(decisions: &[RunOnDecision]) -> Vec<ExplainRow> {
+pub(crate) fn refusal_explain_rows(decisions: &[RunOnDecision]) -> Vec<ExplainRow> {
     let refused: Vec<&RunOnDecision> = decisions
         .iter()
         .filter(|decision| !decision.refusals.is_empty())
@@ -21,7 +22,7 @@ pub fn refusal_explain_rows(decisions: &[RunOnDecision]) -> Vec<ExplainRow> {
             });
         }
     }
-    rows.sort_by(|left, right| right.count.cmp(&left.count));
+    rows.sort_by_key(|row| Reverse(row.count));
     rows
 }
 

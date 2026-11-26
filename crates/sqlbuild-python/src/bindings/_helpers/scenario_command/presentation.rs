@@ -7,11 +7,13 @@ use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyFloat, PyTuple};
 use pyo3::{pyclass, pymethods};
 use sqlbuild_core::cli_text::models::CliStyle;
+use sqlbuild_core::nested_progress::models::NestedChildRow;
 use sqlbuild_core::scenario_command::main::render_capture_result::render_capture_result;
-use sqlbuild_core::scenario_command::main::render_scenario_result::render_scenario_result;
 use sqlbuild_core::scenario_command::main::render_snapshot_sync_result::render_snapshot_sync_result;
 use sqlbuild_core::scenario_command::main::scenario_activity_message::scenario_activity_message;
+use sqlbuild_core::scenario_command::main::scenario_steps::scenario_steps;
 use sqlbuild_core::scenario_command::models::{CodedText, ScenarioNamespace, ScenarioResultRow};
+use sqlbuild_core::test_command::main::expectation_child_rows::expectation_child_rows;
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::ScenarioRunResult;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
@@ -113,13 +115,13 @@ impl ScenarioProgressRelay {
                 }
                 let row: ScenarioResultRow =
                     scenario_result_row(py, &ScenarioRunResult::read(&result)?)?;
-                if let Some(progress) = &self.progress {
-                    let refused: bool = self.local_only
-                        && (self.refused.contains(&row.name)
-                            || !native_field(&result, "local_refusal")?.is_none());
-                    return report_row(progress.bind(py), &row, refused);
-                }
-                render_scenario_result(&row, style)
+                let refused: bool = self.local_only
+                    && (self.refused.contains(&row.name)
+                        || !native_field(&result, "local_refusal")?.is_none());
+                return match &self.progress {
+                    Some(progress) => report_row(progress.bind(py), &row, refused),
+                    None => Ok(()),
+                };
             }
             CompletionKind::Capture => {
                 render_capture_result(&capture_row(&result, (project_dir, plan))?, style)
@@ -136,42 +138,24 @@ impl ScenarioProgressRelay {
     }
 }
 
+/// The errors of a scenario whose expected rows differ (`X506`) or whose assertion returned rows (`X508`); its child rows already say which.
+const EXPECTATIONS_FAILED_CODES: [&str; 2] = ["X506", "X508"];
+
 /// One scenario's row on the run's reporter: its status, where it ran, its error and expectations.
 fn report_row(progress: &Bound<'_, PyAny>, row: &ScenarioResultRow, not_run: bool) -> PyResult<()> {
     let py: Python<'_> = progress.py();
-    let mut children: Vec<Bound<'_, PyAny>> = Vec::new();
-    for expected in &row.expected {
-        let differing: i64 =
-            expected.missing_row_count.unwrap_or(0) + expected.mismatched_row_count.unwrap_or(0);
-        children.push(child_row(
-            py,
-            ("expected", &expected.model_name),
-            (
-                if expected.failed { "FAIL" } else { "PASS" },
-                &match (expected.failed, differing) {
-                    (true, 1) => "1 row differs".to_owned(),
-                    (true, count) if count > 1 => format!("{count} rows differ"),
-                    _ => String::new(),
-                },
-            ),
-        )?);
-    }
-    for assertion in &row.assertions {
-        let count: i64 = assertion.failing_row_count.unwrap_or(0);
-        children.push(child_row(
-            py,
-            ("assertion", &assertion.name),
-            (
-                if assertion.failed { "FAIL" } else { "PASS" },
-                &match (assertion.failed, count) {
-                    (true, 1) => "1 row".to_owned(),
-                    (true, count) if count > 1 => format!("{count} rows"),
-                    _ => String::new(),
-                },
-            ),
-        )?);
-    }
-    let error: Option<&CodedText> = row.error.as_ref().filter(|error| !error.message.is_empty());
+    let children: Vec<NestedChildRow> = expectation_child_rows(&scenario_steps(row));
+    let error: Option<&CodedText> = row
+        .error
+        .as_ref()
+        .filter(|error| !error.message.is_empty())
+        .filter(|error| {
+            children.is_empty()
+                || !error
+                    .code
+                    .as_deref()
+                    .is_some_and(|code| EXPECTATIONS_FAILED_CODES.contains(&code))
+        });
     let optional = |value: Option<&str>| match value {
         Some(value) => text(py, value),
         None => py.None().into_bound(py),
@@ -206,29 +190,32 @@ fn report_row(progress: &Bound<'_, PyAny>, row: &ScenarioResultRow, not_run: boo
                 "error_help",
                 optional(error.and_then(|error| error.help.as_deref())),
             ),
-            ("child_rows", PyTuple::new(py, children)?.into_any()),
+            ("child_rows", child_records(py, &children)?.into_any()),
             ("canonical_resource_name", text(py, &row.name)),
         ],
     )?;
     Ok(())
 }
 
-/// One child row record: label and name, status and detail.
-fn child_row<'py>(
+/// The reporter's records of the child rows under one item.
+pub(crate) fn child_records<'py>(
     py: Python<'py>,
-    (label, name): (&str, &str),
-    (status, detail): (&str, &str),
-) -> PyResult<Bound<'py, PyAny>> {
-    new_record_with(
-        py,
-        RecordId::NestedProgressChildRow,
-        &[
-            ("label", text(py, label)),
-            ("name", text(py, name)),
-            ("status_text", text(py, status)),
-            ("detail", text(py, detail)),
-        ],
-    )
+    rows: &[NestedChildRow],
+) -> PyResult<Bound<'py, PyTuple>> {
+    let mut records: Vec<Bound<'py, PyAny>> = Vec::with_capacity(rows.len());
+    for row in rows {
+        records.push(new_record_with(
+            py,
+            RecordId::NestedProgressChildRow,
+            &[
+                ("label", text(py, &row.label)),
+                ("name", text(py, &row.name)),
+                ("status_text", text(py, &row.status_text)),
+                ("detail", text(py, &row.detail)),
+            ],
+        )?);
+    }
+    PyTuple::new(py, records)
 }
 
 /// Forward connection timing to a reporter that takes keywords.

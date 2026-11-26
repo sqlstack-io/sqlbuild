@@ -1,6 +1,6 @@
 //! Test cases of the run output tests.
 
-use crate::run_output::models::{FailureEntry, ProgressFooter, RunCounts, RunHeader};
+use crate::run_output::models::{FailureEntry, HeaderCause, ProgressFooter, RunCounts, RunHeader};
 
 pub(super) struct FooterTestCase {
     pub(super) description: &'static str,
@@ -55,4 +55,12 @@ pub(super) struct ReasonTestCase {
     pub(super) code: Option<&'static str>,
     pub(super) message: &'static str,
     pub(super) expected_reason: &'static str,
+}
+
+pub(super) struct CauseLineTestCase {
+    pub(super) description: &'static str,
+    pub(super) causes: Vec<HeaderCause>,
+    pub(super) count: usize,
+    pub(super) expected_rollup: &'static str,
+    pub(super) expected_note: &'static str,
 }

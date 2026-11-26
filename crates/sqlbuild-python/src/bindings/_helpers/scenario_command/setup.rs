@@ -229,7 +229,6 @@ pub(crate) fn style(request: &Bound<'_, PyAny>) -> PyResult<CliStyle> {
     Ok(CliStyle { use_color })
 }
 
-/// Write the namespace line, then the execution header with the selected target.
 /// The planning reporter a scenario compile reports its phases to.
 pub(crate) fn planning_reporter<'py>(
     stream: &Bound<'py, PyAny>,
@@ -268,6 +267,7 @@ pub(crate) fn write_execution<'py>(
     )
 }
 
+/// Write the namespace line, then the execution header with the selected target.
 pub(crate) fn write_headers<'py>(
     stream: &Bound<'py, PyAny>,
     project: &ScenarioProject<'py>,

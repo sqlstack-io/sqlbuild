@@ -8,6 +8,9 @@ use crate::text::main::text_wrap::text_wrap;
 const ERROR_LABEL: &str = "error";
 const HELP_LABEL: &str = "help";
 
+/// An engine's own code frame line, such as DuckDB's `LINE 2: …`, whose caret line below it must stay aligned.
+const ENGINE_FRAME_PREFIX: &str = "LINE ";
+
 /// The lines of `field` for a terminal `columns` wide.
 pub(crate) fn field_lines(field: &FailureField, columns: usize, style: CliStyle) -> Vec<String> {
     match field {
@@ -60,16 +63,19 @@ pub(crate) fn field_lines(field: &FailureField, columns: usize, style: CliStyle)
     }
 }
 
-/// `label` then `text`, each line of it wrapped on whitespace under the text column.
+/// `label` then `text`, each line of it wrapped on whitespace under the text column; a line with no whitespace, such as a path, is never cut.
 fn labelled(label: &str, text: &str, columns: usize) -> Vec<String> {
     let width: usize = columns.saturating_sub(FIELD_INDENT).max(MIN_WRAP_WIDTH);
     let mut lines: Vec<String> = Vec::new();
     for paragraph in text.split('\n') {
-        let wrapped: Vec<String> = if paragraph.starts_with(' ') || paragraph.contains(" | ") {
-            vec![paragraph.to_owned()]
-        } else {
-            text_wrap(paragraph, width, ("", ""), false)
-        };
+        let unbreakable: bool =
+            !paragraph.contains(char::is_whitespace) || paragraph.starts_with(ENGINE_FRAME_PREFIX);
+        let wrapped: Vec<String> =
+            if unbreakable || paragraph.starts_with(' ') || paragraph.contains(" | ") {
+                vec![paragraph.to_owned()]
+            } else {
+                text_wrap(paragraph, width, ("", ""), false)
+            };
         for line in if wrapped.is_empty() {
             vec![String::new()]
         } else {

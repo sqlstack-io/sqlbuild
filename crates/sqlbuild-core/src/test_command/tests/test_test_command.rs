@@ -1,7 +1,7 @@
 use crate::cli_text::models::CliStyle;
 use crate::progress::models::ExpectationStep;
 use crate::run_output::main::render_failures::render_failures;
-use crate::test_command::main::expectation_summary::expectation_summary;
+use crate::test_command::_helpers::summary::expectation_summary;
 use crate::test_command::main::parameterized_test_label::parameterized_test_label;
 use crate::test_command::main::render_test_inspection::render_test_inspection;
 use crate::test_command::main::test_exit_code::test_exit_code;

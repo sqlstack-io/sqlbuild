@@ -1,9 +1,10 @@
 //! A failed expectation as failure fields: what differs, then the differing rows.
 
 use crate::progress::models::ExpectationStep;
+use crate::progress::types::DifferenceSample;
 use crate::run_output::models::{FailureField, FailureRow, RowTone};
+use crate::test_command::_helpers::summary::expectation_summary;
 use crate::test_command::constants::{ASSERTION_FAILED_REASON, ASSERTION_PREFIX, FAIL_OUTCOME};
-use crate::test_command::main::expectation_summary::expectation_summary;
 
 /// The fields of one failed step: what differs and the rows; nothing when it passed or errored, whose error says why.
 pub(crate) fn step_fields(step: &ExpectationStep) -> Vec<FailureField> {
@@ -21,11 +22,7 @@ pub(crate) fn step_fields(step: &ExpectationStep) -> Vec<FailureField> {
             .iter()
             .map(|sample| FailureRow {
                 tone: RowTone::Error,
-                text: sample
-                    .iter()
-                    .map(|(column, value)| format!("{column}={value}"))
-                    .collect::<Vec<String>>()
-                    .join("  "),
+                text: sample_text(sample),
                 note: String::new(),
             })
             .collect();
@@ -90,53 +87,25 @@ fn diff_rows(step: &ExpectationStep) -> Vec<FailureRow> {
             }
         }
     }
+    let sample_rows: Vec<&DifferenceSample> =
+        samples.iter().map(|(_, _, _, sample)| *sample).collect();
     let widths: Vec<usize> = columns
         .iter()
-        .map(|column| {
-            samples
-                .iter()
-                .flat_map(|(_, _, _, sample)| {
-                    sample
-                        .iter()
-                        .filter(|(name, _)| name == column)
-                        .map(|(_, value)| value.chars().count())
-                })
-                .chain([column.chars().count()])
-                .max()
-                .unwrap_or(0)
-        })
+        .map(|column| column_width(column, &sample_rows))
         .collect();
-    let line = |sign: &str, cells: Vec<String>| {
-        let cells: Vec<String> = cells
-            .iter()
-            .zip(&widths)
-            .map(|(cell, width)| format!("{cell:<width$}"))
-            .collect();
-        format!("{sign}  {}", cells.join("  "))
-            .trim_end()
-            .to_owned()
-    };
     let mut rows: Vec<FailureRow> = Vec::new();
     if !samples.is_empty() {
         rows.push(FailureRow {
             tone: RowTone::Header,
-            text: line(" ", columns.clone()),
+            text: diff_line(" ", &columns, &widths),
             note: String::new(),
         });
     }
     for (tone, sign, note, sample) in samples {
-        let cells: Vec<String> = columns
-            .iter()
-            .map(|column| {
-                sample
-                    .iter()
-                    .find(|(name, _)| name == column)
-                    .map_or_else(String::new, |(_, value)| value.clone())
-            })
-            .collect();
+        let cells: Vec<String> = columns.iter().map(|column| cell(sample, column)).collect();
         rows.push(FailureRow {
             tone,
-            text: line(sign, cells),
+            text: diff_line(sign, &cells, &widths),
             note: note.to_owned(),
         });
     }
@@ -148,4 +117,43 @@ fn diff_rows(step: &ExpectationStep) -> Vec<FailureRow> {
         });
     }
     rows
+}
+
+/// `column=value` for each cell of an assertion's sample row.
+fn sample_text(sample: &DifferenceSample) -> String {
+    sample
+        .iter()
+        .map(|(column, value)| format!("{column}={value}"))
+        .collect::<Vec<String>>()
+        .join("  ")
+}
+
+/// The value of `column` in a sample row, or nothing when the row lacks it.
+fn cell(sample: &DifferenceSample, column: &str) -> String {
+    sample
+        .iter()
+        .find(|(name, _)| name == column)
+        .map_or_else(String::new, |(_, value)| value.clone())
+}
+
+/// The widest of `column`'s name and its values across the samples.
+fn column_width(column: &str, samples: &[&DifferenceSample]) -> usize {
+    samples
+        .iter()
+        .map(|sample| cell(sample, column).chars().count())
+        .chain([column.chars().count()])
+        .max()
+        .unwrap_or(0)
+}
+
+/// `sign`, then each cell padded to its column's width.
+fn diff_line(sign: &str, cells: &[String], widths: &[usize]) -> String {
+    let cells: Vec<String> = cells
+        .iter()
+        .zip(widths)
+        .map(|(cell, width)| format!("{cell:<width$}"))
+        .collect();
+    format!("{sign}  {}", cells.join("  "))
+        .trim_end()
+        .to_owned()
 }

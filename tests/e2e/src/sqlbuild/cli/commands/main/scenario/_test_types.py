@@ -224,6 +224,7 @@ class ScenarioInterruptE2ETestCase:
     args: tuple[str, ...]
     trigger: str
     trigger_stream: str = "stderr"
+    global_args: tuple[str, ...] = ()
     long_model: bool = False
     long_fixture: bool = False
     slow_hook_seconds: float = 0.0

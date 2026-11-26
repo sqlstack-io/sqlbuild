@@ -1,5 +1,8 @@
 //! Execution headers, SQL expectation rows and verbose inspection lines of CLI progress.
 
+use pyo3::pyfunction;
+use sqlbuild_core::progress::main::format_expectation_detail::format_expectation_detail as format_detail;
+use sqlbuild_core::progress::main::format_expectation_name::format_expectation_name as format_name;
 use std::sync::{Mutex, MutexGuard};
 
 use pyo3::exceptions::PyRuntimeError;
@@ -136,4 +139,16 @@ pub(crate) fn with_verbose_inspection<'py, T>(
     let value: T = within(&sink, |_| body())?;
     writer.get().write_total(py)?;
     Ok(value)
+}
+
+/// Format failing row count detail for an expectation row.
+#[pyfunction]
+pub(crate) fn format_expectation_detail(step_result: &Bound<'_, PyAny>) -> PyResult<String> {
+    Ok(format_detail(&expectation_step(step_result)?))
+}
+
+/// Format a comparison result name as a user-facing expectation name.
+#[pyfunction]
+pub(crate) fn format_expectation_name(model_name: &str) -> String {
+    format_name(model_name)
 }

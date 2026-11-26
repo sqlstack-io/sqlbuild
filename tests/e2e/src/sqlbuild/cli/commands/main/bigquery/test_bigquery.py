@@ -440,10 +440,10 @@ def test_given_source_deferral_env_when_building_on_bigquery_then_reads_prod_and
             description="runs bigquery scenario remotely and retains inspectable artifacts",
             expected_stdout_fragments=(
                 "remote_event_rollup",
-                "Retained relations:",
-                "source raw_events -> __sqb_",
-                "model  stg_events -> __sqb_",
-                "model  event_rollup -> __sqb_",
+                "Retained (1):",
+                "source    raw_events -> __sqb_",
+                "model     stg_events -> __sqb_",
+                "model     event_rollup -> __sqb_",
                 "PASS=1  FAIL=0  TOTAL=1",
             ),
             expected_retained_suffix_counts={

@@ -1,4 +1,4 @@
-pub mod expectation_summary;
+pub mod expectation_child_rows;
 pub mod parameterized_test_label;
 pub mod render_test_inspection;
 pub mod test_exit_code;

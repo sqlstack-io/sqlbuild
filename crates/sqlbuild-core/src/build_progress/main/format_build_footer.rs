@@ -1,15 +1,11 @@
 //! What a build prints after it runs: warnings, failures, not run, skipped, failed, then the completion line last.
 
-use crate::build_progress::_helpers::footer::{
-    FooterCounts, count_results, failed_items, failure_details, ignored_failure_details,
-    not_run_details, python_failure_details, skipped_rollup, warning_details,
-};
+use crate::build_progress::_helpers::footer::{FooterCounts, count_results, footer_sections};
 use crate::build_progress::constants::FAILED;
 use crate::build_progress::models::{BuildResultText, PythonNodeText};
 use crate::cli_text::main::format_completion_line::format_completion_line;
 use crate::cli_text::main::format_summary_footer::format_summary_footer;
 use crate::cli_text::models::{CliStyle, CompletionState, SummaryCount};
-use crate::run_output::main::render_failed_list::render_failed_list;
 
 fn count(label: &str, value: i64) -> SummaryCount {
     SummaryCount {
@@ -72,18 +68,7 @@ pub fn format_build_footer(
     } else {
         (CompletionState::Ok, "Completed successfully".to_owned())
     };
-    let mut lines: Vec<String> = warning_details(result, python, style);
-    lines.extend(ignored_failure_details(result, style));
-    lines.extend(failure_details(result, style));
-    lines.extend(python_failure_details(python, style));
-    lines.extend(not_run_details(result, style));
-    lines.extend(skipped_rollup(result, python, style));
-    let failed: Vec<(String, String)> = failed_items(result, python);
-    let failed_list: String = render_failed_list(&failed, false, style);
-    lines.extend(failed_list.lines().map(str::to_owned));
-    while lines.last().is_some_and(String::is_empty) {
-        lines.pop();
-    }
+    let mut lines: Vec<String> = footer_sections(result, python, style);
     lines.push(String::new());
     lines.push(format_completion_line(style, state, &label, Some(&summary)));
     lines.join("\n")

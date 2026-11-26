@@ -119,6 +119,13 @@ pub struct RefusalGroup {
     pub items: Vec<String>,
 }
 
+impl RefusalOrigin {
+    /// The models this place is written in or expanded into.
+    fn user_models(&self) -> impl Iterator<Item = &str> {
+        self.users.iter().map(|user| user.model.as_str())
+    }
+}
+
 impl RefusalGroup {
     /// What the header and the census call the construct: `fn:HASH`, or `project function`.
     #[must_use]
@@ -135,7 +142,7 @@ impl RefusalGroup {
         let mut models: Vec<&str> = self
             .origins
             .iter()
-            .flat_map(|origin| origin.users.iter().map(|user| user.model.as_str()))
+            .flat_map(RefusalOrigin::user_models)
             .collect();
         models.sort_unstable();
         models.dedup();

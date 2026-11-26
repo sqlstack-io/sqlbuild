@@ -2,6 +2,15 @@
 
 use crate::nested_progress::constants::{CHILD_GLYPH_INDENT, CHILD_NAME_OFFSET, LABEL_WIDTH};
 
+fn shown_width(label: &str, group: &str) -> usize {
+    let prefix: String = format!("{group}__");
+    let shown: &str = match label.strip_prefix(&prefix) {
+        Some(rest) if !group.is_empty() && !rest.is_empty() => rest,
+        _ => label,
+    };
+    shown.chars().count()
+}
+
 /// The longest `(label, group)` label as a row shows it, widened so each child name fits under it.
 #[must_use]
 pub fn test_name_width(labels: &[(String, String)], child_names: &[String]) -> usize {
@@ -12,14 +21,7 @@ pub fn test_name_width(labels: &[(String, String)], child_names: &[String]) -> u
         .unwrap_or(0);
     labels
         .iter()
-        .map(|(label, group)| {
-            label
-                .strip_prefix(&format!("{group}__"))
-                .filter(|rest| !group.is_empty() && !rest.is_empty())
-                .unwrap_or(label)
-                .chars()
-                .count()
-        })
+        .map(|(label, group)| shown_width(label, group))
         .max()
         .unwrap_or(0)
         .max(children)
