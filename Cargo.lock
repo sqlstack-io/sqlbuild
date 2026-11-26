@@ -6779,6 +6779,8 @@ dependencies = [
 name = "sqlbuild-python-load"
 version = "0.0.0"
 dependencies = [
+ "arrow-array",
+ "arrow-schema",
  "pyo3",
  "serde_json",
  "sqlbuild-load",

@@ -33,7 +33,13 @@ pub(crate) fn run_sqlload_project(
     let project: String = project.to_owned();
     let run: ProjectRun = sessions
         .py()
-        .detach(move || run_project((&project, Vec::new()), connections, (options, require)))
+        .detach(move || {
+            run_project(
+                (&project, Vec::new(), None),
+                connections,
+                (options, require),
+            )
+        })
         .map_err(PyRuntimeError::new_err)?;
     Ok(run_report(run))
 }

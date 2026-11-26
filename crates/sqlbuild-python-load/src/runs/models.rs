@@ -33,3 +33,9 @@ pub struct ProjectRun {
     /// Required destination tables the plan left out; nothing loads when there are any.
     pub missing: Vec<String>,
 }
+
+/// SQLLoad's Python host for one `@loader` run: the run (`EngineLoaderRun`) whose table function the engine calls.
+#[derive(Debug)]
+pub struct LoaderHost {
+    pub run: pyo3::Py<pyo3::PyAny>,
+}

@@ -172,6 +172,8 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 # The loading engine behind loads, loaders and sinks: its library, without its CLI or its own DuckDB.
 sqlload = { version = "=0.86.0", default-features = false }
 sqlload-python-host = "=0.86.0"
+arrow-array = { version = "60", default-features = false }
+arrow-schema = { version = "60", default-features = false }
 serde = { version = "1", features = ["derive"] }
 # Reports every field a decode ignores; a worker refuses a run request it can only partly read.
 serde_ignored = "0.1"

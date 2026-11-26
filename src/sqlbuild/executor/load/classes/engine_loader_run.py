@@ -14,7 +14,7 @@ from sqlbuild.executor.load.models import EngineLoaderInputs, LoaderResult, Load
 
 
 class EngineLoaderRun:
-    """The run `run_sqlload_loader` loads, and the table function the runtime module calls."""
+    """The run `run_sqlload_loader` loads, and the table function its Python host calls."""
 
     def __init__(
         self,

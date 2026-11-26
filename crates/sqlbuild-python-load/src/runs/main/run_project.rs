@@ -10,22 +10,22 @@ use sqlload::loader::main::plan_project::plan_project;
 use sqlload::loader::models::{LoadRun, PlanOptions};
 use sqlload::project::main::parse_python_project::parse_python_project;
 use sqlload::python_sources::models::PythonSource;
-use sqlload_python_host::host::main::module_host::module_host;
+use std::sync::Arc;
+
+use sqlload::python_sources::types::PythonHost;
 
 use crate::runs::_helpers::stack::on_load_stack;
 use crate::runs::_helpers::tables::{load_messages, missing_tables, planned_tables};
-use crate::runs::constants::RUNTIME_MODULE;
 use crate::runs::models::{LoadedTable, ProjectRun};
 
-/// Each selected table's load of the project `text` with the `python` sources SQLBuild's runtime module runs; nothing loads when the plan lacks a `required` table.
+/// Each selected table's load of the project `text` with the `python` sources `host` runs; nothing loads when the plan lacks a `required` table.
 pub fn run_project(
-    (text, python): (&str, Vec<PythonSource>),
+    (text, python, host): (&str, Vec<PythonSource>, Option<Arc<dyn PythonHost>>),
     sessions: BTreeMap<String, SessionConnection>,
     (options, required): (PlanOptions, Vec<String>),
 ) -> Result<ProjectRun, String> {
     let mut project = parse_python_project(text, &|_| None, (&python, sessions))
         .map_err(|error| error.to_string())?;
-    let host = (!python.is_empty()).then(|| module_host(RUNTIME_MODULE));
     project.python_host = host.clone();
     on_load_stack(|| async {
         let destinations = connect_targets(&project)
