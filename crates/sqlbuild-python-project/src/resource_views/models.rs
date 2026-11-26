@@ -12,9 +12,9 @@ use crate::resource_views::_helpers::function_views::read_function;
 use crate::resource_views::_helpers::seed_views::SEED_RESOURCE;
 use crate::resource_views::_helpers::seed_views::TAGS_ATTRIBUTE;
 use crate::resource_views::_helpers::seed_views::read_seed;
-use crate::resource_views::_helpers::source_views::SOURCE_RESOURCE;
 use crate::resource_views::_helpers::source_views::SourceAssemblyRow;
 use crate::resource_views::_helpers::source_views::read_source;
+use crate::resource_views::_helpers::source_views::{LOAD_FIELD, LOAD_RESOURCE, SOURCE_RESOURCE};
 use crate::resource_views::types::AttachedSource;
 use crate::resource_views::types::SourceViews;
 use pyo3::IntoPyObjectExt;
@@ -583,12 +583,17 @@ impl NativeCompiledSource {
         Self { owner, index }
     }
 
-    /// The source's project graph row: its key, with no dependencies, tags or folder.
+    /// The source's project graph row: its key and the load that fills it, with no tags or folder.
     pub fn graph_row(&self, py: Python<'_>) -> PyResult<ResourceRow> {
-        read_source(&self.owner, self.index, py, |source, _| {
+        read_source(&self.owner, self.index, py, |source, py| {
+            let load: Option<String> =
+                native_field(source.attached.host.entry.bind(py), LOAD_FIELD)?.extract()?;
             Ok(ResourceRow {
                 key: (SOURCE_RESOURCE.to_owned(), source.attached.name.clone()),
-                deps: Vec::new(),
+                deps: load
+                    .map(|load| (LOAD_RESOURCE.to_owned(), load))
+                    .into_iter()
+                    .collect(),
                 tags: Vec::new(),
                 folder: None,
             })
@@ -613,9 +618,17 @@ impl NativeCompiledSource {
         })
     }
 
+    /// The load that fills the source, the only resource a source depends on.
     #[getter]
-    pub fn deps<'py>(&self, py: Python<'py>) -> Bound<'py, PyTuple> {
-        PyTuple::empty(py)
+    pub fn deps<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
+        let classes: InputViewClasses<'_> = view_classes(&self.owner, py)?;
+        let load: Option<String> = read_source(&self.owner, self.index, py, |source, py| {
+            native_field(source.attached.host.entry.bind(py), LOAD_FIELD)?.extract()
+        })?;
+        match load {
+            Some(load) => PyTuple::new(py, [object_key(&classes.compiled, LOAD_RESOURCE, &load)?]),
+            None => Ok(PyTuple::empty(py)),
+        }
     }
 
     #[getter]
@@ -645,7 +658,7 @@ impl NativeCompiledSource {
     pub fn record_values<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
         Ok(vec![
             self.key(py)?.into_bound(py),
-            self.deps(py).into_any(),
+            self.deps(py)?.into_any(),
             self.name(py)?.into_bound_py_any(py)?,
             self.source_entry(py)?.into_bound(py),
             self.source_file(py)?.into_bound(py),

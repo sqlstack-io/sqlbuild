@@ -9,7 +9,12 @@ pub(crate) const LOAD_KEY: &str = "load";
 /// What joins a load's name to its table's in the name of a source it fills.
 pub(crate) const LOAD_NAME_SEPARATOR: &str = "__";
 /// The source entry keys a load decides for the sources it fills, and what each message says to do instead.
-pub(crate) const LOAD_OWNED_KEYS: [(&str, &str); 7] = [
+pub(crate) const LOAD_OWNED_KEYS: [(&str, &str); 9] = [
+    ("database", "the load writes into the target's database"),
+    (
+        "schema",
+        "the load writes into the target's loader_schema, or its own destination_schema",
+    ),
     ("table", "the load decides its table"),
     ("expression", "the load decides its table"),
     ("managed", "the load fills it"),

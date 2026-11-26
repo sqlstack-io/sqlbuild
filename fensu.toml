@@ -2964,7 +2964,7 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/record_behaviours/durations.rs=1",
     "crates/sqlbuild-python/src/bindings/_helpers/record_behaviours/error_inits.rs=11",
     "crates/sqlbuild-python/src/bindings/_helpers/record_behaviours/lexical.rs=1",
-    "crates/sqlbuild-python/src/bindings/_helpers/record_behaviours/macros.rs=7",
+    "crates/sqlbuild-python/src/bindings/_helpers/record_behaviours/macros.rs=6",
     "crates/sqlbuild-python/src/bindings/_helpers/record_behaviours/migrations.rs=8",
     "crates/sqlbuild-python/src/bindings/_helpers/record_behaviours/planner.rs=7",
     "crates/sqlbuild-python/src/bindings/_helpers/record_behaviours/rule_shapes.rs=5",
@@ -3583,7 +3583,7 @@ paths = ["crates/sqlbuild-python-front/src/discovery/main/python_files/register_
 reason = "Each bindings module registers its own functions and classes with the native module."
 
 [[dupes.allowlist]]
-paths = ["crates/sqlbuild-python-project/src/compiled_views/_helpers/project/project_view.rs", "crates/sqlbuild-python-project/src/graph/main/nodes/native_key.rs", "crates/sqlbuild-python/src/bindings/_helpers/record_behaviours/compiled.rs", "crates/sqlbuild-python/src/bindings/_helpers/record_behaviours/macros.rs", "crates/sqlbuild-python-compile/src/rules/_helpers/configuration/catalogue.rs"]
+paths = ["crates/sqlbuild-python-project/src/compiled_views/_helpers/project/project_view.rs", "crates/sqlbuild-python-project/src/graph/main/nodes/native_key.rs", "crates/sqlbuild-python/src/bindings/_helpers/record_behaviours/compiled.rs", "crates/sqlbuild-python-compile/src/rules/_helpers/configuration/catalogue.rs"]
 reason = "Each reads a resource key's type and name into its own native key; consolidating the key readers across the binding crates is a separate change."
 
 [[dupes.allowlist]]

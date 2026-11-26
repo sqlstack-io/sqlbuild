@@ -21,6 +21,7 @@ sqlbuild-config.workspace = true
 sqlbuild-core.workspace = true
 sqlbuild-discovery.workspace = true
 sqlbuild-host.workspace = true
+sqlbuild-load.workspace = true
 sqlbuild-model-config.workspace = true
 sqlbuild-project.workspace = true
 sqlbuild-pysource.workspace = true

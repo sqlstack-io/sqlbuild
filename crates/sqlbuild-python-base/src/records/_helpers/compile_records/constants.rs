@@ -852,9 +852,21 @@ const R_DISCOVERED_SOURCE_FILE: RecordSpec = RecordSpec {
         FieldSpec::new("load", FieldDefault::None),
     ],
 };
+const R_COMPILED_LOAD: RecordSpec = RecordSpec {
+    name: "CompiledLoad",
+    doc: "A load the project compiles: the SQLLoad source that fills the sources named after it.",
+    fields: &[
+        FieldSpec::required("key"),
+        FieldSpec::required("name"),
+        FieldSpec::required("relative_path"),
+        FieldSpec::required("settings"),
+        FieldSpec::new("sources", FieldDefault::EmptyTuple),
+        FieldSpec::required("fingerprint"),
+    ],
+};
 const R_DISCOVERED_LOAD: RecordSpec = RecordSpec {
     name: "DiscoveredLoad",
-    doc: "A sources file's load: a SQLLoad source under SQLBuild's name, with its settings as authored.",
+    doc: "A sources file's load: a SQLLoad source under SQLBuild's name, settings as authored.",
     fields: &[FieldSpec::required("name"), FieldSpec::required("settings")],
 };
 const R_DISCOVERED_SQL_TEST_FILE: RecordSpec = RecordSpec {
@@ -1558,6 +1570,7 @@ const R_COMPILED_PROJECT: RecordSpec = RecordSpec {
         FieldSpec::new("audits", FieldDefault::EmptyTuple),
         FieldSpec::new("sql_tests", FieldDefault::EmptyTuple),
         FieldSpec::new("sql_scenarios", FieldDefault::EmptyTuple),
+        FieldSpec::new("loads", FieldDefault::EmptyTuple),
         FieldSpec::new("loader_functions", FieldDefault::EmptyTuple),
         FieldSpec::new("hook_functions", FieldDefault::EmptyTuple),
         FieldSpec::new("enforce_explicit_references", FieldDefault::True),
@@ -1700,6 +1713,7 @@ pub(crate) const COMPILE_VALUE_RECORDS: &[RecordSpec] = &[
     R_PYTHON_HOOK_ENTRY,
     R_ENUM_DECLARATION,
     R_CONSTANT_DECLARATION,
+    R_COMPILED_LOAD,
     R_DISCOVERED_LOAD,
     R_DISCOVERED_SOURCE_FILE,
     R_DISCOVERED_SQL_TEST_FILE,

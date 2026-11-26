@@ -1,5 +1,7 @@
 //! Public records of compiled views.
 
+use crate::compiled_views::_helpers::project::loads::load_records;
+use crate::graph::main::project::load_rows::load_rows;
 use sqlbuild_rules::engine::main::model_query_place::model_query_place;
 use sqlbuild_rules::models::ModelQueryPlace;
 
@@ -1488,6 +1490,11 @@ impl NativeProjectView {
     }
 
     #[getter]
+    pub fn loads<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
+        load_records(py, &self.fields.loads)
+    }
+
+    #[getter]
     pub fn python_execution_inputs(&self) -> BTreeMap<String, (String, PathBuf)> {
         self.fields.boundary.python_execution_inputs.clone()
     }
@@ -1655,6 +1662,7 @@ impl NativeProjectView {
                         }
                     });
                 }
+                rows.extend(load_rows(load_records(py, &self.fields.loads)?.as_any())?);
                 self.owner.bind(py).borrow_mut().record_graph_build();
                 count_stage(py, LINEAGE_GRAPH_BUILDS, 1)?;
                 Py::new(py, project_graph(rows)?)

@@ -25,15 +25,15 @@ use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};
 use crate::store::models::{ControlStore, ControlTransaction, TransactionMode};
 
-/// Graph kinds in the order the CLI builds its project graph: models, sources, seeds, then functions.
-const GRAPH_KINDS: [&str; 5] = ["model", "source", "seed", "udf", "table_fn"];
+/// Graph kinds in the order the CLI builds its project graph: models, sources, seeds, functions, then loads.
+const GRAPH_KINDS: [&str; 6] = ["model", "source", "seed", "udf", "table_fn", "load"];
 /// Python node kinds, in the order the CLI discovers them.
 const PYTHON_NODE_KINDS: [&str; 3] = ["asset", "loader", "check"];
 /// SQL unit tests, which `test:` selects; each lists the models it tests.
 const SQL_TEST_KIND: &str = "sql_test";
 /// Every kind planning reads a definition of; audits, macros and scenarios are neither selected nor written.
-const PLANNED_KINDS: [&str; 9] = [
-    "model", "source", "seed", "udf", "table_fn", "asset", "loader", "check", "sql_test",
+const PLANNED_KINDS: [&str; 10] = [
+    "model", "source", "seed", "udf", "table_fn", "load", "asset", "loader", "check", "sql_test",
 ];
 /// Where a SQL unit test's definition lists the models it tests.
 const SQL_TEST_MODELS_POINTER: &str = "/test/payload/expected_model_names";

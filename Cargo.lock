@@ -6555,6 +6555,7 @@ dependencies = [
 name = "sqlbuild-load"
 version = "0.0.0"
 dependencies = [
+ "blake3",
  "sqlbuild-config",
  "sqlload",
  "toml",
@@ -6723,6 +6724,7 @@ dependencies = [
  "sqlbuild-core",
  "sqlbuild-discovery",
  "sqlbuild-host",
+ "sqlbuild-load",
  "sqlbuild-model-config",
  "sqlbuild-project",
  "sqlbuild-pysource",

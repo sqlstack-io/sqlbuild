@@ -7,6 +7,7 @@ use pyo3::prelude::{PyAnyMethods, PyResult, Python};
 use serde_json::{Value, json};
 use sqlbuild_core::nested_progress::main::audit_resource_id::audit_resource_id;
 use sqlbuild_orchestration::snapshots::models::SnapshotNode;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 use crate::compiled_project::main::plain_value::plain_value;
 use crate::compiled_project::models::NativeCompiledProject;
@@ -14,6 +15,7 @@ use crate::compiled_views::models::NativeProjectView;
 use crate::project_snapshot::_helpers::snapshot::snapshot_boundary::boundary_nodes;
 use crate::project_snapshot::_helpers::snapshot::snapshot_boundary::columns;
 use crate::project_snapshot::_helpers::snapshot::snapshot_boundary::metadata;
+use crate::project_snapshot::_helpers::snapshot::snapshot_loads::load_nodes;
 use crate::project_snapshot::_helpers::snapshot::snapshot_project::dependency_keys;
 use crate::project_snapshot::_helpers::snapshot::snapshot_project::destination;
 use crate::project_snapshot::_helpers::snapshot::snapshot_project::insert_node;
@@ -25,30 +27,36 @@ pub(crate) fn resource_nodes(
     owner: &NativeCompiledProject,
     mut nodes: BTreeMap<String, SnapshotNode>,
 ) -> PyResult<BTreeMap<String, SnapshotNode>> {
+    nodes = load_nodes(py, project, nodes)?;
     for source in owner.sources() {
         let attached = &source.attached;
+        let load: Option<String> = native_field(attached.host.entry.bind(py), "load")?.extract()?;
+        let mut definition: Value = json!({
+            "name": attached.name,
+            "path": relative_path(attached.host.source_file.bind(py))?,
+            "database": attached.database,
+            "schema": attached.schema,
+            "table": attached.table,
+            "expression": attached.expression,
+            "contract": attached.contract,
+            "description": attached.description,
+            "namespace": source.namespace,
+            "columns": columns(attached.host.columns.bind(py).as_any())?,
+            "meta": plain_value(attached.host.meta.bind(py))?,
+            "entry": metadata(attached.host.entry.bind(py), &[
+                "loader", "load", "write_strategy", "cursor_column", "unique_key",
+                "final", "load_batch_size", "freshness",
+            ])?,
+        });
+        if let (Some(load), Some(fields)) = (load, definition.as_object_mut()) {
+            fields.insert("deps".to_owned(), json!([format!("load:{load}")]));
+        }
         nodes = insert_node(
             nodes,
             format!("source:{}", attached.name),
             SnapshotNode {
                 kind: "source".into(),
-                definition: json!({
-                    "name": attached.name,
-                    "path": relative_path(attached.host.source_file.bind(py))?,
-                    "database": attached.database,
-                    "schema": attached.schema,
-                    "table": attached.table,
-                    "expression": attached.expression,
-                    "contract": attached.contract,
-                    "description": attached.description,
-                    "namespace": source.namespace,
-                    "columns": columns(attached.host.columns.bind(py).as_any())?,
-                    "meta": plain_value(attached.host.meta.bind(py))?,
-                    "entry": metadata(attached.host.entry.bind(py), &[
-                        "loader", "load", "write_strategy", "cursor_column", "unique_key",
-                        "final", "load_batch_size", "freshness",
-                    ])?,
-                }),
+                definition,
                 raw_sql: None,
                 compiled_sql: attached.expression.clone(),
                 python_source: None,

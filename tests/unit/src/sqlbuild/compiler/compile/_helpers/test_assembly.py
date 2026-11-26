@@ -27,6 +27,7 @@ from tests.unit.src.sqlbuild.compiler.compile._helpers._test_types import (
     AssembleCompiledProjectTestCase,
     AssembleSqlHookValidationTestCase,
     AttachedAuditNameTestCase,
+    LoadAssemblyTestCase,
     PreservedSeedTargetTestCase,
 )
 from tests.unit.src.sqlbuild.compiler.compile._helpers.helpers import (
@@ -42,6 +43,40 @@ from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 if TYPE_CHECKING:
     from sqlbuild._native import CompileInputsView
+
+_SHOP_LOAD_KEY: CompiledObjectKey = CompiledObjectKey(
+    resource_type=CompiledResourceType.LOAD, name="shop"
+)
+_LOAD_PROJECT: str = (
+    'name = "demo"\nadapter = "duckdb"\n\n'
+    '[connections.local]\ndatabase = "demo.duckdb"\n\n'
+    '[connections.shop_db]\nkind = "postgres"\nhost = "db"\nuser = "reader"\n'
+    'database = "shop"\npassword = "${ENV:SHOP_PASSWORD_NOT_SET}"\n\n'
+    '[targets.dev]\nconnection = "local"\nschema = "dev"\n'
+)
+_LOAD_SOURCES: str = """load:
+  name: shop
+  kind: postgres
+  connection: shop_db
+  include: [public.orders, public.customers]
+sources:
+  - name: shop__orders
+    description: Orders
+    columns:
+      - name: id
+        type: INTEGER
+  - name: shop__customers
+    description: Customers
+  - name: payments
+    description: Payments
+"""
+_LOAD_MODEL: str = """MODEL (
+  materialized view,
+  description "Order ids"
+);
+
+select id from __source("shop__orders")
+"""
 
 
 @pytest.mark.parametrize(
@@ -996,3 +1031,73 @@ def test_given_sql_hooks_when_assembling_then_applies_adapter_aware_validation(
         compiled.models[0].config.values["post_hooks"],
     )
     assert (pre_hooks[0].statement, post_hooks[0].statement) == test_case.expected_hook_statements
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        LoadAssemblyTestCase(
+            description="the load is a node its sources depend on, and load:shop+ reaches models",
+            repo_files={
+                "sqlbuild_project.toml": _LOAD_PROJECT,
+                "sql/sources/shop.yml": _LOAD_SOURCES,
+                "sql/models/order_ids.sql": _LOAD_MODEL,
+            },
+            selector="load:shop+",
+            expected_loads=(("shop", ("shop__orders", "shop__customers")),),
+            expected_source_deps=(
+                ("shop__orders", (_SHOP_LOAD_KEY,)),
+                ("shop__customers", (_SHOP_LOAD_KEY,)),
+                ("payments", ()),
+            ),
+            expected_selected=(
+                ("load", "shop"),
+                ("model", "order_ids"),
+                ("source", "shop__customers"),
+                ("source", "shop__orders"),
+            ),
+        ),
+        LoadAssemblyTestCase(
+            description="kind:load selects every load and nothing else",
+            repo_files={
+                "sqlbuild_project.toml": _LOAD_PROJECT,
+                "sql/sources/shop.yml": _LOAD_SOURCES,
+                "sql/models/order_ids.sql": _LOAD_MODEL,
+            },
+            selector="kind:load",
+            expected_loads=(("shop", ("shop__orders", "shop__customers")),),
+            expected_source_deps=(
+                ("shop__orders", (_SHOP_LOAD_KEY,)),
+                ("shop__customers", (_SHOP_LOAD_KEY,)),
+                ("payments", ()),
+            ),
+            expected_selected=(("load", "shop"),),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_load_when_assembling_then_it_is_a_graph_node_its_sources_depend_on(
+    test_case: LoadAssemblyTestCase,
+    tmp_path: Path,
+    write_repo_files: Callable[[Path, dict[str, str]], None],
+) -> None:
+    write_repo_files(tmp_path, test_case.repo_files)
+    compile_inputs: CompileInputsView = build_compile_inputs(
+        discovered_inputs=discover_project_inputs(project_dir=tmp_path),
+        adapter_context=DUCKDB_COMPILE_ADAPTER_CONTEXT,
+        run_id="test_run_id",
+    )
+
+    compiled: CompiledProjectView = assemble_project(inputs=compile_inputs)
+
+    loads: tuple[tuple[str, tuple[str, ...]], ...] = tuple(
+        (load.name, load.sources) for load in compiled.loads
+    )
+    assert loads == test_case.expected_loads, test_case.description
+    source_deps: tuple[tuple[str, tuple[CompiledObjectKey, ...]], ...] = tuple(
+        (source.name, source.deps) for source in compiled.sources
+    )
+    assert source_deps == test_case.expected_source_deps, test_case.description
+    keys, failure = compiled.lineage_graph.resolve([test_case.selector], [])
+    assert failure is None, test_case.description
+    assert tuple(sorted(keys or ())) == test_case.expected_selected, test_case.description

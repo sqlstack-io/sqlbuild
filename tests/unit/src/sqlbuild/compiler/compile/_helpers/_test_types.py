@@ -848,3 +848,15 @@ class UndecodableSecretTestCase:
     value: object
     secret: str
     expected_message: str
+
+
+@dataclass(frozen=True)
+class LoadAssemblyTestCase:
+    """A project with a load: the load node, the sources it fills and selection through it."""
+
+    description: str
+    repo_files: dict[str, str]
+    selector: str
+    expected_loads: tuple[tuple[str, tuple[str, ...]], ...]
+    expected_source_deps: tuple[tuple[str, tuple[CompiledObjectKey, ...]], ...]
+    expected_selected: tuple[tuple[str, str], ...]

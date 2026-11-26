@@ -1878,6 +1878,8 @@ class NativeProjectView:
     @property
     def sql_scenarios(self) -> tuple[CompiledSqlScenario, ...]: ...
     @property
+    def loads(self) -> tuple[CompiledLoad, ...]: ...
+    @property
     def loader_functions(self) -> tuple[DiscoveredLoaderFunction, ...]: ...
     @property
     def python_execution_inputs(self) -> dict[str, tuple[str, Path]]: ...
@@ -9090,6 +9092,7 @@ class CompiledResourceType(StrEnum):
     AUDIT = "audit"
     SQL_TEST = "sql_test"
     SQL_SCENARIO = "sql_scenario"
+    LOAD = "load"
 
 class InferredNullability(StrEnum):
     """Conservative nullability state inferred for an output column."""
@@ -14896,11 +14899,30 @@ class ConstantDeclaration(NativeRecord):
     def scalar_type(self) -> str: ...
 
 class DiscoveredLoad(NativeRecord):
-    """A sources file's load: a SQLLoad source under SQLBuild's name, with its settings as authored."""
+    """A sources file's load: a SQLLoad source under SQLBuild's name, settings as authored."""
 
     name: str
     settings: dict[str, object]
     def __init__(self, name: str, settings: dict[str, object]) -> None: ...
+
+class CompiledLoad(NativeRecord):
+    """A load the project compiles: the SQLLoad source that fills the sources named after it."""
+
+    key: CompiledObjectKey
+    name: str
+    relative_path: Path
+    settings: dict[str, object]
+    sources: tuple[str, ...]
+    fingerprint: str
+    def __init__(
+        self,
+        key: CompiledObjectKey,
+        name: str,
+        relative_path: Path,
+        settings: dict[str, object],
+        fingerprint: str,
+        sources: tuple[str, ...] = ...,
+    ) -> None: ...
 
 class DiscoveredSourceFile(NativeRecord):
     """A discovered source declaration file and its raw contents."""
@@ -15949,6 +15971,7 @@ class CompiledProject(NativeRecord):
     audits: tuple[CompiledAuditView, ...]
     sql_tests: tuple[CompiledSqlTest, ...]
     sql_scenarios: tuple[CompiledSqlScenario, ...]
+    loads: tuple[CompiledLoad, ...]
     loader_functions: tuple[DiscoveredLoaderFunction, ...]
     hook_functions: tuple[DiscoveredHookFunction, ...]
     enforce_explicit_references: bool
@@ -15986,6 +16009,7 @@ class CompiledProject(NativeRecord):
         audits: tuple[CompiledAuditView, ...] = ...,
         sql_tests: tuple[CompiledSqlTest, ...] = ...,
         sql_scenarios: tuple[CompiledSqlScenario, ...] = ...,
+        loads: tuple[CompiledLoad, ...] = ...,
         loader_functions: tuple[DiscoveredLoaderFunction, ...] = ...,
         hook_functions: tuple[DiscoveredHookFunction, ...] = ...,
         enforce_explicit_references: bool = ...,

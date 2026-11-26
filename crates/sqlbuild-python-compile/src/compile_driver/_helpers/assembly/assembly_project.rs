@@ -1,5 +1,6 @@
 //! Compiled project assembly: the project's models, resources, checks and semantic diagnostics.
 
+use crate::compile_driver::_helpers::assembly::assembly_loads::compiled_loads;
 use std::path::PathBuf;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
@@ -307,6 +308,7 @@ fn project_fields<'py>(
         )?,
     )?;
     fields.set_item("sql_scenarios", compiled_sql_scenarios(inputs)?)?;
+    fields.set_item("loads", compiled_loads(&discovered)?)?;
     for name in ["loader_functions", "hook_functions"] {
         fields.set_item(name, native_field(&discovered, name)?)?;
     }

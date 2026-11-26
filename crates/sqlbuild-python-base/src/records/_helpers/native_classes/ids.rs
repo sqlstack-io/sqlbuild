@@ -228,6 +228,7 @@ native_id_names! {
         RecordId::DiscoveredRuntimeExtensions => "DiscoveredRuntimeExtensions",
         RecordId::DiscoveredSchemaFile => "DiscoveredSchemaFile",
         RecordId::DiscoveredSeedFile => "DiscoveredSeedFile",
+        RecordId::CompiledLoad => "CompiledLoad",
         RecordId::DiscoveredLoad => "DiscoveredLoad",
         RecordId::DiscoveredSourceFile => "DiscoveredSourceFile",
         RecordId::DiscoveredSqlFunctionFile => "DiscoveredSqlFunctionFile",

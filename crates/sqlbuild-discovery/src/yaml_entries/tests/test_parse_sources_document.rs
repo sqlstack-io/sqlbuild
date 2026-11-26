@@ -150,6 +150,21 @@ fn given_sources_documents_when_parsing_then_matches_python_sources_and_errors()
             ),
         },
         SourcesDocumentTestCase {
+            description: "a source a load fills takes its schema from the load",
+            document: loaded_sources(
+                vec![("name", text("shop"))],
+                vec![vec![
+                    ("name", text("shop__orders")),
+                    ("schema", text("raw")),
+                ]],
+            ),
+            expected_sources: parse_error(
+                "/project/sources/shop.yml source 'shop__orders' is filled by the load 'shop', \
+                 so it can't set schema; the load writes into the target's loader_schema, or its \
+                 own destination_schema",
+            ),
+        },
+        SourcesDocumentTestCase {
             description: "a load needs a name",
             document: loaded_sources(vec![("kind", text("postgres"))], Vec::new()),
             expected_sources: parse_error(

@@ -22,10 +22,10 @@ use crate::python_selection::_helpers::validation::{
     source_loaders, terminal_loaders, validate_boundaries, validate_selected_dependencies,
 };
 use crate::python_selection::constants::{
-    ASSET_KIND, CHECK_KIND, EXPANSION_MARKER, INTERSECTION_SEPARATOR, JOB_KIND, LOADER_KIND,
-    NAME_KIND, NODE_KIND_KIND, PATH_KIND, PATH_ROOT_CODE, PATH_ROOT_ERROR, PLANNER_DEFAULT_CODE,
-    SEED_KIND, SOURCE_KIND, SOURCE_RESOURCE, SQL_MODEL_PATH_ROOT, TAG_KIND, TEST_KIND,
-    UNKNOWN_NAME_CODE, UNKNOWN_TAG_CODE,
+    ASSET_KIND, CHECK_KIND, EXPANSION_MARKER, INTERSECTION_SEPARATOR, JOB_KIND, LOAD_KIND,
+    LOADER_KIND, NAME_KIND, NODE_KIND_KIND, PATH_KIND, PATH_ROOT_CODE, PATH_ROOT_ERROR,
+    PLANNER_DEFAULT_CODE, SEED_KIND, SOURCE_KIND, SOURCE_RESOURCE, SQL_MODEL_PATH_ROOT, TAG_KIND,
+    TEST_KIND, UNKNOWN_NAME_CODE, UNKNOWN_TAG_CODE,
 };
 use crate::python_selection::models::{Atom, PythonSelectionNode, RunSelection, SelectionContext};
 use sqlbuild_core::constants::PYTHON_NODE_ROOT as PYTHON_NODE_PATH_ROOT;
@@ -343,7 +343,7 @@ fn single_side(context: &SelectionContext<'_>, raw: &str) -> Resolved {
     let atoms: Atoms = match kind.as_str() {
         TEST_KIND => return Err(unit_test_error(raw)),
         PATH_KIND => resolve_path(context, raw, &value)?,
-        SEED_KIND | SOURCE_KIND => resolve_sql(context, raw)?,
+        SEED_KIND | SOURCE_KIND | LOAD_KIND => resolve_sql(context, raw)?,
         JOB_KIND => resolve_job(context, raw)?,
         kind if RUN_SELECTOR_KINDS.contains(&kind) => resolve_job(context, raw)?,
         AUDIT_KIND => resolve_sql(context, raw)?,
