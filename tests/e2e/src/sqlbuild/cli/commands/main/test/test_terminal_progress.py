@@ -34,6 +34,12 @@ _TEST_ROW: re.Pattern[str] = re.compile(r"^\s*\d+/\d+  test  ")
 """A result row: `  N/M  test  <name>  STATUS ...`."""
 
 
+def _is_test_row(line: str) -> bool:
+    """Whether a screen line is a test's result row."""
+
+    return _TEST_ROW.match(line) is not None
+
+
 @pytest.mark.parametrize(
     "test_case",
     [
@@ -85,7 +91,7 @@ def test_given_built_project_when_testing_in_terminal_then_no_spinner_row_surviv
         rendered: str = "\n".join(screen)
         assert result.returncode == 0, rendered
         assert not any(glyph in rendered for glyph in SPINNER_GLYPHS), rendered
-        rows: list[str] = list(filter(_TEST_ROW.match, screen))
+        rows: list[str] = list(filter(_is_test_row, screen))
         row_text: str = "\n".join(rows)
         assert "statement" not in row_text, rendered
         assert all(f"  {name}  " in row_text for name in test_case.expected_row_names), rendered
