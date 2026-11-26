@@ -12,8 +12,7 @@ use sqlbuild_core::cli_text::models::{CliStyle, SummaryCount};
 use sqlbuild_core::progress::main::statement_summary_delta::statement_summary_delta;
 use sqlbuild_core::progress::models::StatementSummary;
 use sqlbuild_core::run_on::main::read_run_on_decisions::read_run_on_decisions;
-use sqlbuild_core::run_on::main::render_local_refusals::render_local_refusals;
-use sqlbuild_core::run_on::main::render_warehouse_census::render_warehouse_census;
+use sqlbuild_core::run_on::main::render_refusal_report::render_refusal_report;
 use sqlbuild_core::run_on::main::run_on_split::run_on_split;
 use sqlbuild_core::run_on::main::with_run_on_json::with_run_on_json;
 use sqlbuild_core::run_on::models::{RunOn, RunOnDecision};
@@ -25,6 +24,7 @@ use sqlbuild_core::scenario_command::models::{
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::{ExecutionStatus, ScenarioRunResult};
 use sqlbuild_host::types::ResultEnum;
+use sqlbuild_python_base::build_progress::main::terminal::terminal_columns::terminal_columns;
 use sqlbuild_python_output::build_progress::main::local_attempt::local_attempt;
 use sqlbuild_python_output::build_progress::models::LocalAttemptStep;
 use sqlbuild_python_output::result_output::main::results::split_scenario_fallbacks::split_scenario_fallbacks;
@@ -234,13 +234,22 @@ fn finish(
     if let Some(line) = statements.as_ref().and_then(StatementReport::line) {
         write(&run.stream, &format!("{line}\n"))?;
     }
+    let columns: usize = terminal_columns(run.stream.py())?;
     let refusals: String = match report.mode {
         RunOn::Warehouse => String::new(),
-        RunOn::Local => render_local_refusals(&report.decisions, true, SCENARIO_NOUNS, run.style),
-        RunOn::Auto if report.verbose => {
-            render_local_refusals(&report.decisions, false, SCENARIO_NOUNS, run.style)
-        }
-        RunOn::Auto => render_warehouse_census(&report.decisions, SCENARIO_NOUNS, run.style),
+        RunOn::Local => render_refusal_report(
+            &report.decisions,
+            (true, report.verbose),
+            SCENARIO_NOUNS,
+            (columns, run.style),
+        ),
+        RunOn::Auto if report.verbose => render_refusal_report(
+            &report.decisions,
+            (false, true),
+            SCENARIO_NOUNS,
+            (columns, run.style),
+        ),
+        RunOn::Auto => String::new(),
     };
     if !refusals.is_empty() {
         write(&run.stream, &refusals)?;

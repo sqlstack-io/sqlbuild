@@ -1,8 +1,8 @@
+pub mod expectation_summary;
 pub mod parameterized_test_label;
-pub mod render_test_completion;
 pub mod render_test_inspection;
-pub mod render_test_ready;
 pub mod test_exit_code;
+pub mod test_failure_entry;
 pub mod test_group_name;
 pub mod test_name_width;
 pub mod test_outcome_status;

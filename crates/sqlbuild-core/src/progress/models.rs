@@ -86,6 +86,10 @@ pub struct ProgressProjection {
     pub(crate) statement_starts: HashMap<String, ProgressEvent>,
     pub(crate) statement_query_ids: HashMap<String, String>,
     pub(crate) statements: StatementSummary,
+    /// Whether resources a result callback renders print no start or statement failure rows.
+    pub(crate) quiet_enriched: bool,
+    /// The phase and kind of each resource's failed statement, by resource name.
+    pub(crate) failed_statements: HashMap<String, (String, String)>,
 }
 
 /// The warehouse statements an invocation finished: how many of each leading keyword, and their query identifiers.
@@ -131,6 +135,24 @@ impl ProgressProjection {
             self.resource_ordinals.insert(name, ordinal);
         }
         self.resource_total = self.resource_total.max(total);
+    }
+
+    /// Print no start or statement failure rows for resources a result callback renders, unless debugging.
+    pub fn quiet_enriched_resources(&mut self) {
+        self.quiet_enriched = true;
+    }
+
+    /// The phase and kind of the statement that failed in resource `resource_name`, if one did.
+    #[must_use]
+    pub fn failed_statement(&self, resource_name: &str) -> Option<(String, String)> {
+        self.failed_statements.get(resource_name).cloned()
+    }
+
+    /// Whether a row of resource `resource_name` is left to its result callback.
+    pub(crate) fn quiet(&self, resource_name: &str) -> bool {
+        self.quiet_enriched
+            && !self.settings.debug
+            && self.enriched_resource_names.contains(resource_name)
     }
 
     /// Declare that a result callback will enrich this resource's terminal.

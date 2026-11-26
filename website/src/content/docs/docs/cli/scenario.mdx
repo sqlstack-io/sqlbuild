@@ -36,7 +36,7 @@ sqb scenario test [flags]
 | `--max-snapshot-total-bytes` | Override total byte limit for capture |
 | `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `query` [warehouse group](/docs/concepts/adapters/snowflake#command-group-warehouses) and the connection warehouse |
 | `--since <ref>` | Run only the scenarios affected by changes since the merge base of `<ref>` and `HEAD`; `@base` reads `[git] base_ref` |
-| `--explain` | With `--since`, print why each selected scenario was selected |
+| `--explain` | Print where each scenario runs and why; with `--since`, also why it was selected |
 
 ### Affected scenarios
 

@@ -62,6 +62,19 @@ pub struct LocalRefusal {
     /// Where the caret goes in `snippet` when it is generated SQL rather than the file's line.
     pub snippet_column: Option<i64>,
     pub expanded_from: Option<String>,
+    /// The macro the refused construct came from, as `@py.<name>` or `@sql.<name>`.
+    pub macro_name: Option<String>,
+    /// Where the macro's own source holds the refused construct; `None` when it can't be found there.
+    pub macro_place: Option<MacroPlace>,
+}
+
+/// The refused construct in a macro's own source file.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct MacroPlace {
+    pub path: String,
+    pub line: i64,
+    pub column: i64,
+    pub snippet: String,
 }
 
 impl LocalRefusal {
@@ -94,19 +107,57 @@ impl RunOnDecision {
     }
 }
 
-/// Where one refusal sits, to show each refused construct and place once.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct RefusalPlace {
-    pub(crate) path: String,
-    pub(crate) construct: String,
-    pub(crate) line: i64,
-    pub(crate) column: i64,
-    pub(crate) code: String,
+/// Everything one refused construct blocks: one block in the report, with each place it is written.
+#[derive(Clone, Debug, Default)]
+pub struct RefusalGroup {
+    /// The first refusal, whose code, message, notes and help the block shows once.
+    pub refusal: LocalRefusal,
+    /// Whether the refusals have no place in a file, such as a project function's.
+    pub unplaced: bool,
+    pub origins: Vec<RefusalOrigin>,
+    /// Every item the construct blocks, in first-seen order.
+    pub items: Vec<String>,
 }
 
-/// One refusal and every item it blocks.
-#[derive(Clone, Debug)]
-pub(crate) struct GroupedRefusal {
-    pub(crate) refusal: LocalRefusal,
-    pub(crate) names: Vec<String>,
+impl RefusalGroup {
+    /// What the header and the census call the construct: `fn:HASH`, or `project function`.
+    #[must_use]
+    pub fn label(&self) -> String {
+        if self.unplaced {
+            return self.refusal.category.clone();
+        }
+        self.refusal.construct.clone()
+    }
+
+    /// The distinct models the construct is written in or expanded into.
+    #[must_use]
+    pub fn models(&self) -> usize {
+        let mut models: Vec<&str> = self
+            .origins
+            .iter()
+            .flat_map(|origin| origin.users.iter().map(|user| user.model.as_str()))
+            .collect();
+        models.sort_unstable();
+        models.dedup();
+        models.len()
+    }
+}
+
+/// One place a construct is written: a macro, a file position, or an unplaced construct's name.
+#[derive(Clone, Debug, Default)]
+pub struct RefusalOrigin {
+    /// The first refusal at this origin, whose place the frame shows.
+    pub refusal: LocalRefusal,
+    /// The models that read it, each with the items it blocks there.
+    pub users: Vec<OriginUser>,
+    pub items: Vec<String>,
+}
+
+/// One model an origin is written in or expanded into, and the items it blocks there.
+#[derive(Clone, Debug, Default)]
+pub struct OriginUser {
+    pub model: String,
+    /// The line of the model file the construct is at, or the macro is called on.
+    pub line: i64,
+    pub items: Vec<String>,
 }

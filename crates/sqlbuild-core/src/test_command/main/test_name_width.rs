@@ -1,15 +1,18 @@
-//! One shared width for test rows and their nested expectation rows.
+//! The widest name a test row shows: its label without the `<group>__` prefix its group header gives.
 
-use crate::cli_text::main::resolve_name_column_width::resolve_name_column_width;
-use crate::test_command::constants::{CHILD_NAME_INDENT, NAME_MIN_WIDTH};
-
-/// The test label column width, widened for the longest indented child name.
+/// The longest `(label, group)` label as a row shows it.
 #[must_use]
-pub fn test_name_width(labels: &[String], child_names: &[String]) -> usize {
-    let child: usize = child_names
+pub fn test_name_width(labels: &[(String, String)]) -> usize {
+    labels
         .iter()
-        .map(|name| name.chars().count())
+        .map(|(label, group)| {
+            label
+                .strip_prefix(&format!("{group}__"))
+                .filter(|rest| !group.is_empty() && !rest.is_empty())
+                .unwrap_or(label)
+                .chars()
+                .count()
+        })
         .max()
-        .unwrap_or(0);
-    resolve_name_column_width(labels, NAME_MIN_WIDTH).max(child + CHILD_NAME_INDENT)
+        .unwrap_or(0)
 }

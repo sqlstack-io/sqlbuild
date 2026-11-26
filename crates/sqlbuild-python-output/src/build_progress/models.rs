@@ -14,7 +14,11 @@ use crate::build_progress::_helpers::build_callbacks::statement;
 use crate::build_progress::_helpers::heartbeat;
 use crate::build_progress::_helpers::nested_progress::ITEM_OPTIONS;
 use crate::build_progress::_helpers::nested_progress::MIN_NAME_WIDTH;
+use crate::build_progress::_helpers::nested_progress::PASS_STATUS;
+use crate::build_progress::_helpers::nested_progress::RunningItem;
+use crate::build_progress::_helpers::nested_progress::TIMEOUT_STATUS;
 use crate::build_progress::_helpers::nested_progress::child_rows;
+use crate::build_progress::_helpers::nested_progress::clear_footer;
 use crate::build_progress::_helpers::nested_progress::optional_argument;
 use crate::build_progress::_helpers::plan_facts::BuildPlanFacts;
 use crate::build_progress::_helpers::plan_facts::build_plan_facts;
@@ -62,8 +66,8 @@ use sqlbuild_core::nested_progress::main::audit_group_name::audit_group_name;
 use sqlbuild_core::nested_progress::main::render_audit_aggregate::render_audit_aggregate;
 use sqlbuild_core::nested_progress::main::render_audit_row::render_audit_row;
 use sqlbuild_core::nested_progress::main::render_group_header::render_group_header;
+use sqlbuild_core::nested_progress::main::render_item_group::render_item_group;
 use sqlbuild_core::nested_progress::main::render_nested_item::render_nested_item;
-use sqlbuild_core::nested_progress::main::render_nested_spinner_line::render_nested_spinner_line;
 use sqlbuild_core::nested_progress::models::AuditAggregate;
 use sqlbuild_core::nested_progress::models::NestedItem;
 use sqlbuild_core::nested_progress::models::NestedLayout;
@@ -71,6 +75,8 @@ use sqlbuild_core::progress::main::connection_phase_line::connection_phase_line;
 use sqlbuild_core::progress::main::connection_start_message::connection_start_message;
 use sqlbuild_core::progress::main::is_planning_completion_message::is_planning_completion_message;
 use sqlbuild_core::progress::main::is_planning_failure_message::is_planning_failure_message;
+use sqlbuild_core::run_output::main::render_progress_footer::render_progress_footer;
+use sqlbuild_core::run_output::main::render_progress_heartbeat::render_progress_heartbeat;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
@@ -959,7 +965,7 @@ pub enum LocalAttemptStep<'a> {
     SettleReplay(&'a Bound<'a, PyAny>),
 }
 
-/// Render one live spinner row for all running items and grouped completed rows.
+/// Render the live footer for running items and the grouped rows of completed ones.
 #[pyclass(module = "sqlbuild._native", frozen)]
 pub struct NestedCommandProgressCallbacks {
     pub(crate) stream: Py<PyAny>,
@@ -967,9 +973,15 @@ pub struct NestedCommandProgressCallbacks {
     pub(crate) lock: Py<PyAny>,
     pub(crate) label: String,
     pub(crate) name_width: usize,
+    pub(crate) total: usize,
+    /// How many items each group has, for its header.
+    pub(crate) group_counts: HashMap<String, usize>,
+    /// The singular and plural noun, and the footer's verb.
+    pub(crate) nouns: (String, String),
+    pub(crate) verb: String,
+    pub(crate) verbose: bool,
     pub(crate) style: CliStyle,
     pub(crate) is_tty: bool,
-    pub(crate) sequential: bool,
     pub(crate) projector: Option<Py<PyAny>>,
     pub(crate) state: Mutex<crate::build_progress::_helpers::nested_progress::ReporterState>,
 }
@@ -1002,27 +1014,54 @@ impl NestedCommandProgressCallbacks {
             label: self.label.clone(),
             name_width: self.name_width,
             columns: terminal_columns(py)?,
+            total: self.total,
+            verbose: self.verbose,
         })
     }
 
-    pub(crate) fn draw_spinner_line(&self, py: Python<'_>) -> PyResult<()> {
-        let (running, frame) = {
+    /// Erase the footer and draw it again for what is running now.
+    pub(crate) fn draw_footer(&self, py: Python<'_>) -> PyResult<()> {
+        let (footer, frame, drawn) = {
             let mut state = self.state();
             let frame: usize = state.frame;
             state.frame = (frame + 1) % SPINNER_FRAMES.len();
-            let running: Vec<String> = state.running.iter().map(|(item, _)| item.clone()).collect();
-            (running, frame)
+            (
+                state.footer((&self.verb, &self.nouns.1)),
+                frame,
+                state.drawn_lines,
+            )
+        };
+        let lines: Vec<String> = render_progress_footer(
+            &footer,
+            SPINNER_FRAMES[frame],
+            terminal_columns(py)?,
+            self.style,
+        );
+        let erase: String = if drawn > 0 {
+            clear_footer(drawn)
+        } else {
+            String::new()
         };
         let stream: &Bound<'_, PyAny> = self.stream.bind(py);
-        write(
-            stream,
-            &render_nested_spinner_line(
-                &running,
-                SPINNER_FRAMES[frame],
-                &self.layout(py)?,
-                self.style,
-            ),
-        )?;
+        write(stream, &format!("{erase}{}", lines.join("\n")))?;
+        self.state().drawn_lines = lines.len();
+        flush(stream)
+    }
+
+    /// Write a heartbeat when one is due and the output is not a terminal.
+    pub(crate) fn beat(&self, py: Python<'_>) -> PyResult<()> {
+        let footer = {
+            let mut state = self.state();
+            if !state.heartbeat_due() {
+                return Ok(());
+            }
+            state.beats += 1;
+            state.last_beat = Some(Instant::now());
+            state.footer((&self.verb, &self.nouns.1))
+        };
+        let lines: Vec<String> = render_progress_heartbeat(&footer, self.style);
+        let stream: &Bound<'_, PyAny> = self.stream.bind(py);
+        write(stream, &format!("{}\n", lines.join("\n")))?;
         flush(stream)
     }
 
@@ -1044,7 +1083,7 @@ impl NestedCommandProgressCallbacks {
         }
     }
 
-    /// Drop an abandoned attempt: its held lines, its terminal row and its place on the live row.
+    /// Drop an abandoned attempt: its held lines, its terminal row and its place in the footer.
     pub fn on_item_abandoned(
         slf: &Bound<'_, Self>,
         item_name: &str,
@@ -1059,7 +1098,7 @@ impl NestedCommandProgressCallbacks {
             reporter
                 .state()
                 .running
-                .retain(|(name, _)| name != item_name);
+                .retain(|item| item.name != item_name);
             Self::refresh_live_row(slf)
         })?;
         if let Some(thread) = stopped {
@@ -1087,22 +1126,24 @@ impl NestedCommandProgressCallbacks {
     }
 
     pub(crate) fn clear_live_row(&self, py: Python<'_>) -> PyResult<()> {
-        if self.is_tty && self.state().line_active {
-            write(self.stream.bind(py), CLEAR_LINE)?;
+        let drawn: usize = self.state().drawn_lines;
+        if self.is_tty && self.state().line_active && drawn > 0 {
+            write(self.stream.bind(py), &clear_footer(drawn))?;
+            self.state().drawn_lines = 0;
         }
         Ok(())
     }
 
     pub(crate) fn write_group_header(&self, py: Python<'_>, group: &str) -> PyResult<()> {
-        let previous: Option<String> = self.state().printed_group.clone();
-        if previous.as_deref() == Some(group) {
+        if group.is_empty() || self.state().printed_group.as_deref() == Some(group) {
             return Ok(());
         }
         self.state().printed_group = Some(group.to_owned());
+        let count: usize = self.group_counts.get(group).copied().unwrap_or(0);
         let stream: &Bound<'_, PyAny> = self.stream.bind(py);
         write(
             stream,
-            &render_group_header(group, previous.is_none(), self.style),
+            &render_item_group(group, count, (&self.nouns.0, &self.nouns.1), self.style),
         )?;
         flush(stream)
     }
@@ -1118,20 +1159,21 @@ impl NestedCommandProgressCallbacks {
         Ok(())
     }
 
-    /// Redraw the live row for remaining items, or retire it; return a thread to join.
+    /// Redraw the footer for remaining items, or retire it; return a thread to join.
     pub(crate) fn refresh_live_row(slf: &Bound<'_, Self>) -> PyResult<Option<Py<PyAny>>> {
         let py: Python<'_> = slf.py();
         let reporter: &Self = slf.get();
-        if !reporter.is_tty {
-            return Ok(None);
-        }
         if !reporter.state().running.is_empty() {
-            reporter.draw_spinner_line(py)?;
+            if reporter.is_tty {
+                reporter.draw_footer(py)?;
+            }
             return Ok(None);
         }
-        reporter.state().line_active = false;
-        release(reporter.lines.bind(py), slf.as_any())?;
-        reporter.set_cursor(py, false)?;
+        if reporter.is_tty {
+            reporter.state().line_active = false;
+            release(reporter.lines.bind(py), slf.as_any())?;
+            reporter.set_cursor(py, false)?;
+        }
         let (event, thread) = {
             let mut state = reporter.state();
             (state.stop_event.take(), state.thread.take())
@@ -1154,7 +1196,7 @@ impl NestedCommandProgressCallbacks {
             options,
             (
                 &["total", "label", "stream", "use_color"],
-                &["name_width", "concurrency"],
+                &["name_width", "group_counts", "nouns", "verb", "verbose"],
             ),
         )?;
         let stream: Bound<'_, PyAny> = arguments.value("stream")?;
@@ -1164,11 +1206,26 @@ impl NestedCommandProgressCallbacks {
         } else {
             MIN_NAME_WIDTH
         };
-        let concurrency: i64 = if arguments.passed("concurrency")? {
-            arguments.value("concurrency")?.extract()?
+        let group_counts: HashMap<String, usize> = if arguments.passed("group_counts")? {
+            arguments.value("group_counts")?.extract()?
         } else {
-            1
+            HashMap::new()
         };
+        let nouns: (String, String) = if arguments.passed("nouns")? {
+            arguments.value("nouns")?.extract()?
+        } else {
+            ("test".to_owned(), "tests".to_owned())
+        };
+        let verb: String = if arguments.passed("verb")? {
+            arguments.value("verb")?.extract()?
+        } else {
+            "Testing".to_owned()
+        };
+        let verbose: bool =
+            arguments.passed("verbose")? && arguments.value("verbose")?.is_truthy()?;
+        let total: usize = arguments.value("total")?.extract()?;
+        let mut state = crate::build_progress::_helpers::nested_progress::ReporterState::default();
+        state.counts.total = total;
         Ok(Self {
             is_tty: tty_flag(&stream)?,
             stream: stream.unbind(),
@@ -1176,14 +1233,16 @@ impl NestedCommandProgressCallbacks {
             lines: lines.unbind(),
             label: arguments.value("label")?.extract()?,
             name_width: name_width.max(MIN_NAME_WIDTH),
+            total,
+            group_counts,
+            nouns,
+            verb,
+            verbose,
             style: CliStyle {
                 use_color: arguments.value("use_color")?.is_truthy()?,
             },
-            sequential: concurrency <= 1,
             projector: projector(py)?,
-            state: Mutex::new(
-                crate::build_progress::_helpers::nested_progress::ReporterState::default(),
-            ),
+            state: Mutex::new(state),
         })
     }
 
@@ -1217,36 +1276,62 @@ impl NestedCommandProgressCallbacks {
                 .call_method("expect_resource_enrichment", (), Some(&options))?;
         }
         reporter.locked(py, || {
-            if reporter.sequential
-                && reporter.state().running.is_empty()
-                && !reporter.state().holding
-            {
-                reporter.clear_live_row(py)?;
-                reporter.write_group_header(py, &group)?;
-            }
             {
                 let mut state = reporter.state();
-                match state.running.iter_mut().find(|(name, _)| *name == item) {
-                    Some(entry) => entry.1 = group,
-                    None => state.running.push((item, group)),
+                let now: Instant = Instant::now();
+                state.started.get_or_insert(now);
+                match state
+                    .running
+                    .iter_mut()
+                    .find(|running| running.name == item)
+                {
+                    Some(running) => {
+                        running.group = group;
+                        running.finished = false;
+                    }
+                    None => state.running.push(RunningItem {
+                        name: item,
+                        group,
+                        started: now,
+                        finished: false,
+                    }),
                 }
             }
-            if !reporter.is_tty {
-                return Ok(());
+            if reporter.is_tty {
+                reporter.set_cursor(py, true)?;
+                reporter.state().line_active = true;
+                claim(
+                    reporter.lines.bind(py),
+                    reporter.stream.bind(py),
+                    slf.as_any(),
+                )?;
+                reporter.draw_footer(py)?;
             }
-            reporter.set_cursor(py, true)?;
-            reporter.state().line_active = true;
-            claim(
-                reporter.lines.bind(py),
-                reporter.stream.bind(py),
-                slf.as_any(),
-            )?;
-            reporter.draw_spinner_line(py)?;
             if reporter.state().thread.is_none() {
                 let (event, thread) = start_spinner(slf.as_any())?;
                 let mut state = reporter.state();
                 state.stop_event = Some(event.unbind());
                 state.thread = Some(thread.unbind());
+            }
+            Ok(())
+        })
+    }
+
+    /// Mark an item finished: it no longer runs, and its row waits for any earlier item's result.
+    pub(crate) fn on_item_finished(slf: &Bound<'_, Self>, item_name: &str) -> PyResult<()> {
+        let py: Python<'_> = slf.py();
+        let reporter: &Self = slf.get();
+        reporter.locked(py, || {
+            if let Some(item) = reporter
+                .state()
+                .running
+                .iter_mut()
+                .find(|item| item.name == item_name)
+            {
+                item.finished = true;
+            }
+            if reporter.is_tty && reporter.state().line_active {
+                reporter.draw_footer(py)?;
             }
             Ok(())
         })
@@ -1262,7 +1347,11 @@ impl NestedCommandProgressCallbacks {
         let arguments = KeywordArguments::read(py, "on_item_complete", options, ITEM_OPTIONS)?;
         let group: String = arguments.value("group_name")?.extract()?;
         let item_name: String = arguments.value("item_name")?.extract()?;
-        let mut detail: String = optional_argument(&arguments, "detail")?.unwrap_or_default();
+        let detail: String = optional_argument(&arguments, "detail")?.unwrap_or_default();
+        let run_on: String = optional_argument(&arguments, "run_on")?.unwrap_or_default();
+        let not_run: bool =
+            arguments.passed("not_run")? && arguments.value("not_run")?.is_truthy()?;
+        let status_text: String = optional_argument(&arguments, "status_text")?.unwrap_or_default();
         let resource_id: Option<String> = optional_argument(&arguments, "canonical_resource_id")?;
         let held: Option<Bound<'_, NativeProgressProjector>> = match reporter.state().holding {
             true => reporter.native_projector(py)?,
@@ -1286,30 +1375,39 @@ impl NestedCommandProgressCallbacks {
                     &canonical
                         .filter(|name| !name.is_empty())
                         .unwrap_or(item_name.clone()),
-                    optional_argument(&arguments, "canonical_resource_id")?.as_deref(),
+                    resource_id.as_deref(),
                 )?
             }
             None => None,
         };
         let stopped: Option<Py<PyAny>> = reporter.locked(py, || {
-            let item_group: String = {
+            let (item_group, position) = {
                 let mut state = reporter.state();
-                match state
+                let item_group: String = match state
                     .running
                     .iter()
-                    .position(|(name, _)| *name == item_name)
+                    .position(|running| running.name == item_name)
                 {
-                    Some(index) => state.running.remove(index).1,
+                    Some(index) => state.running.remove(index).group,
                     None => group,
+                };
+                match (not_run, status_text.as_str()) {
+                    (true, _) => state.counts.not_run += 1,
+                    (false, PASS_STATUS) => state.counts.pass += 1,
+                    (false, TIMEOUT_STATUS) => state.counts.timeout += 1,
+                    (false, _) => state.counts.fail += 1,
                 }
+                (item_group, state.counts.done())
             };
-            if reporter.projector.is_none() || duration_ms.is_some() {
-                if let Some(duration_ms) = duration_ms {
-                    detail = format!("{detail}  {:.2}s", duration_ms / 1000.0);
-                }
+            if not_run {
+                release(&held)?;
+            } else if reporter.projector.is_none() || duration_ms.is_some() {
                 let item: NestedItem = NestedItem {
                     item_name,
-                    status_text: optional_argument(&arguments, "status_text")?.unwrap_or_default(),
+                    position,
+                    status_text,
+                    run_on,
+                    seconds: duration_ms.map(|duration| duration / 1000.0),
                     detail,
                     error: ErrorText {
                         code: optional_argument(&arguments, "error_code")?,
@@ -1323,7 +1421,7 @@ impl NestedCommandProgressCallbacks {
                 release(&held)?;
                 write(
                     reporter.stream.bind(py),
-                    &render_nested_item(&item, &reporter.layout(py)?, reporter.style),
+                    &render_nested_item(&item, &item_group, &reporter.layout(py)?, reporter.style),
                 )?;
             } else {
                 release(&held)?;
@@ -1338,20 +1436,22 @@ impl NestedCommandProgressCallbacks {
         Ok(())
     }
 
-    /// Erase the live spinner row so a persistent line can take its place.
+    /// Erase the footer so a persistent line can take its place.
     pub(crate) fn clear_transient_line(&self, py: Python<'_>) -> PyResult<()> {
         self.locked(py, || {
+            let drawn: usize = self.state().drawn_lines;
             let stream: &Bound<'_, PyAny> = self.stream.bind(py);
-            write(stream, CLEAR_LINE)?;
+            write(stream, &clear_footer(drawn))?;
+            self.state().drawn_lines = 0;
             flush(stream)
         })
     }
 
-    /// Draw the live spinner row again below persistent output.
+    /// Draw the footer again below persistent output.
     pub(crate) fn redraw_transient_line(&self, py: Python<'_>) -> PyResult<()> {
         self.locked(py, || {
             if self.state().line_active {
-                self.draw_spinner_line(py)?;
+                self.draw_footer(py)?;
             }
             Ok(())
         })
@@ -1367,8 +1467,14 @@ impl NestedCommandProgressCallbacks {
             .is_truthy()?
         {
             self.locked(py, || {
-                if !stop_event.call_method0("is_set")?.is_truthy()? && self.state().line_active {
-                    self.draw_spinner_line(py)?;
+                if stop_event.call_method0("is_set")?.is_truthy()? {
+                    return Ok(());
+                }
+                if !self.is_tty {
+                    return self.beat(py);
+                }
+                if self.state().line_active {
+                    self.draw_footer(py)?;
                 }
                 Ok(())
             })?;

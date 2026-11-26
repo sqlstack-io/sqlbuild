@@ -8,8 +8,7 @@ pub(crate) const COLUMN_WIDTH: usize = 9;
 pub(crate) const CANNOT_RUN_LOCALLY_TITLE: &str = "Can't run locally";
 pub(crate) const ON_THE_WAREHOUSE_TITLE: &str = "On the warehouse";
 pub(crate) const RUNS_ON_LABEL: &str = "runs on";
-pub(crate) const TESTS_NOTE: &str = "= tests:";
 pub(crate) const NOTE_LABEL: &str = "= note:";
 pub(crate) const EXPANDED_LABEL: &str = "= expanded from";
-/// The caret line's index in a located block: header, `-->`, gutter, source, caret.
-pub(crate) const CARET_LINE: usize = 4;
+pub(crate) const USED_BY_LABEL: &str = "= used by";
+pub(crate) const VERBOSE_HINT: &str = "  Every model a macro expands into: --verbose; every item each place blocks: --json (refusals[].tests).";

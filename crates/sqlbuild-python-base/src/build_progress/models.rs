@@ -41,6 +41,7 @@ use pyo3::types::PyDict;
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_core::progress::main::claim_progress_terminal::claim_progress_terminal;
 use sqlbuild_core::progress::main::close_progress_projection::close_progress_projection;
+use sqlbuild_core::progress::main::completion_phase_line::completion_phase_line;
 use sqlbuild_core::progress::main::consume_progress_event::consume_progress_event;
 use sqlbuild_core::progress::main::format_status_spinner_line::format_status_spinner_line;
 use sqlbuild_core::progress::main::progress_terminal_duration::progress_terminal_duration;
@@ -277,6 +278,21 @@ impl NativeProgressProjector {
     pub(crate) fn expect_resource_enrichment(&self, resource_name: &str) -> PyResult<()> {
         self.locked()?.expect_resource_enrichment(resource_name);
         Ok(())
+    }
+
+    /// Print no start or statement failure rows for resources a result callback renders.
+    pub(crate) fn quiet_enriched_resources(&self) -> PyResult<()> {
+        self.locked()?.quiet_enriched_resources();
+        Ok(())
+    }
+
+    /// The phase and kind of the statement that failed in `resource_name`, if one did.
+    #[pyo3(signature = (*, resource_name))]
+    pub fn failed_statement(
+        &self,
+        resource_name: &str,
+    ) -> PyResult<Option<(String, String)>> {
+        Ok(self.locked()?.failed_statement(resource_name))
     }
 
     /// Declare that this resource never starts, so it shows only its terminal row.
@@ -647,7 +663,10 @@ impl TransientStatusReporter {
     pub fn complete(slf: &Bound<'_, Self>, message: &str, blank_line_after: bool) -> PyResult<()> {
         let py: Python<'_> = slf.py();
         Self::close(slf)?;
-        slf.get().write_message(py, message, true)?;
+        match completion_phase_line(message, slf.get().style) {
+            Some(line) => slf.get().write_persistent(py, &format!("{line}\n"))?,
+            None => slf.get().write_message(py, message, true)?,
+        }
         if blank_line_after {
             slf.get().write_blank_line(py)?;
         }

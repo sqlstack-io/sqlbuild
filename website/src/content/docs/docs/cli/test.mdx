@@ -31,7 +31,7 @@ Positional `SELECTOR` arguments work like `--select`, and both forms can be comb
 | `--run-on auto\|local\|warehouse` | Where unit tests run; overrides the target's and `[settings]` `test_run_on`. See [Local and warehouse runs](#local-and-warehouse-runs) |
 | `--verbose` | Print every refusal that keeps a test off DuckDB in full, instead of the census |
 | `--since <ref>` | Run only the tests affected by changes since the merge base of `<ref>` and `HEAD` (see [Run only affected tests](#run-only-affected-tests)); `@base` reads `[git] base_ref` |
-| `--explain` | With `--since`, print why each selected test was selected |
+| `--explain` | Print where each test runs and why; with `--since`, also why it was selected |
 | `--sql` | Run only SQL tests |
 | `--python` | Run only [Python tests](#python-tests); cannot be combined with `--inspect` or `--since` |
 

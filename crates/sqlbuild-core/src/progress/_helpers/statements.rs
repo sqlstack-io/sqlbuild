@@ -3,6 +3,25 @@
 use crate::progress::constants::{NESTED_PREFIX, STATEMENT_FAILED, UNKNOWN_RESOURCE_NAME};
 use crate::progress::models::{ProgressEvent, ProgressProjection};
 
+/// The phase a statement ran in and its leading keyword.
+fn statement_phase_kind(
+    projection: &ProgressProjection,
+    event: &ProgressEvent,
+) -> (String, String) {
+    let phase: &str = projection
+        .operation_starts
+        .get(event.operation_id.as_deref().unwrap_or_default())
+        .and_then(|start| {
+            start
+                .payload
+                .phase
+                .as_deref()
+                .or(start.payload.operation_name.as_deref())
+        })
+        .unwrap_or(&event.payload.intent);
+    (phase.to_owned(), event.payload.statement_kind.clone())
+}
+
 /// `model=...  phase=...  kind=...` for one statement.
 fn statement_context(projection: &ProgressProjection, event: &ProgressEvent) -> String {
     let resource_name: &str = projection
@@ -134,11 +153,23 @@ pub(crate) fn consume_statement_terminal(
     let Some(start) = projection.statement_starts.remove(statement_id) else {
         return (projection, None);
     };
-    let line: Option<String> = (event.event_type == STATEMENT_FAILED).then(|| {
-        let suffix: String = query_suffix(statement_query_id(&projection, event).as_ref());
-        let context: String = statement_context(&projection, &start);
-        format!("{NESTED_PREFIX}statement  {context}  FAIL{suffix}")
-    });
+    let resource_name: String = projection
+        .resource_names
+        .get(start.resource_id.as_deref().unwrap_or_default())
+        .cloned()
+        .unwrap_or_default();
+    if event.event_type == STATEMENT_FAILED {
+        let (phase, kind) = statement_phase_kind(&projection, &start);
+        projection
+            .failed_statements
+            .insert(resource_name.clone(), (phase, kind));
+    }
+    let line: Option<String> =
+        (event.event_type == STATEMENT_FAILED && !projection.quiet(&resource_name)).then(|| {
+            let suffix: String = query_suffix(statement_query_id(&projection, event).as_ref());
+            let context: String = statement_context(&projection, &start);
+            format!("{NESTED_PREFIX}statement  {context}  FAIL{suffix}")
+        });
     projection.statement_query_ids.remove(statement_id);
     (projection, line)
 }

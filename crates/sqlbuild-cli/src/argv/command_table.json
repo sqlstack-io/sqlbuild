@@ -3684,7 +3684,7 @@
         "nargs": 0,
         "const": true,
         "default": false,
-        "help": "with --since, show why each test was selected",
+        "help": "show where each test runs and why; with --since, also why it was selected",
         "group": 1
        },
        {
@@ -8030,7 +8030,7 @@
              "nargs": 0,
              "const": true,
              "default": false,
-             "help": "with --since, show why each scenario was selected",
+             "help": "show where each scenario runs and why; with --since, also why it was selected",
              "group": 1
             },
             {

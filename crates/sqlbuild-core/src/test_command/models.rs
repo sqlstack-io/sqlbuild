@@ -34,11 +34,24 @@ pub struct TestPlanWarning {
     pub message: String,
 }
 
-/// One test that did not pass.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct TestFailure {
-    pub label: String,
-    pub error_message: Option<String>,
+/// What a failed test's `Failures:` entry and its `Failed (N):` line are built from.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct TestFailureFacts {
+    /// The full name, never cut.
+    pub name: String,
+    /// `test` or `scenario`.
+    pub kind: String,
+    /// `local` or `warehouse`; empty when the command doesn't say.
+    pub run_on: String,
     pub error_code: Option<String>,
+    pub error_message: Option<String>,
     pub error_help: Option<String>,
+    pub timed_out: bool,
+    pub steps: Vec<crate::progress::models::ExpectationStep>,
+    /// The phase and leading keyword of the statement that failed, when one did.
+    pub statement: Option<(String, String)>,
+    /// The compiled SQL the item ran, under `target/`.
+    pub compiled_path: Option<String>,
+    /// The file the test or scenario is written in.
+    pub source_path: Option<String>,
 }

@@ -1,5 +1,6 @@
 pub mod claim_progress_terminal;
 pub mod close_progress_projection;
+pub mod completion_phase_line;
 pub mod connection_phase_line;
 pub mod connection_start_message;
 pub mod consume_progress_event;

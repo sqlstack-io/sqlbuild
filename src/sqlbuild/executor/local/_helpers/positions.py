@@ -16,12 +16,13 @@ from sqlbuild.executor.local.constants import (
     SQLQUACK_SOURCES_HELP,
     STATEMENT_CONSTRUCT,
 )
-from sqlbuild.executor.local.models import LocalRefusal, Segment, TestSources
+from sqlbuild.executor.local.models import LocalRefusal, MacroPlace, Segment, TestSources
 
 _MODEL_ORIGIN: re.Pattern[str] = re.compile(r"^model '(?P<name>.+)'$")
 _SIMILAR_LINE_RATIO: float = 0.6
 _EQUAL_OPCODE: str = "equal"
 _MACRO_CALL: re.Pattern[str] = re.compile(r"@(?:py|sql)\.[A-Za-z_][A-Za-z0-9_.]*")
+_PYTHON_MACRO: str = "@py."
 
 
 @dataclass(frozen=True)
@@ -33,6 +34,8 @@ class _Place:
     expanded: bool = False
     snippet_column: int | None = None
     expanded_from: str | None = None
+    macro_name: str | None = None
+    macro_place: MacroPlace | None = None
 
 
 def placed_refusal(*, refusal: Mapping[str, Any], sources: TestSources) -> LocalRefusal:
@@ -66,6 +69,8 @@ def placed_refusal(*, refusal: Mapping[str, Any], sources: TestSources) -> Local
         snippet=None if place is None else place.snippet,
         snippet_column=None if place is None else place.snippet_column,
         expanded_from=None if place is None else place.expanded_from,
+        macro_name=None if place is None else place.macro_name,
+        macro_place=None if place is None else place.macro_place,
     )
 
 
@@ -196,6 +201,7 @@ def _expanded_place(
     call: re.Match[str] | None = _MACRO_CALL.match(
         _line_text(text=model.authored_sql, line=call_line)[call_column - 1 :]
     )
+    macro_name: str | None = None if call is None else call.group(0)
     return _Place(
         path=path,
         line=call_line,
@@ -206,7 +212,49 @@ def _expanded_place(
         expanded_from=None
         if call is None
         else f"{call.group(0)} at {path}:{call_line}:{call_column}",
+        macro_name=macro_name,
+        macro_place=None
+        if macro_name is None
+        else _macro_place(call=macro_name, token=token, macros=sources.macros),
     )
+
+
+def _macro_place(*, call: str, token: str, macros: Mapping[str, Any]) -> MacroPlace | None:
+    """Where macro `call` writes `token` in its own source: its body, for a Python macro."""
+
+    name: str = call.split(".", 1)[1]
+    macro: Any = macros.get(name) or macros.get(name.rsplit(".", 1)[-1])
+    word: str = token.strip().split("(", 1)[0].strip()
+    if macro is None or not word:
+        return None
+    lines: list[str] = str(macro.raw_source).split("\n")
+    start, end = 0, len(lines)
+    if call.startswith(_PYTHON_MACRO):
+        short: str = name.rsplit(".", 1)[-1]
+        start = next(
+            (index for index, text in enumerate(lines) if text.startswith(f"def {short}(")), -1
+        )
+        if start < 0:
+            return None
+        end = next(
+            (
+                index
+                for index in range(start + 1, len(lines))
+                if lines[index] and not lines[index][0].isspace()
+            ),
+            len(lines),
+        )
+    pattern: re.Pattern[str] = re.compile(rf"\b{re.escape(word)}\b", re.IGNORECASE)
+    for index in range(start, end):
+        found: re.Match[str] | None = pattern.search(lines[index])
+        if found is not None:
+            return MacroPlace(
+                path=Path(macro.relative_path).as_posix(),
+                line=index + 1,
+                column=found.start() + 1,
+                snippet=lines[index],
+            )
+    return None
 
 
 def _token_place(*, path: str, text: str, token: str, near: int) -> _Place | None:

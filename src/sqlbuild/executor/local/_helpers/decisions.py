@@ -209,6 +209,7 @@ def _test_sources(*, entry: SqlTestPlanEntry, context: DecisionContext) -> TestS
         models={model.name: model for model in getattr(context.project, "models", ())},
         chain_sql={step.model_name: step.resolved_sql for step in entry.chain},
         dialect=CONVERTED_DIALECT,
+        macros=getattr(context.project, "loaded_macros", None) or {},
     )
 
 

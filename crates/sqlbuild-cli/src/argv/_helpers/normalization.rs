@@ -162,10 +162,9 @@ pub(crate) fn cursor_error(present: impl Fn(&str) -> bool) -> Option<&'static st
     )
 }
 
-/// The first rule `--since` and `--explain` break, on the commands that accept them.
+/// The first rule `--since` breaks, on the commands that accept it.
 fn since_error(namespace: &Namespace) -> Option<&'static str> {
     match namespace.value("since") {
-        Value::None if truthy(&namespace.value("explain")) => Some("--explain requires --since"),
         Value::Str(reference) if reference.trim().is_empty() => {
             Some("--since requires a git ref, such as origin/main or @base")
         }

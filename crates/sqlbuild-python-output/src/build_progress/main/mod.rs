@@ -5,6 +5,7 @@ pub mod format_build_footer_with;
 pub mod format_execution_header;
 pub mod format_expectation_detail;
 pub mod format_expectation_name;
+pub mod format_expectation_summary;
 pub mod local_attempt;
 pub mod register_audit_progress;
 pub mod register_build_callbacks;
