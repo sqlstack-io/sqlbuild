@@ -432,7 +432,7 @@ def test_given_chained_loader_project_when_loading_source_then_runs_dependencies
                     "from sqlbuild.loaders import loader\n"
                     "\n"
                     "\n"
-                    "@loader(write_strategy='replace', cursor_column='load_seq', columns=[\n"
+                    "@loader(write_strategy='append', cursor_column='load_seq', columns=[\n"
                     "    {'name': 'event_id', 'type': 'INTEGER'},\n"
                     "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
                     "])\n"

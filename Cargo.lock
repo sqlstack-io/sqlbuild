@@ -168,6 +168,7 @@ dependencies = [
  "chrono-tz",
  "half",
  "hashbrown 0.17.1",
+ "libc",
  "num-complex",
  "num-integer",
  "num-traits",
@@ -276,10 +277,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "arrow-pyarrow"
+version = "60.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5198878404bfe50c150fd9ebf45a39fcf72ce396eeb81734a234d6e6ee1a0841"
+dependencies = [
+ "arrow-array",
+ "arrow-data",
+ "arrow-schema",
+ "pyo3",
+]
+
+[[package]]
 name = "arrow-schema"
 version = "60.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3e7574c4175cc731e0d26a8384bc25d455c5e220250988a772c1af843592444b"
+dependencies = [
+ "bitflags 2.13.1",
+]
 
 [[package]]
 name = "arrow-select"
@@ -6767,6 +6783,7 @@ dependencies = [
  "serde_json",
  "sqlbuild-load",
  "sqlload",
+ "sqlload-python-host",
  "tokio",
 ]
 
@@ -7002,9 +7019,9 @@ dependencies = [
 
 [[package]]
 name = "sqlload"
-version = "0.85.0"
+version = "0.86.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d9e248a71546f04a0abdd67782699d4bd911c40f5db9dcd816d59889d9dd21c"
+checksum = "f7516ef10a6edbbf97e01048379fb0910ba35b7c07f464e897c941dfa334cfdd"
 dependencies = [
  "aes 0.8.4",
  "arrow-array",
@@ -7073,6 +7090,23 @@ dependencies = [
  "windows-sys 0.61.2",
  "zip",
  "zstd 0.14.5",
+]
+
+[[package]]
+name = "sqlload-python-host"
+version = "0.86.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15925d0be960a31a0ea7534bba10b6d9dd21206e7b6df35c76535d1bee33422e"
+dependencies = [
+ "arrow-array",
+ "arrow-pyarrow",
+ "arrow-schema",
+ "base64 0.22.1",
+ "chrono-tz",
+ "pyo3",
+ "serde_json",
+ "sqlload",
+ "tracing",
 ]
 
 [[package]]

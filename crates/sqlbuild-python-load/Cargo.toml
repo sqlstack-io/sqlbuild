@@ -13,6 +13,7 @@ pyo3.workspace = true
 serde_json.workspace = true
 sqlbuild-load.workspace = true
 sqlload.workspace = true
+sqlload-python-host.workspace = true
 tokio.workspace = true
 
 [lints]

@@ -94,12 +94,11 @@ pub(crate) fn python_source(
         })?,
     );
     settings.insert(TABLES.to_owned(), serde_json::Value::Object(tables));
-    Ok(PythonSource {
-        name: loader.name.clone(),
-        module: loader.module.clone(),
+    Ok(PythonSource::new(
+        loader.name.clone(),
+        loader.module.clone(),
         settings,
-        http_paths: std::collections::BTreeMap::new(),
-    })
+    ))
 }
 
 /// SQLLoad's message about the Python source it knows `loader` as, named as the `@loader`.
@@ -108,6 +107,7 @@ pub(crate) fn loader_problem(loader: &LoaderDeclaration, message: &str) -> LoadP
     for kind in ["table", "source"] {
         let place: String = format!("Python {kind} {} ({})", loader.name, loader.module);
         text = text
+            .replace(&format!("{place}: "), "")
             .replace(&format!(" in {place}"), "")
             .replace(&place, &format!("@loader '{}'", loader.name));
     }

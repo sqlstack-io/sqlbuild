@@ -1489,3 +1489,11 @@ class PythonLayoutBuildTestCase:
     description: str
     repo_files: dict[str, str]
     expected_build_fragments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class LoaderOptionsCompileTestCase:
+    description: str
+    loader_options: str
+    expected_exit_code: int
+    expected_stderr_fragment: str

@@ -3774,7 +3774,7 @@ requires-dist = [
     { name = "rivers", marker = "extra == 'rivers'", specifier = ">=0.1.4" },
     { name = "snowflake-connector-python", marker = "extra == 'snowflake'", specifier = ">=4.7.1,<5" },
     { name = "sqlbuild-cli", directory = "crates/sqlbuild-cli" },
-    { name = "sqlload-api", specifier = "==0.85.0" },
+    { name = "sqlload-api", specifier = "==0.86.0" },
     { name = "sqlquack", specifier = "==0.24.1" },
 ]
 provides-extras = ["dbt", "snowflake", "bigquery", "databricks", "dagster", "postgres", "sqlserver", "clickhouse", "rivers"]
@@ -3807,11 +3807,11 @@ source = { directory = "crates/sqlbuild-cli" }
 
 [[package]]
 name = "sqlload-api"
-version = "0.85.0"
+version = "0.86.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/d0/0e/b02f97db36e153369d61b36680db2b9ab65e8aecbcb0c0d0b327c1cf6f5a/sqlload_api-0.85.0.tar.gz", hash = "sha256:486890b3a7b83e90557d964200578469d7da2d1e8f017ce7a934f89d1a92b212", size = 25501, upload-time = "2026-11-26T12:16:03.361Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/82/70/e0512844026443c3bb832c949bca2599aa63aba1eff34e302b4901078535/sqlload_api-0.86.0.tar.gz", hash = "sha256:e678dd8893de53ebcc56ffde7dcec99bb42f93988b00d05e4a529073ad0f288d", size = 32003, upload-time = "2026-11-26T21:26:16.708Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/03/9e/9bdd94f62761f0d5d204cc45f3b56fc75c15616c1c814555fa95ce102dad/sqlload_api-0.85.0-py3-none-any.whl", hash = "sha256:827529b05805c8bec96d5b49f624220d3b722800151e7805c98c5d2d3f4bfdc6", size = 32339, upload-time = "2026-11-26T12:16:02.255Z" },
+    { url = "https://files.pythonhosted.org/packages/a1/e0/9565d0b9ab1d333df16c9f2f20cc0e1077bb1c7a50d937c2f339f2b9bb10/sqlload_api-0.86.0-py3-none-any.whl", hash = "sha256:0d33c4cf21cb8aa6a21f704958ebfaa9ec7d615f67e3d7ac05a146ff78a58eba", size = 38348, upload-time = "2026-11-26T21:26:15.688Z" },
 ]
 
 [[package]]

@@ -170,7 +170,8 @@ reqwest = { version = "0.13", default-features = false, features = ["json", "que
 # The ring provider that `sqlbuild_orchestration::tls` installs before any client is built.
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 # The loading engine behind loads, loaders and sinks: its library, without its CLI or its own DuckDB.
-sqlload = { version = "=0.85.0", default-features = false }
+sqlload = { version = "=0.86.0", default-features = false }
+sqlload-python-host = "=0.86.0"
 serde = { version = "1", features = ["derive"] }
 # Reports every field a decode ignores; a worker refuses a run request it can only partly read.
 serde_ignored = "0.1"
