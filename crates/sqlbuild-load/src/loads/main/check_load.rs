@@ -12,8 +12,8 @@ use crate::loads::models::{LoadCheck, LoadDeclaration, LoadProblem};
 pub fn check_load(check: &LoadCheck, load: &LoadDeclaration) -> Result<toml::Table, LoadProblem> {
     refuse_warehouse_connection(check, load)?;
     let settings: toml::Table = with_source_columns(load)?;
-    let (text, sessions) =
-        check_project(check, (&load.name, settings.clone())).map_err(|message| at(&[], message))?;
+    let (text, sessions) = check_project(check, Some((&load.name, settings.clone())))
+        .map_err(|message| at(&[], message))?;
     match parse_python_project(&text, &|_| None, (&[], sessions)) {
         Ok(_) => Ok(settings),
         Err(ProjectError::Syntax(message)) => Err(problem(&load.name, &message)),

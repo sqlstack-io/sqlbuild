@@ -15091,6 +15091,8 @@ class DiscoveredLoaderFunction(NativeRecord):
     columns: tuple[SourceColumnEntry, ...]
     contract: str | None
     description: str | None
+    connection: str | None
+    settings: dict[str, object]
     provider_usages: tuple[DiscoveredProviderUsage, ...]
     identity: PythonNodeIdentity | None
     def __init__(
@@ -15107,6 +15109,8 @@ class DiscoveredLoaderFunction(NativeRecord):
         columns: tuple[SourceColumnEntry, ...] = ...,
         contract: str | None = ...,
         description: str | None = ...,
+        connection: str | None = ...,
+        settings: dict[str, object] = ...,
         provider_usages: tuple[DiscoveredProviderUsage, ...] = ...,
         identity: PythonNodeIdentity | None = ...,
     ) -> None: ...

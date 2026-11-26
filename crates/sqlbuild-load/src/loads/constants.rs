@@ -34,3 +34,17 @@ pub(crate) const LOAD_NAME_SEPARATOR: &str = "__";
 pub(crate) const LOAD_KEY: &str = "load";
 /// How SQLLoad starts a message about a key it does not know.
 pub(crate) const UNKNOWN_KEY: &str = "unknown key \"";
+/// The `@loader` options SQLBuild decides instead of SQLLoad, and what decides them.
+pub(crate) const LOADER_OWNED_KEYS: [(&str, &str); 3] = [
+    (
+        "columns",
+        "declare each column's type on the source it fills, in its sources file",
+    ),
+    ("table_name", "the source it fills names the table"),
+    ("destination_path", "the source it fills names the table"),
+];
+/// The table option naming how rows are written.
+pub(crate) const WRITE_STRATEGY: &str = "write_strategy";
+/// SQLBuild's old name for writing the whole table each run, and SQLLoad's.
+pub(crate) const RENAMED_STRATEGY: &str = "table";
+pub(crate) const REPLACE_STRATEGY: &str = "replace";

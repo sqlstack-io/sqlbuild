@@ -16,3 +16,11 @@ pub(super) struct LoadMessageTestCase {
     pub(super) message: &'static str,
     pub(super) expected_message: &'static str,
 }
+
+pub(super) struct CheckLoaderTestCase {
+    pub(super) description: &'static str,
+    pub(super) connection: Option<&'static str>,
+    pub(super) settings: &'static str,
+    /// The expected table settings as TOML text, or a fragment of the message.
+    pub(super) expected_result: Result<&'static str, &'static str>,
+}

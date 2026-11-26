@@ -37,3 +37,22 @@ pub(crate) const LOAD_OWNED_KEYS: [(&str, &str); 9] = [
 ];
 /// The load setting naming the schema its tables land in, which the sources it fills read.
 pub(crate) const DESTINATION_SCHEMA_KEY: &str = "destination_schema";
+/// The loading settings of a source a `@loader` fills, and what to do instead of each.
+pub(crate) const LOADER_OWNED_KEYS: [(&str, &str); 4] = [
+    (
+        "write_strategy",
+        "set write_strategy= on @loader, which takes SQLLoad's table options",
+    ),
+    (
+        "cursor_column",
+        "set cursor_column= on @loader, which takes SQLLoad's table options",
+    ),
+    (
+        "unique_key",
+        "set unique_key= on @loader, which takes SQLLoad's table options",
+    ),
+    (
+        "load_batch_size",
+        "remove it; SQLLoad sizes the batches it commits",
+    ),
+];

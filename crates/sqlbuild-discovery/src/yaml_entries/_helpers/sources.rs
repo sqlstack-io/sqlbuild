@@ -11,6 +11,7 @@ use crate::yaml_entries::_helpers::fields::{
 };
 use crate::yaml_entries::_helpers::freshness::freshness;
 use crate::yaml_entries::_helpers::removed_integrations::reject_ingestr_source;
+use crate::yaml_entries::constants::LOADER_OWNED_KEYS;
 use crate::yaml_entries::models::{ParsedSourceEntry, ParsedYamlColumn};
 
 const ENTRY_KEYS: [&str; 18] = [
@@ -124,6 +125,15 @@ fn with_settings<N: AuthoredNode>(
     mut parsed: ParsedSourceEntry<N>,
 ) -> Result<ParsedSourceEntry<N>, ConfigError> {
     let path: &str = site.path;
+    if let Some(loader) = &parsed.loader {
+        for (key, instead) in LOADER_OWNED_KEYS {
+            if get(entry, key).is_some() {
+                return Err(site.error(&format!(
+                    "is filled by @loader '{loader}', so it can't set {key}; {instead}"
+                )));
+            }
+        }
+    }
     parsed.database = optional_text(entry, "database", site)?;
     parsed.schema = optional_text(entry, "schema", site)?;
     parsed.table = optional_text(entry, "table", site)?;

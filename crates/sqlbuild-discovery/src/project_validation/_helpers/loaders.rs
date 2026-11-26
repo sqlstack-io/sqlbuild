@@ -130,8 +130,9 @@ fn terminal_loader_config_ownership(
                 .is_some_and(|loader| loader.decorator_config);
             if configured {
                 return Err(conflict(format!(
-                    "Source '{}' references loader '{loader}', but terminal source loader write \
-                     and schema config must be declared in source YAML, not the @loader decorator",
+                    "Source '{}' references loader '{loader}', which sets destination or columns; \
+                     the source names its table and declares its columns in its sources file, so \
+                     @loader can't",
                     entry.name
                 )));
             }

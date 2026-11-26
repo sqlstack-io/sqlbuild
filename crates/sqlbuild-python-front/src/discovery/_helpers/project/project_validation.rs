@@ -1,5 +1,6 @@
 //! Cross-file validation of one discovery's inputs.
 
+use crate::compile_driver::main::reject_invalid_loaders::reject_invalid_loaders;
 use crate::compile_driver::main::reject_invalid_loads::reject_invalid_loads;
 use crate::compile_driver::models::ProjectConfiguration;
 use crate::discovery::main::project::project_facts::project_facts;
@@ -45,12 +46,11 @@ pub(crate) fn validate_discovered_project_inputs(
     if project_dir.is_none() {
         return Ok(());
     }
-    reject_invalid_loads(
-        &ProjectConfiguration {
-            project_dir: &project_dir,
-            project_config: &native_field(&inputs, "project_config")?,
-            local_config: &native_field(&inputs, "local_config")?,
-        },
-        &native_field(&inputs, "source_files")?,
-    )
+    let config: ProjectConfiguration<'_, '_> = ProjectConfiguration {
+        project_dir: &project_dir,
+        project_config: &native_field(&inputs, "project_config")?,
+        local_config: &native_field(&inputs, "local_config")?,
+    };
+    reject_invalid_loads(&config, &native_field(&inputs, "source_files")?)?;
+    reject_invalid_loaders(&config, &inputs)
 }

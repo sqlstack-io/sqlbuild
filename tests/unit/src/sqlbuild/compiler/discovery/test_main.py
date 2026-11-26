@@ -12,7 +12,9 @@ from sqlbuild._native import (
     DiscoveryConflictError,
     ProjectConfigError,
     ProjectLayoutError,
+    SourceEntry,
     SourceParseError,
+    SourceWriteStrategy,
     TargetConfig,
     discover_project_inputs,
     resolve_target_config,
@@ -20,6 +22,7 @@ from sqlbuild._native import (
 from sqlbuild.observability import EventDispatcher, LifecycleEvent, dispatcher_scope
 from tests.unit.src.sqlbuild.compiler.discovery._test_helpers import (
     base_repo_files,
+    named_source_entry,
 )
 from tests.unit.src.sqlbuild.compiler.discovery._test_types import (
     ConnectionRolesTestCase,
@@ -31,6 +34,7 @@ from tests.unit.src.sqlbuild.compiler.discovery._test_types import (
     DiscoveryRelevantCountTestCase,
     LoadDiscoveryTestCase,
     LoadErrorTestCase,
+    LoaderSettingsTestCase,
     ProjectPythonPathAcceptanceTestCase,
     SourceConnectionErrorTestCase,
 )
@@ -1646,25 +1650,56 @@ def event_loaders():
             expected_error_fragment="Loader dependency cycle detected",
         ),
         DiscoverProjectInputsErrorTestCase(
-            description="raises when terminal loader owns source config",
+            description="a source a loader fills can't set its write strategy",
             repo_files=base_repo_files()
             | {
-                "sql/sources/raw.yml": """
-sources:
-  - name: raw_orders
-    managed: true
-    write_strategy: table
-""".strip()
-                + "\n",
-                "python/nodes/loaders/raw_orders/loader.py": """
-from sqlbuild.loaders import loader
-
-@loader(write_strategy="table", columns=[{"name": "id", "type": "INTEGER"}])
-def raw_orders(ctx):
-    return []
-""",
+                "sql/sources/raw.yml": "sources:\n  - name: raw_orders\n    managed: true\n    write_strategy: append\n",
+                "python/nodes/loaders/raw_orders/loader.py": (
+                    "from sqlbuild.loaders import loader\n\n"
+                    "@loader\n"
+                    "def raw_orders(ctx):\n    return []\n"
+                ),
             },
-            expected_error_fragment="terminal source loader write and schema config must be declared",
+            expected_error_fragment="is filled by @loader 'raw_orders', so it can't set write_strategy; set write_strategy= on @loader",
+        ),
+        DiscoverProjectInputsErrorTestCase(
+            description="a terminal loader can't declare the source's columns",
+            repo_files=base_repo_files()
+            | {
+                "sql/sources/raw.yml": "sources:\n  - name: raw_orders\n    managed: true\n",
+                "python/nodes/loaders/raw_orders/loader.py": (
+                    "from sqlbuild.loaders import loader\n\n"
+                    "@loader(columns=[{'name': 'id', 'type': 'INTEGER'}])\n"
+                    "def raw_orders(ctx):\n    return []\n"
+                ),
+            },
+            expected_error_fragment="Source 'raw_orders' references loader 'raw_orders', which sets destination or columns",
+        ),
+        DiscoverProjectInputsErrorTestCase(
+            description="SQLLoad refuses an option it doesn't know",
+            repo_files=base_repo_files()
+            | {
+                "sql/sources/raw.yml": "sources:\n  - name: raw_orders\n    managed: true\n",
+                "python/nodes/loaders/raw_orders/loader.py": (
+                    "from sqlbuild.loaders import loader\n\n"
+                    "@loader(cursor_colum='id')\n"
+                    "def raw_orders(ctx):\n    return []\n"
+                ),
+            },
+            expected_error_fragment="@loader 'raw_orders': unknown key \"cursor_colum\"",
+        ),
+        DiscoverProjectInputsErrorTestCase(
+            description="SQLBuild's old name for replacing the table",
+            repo_files=base_repo_files()
+            | {
+                "sql/sources/raw.yml": "sources:\n  - name: raw_orders\n    managed: true\n",
+                "python/nodes/loaders/raw_orders/loader.py": (
+                    "from sqlbuild.loaders import loader\n\n"
+                    "@loader(write_strategy='table')\n"
+                    "def raw_orders(ctx):\n    return []\n"
+                ),
+            },
+            expected_error_fragment='@loader \'raw_orders\': write_strategy "table" is now "replace"',
         ),
         DiscoverProjectInputsErrorTestCase(
             description="raises when task and asset names are duplicated",
@@ -2109,3 +2144,48 @@ def test_given_discovery_conflicts_when_discovering_inputs_then_it_raises_clear_
 
     with pytest.raises(ValueError, match=test_case.expected_error_fragment):
         discover_project_inputs(project_dir=tmp_path)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        LoaderSettingsTestCase(
+            description="a merge on a key, reading from a cursor",
+            decorator="@loader(write_strategy='merge', unique_key='id', cursor_column='updated_at')",
+            expected_entry=(SourceWriteStrategy.MERGE, "updated_at", ("id",)),
+        ),
+        LoaderSettingsTestCase(
+            description="SQLLoad's replace is the table strategy",
+            decorator="@loader(write_strategy='replace')",
+            expected_entry=(SourceWriteStrategy.TABLE, None, ()),
+        ),
+        LoaderSettingsTestCase(
+            description="a loader with no options leaves them unset",
+            decorator="@loader",
+            expected_entry=(None, None, ()),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_loader_options_when_discovering_then_the_source_it_fills_has_them(
+    test_case: LoaderSettingsTestCase,
+    tmp_path: Path,
+    write_repo_files: Callable[[Path, dict[str, str]], None],
+) -> None:
+    write_repo_files(
+        tmp_path,
+        base_repo_files()
+        | {
+            "sql/sources/raw.yml": "sources:\n  - name: raw_orders\n    managed: true\n",
+            "python/nodes/loaders/raw_orders/loader.py": (
+                "from sqlbuild.loaders import loader\n\n"
+                f"{test_case.decorator}\n"
+                "def raw_orders(ctx):\n    return []\n"
+            ),
+        },
+    )
+
+    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
+
+    entry: SourceEntry = named_source_entry(discovered, name="raw_orders")
+    assert (entry.write_strategy, entry.cursor_column, entry.unique_key) == test_case.expected_entry

@@ -1,6 +1,7 @@
 //! Project discovery: configuration, declaration files and imported project Python, validated.
 
 use crate::compile_driver::_helpers::stages::implicit_sources::with_implicit_load_sources;
+use crate::compile_driver::_helpers::stages::loader_settings::with_loader_settings;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PySet, PySetMethods, PyTuple};
 use pyo3::{IntoPyObject, pyfunction};
@@ -490,6 +491,7 @@ fn project_inputs<'py>(
         .into_any())
     };
     let loader_functions: Bound<'py, PyAny> = tuple_of("loaders")?;
+    with_loader_settings(declarations.downcast()?, &loader_functions)?;
     let mut fields: Vec<(&str, Bound<'py, PyAny>)> = vec![
         ("project_config", project_config.clone()),
         ("local_config", local_config.clone()),

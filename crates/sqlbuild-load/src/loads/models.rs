@@ -44,3 +44,19 @@ pub struct LoadTarget {
     /// The target's `loader_schema`; without one SQLLoad writes to the load's `destination_schema`.
     pub loader_schema: Option<String>,
 }
+
+/// A `@loader` as SQLLoad checks it: one Python table under the loader's name, filling one source.
+#[derive(Clone, Debug, PartialEq)]
+pub struct LoaderDeclaration {
+    pub name: String,
+    /// The file that defines it, relative to the project.
+    pub module: String,
+    /// The source connection it reads through `ctx.http` and the rest, if it names one.
+    pub connection: Option<String>,
+    /// Its SQLLoad table options as written on `@loader`.
+    pub settings: toml::Table,
+    /// The declared column types of what it fills.
+    pub columns: Vec<(String, String)>,
+    /// The table it fills, which SQLBuild names.
+    pub table: String,
+}

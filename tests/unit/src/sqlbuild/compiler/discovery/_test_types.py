@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+from sqlbuild._native import SourceWriteStrategy
+
 
 @dataclass(frozen=True)
 class InvalidEventExporterConfigTestCase:
@@ -150,3 +152,12 @@ class LoadErrorTestCase:
     repo_files: dict[str, str]
     expected_error_class: type[Exception]
     expected_error_fragment: str
+
+
+@dataclass(frozen=True)
+class LoaderSettingsTestCase:
+    """A loader's SQLLoad table options, and the loading facts of the source it fills."""
+
+    description: str
+    decorator: str
+    expected_entry: tuple[SourceWriteStrategy | None, str | None, tuple[str, ...]]

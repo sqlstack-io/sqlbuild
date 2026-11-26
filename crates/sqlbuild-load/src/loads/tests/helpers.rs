@@ -4,7 +4,7 @@ use crate::loads::main::check_load::check_load;
 use crate::loads::models::{FilledSource, LoadCheck, LoadDeclaration};
 
 /// The project every case checks against: a Postgres source connection and a DuckDB warehouse connection without `kind`.
-fn project_check() -> LoadCheck {
+pub(super) fn project_check() -> LoadCheck {
     LoadCheck {
         connections: toml::from_str(
             "[shop_db]\nkind = \"postgres\"\nhost = \"db\"\nuser = \"reader\"\ndatabase = \"shop\"\n\

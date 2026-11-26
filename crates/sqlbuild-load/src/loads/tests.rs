@@ -1,5 +1,7 @@
 #[path = "tests/test_check_load.rs"]
 mod check_load;
+#[path = "tests/test_check_loader.rs"]
+mod check_loader;
 #[path = "tests/helpers.rs"]
 mod helpers;
 #[path = "tests/test_load_message.rs"]

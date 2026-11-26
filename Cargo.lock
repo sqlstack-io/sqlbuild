@@ -6556,6 +6556,7 @@ name = "sqlbuild-load"
 version = "0.0.0"
 dependencies = [
  "blake3",
+ "serde_json",
  "sqlbuild-config",
  "sqlload",
  "toml",

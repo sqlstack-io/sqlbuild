@@ -27,10 +27,10 @@ impl CallerConnection for UnopenedWarehouse {
     }
 }
 
-/// The project text holding `settings` as the source `load`, and the session its target writes through.
+/// The project text holding `source`, settings as the source of that name when given, and the session its target writes through.
 pub(crate) fn check_project(
     check: &LoadCheck,
-    (load, settings): (&str, toml::Table),
+    source: Option<(&str, toml::Table)>,
 ) -> Result<(String, BTreeMap<String, SessionConnection>), String> {
     let mut target = toml::Table::new();
     target.insert("connection".to_owned(), CHECK_CONNECTION.into());
@@ -38,10 +38,12 @@ pub(crate) fn check_project(
     let mut targets = toml::Table::new();
     targets.insert(CHECK_TARGET.to_owned(), toml::Value::Table(target));
     let mut sources = toml::Table::new();
-    sources.insert(
-        load.to_owned(),
-        literal_settings(toml::Value::Table(settings)),
-    );
+    if let Some((load, settings)) = source {
+        sources.insert(
+            load.to_owned(),
+            literal_settings(toml::Value::Table(settings)),
+        );
+    }
     let mut project = toml::Table::new();
     project.insert("default_target".to_owned(), CHECK_TARGET.into());
     project.insert(
@@ -49,7 +51,9 @@ pub(crate) fn check_project(
         literal_settings(toml::Value::Table(check.connections.clone())),
     );
     project.insert("targets".to_owned(), toml::Value::Table(targets));
-    project.insert(SOURCES.to_owned(), toml::Value::Table(sources));
+    if !sources.is_empty() {
+        project.insert(SOURCES.to_owned(), toml::Value::Table(sources));
+    }
     let sessions = BTreeMap::from([(
         CHECK_CONNECTION.to_owned(),
         SessionConnection {

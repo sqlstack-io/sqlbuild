@@ -18,27 +18,23 @@ def loader(
     name: str | None = None,
     depends_on: tuple[Callable[..., object] | NodeSetRef, ...]
     | list[Callable[..., object] | NodeSetRef] = (),
+    connection: str | None = None,
     destination: str | None = None,
-    write_strategy: str | None = None,
-    cursor_column: str | None = None,
-    unique_key: str | Sequence[str] | None = None,
     columns: Sequence[LoaderColumnSpec | SourceColumnEntry] = (),
-    contract: str | None = None,
     description: str | None = None,
+    **settings: object,
 ) -> Callable[..., object] | Callable[[Callable[..., object]], Callable[..., object]]:
-    """Mark a Python function as a SQLBuild source loader."""
+    """Mark a function as a SQLBuild source loader; `settings` are SQLLoad's table options."""
 
     return apply_loader(
         function=function,
         name=name,
         depends_on=depends_on,
+        connection=connection,
         destination=destination,
-        write_strategy=write_strategy,
-        cursor_column=cursor_column,
-        unique_key=unique_key,
         columns=columns,
-        contract=contract,
         description=description,
+        settings=settings,
     )
 
 
