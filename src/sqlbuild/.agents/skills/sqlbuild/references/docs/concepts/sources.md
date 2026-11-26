@@ -119,7 +119,7 @@ sources:
     managed: true
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
       - name: name
         type: VARCHAR
 ```
@@ -128,7 +128,7 @@ How the rows are written, such as `write_strategy`, `cursor_column` and `unique_
 `@loader` as SQLLoad's table options, not in the sources file (see
 [Write strategies](python-nodes/loaders.md#write-strategies)).
 
-Managed sources support incremental write strategies (`table`, `append`, `delete_insert`, `merge`), cursor-based loading, and concurrent execution.
+Managed sources support SQLLoad's write strategies (`replace`, `append`, `delete_insert`, `merge`), cursor-based loading, and concurrent execution.
 
 See [Loaders](python-nodes/loaders.md) for the full guide on writing loader functions, write strategies, the loader context API, and auto-load behavior during builds.
 
@@ -172,7 +172,9 @@ default, and the source of the same name is filled by it. Listing the source add
 can say: a description, column types, audits, freshness and contracts. A source the load fills
 can't set `database`, `schema`, `table`, `expression`, `managed` or a loading setting such as
 `write_strategy`; those belong to the load. Column types are declared on the sources, not under
-`load.tables`, and SQLLoad uses them as the table's pinned types.
+`load.tables`, and SQLLoad uses them as the table's pinned types. A source's
+[`on_schema_change`](python-nodes/loaders.md#schema-changes) goes to its table the same
+way, and the load's `tables` can't set it for that table too.
 
 A model may read a table of the load without listing it: `__source("shop__customers")` makes the
 source, filled by `shop`. Compiling never connects to the load's connection. With a literal
@@ -353,6 +355,7 @@ without building.
 | `description` | Required human-readable description ([Descriptions](models/configuration.md#descriptions)) |
 | `type_enforcement` | Override implicit type enforcement (`true`/`false`). Defaults to `true` when any column declares a type. |
 | `contract` | `enforced` or `none`. When enforced, downstream models validate configured column references against source columns. |
+| `on_schema_change` | A source a load or `@loader` fills: `append_new_columns` (default), `ignore` or `fail` (see [Schema changes](python-nodes/loaders.md#schema-changes)) |
 | `columns` | Column declarations with `name`, `type`, `nullable`, `description`, `meta`, and `audits` |
 | `audits` | Source-level audits |
 | `meta` | Free-form metadata mapping |

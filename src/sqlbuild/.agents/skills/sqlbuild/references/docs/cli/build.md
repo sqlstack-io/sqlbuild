@@ -80,7 +80,7 @@ own option. `--version` works only directly after `sqb`, as in `sqb --version`:
 | `--end-cursor-int` | Override end cursor for integer incremental models |
 | `--load` | Explicitly load managed sources before building |
 | `--no-load` | Run no source loaders; selected managed sources are still audited |
-| `--reload` | Reload managed sources (passes `is_reload=True` to loaders) |
+| `--reload` | Reload managed sources from scratch: each table is rebuilt from what its loader returns, with `ctx.is_reload` `True` and `ctx.cursor_value` `None` |
 | `--selection-diagnostics` | Warn when a selected model will build on changed upstream models that are not selected; see [Selection and staleness](../concepts/planning/selection-and-staleness.md) |
 | `--manifest` | Generate `target/manifest.json` with plan-aware project metadata |
 | `SELECTOR ...` | Positional selectors, the same as `--select` |

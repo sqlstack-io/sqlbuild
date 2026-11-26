@@ -22,14 +22,12 @@ sqb --project-dir <path> load [flags]
 |------|-------------|
 | `--select`, `-s` | [Selectors](/docs/concepts/selectors), as for `sqb build`; only the loads, loaders and sources they select run |
 | `--exclude` | Selectors to leave out |
-| `--reload` | Pass `is_reload=True` to loader functions |
+| `--reload` | Reload managed sources from scratch: each table is rebuilt from what its loader returns, with `ctx.is_reload` `True` and `ctx.cursor_value` `None` |
 | `--concurrency` | Number of worker connections (default: from settings or 1) |
-| `--start-cursor` | Override the start cursor; an integer value sets `start_cursor_int`, anything else is read as an ISO timestamp and sets `start_cursor_ts` |
-| `--end-cursor` | Override the end cursor, typed the same way as `--start-cursor` |
-| `--start-cursor-ts` | Override start cursor for timestamp-based loaders (ISO format) |
-| `--end-cursor-ts` | Override end cursor for timestamp-based loaders (ISO format) |
-| `--start-cursor-int` | Override start cursor for integer-based loaders |
-| `--end-cursor-int` | Override end cursor for integer-based loaders |
+| `--start-cursor` | Where loaders' cursor windows start, as `ctx.cursor_value`: an integer, or an ISO timestamp |
+| `--end-cursor` | Where they end, not included, as `ctx.cursor_end`; typed the same way as `--start-cursor` |
+| `--start-cursor-ts`, `--end-cursor-ts` | The window's bounds as ISO timestamps |
+| `--start-cursor-int`, `--end-cursor-int` | The window's bounds as integers |
 | `--json` | Output results as JSON |
 | `--json-output` | Write JSON results to a file path |
 | `--vars` | Override project variables with a JSON object (`--vars '{"key": "value"}'`) |
