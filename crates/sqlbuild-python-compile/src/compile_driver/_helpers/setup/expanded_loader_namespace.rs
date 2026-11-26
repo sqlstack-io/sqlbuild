@@ -7,7 +7,7 @@ use sqlbuild_model_config::templates::models::TemplateOptions;
 use sqlbuild_python_front::model_config::main::config::expanded_template_data::expanded_template_data;
 
 /// A managed source's `database` and `schema` with project vars expanded and no context templates.
-pub fn expanded_loader_namespace<'py>(
+pub(crate) fn expanded_loader_namespace<'py>(
     value: &Bound<'py, PyAny>,
     effective_vars: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {

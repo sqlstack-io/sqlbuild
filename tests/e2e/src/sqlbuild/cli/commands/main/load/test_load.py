@@ -726,6 +726,7 @@ def test_given_source_loader_reads_unselected_task_payload_when_loading_then_run
                 f"{test_case.decorator_import}\n"
                 f"@{test_case.decorator_name}\n"
                 "def prepare_events(ctx):\n"
+                "    '''Prepare the events.'''\n"
                 "    return ctx.result(payload={'event_id': 1}, materialized=True)\n"
             ),
         },
@@ -760,7 +761,7 @@ def test_given_source_loader_reads_unselected_task_payload_when_loading_then_run
             setup_command=("--no-color", "load", "--select", "fetch_events"),
             command=("--no-color", "load", "--select", "raw_events"),
             expected_return_code=0,
-            expected_stdout_fragments=("Sources (1)", "source    raw_events"),
+            expected_stdout_fragments=("Sources to load (1)", "source    raw_events"),
             expected_intermediate_rows=((1, 1), (2, 1)),
             expected_terminal_rows=((1,), (2,)),
         ),
@@ -770,7 +771,7 @@ def test_given_source_loader_reads_unselected_task_payload_when_loading_then_run
             command=("--no-color", "load", "--select", "+raw_events"),
             expected_return_code=0,
             expected_stdout_fragments=(
-                "Loaders (1)",
+                "Loaders to load (1)",
                 "loader    fetch_events",
                 "source    raw_events",
             ),
@@ -809,8 +810,8 @@ def test_given_source_only_selection_when_upstream_ingress_exists_then_enforces_
             command=("--no-color", "load", "--select", "raw_rollup"),
             expected_return_code=1,
             expected_error_fragment=(
-                "requires intermediate loader 'fetch_pages', but its target relation "
-                "'__loader__fetch_pages' does not exist"
+                "requires intermediate loader 'normalize_pages', but its target relation "
+                "'__loader__normalize_pages' does not exist"
             ),
         ),
     ],
@@ -948,10 +949,9 @@ def test_given_source_only_selection_when_skipping_complex_intermediates_then_va
             expected_raw_events_exists=False,
             expected_intermediate_rows=((1, 1), (2, 1)),
             expected_stdout_fragments=(
-                "Loaders (1)",
+                "Loaders to load (1)",
                 "  fetch_events",
                 "loader    fetch_events",
-                "Sources (0)",
             ),
         ),
         ChainedLoaderSelectionE2ETestCase(
@@ -960,10 +960,10 @@ def test_given_source_only_selection_when_skipping_complex_intermediates_then_va
             expected_raw_events_exists=True,
             expected_intermediate_rows=((1, 1), (2, 1)),
             expected_stdout_fragments=(
-                "Loaders (1)",
+                "Loaders to load (1)",
                 "  fetch_events",
                 "loader    fetch_events",
-                "Sources (1)",
+                "Sources to load (1)",
                 "source    raw_events",
             ),
         ),
@@ -973,10 +973,10 @@ def test_given_source_only_selection_when_skipping_complex_intermediates_then_va
             expected_raw_events_exists=True,
             expected_intermediate_rows=((1, 1), (2, 1)),
             expected_stdout_fragments=(
-                "Loaders (1)",
+                "Loaders to load (1)",
                 "  fetch_events",
                 "loader    fetch_events",
-                "Sources (1)",
+                "Sources to load (1)",
                 "source    raw_events",
             ),
         ),
@@ -986,11 +986,35 @@ def test_given_source_only_selection_when_skipping_complex_intermediates_then_va
             expected_raw_events_exists=True,
             expected_intermediate_rows=((1, 1), (2, 1)),
             expected_stdout_fragments=(
-                "Loaders (1)",
+                "Loaders to load (1)",
                 "  fetch_events",
                 "loader    fetch_events",
-                "Sources (1)",
+                "Sources to load (1)",
                 "source    raw_events",
+            ),
+        ),
+        ChainedLoaderSelectionE2ETestCase(
+            description="a build downstream of an intermediate loader loads its source and builds readers",
+            command=("--no-color", "build", "--select", "fetch_events+"),
+            expected_raw_events_exists=True,
+            expected_intermediate_rows=((1, 1), (2, 1)),
+            expected_stdout_fragments=(
+                "loader    fetch_events",
+                "source    raw_events",
+                "table     event_ids",
+                "PASS=3",
+            ),
+        ),
+        ChainedLoaderSelectionE2ETestCase(
+            description="a plain build loads the chain and builds readers",
+            command=("--no-color", "build"),
+            expected_raw_events_exists=True,
+            expected_intermediate_rows=((1, 1), (2, 1)),
+            expected_stdout_fragments=(
+                "loader    fetch_events",
+                "source    raw_events",
+                "table     event_ids",
+                "PASS=3",
             ),
         ),
     ],
@@ -1034,6 +1058,10 @@ def test_given_chained_loader_project_when_selecting_loader_then_expands_expecte
                     '    ctx.execute_sql(f"CREATE OR REPLACE TABLE {ctx.destination} '
                     'AS SELECT event_id FROM {events.destination}")\n'
                 ),
+                "sql/models/event_ids.sql": (
+                    'MODEL (description "Loaded event ids.", materialized table);\n\n'
+                    'SELECT event_id FROM __source("raw_events")\n'
+                ),
                 "python/nodes/loaders/source_rows/__init__.py": (
                     "from .fetch_events.loader import fetch_events\n"
                     "from .raw_events.loader import raw_events\n"
@@ -1065,10 +1093,11 @@ def test_given_chained_loader_project_when_selecting_loader_then_expands_expecte
     "test_case",
     [
         ChainedLoaderPruningE2ETestCase(
-            description="excluding required intermediate prunes terminal source",
+            description="excluding a required intermediate that was never loaded stops the load",
             command=("--no-color", "load", "--select", "+raw_events", "--exclude", "fetch_events"),
             expected_raw_events_exists=False,
             expected_intermediate_exists=False,
+            expected_return_code=1,
         ),
         ChainedLoaderPruningE2ETestCase(
             description="excluding downstream from intermediate prunes terminal source",
@@ -1447,7 +1476,7 @@ def test_given_intermediate_loader_without_write_strategy_when_loading_twice_the
             command=("--no-color", "load"),
             expected_ok_rows=((1,),),
             expected_error_fragment="boom",
-            expected_skip_fragment="FAIL=1  SKIP=1",
+            expected_skip_fragment="FAIL=1  INSUFFICIENT=0  SKIP=1",
         )
     ],
     ids=lambda case: case.description,

@@ -111,8 +111,7 @@ Both checks ignore:
 
 This is a guard against accidental hard-coding, not a sandbox. SQL sent directly through
 `ctx.connection` or `ctx.adapter` is not checked. Run-time checks apply to `sqb build`,
-`sqb check`, and `sqb load`. `sqb load` does not compile models, so it checks loaders against
-the project's sources. To turn both checks off while migrating a project,
+`sqb check`, and `sqb load`, which compiles the project as `sqb build` does. To turn both checks off while migrating a project,
 set [`[references] enforce_explicit = false`](/docs/concepts/project-configuration#references).
 
 ## Depending on a job or a tag

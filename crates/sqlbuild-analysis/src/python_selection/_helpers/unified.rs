@@ -258,9 +258,7 @@ fn single(context: &SelectionContext<'_>, raw: &str) -> Resolved {
     }
     if downstream {
         let resolved: Atoms = single_side(context, &format!("{core}{EXPANSION_MARKER}"))?;
-        let dependents: Atoms = sql_dependent_python(context, &resolved);
-        atoms.extend(resolved);
-        atoms.extend(dependents);
+        atoms.extend(downstream_closure(context, resolved));
     }
     Ok(atoms)
 }
@@ -293,6 +291,46 @@ fn sql_dependency_upstream(context: &SelectionContext<'_>, atoms: &Atoms) -> Ato
 
 fn declares_any(node: &PythonSelectionNode, keys: &HashSet<&ObjectKey>) -> bool {
     node.sql_deps.iter().any(|key| keys.contains(key))
+}
+
+/// `atoms` with everything downstream across both graphs: the source each terminal loader fills and its SQL downstream, and the Python nodes reading any of it.
+fn downstream_closure(context: &SelectionContext<'_>, mut atoms: Atoms) -> Atoms {
+    loop {
+        let before: usize = atoms.len();
+        let filled: Atoms = filled_source_downstream(context, &atoms);
+        atoms.extend(filled);
+        let dependents: Atoms = sql_dependent_python(context, &atoms);
+        atoms.extend(dependents);
+        if atoms.len() == before {
+            return atoms;
+        }
+    }
+}
+
+/// The sources the selected terminal loaders fill, with every SQL resource downstream of them.
+fn filled_source_downstream(context: &SelectionContext<'_>, atoms: &Atoms) -> Atoms {
+    let terminal: HashMap<&str, &str> = terminal_loaders(context.sql);
+    let starts: Vec<ObjectKey> = atoms
+        .iter()
+        .filter_map(|atom| match atom {
+            Atom::Python(name) => terminal.get(name.as_str()),
+            Atom::Sql(_) => None,
+        })
+        .map(|source| (SOURCE_RESOURCE.to_owned(), (*source).to_owned()))
+        .collect();
+    if starts.is_empty() {
+        return Atoms::new();
+    }
+    let mut visited: HashSet<&ObjectKey> = starts.iter().collect();
+    let roots: BTreeSet<&ObjectKey> = starts.iter().collect();
+    let Ok(()) = breadth_first_reach(roots, None, &mut visited, |current| {
+        Ok::<_, Infallible>(edge_keys(
+            context.sql.graph,
+            current,
+            EdgeDirection::Downstream,
+        ))
+    });
+    sql_atoms(visited.into_iter().cloned())
 }
 
 /// Runnable Python nodes declaring a selected SQL resource, with their downstream nodes.

@@ -530,7 +530,7 @@ class LoadCommandConcurrencyTestCase:
     description: str
     project_files: dict[str, str]
     max_concurrency: int
-    expected_json_asset_order: tuple[str, ...]
+    expected_json_asset_order: tuple[str, ...] = ()
     expected_connection_count: int = 0
     expected_source_order: tuple[str, ...] = ()
 

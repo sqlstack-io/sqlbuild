@@ -800,7 +800,6 @@ pub enum NativeAttr {
     FormatExpectationDetail,
     FormatExpectationName,
     FormatLintSqlBodies,
-    FormatLoadExecutionJson,
     FormatNativeHeaders,
     FormatPlan,
     FormatPlanJson,

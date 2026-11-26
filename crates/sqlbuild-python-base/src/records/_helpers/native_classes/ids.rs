@@ -807,7 +807,6 @@ native_id_names! {
         NativeAttr::FormatExpectationDetail => "format_expectation_detail",
         NativeAttr::FormatExpectationName => "format_expectation_name",
         NativeAttr::FormatLintSqlBodies => "format_lint_sql_bodies",
-        NativeAttr::FormatLoadExecutionJson => "format_load_execution_json",
         NativeAttr::FormatNativeHeaders => "format_native_headers",
         NativeAttr::FormatPlan => "format_plan",
         NativeAttr::FormatPlanJson => "format_plan_json",

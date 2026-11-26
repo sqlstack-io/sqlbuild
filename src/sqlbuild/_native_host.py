@@ -22,7 +22,6 @@ _TARGETS: dict[str, tuple[str, str]] = {
     "TableFreshnessRequest": ("sqlbuild.adapter.contract.models", "TableFreshnessRequest"),
     "BuiltinAdapter": ("sqlbuild.adapter.contract.types", "BuiltinAdapter"),
     "FrameworkType": ("sqlbuild.adapter.contract.types", "FrameworkType"),
-    "LifeCycleEventKind": ("sqlbuild.adapter.contract.types", "LifeCycleEventKind"),
     "MigrationTransfer": ("sqlbuild.adapter.contract.types", "MigrationTransfer"),
     "RetentionScope": ("sqlbuild.adapter.contract.types", "RetentionScope"),
     "TableFreshnessStatus": ("sqlbuild.adapter.contract.types", "TableFreshnessStatus"),
@@ -432,10 +431,7 @@ _TARGETS: dict[str, tuple[str, str]] = {
     "JanitorSkippedRelation": ("sqlbuild.executor.janitor.models", "JanitorSkippedRelation"),
     "JanitorSkippedSchema": ("sqlbuild.executor.janitor.models", "JanitorSkippedSchema"),
     "JanitorUsageCheck": ("sqlbuild.executor.janitor.models", "JanitorUsageCheck"),
-    "run_load_pipeline": ("sqlbuild.executor.load.main.run", "run_load_pipeline"),
-    "LoadCallbacks": ("sqlbuild.executor.load.models", "LoadCallbacks"),
     "LoadExecutionResult": ("sqlbuild.executor.load.models", "LoadExecutionResult"),
-    "LoadRuntimeParams": ("sqlbuild.executor.load.models", "LoadRuntimeParams"),
     "is_compatibility_view": (
         "sqlbuild.executor.old_name_views._helpers.janitor",
         "is_compatibility_view",

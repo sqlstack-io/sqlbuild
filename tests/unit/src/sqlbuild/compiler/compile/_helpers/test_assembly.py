@@ -14,7 +14,6 @@ from sqlbuild._native import (
     assemble_project,
     build_compile_inputs,
     discover_project_inputs,
-    resolve_loader_defaults,
 )
 from sqlbuild.adapter.contract.models import ExpressionInferenceProfile
 from sqlbuild.compiler.compile.types import (
@@ -941,11 +940,6 @@ def test_given_connection_location_when_assembling_project_then_models_and_loade
     )
 
     compiled: CompiledProjectView = assemble_project(inputs=compile_inputs)
-    loader_location: tuple[str | None, str | None] = resolve_loader_defaults(
-        discovered_inputs=discovered,
-        selected_target=compiled.effective_target_name,
-        target_config=compile_inputs.effective_target,
-    )
 
     expected_location: tuple[str | None, str | None] = (
         test_case.expected_effective_target_database,
@@ -955,7 +949,6 @@ def test_given_connection_location_when_assembling_project_then_models_and_loade
         compiled.effective_target_database,
         compiled.effective_target_schema,
     ) == expected_location, test_case.description
-    assert loader_location == expected_location, f"{test_case.description}: loaders"
 
 
 @pytest.mark.parametrize(

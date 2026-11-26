@@ -1,10 +1,13 @@
 pub(crate) mod compiled;
 pub(crate) mod dynamic;
+pub(crate) mod expanded_loader_namespace;
 pub(crate) mod inputs;
+pub(crate) mod managed_write_schema;
 pub(crate) mod model_free_locations;
 pub(crate) mod node_results;
 pub(crate) mod pipeline;
 pub(crate) mod pipeline_entries;
+pub(crate) mod preserved_loader_schemas;
 pub(crate) mod project;
 pub(crate) mod python_plan_entries;
 pub(crate) mod relation_targets;

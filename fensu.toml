@@ -84,7 +84,7 @@ reason = "Native code resolves these through the sqlbuild._native_host name tabl
 
 [[targets.python.dead_code.roots]]
 modules = ["sqlbuild.adapter.contract.types"]
-symbols = ["BuiltinAdapter", "FrameworkType", "LifeCycleEventKind", "MigrationTransfer", "RetentionScope", "TableFreshnessStatus"]
+symbols = ["BuiltinAdapter", "FrameworkType", "MigrationTransfer", "RetentionScope", "TableFreshnessStatus"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."
 
 [[targets.python.dead_code.roots]]
@@ -473,13 +473,8 @@ symbols = ["JanitorArchiveCandidate", "JanitorArchivedRelation", "JanitorBlocked
 reason = "Native code resolves these through the sqlbuild._native_host name table."
 
 [[targets.python.dead_code.roots]]
-modules = ["sqlbuild.executor.load.main.run"]
-symbols = ["run_load_pipeline"]
-reason = "Native code resolves these through the sqlbuild._native_host name table."
-
-[[targets.python.dead_code.roots]]
 modules = ["sqlbuild.executor.load.models"]
-symbols = ["LoadCallbacks", "LoadExecutionResult", "LoadRuntimeParams"]
+symbols = ["LoadExecutionResult"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."
 
 [[targets.python.dead_code.roots]]
@@ -1531,10 +1526,6 @@ reason = "Each callback or worker report forwards one distinct build or check ev
 [[dupes.allowlist]]
 paths = ["crates/sqlbuild-python/src/bindings/_helpers/command_runtime/connection.rs"]
 reason = "Two Python entry points with different keyword contracts, project and named target, delegate to project_connection_config."
-
-[[dupes.allowlist]]
-paths = ["crates/sqlbuild-python/src/bindings/_helpers/load/load_selection.rs"]
-reason = "Two Python entry points with different keyword contracts, selected and referenced loader entries, delegate to selection_request and LoadProject."
 
 [[dupes.allowlist]]
 paths = ["crates/sqlbuild-cli/src/native_commands/main/_location_metadata.rs", "crates/sqlbuild-cli/src/native_commands/main/_location_work.rs"]
@@ -2953,9 +2944,7 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/janitor/janitor_plan.rs=4",
     "crates/sqlbuild-python/src/bindings/_helpers/janitor/janitor_planning.rs=2",
     "crates/sqlbuild-python/src/bindings/_helpers/lineage/lineage_command.rs=11",
-    "crates/sqlbuild-python/src/bindings/_helpers/load/load_command.rs=16",
-    "crates/sqlbuild-python/src/bindings/_helpers/load/load_progress.rs=17",
-    "crates/sqlbuild-python/src/bindings/_helpers/load/load_selection.rs=2",
+    "crates/sqlbuild-python/src/bindings/_helpers/load/load_command.rs=6",
     "crates/sqlbuild-python/src/bindings/_helpers/location_command/runtime_plan.rs=1",
     "crates/sqlbuild-python/src/bindings/_helpers/plan_command/plan.rs=10",
     "crates/sqlbuild-python/src/bindings/_helpers/plan_command/rules.rs=8",
@@ -3229,9 +3218,6 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/janitor/janitor_facts.rs=2",
     "crates/sqlbuild-python/src/bindings/_helpers/janitor/janitor_old_names.rs=1",
     "crates/sqlbuild-python/src/bindings/_helpers/janitor/janitor_phases.rs=4",
-    "crates/sqlbuild-python/src/bindings/_helpers/load/load_command.rs=12",
-    "crates/sqlbuild-python/src/bindings/_helpers/load/load_progress.rs=8",
-    "crates/sqlbuild-python/src/bindings/_helpers/load/load_selection.rs=4",
     "crates/sqlbuild-python/src/bindings/_helpers/plan_command/plan.rs=7",
     "crates/sqlbuild-python/src/bindings/_helpers/plan_command/rules.rs=4",
     "crates/sqlbuild-python/src/bindings/_helpers/query_command/project.rs=3",
@@ -3628,7 +3614,7 @@ paths = ["crates/sqlbuild-python-base/src/boundary/_helpers/oracles.rs", "crates
 reason = "Each registers its own module's Python functions; only the add-function calls are alike."
 
 [[dupes.allowlist]]
-paths = ["crates/sqlbuild-python-front/src/attachments/main/register_cursor_intrinsics.rs", "crates/sqlbuild-python-front/src/refactor/main/register_contract_edits.rs", "crates/sqlbuild-python-front/src/render/main/declarations/register_authored_sql.rs", "crates/sqlbuild-python-front/src/render/main/declarations/register_declaration_values.rs", "crates/sqlbuild-python-front/src/scopes/main/checks/register_scope_validation.rs", "crates/sqlbuild-python-front/src/sqltext/main/register_ddl_effects.rs", "crates/sqlbuild-python-front/src/sqltext/main/register_model_headers.rs", "crates/sqlbuild-python-front/src/state_rows/main/event_rows/register_events.rs", "crates/sqlbuild-python-front/src/state_rows/main/migrations/register_migration_projections.rs", "crates/sqlbuild-python-project/src/fingerprints/main/register_query_hashes.rs", "crates/sqlbuild-python-project/src/references/main/register_explicit_references.rs", "crates/sqlbuild-python-project/src/references/main/register_relations.rs", "crates/sqlbuild-python-project/src/type_system/main/register_nullability.rs", "crates/sqlbuild-python-compile/src/compile_driver/_helpers/stages/selection_phases.rs", "crates/sqlbuild-python/src/bindings/_helpers/load/load_selection.rs", "crates/sqlbuild-python-compile/src/project_assembly/_helpers/syntax_checks.rs", "crates/sqlbuild-python-compile/src/rules/_helpers/configuration/catalogue.rs", "crates/sqlbuild-python-compile/src/rules/_helpers/rule/rule_cache.rs", "crates/sqlbuild-python-compile/src/rules/_helpers/rule/rule_run.rs"]
+paths = ["crates/sqlbuild-python-front/src/attachments/main/register_cursor_intrinsics.rs", "crates/sqlbuild-python-front/src/refactor/main/register_contract_edits.rs", "crates/sqlbuild-python-front/src/render/main/declarations/register_authored_sql.rs", "crates/sqlbuild-python-front/src/render/main/declarations/register_declaration_values.rs", "crates/sqlbuild-python-front/src/scopes/main/checks/register_scope_validation.rs", "crates/sqlbuild-python-front/src/sqltext/main/register_ddl_effects.rs", "crates/sqlbuild-python-front/src/sqltext/main/register_model_headers.rs", "crates/sqlbuild-python-front/src/state_rows/main/event_rows/register_events.rs", "crates/sqlbuild-python-front/src/state_rows/main/migrations/register_migration_projections.rs", "crates/sqlbuild-python-project/src/fingerprints/main/register_query_hashes.rs", "crates/sqlbuild-python-project/src/references/main/register_explicit_references.rs", "crates/sqlbuild-python-project/src/references/main/register_relations.rs", "crates/sqlbuild-python-project/src/type_system/main/register_nullability.rs", "crates/sqlbuild-python-compile/src/compile_driver/_helpers/stages/selection_phases.rs", "crates/sqlbuild-python-compile/src/project_assembly/_helpers/syntax_checks.rs", "crates/sqlbuild-python-compile/src/rules/_helpers/configuration/catalogue.rs", "crates/sqlbuild-python-compile/src/rules/_helpers/rule/rule_cache.rs", "crates/sqlbuild-python-compile/src/rules/_helpers/rule/rule_run.rs"]
 reason = "Each registers its own module's Python functions; only the add-function calls are alike."
 
 [[dupes.allowlist]]
@@ -3952,7 +3938,7 @@ paths = ["crates/sqlbuild-python-base/src/boundary/_helpers/oracles.rs", "crates
 reason = "Each registers its own module's Python functions; only the add-function calls are alike."
 
 [[dupes.allowlist]]
-paths = ["crates/sqlbuild-python-compile/src/compile_driver/main/stages/register_selection_phases.rs", "crates/sqlbuild-python-compile/src/project_assembly/main/register_syntax_checks.rs", "crates/sqlbuild-python-compile/src/rules/main/configuration/register_catalogue.rs", "crates/sqlbuild-python-compile/src/rules/main/rule/register_rule_cache.rs", "crates/sqlbuild-python-compile/src/rules/main/rule/register_rule_run.rs", "crates/sqlbuild-python-front/src/attachments/main/register_cursor_intrinsics.rs", "crates/sqlbuild-python-front/src/refactor/main/register_contract_edits.rs", "crates/sqlbuild-python-front/src/render/main/declarations/register_authored_sql.rs", "crates/sqlbuild-python-front/src/render/main/declarations/register_declaration_values.rs", "crates/sqlbuild-python-front/src/scopes/main/checks/register_scope_validation.rs", "crates/sqlbuild-python-front/src/sqltext/main/register_ddl_effects.rs", "crates/sqlbuild-python-front/src/sqltext/main/register_model_headers.rs", "crates/sqlbuild-python-front/src/state_rows/main/event_rows/register_events.rs", "crates/sqlbuild-python-front/src/state_rows/main/migrations/register_migration_projections.rs", "crates/sqlbuild-python-project/src/fingerprints/main/register_query_hashes.rs", "crates/sqlbuild-python-project/src/references/main/register_explicit_references.rs", "crates/sqlbuild-python-project/src/references/main/register_relations.rs", "crates/sqlbuild-python-project/src/type_system/main/register_nullability.rs", "crates/sqlbuild-python/src/bindings/_helpers/load/load_selection.rs"]
+paths = ["crates/sqlbuild-python-compile/src/compile_driver/main/stages/register_selection_phases.rs", "crates/sqlbuild-python-compile/src/project_assembly/main/register_syntax_checks.rs", "crates/sqlbuild-python-compile/src/rules/main/configuration/register_catalogue.rs", "crates/sqlbuild-python-compile/src/rules/main/rule/register_rule_cache.rs", "crates/sqlbuild-python-compile/src/rules/main/rule/register_rule_run.rs", "crates/sqlbuild-python-front/src/attachments/main/register_cursor_intrinsics.rs", "crates/sqlbuild-python-front/src/refactor/main/register_contract_edits.rs", "crates/sqlbuild-python-front/src/render/main/declarations/register_authored_sql.rs", "crates/sqlbuild-python-front/src/render/main/declarations/register_declaration_values.rs", "crates/sqlbuild-python-front/src/scopes/main/checks/register_scope_validation.rs", "crates/sqlbuild-python-front/src/sqltext/main/register_ddl_effects.rs", "crates/sqlbuild-python-front/src/sqltext/main/register_model_headers.rs", "crates/sqlbuild-python-front/src/state_rows/main/event_rows/register_events.rs", "crates/sqlbuild-python-front/src/state_rows/main/migrations/register_migration_projections.rs", "crates/sqlbuild-python-project/src/fingerprints/main/register_query_hashes.rs", "crates/sqlbuild-python-project/src/references/main/register_explicit_references.rs", "crates/sqlbuild-python-project/src/references/main/register_relations.rs", "crates/sqlbuild-python-project/src/type_system/main/register_nullability.rs"]
 reason = "Each registers its own module's Python functions; only the add-function calls are alike."
 
 [[dupes.allowlist]]
@@ -4088,10 +4074,6 @@ paths = ["crates/sqlbuild-python-base/src/event_exporting/models.rs", "crates/sq
 reason = "Each context object takes its own resource out of its own lock and releases it the way that resource needs; only the take-under-lock shape is shared."
 
 [[dupes.allowlist]]
-paths = ["crates/sqlbuild-python-output/src/result_output/main/results/format_load_execution_json.rs", "crates/sqlbuild-python-output/src/result_output/main/results/format_seed_execution_json.rs"]
-reason = "Command document projections intentionally mirror the public envelope while preserving command-specific summaries: seeds require a plan and loads report skipped_count."
-
-[[dupes.allowlist]]
 paths = ["crates/sqlbuild-python-base/src/compile_context/_helpers/diagnostic_collector.rs", "crates/sqlbuild-python-output/src/output_capture/main/register_context.rs", "crates/sqlbuild-python-project/src/planner_strategy/main/register_fixture_context.rs", "crates/sqlbuild-python/src/bindings/_helpers/dbt_interop/reference_resolver.rs"]
 reason = "Each registers its own module's Python functions; only the add-function calls are alike."
 
@@ -4100,16 +4082,12 @@ paths = ["crates/sqlbuild-python-output/src/build_progress/main/batch_complete_c
 reason = "Each callback or worker report forwards one distinct build or check event with its own payload."
 
 [[dupes.allowlist]]
-paths = ["crates/sqlbuild-python-output/src/build_progress/models.rs", "crates/sqlbuild-python/src/bindings/_helpers/audit_command/command.rs", "crates/sqlbuild-python/src/bindings/_helpers/load/load_progress.rs", "crates/sqlbuild-python/src/bindings/_helpers/scenario_command/presentation.rs", "crates/sqlbuild-python/src/bindings/_helpers/seed_command/command.rs", "crates/sqlbuild-python/src/bindings/_helpers/sql_test_command/test_command.rs"]
+paths = ["crates/sqlbuild-python-output/src/build_progress/models.rs", "crates/sqlbuild-python/src/bindings/_helpers/audit_command/command.rs", "crates/sqlbuild-python/src/bindings/_helpers/scenario_command/presentation.rs", "crates/sqlbuild-python/src/bindings/_helpers/seed_command/command.rs", "crates/sqlbuild-python/src/bindings/_helpers/sql_test_command/test_command.rs"]
 reason = "Each passes its own keyword set to its own Python callable; only building the keyword dict is alike."
 
 [[dupes.allowlist]]
-paths = ["crates/sqlbuild-python-output/src/build_progress/models.rs", "crates/sqlbuild-python/src/bindings/_helpers/check/check_command.rs", "crates/sqlbuild-python/src/bindings/_helpers/load/load_progress.rs"]
+paths = ["crates/sqlbuild-python-output/src/build_progress/models.rs", "crates/sqlbuild-python/src/bindings/_helpers/check/check_command.rs"]
 reason = "Each passes its own keyword set to its own Python callable; only building the keyword dict is alike."
-
-[[dupes.allowlist]]
-paths = ["crates/sqlbuild-python-output/src/build_progress/models.rs", "crates/sqlbuild-python/src/bindings/_helpers/load/load_progress.rs"]
-reason = "Each reporter toggles its own cursor state through its own writer and lock; only the hide-or-show check is alike."
 
 [[dupes.allowlist]]
 paths = ["crates/sqlbuild-python-base/src/build_progress/_helpers/progress.rs", "crates/sqlbuild-python-output/src/result_output/_helpers/events/terminal_index.rs"]
@@ -4138,10 +4116,6 @@ reason = "Each progress reporter runs its own spinner loop and draws its own lin
 [[dupes.allowlist]]
 paths = ["crates/sqlbuild-python-output/src/build_progress/_helpers/build_callbacks.rs", "crates/sqlbuild-python/src/bindings/_helpers/build_command/policies.rs"]
 reason = "Each reads its own record's fields from its own Python object; only the field-read shape is alike."
-
-[[dupes.allowlist]]
-paths = ["crates/sqlbuild-python-output/src/build_progress/models.rs", "crates/sqlbuild-python/src/bindings/_helpers/load/load_progress.rs"]
-reason = "Each progress reporter runs its own spinner loop and draws its own line; only the wait-and-redraw loop is alike."
 
 [[dupes.allowlist]]
 paths = ["crates/sqlbuild-python-output/src/build_progress/models.rs"]

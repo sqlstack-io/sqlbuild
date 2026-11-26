@@ -48,7 +48,6 @@ from sqlbuild.executor.python_nodes.models import (
 )
 from sqlbuild.executor.python_nodes.types import ExecutablePythonNode
 from sqlbuild.executor.scheduling.classes.session_warehouses import SessionWarehouses
-from sqlbuild.executor.scheduling.main._unlock_downstream import unlock_downstream_python_nodes
 from sqlbuild.executor.scheduling.models import LifecycleExecutionNode
 from sqlbuild.observability import LifecycleEvent
 from sqlbuild.providers import Provider
@@ -100,27 +99,6 @@ def execute_ordered_test_nodes(
 class ExecutionSlackProvider(Provider):
     provider_name: ClassVar[str] = "slack_provider"
     label: str = "slack"
-
-
-def apply_completion_order(
-    *,
-    completion_order: tuple[str, ...],
-    in_degree: dict[str, int],
-    ready: list[str],
-    downstream_names: dict[str, tuple[str, ...]],
-) -> tuple[dict[str, int], list[str]]:
-    updated_in_degree: dict[str, int] = dict(in_degree)
-    updated_ready: list[str] = list(ready)
-    completed_node_name: str
-    for completed_node_name in completion_order:
-        newly_ready: tuple[str, ...]
-        updated_in_degree, newly_ready = unlock_downstream_python_nodes(
-            completed_node_name=completed_node_name,
-            in_degree=updated_in_degree,
-            downstream_names=downstream_names,
-        )
-        updated_ready.extend(newly_ready)
-    return updated_in_degree, updated_ready
 
 
 class PythonNodeContextTestAdapter(BaseAdapter):

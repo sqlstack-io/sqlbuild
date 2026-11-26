@@ -31,10 +31,13 @@ import sqlbuild._native as native_module
 from sqlbuild._native import (
     CompilerStage,
     CustomHostObserver,
+    DiscoveredLoaderFunction,
     PreparedCompileArtifacts,
     SourceEntry,
 )
 from sqlbuild._native import run_cli as main
+from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
+from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.adapter.contract.exceptions import AdapterUserError
 from sqlbuild.adapter.contract.models import (
     RenderedRetentionChange,
@@ -43,6 +46,13 @@ from sqlbuild.adapter.contract.models import (
 )
 from sqlbuild.adapter.contract.types import RetentionChangePhase
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
+from sqlbuild.executor.load.main._build_execution_indexes import build_load_execution_indexes
+from sqlbuild.executor.load.main._execute import execute_source_load
+from sqlbuild.executor.load.models import (
+    LoadExecutionIndexes,
+    LoadExecutionResult,
+    LoadRuntimeParams,
+)
 from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
     ExpansionBoundaryTestCase,
     RepeatedJsonParseTestCase,
@@ -2179,3 +2189,36 @@ def batched_entries(
     """`entries` written by the current loader executor in batches of `load_batch_size` rows."""
 
     return tuple(replace(entry, load_batch_size=load_batch_size or None) for entry in entries)
+
+
+def run_source_loads(
+    *,
+    sources: tuple[SourceEntry, ...],
+    loader_functions: tuple[DiscoveredLoaderFunction, ...],
+    connection_config: dict[str, object],
+    adapter: BaseAdapter,
+    runtime: LoadRuntimeParams,
+) -> tuple[LoadExecutionResult, ...]:
+    """Run each loader-filled source in declaration order on one connection, as a build does."""
+
+    indexes: LoadExecutionIndexes = build_load_execution_indexes(
+        sources=sources, loader_functions=loader_functions
+    )
+    connection: Any = adapter.connect(connection_config)
+    try:
+        return tuple(
+            execute_source_load(
+                source_entry=source,
+                loader_function=indexes.loader_by_name[loader_name],
+                adapter=adapter,
+                connection_config=connection_config,
+                connection=connection,
+                runtime=runtime,
+                statement_recorder=StatementRecorder(),
+                loader_ref_entries=indexes.loader_ref_entries,
+                source_ref_entries=indexes.source_by_name,
+            )
+            for loader_name, source in indexes.source_by_loader_name.items()
+        )
+    finally:
+        adapter.close(connection)

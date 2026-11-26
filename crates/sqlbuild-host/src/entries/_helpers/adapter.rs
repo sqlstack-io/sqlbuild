@@ -75,11 +75,6 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
         edge: HostEdge::Adapter,
     },
     HostEntry {
-        name: "LifeCycleEventKind",
-        kind: HostKind::Class,
-        edge: HostEdge::Adapter,
-    },
-    HostEntry {
         name: "MigrationTransfer",
         kind: HostKind::Class,
         edge: HostEdge::Adapter,

@@ -17,7 +17,6 @@ from duckdb import DuckDBPyConnection
 from sqlbuild._native import (
     AuditCommandRequest,
     BuildCommandRequest,
-    CliUserError,
     CursorOverrides,
     DiscoveredProjectInputs,
     DiscoveredSourceFile,
@@ -27,7 +26,6 @@ from sqlbuild._native import (
     ScenarioTestCommandRequest,
     TestCommandRequest,
     discover_project_inputs,
-    format_load_execution_json,
     run_audit_command,
     run_build_command,
     run_load_command,
@@ -37,9 +35,7 @@ from sqlbuild._native import (
 )
 from sqlbuild.adapter.contract.types import CursorKind
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
-from sqlbuild.executor.load.main.run import run_load_pipeline
 from sqlbuild.executor.load.models import (
-    LoadCallbacks,
     LoadExecutionResult,
     LoadRuntimeParams,
 )
@@ -75,7 +71,10 @@ from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
     SourceDeferralBuildTestCase,
     SourceDeferralNoErrorTestCase,
 )
-from tests.integration.src.sqlbuild.cli.commands.main.helpers import batched_entries
+from tests.integration.src.sqlbuild.cli.commands.main.helpers import (
+    batched_entries,
+    run_source_loads,
+)
 
 _PROJECT_FILE: str = 'name = "demo"\nadapter = "duckdb"\n\n[connection]\ndatabase = "demo.duckdb"\n'
 
@@ -2289,7 +2288,7 @@ def test_given_source_loader_when_running_pipeline_then_uses_staging_relation(
     source_file: DiscoveredSourceFile = discovered_inputs.source_files[0]
     adapter: DuckDbAdapter = DuckDbAdapter()
 
-    results: tuple[LoadExecutionResult, ...] = run_load_pipeline(
+    results: tuple[LoadExecutionResult, ...] = run_source_loads(
         sources=source_file.source_entries,
         loader_functions=discovered_inputs.loader_functions,
         connection_config={"database": str(tmp_path / "demo.duckdb")},
@@ -2341,7 +2340,7 @@ def test_given_source_loader_when_running_pipeline_then_drops_stale_staging_firs
     source_file: DiscoveredSourceFile = discovered_inputs.source_files[0]
     adapter: DuckDbAdapter = DuckDbAdapter()
 
-    results: tuple[LoadExecutionResult, ...] = run_load_pipeline(
+    results: tuple[LoadExecutionResult, ...] = run_source_loads(
         sources=source_file.source_entries,
         loader_functions=discovered_inputs.loader_functions,
         connection_config={"database": str(tmp_path / "demo.duckdb")},
@@ -3121,7 +3120,7 @@ def test_given_source_loader_write_strategy_when_running_pipeline_then_uses_expe
     source_file: DiscoveredSourceFile = discovered_inputs.source_files[0]
     adapter: DuckDbAdapter = DuckDbAdapter()
 
-    first_results: tuple[LoadExecutionResult, ...] = run_load_pipeline(
+    first_results: tuple[LoadExecutionResult, ...] = run_source_loads(
         sources=source_file.source_entries,
         loader_functions=discovered_inputs.loader_functions,
         connection_config={"database": str(tmp_path / "demo.duckdb")},
@@ -3133,7 +3132,7 @@ def test_given_source_loader_write_strategy_when_running_pipeline_then_uses_expe
             is_reload=False,
         ),
     )
-    second_results: tuple[LoadExecutionResult, ...] = run_load_pipeline(
+    second_results: tuple[LoadExecutionResult, ...] = run_source_loads(
         sources=source_file.source_entries,
         loader_functions=discovered_inputs.loader_functions,
         connection_config={"database": str(tmp_path / "demo.duckdb")},
@@ -3218,7 +3217,7 @@ def test_given_source_loader_write_strategy_when_rerunning_then_calls_expected_a
     adapter: DuckDbAdapter = DuckDbAdapter()
     calls: list[tuple[str, str, tuple[str | None, ...]]] = []
 
-    run_load_pipeline(
+    run_source_loads(
         sources=source_file.source_entries,
         loader_functions=discovered_inputs.loader_functions,
         connection_config={"database": str(tmp_path / "demo.duckdb")},
@@ -3274,7 +3273,7 @@ def test_given_source_loader_write_strategy_when_rerunning_then_calls_expected_a
     monkeypatch.setattr(adapter, "merge", merge_spy)
     monkeypatch.setattr(adapter, "delete_insert_cursor", delete_insert_cursor_spy)
 
-    results: tuple[LoadExecutionResult, ...] = run_load_pipeline(
+    results: tuple[LoadExecutionResult, ...] = run_source_loads(
         sources=source_file.source_entries,
         loader_functions=discovered_inputs.loader_functions,
         connection_config={"database": str(tmp_path / "demo.duckdb")},
@@ -3453,7 +3452,7 @@ def test_given_loader_cursor_configuration_when_running_pipeline_then_records_ex
     all_lifecycle_sql: list[str] = []
 
     for _ in range(test_case.run_count):
-        results: tuple[LoadExecutionResult, ...] = run_load_pipeline(
+        results: tuple[LoadExecutionResult, ...] = run_source_loads(
             sources=source_file.source_entries,
             loader_functions=discovered_inputs.loader_functions,
             connection_config={"database": str(tmp_path / "demo.duckdb")},
@@ -3573,149 +3572,6 @@ def test_given_cursor_override_flags_when_running_load_then_passes_typed_context
         connection.close()
     assert exit_code == 0
     assert rows == test_case.expected_rows
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
-        LoadCommandConcurrencyTestCase(
-            description="uses bounded concurrent connections and preserves result order",
-            project_files={
-                "sqlbuild_project.toml": _PROJECT_FILE,
-                "sql/sources/raw.yml": """
-sources:
-  - name: raw_a
-    description: Test source raw_a.
-    managed: true
-    columns:
-      - name: source_name
-        type: VARCHAR
-      - name: connection_id
-        type: BIGINT
-  - name: raw_b
-    description: Test source raw_b.
-    managed: true
-    columns:
-      - name: source_name
-        type: VARCHAR
-      - name: connection_id
-        type: BIGINT
-  - name: raw_c
-    description: Test source raw_c.
-    managed: true
-    columns:
-      - name: source_name
-        type: VARCHAR
-      - name: connection_id
-        type: BIGINT
-""".strip()
-                + "\n",
-                "python/nodes/loaders/raw/raw_a/loader.py": (
-                    "import threading\n"
-                    "import time\n"
-                    "from sqlbuild.loaders import loader\n"
-                    "from python.nodes.loaders.raw._sync import barrier\n"
-                    "\n"
-                    "\n"
-                    "@loader(write_strategy='replace')\n"
-                    "def raw_a(ctx):\n"
-                    "    '''Test loader raw_a.'''\n"
-                    "    barrier.wait(timeout=1)\n"
-                    "    time.sleep(0.05)\n"
-                    '    return [{"source_name": "raw_a", "connection_id": id(ctx.connection)}]\n'
-                ),
-                "python/nodes/loaders/raw/raw_b/loader.py": (
-                    "import threading\n"
-                    "import time\n"
-                    "from sqlbuild.loaders import loader\n"
-                    "from python.nodes.loaders.raw._sync import barrier\n"
-                    "\n"
-                    "\n"
-                    "@loader(write_strategy='replace')\n"
-                    "def raw_b(ctx):\n"
-                    "    '''Test loader raw_b.'''\n"
-                    "    barrier.wait(timeout=1)\n"
-                    '    return [{"source_name": "raw_b", "connection_id": id(ctx.connection)}]\n'
-                ),
-                "python/nodes/loaders/raw/raw_c/loader.py": (
-                    "import threading\n"
-                    "import time\n"
-                    "from sqlbuild.loaders import loader\n"
-                    "from python.nodes.loaders.raw._sync import barrier\n"
-                    "\n"
-                    "\n"
-                    "@loader(write_strategy='replace')\n"
-                    "def raw_c(ctx):\n"
-                    "    '''Test loader raw_c.'''\n"
-                    '    return [{"source_name": "raw_c", "connection_id": id(ctx.connection)}]\n'
-                ),
-                "python/nodes/loaders/raw/_sync.py": (
-                    "import threading\n\nbarrier = threading.Barrier(2)\n"
-                ),
-                "python/nodes/loaders/raw/__init__.py": (
-                    "from .raw_a.loader import raw_a\n"
-                    "from .raw_b.loader import raw_b\n"
-                    "from .raw_c.loader import raw_c\n"
-                ),
-            },
-            max_concurrency=2,
-            expected_connection_count=2,
-            expected_source_order=("raw_a", "raw_b", "raw_c"),
-            expected_json_asset_order=("raw_a", "raw_b", "raw_c"),
-        ),
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_multiple_source_loaders_when_running_pipeline_then_uses_concurrent_connections(
-    test_case: LoadCommandConcurrencyTestCase,
-    tmp_path: Path,
-    write_repo_files: Callable[[Path, dict[str, str]], None],
-) -> None:
-    write_repo_files(tmp_path, test_case.project_files)
-    discovered_inputs: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
-    source_file: DiscoveredSourceFile = discovered_inputs.source_files[0]
-    adapter: DuckDbAdapter = DuckDbAdapter()
-    connection_starts: list[int] = []
-
-    results: tuple[LoadExecutionResult, ...] = run_load_pipeline(
-        sources=source_file.source_entries,
-        loader_functions=discovered_inputs.loader_functions,
-        connection_config={"database": str(tmp_path / "demo.duckdb")},
-        adapter=adapter,
-        max_concurrency=test_case.max_concurrency,
-        runtime=LoadRuntimeParams(
-            run_id="test_run",
-            target="dev",
-            vars={},
-            is_reload=False,
-        ),
-        callbacks=LoadCallbacks(
-            on_connection_start=connection_starts.append,
-        ),
-    )
-
-    assert connection_starts == [test_case.expected_connection_count]
-    assert tuple(result.source_name for result in results) == test_case.expected_source_order
-    payload: dict[str, Any] = cast(
-        dict[str, Any], json.loads(format_load_execution_json(results=results))
-    )
-    assets: list[dict[str, Any]] = cast(list[dict[str, Any]], payload["assets"])
-    assert tuple(asset["name"] for asset in assets) == test_case.expected_json_asset_order
-    connection: DuckDBPyConnection = duckdb.connect(str(tmp_path / "demo.duckdb"))
-    try:
-        first_row: tuple[int] | None = connection.execute(
-            "SELECT connection_id FROM raw_a"
-        ).fetchone()
-        second_row: tuple[int] | None = connection.execute(
-            "SELECT connection_id FROM raw_b"
-        ).fetchone()
-    finally:
-        connection.close()
-    assert first_row is not None
-    assert second_row is not None
-    first_connection_id: int = first_row[0]
-    second_connection_id: int = second_row[0]
-    assert first_connection_id != second_connection_id
 
 
 @pytest.mark.parametrize(
@@ -4140,7 +3996,7 @@ def test_given_generator_loader_uses_batch_size_when_running_pipeline_then_appen
     source_file: DiscoveredSourceFile = discovered_inputs.source_files[0]
     adapter: DuckDbAdapter = DuckDbAdapter()
 
-    results: tuple[LoadExecutionResult, ...] = run_load_pipeline(
+    results: tuple[LoadExecutionResult, ...] = run_source_loads(
         sources=batched_entries(source_file.source_entries, load_batch_size=1),
         loader_functions=discovered_inputs.loader_functions,
         connection_config={"database": str(tmp_path / "demo.duckdb")},
@@ -4361,7 +4217,7 @@ def test_given_batched_loader_variants_when_running_pipeline_then_writes_expecte
     source_file: DiscoveredSourceFile = discovered_inputs.source_files[0]
     adapter: DuckDbAdapter = DuckDbAdapter()
 
-    results: tuple[LoadExecutionResult, ...] = run_load_pipeline(
+    results: tuple[LoadExecutionResult, ...] = run_source_loads(
         sources=batched_entries(
             source_file.source_entries, load_batch_size=test_case.load_batch_size
         ),
@@ -4903,7 +4759,7 @@ def test_given_later_loader_batch_fails_when_running_load_then_drops_staging(
     finally:
         connection.close()
 
-    results: tuple[LoadExecutionResult, ...] = run_load_pipeline(
+    results: tuple[LoadExecutionResult, ...] = run_source_loads(
         sources=source_file.source_entries,
         loader_functions=discovered_inputs.loader_functions,
         connection_config={"database": str(tmp_path / "demo.duckdb")},

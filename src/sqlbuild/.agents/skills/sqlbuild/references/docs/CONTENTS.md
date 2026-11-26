@@ -150,7 +150,7 @@ Bundled copies of every page on the SQLBuild documentation site, matching the in
 - [sqb contract](cli/contract.md) (`cli/contract`) - Compare or generate repository contracts from physical warehouse schemas.
 - [sqb plan](cli/plan.md) (`cli/plan`) - Preview what SQLBuild will do before executing.
 - [sqb build](cli/build.md) (`cli/build`) - Compile, plan, and execute the selected build lifecycle.
-- [sqb load](cli/load.md) (`cli/load`) - Load managed sources into the warehouse.
+- [sqb load](cli/load.md) (`cli/load`) - Run loads and loaders into the warehouse.
 - [sqb seed](cli/seed.md) (`cli/seed`) - Load seed CSV files into the warehouse.
 - [sqb audit](cli/audit.md) (`cli/audit`) - Run data quality audits in isolation.
 - [sqb check](cli/check.md) (`cli/check`) - Run Python checks against assets and loaders.

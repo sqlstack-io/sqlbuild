@@ -63,6 +63,7 @@ pub(crate) fn build_planner_scope<'py>(
         native_field(&project, "lineage_graph")?.cast_into()?;
     let lineage = lineage.borrow();
     let selected = args.value("selected_keys")?;
+    let caller_resolved_loader_upstream: bool = !selected.is_none();
     let (mut selected, audits) = if selected.is_none() {
         resolve_planner_keys(&project, lineage.graph(), (&select, &exclude))?
     } else {
@@ -84,7 +85,7 @@ pub(crate) fn build_planner_scope<'py>(
         source_selectors(&sent, names, &selected, true).map_err(|error| carrier.error(error))?;
     let named_sources =
         source_selectors(&sent, names, &selected, false).map_err(|error| carrier.error(error))?;
-    let mut executable = if auto_load {
+    let mut executable = if auto_load && !caller_resolved_loader_upstream {
         source_keys
     } else {
         HashSet::new()

@@ -3411,7 +3411,6 @@ def format_build_execution_json(
 def format_seed_execution_json(
     *, results: tuple[SeedExecutionResult, ...], plan: PlanOutput
 ) -> str: ...
-def format_load_execution_json(*, results: tuple[LoadExecutionResult, ...]) -> str: ...
 def format_clone_execution_json(
     *,
     result: CloneExecutionResult,

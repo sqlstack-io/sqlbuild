@@ -9,7 +9,6 @@ from typing import Any
 
 from sqlbuild._native import SourceColumnEntry
 from sqlbuild.adapter.contract.types import CursorKind
-from sqlbuild.compiler.python_nodes.types import SkipMode
 from sqlbuild.cursor_algebra.types import CursorScalar
 from sqlbuild.executor.scheduling.types import ExecutionStatus
 
@@ -122,48 +121,6 @@ class LoaderCursorParseErrorTestCase:
     value: object
     expected_error_type: type[Exception]
     expected_error_fragment: str
-
-
-@dataclass(frozen=True)
-class LoadDagWorkerFailureTestCase:
-    """One load DAG worker failure handling case."""
-
-    description: str
-    source_name: str
-    loader_name: str
-    expected_status: ExecutionStatus
-    expected_error_fragment: str
-
-
-@dataclass(frozen=True)
-class LoadDagStateSchedulingTestCase:
-    """One loader DAG state scheduling behavior case."""
-
-    description: str
-    source_names: tuple[str, ...]
-    upstream_names: dict[str, tuple[str, ...]]
-    downstream_names: dict[str, tuple[str, ...]]
-    completed_source_name: str
-    expected_initial_ready: tuple[str, ...]
-    expected_final_ready: tuple[str, ...]
-    expected_callback_sources: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class LoadPipelineSkipFanInTestCase:
-    """One loader skip fan-in behavior case."""
-
-    description: str
-    skip_mode: SkipMode
-    expected_statuses: tuple[ExecutionStatus, ...]
-    expected_skip_modes: tuple[str | None, ...]
-    expected_skip_reasons: tuple[str | None, ...]
-
-
-@dataclass(frozen=True)
-class LoadStartOrderingTestCase:
-    description: str
-    expected_connection_count: int
 
 
 @dataclass(frozen=True)

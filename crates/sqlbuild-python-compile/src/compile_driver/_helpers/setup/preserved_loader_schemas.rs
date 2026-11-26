@@ -15,7 +15,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use std::collections::HashSet;
 
 /// Raise when a `preserve` target leaves `loaders` or Python node results without a schema, after `effective_vars`.
-pub fn preserved_loader_schemas(
+pub(crate) fn preserved_loader_schemas(
     discovered: &Bound<'_, PyAny>,
     (selected_target, effective_vars): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
     loaders: &HashSet<String>,

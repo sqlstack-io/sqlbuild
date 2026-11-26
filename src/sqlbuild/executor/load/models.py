@@ -21,14 +21,13 @@ from sqlbuild.adapter.relations.main.resolve_qualified_name_parts import (
 from sqlbuild.compiler.python_nodes.types import PythonNodeKind, SkipMode
 from sqlbuild.errors.contracts.exceptions import ExecutorInputError
 from sqlbuild.executor.load.constants import LOADER_RELATION_QUALIFIER_SEPARATOR
-from sqlbuild.executor.load.types import LoadProgressCallback
 from sqlbuild.executor.node_results.classes.dependency_result_reader import DependencyResultReader
 from sqlbuild.executor.python_nodes.classes.runtime_relation_guard import RuntimeRelationGuard
 from sqlbuild.executor.scheduling.types import ExecutionStatus
 from sqlbuild.provider.main.runtime import ProviderContainer, _empty_provider_container
 from sqlbuild.python_nodes.models import SqlResourceRef
 from sqlbuild.python_nodes.types import SqlResourceRefKind
-from sqlbuild.runtime.contracts.types import ConnectionElapsedCallback, ExecutionResourceKind
+from sqlbuild.runtime.contracts.types import ExecutionResourceKind
 
 
 @dataclass(frozen=True)
@@ -311,16 +310,6 @@ class LoadRuntimeParams:
 
 
 @dataclass(frozen=True)
-class LoadDispatchInputs:
-    """Per-node dispatch inputs shared by DAG source execution helpers."""
-
-    source_by_name: dict[str, SourceEntry]
-    indexes: LoadExecutionIndexes
-    failed_or_hard_skipped: set[str]
-    results_by_name: dict[str, LoadExecutionResult]
-
-
-@dataclass(frozen=True)
 class LoaderDestination:
     """Resolved destination relation and bare name for one loader run."""
 
@@ -335,18 +324,3 @@ class LoaderRefBindings:
     loader_ref_entries: Mapping[Callable[..., object], SourceEntry] | None = None
     source_ref_entries: Mapping[str, SourceEntry] | None = None
     relation_guard: RuntimeRelationGuard | None = None
-
-
-@dataclass(frozen=True)
-class LoadCallbacks:
-    """Progress callbacks for one load pipeline run."""
-
-    on_load_start: Callable[[SourceEntry], None] | None = None
-    on_load_progress: LoadProgressCallback | None = None
-    on_load_complete: Callable[[LoadExecutionResult], None] | None = None
-    on_connection_start: Callable[[int], None] | None = None
-    on_connection_complete: ConnectionElapsedCallback | None = None
-    on_connection_error: ConnectionElapsedCallback | None = None
-
-
-from sqlbuild.executor.load.classes.dag_state import LoadDagState  # noqa: E402,F401
