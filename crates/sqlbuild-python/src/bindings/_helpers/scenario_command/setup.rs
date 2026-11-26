@@ -209,6 +209,20 @@ pub(crate) fn require_capture_dialect(
 pub(crate) fn project_connection_config<'py>(
     project: &ScenarioProject<'py>,
 ) -> PyResult<Bound<'py, PyAny>> {
+    connection_config(project, true)
+}
+
+/// The project's connection settings for an offline compile, which needs no warehouse connection.
+pub(crate) fn offline_project_connection_config<'py>(
+    project: &ScenarioProject<'py>,
+) -> PyResult<Bound<'py, PyAny>> {
+    connection_config(project, false)
+}
+
+fn connection_config<'py>(
+    project: &ScenarioProject<'py>,
+    require_connection: bool,
+) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = project.discovered.py();
     resolve_project_connection_config(
         py,
@@ -217,6 +231,7 @@ pub(crate) fn project_connection_config<'py>(
             &[
                 ("discovered_inputs", project.discovered.clone()),
                 ("project_dir", project.project_dir.clone()),
+                ("require_connection", boolean(py, require_connection)),
             ],
         )?),
     )

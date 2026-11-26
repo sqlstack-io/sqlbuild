@@ -55,9 +55,9 @@ use crate::bindings::_helpers::scenario_command::presentation::{
 };
 use crate::bindings::_helpers::scenario_command::setup::{
     CompileInputs, ScenarioProject, boolean, cli_user_error, compile, discover_project, flush, int,
-    optional_text, planning_reporter, project_adapter_name, project_connection_config,
-    require_capture_dialect, require_sql_analysis, resolve_adapter, selected_scenarios, style,
-    text, write, write_execution,
+    offline_project_connection_config, optional_text, planning_reporter, project_adapter_name,
+    project_connection_config, require_capture_dialect, require_sql_analysis, resolve_adapter,
+    selected_scenarios, style, text, write, write_execution,
 };
 use crate::bindings::_helpers::scenario_command::snapshot_sync::{LocalSync, sync_local_snapshots};
 use crate::bindings::_helpers::sql_test_command::test_command::timeout_record;
@@ -164,28 +164,6 @@ fn prepare<'py>(
         style,
         concurrency: concurrency.max(1),
         since_json: None,
-    })
-}
-
-/// The warehouse side of an auto run: its own run settings, compiled pipeline and scenarios.
-struct RemoteRun<'py> {
-    run: TestRun<'py>,
-    pipeline: Bound<'py, PyAny>,
-    scenarios: Bound<'py, PyTuple>,
-}
-
-/// Compile the project again for the warehouse, for the scenarios an auto run sends there.
-fn remote_run<'py>(request: &Bound<'py, PyAny>, local: &TestRun<'py>) -> PyResult<RemoteRun<'py>> {
-    let py: Python<'py> = request.py();
-    let mut run: TestRun<'py> = prepare(request, discover_project(py, request)?, false)?;
-    let planning: Bound<'py, PyAny> = planning_reporter(&run.stream, run.style)?;
-    let base: Option<BaseComparison> = since_base(request, &run)?;
-    let (pipeline, scenarios, _since_json) = compiled(request, &run, &planning, base)?;
-    run.since_json = local.since_json.clone();
-    Ok(RemoteRun {
-        run,
-        pipeline,
-        scenarios,
     })
 }
 
@@ -583,7 +561,7 @@ fn select_changed<'py>(
     ))
 }
 
-/// A compiled, selected and `--since`-narrowed set of scenarios, and the `--since` JSON.
+/// The project compiled in its own dialect, its selected scenarios and the `--since` JSON.
 fn compiled<'py>(
     request: &Bound<'py, PyAny>,
     run: &TestRun<'py>,
@@ -591,19 +569,22 @@ fn compiled<'py>(
     base: Option<BaseComparison>,
 ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyTuple>, Option<String>)> {
     let py: Python<'py> = request.py();
-    let no_sql_validation: bool = run.local || flag(request, "no_sql_validation")?;
+    let connection_config: Bound<'py, PyAny> = if run.local {
+        offline_project_connection_config(&run.project)?
+    } else {
+        run.connection_config.clone()
+    };
     let compiled: PyResult<Bound<'_, PyAny>> = compile(
         &run.project,
         CompileInputs {
-            adapter: &run.adapter,
+            adapter: &run.project_adapter,
             options: &[
-                ("no_sql_validation", boolean(py, no_sql_validation)),
-                ("source_deferral_enabled", boolean(py, false)),
-                ("connection_config", run.connection_config.clone()),
                 (
-                    "source_lexical_syntax",
-                    native_field(&run.project_adapter, "sql_lexical_syntax")?,
+                    "no_sql_validation",
+                    boolean(py, flag(request, "no_sql_validation")?),
                 ),
+                ("source_deferral_enabled", boolean(py, false)),
+                ("connection_config", connection_config),
             ],
             planning,
         },
@@ -705,12 +686,6 @@ pub(crate) fn run_scenario_test_command(
         .filter(|decision| mode == RunOn::Local || decision.local())
         .map(|decision| decision.name.as_str())
         .collect();
-    let mut remote: Option<RemoteRun<'_>> =
-        if run.local && decisions.iter().any(|decision| !decision.local()) {
-            Some(remote_run(request, &run)?)
-        } else {
-            None
-        };
     let header: RunHeader = run_on_header(
         &decisions,
         (mode, flag(request, "explain")?),
@@ -808,20 +783,15 @@ pub(crate) fn run_scenario_test_command(
         }
         run
     } else {
-        let remote: RemoteRun<'_> = match remote.take() {
-            Some(remote) => remote,
-            None => remote_run(request, &run)?,
-        };
+        let mut remote: TestRun<'_> = prepare(request, discover_project(py, request)?, false)?;
+        remote.since_json = run.since_json.clone();
         results.extend(execute_batch(
             request,
-            &remote.run,
-            (
-                &remote.pipeline,
-                &named(&remote.scenarios, &warehouse_names)?,
-            ),
+            &remote,
+            (&pipeline, &named(&scenarios, &warehouse_names)?),
             (&section, false, &rows),
         )?);
-        remote.run
+        remote
     };
     let succeeded: bool = finish(
         request,
