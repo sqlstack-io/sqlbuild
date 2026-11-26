@@ -829,7 +829,6 @@ pub enum NativeAttr {
     LoadDbtManifestIndex,
     LoadLocalConfigFile,
     LoadOrBuildScopeIndex,
-    LoadProgressReporter,
     LoadProjectConfigFile,
     LoadRulesConfig,
     LoaderDestinationPartsFunction,

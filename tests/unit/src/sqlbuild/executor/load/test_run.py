@@ -2,16 +2,12 @@
 
 from __future__ import annotations
 
-from contextvars import Token
-from io import StringIO
 from pathlib import Path
 
 import pytest
 
 from sqlbuild._native import (
     DiscoveredLoaderFunction,
-    LoadProgressReporter,
-    NativeProgressProjector,
     SourceEntry,
 )
 from sqlbuild.compiler.python_nodes.types import SkipMode
@@ -30,7 +26,6 @@ from sqlbuild.observability import (
     invocation_scope,
 )
 from tests.unit.src.sqlbuild.executor.load._test_types import (
-    ConcurrentLoadProgressTestCase,
     LoadPipelineSkipFanInTestCase,
     LoadStartOrderingTestCase,
 )
@@ -204,97 +199,3 @@ def test_given_mixed_loader_skips_when_running_pipeline_then_fan_in_matches_mode
         == test_case.expected_skip_modes
     )
     assert tuple(result.skip_reason for result in results) == test_case.expected_skip_reasons
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    (
-        ConcurrentLoadProgressTestCase(
-            description="two concurrent loaders retain canonical and rich progress contexts",
-            expected_start_count=2,
-            expected_terminal_count=2,
-            expected_rich_row_count=2,
-        ),
-    ),
-    ids=lambda case: case.description,
-)
-def test_given_two_independent_loaders_when_run_concurrently_then_each_projects_once(
-    test_case: ConcurrentLoadProgressTestCase,
-) -> None:
-    adapter: CountingLoaderContextTestAdapter = CountingLoaderContextTestAdapter()
-    sources: tuple[SourceEntry, ...] = (
-        SourceEntry(name="first", loader="first_loader"),
-        SourceEntry(name="second", loader="second_loader"),
-    )
-    stream: StringIO = StringIO()
-    projector: NativeProgressProjector = NativeProgressProjector(stream=stream, use_color=False)
-    projector_token: Token[NativeProgressProjector | None] = projector.install()
-    reporter: LoadProgressReporter = LoadProgressReporter(
-        stream=stream,
-        use_color=False,
-        source_order={"first": 1, "second": 2},
-        total_count=2,
-    )
-    dispatcher: EventDispatcher = EventDispatcher()
-    events: list[LifecycleEvent] = []
-    dispatcher.subscribe_lifecycle(subscriber=projector.consume, accepts_opaque=False)
-    dispatcher.subscribe_lifecycle(subscriber=events.append, accepts_opaque=False)
-
-    def first_loader(_ctx: LoaderContext) -> None:
-        assert "first START" in stream.getvalue()
-        return None
-
-    def second_loader(_ctx: LoaderContext) -> None:
-        assert "second START" in stream.getvalue()
-        return None
-
-    try:
-        with invocation_scope("load-invocation"), dispatcher_scope(dispatcher):
-            results: tuple[LoadExecutionResult, ...] = run_load_pipeline(
-                sources=sources,
-                loader_functions=(
-                    DiscoveredLoaderFunction(
-                        file_path=Path("python/nodes/loaders/first.py"),
-                        relative_path=Path("python/nodes/loaders/first.py"),
-                        name="first_loader",
-                        function=first_loader,
-                    ),
-                    DiscoveredLoaderFunction(
-                        file_path=Path("python/nodes/loaders/second.py"),
-                        relative_path=Path("python/nodes/loaders/second.py"),
-                        name="second_loader",
-                        function=second_loader,
-                    ),
-                ),
-                connection_config={},
-                adapter=adapter,
-                runtime=LoadRuntimeParams(
-                    run_id="concurrent-run",
-                    target=None,
-                    vars={},
-                    is_reload=False,
-                ),
-                callbacks=LoadCallbacks(
-                    on_load_start=reporter.on_start,
-                    on_load_complete=reporter.on_complete,
-                ),
-                max_concurrency=2,
-            )
-    finally:
-        projector.restore(projector_token)
-
-    resource_events: tuple[LifecycleEvent, ...] = tuple(
-        filter(lambda event: event.event_type.startswith("resource_attempt_"), events)
-    )
-    output_lines: tuple[str, ...] = tuple(stream.getvalue().splitlines())
-    assert len(results) == 2
-    assert sum(event.event_type.endswith("started") for event in resource_events) == (
-        test_case.expected_start_count
-    )
-    assert (
-        sum(event.event_type.endswith(("completed", "failed")) for event in resource_events)
-        == test_case.expected_terminal_count
-    )
-    assert sum("rows=0" in line and "OK" in line for line in output_lines) == (
-        test_case.expected_rich_row_count
-    ), stream.getvalue()

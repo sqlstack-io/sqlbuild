@@ -522,7 +522,7 @@ class LoadCommandEmptySelectionTestCase:
     exclude: tuple[str, ...]
     expected_exit_code: int
     expected_stdout_fragment: str
-    expected_stdout_fragments: tuple[str, ...] = ()
+    expected_database_created: bool
 
 
 @dataclass(frozen=True)
@@ -530,9 +530,9 @@ class LoadCommandConcurrencyTestCase:
     description: str
     project_files: dict[str, str]
     max_concurrency: int
-    expected_connection_count: int
-    expected_source_order: tuple[str, ...]
     expected_json_asset_order: tuple[str, ...]
+    expected_connection_count: int = 0
+    expected_source_order: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

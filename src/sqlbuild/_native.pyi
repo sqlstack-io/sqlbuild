@@ -5104,30 +5104,6 @@ def resolve_test_name_width(test_entries: tuple[SqlTestPlanEntry, ...]) -> int: 
 def build_test_expectation_rows(
     result: SqlTestExecutionResult,
 ) -> tuple[NestedProgressChildRow, ...]: ...
-def select_load_entries(
-    *,
-    discovered_inputs: DiscoveredProjectInputs,
-    select: tuple[str, ...],
-    exclude: tuple[str, ...],
-    target_config: TargetConfig | None,
-    loader_default_database: str | None = None,
-    loader_default_schema: str | None = None,
-) -> tuple[SourceEntry, ...]: ...
-def select_load_reference_entries(
-    *,
-    discovered_inputs: DiscoveredProjectInputs,
-    selected_sources: tuple[SourceEntry, ...],
-    target_config: TargetConfig | None,
-    loader_default_database: str | None = None,
-    loader_default_schema: str | None = None,
-) -> tuple[SourceEntry, ...]: ...
-def resolve_loader_defaults(
-    *,
-    discovered_inputs: DiscoveredProjectInputs,
-    selected_target: str | None = None,
-    target_config: TargetConfig | None = None,
-    cli_vars: dict[str, object] | None = None,
-) -> tuple[str | None, str | None]: ...
 def write_runtime_target(
     *, target_dir: Path, plan_output: PlanOutput, result: BuildExecutionResult
 ) -> None: ...
@@ -5147,16 +5123,6 @@ class TransientStatusReporter:
     def redraw_transient_line(self) -> None: ...
     def report_preflight_progress(self, message: str) -> None: ...
     def write_blank_line(self) -> None: ...
-
-class LoadProgressReporter:
-    def __init__(
-        self, *, stream: TextIO, use_color: bool, source_order: dict[str, int], total_count: int
-    ) -> None: ...
-    def on_start(self, source: SourceEntry) -> None: ...
-    def on_progress(self, source: SourceEntry, message: str) -> None: ...
-    def on_complete(self, result: LoadExecutionResult) -> None: ...
-    def clear_transient_line(self) -> None: ...
-    def redraw_transient_line(self) -> None: ...
 
 class BuildProgressCallbacks:
     def __init__(
@@ -6667,6 +6633,7 @@ class BuildCommandRequest(NativeRecord):
     test_timeout: str | None
     discovered_inputs: DiscoveredProjectInputs | None
     compiled_project: object | None
+    command_name: str
     def __init__(
         self,
         project_dir: Path | None = None,
@@ -6713,6 +6680,7 @@ class BuildCommandRequest(NativeRecord):
         test_timeout: str | None = None,
         discovered_inputs: DiscoveredProjectInputs | None = None,
         compiled_project: object | None = None,
+        command_name: str = "build",
     ) -> None: ...
 
 class CloneCommandRequest(NativeRecord):

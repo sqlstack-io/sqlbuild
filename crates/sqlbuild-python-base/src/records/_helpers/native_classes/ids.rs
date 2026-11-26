@@ -836,7 +836,6 @@ native_id_names! {
         NativeAttr::LoadDbtManifestIndex => "load_dbt_manifest_index",
         NativeAttr::LoadLocalConfigFile => "load_local_config_file",
         NativeAttr::LoadOrBuildScopeIndex => "load_or_build_scope_index",
-        NativeAttr::LoadProgressReporter => "LoadProgressReporter",
         NativeAttr::LoadProjectConfigFile => "load_project_config_file",
         NativeAttr::LoadRulesConfig => "load_rules_config",
         NativeAttr::LoaderDestinationPartsFunction => "loader_destination_parts",

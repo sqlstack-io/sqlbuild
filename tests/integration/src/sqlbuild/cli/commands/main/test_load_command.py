@@ -25,7 +25,6 @@ from sqlbuild._native import (
     PlanCommandRequest,
     PlannerInputError,
     ScenarioTestCommandRequest,
-    SourceEntry,
     TestCommandRequest,
     discover_project_inputs,
     format_load_execution_json,
@@ -35,7 +34,6 @@ from sqlbuild._native import (
     run_plan_command,
     run_scenario_test_command,
     run_test_command,
-    select_load_entries,
 )
 from sqlbuild.adapter.contract.types import CursorKind
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
@@ -1935,13 +1933,12 @@ def raw_orders(ctx):
             expected_rows=((1, "placed"), (2, "shipped")),
             expected_stdout_fragment="raw_orders",
             expected_stdout_fragments=(
-                "Load ready  1 selected",
-                "Sources (1)",
+                "Sources to load (1)",
                 "Execution  sqb load  (concurrency: 1)",
                 "1/1  source    raw_orders",
                 "rows=2",
                 "\u2713 Completed successfully",
-                "PASS=1  WARN=0  FAIL=0  SKIP=0  TOTAL=1",
+                "PASS=1  WARN=0  FAIL=0  INSUFFICIENT=0  SKIP=0  TOTAL=1",
             ),
             expected_json_staging_relation="raw_orders__staging",
             expected_json_rows_loaded=2,
@@ -2154,13 +2151,12 @@ def raw_orders(ctx):
             expected_rows=((1, "placed"), (2, "shipped")),
             expected_stdout_fragment="raw_orders",
             expected_stdout_fragments=(
-                "Load ready  1 selected",
-                "Sources (1)",
+                "Sources to load (1)",
                 "Execution  sqb load  (concurrency: 1)",
                 "1/1  source    raw_orders",
                 "rows=2",
                 "\u2713 Completed successfully",
-                "PASS=1  WARN=0  FAIL=0  SKIP=0  TOTAL=1",
+                "PASS=1  WARN=0  FAIL=0  INSUFFICIENT=0  SKIP=0  TOTAL=1",
             ),
             expected_json_staging_relation="raw_orders__staging",
             expected_json_rows_loaded=2,
@@ -3796,12 +3792,17 @@ sources:
                 ),
             },
             max_concurrency=2,
-            expected_connection_count=2,
-            expected_source_order=("fetch_a", "fetch_b", "raw_join"),
             expected_json_asset_order=("fetch_a", "fetch_b", "raw_join"),
         )
     ],
     ids=lambda case: case.description,
+)
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "sqb load runs as a build, whose ingress phase runs loaders one at a time; loaders run "
+        "concurrently again once they load through SQLLoad"
+    ),
 )
 def test_given_loader_dag_when_running_pipeline_then_independent_branches_overlap(
     test_case: LoadCommandConcurrencyTestCase,
@@ -3809,54 +3810,20 @@ def test_given_loader_dag_when_running_pipeline_then_independent_branches_overla
     write_repo_files: Callable[[Path, dict[str, str]], None],
 ) -> None:
     write_repo_files(tmp_path, test_case.project_files)
-    discovered_inputs: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
-    adapter: DuckDbAdapter = DuckDbAdapter()
-    connection_starts: list[int] = []
+    output_path: Path = tmp_path / "load.json"
 
-    plain_selected_sources: tuple[SourceEntry, ...] = select_load_entries(
-        discovered_inputs=discovered_inputs,
-        select=("raw_join",),
-        exclude=(),
-        target_config=None,
-    )
-    assert tuple(source.name for source in plain_selected_sources) == ("raw_join",)
-
-    terminal_loader_selected_sources: tuple[SourceEntry, ...] = select_load_entries(
-        discovered_inputs=discovered_inputs,
-        select=("raw_join",),
-        exclude=(),
-        target_config=None,
-    )
-    assert tuple(source.name for source in terminal_loader_selected_sources) == ("raw_join",)
-
-    selected_sources: tuple[SourceEntry, ...] = select_load_entries(
-        discovered_inputs=discovered_inputs,
-        select=("+raw_join",),
-        exclude=(),
-        target_config=None,
-    )
-    results: tuple[LoadExecutionResult, ...] = run_load_pipeline(
-        sources=selected_sources,
-        loader_functions=discovered_inputs.loader_functions,
-        connection_config={"database": str(tmp_path / "demo.duckdb")},
-        adapter=adapter,
-        max_concurrency=test_case.max_concurrency,
-        runtime=LoadRuntimeParams(
-            run_id="test_run",
-            target="dev",
-            vars={},
-            is_reload=False,
-        ),
-        callbacks=LoadCallbacks(
-            on_connection_start=connection_starts.append,
-        ),
+    exit_code: int = run_load_command(
+        request=LoadCommandRequest(
+            project_dir=tmp_path,
+            no_color=True,
+            select=("raw_join",),
+            concurrency=test_case.max_concurrency,
+            json_output_path=output_path,
+        )
     )
 
-    assert connection_starts == [test_case.expected_connection_count]
-    assert tuple(result.source_name for result in results) == test_case.expected_source_order
-    payload: dict[str, Any] = cast(
-        dict[str, Any], json.loads(format_load_execution_json(results=results))
-    )
+    assert exit_code == 0
+    payload: dict[str, Any] = cast(dict[str, Any], json.loads(output_path.read_text()))
     assets: list[dict[str, Any]] = cast(list[dict[str, Any]], payload["assets"])
     assert tuple(asset["name"] for asset in assets) == test_case.expected_json_asset_order
     connection: DuckDBPyConnection = duckdb.connect(str(tmp_path / "demo.duckdb"))
@@ -4986,27 +4953,7 @@ sources:
             },
             select=("missing_source",),
             exclude=(),
-            expected_error_fragment=(
-                "selector 'missing_source' does not match any managed source or loader"
-            ),
-        ),
-        LoadCommandSelectionErrorTestCase(
-            description="raises when selected source is unmanaged",
-            project_files={
-                "sqlbuild_project.toml": _PROJECT_FILE,
-                "sql/sources/raw.yml": """
-sources:
-  - name: raw_customers
-    description: Test source raw_customers.
-    expression: SELECT 1 AS customer_id
-""".strip()
-                + "\n",
-            },
-            select=("raw_customers",),
-            exclude=(),
-            expected_error_fragment=(
-                "selector 'raw_customers' does not match any managed source or loader"
-            ),
+            expected_error_fragment="unknown selector name 'missing_source'",
         ),
         LoadCommandSelectionErrorTestCase(
             description="raises when excluded source does not exist",
@@ -5024,32 +4971,7 @@ sources:
             },
             select=(),
             exclude=("missing_source",),
-            expected_error_fragment=(
-                "selector 'missing_source' does not match any managed source or loader"
-            ),
-        ),
-        LoadCommandSelectionErrorTestCase(
-            description="raises when excluded source is unmanaged",
-            project_files={
-                "sqlbuild_project.toml": _PROJECT_FILE,
-                "sql/sources/raw.yml": """
-sources:
-  - name: raw_orders
-    description: Test source raw_orders.
-    managed: true
-  - name: raw_customers
-    description: Test source raw_customers.
-    expression: SELECT 1 AS customer_id
-""".strip()
-                + "\n",
-                "python/nodes/loaders/raw_orders/loader.py": _RAW_ORDERS_LOADER,
-                "python/nodes/loaders/raw_orders/__init__.py": "from .loader import raw_orders\n",
-            },
-            select=(),
-            exclude=("raw_customers",),
-            expected_error_fragment=(
-                "selector 'raw_customers' does not match any managed source or loader"
-            ),
+            expected_error_fragment="unknown selector name 'missing_source'",
         ),
     ],
     ids=lambda case: case.description,
@@ -5061,7 +4983,7 @@ def test_given_invalid_load_selectors_when_running_load_then_it_raises_clear_err
 ) -> None:
     write_repo_files(tmp_path, test_case.project_files)
 
-    with pytest.raises(CliUserError) as exc_info:
+    with pytest.raises(PlannerInputError) as exc_info:
         run_load_command(
             request=LoadCommandRequest(
                 project_dir=tmp_path,
@@ -5092,12 +5014,8 @@ sources:
             select=(),
             exclude=(),
             expected_exit_code=0,
-            expected_stdout_fragment="No managed sources selected.",
-            expected_stdout_fragments=(
-                "Load ready  0 selected",
-                "\u2713 Completed successfully",
-                "PASS=0  WARN=0  FAIL=0  SKIP=0  TOTAL=0",
-            ),
+            expected_stdout_fragment="Nothing to load: the project declares no load or @loader.",
+            expected_database_created=False,
         ),
         LoadCommandEmptySelectionTestCase(
             description="succeeds without connecting when all managed sources are excluded",
@@ -5116,17 +5034,36 @@ sources:
             select=(),
             exclude=("raw_orders",),
             expected_exit_code=0,
-            expected_stdout_fragment="No managed sources selected.",
-            expected_stdout_fragments=(
-                "Load ready  0 selected",
-                "\u2713 Completed successfully",
-                "PASS=0  WARN=0  FAIL=0  SKIP=0  TOTAL=0",
-            ),
+            expected_stdout_fragment="Plan ready  0 selected",
+            expected_database_created=True,
+        ),
+        LoadCommandEmptySelectionTestCase(
+            description="a selected source that nothing loads selects nothing",
+            project_files={
+                "sqlbuild_project.toml": _PROJECT_FILE,
+                "sql/sources/raw.yml": """
+sources:
+  - name: raw_orders
+    description: Test source raw_orders.
+    managed: true
+  - name: raw_customers
+    description: Test source raw_customers.
+    expression: SELECT 1 AS customer_id
+""".strip()
+                + "\n",
+                "python/nodes/loaders/raw_orders/loader.py": _RAW_ORDERS_LOADER,
+                "python/nodes/loaders/raw_orders/__init__.py": "from .loader import raw_orders\n",
+            },
+            select=("raw_customers",),
+            exclude=(),
+            expected_exit_code=0,
+            expected_stdout_fragment="Plan ready  0 selected",
+            expected_database_created=True,
         ),
     ],
     ids=lambda case: case.description,
 )
-def test_given_no_selected_managed_sources_when_running_load_then_it_does_not_connect(
+def test_given_nothing_selected_to_load_when_running_load_then_nothing_loads(
     test_case: LoadCommandEmptySelectionTestCase,
     tmp_path: Path,
     write_repo_files: Callable[[Path, dict[str, str]], None],
@@ -5146,5 +5083,4 @@ def test_given_no_selected_managed_sources_when_running_load_then_it_does_not_co
     captured: CaptureResult[str] = capsys.readouterr()
     assert exit_code == test_case.expected_exit_code
     assert test_case.expected_stdout_fragment in captured.out
-    assert all(fragment in captured.out for fragment in test_case.expected_stdout_fragments)
-    assert not (tmp_path / "demo.duckdb").exists()
+    assert (tmp_path / "demo.duckdb").exists() == test_case.expected_database_created

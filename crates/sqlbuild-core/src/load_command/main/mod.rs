@@ -1,10 +1,2 @@
-pub mod load_counts;
-pub mod load_exit_code;
-pub mod load_reference_loaders;
+pub mod load_selectors;
 pub mod render_empty_load;
-pub mod render_load_footer;
-pub mod render_load_plan;
-pub mod render_load_ready;
-pub mod render_load_result;
-pub mod render_load_spinner_line;
-pub mod select_load_entries;

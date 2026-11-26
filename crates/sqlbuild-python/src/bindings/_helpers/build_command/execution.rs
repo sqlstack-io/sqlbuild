@@ -75,7 +75,6 @@ use sqlbuild_python_planner::planner_resolution::main::cursor::type_cursor_overr
 use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;
 use sqlbuild_state::consumption::models::ChangedPolicy;
 
-const EXECUTION_COMMAND: &str = "sqb build";
 const NODE_START: [&str; 2] = ["name", "resource_kind"];
 const CONNECTION_TIMING: [&str; 2] = ["connection_count", "elapsed_seconds"];
 
@@ -172,7 +171,7 @@ fn run_context_facts(
     }
     let (full_refresh_jobs, job_warehouses) = job_run_context(pipeline)?;
     Ok(RunContextFacts {
-        command: EXECUTION_COMMAND.to_owned(),
+        command: format!("sqb {}", context.command_name()?),
         run_id: display_text(&native_field(&project, "run_id")?)?,
         target: display_text(&native_field(&project, "effective_target_name")?)?,
         database: display_text(&native_field(&project, "effective_target_database")?)?,
@@ -272,7 +271,10 @@ pub(crate) fn prepare_build_execution<'py>(
                 py,
                 &[
                     ("stream", context.stream.clone()),
-                    ("command", text(py, EXECUTION_COMMAND)),
+                    (
+                        "command",
+                        text(py, &format!("sqb {}", context.command_name()?)),
+                    ),
                     ("target", none(py)),
                     ("concurrency", concurrency.into_pyobject(py)?.into_any()),
                     ("use_color", boolean(py, context.use_color)),
