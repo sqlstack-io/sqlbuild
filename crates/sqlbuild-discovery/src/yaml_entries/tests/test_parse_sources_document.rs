@@ -69,14 +69,16 @@ fn given_sources_documents_when_parsing_then_matches_python_sources_and_errors()
             ),
         },
         SourcesDocumentTestCase {
-            description: "merge without a unique key",
+            description: "a loading setting on a source a loader fills",
             document: sources(vec![
                 ("name", text("orders")),
                 ("managed", Node::Bool(true)),
                 ("write_strategy", text("merge")),
             ]),
             expected_sources: parse_error(
-                "/project/sources/shop.yml source 'orders' write_strategy merge requires unique_key",
+                "/project/sources/shop.yml source 'orders' is filled by @loader 'orders', so it \
+                 can't set write_strategy; set write_strategy= on @loader, which takes SQLLoad's \
+                 table options",
             ),
         },
         SourcesDocumentTestCase {
@@ -86,7 +88,9 @@ fn given_sources_documents_when_parsing_then_matches_python_sources_and_errors()
                 ("write_strategy", text("append")),
             ]),
             expected_sources: parse_error(
-                "/project/sources/shop.yml source 'orders' defines write_strategy but is not managed",
+                "/project/sources/shop.yml source 'orders' can't set write_strategy; a source that \
+                 isn't loaded has no loading settings, and the @loader or load that fills one sets \
+                 them",
             ),
         },
         SourcesDocumentTestCase {

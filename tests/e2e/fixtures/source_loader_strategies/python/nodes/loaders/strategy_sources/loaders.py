@@ -7,7 +7,7 @@ from sqlbuild.loaders import loader
 
 @factory
 def strategy_sources_loaders() -> list[object]:
-    @loader
+    @loader(write_strategy="replace")
     def raw_countries(ctx: object) -> list[dict[str, object]]:
         """Test loader raw_countries."""
         _ = ctx
@@ -16,7 +16,7 @@ def strategy_sources_loaders() -> list[object]:
             {"country_id": 2, "country_code": "CA", "country_name": "Canada"},
         ]
 
-    @loader
+    @loader(write_strategy="append")
     def raw_webhook_events(ctx: object) -> list[dict[str, object]]:
         """Test loader raw_webhook_events."""
         _ = ctx
@@ -25,7 +25,7 @@ def strategy_sources_loaders() -> list[object]:
             {"event_id": 102, "event_name": "checkout"},
         ]
 
-    @loader
+    @loader(write_strategy="delete_insert", cursor_column="event_at")
     def raw_order_events(ctx: Any) -> list[dict[str, object]]:
         """Test loader raw_order_events."""
         if ctx.current_cursor_value is None:
@@ -54,7 +54,7 @@ def strategy_sources_loaders() -> list[object]:
             },
         ]
 
-    @loader
+    @loader(write_strategy="merge", unique_key="customer_id", cursor_column="updated_at")
     def raw_customers(ctx: Any) -> list[dict[str, object]]:
         """Test loader raw_customers."""
         if ctx.current_cursor_value is None:

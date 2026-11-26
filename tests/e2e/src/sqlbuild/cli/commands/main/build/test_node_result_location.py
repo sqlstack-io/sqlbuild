@@ -30,7 +30,7 @@ from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 _EDGE_CASES: Path = Path("benchmarks/duckshop/edge_cases/loaders")
 _LOADER: str = (
-    "from sqlbuild.loaders import loader\n\n\n@loader\n"
+    "from sqlbuild.loaders import loader\n\n\n@loader(write_strategy='replace')\n"
     "def raw_orders(ctx: object) -> list[dict[str, object]]:\n"
     '    """Raw orders."""\n    _ = ctx\n    return [{"order_id": 1}]\n'
 )
@@ -51,7 +51,7 @@ _CHECK: str = (
 )
 _COPYING_LOADER: str = (
     "from python.nodes.loaders.orders.loader import raw_orders\nfrom sqlbuild.loaders import loader\n\n\n"
-    "@loader\n"
+    "@loader(write_strategy='replace')\n"
     "def raw_order_copies(ctx) -> list[dict[str, object]]:\n"
     '    """One order when the orders loader has a result to read, none otherwise."""\n'
     "    found = ctx.result_of(node_function=raw_orders, default=None) is not None\n"

@@ -200,7 +200,10 @@ from tests.unit.src.sqlbuild.presentation.helpers import use_color_terminal
                 (Path("python/nodes/assets/export_window/asset.py"), ("def export_window",)),
                 (
                     Path("python/nodes/loaders/orders/loader.py"),
-                    ("@loader(depends_on=(prepare_raw_orders,))", "def raw_orders"),
+                    (
+                        '@loader(write_strategy="replace", depends_on=(prepare_raw_orders,))',
+                        "def raw_orders",
+                    ),
                 ),
                 (
                     Path("python/nodes/assets/orders_export/asset.py"),

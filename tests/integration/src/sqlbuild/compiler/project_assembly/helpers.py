@@ -98,7 +98,7 @@ def generated_assembly_files(*, rng: random.Random, model_count: int) -> dict[st
         "sql/sources/raw.yml": (
             "sources:\n"
             "  - name: raw_orders\n    description: Raw orders.\n    managed: true\n"
-            f"    write_strategy: table\n{rng.choice(_SOURCE_NAMESPACES)}"
+            f"{rng.choice(_SOURCE_NAMESPACES)}"
             "    columns:\n      - name: n\n        type: INTEGER\n"
             "  - name: landing_orders\n    description: Landing orders.\n"
             f"{rng.choice(_SOURCE_NAMESPACES)}"
@@ -106,7 +106,8 @@ def generated_assembly_files(*, rng: random.Random, model_count: int) -> dict[st
         ),
         "python/nodes/loaders/raw/loader.py": (
             "from sqlbuild.loaders import loader\n\n\n"
-            "@loader\ndef raw_orders(ctx):\n    '''Load raw orders.'''\n    return [{'n': 1}]\n"
+            "@loader(write_strategy='replace')\n"
+            "def raw_orders(ctx):\n    '''Load raw orders.'''\n    return [{'n': 1}]\n"
         ),
         "sql/functions/sql/order_numbers.sql": (
             'FUNCTION (\n  description "Order numbers.",\n  arguments (p_n INTEGER),\n'
@@ -271,11 +272,12 @@ _EDGE_MODEL: str = (
 )
 _EDGE_SOURCE: str = (
     "sources:\n  - name: raw_orders\n    description: Raw orders.\n    managed: true\n"
-    "    write_strategy: table\n{ns}    columns:\n      - name: n\n        type: INTEGER\n"
+    "{ns}    columns:\n      - name: n\n        type: INTEGER\n"
 )
 _EDGE_LOADER: str = (
     "from sqlbuild.loaders import loader\n\n\n"
-    "@loader\ndef raw_orders(ctx):\n    '''Load raw orders.'''\n    return [{'n': 1}]\n"
+    "@loader(write_strategy='replace')\n"
+    "def raw_orders(ctx):\n    '''Load raw orders.'''\n    return [{'n': 1}]\n"
 )
 _EDGE_VARS: dict[str, object] = {
     "tags": ["daily", "x"],

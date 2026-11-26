@@ -102,13 +102,16 @@ sources:
   - name: raw_customers
     description: Customers
     managed: true
-    write_strategy: table
     columns:
       - name: id
         type: INTEGER
       - name: name
         type: VARCHAR
 ```
+
+How the rows are written, such as `write_strategy`, `cursor_column` and `unique_key`, is set on the
+`@loader` as SQLLoad's table options, not in the sources file (see
+[Write strategies](/docs/concepts/python-nodes/loaders#write-strategies)).
 
 Managed sources support incremental write strategies (`table`, `append`, `delete_insert`, `merge`), cursor-based loading, and concurrent execution.
 
@@ -331,9 +334,6 @@ without building.
 | `expression` | Inline SQL expression (alternative to table reference) |
 | `final` | ClickHouse only. Set to `true` to read the source with `FINAL`, so a `ReplacingMergeTree` table returns one row per key (see [ClickHouse](/docs/concepts/adapters/clickhouse#reading-replacingmergetree-sources)). Other adapters reject it with `A010`. |
 | `managed` | Set to `true` to bind the source to the `@loader` function of the same name (see [Loaders](/docs/concepts/python-nodes/loaders)) |
-| `write_strategy` | How the loader writes data: `table`, `append`, `delete_insert`, or `merge` (requires `managed: true`) |
-| `cursor_column` | Column for incremental cursor tracking (required for `delete_insert` and `merge`) |
-| `unique_key` | Merge key column(s) (required for `merge`) |
 | `freshness` | Source freshness observation config (see [Source freshness](#source-freshness)) |
 | `description` | Required human-readable description ([Descriptions](/docs/concepts/models/configuration#descriptions)) |
 | `type_enforcement` | Override implicit type enforcement (`true`/`false`). Defaults to `true` when any column declares a type. |
@@ -341,7 +341,10 @@ without building.
 | `columns` | Column declarations with `name`, `type`, `nullable`, `description`, `meta`, and `audits` |
 | `audits` | Source-level audits |
 | `meta` | Free-form metadata mapping |
-| `load_batch_size` | Positive row batch size for managed loaders |
+
+A source can't set `write_strategy`, `cursor_column`, `unique_key` or `load_batch_size`: a managed
+source's `@loader` sets how it loads, and a load-filled source's load does. Compile stops with
+`D006`, naming what to use instead.
 
 A sources file contains only `sources`. Unknown keys in a sources file, a source, a source column,
 `freshness`, or `freshness.age_policy` fail discovery with `D006`, naming the key and suggesting the

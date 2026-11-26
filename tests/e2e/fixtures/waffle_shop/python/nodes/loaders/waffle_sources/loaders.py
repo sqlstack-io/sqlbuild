@@ -58,13 +58,13 @@ ORDERS: list[tuple[int, int, int, int, datetime, str]] = [
 
 @factory
 def waffle_sources_loaders() -> list[object]:
-    @loader
+    @loader(write_strategy="replace")
     def raw_customers(ctx: object) -> list[dict[str, object]]:
         """Test loader raw_customers."""
         _ = ctx
         return CUSTOMERS
 
-    @loader
+    @loader(write_strategy="delete_insert", cursor_column="ordered_at")
     def raw_orders(ctx: object) -> Iterator[dict[str, object]]:
         """Test loader raw_orders."""
         _ = ctx

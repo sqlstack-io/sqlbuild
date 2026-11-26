@@ -1,9 +1,10 @@
 //! Native semantic metadata checks: config references, cursors, function calls and SQL tests.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use pyo3::IntoPyObjectExt;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyFloat, PyInt, PyList, PyString, PyTuple};
 use sqlbuild_analysis::semantic_checks::main::check_semantic_metadata::check_semantic_metadata;
 use sqlbuild_analysis::semantic_checks::models::{
@@ -88,10 +89,11 @@ pub(crate) fn metadata_diagnostics<'py>(
             diagnostics.extend(model_diagnostics(classes, model, findings)?);
         }
     }
+    let loaders: HashMap<String, Bound<'py, PyAny>> = loader_files(project)?;
     for (index, finding) in outcome.sources {
         let source: &Bound<'py, PyAny> = &inputs.sources[index];
         let path: Bound<'py, PyAny> =
-            native_field(&native_field(source, "source_file")?, "relative_path")?;
+            native_field(&cursor_file(source, &loaders)?, "relative_path")?;
         diagnostics.push(diagnostic(
             classes,
             finding,
@@ -138,11 +140,16 @@ fn metadata_request<'py>(
     for model in &models {
         metadata_models.push(metadata_model(classes, model)?);
     }
+    let loaders: HashMap<String, Bound<'py, PyAny>> = loader_files(project)?;
     let mut metadata_sources: Vec<MetadataSource> = Vec::with_capacity(sources.len());
     for source in &sources {
         let cursor: Bound<'py, PyAny> =
             native_field(&native_field(source, "source_entry")?, "cursor_column")?;
-        let index: usize = file_index(&files, &native_field(source, "source_file")?)?;
+        let file: Bound<'py, PyAny> = cursor_file(source, &loaders)?;
+        let text: Arc<str> = match files.get_item(native_field(&file, "file_path")?)? {
+            Some(index) => contents[index.extract::<usize>()?].clone(),
+            None => Arc::from(loader_text(&file)?),
+        };
         metadata_sources.push(MetadataSource {
             name: native_field(source, "name")?.extract()?,
             cursor_column: if cursor.is_truthy()? {
@@ -150,7 +157,7 @@ fn metadata_request<'py>(
             } else {
                 None
             },
-            contents: contents[index].clone(),
+            contents: text,
         });
     }
     let mut metadata_tests: Vec<MetadataSqlTest> = Vec::with_capacity(tests.len());
@@ -206,6 +213,35 @@ fn metadata_functions(project: &Bound<'_, PyAny>) -> PyResult<Vec<MetadataFuncti
         });
     }
     Ok(metadata)
+}
+
+/// Each loader function by name, which sets the cursor of the source it fills.
+fn loader_files<'py>(project: &Bound<'py, PyAny>) -> PyResult<HashMap<String, Bound<'py, PyAny>>> {
+    let mut loaders: HashMap<String, Bound<'py, PyAny>> = HashMap::new();
+    for loader in native_field(project, "loader_functions")?.try_iter()? {
+        let loader: Bound<'py, PyAny> = loader?;
+        loaders.insert(native_field(&loader, "name")?.extract()?, loader);
+    }
+    Ok(loaders)
+}
+
+/// The file that sets `source`'s cursor: the `@loader` that fills it, else its sources file.
+fn cursor_file<'py>(
+    source: &Bound<'py, PyAny>,
+    loaders: &HashMap<String, Bound<'py, PyAny>>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let loader: Option<String> =
+        native_field(&native_field(source, "source_entry")?, "loader")?.extract()?;
+    match loader.as_ref().and_then(|name| loaders.get(name)) {
+        Some(loader) => Ok(loader.clone()),
+        None => native_field(source, "source_file"),
+    }
+}
+
+/// The text of the Python file `loader` is defined in.
+fn loader_text(loader: &Bound<'_, PyAny>) -> PyResult<String> {
+    let path: std::path::PathBuf = native_field(loader, "file_path")?.extract()?;
+    std::fs::read_to_string(&path).map_err(PyErr::from)
 }
 
 /// Each distinct file path's index and the text its first resource carries.

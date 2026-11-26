@@ -80,13 +80,13 @@ def test_given_built_python_nodes_when_editing_decorator_inputs_then_identity_tr
                 STAGED_ORDER_COLUMNS = [{_ORIGINAL_COLUMNS}]
 
 
-                @loader(write_strategy="table", columns=STAGED_ORDER_COLUMNS)
+                @loader(write_strategy="replace", columns=STAGED_ORDER_COLUMNS)
                 def staged_orders(ctx):
                     '''Test loader staged_orders.'''
                     return [{{"order_id": 1}}]
 
 
-                @loader(depends_on=[staged_orders])
+                @loader(write_strategy='replace', depends_on=[staged_orders])
                 def raw_orders(ctx):
                     '''Test loader raw_orders.'''
                     staged = ctx.loader(staged_orders).destination
@@ -101,7 +101,6 @@ def test_given_built_python_nodes_when_editing_decorator_inputs_then_identity_tr
                   - name: raw_orders
                     description: Test source raw_orders.
                     managed: true
-                    write_strategy: table
                     columns:
                       - name: order_id
                         type: INTEGER

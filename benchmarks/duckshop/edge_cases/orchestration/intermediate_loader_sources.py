@@ -6,13 +6,13 @@ A job that selects the model must claim the intermediate loader's relation as we
 from sqlbuild.loaders import loader
 
 
-@loader(write_strategy="table")
+@loader(write_strategy="replace")
 def stage_shipments(ctx):
     """Stage synthetic shipments in the intermediate loader's own relation."""
     return [{"order_id": 9}]
 
 
-@loader(depends_on=[stage_shipments])
+@loader(write_strategy="replace", depends_on=[stage_shipments])
 def raw_shipments(ctx):
     """Load the staged shipments."""
     staged = ctx.loader(stage_shipments)

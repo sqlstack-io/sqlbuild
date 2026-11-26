@@ -459,13 +459,14 @@ _INPUT_COLUMNS: tuple[str, ...] = ("ordered_at", "order_id", "created_at")
 _LOADED_CURSORS: tuple[str, ...] = ("load_seq", "Load_Seq", "loaded_at")
 _LOADED_SOURCE: str = (
     "  - name: raw_events\n    description: Loaded events.\n    managed: true\n"
-    "    write_strategy: append\n    contract: enforced\n    cursor_column: {cursor}\n"
+    "    contract: enforced\n"
     "    columns:\n"
     "      - name: event_id\n        type: INTEGER\n"
     "      - name: load_seq\n        type: INTEGER\n"
 )
 _LOADER: str = (
-    "from sqlbuild.loaders import loader\n\n\n@loader\n"
+    "from sqlbuild.loaders import loader\n\n\n"
+    "@loader(write_strategy='append', cursor_column='CURSOR')\n"
     "def raw_events(ctx):\n    '''Load events.'''\n    return [{'event_id': 1, 'load_seq': 1}]\n"
 )
 _FIXTURE_EXTRAS: tuple[str, ...] = ("", ", 2 AS discount")
@@ -549,9 +550,11 @@ def generated_metadata_files(*, rng: random.Random, model_count: int) -> dict[st
         ),
         "sql/sources/raw.yml": (
             "sources:\n  - name: raw_orders\n    description: Orders feed.\n"
-            f"{_SOURCE_SQL}{columns}{_LOADED_SOURCE.format(cursor=rng.choice(_LOADED_CURSORS))}"
+            f"{_SOURCE_SQL}{columns}{_LOADED_SOURCE}"
         ),
-        "python/nodes/loaders/raw_events/loader.py": _LOADER,
+        "python/nodes/loaders/raw_events/loader.py": _LOADER.replace(
+            "CURSOR", rng.choice(_LOADED_CURSORS)
+        ),
         "tests/unit/test_orders_model_0.sql": (
             "TEST();\n\nWITH\n__source__raw_orders AS (\n"
             "  SELECT 1 AS order_id, 10 AS customer_id, CAST(5 AS DOUBLE) AS amount,"

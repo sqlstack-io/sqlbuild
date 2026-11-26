@@ -2277,11 +2277,11 @@ NODE_RESULT_FILES: dict[str, str] = {
             "def raw_gate(ctx):\n"
             '    """A gate that stays closed."""\n'
             '    return ctx.skip(reason="gate closed", mode=SkipMode.HARD)\n\n\n'
-            "@loader(depends_on=[raw_gate])\n"
+            "@loader(write_strategy='replace', depends_on=[raw_gate])\n"
             "def raw_gated(ctx):\n"
             '    """Rows behind the gate."""\n'
             '    return [{"gated_id": 1}]\n\n\n'
-            "@loader\n"
+            "@loader(write_strategy='replace')\n"
             "def raw_events(ctx):\n"
             '    """Three events."""\n'
             '    return [{"event_id": event_id} for event_id in range(3)]\n'
@@ -2290,9 +2290,7 @@ NODE_RESULT_FILES: dict[str, str] = {
     "sql/sources/raw.yml": (
         "sources:\n"
         "  - name: raw_gated\n    description: Gated rows.\n    managed: true\n"
-        "    write_strategy: table\n"
         "  - name: raw_events\n    description: Events.\n    managed: true\n"
-        "    write_strategy: table\n"
     ),
     "sql/models/events.sql": (
         "MODEL (description 'Events.', materialized table);\n"

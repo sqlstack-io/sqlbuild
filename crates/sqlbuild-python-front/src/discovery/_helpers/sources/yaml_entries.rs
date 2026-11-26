@@ -35,7 +35,6 @@ pub(crate) struct YamlClasses<'py> {
     source_column_entry: Bound<'py, PyAny>,
     source_freshness_config: Bound<'py, PyAny>,
     source_freshness_age_policy: Bound<'py, PyAny>,
-    source_write_strategy: Bound<'py, PyAny>,
     source_freshness_strategy: Bound<'py, PyAny>,
     source_freshness_value_kind: Bound<'py, PyAny>,
 }
@@ -171,10 +170,6 @@ pub(crate) fn parse_schema_document<'py>(
     PyTuple::new(py, built)
 }
 
-fn strings<'py>(py: Python<'py>, values: &[String]) -> PyResult<Bound<'py, PyTuple>> {
-    PyTuple::new(py, values)
-}
-
 fn freshness<'py>(
     py: Python<'py>,
     classes: &YamlClasses<'py>,
@@ -233,17 +228,6 @@ fn source_entry<'py>(
         None => py.None().into_bound(py),
     };
     fields.set_item("freshness", freshness_config)?;
-    let write_strategy: Bound<'py, PyAny> = match source.write_strategy {
-        Some(strategy) => classes.source_write_strategy.call1((strategy,))?,
-        None => py.None().into_bound(py),
-    };
-    fields.set_item("write_strategy", write_strategy)?;
-    fields.set_item(
-        "load_batch_size",
-        optional(py, source.load_batch_size.as_ref()),
-    )?;
-    fields.set_item("cursor_column", optional(py, source.cursor_column.as_ref()))?;
-    fields.set_item("unique_key", strings(py, &source.unique_key)?)?;
     fields.set_item("expression", optional(py, source.expression.as_ref()))?;
     fields.set_item("description", optional(py, source.description.as_ref()))?;
     fields.set_item("type_enforcement", source.type_enforcement)?;

@@ -26,7 +26,7 @@ fn sqlload_settings<'py>(py: Python<'py>, load: &LoadDeclaration) -> PyResult<Bo
 pub(crate) fn compiled_loads<'py>(discovered: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyTuple>> {
     let py: Python<'py> = discovered.py();
     let mut loads: Vec<Bound<'py, PyAny>> = Vec::new();
-    for (file, _, declaration) in discovered_loads(&native_field(discovered, "source_files")?)? {
+    for (file, declaration) in discovered_loads(&native_field(discovered, "source_files")?)? {
         let name: Bound<'py, PyAny> = PyString::new(py, &declaration.name).into_any();
         let key: Bound<'py, PyAny> = new_record_with(
             py,

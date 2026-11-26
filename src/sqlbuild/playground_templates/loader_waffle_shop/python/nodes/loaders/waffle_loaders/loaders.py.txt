@@ -82,7 +82,7 @@ def waffle_loaders_loaders() -> list[object]:
             {"waffle_type": "blueberry", "price_cents": 750, "load_seq": 1},
         ]
 
-    @loader(depends_on=[fetch_order_events, fetch_prices])
+    @loader(write_strategy="replace", depends_on=[fetch_order_events, fetch_prices])
     def raw_orders(ctx):
         events = ctx.loader(fetch_order_events)
         prices = ctx.loader(fetch_prices)
@@ -104,7 +104,7 @@ def waffle_loaders_loaders() -> list[object]:
             for row in cursor.fetchall()
         ]
 
-    @loader(depends_on=[fetch_customers])
+    @loader(write_strategy="replace", depends_on=[fetch_customers])
     def raw_customers(ctx):
         customers = ctx.loader(fetch_customers)
         cursor = ctx.query(

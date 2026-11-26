@@ -698,7 +698,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                 "python/nodes/loaders/raw/loader.py": (
                     "from python.nodes.tasks.prepare.asset import prepare_orders\n"
                     "from sqlbuild.loaders import loader\n\n"
-                    "@loader(depends_on=(prepare_orders,))\n"
+                    "@loader(write_strategy='replace', depends_on=(prepare_orders,))\n"
                     "def raw_orders(ctx):\n"
                     "    '''Test loader raw_orders.'''\n    return [{'order_id': 1}]\n"
                 ),
@@ -707,7 +707,6 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "sources:\n"
                     "  - name: raw_orders\n    description: Test source raw_orders.\n"
                     "    managed: true\n"
-                    "    write_strategy: table\n"
                     "    columns:\n"
                     "      - name: order_id\n"
                     "        type: INTEGER\n"
@@ -748,7 +747,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                 "python/nodes/loaders/raw/loader.py": (
                     "from python.nodes.tasks.prepare.asset import prepare_orders\n"
                     "from sqlbuild.loaders import loader\n\n"
-                    "@loader(depends_on=(prepare_orders,))\n"
+                    "@loader(write_strategy='replace', depends_on=(prepare_orders,))\n"
                     "def raw_orders(ctx):\n"
                     "    '''Test loader raw_orders.'''\n    return [{'order_id': 1}]\n"
                 ),
@@ -757,7 +756,6 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "sources:\n"
                     "  - name: raw_orders\n    description: Test source raw_orders.\n"
                     "    managed: true\n"
-                    "    write_strategy: table\n"
                     "    columns:\n"
                     "      - name: order_id\n"
                     "        type: INTEGER\n"
@@ -975,7 +973,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                 "python/nodes/loaders/raw/loader.py": (
                     "from python.nodes.tasks.prepare.asset import prepare_orders\n"
                     "from sqlbuild.loaders import loader\n\n"
-                    "@loader(depends_on=(prepare_orders,))\n"
+                    "@loader(write_strategy='replace', depends_on=(prepare_orders,))\n"
                     "def raw_orders(ctx):\n"
                     "    '''Test loader raw_orders.'''\n    return [{'order_id': 3}]\n"
                 ),
@@ -984,7 +982,6 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "sources:\n"
                     "  - name: raw_orders\n    description: Test source raw_orders.\n"
                     "    managed: true\n"
-                    "    write_strategy: table\n"
                     "    columns:\n"
                     "      - name: order_id\n"
                     "        type: INTEGER\n"
@@ -1027,7 +1024,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                 ),
                 "python/nodes/loaders/raw/loader.py": (
                     "from sqlbuild.loaders import loader\n\n"
-                    "@loader\n"
+                    "@loader(write_strategy='replace')\n"
                     "def raw_orders(ctx):\n"
                     "    '''Test loader raw_orders.'''\n    return [{'order_id': 5}]\n"
                 ),
@@ -1036,7 +1033,6 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "sources:\n"
                     "  - name: raw_orders\n    description: Test source raw_orders.\n"
                     "    managed: true\n"
-                    "    write_strategy: table\n"
                     "    columns:\n"
                     "      - name: order_id\n"
                     "        type: INTEGER\n"
@@ -1119,7 +1115,7 @@ def test_given_python_lifecycle_edge_case_when_building_then_direct_build_harden
                     "from sqlbuild.loaders import loader\n"
                     "\n"
                     "\n"
-                    "@loader(write_strategy='table', columns=[\n"
+                    "@loader(write_strategy='replace', columns=[\n"
                     "    {'name': 'event_id', 'type': 'INTEGER'},\n"
                     "])\n"
                     "def fetch_events(ctx):\n"
@@ -1171,7 +1167,7 @@ def test_given_python_lifecycle_edge_case_when_building_then_direct_build_harden
                 "python/nodes/loaders/raw/loader.py": (
                     "from sqlbuild.loaders import loader\n"
                     "from python.nodes.tasks.prepare.asset import prepare_events\n\n"
-                    "@loader(depends_on=[prepare_events])\n"
+                    "@loader(write_strategy='replace', depends_on=[prepare_events])\n"
                     "def raw_events(ctx):\n"
                     "    '''Test loader raw_events.'''\n    return [{'event_id': 1}]\n"
                 ),
@@ -1180,7 +1176,6 @@ def test_given_python_lifecycle_edge_case_when_building_then_direct_build_harden
                     "sources:\n"
                     "  - name: raw_events\n    description: Test source raw_events.\n"
                     "    managed: true\n"
-                    "    write_strategy: table\n"
                     "    columns:\n"
                     "      - name: event_id\n"
                     "        type: INTEGER\n"
@@ -1241,7 +1236,7 @@ def test_given_direct_source_only_build_when_loader_has_ingress_then_enforces_so
                     "from sqlbuild.loaders import loader\n"
                     "\n"
                     "\n"
-                    "@loader(write_strategy='table', columns=[\n"
+                    "@loader(write_strategy='replace', columns=[\n"
                     "    {'name': 'event_id', 'type': 'INTEGER'},\n"
                     "])\n"
                     "def fetch_events(ctx):\n"
@@ -1429,7 +1424,7 @@ def test_given_python_sql_python_spine_when_building_then_orders_python_around_s
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader(\n"
                 "    destination='window_orders',\n"
-                "    write_strategy='table',\n"
+                "    write_strategy='replace',\n"
                 "    columns=[{'name': 'order_id', 'type': 'INTEGER'}],\n"
                 ")\n"
                 "def load_window_orders(ctx):\n"
@@ -1460,7 +1455,7 @@ def test_given_python_sql_python_spine_when_building_then_orders_python_around_s
                 "from pathlib import Path\n"
                 "from python.nodes.assets.prepare.asset import publish_prepared_orders\n"
                 "from sqlbuild.loaders import loader\n\n"
-                "@loader(depends_on=(publish_prepared_orders,))\n"
+                "@loader(write_strategy='replace', depends_on=(publish_prepared_orders,))\n"
                 "def raw_orders(ctx):\n"
                 "    '''Test loader raw_orders.'''\n    marker = "
                 "Path(__file__).parents[4].joinpath('prepared_order_id.txt')\n"
@@ -1471,7 +1466,6 @@ def test_given_python_sql_python_spine_when_building_then_orders_python_around_s
                 "sources:\n"
                 "  - name: raw_orders\n    description: Test source raw_orders.\n"
                 "    managed: true\n"
-                "    write_strategy: table\n"
                 "    columns:\n"
                 "      - name: order_id\n"
                 "        type: INTEGER\n"
@@ -1741,7 +1735,7 @@ def test_given_prior_loader_result_when_later_task_reads_result_then_uses_loader
             ),
             "python/nodes/loaders/events/loader.py": (
                 "from sqlbuild.loaders import loader\n\n"
-                "@loader\n"
+                "@loader(write_strategy='replace')\n"
                 "def raw_events(ctx):\n"
                 "    '''Test loader raw_events.'''\n    return [{'event_id': 1}]\n"
             ),
@@ -1749,7 +1743,6 @@ def test_given_prior_loader_result_when_later_task_reads_result_then_uses_loader
                 "sources:\n"
                 "  - name: raw_events\n    description: Test source raw_events.\n"
                 "    managed: true\n"
-                "    write_strategy: table\n"
                 "    columns:\n"
                 "      - name: event_id\n"
                 "        type: INTEGER\n"
@@ -1812,7 +1805,7 @@ def test_given_prior_loader_result_when_later_task_reads_result_then_uses_loader
                 ),
                 "python/nodes/loaders/events/loader.py": (
                     "from sqlbuild.loaders import loader\n\n"
-                    "@loader\n"
+                    "@loader(write_strategy='replace')\n"
                     "def raw_events(ctx):\n"
                     "    '''Test loader raw_events.'''\n    raise RuntimeError('loader failed')\n"
                 ),
@@ -1820,7 +1813,6 @@ def test_given_prior_loader_result_when_later_task_reads_result_then_uses_loader
                     "sources:\n"
                     "  - name: raw_events\n    description: Test source raw_events.\n"
                     "    managed: true\n"
-                    "    write_strategy: table\n"
                     "    columns:\n"
                     "      - name: event_id\n"
                     "        type: INTEGER\n"
@@ -1855,7 +1847,7 @@ def test_given_prior_loader_result_when_later_task_reads_result_then_uses_loader
                 "python/nodes/loaders/events/loader.py": (
                     "from python.nodes.tasks.prepare.asset import prepare_events\n"
                     "from sqlbuild.loaders import loader\n\n"
-                    "@loader(depends_on=(prepare_events,))\n"
+                    "@loader(write_strategy='replace', depends_on=(prepare_events,))\n"
                     "def raw_events(ctx):\n"
                     "    '''Test loader raw_events.'''\n    return [{'event_id': 1}]\n"
                 ),
@@ -1863,7 +1855,6 @@ def test_given_prior_loader_result_when_later_task_reads_result_then_uses_loader
                     "sources:\n"
                     "  - name: raw_events\n    description: Test source raw_events.\n"
                     "    managed: true\n"
-                    "    write_strategy: table\n"
                     "    columns:\n"
                     "      - name: event_id\n"
                     "        type: INTEGER\n"
@@ -1998,7 +1989,7 @@ def test_given_local_target_override_when_running_python_then_every_context_sees
                 "from python.providers.target_probe import TargetProbe\n"
                 "from python.nodes.recorder import record\n"
                 "from sqlbuild.loaders import loader\n\n"
-                "@loader\n"
+                "@loader(write_strategy='replace')\n"
                 "def raw_orders(ctx, target_probe: TargetProbe):\n"
                 "    '''Test loader raw_orders.'''\n"
                 "    record(ctx, 'loader')\n"
@@ -2020,7 +2011,6 @@ def test_given_local_target_override_when_running_python_then_every_context_sees
                 "sources:\n"
                 "  - name: raw_orders\n    description: Test source raw_orders.\n"
                 "    managed: true\n"
-                "    write_strategy: table\n"
                 "    columns:\n"
                 "      - name: order_id\n"
                 "        type: INTEGER\n"
@@ -2174,7 +2164,7 @@ def test_given_ctx_templated_target_schema_when_running_then_python_sees_no_load
             "python/nodes/loaders/raw/loader.py": (
                 "from python.nodes.recorder import record\n"
                 "from sqlbuild.loaders import loader\n\n"
-                "@loader\n"
+                "@loader(write_strategy='replace')\n"
                 "def raw_orders(ctx):\n"
                 '    """Test loader raw_orders."""\n'
                 "    record(ctx, 'loader')\n"
@@ -2195,7 +2185,6 @@ def test_given_ctx_templated_target_schema_when_running_then_python_sees_no_load
                 "  - name: raw_orders\n    description: Test source raw_orders.\n"
                 "    managed: true\n"
                 "    schema: raw\n"
-                "    write_strategy: table\n"
                 "    columns:\n"
                 "      - name: order_id\n"
                 "        type: INTEGER\n"

@@ -201,14 +201,14 @@ def test_given_concurrent_provider_backed_loaders_when_executing_then_share_prov
                 from sqlbuild.loaders import loader
 
 
-                @loader
+                @loader(write_strategy='replace')
                 def raw_alpha(ctx, concurrent_marker_provider: ConcurrentMarkerProvider):
                     '''Test loader raw_alpha.'''
                     concurrent_marker_provider.mark("alpha")
                     return [{"event_id": 1}]
 
 
-                @loader
+                @loader(write_strategy='replace')
                 def raw_beta(ctx, concurrent_marker_provider: ConcurrentMarkerProvider):
                     '''Test loader raw_beta.'''
                     concurrent_marker_provider.mark("beta")
@@ -223,14 +223,12 @@ def test_given_concurrent_provider_backed_loaders_when_executing_then_share_prov
                   - name: raw_alpha
                     description: Test source raw_alpha.
                     managed: true
-                    write_strategy: table
                     columns:
                       - name: event_id
                         type: INTEGER
                   - name: raw_beta
                     description: Test source raw_beta.
                     managed: true
-                    write_strategy: table
                     columns:
                       - name: event_id
                         type: INTEGER

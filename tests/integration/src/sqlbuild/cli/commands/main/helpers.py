@@ -16,6 +16,7 @@ import time
 from collections import defaultdict
 from collections.abc import Callable, Iterable
 from contextlib import suppress
+from dataclasses import replace
 from datetime import datetime, timedelta
 from itertools import accumulate, chain, compress, takewhile
 from pathlib import Path
@@ -31,6 +32,7 @@ from sqlbuild._native import (
     CompilerStage,
     CustomHostObserver,
     PreparedCompileArtifacts,
+    SourceEntry,
 )
 from sqlbuild._native import run_cli as main
 from sqlbuild.adapter.contract.exceptions import AdapterUserError
@@ -1576,14 +1578,14 @@ RUN_RECORD_MARTS_FILES: dict[str, str] = {
     ),
     "python/nodes/loaders/events/loader.py": (
         "from sqlbuild.loaders import loader\n\n\n"
-        "@loader\n"
+        "@loader(write_strategy='replace')\n"
         "def landed_events(ctx):\n"
         '    """Load one event."""\n\n'
         '    return [{"event_id": 1}]\n'
     ),
     "sql/sources/landed.yml": (
         "sources:\n  - name: landed_events\n    description: Loaded events.\n    schema: landing\n"
-        "    managed: true\n    write_strategy: table\n    columns:\n"
+        "    managed: true\n    columns:\n"
         "      - name: event_id\n        type: INTEGER\n"
     ),
     "sql/models/upper/revenue_upper.sql": (
@@ -2169,3 +2171,11 @@ def write_not_run_audit_project(project_dir: Path) -> None:
         destination: Path = project_dir / relative_path
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(contents, encoding="utf-8")
+
+
+def batched_entries(
+    entries: Iterable[SourceEntry], *, load_batch_size: int
+) -> tuple[SourceEntry, ...]:
+    """`entries` written by the current loader executor in batches of `load_batch_size` rows."""
+
+    return tuple(replace(entry, load_batch_size=load_batch_size or None) for entry in entries)

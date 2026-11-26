@@ -570,6 +570,8 @@ class LoadCommandBatchedRowsTestCase:
     expected_rows_loaded: int
     expected_lifecycle_sql_fragments: tuple[str, ...] = ()
     absent_lifecycle_sql_fragments: tuple[str, ...] = ()
+    # Rows per batch the current loader executor writes; 0 keeps its default.
+    load_batch_size: int = 1
 
 
 @dataclass(frozen=True)

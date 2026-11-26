@@ -349,7 +349,7 @@ def _conflict_cases() -> tuple[FailureCase, ...]:
             files={
                 FAILURE_SOURCES_PATH: FAILURE_BASE_FILES[FAILURE_SOURCES_PATH]
                 + "  - name: loaded_products\n    description: Loaded products.\n"
-                "    managed: true\n    write_strategy: table\n"
+                "    managed: true\n"
                 "    columns:\n      - name: id\n        type: INTEGER\n"
             },
         ),

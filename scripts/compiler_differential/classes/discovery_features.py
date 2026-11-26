@@ -199,14 +199,13 @@ class DiscoveryFeatureWriter:
             "  - name: loaded_products\n"
             "    description: Products loaded by a project loader.\n"
             "    managed: true\n"
-            "    write_strategy: table\n"
             "    columns:\n"
             "      - name: id\n        type: INTEGER\n"
             "      - name: label\n        type: VARCHAR\n"
         )
         self._files["python/nodes/loaders/products/loader.py"] = (
             "from sqlbuild.loaders import loader\n\n\n"
-            "@loader\n"
+            "@loader(write_strategy='replace')\n"
             "def loaded_products(ctx):\n"
             '    """Load the product list."""\n'
             f'    return [{{"id": 1, "label": "{self._label()}"}}, {{"id": 2, "label": "plain"}}]\n'

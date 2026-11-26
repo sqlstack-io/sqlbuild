@@ -6,11 +6,11 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 use crate::compile_driver::_helpers::loads::declaration;
 
-/// Each declared load of `source_files`: the file, its `DiscoveredLoad` and its declaration, in file order.
+/// Each declared load of `source_files`: the file and the load's declaration, in file order.
 pub fn discovered_loads<'py>(
     source_files: &Bound<'py, PyAny>,
-) -> PyResult<Vec<(Bound<'py, PyAny>, Bound<'py, PyAny>, LoadDeclaration)>> {
-    let mut loads: Vec<(Bound<'py, PyAny>, Bound<'py, PyAny>, LoadDeclaration)> = Vec::new();
+) -> PyResult<Vec<(Bound<'py, PyAny>, LoadDeclaration)>> {
+    let mut loads: Vec<(Bound<'py, PyAny>, LoadDeclaration)> = Vec::new();
     for file in source_files.try_iter()? {
         let file: Bound<'py, PyAny> = file?;
         let load: Bound<'py, PyAny> = native_field(&file, "load")?;
@@ -18,7 +18,7 @@ pub fn discovered_loads<'py>(
             continue;
         }
         let declared: LoadDeclaration = declaration(&file, &load)?;
-        loads.push((file, load, declared));
+        loads.push((file, declared));
     }
     Ok(loads)
 }

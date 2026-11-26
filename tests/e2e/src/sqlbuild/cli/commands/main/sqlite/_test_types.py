@@ -92,10 +92,7 @@ class SqliteWaffleShopE2ETestCase:
 @dataclass(frozen=True)
 class SqliteLoaderE2ETestCase:
     description: str
-    builds: int
-    relations: tuple[str, ...]
-    expected_rows: tuple[tuple[object, ...], ...]
-    expected_declared_types: tuple[tuple[object, ...], ...]
+    expected_fragment: str
 
 
 @dataclass(frozen=True)

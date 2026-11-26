@@ -59,7 +59,7 @@ def test_given_managed_loader_watermark_when_reloaded_then_incremental_consumes_
             "python/nodes/loaders/raw/loader.py": (
                 "from pathlib import Path\n"
                 "from sqlbuild.loaders import loader\n\n"
-                "@loader\n"
+                "@loader(write_strategy='replace')\n"
                 "def raw_orders(ctx):\n"
                 "    '''Test loader raw_orders.'''\n    maximum = int(Path(__file__).parents[4].joinpath('maximum.txt').read_text())\n"
                 "    return [{'id': value, 'amount': value * 100} "
@@ -69,7 +69,6 @@ def test_given_managed_loader_watermark_when_reloaded_then_incremental_consumes_
                 "sources:\n"
                 "  - name: raw_orders\n    description: Test source raw_orders.\n"
                 "    managed: true\n"
-                "    write_strategy: table\n"
                 "    columns:\n"
                 "      - name: id\n"
                 "        type: INTEGER\n"

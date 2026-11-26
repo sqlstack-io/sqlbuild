@@ -2,7 +2,6 @@ sources:
   - name: raw_countries
     description: Test source raw_countries.
     managed: true
-    write_strategy: table
     columns:
       - name: country_id
         type: INTEGER
@@ -14,7 +13,6 @@ sources:
   - name: raw_webhook_events
     description: Test source raw_webhook_events.
     managed: true
-    write_strategy: append
     columns:
       - name: event_id
         type: INTEGER
@@ -24,8 +22,6 @@ sources:
   - name: raw_order_events
     description: Test source raw_order_events.
     managed: true
-    write_strategy: delete_insert
-    cursor_column: event_at
     columns:
       - name: event_id
         type: INTEGER
@@ -37,9 +33,6 @@ sources:
   - name: raw_customers
     description: Test source raw_customers.
     managed: true
-    write_strategy: merge
-    unique_key: customer_id
-    cursor_column: updated_at
     columns:
       - name: customer_id
         type: INTEGER

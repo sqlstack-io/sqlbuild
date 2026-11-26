@@ -3,7 +3,6 @@ sources:
     description: Raw waffle orders loaded by the Python loader
     contract: enforced
     managed: true
-    write_strategy: table
     columns:
       - name: order_id
         type: INTEGER
@@ -21,7 +20,6 @@ sources:
     description: Raw customers loaded by the Python loader
     contract: enforced
     managed: true
-    write_strategy: table
     columns:
       - name: customer_id
         type: INTEGER

@@ -2,7 +2,6 @@ sources:
   - name: partner_scores
     description: Scores the partner returned for each order
     managed: true
-    write_strategy: table
     columns:
       - name: order_id
         type: INTEGER

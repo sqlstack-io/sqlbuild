@@ -7,7 +7,6 @@ use sqlbuild_model_config::types::{AuthoredNode, NodeKind};
 use crate::yaml_entries::_helpers::columns::yaml_columns;
 use crate::yaml_entries::_helpers::fields::{
     Site, get, optional_bool, optional_mapping, optional_text, reject_unknown_keys, required_text,
-    stripped_strings,
 };
 use crate::yaml_entries::_helpers::freshness::freshness;
 use crate::yaml_entries::_helpers::removed_integrations::reject_ingestr_source;
@@ -36,11 +35,6 @@ const ENTRY_KEYS: [&str; 18] = [
 ];
 const COLUMN_KEYS: [&str; 6] = ["audits", "description", "meta", "name", "nullable", "type"];
 const CONTRACT_POLICIES: [&str; 2] = ["none", "enforced"];
-const WRITE_STRATEGIES: [&str; 4] = ["append", "delete_insert", "merge", "table"];
-const APPEND: &str = "append";
-const DELETE_INSERT: &str = "delete_insert";
-const MERGE: &str = "merge";
-const TABLE: &str = "table";
 
 /// What Python reads of an entry before its name: columns, typing, contract and expression.
 struct SourceShape<N> {
@@ -125,14 +119,23 @@ fn with_settings<N: AuthoredNode>(
     mut parsed: ParsedSourceEntry<N>,
 ) -> Result<ParsedSourceEntry<N>, ConfigError> {
     let path: &str = site.path;
-    if let Some(loader) = &parsed.loader {
-        for (key, instead) in LOADER_OWNED_KEYS {
-            if get(entry, key).is_some() {
-                return Err(site.error(&format!(
-                    "is filled by @loader '{loader}', so it can't set {key}; {instead}"
-                )));
-            }
+    for (key, instead) in LOADER_OWNED_KEYS {
+        if get(entry, key).is_none() {
+            continue;
         }
+        let why: String = match &parsed.loader {
+            Some(loader) => {
+                format!("is filled by @loader '{loader}', so it can't set {key}; {instead}")
+            }
+            None => format!(
+                "can't set {key}; a source that isn't loaded has no loading settings, and the \
+                 @loader or load that fills one sets them"
+            ),
+        };
+        let name: String = parsed.name.text().unwrap_or_default();
+        return Err(ConfigError::compile(format!(
+            "{path} source '{name}' {why}"
+        )));
     }
     parsed.database = optional_text(entry, "database", site)?;
     parsed.schema = optional_text(entry, "schema", site)?;
@@ -140,10 +143,6 @@ fn with_settings<N: AuthoredNode>(
     parsed.read_final = optional_bool(entry, "final", site)?
         .is_some_and(|node| node.kind() == NodeKind::Bool(true));
     parsed.freshness = freshness(entry, &shape.columns, path)?;
-    parsed.write_strategy = write_strategy(entry, site)?;
-    parsed.load_batch_size = positive_int(entry, "load_batch_size", path)?;
-    parsed.cursor_column = optional_text(entry, "cursor_column", site)?;
-    parsed.unique_key = unique_key(entry, path)?;
     parsed.expression = shape.expression;
     parsed.description = optional_text(entry, "description", site)?;
     parsed.type_enforcement = shape.type_enforcement;
@@ -152,58 +151,6 @@ fn with_settings<N: AuthoredNode>(
     parsed.columns = shape.columns;
     parsed.audits = parse_audit_list(get(entry, "audits"), path, "source", false)?;
     Ok(parsed)
-}
-
-fn write_strategy<N: AuthoredNode>(
-    entry: &[(N, N)],
-    site: Site<'_>,
-) -> Result<Option<&'static str>, ConfigError> {
-    let Some(text) = optional_text(entry, "write_strategy", site)?.and_then(|node| node.text())
-    else {
-        return Ok(None);
-    };
-    WRITE_STRATEGIES
-        .iter()
-        .copied()
-        .find(|strategy| *strategy == text)
-        .map(Some)
-        .ok_or_else(|| {
-            site.error(&format!(
-                "write_strategy must be one of: {}",
-                WRITE_STRATEGIES.join(", ")
-            ))
-        })
-}
-
-fn positive_int<N: AuthoredNode>(
-    entry: &[(N, N)],
-    key: &str,
-    path: &str,
-) -> Result<Option<N>, ConfigError> {
-    let Some(value) = get(entry, key).filter(|value| value.kind() != NodeKind::Null) else {
-        return Ok(None);
-    };
-    match value.kind() {
-        NodeKind::Int { negative: false } if value.integer().is_none_or(|amount| amount != 0) => {
-            Ok(Some(value.clone()))
-        }
-        _ => Err(ConfigError::compile(format!(
-            "{path} source '{key}' must be a positive integer"
-        ))),
-    }
-}
-
-fn unique_key<N: AuthoredNode>(entry: &[(N, N)], path: &str) -> Result<Vec<String>, ConfigError> {
-    let error = |text: &str| ConfigError::compile(format!("{path} source 'unique_key' {text}"));
-    let Some(value) = get(entry, "unique_key").filter(|value| value.kind() != NodeKind::Null)
-    else {
-        return Ok(Vec::new());
-    };
-    let keys: Vec<String> = stripped_strings(value, error)?;
-    if keys.is_empty() {
-        return Err(error("must be non-empty"));
-    }
-    Ok(keys)
 }
 
 /// `_validate_source_entry`.
@@ -241,46 +188,6 @@ fn validate_source<N: AuthoredNode>(
         return Err(error(
             "uses expression with type_enforcement but has no typed columns",
         ));
-    }
-    let strategy: Option<&str> = entry.write_strategy;
-    let has_unique_key: bool = !entry.unique_key.is_empty();
-    let has_cursor: bool = entry.cursor_column.is_some();
-    if strategy.is_some() && entry.loader.is_none() {
-        return Err(error("defines write_strategy but is not managed"));
-    }
-    if strategy == Some(APPEND) && has_unique_key {
-        return Err(error(
-            "unique_key is not supported with write_strategy append",
-        ));
-    }
-    if strategy == Some(MERGE) && !has_unique_key {
-        return Err(error("write_strategy merge requires unique_key"));
-    }
-    if strategy == Some(TABLE) && has_cursor {
-        return Err(error(
-            "cursor_column is not supported with write_strategy table",
-        ));
-    }
-    if strategy == Some(TABLE) && has_unique_key {
-        return Err(error(
-            "unique_key is not supported with write_strategy table",
-        ));
-    }
-    if strategy == Some(DELETE_INSERT) && !has_cursor {
-        return Err(error("write_strategy delete_insert requires cursor_column"));
-    }
-    if strategy == Some(DELETE_INSERT) && has_unique_key {
-        return Err(error(
-            "unique_key is not supported with write_strategy delete_insert",
-        ));
-    }
-    if has_cursor && !matches!(strategy, Some(APPEND | DELETE_INSERT | MERGE)) {
-        return Err(error(
-            "cursor_column requires write_strategy append, delete_insert, or merge",
-        ));
-    }
-    if has_unique_key && strategy != Some(MERGE) {
-        return Err(error("unique_key requires write_strategy merge"));
     }
     Ok(())
 }

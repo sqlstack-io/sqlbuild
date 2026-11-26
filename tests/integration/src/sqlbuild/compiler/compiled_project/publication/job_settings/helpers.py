@@ -86,10 +86,10 @@ LOADER_PROJECT_FILES: dict[str, str] = {
     "sql/sources/loaded.yml": (
         "sources:\n"
         "  - name: raw_customers\n    description: Customers.\n    managed: true\n"
-        "    write_strategy: table\n    table: raw_customers\n    columns:\n"
+        "    table: raw_customers\n    columns:\n"
         "      - name: customer_id\n        type: BIGINT\n"
         "  - name: raw_inventory\n    description: Inventory.\n    managed: true\n"
-        "    write_strategy: table\n    table: raw_inventory\n    columns:\n"
+        "    table: raw_inventory\n    columns:\n"
         "      - name: product_id\n        type: BIGINT\n"
     ),
     "python/nodes/loaders/loaded/raw_customers/loader.py": (
@@ -102,7 +102,7 @@ LOADER_PROJECT_FILES: dict[str, str] = {
         '        log.write(f"LOAD {name}\\n")\n'
         "\n"
         "\n"
-        "@loader\n"
+        "@loader(write_strategy='replace')\n"
         "def raw_customers(ctx):\n"
         '    """Load customers."""\n'
         '    _record("raw_customers")\n'
@@ -118,7 +118,7 @@ LOADER_PROJECT_FILES: dict[str, str] = {
         '        log.write(f"LOAD {name}\\n")\n'
         "\n"
         "\n"
-        "@loader\n"
+        "@loader(write_strategy='replace')\n"
         "def raw_inventory(ctx):\n"
         '    """Load inventory."""\n'
         '    _record("raw_inventory")\n'
@@ -134,7 +134,7 @@ LOADER_PROJECT_FILES: dict[str, str] = {
         '        log.write(f"LOAD {name}\\n")\n'
         "\n"
         "\n"
-        '@loader(write_strategy="table")\n'
+        '@loader(write_strategy="replace")\n'
         "def stage_inventory(ctx):\n"
         '    """Stage inventory in the loader\'s own relation; no source declares it."""\n'
         '    _record("stage_inventory")\n'

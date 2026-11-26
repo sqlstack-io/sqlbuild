@@ -86,10 +86,6 @@ pub struct ParsedSourceEntry<N> {
     pub managed: bool,
     pub freshness: Option<ParsedFreshness<N>>,
     /// `append`, `delete_insert`, `merge` or `table`.
-    pub write_strategy: Option<&'static str>,
-    pub load_batch_size: Option<N>,
-    pub cursor_column: Option<N>,
-    pub unique_key: Vec<String>,
     pub expression: Option<N>,
     pub description: Option<N>,
     /// The authored flag, or `True` implied by typed columns.
@@ -113,10 +109,6 @@ impl<N> ParsedSourceEntry<N> {
             load: None,
             managed: false,
             freshness: None,
-            write_strategy: None,
-            load_batch_size: None,
-            cursor_column: None,
-            unique_key: Vec::new(),
             expression: None,
             description: None,
             type_enforcement: None,

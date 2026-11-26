@@ -17,15 +17,15 @@ from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 _SOURCES: str = (
     "sources:\n"
-    "  - name: raw_regions\n    description: Test source raw_regions.\n    managed: true\n    write_strategy: table\n"
-    "  - name: raw_customers\n    description: Test source raw_customers.\n    managed: true\n    write_strategy: table\n"
+    "  - name: raw_regions\n    description: Test source raw_regions.\n    managed: true\n"
+    "  - name: raw_customers\n    description: Test source raw_customers.\n    managed: true\n"
 )
 _LOADERS: str = (
     "from sqlbuild.loaders import loader\n\n\n"
-    "@loader\n"
+    "@loader(write_strategy='replace')\n"
     "def raw_regions(ctx):\n"
     "    '''Test loader raw_regions.'''\n    return [{'id': 1}]\n\n\n"
-    "@loader(depends_on=[raw_regions])\n"
+    "@loader(write_strategy='replace', depends_on=[raw_regions])\n"
     "def raw_customers(ctx):\n"
     "    '''Test loader raw_customers.'''\n    table = 'raw_' + 'regions'\n"
     "    ctx.query(f'SELECT count(*) FROM {table}')\n"

@@ -30,12 +30,12 @@ _PROJECT_FILES: dict[str, str] = {
         '[targets.prod]\nschema = "prod"\nloader_schema = "raw_prod"\n'
     ),
     "sql/sources/raw.yml": (
-        "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n    managed: true\n    write_strategy: table\n"
+        "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n    managed: true\n"
         "    columns:\n      - name: order_id\n        type: INTEGER\n"
     ),
     "python/nodes/loaders/raw/loader.py": (
         "from sqlbuild.loaders import loader\n\n\n"
-        "@loader\ndef raw_orders(ctx):\n    '''Test loader raw_orders.'''\n    return [{'order_id': 9}]\n"
+        "@loader(write_strategy='replace')\ndef raw_orders(ctx):\n    '''Test loader raw_orders.'''\n    return [{'order_id': 9}]\n"
     ),
     f"{_MODELS}/z_orders.sql": (
         "MODEL (description 'Test model z_orders.', materialized table);\nSELECT 1 AS order_id UNION ALL SELECT 2\n"

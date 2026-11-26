@@ -402,7 +402,6 @@ sources:
   - name: raw_orders
     description: Test source raw_orders.
     managed: true
-    write_strategy: table
 """.strip()
                 + "\n",
                 **node_module_files(
@@ -410,7 +409,7 @@ sources:
                     """
 from sqlbuild.loaders import loader
 
-@loader
+@loader(write_strategy='replace')
 def raw_orders(ctx):
     '''Test loader raw_orders.'''
     return [{"id": 1}]

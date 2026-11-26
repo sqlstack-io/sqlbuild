@@ -5,24 +5,14 @@ from pathlib import Path
 
 import pytest
 
-from tests.e2e.src.sqlbuild.cli.commands.main.load.helpers import (
-    build_loader_waffle_shop_project_files,
-    build_schema_behavior_project_files,
-)
 from tests.e2e.src.sqlbuild.cli.commands.main.sqlserver._test_types import (
     SqlServerBuildE2ETestCase,
-    SqlServerCloneE2ETestCase,
     SqlServerDbtProfileE2ETestCase,
     SqlServerDiffE2ETestCase,
-    SqlServerIntermediateDagStrategyE2ETestCase,
-    SqlServerLoaderWaffleShopE2ETestCase,
+    SqlServerLoaderRefusalE2ETestCase,
     SqlServerNodeResultE2ETestCase,
     SqlServerSnapshotApplyE2ETestCase,
     SqlServerSnapshotE2ETestCase,
-    SqlServerSourceDeferralE2ETestCase,
-    SqlServerSourceLoaderDagE2ETestCase,
-    SqlServerSourceLoaderE2ETestCase,
-    SqlServerSourceLoaderStrategiesE2ETestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.sqlserver.helpers import (
     adapt_sqlserver_project_files,
@@ -32,15 +22,14 @@ from tests.e2e.src.sqlbuild.cli.commands.main.sqlserver.helpers import (
     assert_sqlserver_snapshot_matrix_rows,
     build_sqlserver_config,
     build_sqlserver_project_toml,
-    build_sqlserver_source_deferral_project_toml,
     build_unique_schema_name,
     cleanup_sqlserver_schema,
     ensure_sqlserver_schema_ready,
     execute_sqlserver_sql,
     fetch_sqlserver_rows,
-    prepare_sqlserver_source_loader_strategies,
     prepare_sqlserver_waffle_shop,
     relation_name,
+    write_sqlserver_waffle_sources,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     assert_dbt_profile_lifecycle,
@@ -53,132 +42,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     build_real_warehouse_snapshot_project_files,
     prepare_inline_project,
     run_sqb,
-    stringify_warehouse_rows,
 )
-from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    (
-        SqlServerCloneE2ETestCase(
-            description="managed source is copied before dependent view recreation",
-            expected_stdout_fragments=(
-                "raw_customers",
-                "copied",
-                "stg_customers",
-                "recreated_view",
-            ),
-            expected_rows=((1, "Ada"), (2, "Grace")),
-        ),
-    ),
-    ids=lambda case: case.description,
-)
-def test_given_managed_source_when_cloning_sqlserver_then_source_precedes_dependent_view(
-    test_case: SqlServerCloneE2ETestCase,
-    tmp_path: Path,
-) -> None:
-    config: dict[str, object] = build_sqlserver_config()
-    schema_base: str = build_unique_schema_name(prefix="sqb_clone_source")
-    dev_schema_name: str = f"{schema_base}_dev"
-    prod_schema_name: str = f"{schema_base}_prod"
-    dev_loader_schema_name: str = f"{schema_base}_raw_dev"
-    prod_loader_schema_name: str = f"{schema_base}_raw_prod"
-    project_dir: Path = prepare_inline_project(
-        tmp_path=tmp_path,
-        project_name="sqlserver_managed_source_clone",
-        repo_files={
-            "sqlbuild_project.toml": (
-                'name = "sqlserver_managed_source_clone"\n'
-                'adapter = "sqlserver"\n'
-                'default_target = "dev"\n\n'
-                "[connection]\n"
-                f'host = "{config["host"]}"\n'
-                f"port = {config['port']}\n"
-                f'database = "{config["database"]}"\n'
-                f'user = "{config["user"]}"\n'
-                f'password = "{config["password"]}"\n\n'
-                "[targets.dev]\n"
-                f'schema = "{dev_schema_name}"\n\n'
-                f'loader_schema = "{dev_loader_schema_name}"\n\n'
-                "[targets.dev.clone]\n"
-                "allow_as_clone_origin = true\n\n"
-                "[targets.prod]\n"
-                f'schema = "{prod_schema_name}"\n\n'
-                f'loader_schema = "{prod_loader_schema_name}"\n\n'
-                "[targets.prod.clone]\n"
-                "allow_as_clone_destination = true\n"
-            ),
-            "python/nodes/loaders/raw/loader.py": (
-                "from sqlbuild.loaders import loader\n\n"
-                "@loader\n"
-                "def raw_customers(ctx):\n"
-                "    '''Test loader raw_customers.'''\n    return []\n"
-            ),
-            "sql/sources/raw.yml": (
-                "sources:\n"
-                "  - name: raw_customers\n    description: Test source raw_customers.\n"
-                "    managed: true\n"
-                "    write_strategy: table\n"
-                "    columns:\n"
-                "      - name: customer_id\n"
-                "        type: INTEGER\n"
-                "      - name: first_name\n"
-                "        type: VARCHAR\n"
-            ),
-            "sql/models/stg_customers.sql": (
-                "MODEL (description 'Test model stg_customers.', materialized view);\n\n"
-                'SELECT customer_id, first_name FROM __source("raw_customers")\n'
-            ),
-        },
-    )
-    try:
-        ensure_sqlserver_schema_ready(schema_name=dev_schema_name, config=config)
-        ensure_sqlserver_schema_ready(schema_name=prod_schema_name, config=config)
-        ensure_sqlserver_schema_ready(schema_name=dev_loader_schema_name, config=config)
-        ensure_sqlserver_schema_ready(schema_name=prod_loader_schema_name, config=config)
-        execute_sqlserver_sql(
-            sql=(
-                "SELECT customer_id, first_name "
-                f"INTO {relation_name(schema_name=dev_loader_schema_name, name='raw_customers')} "
-                "FROM (VALUES (1, 'Ada'), (2, 'Grace')) AS source(customer_id, first_name)"
-            ),
-            config=config,
-        )
-        execute_sqlserver_sql(
-            sql=(
-                f"CREATE VIEW {relation_name(schema_name=dev_schema_name, name='stg_customers')} "
-                "AS SELECT customer_id, first_name "
-                f"FROM {relation_name(schema_name=dev_loader_schema_name, name='raw_customers')}"
-            ),
-            config=config,
-        )
-
-        result: subprocess.CompletedProcess[str] = run_sqb(
-            command=("--no-color", "clone", "--from", "dev", "--to", "prod"),
-            project_dir=project_dir,
-        )
-
-        assert result.returncode == test_case.expected_return_code, result.stdout + result.stderr
-        expected_fragment: str
-        for expected_fragment in test_case.expected_stdout_fragments:
-            assert expected_fragment in result.stdout
-        assert (
-            fetch_sqlserver_rows(
-                sql=(
-                    "SELECT customer_id, first_name FROM "
-                    f"{relation_name(schema_name=prod_schema_name, name='stg_customers')} "
-                    "ORDER BY customer_id"
-                ),
-                config=config,
-            )
-            == test_case.expected_rows
-        )
-    finally:
-        cleanup_sqlserver_schema(schema_name=prod_loader_schema_name, config=config)
-        cleanup_sqlserver_schema(schema_name=dev_loader_schema_name, config=config)
-        cleanup_sqlserver_schema(schema_name=prod_schema_name, config=config)
-        cleanup_sqlserver_schema(schema_name=dev_schema_name, config=config)
 
 
 @pytest.mark.parametrize(
@@ -505,24 +369,16 @@ def test_given_waffle_shop_when_running_full_build_on_sqlserver_then_expected_ta
     ensure_sqlserver_schema_ready(schema_name=schema_name, config=config)
 
     try:
+        write_sqlserver_waffle_sources(schema_name=schema_name, config=config)
         first_result: subprocess.CompletedProcess[str] = run_sqb(
             command=test_case.command,
             project_dir=project_dir,
-        )
-        cursor_type_rows: tuple[tuple[object, ...], ...] = fetch_sqlserver_rows(
-            sql=(
-                "SELECT data_type FROM information_schema.columns "
-                f"WHERE table_schema = '{schema_name}' AND table_name = 'raw_orders' "
-                "AND column_name = 'ordered_at'"
-            ),
-            config=config,
         )
         second_result: subprocess.CompletedProcess[str] = run_sqb(
             command=test_case.command,
             project_dir=project_dir,
         )
 
-        assert cursor_type_rows == (("datetime",),)
         for result in (first_result, second_result):
             assert result.returncode == test_case.expected_return_code, (
                 result.stdout + result.stderr
@@ -544,602 +400,6 @@ def test_given_waffle_shop_when_running_full_build_on_sqlserver_then_expected_ta
             config=config,
         )
         assert int(str(source_rows[0][0])) == test_case.expected_row_count
-    finally:
-        cleanup_sqlserver_schema(schema_name=schema_name, config=config)
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
-        SqlServerSourceLoaderE2ETestCase(
-            description="source loader build writes and reads SQL Server rows",
-            expected_rows=(("7", "loaded-dev"),),
-        )
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_source_loader_project_when_building_on_sqlserver_then_model_reads_loaded_rows(
-    tmp_path: Path,
-    test_case: SqlServerSourceLoaderE2ETestCase,
-) -> None:
-    config: dict[str, object] = build_sqlserver_config()
-    schema_name: str = build_unique_schema_name(prefix="sqb_e2e_loader")
-    project_dir: Path = prepare_inline_project(
-        tmp_path=tmp_path,
-        project_name="sqlserver_source_loader",
-        repo_files={
-            "sqlbuild_project.toml": build_sqlserver_project_toml(
-                project_name="sqlserver_source_loader",
-                schema_name=schema_name,
-                config=config,
-            ),
-            "sql/sources/raw.yml": (
-                "sources:\n"
-                "  - name: raw_orders\n    description: Test source raw_orders.\n"
-                "    managed: true\n"
-                "    write_strategy: table\n"
-                "    columns:\n"
-                "      - name: order_id\n"
-                "        type: INTEGER\n"
-                "      - name: status\n"
-                "        type: NVARCHAR(100)\n"
-            ),
-            "python/nodes/loaders/raw_orders/loader.py": (
-                "from sqlbuild.loaders import loader\n\n"
-                "@loader\n"
-                "def raw_orders(ctx):\n"
-                "    '''Test loader raw_orders.'''\n    return [{'order_id': 7, 'status': 'loaded-dev'}]\n"
-            ),
-            "sql/models/stg_orders.sql": (
-                'MODEL (description "Test model stg_orders.", materialized table);\n\nSELECT order_id, status FROM __source("raw_orders")'
-            ),
-        },
-    )
-    ensure_sqlserver_schema_ready(schema_name=schema_name, config=config)
-
-    try:
-        result: subprocess.CompletedProcess[str] = run_sqb(
-            command=("--no-color", "build", "--select", "stg_orders"),
-            project_dir=project_dir,
-        )
-
-        assert result.returncode == test_case.expected_return_code, result.stdout + result.stderr
-        rows: tuple[tuple[object, ...], ...] = fetch_sqlserver_rows(
-            config=config,
-            sql=(
-                "SELECT order_id, status FROM "
-                f"{relation_name(schema_name=schema_name, name='stg_orders')} "
-                "ORDER BY order_id"
-            ),
-        )
-        assert stringify_warehouse_rows(rows) == test_case.expected_rows
-    finally:
-        cleanup_sqlserver_schema(schema_name=schema_name, config=config)
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
-        SqlServerSourceDeferralE2ETestCase(
-            description="SQL Server loader writes dev while model reads prod deferred source",
-            expected_model_rows=(("99", "prod-source"),),
-            expected_loader_rows=(("7", "loaded-dev"),),
-        )
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_source_deferral_env_when_building_on_sqlserver_then_reads_prod_and_writes_dev(
-    tmp_path: Path,
-    test_case: SqlServerSourceDeferralE2ETestCase,
-) -> None:
-    config: dict[str, object] = build_sqlserver_config()
-    dev_schema_name: str = build_unique_schema_name(prefix="sqlbuild_defer_dev")
-    prod_schema_name: str = build_unique_schema_name(prefix="sqlbuild_defer_prod")
-    project_dir: Path = prepare_inline_project(
-        tmp_path=tmp_path,
-        project_name="sqlserver_source_deferral",
-        repo_files={
-            "sqlbuild_project.toml": build_sqlserver_source_deferral_project_toml(
-                project_name="sqlserver_source_deferral",
-                dev_schema_name=dev_schema_name,
-                prod_schema_name=prod_schema_name,
-                config=config,
-            ),
-            "sql/sources/raw.yml": (
-                "sources:\n"
-                "  - name: raw_orders\n    description: Test source raw_orders.\n"
-                "    managed: true\n"
-                "    write_strategy: table\n"
-                "    columns:\n"
-                "      - name: order_id\n"
-                "        type: INTEGER\n"
-                "      - name: status\n"
-                "        type: NVARCHAR(100)\n"
-            ),
-            "python/nodes/loaders/raw_orders/loader.py": (
-                "from sqlbuild.loaders import loader\n\n"
-                "@loader\n"
-                "def raw_orders(ctx):\n"
-                "    '''Test loader raw_orders.'''\n    return [{'order_id': 7, 'status': 'loaded-dev'}]\n"
-            ),
-            "sql/models/stg_orders.sql": (
-                'MODEL (description "Test model stg_orders.", materialized table);\n\nSELECT order_id, status FROM __source("raw_orders")'
-            ),
-        },
-    )
-    ensure_sqlserver_schema_ready(schema_name=dev_schema_name, config=config)
-    ensure_sqlserver_schema_ready(schema_name=prod_schema_name, config=config)
-
-    try:
-        execute_sqlserver_sql(
-            config=config,
-            sql=(
-                f"CREATE TABLE {relation_name(schema_name=prod_schema_name, name='raw_orders')} "
-                "(order_id INT, status NVARCHAR(100))"
-            ),
-        )
-        execute_sqlserver_sql(
-            config=config,
-            sql=(
-                f"INSERT INTO {relation_name(schema_name=prod_schema_name, name='raw_orders')} "
-                "VALUES (99, 'prod-source')"
-            ),
-        )
-
-        result: subprocess.CompletedProcess[str] = run_sqb(
-            command=("--no-color", "build", "--select", "stg_orders"),
-            project_dir=project_dir,
-        )
-
-        assert result.returncode == test_case.expected_return_code, result.stdout + result.stderr
-        model_rows: tuple[tuple[object, ...], ...] = fetch_sqlserver_rows(
-            config=config,
-            sql=(
-                "SELECT order_id, status FROM "
-                f"{relation_name(schema_name=dev_schema_name, name='stg_orders')} "
-                "ORDER BY order_id"
-            ),
-        )
-        loader_rows: tuple[tuple[object, ...], ...] = fetch_sqlserver_rows(
-            config=config,
-            sql=(
-                "SELECT order_id, status FROM "
-                f"{relation_name(schema_name=dev_schema_name, name='raw_orders')} "
-                "ORDER BY order_id"
-            ),
-        )
-        assert stringify_warehouse_rows(model_rows) == test_case.expected_model_rows
-        assert stringify_warehouse_rows(loader_rows) == test_case.expected_loader_rows
-    finally:
-        cleanup_sqlserver_schema(schema_name=dev_schema_name, config=config)
-        cleanup_sqlserver_schema(schema_name=prod_schema_name, config=config)
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
-        SqlServerLoaderWaffleShopE2ETestCase(
-            description="loader focused waffle shop grows across repeated SQL Server builds",
-            expected_rows=(
-                ("1", "pro", "650", "1"),
-                ("2", "plus", "3750", "2"),
-                ("3", "enterprise", "1300", "1"),
-            ),
-            expected_event_count=4,
-        )
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_loader_waffle_shop_when_building_on_sqlserver_then_dag_grows_models(
-    tmp_path: Path,
-    test_case: SqlServerLoaderWaffleShopE2ETestCase,
-) -> None:
-    config: dict[str, object] = build_sqlserver_config()
-    schema_name: str = build_unique_schema_name(prefix="sqb_load_waffle")
-    project_dir: Path = prepare_inline_project(
-        tmp_path=tmp_path,
-        project_name="loader_waffle_shop",
-        repo_files=build_loader_waffle_shop_project_files(
-            project_toml=build_sqlserver_project_toml(
-                project_name="loader_waffle_shop",
-                schema_name=schema_name,
-                config=config,
-            )
-        ),
-    )
-    ensure_sqlserver_schema_ready(schema_name=schema_name, config=config)
-
-    try:
-        for _ in range(2):
-            result: subprocess.CompletedProcess[str] = run_sqb(
-                command=("--no-color", "build", "--select", "+customer_revenue"),
-                project_dir=project_dir,
-            )
-            assert result.returncode == test_case.expected_return_code, (
-                result.stdout + result.stderr
-            )
-
-        rows: tuple[tuple[object, ...], ...] = fetch_sqlserver_rows(
-            config=config,
-            sql=(
-                "SELECT customer_id, plan_name, revenue_cents, order_count FROM "
-                f"{relation_name(schema_name=schema_name, name='customer_revenue')} "
-                "ORDER BY customer_id"
-            ),
-        )
-        event_count_rows: tuple[tuple[object, ...], ...] = fetch_sqlserver_rows(
-            config=config,
-            sql=(
-                "SELECT COUNT(*) FROM "
-                f"{relation_name(schema_name=schema_name, name='__loader__fetch_order_events')}"
-            ),
-        )
-        assert stringify_warehouse_rows(rows) == test_case.expected_rows
-        assert int(str(event_count_rows[0][0])) == test_case.expected_event_count
-    finally:
-        cleanup_sqlserver_schema(schema_name=schema_name, config=config)
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
-        SqlServerSourceLoaderStrategiesE2ETestCase(
-            description="source loader strategies apply expected rows on SQL Server",
-            expected_countries=(("1", "US", "United States"), ("2", "CA", "Canada")),
-            expected_webhook_event_counts=(("101", "signup", "2"), ("102", "checkout", "2")),
-            expected_order_events=(("201", "1000"), ("202", "2500"), ("203", "3000")),
-            expected_customers=(("1", "pro"), ("2", "trial"), ("3", "enterprise")),
-            expected_loader_status=(("1", "loaded", "self_managed"),),
-        )
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_loader_strategy_project_when_loading_twice_on_sqlserver_then_write_modes_apply(
-    tmp_path: Path,
-    test_case: SqlServerSourceLoaderStrategiesE2ETestCase,
-) -> None:
-    config: dict[str, object] = build_sqlserver_config()
-    project_dir: Path
-    schema_name: str
-    project_dir, schema_name = prepare_sqlserver_source_loader_strategies(
-        tmp_path=tmp_path,
-        config=config,
-    )
-    ensure_sqlserver_schema_ready(schema_name=schema_name, config=config)
-
-    try:
-        first_result: subprocess.CompletedProcess[str] = run_sqb(
-            command=("--no-color", "load", "--concurrency", "4"),
-            project_dir=project_dir,
-        )
-        second_result: subprocess.CompletedProcess[str] = run_sqb(
-            command=("--no-color", "load", "--concurrency", "4"),
-            project_dir=project_dir,
-        )
-
-        assert first_result.returncode == test_case.expected_return_code, (
-            first_result.stdout + first_result.stderr
-        )
-        assert second_result.returncode == test_case.expected_return_code, (
-            second_result.stdout + second_result.stderr
-        )
-        countries: tuple[tuple[object, ...], ...] = fetch_sqlserver_rows(
-            config=config,
-            sql=(
-                "SELECT country_id, country_code, country_name FROM "
-                f"{relation_name(schema_name=schema_name, name='raw_countries')} "
-                "ORDER BY country_id"
-            ),
-        )
-        webhook_event_counts: tuple[tuple[object, ...], ...] = fetch_sqlserver_rows(
-            config=config,
-            sql=(
-                "SELECT event_id, event_name, COUNT(*) FROM "
-                f"{relation_name(schema_name=schema_name, name='raw_webhook_events')} "
-                "GROUP BY event_id, event_name ORDER BY event_id"
-            ),
-        )
-        order_events: tuple[tuple[object, ...], ...] = fetch_sqlserver_rows(
-            config=config,
-            sql=(
-                "SELECT event_id, amount_cents FROM "
-                f"{relation_name(schema_name=schema_name, name='raw_order_events')} "
-                "ORDER BY event_id"
-            ),
-        )
-        customers: tuple[tuple[object, ...], ...] = fetch_sqlserver_rows(
-            config=config,
-            sql=(
-                "SELECT customer_id, plan_name FROM "
-                f"{relation_name(schema_name=schema_name, name='raw_customers')} "
-                "ORDER BY customer_id"
-            ),
-        )
-        loader_status: tuple[tuple[object, ...], ...] = fetch_sqlserver_rows(
-            config=config,
-            sql=(
-                "SELECT status_id, status_name, loaded_by FROM "
-                f"{relation_name(schema_name=schema_name, name='raw_loader_status')} "
-                "ORDER BY status_id"
-            ),
-        )
-        assert stringify_warehouse_rows(countries) == test_case.expected_countries
-        assert stringify_warehouse_rows(webhook_event_counts) == (
-            test_case.expected_webhook_event_counts
-        )
-        assert stringify_warehouse_rows(order_events) == test_case.expected_order_events
-        assert stringify_warehouse_rows(customers) == test_case.expected_customers
-        assert stringify_warehouse_rows(loader_status) == test_case.expected_loader_status
-    finally:
-        cleanup_sqlserver_schema(schema_name=schema_name, config=config)
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
-        SqlServerSourceLoaderDagE2ETestCase(
-            description="chained source loader runs on SQL Server",
-            command=("--no-color", "load", "--select", "+raw_events"),
-            expected_rows=(("1", "loaded"), ("2", "loaded")),
-        )
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_chained_loader_project_when_loading_on_sqlserver_then_runs_loader_dag(
-    tmp_path: Path,
-    test_case: SqlServerSourceLoaderDagE2ETestCase,
-) -> None:
-    config: dict[str, object] = build_sqlserver_config()
-    schema_name: str = build_unique_schema_name(prefix="sqb_load_dag")
-    project_dir: Path = prepare_inline_project(
-        tmp_path=tmp_path,
-        project_name="source_loader_dag_behavior",
-        repo_files=build_schema_behavior_project_files(
-            source_yaml=(
-                "sources:\n"
-                "  - name: raw_events\n    description: Test source raw_events.\n"
-                "    managed: true\n"
-                "    write_strategy: table\n"
-                "    columns:\n"
-                "      - name: event_id\n"
-                "        type: INTEGER\n"
-                "      - name: status\n"
-                "        type: NVARCHAR(100)\n"
-            ),
-            node_files={
-                **node_module_files(
-                    "python/nodes/loaders/source_rows.py",
-                    "from sqlbuild.loaders import loader\n\n"
-                    "@loader(write_strategy='table', columns=[\n"
-                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                    "])\n"
-                    "def fetch_events(ctx):\n"
-                    "    '''Test loader fetch_events.'''\n    return [{'event_id': 1}, {'event_id': 2}]\n\n"
-                    "@loader(depends_on=[fetch_events])\n"
-                    "def raw_events(ctx):\n"
-                    "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
-                    "    cursor = ctx.query(\n"
-                    "        f'SELECT event_id FROM {events.destination} ORDER BY event_id'\n"
-                    "    )\n"
-                    "    rows = cursor.fetchall()\n"
-                    "    return [{'event_id': row[0], 'status': 'loaded'} for row in rows]\n",
-                )
-            },
-        ),
-    )
-    (project_dir / "sqlbuild_project.toml").write_text(
-        build_sqlserver_project_toml(
-            project_name="source_loader_dag_behavior",
-            schema_name=schema_name,
-            config=config,
-        ),
-        encoding="utf-8",
-    )
-    ensure_sqlserver_schema_ready(schema_name=schema_name, config=config)
-
-    try:
-        result: subprocess.CompletedProcess[str] = run_sqb(
-            command=test_case.command,
-            project_dir=project_dir,
-        )
-
-        assert result.returncode == test_case.expected_return_code, result.stdout + result.stderr
-        rows: tuple[tuple[object, ...], ...] = fetch_sqlserver_rows(
-            config=config,
-            sql=(
-                "SELECT event_id, status FROM "
-                f"{relation_name(schema_name=schema_name, name='raw_events')} "
-                "ORDER BY event_id"
-            ),
-        )
-        intermediate_rows: tuple[tuple[object, ...], ...] = fetch_sqlserver_rows(
-            config=config,
-            sql=(
-                "SELECT COUNT(*) FROM "
-                f"{relation_name(schema_name=schema_name, name='__loader__fetch_events')}"
-            ),
-        )
-        assert stringify_warehouse_rows(rows) == test_case.expected_rows
-        assert int(str(intermediate_rows[0][0])) == 2
-    finally:
-        cleanup_sqlserver_schema(schema_name=schema_name, config=config)
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
-        SqlServerIntermediateDagStrategyE2ETestCase(
-            description="SQL Server append intermediate accumulates rows across DAG loads",
-            loader_py=(
-                "from sqlbuild.loaders import loader\n\n"
-                "@loader(write_strategy='append', cursor_column='load_seq', columns=[\n"
-                "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                "    {'name': 'amount', 'type': 'INTEGER'},\n"
-                "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
-                "])\n"
-                "def fetch_events(ctx):\n"
-                "    '''Test loader fetch_events.'''\n    if ctx.current_cursor_value is None:\n"
-                "        next_seq = 1\n"
-                "    else:\n"
-                "        next_seq = ctx.current_cursor_value + 1\n"
-                "    return [\n"
-                "        {'event_id': next_seq, 'amount': next_seq * 100, 'load_seq': next_seq}\n"
-                "    ]\n\n"
-                "@loader(depends_on=[fetch_events])\n"
-                "def raw_events(ctx):\n"
-                "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
-                "    cursor = ctx.query(\n"
-                "        f'SELECT event_id, amount FROM {events.destination} '\n"
-                "        'ORDER BY event_id, amount'\n"
-                "    )\n"
-                "    rows = cursor.fetchall()\n"
-                "    return [{'event_id': row[0], 'amount': row[1]} for row in rows]\n"
-            ),
-            expected_intermediate_rows=(("1", "100"), ("2", "200")),
-            expected_terminal_rows=(("1", "100"), ("2", "200")),
-        ),
-        SqlServerIntermediateDagStrategyE2ETestCase(
-            description="SQL Server merge intermediate updates and adds rows across DAG loads",
-            loader_py=(
-                "from sqlbuild.loaders import loader\n\n"
-                "@loader(\n"
-                "    write_strategy='merge',\n"
-                "    unique_key='event_id',\n"
-                "    cursor_column='load_seq',\n"
-                "    columns=[\n"
-                "        {'name': 'event_id', 'type': 'INTEGER'},\n"
-                "        {'name': 'amount', 'type': 'INTEGER'},\n"
-                "        {'name': 'load_seq', 'type': 'INTEGER'},\n"
-                "    ],\n"
-                ")\n"
-                "def fetch_events(ctx):\n"
-                "    '''Test loader fetch_events.'''\n    if ctx.current_cursor_value is None:\n"
-                "        return [\n"
-                "            {'event_id': 1, 'amount': 100, 'load_seq': 1},\n"
-                "            {'event_id': 2, 'amount': 200, 'load_seq': 1},\n"
-                "        ]\n"
-                "    return [\n"
-                "        {'event_id': 1, 'amount': 150, 'load_seq': 2},\n"
-                "        {'event_id': 3, 'amount': 300, 'load_seq': 2},\n"
-                "    ]\n\n"
-                "@loader(depends_on=[fetch_events])\n"
-                "def raw_events(ctx):\n"
-                "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
-                "    cursor = ctx.query(\n"
-                "        f'SELECT event_id, amount FROM {events.destination} '\n"
-                "        'ORDER BY event_id, amount'\n"
-                "    )\n"
-                "    rows = cursor.fetchall()\n"
-                "    return [{'event_id': row[0], 'amount': row[1]} for row in rows]\n"
-            ),
-            expected_intermediate_rows=(("1", "150"), ("2", "200"), ("3", "300")),
-            expected_terminal_rows=(("1", "150"), ("2", "200"), ("3", "300")),
-        ),
-        SqlServerIntermediateDagStrategyE2ETestCase(
-            description="SQL Server delete insert intermediate replaces cursor window across DAG loads",
-            loader_py=(
-                "from sqlbuild.loaders import loader\n\n"
-                "@loader(write_strategy='delete_insert', cursor_column='load_seq', columns=[\n"
-                "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                "    {'name': 'amount', 'type': 'INTEGER'},\n"
-                "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
-                "])\n"
-                "def fetch_events(ctx):\n"
-                "    '''Test loader fetch_events.'''\n    if ctx.current_cursor_value is None:\n"
-                "        return [\n"
-                "            {'event_id': 1, 'amount': 100, 'load_seq': 1},\n"
-                "            {'event_id': 2, 'amount': 200, 'load_seq': 1},\n"
-                "        ]\n"
-                "    return [\n"
-                "        {'event_id': 2, 'amount': 250, 'load_seq': 1},\n"
-                "        {'event_id': 3, 'amount': 300, 'load_seq': 1},\n"
-                "    ]\n\n"
-                "@loader(depends_on=[fetch_events])\n"
-                "def raw_events(ctx):\n"
-                "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
-                "    cursor = ctx.query(\n"
-                "        f'SELECT event_id, amount FROM {events.destination} '\n"
-                "        'ORDER BY event_id, amount'\n"
-                "    )\n"
-                "    rows = cursor.fetchall()\n"
-                "    return [{'event_id': row[0], 'amount': row[1]} for row in rows]\n"
-            ),
-            expected_intermediate_rows=(("2", "250"), ("3", "300")),
-            expected_terminal_rows=(("2", "250"), ("3", "300")),
-        ),
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_intermediate_strategy_project_when_loading_twice_on_sqlserver_then_strategy_applies(
-    tmp_path: Path,
-    test_case: SqlServerIntermediateDagStrategyE2ETestCase,
-) -> None:
-    config: dict[str, object] = build_sqlserver_config()
-    schema_name: str = build_unique_schema_name(prefix="sqb_load_dag_strategy")
-    project_dir: Path = prepare_inline_project(
-        tmp_path=tmp_path,
-        project_name="source_loader_dag_strategy_behavior",
-        repo_files=build_schema_behavior_project_files(
-            source_yaml=(
-                "sources:\n"
-                "  - name: raw_events\n    description: Test source raw_events.\n"
-                "    managed: true\n"
-                "    write_strategy: table\n"
-                "    columns:\n"
-                "      - name: event_id\n"
-                "        type: INTEGER\n"
-                "      - name: amount\n"
-                "        type: INTEGER\n"
-            ),
-            node_files={
-                **node_module_files("python/nodes/loaders/source_rows.py", test_case.loader_py)
-            },
-        ),
-    )
-    (project_dir / "sqlbuild_project.toml").write_text(
-        build_sqlserver_project_toml(
-            project_name="source_loader_dag_strategy_behavior",
-            schema_name=schema_name,
-            config=config,
-        ),
-        encoding="utf-8",
-    )
-    ensure_sqlserver_schema_ready(schema_name=schema_name, config=config)
-
-    try:
-        first_result: subprocess.CompletedProcess[str] = run_sqb(
-            command=test_case.command,
-            project_dir=project_dir,
-        )
-        second_result: subprocess.CompletedProcess[str] = run_sqb(
-            command=test_case.command,
-            project_dir=project_dir,
-        )
-
-        assert first_result.returncode == test_case.expected_return_code, (
-            first_result.stdout + first_result.stderr
-        )
-        assert second_result.returncode == test_case.expected_return_code, (
-            second_result.stdout + second_result.stderr
-        )
-        intermediate_rows: tuple[tuple[object, ...], ...] = fetch_sqlserver_rows(
-            config=config,
-            sql=(
-                "SELECT event_id, amount FROM "
-                f"{relation_name(schema_name=schema_name, name='__loader__fetch_events')} "
-                "ORDER BY event_id, amount"
-            ),
-        )
-        terminal_rows: tuple[tuple[object, ...], ...] = fetch_sqlserver_rows(
-            config=config,
-            sql=(
-                "SELECT event_id, amount FROM "
-                f"{relation_name(schema_name=schema_name, name='raw_events')} "
-                "ORDER BY event_id, amount"
-            ),
-        )
-        assert stringify_warehouse_rows(intermediate_rows) == test_case.expected_intermediate_rows
-        assert stringify_warehouse_rows(terminal_rows) == test_case.expected_terminal_rows
     finally:
         cleanup_sqlserver_schema(schema_name=schema_name, config=config)
 
@@ -1350,3 +610,46 @@ def test_given_existing_snapshot_targets_when_building_on_sqlserver_then_apply_s
         )
     finally:
         cleanup_sqlserver_schema(schema_name=schema_name, config=config)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SqlServerLoaderRefusalE2ETestCase(
+            description="a loader is refused at compile, since SQLLoad can't write to SQL Server",
+            expected_fragment="loads and loaders can't write to sqlserver yet",
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_loader_when_compiling_on_sqlserver_then_it_is_refused(
+    tmp_path: Path,
+    test_case: SqlServerLoaderRefusalE2ETestCase,
+) -> None:
+    config: dict[str, object] = build_sqlserver_config()
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="sqlserver_loader",
+        repo_files={
+            "sqlbuild_project.toml": build_sqlserver_project_toml(
+                project_name="sqlserver_loader",
+                schema_name=build_unique_schema_name(prefix="sqb_loader"),
+                config=config,
+            ),
+            "sql/sources/raw.yml": (
+                "sources:\n  - name: raw_orders\n    description: Orders from a loader.\n"
+                "    managed: true\n"
+            ),
+            "python/nodes/loaders/raw_orders/loader.py": (
+                "from sqlbuild.loaders import loader\n\n\n@loader\n"
+                "def raw_orders(ctx):\n    '''Orders.'''\n    return [{'id': 1}]\n"
+            ),
+        },
+    )
+
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "compile"), project_dir=project_dir
+    )
+
+    assert result.returncode != 0, result.stdout + result.stderr
+    assert test_case.expected_fragment in result.stdout + result.stderr

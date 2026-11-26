@@ -51,12 +51,12 @@ _METADATA_FILES: dict[str, str] = {
     "sql/sources/raw.yml": _SOURCES
     + (
         "  - name: raw_events\n    description: Loaded events.\n    managed: true\n"
-        "    write_strategy: append\n    contract: enforced\n    cursor_column: loaded_at\n"
+        "    contract: enforced\n"
         "    columns:\n      - name: event_id\n        type: INTEGER\n"
         "      - name: load_seq\n        type: INTEGER\n"
     ),
     "python/nodes/loaders/raw_events/loader.py": (
-        "from sqlbuild.loaders import loader\n\n\n@loader\n"
+        "from sqlbuild.loaders import loader\n\n\n@loader(write_strategy='append', cursor_column='loaded_at')\n"
         "def raw_events(ctx):\n    '''Load events.'''\n"
         "    return [{'event_id': 1, 'load_seq': 1}]\n"
     ),

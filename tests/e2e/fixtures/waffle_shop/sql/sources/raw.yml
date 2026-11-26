@@ -2,7 +2,6 @@ sources:
   - name: raw_customers
     description: Test source raw_customers.
     managed: true
-    write_strategy: table
     columns:
       - name: id
         type: INTEGER
@@ -18,8 +17,6 @@ sources:
   - name: raw_orders
     description: Test source raw_orders.
     managed: true
-    write_strategy: delete_insert
-    cursor_column: ordered_at
     columns:
       - name: id
         type: INTEGER

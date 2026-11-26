@@ -128,7 +128,6 @@ REGION_PROVIDER_FILES: dict[str, str] = {
         "  - name: raw_regions\n"
         "    description: The region code the provider reads.\n"
         "    managed: true\n"
-        "    write_strategy: table\n"
         "    columns:\n"
         "      - name: code\n"
         "        type: BIGINT\n"
@@ -136,7 +135,7 @@ REGION_PROVIDER_FILES: dict[str, str] = {
     "python/nodes/loaders/regions/loader.py": (
         "from python.providers.region import Region\n"
         "from sqlbuild.loaders import loader\n\n\n"
-        "@loader\n"
+        "@loader(write_strategy='replace')\n"
         "def raw_regions(ctx, region: Region):\n"
         '    """Load the provider\'s region code."""\n'
         "    return [{'code': region.code}]\n"
@@ -2495,7 +2494,7 @@ INGRESS_LOADER_FILES: dict[str, str] = {
         "from python.nodes.ready.asset import ready\n"
         "\n"
         "\n"
-        "@loader(depends_on=[ready], write_strategy='table', "
+        "@loader(depends_on=[ready], write_strategy='replace', "
         "columns=[{'name': 'step', 'type': 'INTEGER'}])\n"
         "def fetch_steps(ctx):\n"
         '    """Fetch the steps."""\n'
@@ -2507,7 +2506,7 @@ INGRESS_LOADER_FILES: dict[str, str] = {
         "from python.nodes.loads.fetch_steps.loader import fetch_steps\n"
         "\n"
         "\n"
-        "@loader(depends_on=[fetch_steps])\n"
+        "@loader(write_strategy='replace', depends_on=[fetch_steps])\n"
         "def raw_steps(ctx):\n"
         '    """Load the steps."""\n'
         '    return [{"step": 1}]\n'
@@ -2516,8 +2515,7 @@ INGRESS_LOADER_FILES: dict[str, str] = {
         "from .fetch_steps.loader import fetch_steps\nfrom .raw_steps.loader import raw_steps\n"
     ),
     "sql/sources/raw.yml": (
-        "sources:\n  - name: raw_steps\n    description: Steps.\n"
-        "    managed: true\n    write_strategy: table\n"
+        "sources:\n  - name: raw_steps\n    description: Steps.\n    managed: true\n"
     ),
 }
 

@@ -85,13 +85,15 @@ def _loaders(*, depends_on: str, body: str) -> dict[str, str]:
     return {
         _REGIONS_LOADER_PATH: (
             "from sqlbuild.loaders import loader\n\n\n"
-            "@loader\ndef raw_regions(ctx):\n    '''Test loader raw_regions.'''\n"
+            "@loader(write_strategy='replace')\n"
+            "def raw_regions(ctx):\n    '''Test loader raw_regions.'''\n"
             "    return [{'id': 1}]\n"
         ),
         _CUSTOMERS_LOADER_PATH: (
             "from sqlbuild.loaders import loader\n\n"
             "from python.nodes.loaders.raw_regions.loader import raw_regions\n\n\n\n\n\n\n"
-            f"@loader(depends_on=[{depends_on}])\ndef raw_customers(ctx):\n{body}"
+            f"@loader(write_strategy='replace', depends_on=[{depends_on}])\n"
+            f"def raw_customers(ctx):\n{body}"
             "    return [{'id': 1}]\n"
         ),
     }
@@ -112,9 +114,9 @@ _MANAGED: dict[str, str] = {
     "sql/sources/raw.yml": (
         "sources:\n"
         "  - name: raw_regions\n    description: Raw regions.\n    managed: true\n"
-        "    write_strategy: table\n    columns:\n      - name: id\n        type: INTEGER\n"
+        "    columns:\n      - name: id\n        type: INTEGER\n"
         "  - name: raw_customers\n    description: Raw customers.\n    managed: true\n"
-        "    write_strategy: table\n    columns:\n      - name: id\n        type: INTEGER\n"
+        "    columns:\n      - name: id\n        type: INTEGER\n"
     ),
 }
 _EXTERNAL: dict[str, str] = {

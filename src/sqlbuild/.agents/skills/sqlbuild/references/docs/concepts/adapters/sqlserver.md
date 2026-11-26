@@ -16,6 +16,9 @@ pip install 'sqlbuild[sqlserver]'
 uv pip install 'sqlbuild[sqlserver]'
 ```
 
+SQLLoad can't write to SQL Server yet, so compile refuses a SQL Server project that declares a
+[load](../sources.md#loads) or a [`@loader`](../python-nodes/loaders.md).
+
 ## Connection config
 
 ```toml

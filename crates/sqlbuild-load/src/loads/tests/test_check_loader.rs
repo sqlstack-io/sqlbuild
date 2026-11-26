@@ -18,20 +18,23 @@ fn given_loader_options_when_checking_them_then_sqlload_reads_them_as_a_python_t
             description: "SQLBuild's old name for replacing the table",
             connection: None,
             settings: "write_strategy = \"table\"\n",
-            expected_result: Err("write_strategy \"table\" is now \"replace\""),
+            expected_result: Err(
+                "write_strategy \"table\" is now \"replace\", as SQLLoad names it",
+            ),
         },
         CheckLoaderTestCase {
             description: "an option SQLLoad doesn't know",
             connection: None,
             settings: "cursor_colum = \"id\"\n",
-            expected_result: Err("cursor_colum"),
+            expected_result: Err("unknown key \"cursor_colum\"; did you mean \"cursor_column\"?"),
         },
         CheckLoaderTestCase {
             description: "the columns belong to the source",
             connection: None,
             settings: "columns = { id = \"INTEGER\" }\n",
             expected_result: Err(
-                "@loader can't set columns; declare each column's type on the source",
+                "@loader can't set columns; declare each column's type on the source it fills, in \
+                 its sources file",
             ),
         },
         CheckLoaderTestCase {
@@ -55,16 +58,11 @@ fn given_loader_options_when_checking_them_then_sqlload_reads_them_as_a_python_t
         let checked: Result<String, String> = check_loader(&project_check(), &loader)
             .map(|table| toml::to_string(&table).expect("table"))
             .map_err(|problem| problem.message);
-        match (checked, test_case.expected_result) {
-            (Ok(table), Ok(expected)) => assert_eq!(table, expected, "{}", test_case.description),
-            (Err(message), Err(fragment)) => {
-                assert!(
-                    message.contains(fragment),
-                    "{}: {message}",
-                    test_case.description
-                )
-            }
-            (checked, _) => panic!("{}: {checked:?}", test_case.description),
-        }
+        assert_eq!(
+            checked.as_deref().map_err(String::as_str),
+            test_case.expected_result,
+            "{}",
+            test_case.description
+        );
     }
 }

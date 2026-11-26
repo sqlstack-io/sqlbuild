@@ -860,10 +860,10 @@ def explicit_reference_literal_loader(*, table: str) -> str:
 
     return (
         "from sqlbuild.loaders import loader\n\n\n"
-        "@loader\n"
+        "@loader(write_strategy='replace')\n"
         "def raw_regions(ctx):\n"
         "    '''Test loader raw_regions.'''\n    return [{'id': 1}]\n\n\n"
-        "@loader\n"
+        "@loader(write_strategy='replace')\n"
         "def raw_customers(ctx):\n"
         f'    """Test loader raw_customers."""\n    ctx.query("SELECT count(*) FROM {table}")\n'
         "    return [{'id': 1}]\n"
@@ -916,12 +916,12 @@ def python_node_selection_project_files(*, orders_sql: str) -> dict[str, str]:
             "  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n    table: raw_orders\n"
             "  - name: raw_customers\n    description: Test source raw_customers.\n"
-            "    managed: true\n    write_strategy: table\n"
+            "    managed: true\n"
             "    columns:\n      - name: customer_id\n        type: INTEGER\n"
         ),
         "python/nodes/loaders/customers/loader.py": (
             "from sqlbuild.loaders import loader\n\n\n"
-            "@loader\ndef raw_customers(ctx):\n"
+            "@loader(write_strategy='replace')\ndef raw_customers(ctx):\n"
             "    '''Test loader raw_customers.'''\n"
             "    return [{'customer_id': 99}]\n"
         ),
@@ -1736,7 +1736,7 @@ def node_result_source_yml(location: str) -> str:
 
     return (
         "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
-        f"    managed: true\n{location}    write_strategy: table\n"
+        f"    managed: true\n{location}"
         "    columns:\n      - name: order_id\n        type: INTEGER\n"
     )
 

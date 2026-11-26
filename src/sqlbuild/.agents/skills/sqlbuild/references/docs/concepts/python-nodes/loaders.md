@@ -29,7 +29,7 @@ Loaders are Python functions that load data into source tables. They replace exp
 
 1. Write a Python function under `python/nodes/` decorated with `@loader`
 2. Declare a managed source in `sql/sources/*.yml` with `managed: true` and **the same name as the loader function**
-3. SQLBuild calls the function, writes returned rows to a staging table, then applies the configured write strategy to the target
+3. SQLBuild calls the function, writes returned rows to a staging table, then applies the write strategy set on `@loader` to the target
 
 Loaders participate in the build lifecycle. When `sqb build` runs, managed sources are loaded before any dependent model is materialized.
 
@@ -42,7 +42,7 @@ Place Python files under `python/nodes/` in your project directory (the playgrou
 from sqlbuild.loaders import loader
 from sqlbuild.executor.load.models import LoaderContext
 
-@loader
+@loader(write_strategy="replace")
 def raw_customers(ctx: LoaderContext) -> list[dict[str, object]]:
     """Load customers from the CRM export."""
     return [
@@ -62,7 +62,6 @@ sources:
   - name: raw_customers
     description: Customers
     managed: true
-    write_strategy: table
     columns:
       - name: id
         type: INTEGER
@@ -72,7 +71,11 @@ sources:
         type: VARCHAR
 ```
 
-Setting `managed: true` makes this a **managed source** - SQLBuild owns both the loading and the schema. The binding is by name: the source `raw_customers` is populated by the `@loader` function named `raw_customers`. SQLBuild raises an error if a managed source has no loader function of the same name.
+Setting `managed: true` makes this a **managed source** - SQLBuild owns both the loading and the schema.
+The source declares the columns; how they are loaded is set on `@loader` (see
+[Write strategies](#write-strategies)). A managed source can't set `write_strategy`, `cursor_column`,
+`unique_key` or `load_batch_size` in its sources file; compile stops naming the `@loader` option to
+use instead. The binding is by name: the source `raw_customers` is populated by the `@loader` function named `raw_customers`. SQLBuild raises an error if a managed source has no loader function of the same name.
 
 Models reference managed sources the same way as any other source:
 
@@ -104,59 +107,68 @@ Details:
 - A value of any other type, such as a `UUID`, `bytes` or `time`, stops the load with an error
   naming the column and the type. Declare the column's `type`, or convert the value first.
 - Values of different types in one undeclared column, such as `float` and `Decimal`, stop the load.
-- SQLBuild writes rows in batches of `load_batch_size` rows (10,000 by default), and a decimal
-  column's width comes from the first batch that has it. A later value that needs more digits stops
+- SQLBuild writes rows in batches of 10,000 rows, and a decimal column's width comes from the first
+  batch that has it. A later value that needs more digits stops
   the load instead of being rounded; declare the column's `type` to allow it.
 
 ## Write strategies
 
-The `write_strategy` field controls how returned rows are written to the target table.
+`@loader` takes SQLLoad's table options as keyword arguments, and compile checks them as SQLLoad
+reads a Python table's: an option SQLLoad doesn't know, or a value of the wrong kind, stops compile
+naming the `@loader`. The most used are `write_strategy`, `cursor_column` and `unique_key`. The
+source's own sources file declares the columns, and the source names the table, so `@loader` can't
+set `columns`, `table_name` or `destination_path` for a source it fills.
 
-### table
+`write_strategy` controls how returned rows are written to the target table. SQLLoad's rules for
+combining it with a cursor and keys are checked when the source is planned and loaded.
 
-Full replace. The target is dropped and recreated from the loader output on every run.
+### replace
 
-```yaml
-sources:
-  - name: raw_countries
-    description: Countries
-    managed: true
-    write_strategy: table
-    columns:
-      - name: country_id
-        type: INTEGER
-      - name: country_code
-        type: VARCHAR
+Full replace. The target is recreated from the loader output on every run. It takes no
+`cursor_column`.
+
+```python
+@loader(write_strategy="replace")
+def raw_countries(ctx: LoaderContext) -> list[dict[str, object]]:
+    """Countries."""
+    return [{"country_id": 1, "country_code": "GB"}]
 ```
+
+SQLBuild's earlier name for this strategy, `table`, is refused with a pointer to `replace`.
 
 ### append
 
 Insert all returned rows into the target. No deduplication.
 
-```yaml
-sources:
-  - name: raw_webhook_events
-    description: Webhook events
-    managed: true
-    write_strategy: append
-    columns:
-      - name: event_id
-        type: INTEGER
-      - name: event_name
-        type: VARCHAR
+```python
+@loader(write_strategy="append")
+def raw_webhook_events(ctx: LoaderContext) -> list[dict[str, object]]:
+    """Webhook events."""
+    return fetch_new_events()
 ```
 
 ### delete_insert
 
-Delete rows in the cursor range, then insert replacements. Requires `cursor_column`.
+Delete rows in the cursor range, then insert replacements. Needs a `cursor_column`.
+
+```python
+@loader(write_strategy="delete_insert", cursor_column="event_at")
+def raw_order_events(ctx: LoaderContext) -> list[dict[str, object]]:
+    """Order events."""
+    if ctx.current_cursor_value is None:
+        return fetch_all_events()
+    return fetch_events_since(ctx.current_cursor_value)
+```
+
+The loader receives `ctx.current_cursor_value` with the current `MAX(cursor_column)` from the
+target, so it can fetch only new or updated data. The source it fills declares its columns as any
+managed source does:
 
 ```yaml
 sources:
   - name: raw_order_events
     description: Order events
     managed: true
-    write_strategy: delete_insert
-    cursor_column: event_at
     columns:
       - name: event_id
         type: INTEGER
@@ -166,36 +178,15 @@ sources:
         type: INTEGER
 ```
 
-The loader receives `ctx.current_cursor_value` with the current `MAX(cursor_column)` from the target, so it can fetch only new or updated data. Its function name matches the source name (`raw_order_events`):
-
-```python
-@loader
-def raw_order_events(ctx: LoaderContext) -> list[dict[str, object]]:
-    """Order events."""
-    if ctx.current_cursor_value is None:
-        return fetch_all_events()
-    return fetch_events_since(ctx.current_cursor_value)
-```
-
 ### merge
 
-Upsert based on `unique_key`. Requires both `unique_key` and `cursor_column`.
+Upsert based on `unique_key`, which `merge` needs.
 
-```yaml
-sources:
-  - name: raw_customers
-    description: Customers
-    managed: true
-    write_strategy: merge
-    unique_key: customer_id
-    cursor_column: updated_at
-    columns:
-      - name: customer_id
-        type: INTEGER
-      - name: plan_name
-        type: VARCHAR
-      - name: updated_at
-        type: TIMESTAMP
+```python
+@loader(write_strategy="merge", unique_key="customer_id", cursor_column="updated_at")
+def raw_customers(ctx: LoaderContext) -> list[dict[str, object]]:
+    """Customers."""
+    return fetch_customers_since(ctx.current_cursor_value)
 ```
 
 Existing rows matching the unique key are updated; new rows are inserted.
@@ -223,7 +214,7 @@ def raw_status(ctx: LoaderContext) -> None:
     )
 ```
 
-The source is still declared as managed, just without a `write_strategy`:
+The source is still declared as managed, and its `@loader` sets no `write_strategy`:
 
 ```yaml
 sources:
@@ -237,7 +228,7 @@ sources:
         type: VARCHAR
 ```
 
-Self-managed loaders must not declare a `write_strategy`. They are useful when you want to use adapter-specific SQL (e.g. `COPY INTO`, external tables), call an external ingestion tool, or handle writes in a way that doesn't fit the dict-return pattern.
+Self-managed loaders must not set a `write_strategy`. They are useful when you want to use adapter-specific SQL (e.g. `COPY INTO`, external tables), call an external ingestion tool, or handle writes in a way that doesn't fit the dict-return pattern.
 
 ## Loader context
 
@@ -368,18 +359,14 @@ keep, so `compile`, `build` and `load` stop with `S103` until its `destination` 
 
 ## Decorator parameters
 
-The `@loader` decorator accepts optional parameters that can also be set in the source YAML. When both are specified, the YAML takes precedence.
-
 | Parameter | Description |
 |-----------|-------------|
 | `depends_on` | List of loader and asset functions this loader depends on, and [`job()` or `tag()` sets](sql-references.md#depending-on-a-job-or-a-tag), as for assets. Depending on one that reads SQL is a [warehouse round trip](overview.md#warehouse-round-trips) |
-| `destination` | Override the destination relation name (can include schema or database) |
-| `write_strategy` | `table`, `append`, `delete_insert`, or `merge` |
-| `cursor_column` | Column used for incremental cursor tracking |
-| `unique_key` | Column(s) used as the merge key (string or list of strings) |
-| `columns` | Column specifications with name, type, nullable, and description |
-| `contract` | `enforced` or `none` |
+| `connection` | The [source connection](../sources.md#source-connections) the loader reads through; a target's warehouse connection is refused |
+| `destination` | Override the destination relation name of an intermediate loader (can include schema or database); a loader that fills a managed source can't set it |
+| `columns` | Column specifications of an intermediate loader; a loader that fills a managed source can't set them, as its source declares them |
 | `description` | What the loaded rows are; defaults to the function docstring. Required unless the source YAML entry has a `description` ([Descriptions](../models/configuration.md#descriptions)) |
+| any other keyword | One of SQLLoad's table options, such as `write_strategy` (`replace`, `append`, `delete_insert` or `merge`), `cursor_column` and `unique_key` (a column name or a list of them), checked at compile |
 
 ## Auto-load during builds
 
@@ -476,16 +463,8 @@ SQLBuild imports all `.py` files under `python/nodes/` recursively (excluding `_
 | Field | Description |
 |-------|-------------|
 | `managed` | Set to `true` to bind the source to the `@loader` function of the same name |
-| `write_strategy` | `table`, `append`, `delete_insert`, or `merge` (requires `managed: true`) |
-| `cursor_column` | Column for incremental cursor tracking (required for `delete_insert` and `merge`) |
-| `unique_key` | Merge key column(s) (required for `merge`) |
 | `columns` | Column declarations with types |
 | `contract` | `enforced` or `none` |
 
-### Validation rules
-
-- `append` cannot have `unique_key`
-- `merge` requires `unique_key`
-- `table` cannot have `cursor_column` or `unique_key`
-- `delete_insert` requires `cursor_column` and cannot have `unique_key`
-- `cursor_column` requires one of `append`, `delete_insert`, or `merge`
+How the rows are written (`write_strategy`, `cursor_column`, `unique_key` and SQLLoad's other table
+options) is set on `@loader`, not in the sources file.

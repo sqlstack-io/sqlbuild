@@ -2,7 +2,6 @@ sources:
   - name: raw_orders
     description: Raw orders loaded by the raw_orders Python loader
     managed: true
-    write_strategy: table
     columns:
       - name: order_id
         type: INTEGER

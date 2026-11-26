@@ -63,7 +63,7 @@ PROJECT_FILES: dict[str, str] = {
         from sqlbuild.loaders import loader
 
 
-        @loader
+        @loader(write_strategy='replace')
         def raw_payments(ctx):
             '''Test loader raw_payments.'''
             return [{"payment_id": 1, "order_id": 1, "amount_cents": 500}]
@@ -76,7 +76,6 @@ PROJECT_FILES: dict[str, str] = {
           - name: raw_payments
             description: Test source raw_payments.
             managed: true
-            write_strategy: table
             columns:
               - name: payment_id
                 type: INTEGER

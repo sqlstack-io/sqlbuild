@@ -2,7 +2,6 @@ sources:
   - name: raw__customers
     description: Raw customer records loaded by the Python loader
     managed: true
-    write_strategy: table
     columns:
       - name: id
         type: INTEGER
@@ -18,8 +17,6 @@ sources:
   - name: raw__orders
     description: Raw order records loaded by the Python loader
     managed: true
-    write_strategy: delete_insert
-    cursor_column: ordered_at
     columns:
       - name: id
         type: INTEGER
