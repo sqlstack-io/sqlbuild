@@ -12,13 +12,16 @@ fn relation_line(relation: &RetainedRelation, style: CliStyle) -> String {
     )
 }
 
-/// Each retained scenario's local DuckDB file, and with `relations` its warehouse relations; empty with none.
+/// With `--retain` or `--verbose`, each retained scenario's DuckDB file, and with `--retain` its warehouse relations.
 #[must_use]
 pub fn render_retained_section(
     rows: &[ScenarioResultRow],
-    relations: bool,
+    (relations, verbose): (bool, bool),
     style: CliStyle,
 ) -> String {
+    if !relations && !verbose {
+        return String::new();
+    }
     let retained: Vec<&ScenarioResultRow> = rows
         .iter()
         .filter(|row| row.retained && (row.local_duckdb_path.is_some() || relations))

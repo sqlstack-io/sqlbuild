@@ -86,6 +86,7 @@ pub(crate) fn stream_isatty(stream: &Bound<'_, PyAny>) -> PyResult<bool> {
 }
 
 /// The project, its discovered inputs and the effective scenario namespace.
+#[derive(Clone)]
 pub(crate) struct ScenarioProject<'py> {
     pub(crate) project_dir: Bound<'py, PyAny>,
     pub(crate) discovered: Bound<'py, PyAny>,
@@ -257,11 +258,11 @@ pub(crate) fn planning_reporter<'py>(
     .into_any())
 }
 
-/// `Execution  sqb scenario test  (concurrency: N)`, after the run's header.
+/// `Execution  sqb scenario test  (concurrency: N, DuckDB)`, after the run's header.
 pub(crate) fn write_execution<'py>(
     stream: &Bound<'py, PyAny>,
     project: &ScenarioProject<'py>,
-    (command, concurrency, style): (&str, i64, CliStyle),
+    (command, (concurrency, engines), style): (&str, (i64, Option<String>), CliStyle),
 ) -> PyResult<()> {
     let py: Python<'py> = stream.py();
     let selectors: Vec<String> = project.selectors.extract()?;
@@ -277,6 +278,7 @@ pub(crate) fn write_execution<'py>(
                 ("target", optional_text(py, target.as_deref())),
                 ("concurrency", int(py, concurrency)),
                 ("use_color", boolean(py, style.use_color)),
+                ("engines", optional_text(py, engines.as_deref())),
             ],
         )?),
     )

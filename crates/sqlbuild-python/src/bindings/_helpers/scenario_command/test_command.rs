@@ -11,6 +11,7 @@ use sqlbuild_analysis::definition_changes::models::{ExecutedItem, SelectedItem};
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_core::progress::main::statement_summary_delta::statement_summary_delta;
 use sqlbuild_core::progress::models::StatementSummary;
+use sqlbuild_core::run_on::main::execution_engines::execution_engines;
 use sqlbuild_core::run_on::main::read_run_on_decisions::read_run_on_decisions;
 use sqlbuild_core::run_on::main::refusal_causes::refusal_causes;
 use sqlbuild_core::run_on::main::render_refusal_report::render_refusal_report;
@@ -294,7 +295,7 @@ fn finish(
     });
     output.push_str(&render_retained_section(
         &rows,
-        flag(request, "retain")?,
+        (flag(request, "retain")?, report.verbose),
         run.style,
     ));
     output.push_str(&render_failed_list(&failed, report.verbose, run.style));
@@ -704,11 +705,14 @@ pub(crate) fn run_scenario_test_command(
         &run.project,
         (
             "sqb scenario test",
-            if mode == RunOn::Local {
-                1
-            } else {
-                run.concurrency
-            },
+            (
+                if mode == RunOn::Local {
+                    1
+                } else {
+                    run.concurrency
+                },
+                execution_engines(&decisions, mode, &run.project_adapter_name),
+            ),
             run.style,
         ),
     )?;
@@ -783,7 +787,7 @@ pub(crate) fn run_scenario_test_command(
         }
         run
     } else {
-        let mut remote: TestRun<'_> = prepare(request, discover_project(py, request)?, false)?;
+        let mut remote: TestRun<'_> = prepare(request, run.project.clone(), false)?;
         remote.since_json = run.since_json.clone();
         results.extend(execute_batch(
             request,

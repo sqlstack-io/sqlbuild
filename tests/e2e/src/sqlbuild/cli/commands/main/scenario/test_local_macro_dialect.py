@@ -38,9 +38,8 @@ _HASH_SCENARIO: str = "order_fingerprints__hash"
             expected_rows=(
                 ("order_flags__macros", "PASS", "local"),
                 ("order_ids__plain", "PASS", "local"),
-                (_HASH_SCENARIO, "ERROR", "local"),
             ),
-            expected_absent_rows=(),
+            expected_absent_rows=(_HASH_SCENARIO,),
             expected_fragments=("error[SQ0008]: HASH gives a different value in DuckDB",),
         ),
         SnowflakeMacroScenarioRunOnTestCase(

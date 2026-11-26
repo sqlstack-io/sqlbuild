@@ -315,7 +315,8 @@ fn given_scenario_result_when_listing_checks_then_each_names_its_outcome_and_row
 }
 
 #[test]
-fn given_retained_scenarios_when_listing_then_shows_duckdb_and_relations_under_retain() {
+fn given_retained_scenarios_when_listing_then_shows_duckdb_under_verbose_and_relations_under_retain()
+ {
     let local: ScenarioResultRow = ScenarioResultRow {
         name: "orders_local".to_owned(),
         status: "PASS".to_owned(),
@@ -328,26 +329,32 @@ fn given_retained_scenarios_when_listing_then_shows_duckdb_and_relations_under_r
         RetainedTestCase {
             description: "nothing retained renders nothing",
             rows: vec![ScenarioResultRow::default()],
-            relations: true,
+            flags: (true, false),
             expected_text: "",
         },
         RetainedTestCase {
             description: "--retain lists the warehouse relations",
             rows: vec![failing_result_row(), local.clone()],
-            relations: true,
+            flags: (true, false),
             expected_text: "\nRetained (2):\n  orders_paid\n    source    raw_orders -> main.__sqb_abc__source__raw_orders\n    model     fact_orders -> main.__sqb_abc__model__fact_orders\n  orders_local\n    duckdb    target/run/scenarios/orders_local/local.duckdb\n",
         },
         RetainedTestCase {
-            description: "without --retain only the local DuckDB file is listed",
-            rows: vec![failing_result_row(), local],
-            relations: false,
+            description: "--verbose without --retain lists only the local DuckDB file",
+            rows: vec![failing_result_row(), local.clone()],
+            flags: (false, true),
             expected_text: "\nRetained (1):\n  orders_local\n    duckdb    target/run/scenarios/orders_local/local.duckdb\n",
+        },
+        RetainedTestCase {
+            description: "neither --retain nor --verbose lists nothing",
+            rows: vec![failing_result_row(), local],
+            flags: (false, false),
+            expected_text: "",
         },
     ];
 
     for test_case in test_cases {
         assert_eq!(
-            render_retained_section(&test_case.rows, test_case.relations, PLAIN),
+            render_retained_section(&test_case.rows, test_case.flags, PLAIN),
             test_case.expected_text,
             "{}",
             test_case.description

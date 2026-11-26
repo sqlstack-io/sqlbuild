@@ -139,7 +139,6 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
         expected_exit_code=0,
         expected_stdout_fragments=(
             "order_totals_pass",
-            "Retained (1):",
             "PASS=1  FAIL=0  TOTAL=1",
         ),
         retained_duckdb_relative_path=Path("target/run/scenarios/order_totals_pass/local.duckdb"),
@@ -158,7 +157,7 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
             "order_totals_pass",
             "ERROR",
             "[X604]",
-            "Retained (1):",
+            "local.duckdb",
             "PASS=0  FAIL=1  TOTAL=1",
         ),
         retained_duckdb_relative_path=Path("target/run/scenarios/order_totals_pass/local.duckdb"),
@@ -855,7 +854,15 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
             description="captured snapshot keeps local DuckDB by default",
             scenario_name="order_totals_pass",
             capture_command=("--no-color", "scenario", "capture", "order_totals_pass"),
-            command=("--no-color", "scenario", "test", "order_totals_pass", "--run-on", "local"),
+            command=(
+                "--no-color",
+                "scenario",
+                "test",
+                "order_totals_pass",
+                "--run-on",
+                "local",
+                "--verbose",
+            ),
             expected_exit_code=0,
             expected_stdout_fragments=(
                 "order_totals_pass",
@@ -882,7 +889,7 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
                 "order_totals_pass",
                 "ERROR",
                 "[X604]",
-                "Retained (1):",
+                "local.duckdb",
                 "PASS=0  FAIL=1  TOTAL=1",
             ),
             retained_duckdb_relative_path=Path(
@@ -1387,7 +1394,6 @@ def test_given_captured_snapshot_when_running_local_scenario_then_manages_local_
         assert expected_fragment in result.stdout, result.stdout
     assert_local_duckdb_state(
         db_path=local_duckdb_path,
-        stdout=result.stdout,
         expected_exists=test_case.expected_duckdb_exists,
         query_when_exists=test_case.expected_duckdb_exists and not test_case.corrupt_jsonl,
         count_sql=test_case.retained_count_sql,
@@ -1449,7 +1455,6 @@ def test_given_committed_snapshot_when_running_local_scenario_then_replays_witho
         assert unexpected_fragment not in result.stdout
     assert_local_duckdb_state(
         db_path=local_duckdb_path,
-        stdout=result.stdout,
         expected_exists=True,
         query_when_exists=True,
         count_sql=test_case.retained_count_sql,
@@ -1604,7 +1609,6 @@ def test_given_local_snapshot_sync_when_running_local_scenario_then_captures_exp
         assert expected_fragment in result.stdout
     assert_local_duckdb_state(
         db_path=local_duckdb_path,
-        stdout=result.stdout,
         expected_exists=test_case.expected_duckdb_exists,
         query_when_exists=test_case.query_when_exists,
         count_sql='SELECT COUNT(*) FROM "__sqb_local__source__raw_orders"',

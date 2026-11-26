@@ -20,7 +20,15 @@ pub fn write_execution_header(py: Python<'_>, options: Option<Bound<'_, PyDict>>
     let style: CliStyle = CliStyle {
         use_color: arguments.value("use_color")?.extract()?,
     };
-    let text: String = execution_header_text(style, (&command, target.as_deref(), concurrency));
+    let engines: Option<String> = match arguments.passed("engines")? {
+        true => arguments.value("engines")?.extract()?,
+        false => None,
+    };
+    let text: String = execution_header_text(
+        style,
+        (&command, target.as_deref(), concurrency),
+        engines.as_deref(),
+    );
     let stream: Bound<'_, PyAny> = arguments.value("stream")?;
     stream.call_method1("write", (text,))?;
     stream.call_method0("flush")?;

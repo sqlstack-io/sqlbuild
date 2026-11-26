@@ -20,7 +20,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 pub(crate) const HEADER_OPTIONS: (&[&str], &[&str]) = (
     &["stream", "command", "target", "concurrency", "use_color"],
-    &[],
+    &["engines"],
 );
 
 fn difference_samples(samples: &Bound<'_, PyAny>) -> PyResult<Vec<DifferenceSample>> {

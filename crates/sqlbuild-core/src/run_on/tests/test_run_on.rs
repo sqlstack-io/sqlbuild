@@ -3,6 +3,7 @@ use serde_json::json;
 use crate::cli_text::models::CliStyle;
 use crate::run_on::_helpers::explain_rows::refusal_explain_rows;
 use crate::run_on::main::apply_local_refusals::apply_local_refusals;
+use crate::run_on::main::execution_engines::execution_engines;
 use crate::run_on::main::read_local_refusal::read_local_refusal;
 use crate::run_on::main::refusal_causes::refusal_causes;
 use crate::run_on::main::render_refusal_report::render_refusal_report;
@@ -15,8 +16,8 @@ use crate::run_on::tests::helpers::{
     refused_in_macro_source, refused_with_code, run_on_document, unplaced,
 };
 use crate::run_on::tests::test_types::{
-    CausesTestCase, HeaderTestCase, InspectionTestCase, JsonTestCase, LocalRefusalTestCase,
-    ReadTestCase, RenderTestCase, ResolveTestCase,
+    CausesTestCase, ExecutionEnginesTestCase, HeaderTestCase, InspectionTestCase, JsonTestCase,
+    LocalRefusalTestCase, ReadTestCase, RenderTestCase, ResolveTestCase,
 };
 
 use crate::run_output::models::{ExplainRow, HeaderCause};
@@ -438,6 +439,45 @@ fn given_decisions_when_building_header_then_counts_where_tests_run_by_mode() {
                 test_case.expected_causes,
                 test_case.expected_explain_rows
             ),
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_decisions_when_naming_engines_then_duckdb_and_the_warehouse_only_when_they_run() {
+    let test_cases = [
+        ExecutionEnginesTestCase {
+            description: "local only names DuckDB",
+            decisions: vec![local("a"), local("b")],
+            mode: RunOn::Auto,
+            expected_engines: Some("DuckDB"),
+        },
+        ExecutionEnginesTestCase {
+            description: "auto with a refused test names both",
+            decisions: vec![local("a"), refused("b", "fn:HASH", 3)],
+            mode: RunOn::Auto,
+            expected_engines: Some("DuckDB and snowflake"),
+        },
+        ExecutionEnginesTestCase {
+            description: "local mode never names the warehouse",
+            decisions: vec![local("a"), refused("b", "fn:HASH", 3)],
+            mode: RunOn::Local,
+            expected_engines: Some("DuckDB"),
+        },
+        ExecutionEnginesTestCase {
+            description: "a warehouse-only run names nothing",
+            decisions: vec![refused("b", "fn:HASH", 3)],
+            mode: RunOn::Warehouse,
+            expected_engines: None,
+        },
+    ];
+
+    for test_case in test_cases {
+        assert_eq!(
+            execution_engines(&test_case.decisions, test_case.mode, "snowflake").as_deref(),
+            test_case.expected_engines,
             "{}",
             test_case.description
         );

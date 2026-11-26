@@ -19,6 +19,7 @@ use sqlbuild_core::progress::main::statement_summary_delta::statement_summary_de
 use sqlbuild_core::progress::models::ExpectationStep;
 use sqlbuild_core::progress::models::StatementSummary;
 use sqlbuild_core::run_on::main::apply_local_refusals::apply_local_refusals;
+use sqlbuild_core::run_on::main::execution_engines::execution_engines;
 use sqlbuild_core::run_on::main::read_run_on_decisions::read_run_on_decisions;
 use sqlbuild_core::run_on::main::refusal_causes::refusal_causes;
 use sqlbuild_core::run_on::main::render_refusal_report::render_refusal_report;
@@ -1408,6 +1409,11 @@ fn run_sql_tests<'py>(
     header.set_item("target", py.None())?;
     header.set_item("concurrency", concurrency)?;
     header.set_item("use_color", invocation.getattr("use_color")?)?;
+    let adapter_name: String = native_field(invocation, "adapter_name")?.extract()?;
+    header.set_item(
+        "engines",
+        execution_engines(&decisions, mode, &adapter_name),
+    )?;
     write_execution_header(py, Some(header))?;
     let timeout: RunTimeout = resolve_run_timeout(
         (

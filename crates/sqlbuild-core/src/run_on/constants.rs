@@ -2,6 +2,7 @@
 
 pub(crate) const AUTO: &str = "auto";
 pub(crate) const LOCAL: &str = "local";
+pub(crate) const DUCKDB_ENGINE: &str = "DuckDB";
 pub(crate) const WAREHOUSE: &str = "warehouse";
 pub(crate) const CANNOT_RUN_LOCALLY_TITLE: &str = "Can't run locally";
 pub(crate) const ON_THE_WAREHOUSE_TITLE: &str = "On the warehouse";

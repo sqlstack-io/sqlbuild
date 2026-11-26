@@ -59,3 +59,10 @@ pub(super) struct HeaderTestCase {
     pub(super) expected_causes: usize,
     pub(super) expected_explain_rows: usize,
 }
+
+pub(super) struct ExecutionEnginesTestCase {
+    pub(super) description: &'static str,
+    pub(super) decisions: Vec<RunOnDecision>,
+    pub(super) mode: RunOn,
+    pub(super) expected_engines: Option<&'static str>,
+}

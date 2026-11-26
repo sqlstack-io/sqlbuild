@@ -50,7 +50,8 @@ pub(super) struct ChildRowsTestCase {
 pub(super) struct RetainedTestCase {
     pub(super) description: &'static str,
     pub(super) rows: Vec<ScenarioResultRow>,
-    pub(super) relations: bool,
+    /// `--retain`, then `--verbose`.
+    pub(super) flags: (bool, bool),
     pub(super) expected_text: &'static str,
 }
 

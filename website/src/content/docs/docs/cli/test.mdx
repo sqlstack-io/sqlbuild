@@ -66,7 +66,7 @@ many of them timed out. A timeout still fails the run: `sqb test` exits non-zero
 Tests ready  5 selected, 4 local, 1 on the warehouse
   note: 1 test runs on the warehouse: fn:HASH 1 (--explain for where)
 
-Execution  sqb test  (concurrency: 4)
+Execution  sqb test  (concurrency: 4, DuckDB and snowflake)
 
 ✓ Test functions prepared  (0.05s)
 
@@ -98,6 +98,8 @@ Failed (1):
 ```
 
 - The header counts the selected tests and where they run.
+- The `Execution` line names the engines that run: `DuckDB`, or `DuckDB and <adapter>` when some
+  tests also run on the warehouse.
 - A model that more than one test targets heads its tests, and each row shows the test without
   the `<model>__` prefix. A long name is cut in the middle to fit the terminal.
 - A passing test is one row. A failed test also lists its expectations (`expected <model>`,

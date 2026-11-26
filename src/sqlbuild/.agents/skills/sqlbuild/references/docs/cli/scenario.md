@@ -132,7 +132,7 @@ line last:
 Scenarios ready  3 selected, 2 local, 1 on the warehouse
   note: 1 scenario runs on the warehouse: snapshot stale 1 (--explain for where)
 
-Execution  sqb scenario test  (concurrency: 1)
+Execution  sqb scenario test  (concurrency: 1, DuckDB and snowflake)
 
   1/3  scenario  daily_revenue_minimal       PASS   local        0.21s
   2/3  scenario  daily_revenue_multi_order   FAIL   local        0.34s
@@ -145,12 +145,6 @@ Failures:
     error     expected rows of daily_revenue differ: 1 missing, 1 extra (2 expected, 2 actual)
     duckdb    target/run/scenarios/daily_revenue_multi_order/local.duckdb
 
-Retained (2):
-  daily_revenue_minimal
-    duckdb    target/run/scenarios/daily_revenue_minimal/local.duckdb
-  daily_revenue_multi_order
-    duckdb    target/run/scenarios/daily_revenue_multi_order/local.duckdb
-
 Failed (1):
   ✗ daily_revenue_multi_order  2 rows differ
 
@@ -160,8 +154,11 @@ Failed (1):
 ```
 
 A passing scenario is one row; a failed one also lists its expected outputs and assertions and
-its error. `--verbose` lists them for passing scenarios too. `Retained (N):` lists the local DuckDB
-file each local run keeps, and with `--retain` the warehouse relations each scenario kept. A
+its error. `--verbose` lists them for passing scenarios too. The execution header names the
+engines that run: `DuckDB`, or `DuckDB and <adapter>` when some scenarios also run on the
+warehouse. With `--retain` or `--verbose`, a `Retained (N):` section lists the local DuckDB file
+each local run keeps; with `--retain` it also lists the warehouse relations each scenario kept. A
+failed local scenario always shows its DuckDB file under `Failures:`. A
 namespaced run prints `namespace <value> (from <source>)` under the header and in the detail
 lines. Each scenario row shows its wall time and the summary shows the total. `--json` reports
 the same values as `scenarios[].duration_ms` and `summary.duration_ms`. The `Statements:` line

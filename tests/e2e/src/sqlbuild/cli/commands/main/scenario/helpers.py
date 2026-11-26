@@ -519,7 +519,6 @@ def maybe_write_stale_order_totals_scenario(*, project_dir: Path, enabled: bool)
 def assert_local_duckdb_state(
     *,
     db_path: Path,
-    stdout: str,
     expected_exists: bool,
     query_when_exists: bool,
     count_sql: str,
@@ -531,7 +530,6 @@ def assert_local_duckdb_state(
 
     assert db_path.exists() is expected_exists
     for _ in range(int(query_when_exists)):
-        assert f"duckdb    {db_path.as_posix()}" in stdout
         rows: list[tuple[object, ...]] = query_duckdb(db_path=db_path, sql=count_sql)
         assert rows == [(expected_count,)]
         for value_rows_sql in (rows_sql,) * int(rows_sql is not None):
@@ -1496,4 +1494,6 @@ def prepare_snowflake_macro_scenario_project(*, tmp_path: Path) -> Path:
 def scenario_result_rows(*, output: str, name: str) -> list[tuple[str, str]]:
     """The status and run-on place of each result row of scenario `name` in `output`."""
 
-    return re.findall(rf"^{re.escape(name)}\s+(\S+)\s+(\S+)", output, flags=re.MULTILINE)
+    return re.findall(
+        rf"^\s*\d+/\d+\s+scenario\s+{re.escape(name)}\s+(\S+)\s+(\S+)", output, flags=re.MULTILINE
+    )
