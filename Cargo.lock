@@ -6555,6 +6555,7 @@ dependencies = [
 name = "sqlbuild-load"
 version = "0.0.0"
 dependencies = [
+ "sqlbuild-config",
  "sqlload",
  "toml",
 ]
