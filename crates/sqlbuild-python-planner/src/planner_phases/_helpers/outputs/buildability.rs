@@ -74,11 +74,7 @@ pub(crate) fn check_selected_scope_buildability<'py>(
         })
         .collect();
     let mut missing = missing_upstreams(&selected, &deps, &available);
-    let mut origins: std::collections::HashMap<(GraphKey, GraphKey), String> =
-        execution_origins(&project)?
-            .into_iter()
-            .map(|((key, read), label)| ((GraphKey::from(&key), GraphKey::from(&read)), label))
-            .collect();
+    let mut audit_origins: HashMap<(GraphKey, GraphKey), String> = HashMap::new();
     let mut not_run: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let mut built = available.clone();
     built.satisfied_keys.extend(selected.iter().cloned());
@@ -101,11 +97,16 @@ pub(crate) fn check_selected_scope_buildability<'py>(
                 ),
                 None => format!("audit '{}' reads '{}'", audit.key.name, miss.key.name),
             };
-            origins.insert((audit.key.clone(), miss.key.clone()), label);
+            audit_origins.insert((audit.key.clone(), miss.key.clone()), label);
         }
         missing.extend(misses);
     }
     if !missing.is_empty() {
+        let mut origins: HashMap<(GraphKey, GraphKey), String> = execution_origins(&project)?
+            .into_iter()
+            .map(|((key, read), label)| ((GraphKey::from(&key), GraphKey::from(&read)), label))
+            .collect();
+        origins.extend(audit_origins);
         let message = missing_upstream_message(
             &missing,
             &origins,
@@ -136,26 +137,28 @@ pub(crate) struct EndAudit {
     named: bool,
 }
 
-/// The selected audits that run after the build: singular audits, and attached audits selected by name whose target isn't built.
+/// The selected audits that run after the build: singular audits, and named attached audits whose target isn't built; unnamed attached audits are skipped first.
 pub(crate) fn end_audits(project: &Bound<'_, PyAny>, scope: &ScopeData) -> PyResult<Vec<EndAudit>> {
     let mut out: Vec<EndAudit> = Vec::new();
     for audit in audits(project)?.try_iter()? {
         let audit = audit?;
-        if !audit_is_selected(&audit, (&scope.selected, &scope.audits))? {
-            continue;
-        }
         let audit_name: String = name(&audit)?.extract()?;
         let named: bool = scope.audits.contains(&audit_name);
         let target: Option<String> = attached_target_name(&audit)?.extract()?;
         if let Some(target) = &target {
+            if !named {
+                continue;
+            }
             let kind = attached_target_kind(&audit)?;
             let kind: String = match kind.getattr_opt("value")? {
                 Some(value) => value.extract()?,
                 None => kind.extract()?,
             };
-            if !named || scope.selected.contains(&(kind, target.clone())) {
+            if scope.selected.contains(&(kind, target.clone())) {
                 continue;
             }
+        } else if !named && !audit_is_selected(&audit, (&scope.selected, &scope.audits))? {
+            continue;
         }
         let mut reads: Vec<GraphKey> = Vec::new();
         for read in scope_deps(&audit)?.try_iter()? {
