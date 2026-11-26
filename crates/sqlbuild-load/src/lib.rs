@@ -1,0 +1,1 @@
+//! Loads, loaders and sinks on SQLLoad's engine: SQLBuild's source connections and load blocks read into SQLLoad's types, and SQLBuild's warehouse connections as SQLLoad's caller sessions. Only the Python extension links it.

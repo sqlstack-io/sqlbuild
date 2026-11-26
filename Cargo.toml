@@ -23,6 +23,7 @@ members = [
     "crates/sqlbuild-refactor",
     "crates/sqlbuild-project",
     "crates/sqlbuild-cli",
+    "crates/sqlbuild-load",
     "crates/sqlbuild-python-base",
     "crates/sqlbuild-python-front",
     "crates/sqlbuild-python-project",
@@ -61,6 +62,7 @@ order = [
     "sqlbuild-refactor",
     "sqlbuild-project",
     "sqlbuild-cli",
+    "sqlbuild-load",
     "sqlbuild-python-base",
     "sqlbuild-python-front",
     "sqlbuild-python-project",
@@ -159,8 +161,12 @@ rusqlite = { version = "0.37", features = ["bundled", "column_decltype"] }
 rustix = { version = "1.1.4", default-features = false, features = ["event", "fs", "process", "pty", "std", "stdio", "termios"] }
 saphyr-parser = "0.1"
 regex = "1"
-object_store = { version = "0.13", default-features = false, features = ["fs", "aws"] }
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+object_store = { version = "0.14", default-features = false, features = ["fs", "aws"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
+# The loading engine behind loads, loaders and sinks: its library, without its CLI or its own DuckDB.
+# TODO(sqlload-release): a git pin of the unreleased caller-session destination; switch to the
+# crates.io release before the PR. `make check-sqlload-release` (in `make check-ci`) fails on it.
+sqlload = { git = "https://github.com/sqlstack-io/sqlload.git", rev = "3f59090f75c17d069cd07e9409c96a748cb3da32", default-features = false }
 serde = { version = "1", features = ["derive"] }
 # Reports every field a decode ignores; a worker refuses a run request it can only partly read.
 serde_ignored = "0.1"
@@ -193,6 +199,7 @@ sqlbuild-config = { path = "crates/sqlbuild-config" }
 sqlbuild-core = { path = "crates/sqlbuild-core" }
 sqlbuild-cursor = { path = "crates/sqlbuild-cursor" }
 sqlbuild-discovery = { path = "crates/sqlbuild-discovery" }
+sqlbuild-load = { path = "crates/sqlbuild-load" }
 sqlbuild-host = { path = "crates/sqlbuild-host" }
 sqlbuild-render = { path = "crates/sqlbuild-render" }
 sqlbuild-refactor = { path = "crates/sqlbuild-refactor" }

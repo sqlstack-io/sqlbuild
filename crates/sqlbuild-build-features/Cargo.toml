@@ -14,6 +14,56 @@ rust-version.workspace = true
 # crate, so the extension build sees them too and stays unchanged. `make check-build-features`
 # fails when the two builds resolve a shared crate differently.
 [dependencies]
+zstd-safe = { version = "8.4", default-features = false, features = ["alloc", "arrays", "legacy", "std", "zdict_builder"] }
+zstd = { version = "0.14", default-features = true, features = ["arrays", "legacy", "zdict_builder"] }
+polyval = { version = "0.7", default-features = false, features = ["hazmat", "zeroize"] }
+ghash = { version = "0.6", default-features = false, features = ["zeroize"] }
+cipher = { version = "0.5", default-features = false, features = ["block-buffer", "block-padding", "rand_core", "stream-wrapper"] }
+aes-gcm = { version = "0.11", default-features = false, features = ["aes", "zeroize"] }
+aes = { version = "0.9", default-features = false, features = ["zeroize"] }
+aead = { version = "0.6", default-features = false, features = ["rand_core"] }
+async-compression = { version = "0.4", default-features = false, features = ["gzip", "tokio", "zstd"] }
+bitflags = { version = "2.13", default-features = false, features = ["serde", "serde_core"] }
+chacha20 = { version = "0.10", default-features = false, features = ["cipher", "legacy", "rng", "zeroize"] }
+compression-codecs = { version = "0.4", default-features = false, features = ["flate2", "gzip", "libzstd", "memchr", "zstd", "zstd-safe"] }
+crc32fast = { version = "1.5", default-features = true, features = ["std"] }
+crypto-bigint = { version = "0.7", default-features = true, features = ["alloc", "getrandom", "hybrid-array", "rand_core", "subtle", "zeroize"] }
+curve25519-dalek = { version = "5.0", default-features = true, features = ["alloc", "digest", "precomputed-tables", "rand_core", "zeroize"] }
+digest = { version = "0.11", default-features = true, features = ["alloc", "block-api", "mac", "oid", "rand_core"] }
+ecdsa = { version = "0.17", default-features = true, features = ["algorithm", "alloc", "der", "digest", "getrandom", "pem", "pkcs8", "spki", "std"] }
+ed25519-dalek = { version = "3.0", default-features = true, features = ["alloc", "fast", "pem", "pkcs8", "rand_core", "signature", "zeroize"] }
+elliptic-curve = { version = "0.14", default-features = true, features = ["alloc", "arithmetic", "digest", "ecdh", "ff", "getrandom", "group", "pem", "pkcs8", "sec1", "std"] }
+flate2 = { version = "1.1", default-features = true, features = ["any_impl", "any_zlib", "miniz_oxide", "runtime_detection", "rust_backend", "zlib-rs"] }
+futures-util = { version = "0.3", default-features = true, features = ["alloc", "async-await", "async-await-macro", "channel", "futures-channel", "futures-io", "futures-macro", "futures-sink", "io", "memchr", "sink", "slab", "std"] }
+generic-array = { version = "0.14", default-features = false, features = ["more_lengths", "zeroize"] }
+getrandom = { version = "0.3", default-features = false, features = ["std"] }
+hashbrown = { version = "0.17", default-features = false, features = ["inline-more"] }
+hybrid-array = { version = "0.4", default-features = false, features = ["alloc", "ctutils", "extra-sizes", "subtle", "zeroize"] }
+hyper-rustls = { version = "0.27", default-features = false, features = ["aws-lc-rs", "http1", "http2", "native-tokio", "ring", "rustls-native-certs", "tls12", "webpki-roots", "webpki-tokio"] }
+hyper-util = { version = "0.1", default-features = true, features = ["client", "client-legacy", "client-proxy", "http1", "http2", "server", "server-auto", "service", "tokio"] }
+md-5 = { version = "0.11", default-features = true, features = ["alloc", "oid"] }
+object_store = { version = "0.14", default-features = false, features = ["aws", "aws-base", "aws-lc-rs", "base64", "cloud-base", "crc-fast", "form_urlencoded", "fs", "gcp-base", "http-body-util", "hyper", "md-5", "nix", "quick-xml", "rand", "reqwest", "ring", "rustls-pki-types", "serde", "serde_json", "serde_urlencoded", "tokio", "walkdir", "windows-sys"] }
+p256 = { version = "0.14", default-features = true, features = ["alloc", "arithmetic", "digest", "ecdh", "ecdsa", "ecdsa-core", "getrandom", "pem", "pkcs8", "precomputed-tables", "sha2", "sha256", "std"] }
+p384 = { version = "0.14", default-features = true, features = ["alloc", "arithmetic", "digest", "ecdh", "ecdsa", "ecdsa-core", "getrandom", "pem", "pkcs8", "precomputed-tables", "sha2", "sha384", "std"] }
+pkcs8 = { version = "0.11", default-features = false, features = ["alloc", "encryption", "pem", "pkcs5", "std"] }
+rand = { version = "0.10", default-features = true, features = ["alloc", "std", "std_rng", "sys_rng", "thread_rng"] }
+reqwest-v012 = { package = "reqwest", version = "0.12", default-features = false, features = ["__rustls", "__rustls-ring", "__tls", "json", "rustls-tls", "rustls-tls-native-roots", "rustls-tls-native-roots-no-provider", "rustls-tls-webpki-roots", "rustls-tls-webpki-roots-no-provider"] }
+reqwest-v013 = { package = "reqwest", version = "0.13", default-features = false, features = ["__rustls", "__rustls-aws-lc-rs", "__tls", "form", "gzip", "http2", "json", "query", "rustls", "rustls-no-provider", "stream"] }
+ring = { version = "0.17", default-features = true, features = ["alloc", "dev_urandom_fallback", "std"] }
+rustls = { version = "0.23", default-features = false, features = ["aws-lc-rs", "aws_lc_rs", "log", "logging", "ring", "std", "tls12"] }
+sha2 = { version = "0.11", default-features = true, features = ["alloc", "oid"] }
+simd-adler32 = { version = "0.3", default-features = false, features = ["std"] }
+tokio = { version = "1.54", default-features = true, features = ["bytes", "fs", "io-std", "io-util", "libc", "macros", "mio", "net", "process", "rt", "rt-multi-thread", "signal", "signal-hook-registry", "socket2", "sync", "time", "tokio-macros"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["aws-lc-rs", "aws_lc_rs", "logging", "ring", "tls12"] }
+tokio-stream = { version = "0.1", default-features = true, features = ["fs", "net", "time"] }
+tokio-util = { version = "0.7", default-features = true, features = ["codec", "futures-util", "io", "libc", "rt"] }
+toml_edit = { version = "0.25", default-features = true, features = ["display", "parse"] }
+toml_writer = { version = "1.1", default-features = true, features = ["alloc", "std"] }
+tower = { version = "0.5", default-features = false, features = ["balance", "buffer", "discover", "futures-core", "futures-util", "indexmap", "limit", "load", "load-shed", "make", "pin-project-lite", "ready-cache", "retry", "slab", "sync_wrapper", "timeout", "tokio", "tokio-util", "tracing", "util"] }
+tower-http = { version = "0.6", default-features = false, features = ["compression-gzip", "decompression-gzip", "follow-redirect", "futures-core", "futures-util", "tokio-util", "tower"] }
+uuid = { version = "1.18", default-features = true, features = ["rng", "serde", "sha1", "std", "v4", "v5", "v7"] }
+zerocopy = { version = "0.8", default-features = false, features = ["derive", "simd", "zerocopy-derive"] }
+zstd-sys = { version = "2.2", default-features = true, features = ["legacy", "std", "zdict_builder"] }
 arrayvec.workspace = true
 bstr.workspace = true
 either.workspace = true
@@ -25,15 +75,24 @@ thiserror.workspace = true
 # signal-hook's registry, in the extension only, enables these on the platforms that use them.
 [target.'cfg(unix)'.dependencies]
 errno.workspace = true
+bitflags = { version = "2.13", default-features = false, features = ["std"] }
+byteorder = { version = "1.5", default-features = true, features = ["std"] }
+nix = { version = "0.31", default-features = true, features = ["fs", "mman", "resource"] }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys.workspace = true
+tokio = { version = "1.54", default-features = false, features = ["windows-sys"] }
+windows-sys = { workspace = true, features = ["Wdk", "Wdk_Foundation", "Wdk_Storage", "Wdk_Storage_FileSystem", "Wdk_System", "Wdk_System_IO", "Win32", "Win32_Foundation", "Win32_Networking", "Win32_Networking_WinSock", "Win32_Security", "Win32_Security_Authentication", "Win32_Security_Authentication_Identity", "Win32_Security_Authorization", "Win32_Security_Credentials", "Win32_Security_Cryptography", "Win32_Storage", "Win32_Storage_FileSystem", "Win32_System", "Win32_System_Com", "Win32_System_Console", "Win32_System_Diagnostics", "Win32_System_Diagnostics_Debug", "Win32_System_Diagnostics_ToolHelp", "Win32_System_IO", "Win32_System_Ioctl", "Win32_System_JobObjects", "Win32_System_LibraryLoader", "Win32_System_Memory", "Win32_System_Pipes", "Win32_System_ProcessStatus", "Win32_System_SystemInformation", "Win32_System_SystemServices", "Win32_System_Threading", "Win32_System_WindowsProgramming", "Win32_UI", "Win32_UI_Shell"] }
+
+[target.'cfg(any(target_os = "macos", windows))'.dependencies]
+num-integer = { version = "0.1", default-features = false, features = ["i128", "std"] }
+zeroize = { version = "1.9", default-features = true, features = ["alloc", "derive", "zeroize_derive"] }
 
 # Proc-macro dependencies resolve with build dependencies, so the syn features PyO3's macros use
 # are enabled here. The empty build script makes Cargo resolve them.
 [build-dependencies]
-syn-v2-macro-features.workspace = true
+syn-v2-macro-features = { workspace = true, features = ["clone-impls", "derive", "extra-traits", "fold", "full", "parsing", "printing", "proc-macro", "visit", "visit-mut"] }
 syn-v3-macro-features.workspace = true
+memchr = { version = "2.8", features = ["alloc", "std"] }
 
 [lints]
 workspace = true

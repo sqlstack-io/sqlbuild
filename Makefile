@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: verify verify-quick verify-pg coverage cli-preview rust-check check-native-layering check-parse-guard check-dupes-new check-native-stub check-build-features check-python-boundary check-release-gate check-docs-skill check-control-client \
+.PHONY: verify verify-quick verify-pg coverage cli-preview rust-check check-native-layering check-parse-guard check-dupes-new check-native-stub check-build-features check-sqlload-release check-python-boundary check-release-gate check-docs-skill check-control-client \
 	check-e2e-shards check-test-shards test-shard-core test-shard-publication test-shard-history \
 	test-e2e-duckdb test-e2e-duckdb-build-core \
 	test-e2e-duckdb-build-incremental \
@@ -751,7 +751,7 @@ verify-quick:
 	exit $$status
 
 
-check-ci: check-dupes-new check-e2e-shards check-test-shards check-native-layering check-parse-guard check-native-stub check-build-features check-python-boundary check-release-gate check-docs-skill check-control-client rust-lint
+check-ci: check-dupes-new check-e2e-shards check-test-shards check-native-layering check-parse-guard check-native-stub check-build-features check-sqlload-release check-python-boundary check-release-gate check-docs-skill check-control-client rust-lint
 	uv run ruff format --check .
 	uv run ruff check .
 	uv run ty check src tests
@@ -780,6 +780,14 @@ check-parse-guard:
 
 check-build-features:
 	uv run python -m scripts.check_build_features
+
+
+# A release links SQLLoad from crates.io only; a git pin is for unreleased work on a branch.
+check-sqlload-release:
+	@if grep -Eq '^sqlload = .*git *=' Cargo.toml; then \
+		echo "Cargo.toml pins sqlload to git; depend on its crates.io release before merging (TODO(sqlload-release))." >&2; \
+		exit 1; \
+	fi
 
 
 check-python-boundary:
