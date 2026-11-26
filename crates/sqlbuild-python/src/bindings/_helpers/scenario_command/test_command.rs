@@ -43,8 +43,9 @@ use crate::bindings::_helpers::scenario_command::presentation::{
 };
 use crate::bindings::_helpers::scenario_command::setup::{
     CompileInputs, ScenarioProject, boolean, cli_user_error, compile, discover_project, flush, int,
-    optional_text, project_adapter_name, project_connection_config, require_capture_dialect,
-    require_sql_analysis, resolve_adapter, selected_scenarios, style, text, write, write_headers,
+    offline_project_connection_config, optional_text, project_adapter_name,
+    project_connection_config, require_capture_dialect, require_sql_analysis, resolve_adapter,
+    selected_scenarios, style, text, write, write_headers,
 };
 use crate::bindings::_helpers::scenario_command::snapshot_sync::{LocalSync, sync_local_snapshots};
 use crate::bindings::_helpers::sql_test_command::test_command::timeout_record;
@@ -465,7 +466,7 @@ fn select_changed<'py>(
     ))
 }
 
-/// A compiled, selected and `--since`-narrowed set of scenarios, and the `--since` JSON.
+/// The project compiled in its own dialect, its selected scenarios and the `--since` JSON.
 fn compiled<'py>(
     request: &Bound<'py, PyAny>,
     run: &TestRun<'py>,
@@ -473,19 +474,22 @@ fn compiled<'py>(
     base: Option<BaseComparison>,
 ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyTuple>, Option<String>)> {
     let py: Python<'py> = request.py();
-    let no_sql_validation: bool = run.local || flag(request, "no_sql_validation")?;
+    let connection_config: Bound<'py, PyAny> = if run.local {
+        offline_project_connection_config(&run.project)?
+    } else {
+        run.connection_config.clone()
+    };
     let compiled: PyResult<Bound<'_, PyAny>> = compile(
         &run.project,
         CompileInputs {
-            adapter: &run.adapter,
+            adapter: &run.project_adapter,
             options: &[
-                ("no_sql_validation", boolean(py, no_sql_validation)),
-                ("source_deferral_enabled", boolean(py, false)),
-                ("connection_config", run.connection_config.clone()),
                 (
-                    "source_lexical_syntax",
-                    native_field(&run.project_adapter, "sql_lexical_syntax")?,
+                    "no_sql_validation",
+                    boolean(py, flag(request, "no_sql_validation")?),
                 ),
+                ("source_deferral_enabled", boolean(py, false)),
+                ("connection_config", connection_config),
             ],
             planning,
         },
@@ -639,26 +643,11 @@ pub(crate) fn run_scenario_test_command(
         run
     } else {
         let mut remote: TestRun<'_> = prepare(request, discover_project(py, request)?, false)?;
-        let quiet: Bound<'_, PyAny> = Bound::new(
-            py,
-            sqlbuild_python_output::build_progress::models::PlanningProgressReporter::new(
-                py,
-                &remote.stream,
-                remote.style.use_color,
-            )?,
-        )?
-        .into_any();
-        let remote_base: Option<BaseComparison> = since_base(request, &remote)?;
-        let (remote_pipeline, remote_scenarios, _remote_since_json) =
-            compiled(request, &remote, &quiet, remote_base)?;
         remote.since_json = run.since_json.clone();
         results.extend(execute_batch(
             request,
             &remote,
-            (
-                &remote_pipeline,
-                &named(&remote_scenarios, &warehouse_names)?,
-            ),
+            (&pipeline, &named(&scenarios, &warehouse_names)?),
             (&section, false),
         )?);
         remote

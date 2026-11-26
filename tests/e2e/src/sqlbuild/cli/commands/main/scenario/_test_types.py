@@ -381,3 +381,15 @@ class GuardedScenarioRunOnTestCase:
     run_on: str
     expected_text: str
     expected_local_lines: int
+
+
+@dataclass(frozen=True)
+class SnowflakeMacroScenarioRunOnTestCase:
+    """A command over a Snowflake project with Snowflake-only macros, and what it reports."""
+
+    description: str
+    command: tuple[str, ...]
+    expected_returncode: int
+    expected_rows: tuple[tuple[str, str, str], ...]
+    expected_absent_rows: tuple[str, ...]
+    expected_fragments: tuple[str, ...]
