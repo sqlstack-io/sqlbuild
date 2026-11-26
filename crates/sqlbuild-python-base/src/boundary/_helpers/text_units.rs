@@ -7,7 +7,7 @@ use pyo3::types::{PyBytes, PyBytesMethods, PyString};
 pub(crate) fn utf16_units(text: &Bound<'_, PyString>) -> PyResult<Vec<u16>> {
     let encoded: Bound<'_, PyBytes> = text
         .call_method1("encode", ("utf-16-le", "surrogatepass"))?
-        .downcast_into::<PyBytes>()?;
+        .cast_into::<PyBytes>()?;
     Ok(encoded
         .as_bytes()
         .as_chunks::<2>()

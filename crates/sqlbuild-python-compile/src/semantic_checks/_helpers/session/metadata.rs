@@ -549,7 +549,7 @@ fn metadata_model(classes: &StageClasses<'_>, model: &Bound<'_, PyAny>) -> PyRes
 fn metadata_audits(model: &Bound<'_, PyAny>) -> PyResult<Vec<MetadataAudit>> {
     let py: Python<'_> = model.py();
     let mut attached: Vec<(Option<String>, AuditInstance<'_>)> = Vec::new();
-    match model.downcast::<NativeCompiledModel>() {
+    match model.cast::<NativeCompiledModel>() {
         Ok(view) => {
             let Some((entry_audits, columns, audited)) =
                 view.get().schema_audits_and_columns(py)?

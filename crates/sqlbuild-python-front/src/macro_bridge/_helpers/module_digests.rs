@@ -56,8 +56,8 @@ pub(crate) fn module_digests_metadata<'py>(
     for item in mapping_items(digests)?.try_iter()? {
         let item: Bound<'py, PyAny> = item?;
         rows.push((
-            text(item.get_item(0)?.downcast::<PyString>()?)?,
-            text(item.get_item(1)?.downcast::<PyString>()?)?,
+            text(item.get_item(0)?.cast::<PyString>()?)?,
+            text(item.get_item(1)?.cast::<PyString>()?)?,
         ));
     }
     let encoded: String = metadata_text(rows).map_err(emit_error)?;
@@ -66,7 +66,7 @@ pub(crate) fn module_digests_metadata<'py>(
 
 /// Whether a decoded metadata row is a list of a path and a digest.
 fn digest_row_check(row: &Bound<'_, PyAny>) -> PyResult<bool> {
-    let Ok(row) = row.downcast::<PyList>() else {
+    let Ok(row) = row.cast::<PyList>() else {
         return Ok(false);
     };
     if row.len() != MODULE_DIGEST_ROW_FIELDS {
@@ -93,7 +93,7 @@ pub(crate) fn unchanged_module_digests<'py>(
         Err(error) if error.is_instance_of::<PyValueError>(py) => return Ok(None),
         Err(error) => return Err(error),
     };
-    let Ok(rows) = rows.downcast::<PyList>() else {
+    let Ok(rows) = rows.cast::<PyList>() else {
         return Ok(None);
     };
     for row in rows.iter() {

@@ -301,7 +301,7 @@ fn seed(seed: &Bound<'_, PyAny>) -> PyResult<ManifestSeedInput> {
 fn macros(project: &Bound<'_, PyAny>) -> PyResult<Vec<ManifestMacroInput>> {
     let loaded: Bound<'_, PyAny> = attribute(project, "loaded_macros")?;
     let mut macros: Vec<ManifestMacroInput> = Vec::new();
-    for (key, loaded_macro) in loaded.downcast::<PyDict>()?.iter() {
+    for (key, loaded_macro) in loaded.cast::<PyDict>()?.iter() {
         macros.push(ManifestMacroInput {
             key: key.extract()?,
             name: text(&loaded_macro, "name")?,

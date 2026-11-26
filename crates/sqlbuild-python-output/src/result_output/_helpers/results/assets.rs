@@ -172,7 +172,7 @@ fn microbatch<'py>(
     if summary.is_none() {
         return Ok(summary);
     }
-    let state: &Bound<'py, PyDict> = summary.downcast()?;
+    let state: &Bound<'py, PyDict> = summary.cast()?;
     let intervals: Bound<'py, PyList> = PyList::empty(py);
     for interval in &result.microbatch_accounting_intervals {
         pyo3::types::PyListMethods::append(

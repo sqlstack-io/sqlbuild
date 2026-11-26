@@ -99,7 +99,7 @@ fn model_names_and_paths(scope: &Scope<'_, '_>) -> PyResult<Vec<(String, PathBuf
         let relative_path: Bound<'_, PyAny> = native_field(&model_file, "relative_path")?;
         let configured: Bound<'_, PyAny> =
             native_field(&model_file, "header_values")?.call_method1("get", ("name",))?;
-        let name: String = match configured.downcast::<PyString>() {
+        let name: String = match configured.cast::<PyString>() {
             Ok(text) if !text.to_str()?.is_empty() => text.to_str()?.to_owned(),
             _ => native_field(&relative_path, "stem")?.extract()?,
         };

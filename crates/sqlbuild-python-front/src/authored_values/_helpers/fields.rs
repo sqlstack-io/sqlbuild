@@ -49,7 +49,7 @@ pub(crate) fn optional_named_string<'py>(
     if setting.raw_value.is_none() {
         return Ok(setting.raw_value);
     }
-    let blank: bool = match setting.raw_value.downcast::<PyString>() {
+    let blank: bool = match setting.raw_value.cast::<PyString>() {
         Ok(text) => text.to_cow()?.trim().is_empty(),
         Err(_) => true,
     };

@@ -102,7 +102,7 @@ impl<'py> PythonTypes<'py> {
         if value.is_instance(self.bytes_like.as_any())? {
             let data: Bound<'py, PyBytes> = imported(value.py(), "builtins", "bytes")?
                 .call1((value,))?
-                .downcast_into::<PyBytes>()?;
+                .cast_into::<PyBytes>()?;
             let digest: String = self
                 .sha256
                 .call1((&data,))?

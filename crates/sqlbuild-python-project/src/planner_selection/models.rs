@@ -101,9 +101,7 @@ impl<'py> Carrier<'py> {
         let restored: Bound<'py, PyString> = PyString::new(self.py, text);
         match &self.tables {
             None => Ok(restored),
-            Some((_, back)) => Ok(restored
-                .call_method1("translate", (back,))?
-                .downcast_into()?),
+            Some((_, back)) => Ok(restored.call_method1("translate", (back,))?.cast_into()?),
         }
     }
 

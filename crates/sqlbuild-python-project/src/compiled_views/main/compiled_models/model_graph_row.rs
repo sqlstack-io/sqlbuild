@@ -18,7 +18,7 @@ pub fn model_graph_row(model: &NativeCompiledModel, py: Python<'_>) -> PyResult<
         let compiled: &CompiledRecord = compiled_of(record)?;
         let values: Bound<'_, PyAny> = native_field(record.host.config.bind(py), VALUES_ATTRIBUTE)?;
         let mut tags: Vec<String> = Vec::new();
-        if let Some(value) = values.downcast::<PyDict>()?.get_item(TAGS_KEY)?
+        if let Some(value) = values.cast::<PyDict>()?.get_item(TAGS_KEY)?
             && (value.is_instance_of::<pyo3::types::PyList>()
                 || value.is_instance_of::<pyo3::types::PyTuple>())
         {

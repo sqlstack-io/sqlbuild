@@ -45,7 +45,7 @@ pub(crate) fn declaration(
 ) -> PyResult<LoadDeclaration> {
     let name: String = native_field(load, "name")?.extract()?;
     let mut settings = toml::Table::new();
-    for (key, value) in native_field(load, "settings")?.downcast::<PyDict>()?.iter() {
+    for (key, value) in native_field(load, "settings")?.cast::<PyDict>()?.iter() {
         let key: String = key.str()?.to_string();
         if key == LOAD_NAME_KEY {
             continue;

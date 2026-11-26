@@ -138,10 +138,7 @@ fn deferred_migration_origins<'py>(
             &Dialect::passed(args.value("dialect")?)?,
             &PlannerReads::passed(args.value("reads")?)?,
         ),
-        (
-            locations.downcast::<PyDict>()?,
-            relations.downcast::<PyDict>()?,
-        ),
+        (locations.cast::<PyDict>()?, relations.cast::<PyDict>()?),
         &unselected_upstream_models(scopes)?,
     )
 }

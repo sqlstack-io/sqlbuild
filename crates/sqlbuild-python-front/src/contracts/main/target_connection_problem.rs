@@ -55,7 +55,7 @@ fn kind_and_keys(merged: &Pairs<'_>) -> PyResult<(Option<String>, Vec<String>)> 
     for (key, value) in merged {
         let key: String = key.text();
         if key == CONNECTION_KIND_KEY {
-            kind = Some(match value.downcast::<PyString>() {
+            kind = Some(match value.cast::<PyString>() {
                 Ok(text) => text.to_string_lossy().into_owned(),
                 Err(_) => value.repr()?.to_string(),
             });

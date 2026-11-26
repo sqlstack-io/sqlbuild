@@ -96,10 +96,10 @@ fn plain_scalar(value: &Bound<'_, PyAny>) -> PyResult<Option<Scalar>> {
     if value.is_none() {
         return Ok(Some(Scalar::Null));
     }
-    if let Ok(flag) = value.downcast_exact::<PyBool>() {
+    if let Ok(flag) = value.cast_exact::<PyBool>() {
         return Ok(Some(Scalar::Bool(flag.is_true())));
     }
-    if let Ok(text) = value.downcast_exact::<PyString>() {
+    if let Ok(text) = value.cast_exact::<PyString>() {
         return Ok(Some(Scalar::Text(text.to_str()?.to_owned())));
     }
     if value.is_exact_instance_of::<PyInt>() {

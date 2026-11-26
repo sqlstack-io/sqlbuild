@@ -115,7 +115,7 @@ keyring = { version = "3.6.3", default-features = false }
 # partly used 2 MiB page then stays resident in full, which raises peak memory.
 mimalloc = { version = "0.1", default-features = false, features = ["local_dynamic_tls", "no_thp"] }
 proc-macro2 = { version = "1", features = ["span-locations"] }
-pyo3 = { version = "0.26", features = ["abi3-py312"] }
+pyo3 = { version = "0.29", features = ["abi3-py312"] }
 rpassword = "7.5.4"
 rcgen = "0.14"
 polyglot-sql = { git = "https://github.com/sqlstack-io/polyglot.git", rev = "8767d688c5b504ad609645e27ab77a260d91c5a1", default-features = false, features = [

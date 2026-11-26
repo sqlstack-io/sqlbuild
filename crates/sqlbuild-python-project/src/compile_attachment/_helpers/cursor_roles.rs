@@ -17,7 +17,7 @@ pub(crate) fn role_blocks<'py>(
     for (relation, block) in authored.iter() {
         let (true, Ok(block)) = (
             relation.is_instance_of::<PyString>(),
-            block.downcast::<PyDict>(),
+            block.cast::<PyDict>(),
         ) else {
             continue;
         };
@@ -26,10 +26,8 @@ pub(crate) fn role_blocks<'py>(
         let (Some(column), Some(roles)) = (column, roles) else {
             continue;
         };
-        let (true, Ok(roles)) = (
-            column.is_instance_of::<PyString>(),
-            roles.downcast::<PyList>(),
-        ) else {
+        let (true, Ok(roles)) = (column.is_instance_of::<PyString>(), roles.cast::<PyList>())
+        else {
             continue;
         };
         if roles.contains(FILTER_ROLE)? {

@@ -27,7 +27,7 @@ pub(crate) fn text(value: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
 fn json_items(dict: &Bound<'_, PyDict>) -> PyResult<Option<Value>> {
     let mut entries: Map<String, Value> = Map::new();
     for (key, item) in dict.iter() {
-        let Ok(key) = key.downcast::<PyString>() else {
+        let Ok(key) = key.cast::<PyString>() else {
             return Ok(None);
         };
         let Some(item) = json_value(&item)? else {
@@ -43,7 +43,7 @@ fn json_value(value: &Bound<'_, PyAny>) -> PyResult<Option<Value>> {
     if value.is_none() {
         return Ok(Some(Value::Null));
     }
-    if let Ok(flag) = value.downcast::<PyBool>() {
+    if let Ok(flag) = value.cast::<PyBool>() {
         return Ok(Some(Value::Bool(flag.is_true())));
     }
     if value.is_instance_of::<PyInt>() {
@@ -54,7 +54,7 @@ fn json_value(value: &Bound<'_, PyAny>) -> PyResult<Option<Value>> {
     if value.is_instance_of::<PyFloat>() {
         return Ok(Number::from_f64(value.extract::<f64>()?).map(Value::Number));
     }
-    if let Ok(text) = value.downcast::<PyString>() {
+    if let Ok(text) = value.cast::<PyString>() {
         return Ok(Some(Value::String(escaped_text(text)?)));
     }
     if value.is_instance_of::<PyList>() || value.is_instance_of::<PyTuple>() {
@@ -67,10 +67,10 @@ fn json_value(value: &Bound<'_, PyAny>) -> PyResult<Option<Value>> {
         }
         return Ok(Some(Value::Array(items)));
     }
-    if let Ok(dict) = value.downcast::<PyDict>() {
+    if let Ok(dict) = value.cast::<PyDict>() {
         return json_items(dict);
     }
-    if let Ok(mapping) = value.downcast::<PyMapping>() {
+    if let Ok(mapping) = value.cast::<PyMapping>() {
         let dict: Bound<'_, PyDict> = PyDict::new(value.py());
         dict.update(mapping)?;
         return json_items(&dict);

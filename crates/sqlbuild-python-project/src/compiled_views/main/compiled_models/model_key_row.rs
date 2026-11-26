@@ -10,12 +10,12 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 /// The declared key facts of a model input or compiled model.
 pub fn model_key_row(model: &Bound<'_, PyAny>) -> PyResult<RelationKeyRow> {
     let py: Python<'_> = model.py();
-    if let Ok(input) = model.downcast::<NativeModelInput>() {
+    if let Ok(input) = model.cast::<NativeModelInput>() {
         return input.get().read_with_owner(py, |owner, record| {
             model_relation_key_row(owner, record, py)
         });
     }
-    if let Ok(compiled) = model.downcast::<NativeCompiledModel>() {
+    if let Ok(compiled) = model.cast::<NativeCompiledModel>() {
         return compiled.get().relation_key_row(py);
     }
     native_field(model, "relation_key_row")?.extract()

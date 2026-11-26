@@ -57,7 +57,7 @@ pub(crate) fn session_connections(
 ) -> PyResult<BTreeMap<String, SessionConnection>> {
     let mut connections: BTreeMap<String, SessionConnection> = BTreeMap::new();
     for (name, session) in sessions.iter() {
-        let session: &Bound<'_, PyDict> = session.downcast()?;
+        let session: &Bound<'_, PyDict> = session.cast()?;
         let opener: Py<PyAny> = required(session, OPENER)?.unbind();
         let connection = session_connection(
             &required(session, ADAPTER)?.extract::<String>()?,

@@ -118,7 +118,7 @@ pub(crate) fn expanded<'py>(
     let memo: Option<Bound<'py, MacroCallMemo>> = if bridge.is_none() {
         None
     } else {
-        Some(bridge.getattr(MEMO_ATTRIBUTE)?.downcast_into()?)
+        Some(bridge.getattr(MEMO_ATTRIBUTE)?.cast_into()?)
     };
     let call_classes: Option<Vec<CallClass>> = match &memo {
         Some(memo) => this.call_classes(&classes, memo.get(), &scan)?,

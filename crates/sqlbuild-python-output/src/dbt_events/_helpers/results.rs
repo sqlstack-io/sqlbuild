@@ -76,8 +76,11 @@ pub(crate) fn python_result<'py>(
     )
 }
 
-fn field<T: for<'a> pyo3::FromPyObject<'a>>(value: &Bound<'_, PyAny>, name: &str) -> PyResult<T> {
-    native_field(value, name)?.extract()
+fn field<T: for<'py> pyo3::prelude::FromPyObjectOwned<'py>>(
+    value: &Bound<'_, PyAny>,
+    name: &str,
+) -> PyResult<T> {
+    native_field(value, name)?.extract().map_err(Into::into)
 }
 
 /// A Python `DbtNodeExecutionResult` as plain data.

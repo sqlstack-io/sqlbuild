@@ -47,7 +47,7 @@ fn parsed_tolerances<'py>(raw: &Bound<'py, PyAny>, label: &str) -> PyResult<Boun
     if raw.is_none() {
         return class.call0();
     }
-    let Ok(mapping) = raw.downcast::<PyDict>() else {
+    let Ok(mapping) = raw.cast::<PyDict>() else {
         return Err(input_error(
             py,
             format!("{label} must be a mapping"),
@@ -82,7 +82,7 @@ fn tolerance_section<'py>(
     let Some(raw) = raw.filter(|raw| !raw.is_none()) else {
         return Ok(parsed);
     };
-    let Ok(mapping) = raw.downcast::<PyDict>() else {
+    let Ok(mapping) = raw.cast::<PyDict>() else {
         return Err(input_error(
             py,
             format!("{label} must be a mapping"),
@@ -90,7 +90,7 @@ fn tolerance_section<'py>(
         ));
     };
     for (key, rule) in mapping.iter() {
-        let Ok(text) = key.downcast::<PyString>() else {
+        let Ok(text) = key.cast::<PyString>() else {
             return Err(input_error(
                 py,
                 format!("{label} keys must be non-empty strings"),
@@ -120,7 +120,7 @@ fn tolerance_section<'py>(
 
 fn tolerance_rule<'py>(raw: &Bound<'py, PyAny>, label: &str) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = raw.py();
-    let Ok(mapping) = raw.downcast::<PyDict>() else {
+    let Ok(mapping) = raw.cast::<PyDict>() else {
         return Err(input_error(
             py,
             format!("{label} must be a mapping"),
@@ -252,7 +252,7 @@ pub(crate) fn cli_tolerance_overrides<'py>(
             return Err(input_error(py, CLI_TOLERANCE_MESSAGE.to_owned(), "X408"));
         };
         let rule: Bound<'py, PyDict> = match by_column.get_item(column)? {
-            Some(rule) => rule.downcast_into()?,
+            Some(rule) => rule.cast_into()?,
             None => {
                 let rule: Bound<'py, PyDict> = PyDict::new(py);
                 by_column.set_item(column, &rule)?;
@@ -329,8 +329,8 @@ fn merge_row_diff_tolerances<'py>(
     }
     let merged = |field: &str| -> PyResult<Bound<'py, PyAny>> {
         let combined: Bound<'py, PyDict> = PyDict::new(py);
-        combined.update(native_field(&base, field)?.downcast()?.as_mapping())?;
-        combined.update(native_field(&overlay, field)?.downcast()?.as_mapping())?;
+        combined.update(native_field(&base, field)?.cast()?.as_mapping())?;
+        combined.update(native_field(&overlay, field)?.cast()?.as_mapping())?;
         Ok(combined.into_any())
     };
     call_with(

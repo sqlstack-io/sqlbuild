@@ -15,10 +15,7 @@ pub(crate) fn loader_declaration(
     let name: String = native_field(loader, "name")?.extract()?;
     let module: String = native_field(loader, "relative_path")?.str()?.to_string();
     let mut settings = toml::Table::new();
-    for (key, value) in native_field(loader, "settings")?
-        .downcast::<PyDict>()?
-        .iter()
-    {
+    for (key, value) in native_field(loader, "settings")?.cast::<PyDict>()?.iter() {
         if let Some(value) = toml_value(&value)? {
             settings.insert(key.str()?.to_string(), value);
         }

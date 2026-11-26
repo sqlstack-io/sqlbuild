@@ -41,7 +41,7 @@ pub fn planned_load_projects<'py>(
                 project_config: &project_config,
                 local_config: &local_config,
             },
-            effective_vars.downcast()?,
+            effective_vars.cast()?,
             (&name, &native_field(&load, "settings")?),
             &LoadTarget {
                 name: target.to_owned(),

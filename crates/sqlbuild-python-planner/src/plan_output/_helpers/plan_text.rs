@@ -163,7 +163,7 @@ fn config_json<'py>(metadata_json: &Bound<'py, PyAny>) -> PyResult<Bound<'py, Py
         }
         Err(error) => return Err(error),
     };
-    let config: Bound<'_, PyAny> = match payload.downcast::<PyDict>() {
+    let config: Bound<'_, PyAny> = match payload.cast::<PyDict>() {
         Ok(payload) => payload
             .get_item("config")?
             .unwrap_or_else(|| PyDict::new(py).into_any()),
@@ -473,7 +473,7 @@ fn metadata_names(value: Option<Bound<'_, PyAny>>) -> PyResult<Vec<String>> {
 /// The metadata `selection_diagnostics.enabled` flag, when it is a bool.
 pub(crate) fn selection_diagnostics(metadata: &Bound<'_, PyAny>) -> PyResult<Option<bool>> {
     let diagnostics: Bound<'_, PyAny> = mapping_get(metadata, "selection_diagnostics")?;
-    let Ok(diagnostics) = diagnostics.downcast::<PyDict>() else {
+    let Ok(diagnostics) = diagnostics.cast::<PyDict>() else {
         return Ok(None);
     };
     match diagnostics.get_item("enabled")? {
@@ -486,7 +486,7 @@ pub(crate) fn selection_diagnostics(metadata: &Bound<'_, PyAny>) -> PyResult<Opt
 
 fn source_freshness(metadata: &Bound<'_, PyAny>) -> PyResult<Option<SourceFreshnessText>> {
     let freshness: Bound<'_, PyAny> = mapping_get(metadata, "direct_source_freshness")?;
-    let Ok(freshness) = freshness.downcast::<PyDict>() else {
+    let Ok(freshness) = freshness.cast::<PyDict>() else {
         return Ok(None);
     };
     let names = |key: &str| -> PyResult<Vec<String>> { metadata_names(freshness.get_item(key)?) };

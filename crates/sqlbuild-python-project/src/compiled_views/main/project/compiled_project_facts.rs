@@ -12,12 +12,12 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 pub fn compiled_project_facts<'py>(
     project: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, NativeCompiledProject>> {
-    if let Ok(view) = project.downcast::<NativeProjectView>() {
+    if let Ok(view) = project.cast::<NativeProjectView>() {
         return Ok(view.get().owner().bind(project.py()).clone());
     }
     let retained: Bound<'py, PyAny> = native_field(project, "native_project")?;
     if !retained.is_none() {
-        return Ok(retained.downcast_into()?);
+        return Ok(retained.cast_into()?);
     }
     hand_built_project(project)
 }

@@ -212,11 +212,10 @@ fn orphaned_factories<'py>(diagnostics: &Diagnostics<'_, 'py>) -> PyResult<Vec<B
         } else {
             None
         };
-        let header: Bound<'py, PyDict> =
-            native_field(model_file, "header_values")?.downcast_into()?;
+        let header: Bound<'py, PyDict> = native_field(model_file, "header_values")?.cast_into()?;
         let mut names: Vec<String> = Vec::new();
         if let Some(values) = header.get_item(AUDIT_FACTORIES_KEY)?
-            && let Ok(values) = values.downcast::<PyList>()
+            && let Ok(values) = values.cast::<PyList>()
         {
             for name in values.iter() {
                 if name.is_instance_of::<PyString>() {
@@ -340,7 +339,7 @@ fn missing_descriptions<'py>(
             .str()?
             .extract()?;
         let contents_value = native_field(schema_file, "contents")?;
-        let contents = contents_value.downcast::<PyString>()?.to_str()?;
+        let contents = contents_value.cast::<PyString>()?.to_str()?;
         found.push(diagnostics.described(
             ("seed", &name, Some("seed")),
             (description.as_deref(), false),
@@ -416,7 +415,7 @@ fn source_description<'py>(
         .str()?
         .extract()?;
     let contents_value = native_field(source_file, "contents")?;
-    let contents = contents_value.downcast::<PyString>()?.to_str()?;
+    let contents = contents_value.cast::<PyString>()?.to_str()?;
     let loader_name: Option<String> =
         native_field(attached.host.entry.bind(py), "loader")?.extract()?;
     let loader: Option<(&String, &LoaderRow)> = loader_name
@@ -517,7 +516,7 @@ fn cursor_without_inputs<'py>(
     let mut errors: Vec<Bound<'py, PyAny>> = Vec::new();
     for record in project.inputs() {
         let values: Bound<'py, PyDict> =
-            native_field(record.host.config.bind(py), "values")?.downcast_into()?;
+            native_field(record.host.config.bind(py), "values")?.cast_into()?;
         let kinds: Vec<&str> = record
             .references
             .iter()

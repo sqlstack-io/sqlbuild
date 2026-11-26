@@ -43,7 +43,7 @@ pub fn attach_checks<'py>(
     )?;
     let discovered_inputs: &Bound<'py, PyAny> = &arguments.value("discovered_inputs")?;
     let native_project: &Bound<'py, NativeCompiledProject> =
-        &arguments.value("native_project")?.downcast_into()?;
+        &arguments.value("native_project")?.cast_into()?;
     let (effective_settings, value_renderer, syntax): (
         Bound<'py, PyAny>,
         Bound<'py, PyAny>,

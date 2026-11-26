@@ -46,14 +46,14 @@ use std::sync::Mutex;
 use std::sync::MutexGuard;
 
 /// Frozen attempt counters for one exporter or their aggregate.
-#[pyclass(module = "sqlbuild._native", frozen, eq, hash)]
+#[pyclass(module = "sqlbuild._native", frozen, eq, hash, skip_from_py_object)]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct EventExporterCounts {
     pub counts: ExporterCounts,
 }
 
 /// Frozen accounting snapshot for one named exporter.
-#[pyclass(module = "sqlbuild._native", frozen, eq, hash)]
+#[pyclass(module = "sqlbuild._native", frozen, eq, hash, skip_from_py_object)]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct EventExporterAccounting {
     pub(crate) exporter_name: String,
@@ -61,14 +61,14 @@ pub struct EventExporterAccounting {
 }
 
 /// Final or point-in-time best-effort delivery accounting.
-#[pyclass(module = "sqlbuild._native", frozen, eq, hash)]
+#[pyclass(module = "sqlbuild._native", frozen, eq, hash, skip_from_py_object)]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct EventExportSummary {
     pub snapshot: ExportSnapshot,
 }
 
 /// Sanitized exporter failure information safe for diagnostics.
-#[pyclass(module = "sqlbuild._native", frozen, eq, hash)]
+#[pyclass(module = "sqlbuild._native", frozen, eq, hash, skip_from_py_object)]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct EventExporterFailure {
     pub exporter_name: String,

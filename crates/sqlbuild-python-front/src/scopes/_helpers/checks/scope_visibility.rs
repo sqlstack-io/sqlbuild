@@ -26,7 +26,9 @@ type PyObject = Py<PyAny>;
 const CURRENT_PATH: &str = ".";
 
 fn native_lookup(lookup: &Bound<'_, PyAny>) -> PyResult<Py<NativeScopeLookup>> {
-    native_field(lookup, "native")?.extract()
+    native_field(lookup, "native")?
+        .extract()
+        .map_err(Into::into)
 }
 
 /// Python's `query_target`: the resources or declarations `target` names.

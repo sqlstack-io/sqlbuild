@@ -110,7 +110,7 @@ impl ProjectFields {
             sql_analysis_dialect: required(fields, "sql_analysis_dialect")?.extract()?,
             enforce_explicit_references: required(fields, ENFORCE_EXPLICIT_FIELD)?.extract()?,
             models: required(fields, MODELS_FIELD)?
-                .downcast_into::<PyTuple>()?
+                .cast_into::<PyTuple>()?
                 .unbind(),
             loads: load_facts(&required(fields, "loads")?)?,
             boundary: BoundaryInputs {

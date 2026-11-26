@@ -55,11 +55,11 @@ pub(crate) fn raw_value(
     }
     if is_exactly(value, &py.get_type::<PyString>().into_any()) {
         return Ok(RawSqlValue::Str(
-            value.downcast::<PyString>()?.to_string_lossy().into_owned(),
+            value.cast::<PyString>()?.to_string_lossy().into_owned(),
         ));
     }
     if is_exactly(value, &py.get_type::<PyList>().into_any()) {
-        return sequence(value.downcast::<PyList>()?.iter(), classes).map(RawSqlValue::List);
+        return sequence(value.cast::<PyList>()?.iter(), classes).map(RawSqlValue::List);
     }
     if value.is_instance(&classes.authored_set)? {
         let items = native_field(value, "values")?;
@@ -79,9 +79,9 @@ pub(crate) fn raw_value(
     }
     if is_exactly(value, &py.get_type::<PyDict>().into_any()) {
         let mut entries: Vec<(RawKey, RawSqlValue)> = Vec::new();
-        for (key, item) in value.downcast::<PyDict>()?.iter() {
+        for (key, item) in value.cast::<PyDict>()?.iter() {
             let raw_key = if is_exactly(&key, &py.get_type::<PyString>().into_any()) {
-                RawKey::Str(key.downcast::<PyString>()?.to_string_lossy().into_owned())
+                RawKey::Str(key.cast::<PyString>()?.to_string_lossy().into_owned())
             } else {
                 RawKey::Other(key.repr()?.to_string_lossy().into_owned())
             };

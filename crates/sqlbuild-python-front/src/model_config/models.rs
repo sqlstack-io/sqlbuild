@@ -133,7 +133,7 @@ impl AuthoredNode for PyNode<'_> {
         let value = &self.0;
         if value.is_none() {
             NodeKind::Null
-        } else if let Ok(flag) = value.downcast::<PyBool>() {
+        } else if let Ok(flag) = value.cast::<PyBool>() {
             NodeKind::Bool(flag.is_true())
         } else if value.is_instance_of::<PyInt>() {
             value
@@ -185,7 +185,7 @@ impl AuthoredNode for PyNode<'_> {
 
     /// Read a string's text; lone surrogates, rejected where text enters a compile, read as U+FFFD.
     fn with_text<R>(&self, read: impl FnOnce(&str) -> R) -> Option<R> {
-        match self.0.downcast::<PyString>() {
+        match self.0.cast::<PyString>() {
             Ok(value) => Some(read(&value.to_string_lossy())),
             Err(_) => None,
         }
@@ -196,9 +196,9 @@ impl AuthoredNode for PyNode<'_> {
     }
 
     fn items(&self) -> Vec<Self> {
-        if let Ok(items) = self.0.downcast::<PyList>() {
+        if let Ok(items) = self.0.cast::<PyList>() {
             items.iter().map(PyNode).collect()
-        } else if let Ok(items) = self.0.downcast::<PyTuple>() {
+        } else if let Ok(items) = self.0.cast::<PyTuple>() {
             items.iter().map(PyNode).collect()
         } else {
             Vec::new()
@@ -206,7 +206,7 @@ impl AuthoredNode for PyNode<'_> {
     }
 
     fn entries(&self) -> Vec<(Self, Self)> {
-        if let Ok(entries) = self.0.downcast::<PyDict>() {
+        if let Ok(entries) = self.0.cast::<PyDict>() {
             entries.iter().map(entry_nodes).collect()
         } else {
             Vec::new()
@@ -337,7 +337,7 @@ impl<'py> PythonHost<'py> {
 
     pub(crate) fn text_of(&self, value: &Bound<'py, PyAny>) -> Result<String, TemplateFailure> {
         value
-            .downcast::<PyString>()
+            .cast::<PyString>()
             .map_err(|error| self.hold(error.into()))?
             .to_str()
             .map(str::to_owned)
@@ -472,7 +472,7 @@ impl<'py> TemplateHost for PythonHost<'py> {
         if value.is_none() {
             return Ok(Scalar::Null);
         }
-        if let Ok(flag) = value.downcast_exact::<PyBool>() {
+        if let Ok(flag) = value.cast_exact::<PyBool>() {
             return Ok(Scalar::Bool(flag.is_true()));
         }
         let text = value.str().map_err(|error| self.hold(error))?;
@@ -1187,7 +1187,7 @@ impl NativeModelConfigBuilder {
             Vec::with_capacity(path_defaults.len());
         for (key, values) in path_defaults.iter() {
             let key: String = key.extract()?;
-            path_values.push((key.clone(), config_entries(values.downcast::<PyDict>()?)?));
+            path_values.push((key.clone(), config_entries(values.cast::<PyDict>()?)?));
             path_keys.push(key);
         }
         let (target_name, run_id) = run;

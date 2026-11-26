@@ -41,8 +41,8 @@ pub(crate) fn reject_invalid_source_connections(
 /// The project's connections by use: each source connection's merged settings and defining file, and each SQLBuild connection.
 pub(crate) fn connection_roles(config: &ProjectConfiguration<'_, '_>) -> PyResult<ConnectionRoles> {
     let used: Vec<String> = sqlbuild_connection_names(config)?;
-    let project = native_field(config.project_config, "connections")?.downcast_into::<PyDict>()?;
-    let local = native_field(config.local_config, "connections")?.downcast_into::<PyDict>()?;
+    let project = native_field(config.project_config, "connections")?.cast_into::<PyDict>()?;
+    let local = native_field(config.local_config, "connections")?.cast_into::<PyDict>()?;
     let mut names: Vec<String> = project.keys().extract()?;
     for name in local.keys().extract::<Vec<String>>()? {
         if !names.contains(&name) {
@@ -54,7 +54,7 @@ pub(crate) fn connection_roles(config: &ProjectConfiguration<'_, '_>) -> PyResul
         let entries: Vec<Bound<'_, PyDict>> = [project.get_item(&name)?, local.get_item(&name)?]
             .into_iter()
             .flatten()
-            .map(|entry| entry.downcast_into::<PyDict>().map_err(PyErr::from))
+            .map(|entry| entry.cast_into::<PyDict>().map_err(PyErr::from))
             .collect::<PyResult<_>>()?;
         let mut settings = toml::Table::new();
         for entry in &entries {
@@ -88,7 +88,7 @@ fn sqlbuild_connection_names(config: &ProjectConfiguration<'_, '_>) -> PyResult<
     for document in [config.project_config, config.local_config] {
         names.extend(native_field(document, "recall_connections")?.extract::<Vec<String>>()?);
         for target in native_field(document, "targets")?
-            .downcast::<PyDict>()?
+            .cast::<PyDict>()?
             .values()
         {
             for field in ["connection_name", "catalog_connection"] {
@@ -118,7 +118,7 @@ pub(crate) fn toml_value(value: &Bound<'_, PyAny>) -> PyResult<Option<toml::Valu
         toml::Value::Float(value.extract()?)
     } else if value.is_instance_of::<PyString>() {
         toml::Value::String(value.extract()?)
-    } else if let Ok(items) = value.downcast::<PyDict>() {
+    } else if let Ok(items) = value.cast::<PyDict>() {
         let mut table = toml::Table::new();
         for (key, item) in items.iter() {
             if let Some(item) = toml_value(&item)? {

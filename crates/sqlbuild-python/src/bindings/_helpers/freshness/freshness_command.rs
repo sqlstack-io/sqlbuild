@@ -189,7 +189,7 @@ fn previous_records<'py>(
                 &read_latest(&read, (&database, &schema), table_exists, None)?,
                 "records",
             )?
-            .downcast()?,
+            .cast()?,
         )?;
     }
     Ok(records)

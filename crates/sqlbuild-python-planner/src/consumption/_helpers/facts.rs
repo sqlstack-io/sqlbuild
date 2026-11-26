@@ -102,7 +102,7 @@ fn source_versions(plan: &Bound<'_, PyAny>) -> PyResult<HashMap<String, Option<S
         let name: String = native_field(&load, "name")?.extract()?;
         let every_table: bool = native_field(&load, "every_table")?.is_truthy()?;
         let selected: Vec<String> = native_field(&load, "sources")?.extract()?;
-        for (source, entry) in source_map.downcast::<PyDict>()?.iter() {
+        for (source, entry) in source_map.cast::<PyDict>()?.iter() {
             let source: String = source.extract()?;
             let filled: Option<String> = native_field(&entry, "load")?.extract()?;
             if filled.as_deref() == Some(name.as_str())

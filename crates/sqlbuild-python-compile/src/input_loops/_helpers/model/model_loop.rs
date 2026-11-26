@@ -135,10 +135,7 @@ pub(crate) struct LoopModel<'a, 'py> {
 /// Replace the SQL hook classes' discovered `hook_files` with their `definitions` by name.
 pub(crate) fn index_sql_hook_definitions(loop_classes: &Bound<'_, PyDict>) -> PyResult<()> {
     let py: Python<'_> = loop_classes.py();
-    let hooks: Bound<'_, PyDict> = loop_classes
-        .as_any()
-        .get_item(SQL_HOOKS_KEY)?
-        .downcast_into()?;
+    let hooks: Bound<'_, PyDict> = loop_classes.as_any().get_item(SQL_HOOKS_KEY)?.cast_into()?;
     let definitions: Bound<'_, PyDict> = PyDict::new(py);
     for hook_file in hooks.as_any().get_item(HOOK_FILES_KEY)?.try_iter()? {
         let hook_file: Bound<'_, PyAny> = hook_file?;

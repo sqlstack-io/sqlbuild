@@ -491,7 +491,7 @@ fn project_inputs<'py>(
         .into_any())
     };
     let loader_functions: Bound<'py, PyAny> = tuple_of("loaders")?;
-    with_loader_settings(declarations.downcast()?, &loader_functions)?;
+    with_loader_settings(declarations.cast()?, &loader_functions)?;
     let mut fields: Vec<(&str, Bound<'py, PyAny>)> = vec![
         ("project_config", project_config.clone()),
         ("local_config", local_config.clone()),

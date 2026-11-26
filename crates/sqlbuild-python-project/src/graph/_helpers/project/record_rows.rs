@@ -48,7 +48,7 @@ pub(crate) fn resource_rows(
 /// A model's configured tags and folder.
 pub(crate) fn model_tags(model: &Bound<'_, PyAny>) -> PyResult<ResourceTags> {
     let values: Bound<'_, PyAny> = native_field(&native_field(model, "config")?, "values")?;
-    let tags: Vec<String> = match values.downcast::<PyDict>()?.get_item("tags")? {
+    let tags: Vec<String> = match values.cast::<PyDict>()?.get_item("tags")? {
         Some(tags) => graph_tags(&tags)?,
         None => Vec::new(),
     };

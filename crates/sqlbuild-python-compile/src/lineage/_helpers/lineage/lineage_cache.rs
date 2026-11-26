@@ -158,12 +158,12 @@ pub(crate) fn lineage_fingerprint(
     };
     let mut prefix: Vec<u8> = CACHE_ALGORITHM_VERSION.as_bytes().to_vec();
     prefix.extend(sqlbuild_version(py)?.as_bytes());
-    prefix.extend(encoded.downcast::<PyBytes>()?.as_bytes());
+    prefix.extend(encoded.cast::<PyBytes>()?.as_bytes());
     let uncacheable: bool = py.version_info() < FIRST_PYTHON_SKIPPING_INTERRUPTED_LISTINGS;
     relation_lineage_fingerprint(py, project_dir.extract()?, prefix, uncacheable)
 }
 
-pub(crate) fn rows<'py, T: pyo3::FromPyObject<'py>>(
+pub(crate) fn rows<'py, T: pyo3::prelude::FromPyObjectOwned<'py>>(
     connection: &Bound<'py, PyAny>,
     sql: &str,
 ) -> PyResult<Vec<T>> {

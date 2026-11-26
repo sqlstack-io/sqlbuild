@@ -11,7 +11,7 @@ pub fn model_placeholders<'py>(
     model_input: &Bound<'py, PyAny>,
 ) -> PyResult<Option<Bound<'py, PyDict>>> {
     let raw: Bound<'py, PyAny> = config_value(model_input, "placeholders")?;
-    let Ok(raw) = raw.downcast::<PyDict>() else {
+    let Ok(raw) = raw.cast::<PyDict>() else {
         return Ok(None);
     };
     let placeholders: Bound<'py, PyDict> = PyDict::new(model_input.py());

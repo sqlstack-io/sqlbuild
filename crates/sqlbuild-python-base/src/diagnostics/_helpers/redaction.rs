@@ -41,7 +41,7 @@ pub(crate) fn redacted_value<'py>(
     if secret_field_name(name) {
         return Ok(PyString::new(py, REDACTED).into_any());
     }
-    if let Ok(text) = value.downcast::<PyString>() {
+    if let Ok(text) = value.cast::<PyString>() {
         return Ok(PyString::new(py, &redact_text(text.to_str()?)).into_any());
     }
     let scalar: bool = value.is_none()

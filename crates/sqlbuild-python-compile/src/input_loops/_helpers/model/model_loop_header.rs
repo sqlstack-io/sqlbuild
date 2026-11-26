@@ -212,7 +212,7 @@ pub(crate) fn header_schema<'py>(
         &context.contracts.schema_dynamic_column_family,
         families,
     )?);
-    let enums: Bound<'py, PyDict> = native_field(source.visible.0, ENUMS_FIELD)?.downcast_into()?;
+    let enums: Bound<'py, PyDict> = native_field(source.visible.0, ENUMS_FIELD)?.cast_into()?;
     let enums: Bound<'py, PyDict> = match source.schema {
         Some(schema) => {
             let merged: Bound<'py, PyDict> = enums.copy()?;
@@ -316,7 +316,7 @@ fn description(
     let Some(value) = present(source.values, DESCRIPTION_KEY)? else {
         return Ok(None);
     };
-    if let Ok(text) = value.downcast::<PyString>()
+    if let Ok(text) = value.cast::<PyString>()
         && text.call_method0(STRIP_METHOD)?.is_truthy()?
     {
         return Ok(Some(text.to_str()?.to_owned()));

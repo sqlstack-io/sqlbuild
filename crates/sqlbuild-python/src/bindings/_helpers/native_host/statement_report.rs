@@ -132,7 +132,7 @@ fn read_timings(
     query_ids: &[String],
 ) -> PyResult<StatementTimings> {
     let py: Python<'_> = source.adapter.py();
-    let config: Bound<'_, PyDict> = source.connection_config.downcast::<PyDict>()?.copy()?;
+    let config: Bound<'_, PyDict> = source.connection_config.cast::<PyDict>()?.copy()?;
     let database: Option<String> = match config.get_item("database")? {
         Some(database) if !database.is_none() => Some(database.str()?.extract()?),
         _ => None,

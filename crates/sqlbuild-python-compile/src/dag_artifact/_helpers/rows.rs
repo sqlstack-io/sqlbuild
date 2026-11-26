@@ -361,7 +361,7 @@ fn python_asset(node: &Bound<'_, PyAny>) -> PyResult<Option<DagPythonAssetInput>
         None
     } else {
         let mut entries: Vec<(String, Vec<(String, String)>)> = Vec::new();
-        for (column, refs) in lineage.downcast::<PyDict>()?.iter() {
+        for (column, refs) in lineage.cast::<PyDict>()?.iter() {
             let refs: Vec<(String, String)> = refs
                 .try_iter()?
                 .map(|reference| {
@@ -434,10 +434,7 @@ fn python_node(node: &Bound<'_, PyAny>) -> PyResult<DagPythonNodeInput> {
 /// The discovered Python node graph.
 pub(crate) fn python_graph_input(graph: &Bound<'_, PyAny>) -> PyResult<DagPythonGraphInput> {
     let mut kinds_by_name: Vec<(String, String)> = Vec::new();
-    for (name, node) in attribute(graph, "nodes_by_name")?
-        .downcast::<PyDict>()?
-        .iter()
-    {
+    for (name, node) in attribute(graph, "nodes_by_name")?.cast::<PyDict>()?.iter() {
         kinds_by_name.push((
             name.extract()?,
             enum_value(&node, "kind")?.unwrap_or_default(),

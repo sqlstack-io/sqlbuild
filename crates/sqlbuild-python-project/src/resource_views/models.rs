@@ -256,8 +256,11 @@ pub struct SeedNamespace {
     pub logical_schema: Option<String>,
 }
 
-impl<'py> pyo3::FromPyObject<'py> for SeedNamespace {
-    fn extract_bound(value: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for SeedNamespace {
+    type Error = pyo3::PyErr;
+
+    fn extract(value: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        let value: &pyo3::Bound<'py, pyo3::PyAny> = &value;
         let (database, schema, logical_database, logical_schema): (
             Option<String>,
             Option<String>,

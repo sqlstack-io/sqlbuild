@@ -153,7 +153,7 @@ fn warehouse_body<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = module.py();
     let ast: Bound<'py, PyModule> = py.import(AST_MODULE)?;
-    let statements: Bound<'py, PyList> = native_field(module, "body")?.downcast_into::<PyList>()?;
+    let statements: Bound<'py, PyList> = native_field(module, "body")?.cast_into::<PyList>()?;
     let body: Bound<'py, PyList> = PyList::empty(py);
     for (index, statement) in statements.iter().enumerate() {
         if function.removed_statements.contains(&index) {
@@ -233,7 +233,7 @@ fn parsed_record<'py>(source: &FunctionSource<'py>) -> PyResult<Bound<'py, PyAny
             PyString::new(py, &function.name).into_any()
         }
     };
-    let stripped: Option<Bound<'py, PyAny>> = match entry_point.downcast::<PyString>() {
+    let stripped: Option<Bound<'py, PyAny>> = match entry_point.cast::<PyString>() {
         Ok(text) => {
             Some(text.call_method0("strip")?).filter(|text| text.is_truthy().unwrap_or(false))
         }

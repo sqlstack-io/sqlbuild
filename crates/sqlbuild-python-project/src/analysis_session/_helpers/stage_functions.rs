@@ -119,7 +119,7 @@ pub(crate) fn expression_source_shapes<'py>(
             cached
         } else {
             let copied: Bound<'py, PyDict> = PyDict::new(py);
-            copied.update(cached.downcast::<PyDict>()?.as_mapping())?;
+            copied.update(cached.cast::<PyDict>()?.as_mapping())?;
             copied.into_any()
         });
     }
@@ -240,8 +240,10 @@ pub(crate) fn query_column_rows(
     for query in &queries {
         rows.push(query_row(query)?);
     }
-    let catalog: Option<PyRef<'_, ProjectCatalog>> =
-        catalog.map(|native| native.extract()).transpose()?;
+    let catalog: Option<PyRef<'_, ProjectCatalog>> = catalog
+        .as_ref()
+        .map(|native| native.extract())
+        .transpose()?;
     infer_query_columns(
         py,
         catalog,

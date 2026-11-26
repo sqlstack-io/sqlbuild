@@ -261,7 +261,7 @@ fn connection_hooks<'py>(invocation: &PlanInvocation<'py>) -> PyResult<Bound<'py
     if invocation.preview.is_some() {
         let progress: Py<PlanningProgressReporter> = invocation
             .planning_progress
-            .downcast::<PlanningProgressReporter>()?
+            .cast::<PlanningProgressReporter>()?
             .clone()
             .unbind();
         let reading = PyCFunction::new_closure(py, None, None, move |arguments, _keywords| {

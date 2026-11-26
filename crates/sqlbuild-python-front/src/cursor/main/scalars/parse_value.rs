@@ -36,7 +36,7 @@ pub fn parse_value<'py>(
     if raw.is_instance(&imported(py, DATETIME_MODULE, "date")?)? {
         return new_record_with(py, RecordId::DateValue, &[("value", raw.clone())]);
     }
-    let Ok(text) = raw.downcast::<PyString>() else {
+    let Ok(text) = raw.cast::<PyString>() else {
         return Err(algebra_error(
             py,
             &format!("invalid timestamp cursor value: {}", raw.str()?),

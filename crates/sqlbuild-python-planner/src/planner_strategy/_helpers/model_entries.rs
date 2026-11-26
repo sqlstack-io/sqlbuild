@@ -387,12 +387,12 @@ fn custom_fields<'py>(
         if raw_name.is_instance_of::<PyString>() {
             name = raw_name;
         }
-        if let Ok(raw) = mapping_get(values, "config")?.downcast::<PyDict>() {
+        if let Ok(raw) = mapping_get(values, "config")?.cast::<PyDict>() {
             for (key, value) in raw.iter() {
                 config.set_item(key.str()?, value)?;
             }
         }
-        if let Ok(raw) = mapping_get(values, "placeholders")?.downcast::<PyDict>() {
+        if let Ok(raw) = mapping_get(values, "placeholders")?.cast::<PyDict>() {
             for (key, value) in raw.iter() {
                 placeholders.set_item(key.str()?, value.str()?)?;
             }

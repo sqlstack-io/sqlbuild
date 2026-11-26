@@ -37,7 +37,7 @@ fn optional_text(value: Bound<'_, PyAny>) -> PyResult<Option<String>> {
 
 /// A JSON object key as `json.dumps` writes it.
 fn json_key(key: &Bound<'_, PyAny>) -> PyResult<String> {
-    if let Ok(flag) = key.downcast::<PyBool>() {
+    if let Ok(flag) = key.cast::<PyBool>() {
         return Ok(if flag.is_true() { "true" } else { "false" }.to_owned());
     }
     if key.is_none() {
@@ -54,10 +54,10 @@ pub(crate) fn json_of(value: &Bound<'_, PyAny>) -> PyResult<JsonValue> {
     if value.is_none() {
         return Ok(JsonValue::Null);
     }
-    if let Ok(text) = value.downcast::<PyString>() {
+    if let Ok(text) = value.cast::<PyString>() {
         return Ok(JsonValue::String(text.to_string_lossy().into_owned()));
     }
-    if let Ok(flag) = value.downcast::<PyBool>() {
+    if let Ok(flag) = value.cast::<PyBool>() {
         return Ok(JsonValue::Bool(flag.is_true()));
     }
     if value.is_instance_of::<PyInt>() {
@@ -80,7 +80,7 @@ pub(crate) fn json_of(value: &Bound<'_, PyAny>) -> PyResult<JsonValue> {
         }
         return Ok(JsonValue::Array(items));
     }
-    if let Ok(mapping) = value.downcast::<PyDict>() {
+    if let Ok(mapping) = value.cast::<PyDict>() {
         let mut entries: Vec<(String, JsonValue)> = Vec::new();
         for (key, item) in mapping.iter() {
             entries.push((json_key(&key)?, json_of(&item)?));

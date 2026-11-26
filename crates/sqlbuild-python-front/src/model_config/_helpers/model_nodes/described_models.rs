@@ -44,7 +44,7 @@ pub(crate) fn externally_described_models<'py>(
         "defaults",
     )?)?)?;
     let path_defaults: Bound<'py, PyDict> =
-        native_field(&project_config, "path_defaults")?.downcast_into()?;
+        native_field(&project_config, "path_defaults")?.cast_into()?;
     let path_keys: Vec<String> = path_defaults
         .keys()
         .iter()
@@ -68,7 +68,7 @@ pub(crate) fn externally_described_models<'py>(
             PathDefaultChoice::Selected(Some(key)) => {
                 if !layers.contains_key(&key) {
                     let layer: Bound<'py, PyDict> =
-                        path_defaults.as_any().get_item(&key)?.downcast_into()?;
+                        path_defaults.as_any().get_item(&key)?.cast_into()?;
                     layers.insert(key.clone(), config_entries(&layer)?);
                 }
                 values = layered_config(&values, &layers[&key], &text)?.entries;
@@ -76,8 +76,7 @@ pub(crate) fn externally_described_models<'py>(
             PathDefaultChoice::Selected(None) => {}
             PathDefaultChoice::Conflict(error) => return Err(raised_config_error(py, error)),
         }
-        let header: Bound<'py, PyDict> =
-            native_field(&model_file, "header_values")?.downcast_into()?;
+        let header: Bound<'py, PyDict> = native_field(&model_file, "header_values")?.cast_into()?;
         values = layered_config(&values, &config_entries(&header)?, &text)?.entries;
         let schema_description: Option<PyConfigNode> = match config_entry(&values, MODEL_SCHEMA_KEY)
         {
