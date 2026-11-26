@@ -230,6 +230,44 @@ pub(crate) fn style(request: &Bound<'_, PyAny>) -> PyResult<CliStyle> {
 }
 
 /// Write the namespace line, then the execution header with the selected target.
+/// The planning reporter a scenario compile reports its phases to.
+pub(crate) fn planning_reporter<'py>(
+    stream: &Bound<'py, PyAny>,
+    style: CliStyle,
+) -> PyResult<Bound<'py, PyAny>> {
+    let py: Python<'py> = stream.py();
+    Ok(Bound::new(
+        py,
+        PlanningProgressReporter::new(py, stream, style.use_color)?,
+    )?
+    .into_any())
+}
+
+/// `Execution  sqb scenario test  (concurrency: N)`, after the run's header.
+pub(crate) fn write_execution<'py>(
+    stream: &Bound<'py, PyAny>,
+    project: &ScenarioProject<'py>,
+    (command, concurrency, style): (&str, i64, CliStyle),
+) -> PyResult<()> {
+    let py: Python<'py> = stream.py();
+    let selectors: Vec<String> = project.selectors.extract()?;
+    write(stream, "\n")?;
+    let target: Option<String> = (!selectors.is_empty()).then(|| selectors.join(" "));
+    write_execution_header(
+        py,
+        Some(keywords(
+            py,
+            &[
+                ("stream", stream.clone()),
+                ("command", text(py, command)),
+                ("target", optional_text(py, target.as_deref())),
+                ("concurrency", int(py, concurrency)),
+                ("use_color", boolean(py, style.use_color)),
+            ],
+        )?),
+    )
+}
+
 pub(crate) fn write_headers<'py>(
     stream: &Bound<'py, PyAny>,
     project: &ScenarioProject<'py>,

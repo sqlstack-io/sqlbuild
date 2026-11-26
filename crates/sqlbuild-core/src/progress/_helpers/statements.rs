@@ -160,16 +160,18 @@ pub(crate) fn consume_statement_terminal(
         .unwrap_or_default();
     if event.event_type == STATEMENT_FAILED {
         let (phase, kind) = statement_phase_kind(&projection, &start);
-        projection
-            .failed_statements
-            .insert(resource_name.clone(), (phase, kind));
+        projection.failed_statements.insert(
+            ProgressProjection::statement_owner(start.resource_id.as_deref(), &resource_name),
+            (phase, kind),
+        );
     }
-    let line: Option<String> =
-        (event.event_type == STATEMENT_FAILED && !projection.quiet(&resource_name)).then(|| {
-            let suffix: String = query_suffix(statement_query_id(&projection, event).as_ref());
-            let context: String = statement_context(&projection, &start);
-            format!("{NESTED_PREFIX}statement  {context}  FAIL{suffix}")
-        });
+    let line: Option<String> = (event.event_type == STATEMENT_FAILED
+        && !projection.quiet(start.resource_id.as_deref(), &resource_name))
+    .then(|| {
+        let suffix: String = query_suffix(statement_query_id(&projection, event).as_ref());
+        let context: String = statement_context(&projection, &start);
+        format!("{NESTED_PREFIX}statement  {context}  FAIL{suffix}")
+    });
     projection.statement_query_ids.remove(statement_id);
     (projection, line)
 }

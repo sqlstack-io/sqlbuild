@@ -3,6 +3,7 @@
 use crate::cli_text::main::format_tree_connector::format_tree_connector;
 use crate::cli_text::models::CliStyle;
 use crate::format_command::main::render_help_lines::render_help_lines;
+use crate::run_on::_helpers::refusal_groups::names_item;
 use crate::run_on::constants::{EXPANDED_LABEL, NOTE_LABEL, USED_BY_LABEL};
 use crate::run_on::models::{LocalRefusal, RefusalGroup, RefusalOrigin};
 use crate::text::main::text_wrap::text_wrap;
@@ -249,10 +250,18 @@ fn used_by(origin: &RefusalOrigin, indent: &str, block: &BlockStyle<'_>) -> (Vec
 /// One row per construct of an unplaced group: its name, how many items, and the first of them.
 fn construct_rows(group: &RefusalGroup, block: &BlockStyle<'_>) -> Vec<String> {
     let style: CliStyle = block.style;
+    let name = |origin: &RefusalOrigin| {
+        let first: &str = origin.items.first().map_or("", String::as_str);
+        if names_item(&origin.refusal, first) {
+            first.to_owned()
+        } else {
+            origin.refusal.construct.clone()
+        }
+    };
     let width: usize = group
         .origins
         .iter()
-        .map(|origin| origin.refusal.construct.chars().count())
+        .map(|origin| name(origin).chars().count())
         .max()
         .unwrap_or(0);
     group
@@ -262,13 +271,14 @@ fn construct_rows(group: &RefusalGroup, block: &BlockStyle<'_>) -> Vec<String> {
         .map(|(index, origin)| {
             let first: String = origin.items.first().cloned().unwrap_or_default();
             let others: String = match origin.items.len() {
+                _ if names_item(&origin.refusal, &first) => String::new(),
                 0 | 1 => first,
                 count => format!("{first} +{}", count - 1),
             };
             format!(
                 "   {} {:<width$}  {:<8} {}",
                 format_tree_connector(style, index + 1 == group.origins.len()),
-                origin.refusal.construct,
+                name(origin),
                 plural(origin.items.len(), block.nouns),
                 style.muted(&others)
             )

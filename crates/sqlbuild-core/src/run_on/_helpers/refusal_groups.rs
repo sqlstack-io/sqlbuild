@@ -4,13 +4,18 @@ use std::path::Path;
 
 use crate::run_on::models::{LocalRefusal, OriginUser, RefusalGroup, RefusalOrigin, RunOnDecision};
 
-/// The group a refusal belongs to: its code and construct, or for an unplaced refusal its category.
-fn group_key(refusal: &LocalRefusal) -> (String, String, bool) {
+/// The group a refusal belongs to: its code and construct; its category when it has no place or names its item.
+fn group_key(refusal: &LocalRefusal, item: &str) -> (String, String, bool) {
     let code: String = refusal.code.clone().unwrap_or_default();
-    match refusal.path {
-        Some(_) => (code, refusal.construct.clone(), false),
-        None => (code, refusal.category.clone(), true),
+    if refusal.path.is_none() || names_item(refusal, item) {
+        return (code, refusal.category.clone(), true);
     }
+    (code, refusal.construct.clone(), false)
+}
+
+/// Whether the construct is the item itself, as a stale snapshot's `scenario:<name>` is.
+pub(crate) fn names_item(refusal: &LocalRefusal, item: &str) -> bool {
+    refusal.construct.rsplit(':').next() == Some(item)
 }
 
 /// Where in its group a refusal is written: its macro, its file position, or its construct.
@@ -49,7 +54,7 @@ pub(crate) fn group_refusals(decisions: &[&RunOnDecision]) -> Vec<RefusalGroup> 
     let mut groups: Vec<RefusalGroup> = Vec::new();
     for decision in decisions {
         for refusal in &decision.refusals {
-            let key: (String, String, bool) = group_key(refusal);
+            let key: (String, String, bool) = group_key(refusal, &decision.name);
             let index: usize = match keys.iter().position(|seen| *seen == key) {
                 Some(index) => index,
                 None => {

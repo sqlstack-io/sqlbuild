@@ -24,6 +24,7 @@ pub(crate) const ITEM_OPTIONS: (&[&str], &[&str]) = (
         "run_on",
         "detail",
         "not_run",
+        "seconds",
         "error_code",
         "error_help",
         "error_message",

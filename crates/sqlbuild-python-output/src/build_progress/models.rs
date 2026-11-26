@@ -1366,6 +1366,11 @@ impl NestedCommandProgressCallbacks {
         let run_on: String = optional_argument(&arguments, "run_on")?.unwrap_or_default();
         let not_run: bool =
             arguments.passed("not_run")? && arguments.value("not_run")?.is_truthy()?;
+        let own_seconds: Option<f64> = if arguments.passed("seconds")? {
+            arguments.value("seconds")?.extract()?
+        } else {
+            None
+        };
         let status_text: String = optional_argument(&arguments, "status_text")?.unwrap_or_default();
         let resource_id: Option<String> = optional_argument(&arguments, "canonical_resource_id")?;
         let held: Option<Bound<'_, NativeProgressProjector>> = match reporter.state().holding {
@@ -1416,13 +1421,16 @@ impl NestedCommandProgressCallbacks {
             };
             if not_run {
                 release(&held)?;
-            } else if reporter.projector.is_none() || duration_ms.is_some() {
+            } else if reporter.projector.is_none() || duration_ms.is_some() || own_seconds.is_some()
+            {
                 let item: NestedItem = NestedItem {
                     item_name,
                     position,
                     status_text,
                     run_on,
-                    seconds: duration_ms.map(|duration| duration / 1000.0),
+                    seconds: duration_ms
+                        .map(|duration| duration / 1000.0)
+                        .or(own_seconds),
                     detail,
                     error: ErrorText {
                         code: optional_argument(&arguments, "error_code")?,

@@ -1,18 +1,21 @@
 //! Scenario progress: section headers, live status, per-scenario rows and connection timing.
 
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::types::{PyDict, PyDictMethods};
+use pyo3::types::{PyDict, PyDictMethods, PyFloat, PyTuple};
 use pyo3::{pyclass, pymethods};
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_core::scenario_command::main::render_capture_result::render_capture_result;
 use sqlbuild_core::scenario_command::main::render_scenario_result::render_scenario_result;
 use sqlbuild_core::scenario_command::main::render_snapshot_sync_result::render_snapshot_sync_result;
 use sqlbuild_core::scenario_command::main::scenario_activity_message::scenario_activity_message;
-use sqlbuild_core::scenario_command::models::ScenarioNamespace;
+use sqlbuild_core::scenario_command::models::{CodedText, ScenarioNamespace, ScenarioResultRow};
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::ScenarioRunResult;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_output::build_progress::main::local_attempt::local_attempt;
 use sqlbuild_python_output::build_progress::models::LocalAttemptStep;
 
@@ -52,11 +55,26 @@ pub(crate) struct ScenarioProgressRelay {
     project_dir: Py<PyAny>,
     adapter: Py<PyAny>,
     kind: CompletionKind,
+    /// The run's row reporter, which a test run reports each scenario to.
+    progress: Option<Py<PyAny>>,
+    /// Scenarios that can't run locally under `--run-on local`, by name.
+    refused: HashSet<String>,
+    local_only: bool,
 }
 
 #[pymethods]
 impl ScenarioProgressRelay {
-    fn on_scenario_start(&self, py: Python<'_>, _scenario: Bound<'_, PyAny>) -> PyResult<()> {
+    fn on_scenario_start(&self, py: Python<'_>, scenario: Bound<'_, PyAny>) -> PyResult<()> {
+        if let Some(progress) = &self.progress {
+            call_with(
+                &progress.bind(py).getattr("on_item_start")?,
+                &[
+                    ("group_name", text(py, "")),
+                    ("item_name", native_field(&scenario, "name")?),
+                ],
+            )?;
+            return Ok(());
+        }
         if self.status_is_tty {
             self.status
                 .bind(py)
@@ -72,7 +90,7 @@ impl ScenarioProgressRelay {
         scenario_plan: Bound<'_, PyAny>,
         result: Bound<'_, PyAny>,
     ) -> PyResult<()> {
-        if self.status_is_tty {
+        if self.status_is_tty && self.progress.is_none() {
             self.status.bind(py).call_method0("close")?;
         }
         let style: CliStyle = CliStyle {
@@ -93,10 +111,15 @@ impl ScenarioProgressRelay {
                         write_local_runtime_target(target_dir, (adapter, plan, &result))?;
                     }
                 }
-                render_scenario_result(
-                    &scenario_result_row(py, &ScenarioRunResult::read(&result)?)?,
-                    style,
-                )
+                let row: ScenarioResultRow =
+                    scenario_result_row(py, &ScenarioRunResult::read(&result)?)?;
+                if let Some(progress) = &self.progress {
+                    let refused: bool = self.local_only
+                        && (self.refused.contains(&row.name)
+                            || !native_field(&result, "local_refusal")?.is_none());
+                    return report_row(progress.bind(py), &row, refused);
+                }
+                render_scenario_result(&row, style)
             }
             CompletionKind::Capture => {
                 render_capture_result(&capture_row(&result, (project_dir, plan))?, style)
@@ -111,6 +134,101 @@ impl ScenarioProgressRelay {
         write(stream, &rendered)?;
         flush(stream)
     }
+}
+
+/// One scenario's row on the run's reporter: its status, where it ran, its error and expectations.
+fn report_row(progress: &Bound<'_, PyAny>, row: &ScenarioResultRow, not_run: bool) -> PyResult<()> {
+    let py: Python<'_> = progress.py();
+    let mut children: Vec<Bound<'_, PyAny>> = Vec::new();
+    for expected in &row.expected {
+        let differing: i64 =
+            expected.missing_row_count.unwrap_or(0) + expected.mismatched_row_count.unwrap_or(0);
+        children.push(child_row(
+            py,
+            ("expected", &expected.model_name),
+            (
+                if expected.failed { "FAIL" } else { "PASS" },
+                &match (expected.failed, differing) {
+                    (true, 1) => "1 row differs".to_owned(),
+                    (true, count) if count > 1 => format!("{count} rows differ"),
+                    _ => String::new(),
+                },
+            ),
+        )?);
+    }
+    for assertion in &row.assertions {
+        let count: i64 = assertion.failing_row_count.unwrap_or(0);
+        children.push(child_row(
+            py,
+            ("assertion", &assertion.name),
+            (
+                if assertion.failed { "FAIL" } else { "PASS" },
+                &match (assertion.failed, count) {
+                    (true, 1) => "1 row".to_owned(),
+                    (true, count) if count > 1 => format!("{count} rows"),
+                    _ => String::new(),
+                },
+            ),
+        )?);
+    }
+    let error: Option<&CodedText> = row.error.as_ref().filter(|error| !error.message.is_empty());
+    let optional = |value: Option<&str>| match value {
+        Some(value) => text(py, value),
+        None => py.None().into_bound(py),
+    };
+    call_with(
+        &progress.getattr("on_item_complete")?,
+        &[
+            ("group_name", text(py, "")),
+            ("item_name", text(py, &row.name)),
+            ("status_text", text(py, &row.status)),
+            (
+                "run_on",
+                text(py, if row.local { "local" } else { "warehouse" }),
+            ),
+            ("not_run", boolean(py, not_run)),
+            (
+                "seconds",
+                match row.duration_ms {
+                    Some(milliseconds) => PyFloat::new(py, milliseconds / 1000.0).into_any(),
+                    None => py.None().into_bound(py),
+                },
+            ),
+            (
+                "error_code",
+                optional(error.and_then(|error| error.code.as_deref())),
+            ),
+            (
+                "error_message",
+                optional(error.map(|error| error.message.as_str())),
+            ),
+            (
+                "error_help",
+                optional(error.and_then(|error| error.help.as_deref())),
+            ),
+            ("child_rows", PyTuple::new(py, children)?.into_any()),
+            ("canonical_resource_name", text(py, &row.name)),
+        ],
+    )?;
+    Ok(())
+}
+
+/// One child row record: label and name, status and detail.
+fn child_row<'py>(
+    py: Python<'py>,
+    (label, name): (&str, &str),
+    (status, detail): (&str, &str),
+) -> PyResult<Bound<'py, PyAny>> {
+    new_record_with(
+        py,
+        RecordId::NestedProgressChildRow,
+        &[
+            ("label", text(py, label)),
+            ("name", text(py, name)),
+            ("status_text", text(py, status)),
+            ("detail", text(py, detail)),
+        ],
+    )
 }
 
 /// Forward connection timing to a reporter that takes keywords.
@@ -243,12 +361,26 @@ pub(crate) fn begin_section<'py>(
     })
 }
 
+/// The section status of a test run, whose rows and footer the run's row reporter draws instead.
+pub(crate) fn quiet_section<'py>(
+    stream: &Bound<'py, PyAny>,
+    style: CliStyle,
+) -> PyResult<SectionStatus<'py>> {
+    Ok(SectionStatus {
+        status: status_reporter(stream, style.use_color)?,
+        status_is_tty: false,
+        activity: String::new(),
+    })
+}
+
 /// The project directory, adapter, completion kind and style a progress relay reports with.
 pub(crate) struct RelayContext<'a, 'py> {
     pub(crate) project_dir: &'a Bound<'py, PyAny>,
     pub(crate) adapter: &'a Bound<'py, PyAny>,
     pub(crate) kind: CompletionKind,
     pub(crate) style: CliStyle,
+    /// A test run's row reporter, the scenarios that can't run locally, and whether that is an error.
+    pub(crate) rows: Option<(&'a Bound<'py, PyAny>, HashSet<String>, bool)>,
 }
 
 /// The relay reporting one section's scenarios.
@@ -260,8 +392,15 @@ pub(crate) fn progress_relay<'py>(
         adapter,
         kind,
         style,
+        rows,
     }: RelayContext<'_, 'py>,
 ) -> PyResult<Bound<'py, ScenarioProgressRelay>> {
+    let (progress, refused, local_only) = match rows {
+        Some((progress, refused, local_only)) => {
+            (Some(progress.clone().unbind()), refused, local_only)
+        }
+        None => (None, HashSet::new(), false),
+    };
     Bound::new(
         stream.py(),
         ScenarioProgressRelay {
@@ -273,6 +412,9 @@ pub(crate) fn progress_relay<'py>(
             project_dir: project_dir.clone().unbind(),
             adapter: adapter.clone().unbind(),
             kind,
+            progress,
+            refused,
+            local_only,
         },
     )
 }
