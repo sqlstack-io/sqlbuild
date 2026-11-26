@@ -10,3 +10,9 @@ pub(super) struct YamlLineTestCase {
     pub(super) path: &'static [&'static str],
     pub(super) expected_line: Option<usize>,
 }
+
+pub(super) struct LoadMessageTestCase {
+    pub(super) description: &'static str,
+    pub(super) message: &'static str,
+    pub(super) expected_message: &'static str,
+}

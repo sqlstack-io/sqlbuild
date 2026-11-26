@@ -1,6 +1,8 @@
 //! Which required destination tables a plan leaves out, and the plan lines SQLBuild shows.
 
+use sqlbuild_load::loads::main::load_message::load_message;
 use sqlload::loader::models::ProjectPlan;
+use sqlload::project::models::ProjectConfig;
 
 use crate::runs::constants::{PLAN_SUMMARY_MARKS, SQLLOAD_COMMAND};
 
@@ -53,4 +55,15 @@ fn without_command(line: &str) -> &str {
         }
         _ => line,
     }
+}
+
+/// `messages` as SQLBuild shows them, about the project's one load: its settings named as `load:` names them.
+pub(crate) fn load_messages(project: &ProjectConfig, messages: Vec<String>) -> Vec<String> {
+    let Some(load) = project.sources.keys().next() else {
+        return messages;
+    };
+    messages
+        .into_iter()
+        .map(|message| load_message(load, &message))
+        .collect()
 }

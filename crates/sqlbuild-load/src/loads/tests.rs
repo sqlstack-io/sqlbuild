@@ -2,6 +2,8 @@
 mod check_load;
 #[path = "tests/helpers.rs"]
 mod helpers;
+#[path = "tests/test_load_message.rs"]
+mod load_message;
 #[path = "tests/test_types.rs"]
 mod test_types;
 #[path = "tests/test_yaml_line.rs"]

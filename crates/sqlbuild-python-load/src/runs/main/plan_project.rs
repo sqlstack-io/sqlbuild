@@ -10,7 +10,9 @@ use sqlload::loader::models::PlanOptions;
 use sqlload::project::main::parse_python_project::parse_python_project;
 
 use crate::runs::_helpers::stack::on_load_stack;
-use crate::runs::_helpers::tables::{missing_tables, planned_tables, shown_plan_lines};
+use crate::runs::_helpers::tables::{
+    load_messages, missing_tables, planned_tables, shown_plan_lines,
+};
 use crate::runs::models::PlannedProject;
 
 /// The plan of the project `text`: its lines, readiness, destination tables, and the `required` ones it lacks.
@@ -31,7 +33,7 @@ pub fn plan_project(
         let (lines, ready) = render_plan(&plan, false);
         let tables: Vec<String> = planned_tables(&plan);
         Ok(PlannedProject {
-            lines: shown_plan_lines(lines),
+            lines: load_messages(&project, shown_plan_lines(lines)),
             ready,
             missing: missing_tables(&required, &tables),
             tables,

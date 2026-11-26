@@ -11,7 +11,7 @@ use sqlload::loader::models::{LoadRun, PlanOptions};
 use sqlload::project::main::parse_python_project::parse_python_project;
 
 use crate::runs::_helpers::stack::on_load_stack;
-use crate::runs::_helpers::tables::{missing_tables, planned_tables};
+use crate::runs::_helpers::tables::{load_messages, missing_tables, planned_tables};
 use crate::runs::models::{LoadedTable, ProjectRun};
 
 /// Each selected table's load of the project `text`; nothing loads when the plan lacks a `required` table.
@@ -30,7 +30,7 @@ pub fn run_project(
             .await
             .map_err(|error| error.to_string())?;
         if !plan.problems.is_empty() {
-            return Err(plan.problems.join("\n"));
+            return Err(load_messages(&project, plan.problems.clone()).join("\n"));
         }
         let planned: Vec<String> = planned_tables(&plan);
         let missing: Vec<String> = missing_tables(&required, &planned);
@@ -54,7 +54,10 @@ pub fn run_project(
         for outcome in load_tables(&run, &plan, None).await {
             let (loaded, changes) = match outcome.loaded {
                 Ok(loaded) => (Ok(loaded.rows), loaded.changes),
-                Err(error) => (Err(error), Vec::new()),
+                Err(error) => (
+                    Err(load_messages(&project, vec![error]).concat()),
+                    Vec::new(),
+                ),
             };
             tables.push(LoadedTable {
                 table: outcome.table,
