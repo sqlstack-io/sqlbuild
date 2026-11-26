@@ -7,3 +7,4 @@ pub mod effective_target_name;
 pub mod effective_vars;
 pub mod merged_target;
 pub mod target_fields;
+pub mod warehouse_connection_problem;

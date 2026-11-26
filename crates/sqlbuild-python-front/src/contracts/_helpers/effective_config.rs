@@ -27,6 +27,13 @@ pub(crate) struct Key<'py> {
     handle: Bound<'py, PyString>,
 }
 
+impl Key<'_> {
+    /// The key as text, lone surrogates replaced, for messages and fixed names.
+    pub(crate) fn text(&self) -> String {
+        String::from_utf8_lossy(&self.bytes).into_owned()
+    }
+}
+
 impl PartialEq for Key<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.bytes == other.bytes

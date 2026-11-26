@@ -64,3 +64,11 @@ pub(super) struct AuditFailureTestCase {
     pub(super) settings: bool,
     pub(super) expected_ignored: bool,
 }
+
+pub(super) struct WarehouseConnectionTestCase {
+    pub(super) description: &'static str,
+    pub(super) name: Option<&'static str>,
+    pub(super) kind: Option<&'static str>,
+    pub(super) keys: &'static [&'static str],
+    pub(super) expected_problem: Option<&'static str>,
+}

@@ -108,3 +108,17 @@ pub struct AuditFailureLayers {
 pub struct EffectiveConcurrency {
     pub limit: i64,
 }
+
+/// A connection a target writes through, as its role check reads it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct WarehouseConnection<'a> {
+    pub target: &'a str,
+    /// The `[connections.*]` entry the target names; `None` for `[connection]` or an inline mapping.
+    pub name: Option<&'a str>,
+    /// The project's `adapter`, the only kind its targets can hold models in.
+    pub adapter: &'a str,
+    /// The connection's `kind`, as text, when it sets one.
+    pub kind: Option<&'a str>,
+    /// Every key the connection sets, after its layers merge.
+    pub keys: &'a [&'a str],
+}

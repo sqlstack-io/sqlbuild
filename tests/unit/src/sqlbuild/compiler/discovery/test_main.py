@@ -763,6 +763,79 @@ def test_given_ambiguous_target_connection_when_discovering_then_config_error_is
     "test_case",
     (
         DiscoverProjectInputsErrorTestCase(
+            description="a target names a source connection",
+            repo_files={
+                "sqlbuild_project.toml": (
+                    'name = "demo"\nadapter = "duckdb"\n\n'
+                    '[connections.local]\ndatabase = "demo.duckdb"\n\n'
+                    '[connections.shop]\nkind = "http"\nbase_url = "https://shop.example"\n\n'
+                    '[targets.dev]\nconnection = "shop"\nschema = "dev"\n'
+                )
+            },
+            expected_error_fragment=(
+                "target 'dev' uses connection 'shop' (http), which can't hold models; this "
+                "project's targets need duckdb connections"
+            ),
+        ),
+        DiscoverProjectInputsErrorTestCase(
+            description="a local override gives a target's connection another kind",
+            repo_files={
+                "sqlbuild_project.toml": (
+                    'name = "demo"\nadapter = "duckdb"\n\n'
+                    '[connections.local]\ndatabase = "demo.duckdb"\n\n'
+                    '[targets.dev]\nconnection = "local"\nschema = "dev"\n'
+                ),
+                "sqlbuild_local.toml": '[connections.local]\nkind = "postgres"\n',
+            },
+            expected_error_fragment="target 'dev' uses connection 'local' (postgres)",
+        ),
+        DiscoverProjectInputsErrorTestCase(
+            description="an http setting on a warehouse connection",
+            repo_files={
+                "sqlbuild_project.toml": (
+                    'name = "demo"\nadapter = "duckdb"\n\n'
+                    '[connections.local]\ndatabase = "demo.duckdb"\nrate_limit = "10/s"\n\n'
+                    '[targets.dev]\nconnection = "local"\nschema = "dev"\n'
+                )
+            },
+            expected_error_fragment=(
+                "connections.local: rate_limit is for http connections; a warehouse "
+                "connection can't take it"
+            ),
+        ),
+        DiscoverProjectInputsErrorTestCase(
+            description="an http setting on the top-level connection",
+            repo_files={
+                "sqlbuild_project.toml": (
+                    'name = "demo"\nadapter = "duckdb"\n\n'
+                    '[connection]\ndatabase = "demo.duckdb"\nheaders = { a = "b" }\n\n'
+                    '[targets.dev]\nschema = "dev"\n'
+                )
+            },
+            expected_error_fragment="the connection of target 'dev': headers is for http",
+        ),
+    ),
+    ids=lambda case: case.description,
+)
+def test_given_target_connection_that_cant_hold_models_when_discovering_then_config_error_is_raised(
+    test_case: DiscoverProjectInputsErrorTestCase,
+    tmp_path: Path,
+    write_repo_files: Callable[[Path, dict[str, str]], None],
+) -> None:
+    write_repo_files(tmp_path, test_case.repo_files)
+
+    with pytest.raises(ProjectConfigError) as error_info:
+        discover_project_inputs(project_dir=tmp_path)
+
+    assert error_info.value.code == "D001"
+    assert test_case.expected_error_fragment in str(error_info.value)
+    assert str(tmp_path / "sqlbuild_project.toml") in str(error_info.value)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    (
+        DiscoverProjectInputsErrorTestCase(
             description="non-project directory containing Python",
             repo_files={"application/main.py": "print('hello')\n"},
             expected_error_fragment="Project config not found",

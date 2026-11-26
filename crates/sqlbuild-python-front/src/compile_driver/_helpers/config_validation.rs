@@ -1,5 +1,6 @@
 //! Validate loaded project and local configuration before discovery reads project files.
 
+use crate::compile_driver::_helpers::connection_roles::target_connection_problem;
 use crate::compile_driver::main::session_warehouse_support::session_warehouse_support;
 use crate::compile_driver::models::ProjectConfiguration;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
@@ -146,8 +147,17 @@ pub(crate) fn reject_invalid_target_connections(
             config.local_config,
             PyString::new(py, &name).as_any(),
         );
-        let Err(error) = resolved else {
-            continue;
+        let error: PyErr = match resolved {
+            Ok(resolved) => {
+                let Some(problem) = target_connection_problem(config, (&name, &resolved))? else {
+                    continue;
+                };
+                let config_path: Bound<'_, PyAny> =
+                    config.project_dir.div(PROJECT_CONFIG_FILENAME)?;
+                let message: String = format!("{} {problem}", config_path.str()?);
+                return Err(project_config_error(py, &message, None));
+            }
+            Err(error) => error,
         };
         if !error.is_instance(py, &spec_error) {
             return Err(error);
