@@ -10,6 +10,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.load._test_types import (
     ChainedLoaderFailureE2ETestCase,
     ChainedLoaderPruningE2ETestCase,
     ChainedLoaderSelectionE2ETestCase,
+    HttpLoaderE2ETestCase,
     IntermediateLoaderDefaultE2ETestCase,
     IntermediateLoaderStrategyE2ETestCase,
     LoaderWaffleShopE2ETestCase,
@@ -23,6 +24,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.load.helpers import (
     assert_source_only_ingress_dependency_case,
     build_loader_waffle_shop_project_files,
     build_schema_behavior_project_files,
+    serve_orders_api,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     prepare_inline_project,
@@ -188,6 +190,68 @@ def test_given_non_contract_loader_when_late_column_appears_then_existing_target
     rows: list[tuple[object, ...]] = query_duckdb(
         db_path=db_path,
         sql="SELECT event_id, note FROM raw_events ORDER BY event_id",
+    )
+    assert tuple(rows) == test_case.expected_rows
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        HttpLoaderE2ETestCase(
+            description="ctx.http pages through the loader's connection in SQLLoad",
+            loader_body="    return ctx.http().paginate('/orders', paginator=sl.single())\n",
+            expected_rows=((1, 10), (2, 20), (3, 30)),
+        ),
+        HttpLoaderE2ETestCase(
+            description="ctx.http yields its job, with headers added to the connection's",
+            loader_body=(
+                "    yield ctx.http(headers={'X-Trace': 'loader'}).paginate(\n"
+                "        '/orders', paginator=sl.single()\n"
+                "    )\n"
+            ),
+            expected_rows=((1, 10), (2, 20), (3, 30)),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_http_loader_when_loading_then_sqlload_runs_its_requests(
+    tmp_path: Path,
+    test_case: HttpLoaderE2ETestCase,
+) -> None:
+    with serve_orders_api() as base_url:
+        project_dir: Path = prepare_inline_project(
+            tmp_path=tmp_path,
+            project_name="http_loader",
+            repo_files={
+                "sqlbuild_project.toml": (
+                    'name = "http_loader"\nadapter = "duckdb"\n\n'
+                    '[connection]\ndatabase = "http_loader.duckdb"\n\n'
+                    f'[connections.shop]\nkind = "http"\nbase_url = "{base_url}"\n'
+                ),
+                "sql/sources/raw.yml": (
+                    "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
+                    "    managed: true\n"
+                    "    columns:\n"
+                    "      - name: order_id\n        type: BIGINT\n"
+                    "      - name: amount\n        type: BIGINT\n"
+                ),
+                "python/nodes/loaders/raw_orders/loader.py": (
+                    "import sqlload_api as sl\n\nfrom sqlbuild.loaders import loader\n\n\n"
+                    "@loader(connection='shop', write_strategy='replace')\n"
+                    "def raw_orders(ctx):\n"
+                    "    '''Test loader raw_orders.'''\n" + test_case.loader_body
+                ),
+            },
+        )
+        result: subprocess.CompletedProcess[str] = run_sqb(
+            command=("--no-color", "load"),
+            project_dir=project_dir,
+        )
+
+    assert result.returncode == test_case.expected_return_code, result.stdout + result.stderr
+    rows: list[tuple[object, ...]] = query_duckdb(
+        db_path=project_dir / "http_loader.duckdb",
+        sql="SELECT order_id, amount FROM raw_orders ORDER BY order_id",
     )
     assert tuple(rows) == test_case.expected_rows
 
@@ -1910,6 +1974,26 @@ def test_given_loader_dependency_failure_when_loading_json_then_reports_skipped_
                     "python/nodes/loaders/source_rows/__init__.py": (
                         "from .fetch_events.loader import fetch_events\n"
                         "from .raw_events.loader import raw_events\n"
+                    ),
+                },
+            ),
+        ),
+        SourceLoaderErrorE2ETestCase(
+            description="ctx.http needs the loader to name a connection",
+            command=("--no-color", "load"),
+            expected_error_fragment="ctx.http() needs @loader(connection=...) naming an http",
+            repo_files=build_schema_behavior_project_files(
+                source_yaml=(
+                    "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
+                    "    managed: true\n"
+                ),
+                node_files={
+                    "python/nodes/loaders/raw_orders/loader.py": (
+                        "import sqlload_api as sl\n\nfrom sqlbuild.loaders import loader\n\n\n"
+                        "@loader(write_strategy='replace')\n"
+                        "def raw_orders(ctx):\n"
+                        "    '''Test loader raw_orders.'''\n"
+                        "    return ctx.http().paginate('/orders', paginator=sl.single())\n"
                     ),
                 },
             ),

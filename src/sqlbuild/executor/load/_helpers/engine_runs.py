@@ -16,6 +16,7 @@ from sqlbuild.executor.load._helpers.execution import load_resource_kind
 from sqlbuild.executor.load.classes.engine_loader_run import EngineLoaderRun
 from sqlbuild.executor.load.classes.loader_run_context import LoaderRunContext
 from sqlbuild.executor.load.constants import (
+    HTTP_CONTEXT_CLIENTS,
     INTERMEDIATE_WRITE_STRATEGY,
     LOADER_NAMING,
     NOT_CALLED,
@@ -48,7 +49,12 @@ def engine_run(
     def started(read: Mapping[str, Any]) -> tuple[Context, object]:
         context: LoaderRunContext = cast(
             LoaderRunContext,
-            LoaderRunContext.from_read(read, logger=sqlbuild.logger, sqlbuild=sqlbuild),
+            LoaderRunContext.from_read(
+                read,
+                logger=sqlbuild.logger,
+                sqlbuild=sqlbuild,
+                connection_name=read.get("connection"),
+            ),
         )
         if returned is not NOT_CALLED:
             return context, returned
@@ -134,7 +140,7 @@ def _run_source(
     if schema is not None:
         settings["destination_schema"] = schema
     settings["tables"][name].setdefault("write_strategy", INTERMEDIATE_WRITE_STRATEGY)
-    paths: dict[str, Any] | None = literal_paths(callable_)
+    paths: dict[str, Any] | None = literal_paths(callable_, context_clients=HTTP_CONTEXT_CLIENTS)
     return {**declared, "http_paths": {} if paths is None else {name: paths}}
 
 

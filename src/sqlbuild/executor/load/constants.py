@@ -34,3 +34,4 @@ LOADER_SESSION: str = "sqlbuild_warehouse"
 INTERMEDIATE_WRITE_STRATEGY: str = "replace"
 LOADER_NAMING: str = "source"
 NOT_CALLED: object = object()
+HTTP_CONTEXT_CLIENTS: frozenset[str] = frozenset({"http"})

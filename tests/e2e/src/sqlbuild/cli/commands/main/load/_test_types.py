@@ -121,3 +121,11 @@ class IntermediateLoaderDefaultE2ETestCase:
     command: tuple[str, ...]
     expected_intermediate_rows: tuple[tuple[object, ...], ...]
     expected_terminal_rows: tuple[tuple[object, ...], ...]
+
+
+@dataclass(frozen=True)
+class HttpLoaderE2ETestCase:
+    description: str
+    loader_body: str
+    expected_rows: tuple[tuple[object, ...], ...]
+    expected_return_code: int = 0
