@@ -7000,8 +7000,9 @@ dependencies = [
 
 [[package]]
 name = "sqlload"
-version = "0.84.0"
-source = "git+https://github.com/sqlstack-io/sqlload.git?rev=3f59090f75c17d069cd07e9409c96a748cb3da32#3f59090f75c17d069cd07e9409c96a748cb3da32"
+version = "0.85.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d9e248a71546f04a0abdd67782699d4bd911c40f5db9dcd816d59889d9dd21c"
 dependencies = [
  "aes 0.8.4",
  "arrow-array",

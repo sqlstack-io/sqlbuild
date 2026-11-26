@@ -785,7 +785,7 @@ check-build-features:
 # A release links SQLLoad from crates.io only; a git pin is for unreleased work on a branch.
 check-sqlload-release:
 	@if grep -Eq '^sqlload = .*git *=' Cargo.toml; then \
-		echo "Cargo.toml pins sqlload to git; depend on its crates.io release before merging (TODO(sqlload-release))." >&2; \
+		echo "Cargo.toml pins sqlload to git; depend on its crates.io release before merging." >&2; \
 		exit 1; \
 	fi
 
