@@ -444,6 +444,10 @@ pub(crate) fn python_node_assets<'py>(
                     "warnings",
                     or_none(native_field(result, "warning_messages")?)?,
                 ),
+                (
+                    "dropped_log_lines",
+                    or_none(native_field(result, "dropped_log_lines")?)?,
+                ),
             ],
         )?);
     }

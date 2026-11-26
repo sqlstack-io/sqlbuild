@@ -149,6 +149,7 @@ E2E_DUCKDB_BUILD_CORE_PATHS := \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_no_tests_no_audits_flags.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_plan_command_surface.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_python_hooks.py \
+	tests/e2e/src/sqlbuild/cli/commands/main/build/test_python_live_logs.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_python_node_selection.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_python_source_deferral.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_defer_migration_origin.py \

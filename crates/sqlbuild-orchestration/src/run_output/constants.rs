@@ -63,6 +63,18 @@ pub const NODE_LOG_MESSAGE_BYTES: usize = 4096;
 /// The most `ctx.log` lines a worker reports per node.
 pub const NODE_LOGS_PER_NODE: usize = 200;
 
+/// A worker sends a node's `ctx.log` lines at least this often while they arrive.
+pub const NODE_LOG_FLUSH_INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// A worker sends its queued `ctx.log` lines as soon as this many are waiting.
+pub const NODE_LOG_FLUSH_LINES: usize = 50;
+
+/// How long a finishing node waits for its queued `ctx.log` lines to be sent before it reports the rest itself.
+pub const NODE_LOG_FLUSH_WAIT: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// What a node's last log line says when it logged more lines than are kept: `{count}` is how many more, `{limit}` the cap.
+pub const NODE_LOG_OVERFLOW_MESSAGE: &str = "{count} more lines not kept as log lines; ctx.log keeps {limit} per node, and print() output is kept in full in Output";
+
 /// The folder an output store defaults to, beside a SQLite control store.
 pub const DEFAULT_OUTPUT_FOLDER: &str = "output";
 

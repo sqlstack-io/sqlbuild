@@ -1792,3 +1792,19 @@ class CursorWindowFloorTestCase:
     expected_json_rows: dict[str, dict[str, str]]
     expected_warning_fragments: dict[str, str]
     expected_rows: dict[str, tuple[str, ...]]
+
+
+@dataclass(frozen=True)
+class BlockedAssetBuild:
+    """A build whose asset waited for the test: whether a line showed first, its output and exit."""
+
+    shown_before_release: bool
+    output: str
+    returncode: int
+
+
+@dataclass(frozen=True)
+class LiveLogBuildTestCase:
+    description: str
+    expected_live_line: str
+    expected_later_line: str

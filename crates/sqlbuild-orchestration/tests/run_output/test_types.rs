@@ -165,3 +165,16 @@ pub(crate) struct OutputStoredReadTimeTestCase {
     /// Each line read back: its text and the milliseconds it was read at.
     pub(crate) expected_lines: [(&'static str, i64); 3],
 }
+
+/// Lines one node logs through a worker's log sender, and what reaches the server.
+pub(crate) struct NodeLogSendTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) lines: usize,
+    /// Whether the server acknowledges each report.
+    pub(crate) acknowledged: bool,
+    /// Whether the node finishes (flushes) rather than the run closing the sender.
+    pub(crate) flushed: bool,
+    pub(crate) expected_reported: usize,
+    pub(crate) expected_last_sent: bool,
+    pub(crate) expected_overflow: Option<&'static str>,
+}

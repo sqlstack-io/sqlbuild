@@ -161,7 +161,7 @@ Each node receives a context object as its first argument (`AssetContext`, `Chec
 | `ctx.vars` | Project variables |
 | `ctx.is_reload` | `True` when `--reload` was passed |
 | `ctx.adapter` / `ctx.connection` | Adapter and live connection |
-| `ctx.log.info(message)`, `ctx.log.warning(message)`, `ctx.log.error(message)` | Log a line at that level; it shows with the run's events, while anything the node prints stays its output |
+| `ctx.log.info(message)`, `ctx.log.warning(message)`, `ctx.log.error(message)` | Log a line at that level; it shows with the run's events while the node runs, while anything the node prints stays its output (see [Logging](#logging)) |
 | `ctx.query(sql)` / `ctx.execute_sql(sql)` | Run SQL on the connection |
 | `ctx.qualify_name(name)` | Qualify a relation name |
 | `ctx.relation(ref)` | Resolve a declared `model()`/`source()` reference to a relation |
@@ -196,6 +196,39 @@ def partner_export(ctx):
 ```
 
 Connection settings and secrets are not part of `ctx.target_config`.
+
+### Logging
+
+`ctx.log` is for milestones: a few lines that say how far a node has got, such as `loaded 3 orders`
+or `step 2 of 5`. Each line shows as soon as it is logged: a local `sqb build` prints it, and on a
+server it reaches the run page's Log tab within a few seconds, while the node is still running.
+
+A node keeps its first 200 `ctx.log` lines as log lines. When it logs more, the rest are counted
+rather than kept, and one last warning says how many: `N more lines not kept as log lines; ctx.log
+keeps 200 per node, and print() output is kept in full in Output`. The count is also the node's
+`dropped_log_lines` in `--json` output.
+
+Send a long stream, such as a subprocess's output, to `print()` instead. Everything a node prints
+is kept in full and shows in the run's Output tab as it arrives:
+
+```python
+import subprocess
+
+
+@asset
+def partner_export(ctx):
+    """Run the partner export tool, keeping its full output."""
+    ctx.log.info("export started")
+    tool = subprocess.Popen(["partner-export"], stdout=subprocess.PIPE, text=True)
+    for line in tool.stdout:
+        print(line, end="")
+    tool.wait()
+    ctx.log.info(f"export finished with exit code {tool.returncode}")
+    return ctx.result()
+```
+
+A subprocess that writes to the node's own standard output directly, without the node reading its
+output, isn't captured; read its output and print it, as above.
 
 ## Returns and skips
 
