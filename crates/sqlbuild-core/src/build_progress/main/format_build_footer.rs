@@ -81,6 +81,9 @@ pub fn format_build_footer(
     let failed: Vec<(String, String)> = failed_items(result, python);
     let failed_list: String = render_failed_list(&failed, false, style);
     lines.extend(failed_list.lines().map(str::to_owned));
+    while lines.last().is_some_and(String::is_empty) {
+        lines.pop();
+    }
     lines.push(String::new());
     lines.push(format_completion_line(style, state, &label, Some(&summary)));
     lines.join("\n")

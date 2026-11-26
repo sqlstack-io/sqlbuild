@@ -12,7 +12,9 @@ from typing import Any
 
 from sqlbuild._native import SqlDocument
 from sqlbuild.executor.local.constants import (
+    SQLBUILD_ALLOW_HELP,
     SQLBUILD_SOURCES_HELP,
+    SQLQUACK_ALLOW_HELP,
     SQLQUACK_SOURCES_HELP,
     STATEMENT_CONSTRUCT,
 )
@@ -52,7 +54,7 @@ def placed_refusal(*, refusal: Mapping[str, Any], sources: TestSources) -> Local
         place = _place(start=start, refused=refused, sources=sources)
     help_text: str | None = refusal.get("help")
     if help_text is not None:
-        help_text = help_text.replace(SQLQUACK_SOURCES_HELP, SQLBUILD_SOURCES_HELP)
+        help_text = sqlbuild_help(help_text)
     return LocalRefusal(
         category=str(refusal.get("category", "")),
         construct=str(refusal.get("construct") or STATEMENT_CONSTRUCT),
@@ -74,6 +76,17 @@ def placed_refusal(*, refusal: Mapping[str, Any], sources: TestSources) -> Local
     )
 
 
+def sqlbuild_help(help_text: str) -> str:
+    """SQLQuack's help with its settings and paths replaced by SQLBuild's."""
+
+    replaced: str = help_text.replace(SQLQUACK_SOURCES_HELP, SQLBUILD_SOURCES_HELP)
+    return re.sub(
+        SQLQUACK_ALLOW_HELP,
+        lambda match: SQLBUILD_ALLOW_HELP.format(key=match["key"]),
+        replaced,
+    )
+
+
 def file_placed_refusal(
     *, refusal: Mapping[str, Any], sql: str, file: tuple[str, str] | None
 ) -> dict[str, Any]:
@@ -82,7 +95,7 @@ def file_placed_refusal(
     placed: dict[str, Any] = dict(refusal)
     help_text: str | None = refusal.get("help")
     if help_text is not None:
-        placed["help"] = help_text.replace(SQLQUACK_SOURCES_HELP, SQLBUILD_SOURCES_HELP)
+        placed["help"] = sqlbuild_help(help_text)
     span: Mapping[str, int] | None = refusal.get("span")
     if span is None or file is None:
         return placed

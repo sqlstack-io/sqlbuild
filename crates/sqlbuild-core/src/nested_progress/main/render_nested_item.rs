@@ -73,7 +73,7 @@ pub fn render_nested_item(
             "{indent}{} {}{:<child_width$}{}{} {}",
             format_tree_connector(style, last),
             style.muted(&format!("{:<LABEL_WIDTH$}", child.label)),
-            cut_middle(&child.name, child_width.saturating_sub(1)),
+            cut_middle(&child.name, child_width.saturating_sub(2)),
             style.status(&child.status_text),
             " ".repeat(STATUS_WIDTH.saturating_sub(child.status_text.chars().count())),
             style.muted(&child.detail)

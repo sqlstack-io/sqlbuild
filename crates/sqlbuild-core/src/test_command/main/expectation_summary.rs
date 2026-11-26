@@ -26,5 +26,8 @@ pub fn expectation_summary(step: &ExpectationStep) -> String {
     if differing == 0 {
         return String::new();
     }
-    format!("{} differ", rows(differing))
+    if differing == 1 {
+        return "1 row differs".to_owned();
+    }
+    format!("{differing} rows differ")
 }

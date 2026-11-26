@@ -3,20 +3,23 @@ use serde_json::json;
 use crate::cli_text::models::CliStyle;
 use crate::run_on::main::apply_local_refusals::apply_local_refusals;
 use crate::run_on::main::read_local_refusal::read_local_refusal;
-use crate::run_on::main::render_local_refusals::render_local_refusals;
-use crate::run_on::main::render_warehouse_census::render_warehouse_census;
+use crate::run_on::main::refusal_causes::refusal_causes;
+use crate::run_on::main::refusal_explain_rows::refusal_explain_rows;
+use crate::run_on::main::render_refusal_report::render_refusal_report;
 use crate::run_on::main::resolve_run_on::resolve_run_on;
 use crate::run_on::main::run_on_column::run_on_column;
 use crate::run_on::main::run_on_inspection_line::run_on_inspection_line;
 use crate::run_on::models::{LocalRefusal, RunOn, RunOnDecision};
 use crate::run_on::tests::helpers::{
-    layers, local, read_digest, refusal_digest, refused, refused_in_macro_output, run_on_document,
-    unplaced,
+    layers, local, read_digest, refusal_digest, refused, refused_in_macro_output,
+    refused_in_macro_source, refused_with_code, run_on_document, unplaced,
 };
 use crate::run_on::tests::test_types::{
-    ColumnTestCase, FragmentTestCase, InspectionTestCase, JsonTestCase, LocalRefusalTestCase,
+    CausesTestCase, ColumnTestCase, InspectionTestCase, JsonTestCase, LocalRefusalTestCase,
     ReadTestCase, RenderTestCase, ResolveTestCase,
 };
+
+use crate::run_output::models::{ExplainRow, HeaderCause};
 
 const PLAIN: CliStyle = CliStyle { use_color: false };
 const NOUNS: (&str, &str) = ("test", "tests");
@@ -56,69 +59,135 @@ fn given_run_on_layers_when_resolving_then_flag_beats_target_beats_settings_beat
 }
 
 #[test]
-fn given_decisions_when_rendering_census_then_counts_tests_per_refusal_most_first() {
+fn given_decisions_when_counting_causes_then_groups_by_code_and_construct_most_first() {
     let test_cases = [
-        RenderTestCase {
-            description: "every test local prints nothing",
+        CausesTestCase {
+            description: "every test local has no causes",
             decisions: vec![local("a")],
-            errors: false,
-            expected_text: "",
+            expected_causes: Vec::new(),
+            expected_rows: Vec::new(),
         },
-        RenderTestCase {
-            description: "refusals are counted per test, most tests first",
+        CausesTestCase {
+            description: "refusals are counted per cause and listed per place",
             decisions: vec![
                 local("a"),
                 refused("b", "fn:HASH", 26),
                 refused("c", "fn:HASH", 26),
-                unplaced("d"),
+                refused_in_macro_source("d"),
+                unplaced("e"),
             ],
-            errors: false,
-            expected_text: "\nOn the warehouse (3 tests)\n  a known difference that isn't allowed: fn:HASH  2 tests\n  missing rule: node:method_call                  1 test\n",
+            expected_causes: vec![
+                HeaderCause {
+                    label: "fn:HASH".to_owned(),
+                    count: 3,
+                    detail: "SQ0008 \u{b7} 1 model".to_owned(),
+                },
+                HeaderCause {
+                    label: "missing rule".to_owned(),
+                    count: 1,
+                    detail: String::new(),
+                },
+            ],
+            expected_rows: vec![
+                ExplainRow {
+                    count: 2,
+                    reason: "fn:HASH".to_owned(),
+                    place: "sql/models/staging/stg_orders.sql:26".to_owned(),
+                },
+                ExplainRow {
+                    count: 1,
+                    reason: "fn:HASH".to_owned(),
+                    place: "@sql.status_hash  sql/macros/status_hash.sql:3".to_owned(),
+                },
+                ExplainRow {
+                    count: 1,
+                    reason: "missing rule".to_owned(),
+                    place: "node:method_call".to_owned(),
+                },
+            ],
         },
     ];
     for test_case in test_cases {
+        let causes = refusal_causes(&test_case.decisions);
+        let rows = refusal_explain_rows(&test_case.decisions);
         assert_eq!(
-            render_warehouse_census(&test_case.decisions, NOUNS, PLAIN),
-            test_case.expected_text,
+            causes, test_case.expected_causes,
             "{}",
             test_case.description
         );
+        assert_eq!(rows, test_case.expected_rows, "{}", test_case.description);
     }
 }
 
 #[test]
-fn given_refusals_when_rendering_diagnostics_then_dedupes_by_place_and_lists_blocked_tests() {
+fn given_refusals_when_rendering_report_then_groups_by_cause_and_lists_origins() {
     let test_cases = [
         RenderTestCase {
-            description: "one diagnostic per construct and place, with every blocked test",
-            decisions: vec![
-                refused("test_stg_orders", "fn:HASH", 26),
-                refused("test_daily_revenue_chain", "fn:HASH", 26),
-                unplaced("test_fact_orders"),
-                local("calculates_line_total_cents"),
-            ],
-            expected_text: "\nCan't run locally (3 tests)\n\nerror[SQ0008]: HASH gives a different value in DuckDB\n --> sql/models/staging/stg_orders.sql:26:3\n   |\n26 |   HASH(status) AS status_hash\n   |   ^^^^^^^^^^^^ DuckDB computes its own hash, never Snowflake's\n   |\n  = note: Equal inputs still get equal hashes within one run.\n  = help: allow it with hash = true under [allow] in a sqlquack.toml\n  = tests: test_stg_orders, test_daily_revenue_chain\n\nerror: missing rule: node:method_call\n  = note: no rule converts METHOD CALL\n  = tests: test_fact_orders\n",
+            description: "every test local prints nothing",
+            decisions: vec![local("a")],
             errors: true,
+            verbose: false,
+            columns: 80,
+            expected_text: "",
         },
         RenderTestCase {
-            description: "auto: the tests run on the warehouse, so each refusal is a note",
+            description: "--run-on local: one error per cause at 80 columns",
             decisions: vec![
                 refused("test_stg_orders", "fn:HASH", 26),
                 refused("test_daily_revenue_chain", "fn:HASH", 26),
+                refused_with_code("test_customers", "fn:IS_DOUBLE", "SQ0002"),
                 unplaced("test_fact_orders"),
                 local("calculates_line_total_cents"),
             ],
-            expected_text: "\nOn the warehouse (3 tests)\n\nnote[SQ0008]: HASH gives a different value in DuckDB\n --> sql/models/staging/stg_orders.sql:26:3\n   |\n26 |   HASH(status) AS status_hash\n   |   ^^^^^^^^^^^^ DuckDB computes its own hash, never Snowflake's\n   |\n  = note: Equal inputs still get equal hashes within one run.\n  = help: allow it with hash = true under [allow] in a sqlquack.toml\n  = tests: test_stg_orders, test_daily_revenue_chain\n\nnote: missing rule: node:method_call\n  = note: no rule converts METHOD CALL\n  = tests: test_fact_orders\n",
+            errors: true,
+            verbose: false,
+            columns: 80,
+            expected_text: "\nCan't run locally (4 tests):\n\nerror[SQ0008]: HASH gives a different value in DuckDB          2 tests · 1 model\n   = note: Equal inputs still get equal hashes within one run.\n   = help: allow it with hash = true under [allow] in a sqlquack.toml\n     --> sql/models/staging/stg_orders.sql:26:3\n      |\n   26 |   HASH(status) AS status_hash\n      |   ^^^^^^^^^^^^ DuckDB computes its own hash, never Snowflake's\n\nerror[SQ0002]: fn:IS_DOUBLE has no DuckDB equivalent            1 test · 1 model\n     --> sql/models/staging/stg_orders.sql:40:3\n      |\n   40 |   IS_DOUBLE(payload) AS is_number\n      |   ^^^^^^^^^^^^^^^^^ no rule converts this function\n\nerror: missing rule                                                       1 test\n   └── node:method_call  1 test   test_fact_orders\n",
+        },
+        RenderTestCase {
+            description: "--run-on local at 160 columns",
+            decisions: vec![
+                refused("test_stg_orders", "fn:HASH", 26),
+                refused("test_daily_revenue_chain", "fn:HASH", 26),
+                refused_with_code("test_customers", "fn:IS_DOUBLE", "SQ0002"),
+                unplaced("test_fact_orders"),
+            ],
+            errors: true,
+            verbose: false,
+            columns: 160,
+            expected_text: "\nCan't run locally (4 tests):\n\nerror[SQ0008]: HASH gives a different value in DuckDB                                                                                          2 tests · 1 model\n   = note: Equal inputs still get equal hashes within one run.\n   = help: allow it with hash = true under [allow] in a sqlquack.toml\n     --> sql/models/staging/stg_orders.sql:26:3\n      |\n   26 |   HASH(status) AS status_hash\n      |   ^^^^^^^^^^^^ DuckDB computes its own hash, never Snowflake's\n\nerror[SQ0002]: fn:IS_DOUBLE has no DuckDB equivalent                                                                                            1 test · 1 model\n     --> sql/models/staging/stg_orders.sql:40:3\n      |\n   40 |   IS_DOUBLE(payload) AS is_number\n      |   ^^^^^^^^^^^^^^^^^ no rule converts this function\n\nerror: missing rule                                                                                                                                       1 test\n   └── node:method_call  1 test   test_fact_orders\n",
+        },
+        RenderTestCase {
+            description: "auto --verbose: the tests run on the warehouse, so each cause is a note",
+            decisions: vec![
+                refused("test_stg_orders", "fn:HASH", 26),
+                unplaced("test_fact_orders"),
+            ],
             errors: false,
+            verbose: true,
+            columns: 80,
+            expected_text: "\nOn the warehouse (2 tests):\n\nnote[SQ0008]: HASH gives a different value in DuckDB            1 test · 1 model\n   = note: Equal inputs still get equal hashes within one run.\n   = help: allow it with hash = true under [allow] in a sqlquack.toml\n     --> sql/models/staging/stg_orders.sql:26:3\n      |\n   26 |   HASH(status) AS status_hash\n      |   ^^^^^^^^^^^^ DuckDB computes its own hash, never Snowflake's\n\nnote: missing rule                                                        1 test\n   └── node:method_call  1 test   test_fact_orders\n",
+        },
+        RenderTestCase {
+            description: "two places of one cause are one group with both frames",
+            decisions: vec![
+                refused("test_stg_orders", "fn:HASH", 26),
+                refused("test_customers", "fn:HASH", 31),
+            ],
+            errors: true,
+            verbose: false,
+            columns: 80,
+            expected_text: "\nCan't run locally (2 tests):\n\nerror[SQ0008]: HASH gives a different value in DuckDB\n   2 tests · 1 model · 2 places\n   = note: Equal inputs still get equal hashes within one run.\n   = help: allow it with hash = true under [allow] in a sqlquack.toml\n\n   1. stg_orders  1 test\n        --> sql/models/staging/stg_orders.sql:26:3\n         |\n      26 |   HASH(status) AS status_hash\n         |   ^^^^^^^^^^^^ DuckDB computes its own hash, never Snowflake's\n\n   2. stg_orders  1 test\n        --> sql/models/staging/stg_orders.sql:31:3\n         |\n      31 |   HASH(status) AS status_hash\n         |   ^^^^^^^^^^^^ DuckDB computes its own hash, never Snowflake's\n",
         },
     ];
     for test_case in test_cases {
-        assert_eq!(
-            render_local_refusals(&test_case.decisions, test_case.errors, NOUNS, PLAIN),
-            test_case.expected_text,
-            "{}",
-            test_case.description
+        let text = render_refusal_report(
+            &test_case.decisions,
+            (test_case.errors, test_case.verbose),
+            NOUNS,
+            (test_case.columns, PLAIN),
         );
+        assert_eq!(text, test_case.expected_text, "{}", test_case.description);
     }
 }
 
@@ -235,26 +304,33 @@ fn given_runner_json_when_reading_decisions_then_keeps_refusal_fields() {
 }
 
 #[test]
-fn given_refusal_in_macro_output_when_rendering_then_points_at_call_and_shows_generated_sql() {
-    let test_cases = [FragmentTestCase {
-        description: "the call site, the generated SQL and the macro that produced it",
-        decisions: vec![refused_in_macro_output("test_orders")],
-        expected_fragments: &[
-            " --> sql/models/staging/stg_orders.sql:12:5\n",
-            "12 |   status, HASH(status) AS status_hash\n   |           ^^^^^^^^^^^^ ",
-            "  = expanded from @py.status_hash at sql/models/staging/stg_orders.sql:12:5\n",
-        ],
-    }];
+fn given_refusal_in_macro_when_rendering_then_frames_the_macro_source_or_the_call_site() {
+    let test_cases = [
+        RenderTestCase {
+            description: "the macro's own file holds the construct, so the frame is there",
+            decisions: vec![refused_in_macro_source("test_orders")],
+            errors: true,
+            verbose: false,
+            columns: 80,
+            expected_text: "\nCan't run locally (1 test):\n\nerror[SQ0008]: HASH gives a different value in DuckDB           1 test · 1 model\n   = note: Equal inputs still get equal hashes within one run.\n   = help: allow it with hash = true under [allow] in a sqlquack.toml\n    --> sql/macros/status_hash.sql:3:5\n     |\n   3 |     HASH(status)\n     |     ^^^^^^^^^^^^ DuckDB computes its own hash, never Snowflake's\n    = used by 1 model:\n      stg_orders (1)\n",
+        },
+        RenderTestCase {
+            description: "the construct isn't in the macro's file, so the call site is framed",
+            decisions: vec![refused_in_macro_output("test_orders")],
+            errors: true,
+            verbose: false,
+            columns: 80,
+            expected_text: "\nCan't run locally (1 test):\n\nerror[SQ0008]: HASH gives a different value in DuckDB           1 test · 1 model\n   = note: Equal inputs still get equal hashes within one run.\n   = help: allow it with hash = true under [allow] in a sqlquack.toml\n     --> sql/models/staging/stg_orders.sql:12:5\n      |\n   12 |   status, HASH(status) AS status_hash\n      |           ^^^^^^^^^^^^ DuckDB computes its own hash, never Snowflake's\n      = expanded from @py.status_hash at sql/models/staging/stg_orders.sql:12:5\n",
+        },
+    ];
     for test_case in test_cases {
-        let text: String = render_local_refusals(&test_case.decisions, true, NOUNS, PLAIN);
-        assert!(
-            test_case
-                .expected_fragments
-                .iter()
-                .all(|fragment| text.contains(fragment)),
-            "{}: {text}",
-            test_case.description
+        let text = render_refusal_report(
+            &test_case.decisions,
+            (test_case.errors, test_case.verbose),
+            NOUNS,
+            (test_case.columns, PLAIN),
         );
+        assert_eq!(text, test_case.expected_text, "{}", test_case.description);
     }
 }
 

@@ -1,84 +1,84 @@
-use crate::build_progress::models::ErrorText;
 use crate::cli_text::models::CliStyle;
+use crate::nested_progress::main::render_item_group::render_item_group;
 use crate::nested_progress::main::render_nested_item::render_nested_item;
-use crate::nested_progress::main::render_nested_spinner_line::render_nested_spinner_line;
-use crate::nested_progress::models::{NestedChildRow, NestedItem};
-use crate::nested_progress::tests::helpers::layout;
-use crate::nested_progress::tests::test_types::{NestedItemTestCase, SpinnerTestCase};
+use crate::nested_progress::tests::helpers::{errored, item, layout};
+use crate::nested_progress::tests::test_types::{GroupTestCase, NestedItemTestCase};
 
 const PLAIN: CliStyle = CliStyle { use_color: false };
+const LONG_NAME: &str =
+    "fct_orders__totals_match_line_items_after_refunds_and_partial_shipments_are_applied";
 
 #[test]
-fn given_completed_item_when_rendering_then_draws_children_and_error_as_tree() {
+fn given_completed_item_when_rendering_then_draws_one_row_and_children_only_on_failure() {
     let test_cases = [
         NestedItemTestCase {
-            description: "the last child closes the tree",
-            item: NestedItem {
-                item_name: "orders_test".to_owned(),
-                status_text: "PASS".to_owned(),
-                detail: "  0.10s".to_owned(),
-                error: ErrorText::default(),
-                child_rows: vec![NestedChildRow {
-                    label: "expect".to_owned(),
-                    name: "expected orders".to_owned(),
-                    status_text: "PASS".to_owned(),
-                    detail: String::new(),
-                }],
-            },
-            expected_text: "    test      orders_test          PASS  0.10s\n      \u{2514}\u{2500}\u{2500} expect  expected orders  PASS\n",
+            description: "a pass at 80 columns is one row without detail",
+            item: item("orders_assert", "PASS"),
+            group: "",
+            layout: layout(80, false),
+            expected_text: "    7/461  test      orders_assert                   PASS   local        0.42s\n",
         },
         NestedItemTestCase {
-            description: "an error is the final tree child",
-            item: NestedItem {
-                item_name: "orders_test".to_owned(),
-                status_text: "ERROR".to_owned(),
-                detail: String::new(),
-                error: ErrorText {
-                    code: Some("T1".to_owned()),
-                    message: Some("broken".to_owned()),
-                    help: None,
-                },
-                child_rows: Vec::new(),
-            },
-            expected_text: "    test      orders_test          ERROR\n      \u{2514}\u{2500}\u{2500} error   [T1] broken\n",
+            description: "a pass at 160 columns adds the dim detail",
+            item: item("orders_assert", "PASS"),
+            group: "",
+            layout: layout(160, false),
+            expected_text: "    7/461  test      orders_assert                   PASS   local        0.42s  1 real model\n",
+        },
+        NestedItemTestCase {
+            description: "--verbose shows a passing item's children",
+            item: item("orders_assert", "PASS"),
+            group: "",
+            layout: layout(80, true),
+            expected_text: "    7/461  test      orders_assert                   PASS   local        0.42s\n             └── expected  fct_orders                PASS   1 row differs\n",
+        },
+        NestedItemTestCase {
+            description: "a row under its group drops the group prefix",
+            item: item("fct_orders__totals_match", "FAIL"),
+            group: "fct_orders",
+            layout: layout(80, false),
+            expected_text: "    7/461  test      totals_match                    FAIL   local        0.42s\n             └── expected  fct_orders                FAIL   1 row differs\n",
+        },
+        NestedItemTestCase {
+            description: "a long name is cut in the middle at 80 columns",
+            item: item(LONG_NAME, "PASS"),
+            group: "",
+            layout: layout(80, false),
+            expected_text: "    7/461  test      fct_orders__t...ts_are_applied  PASS   local        0.42s\n",
+        },
+        NestedItemTestCase {
+            description: "an error is the last child, wrapped to the terminal",
+            item: errored("orders_assert"),
+            group: "",
+            layout: layout(80, false),
+            expected_text: "    7/461  test      orders_assert                   FAIL   local        0.42s\n             └── error     [T2001] Binder Error: Referenced column \"amount\" not\n                           found in FROM clause...\n",
         },
     ];
 
     for test_case in test_cases {
-        assert_eq!(
-            render_nested_item(&test_case.item, &layout(80), PLAIN),
-            test_case.expected_text,
-            "{}",
-            test_case.description
-        );
+        let text = render_nested_item(&test_case.item, test_case.group, &test_case.layout, PLAIN);
+        assert_eq!(text, test_case.expected_text, "{}", test_case.description);
     }
 }
 
 #[test]
-fn given_running_items_when_drawing_spinner_then_lists_and_truncates() {
+fn given_group_when_heading_then_counts_its_tests() {
     let test_cases = [
-        SpinnerTestCase {
-            description: "one running item is shown by name",
-            running: vec!["orders_test".to_owned()],
-            columns: 80,
-            expected_text: "\r\x1b[K    test      orders_test          \u{280b}",
+        GroupTestCase {
+            description: "one test is singular",
+            count: 1,
+            expected_text: "\n  fct_orders  (1 test)\n",
         },
-        SpinnerTestCase {
-            description: "several running items are counted and cut to the terminal",
-            running: vec!["orders_test".to_owned(), "customers_test".to_owned()],
-            columns: 30,
-            expected_text: "\r\x1b[K    test      2 running:... \u{280b}",
+        GroupTestCase {
+            description: "several tests are plural",
+            count: 3,
+            expected_text: "\n  fct_orders  (3 tests)\n",
         },
     ];
 
     for test_case in test_cases {
         assert_eq!(
-            render_nested_spinner_line(
-                &test_case.running,
-                "\u{280b}",
-                &layout(test_case.columns),
-                PLAIN
-            ),
+            render_item_group("fct_orders", test_case.count, ("test", "tests"), PLAIN),
             test_case.expected_text,
             "{}",
             test_case.description

@@ -288,10 +288,7 @@ impl NativeProgressProjector {
 
     /// The phase and kind of the statement that failed in `resource_name`, if one did.
     #[pyo3(signature = (*, resource_name))]
-    pub fn failed_statement(
-        &self,
-        resource_name: &str,
-    ) -> PyResult<Option<(String, String)>> {
+    pub fn failed_statement(&self, resource_name: &str) -> PyResult<Option<(String, String)>> {
         Ok(self.locked()?.failed_statement(resource_name))
     }
 

@@ -2,7 +2,7 @@ use serde_json::{Value, json};
 
 use crate::run_on::main::read_run_on_decisions::read_run_on_decisions;
 use crate::run_on::main::with_run_on_json::with_run_on_json;
-use crate::run_on::models::{LocalRefusal, RunOnDecision, RunOnLayers};
+use crate::run_on::models::{LocalRefusal, MacroPlace, RunOnDecision, RunOnLayers};
 
 /// A test that runs locally.
 pub(super) fn local(name: &str) -> RunOnDecision {
@@ -40,6 +40,8 @@ fn hash_refusal(construct: &str, line: i64) -> LocalRefusal {
         snippet: Some("  HASH(status) AS status_hash".to_owned()),
         snippet_column: None,
         expanded_from: None,
+        macro_name: None,
+        macro_place: None,
     }
 }
 
@@ -131,4 +133,38 @@ pub(super) fn read_digest(runner_json: &str) -> Option<Vec<(Option<String>, i64)
         digest.push((decision.reason(), width));
     }
     Some(digest)
+}
+
+/// A test refused in the output of `@sql.status_hash`, whose own file holds the refused HASH.
+pub(super) fn refused_in_macro_source(name: &str) -> RunOnDecision {
+    RunOnDecision {
+        name: name.to_owned(),
+        run_on: "warehouse".to_owned(),
+        refusals: vec![LocalRefusal {
+            macro_name: Some("@sql.status_hash".to_owned()),
+            macro_place: Some(MacroPlace {
+                path: "sql/macros/status_hash.sql".to_owned(),
+                line: 3,
+                column: 5,
+                snippet: "    HASH(status)".to_owned(),
+            }),
+            ..refused_in_macro_output(name).refusals[0].clone()
+        }],
+    }
+}
+
+/// A test refused at `line` of `stg_orders.sql` for `construct`, with a different code.
+pub(super) fn refused_with_code(name: &str, construct: &str, code: &str) -> RunOnDecision {
+    let mut decision: RunOnDecision = refused(name, construct, 40);
+    decision.refusals[0] = LocalRefusal {
+        code: Some(code.to_owned()),
+        message: Some(format!("{construct} has no DuckDB equivalent")),
+        label: Some("no rule converts this function".to_owned()),
+        notes: Vec::new(),
+        help: None,
+        snippet: Some("  IS_DOUBLE(payload) AS is_number".to_owned()),
+        width: 17,
+        ..decision.refusals[0].clone()
+    };
+    decision
 }

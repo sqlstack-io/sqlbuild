@@ -1,4 +1,5 @@
 use crate::run_on::models::{RunOn, RunOnDecision, RunOnLayers};
+use crate::run_output::models::{ExplainRow, HeaderCause};
 
 pub(super) struct ResolveTestCase {
     pub(super) description: &'static str,
@@ -11,7 +12,16 @@ pub(super) struct RenderTestCase {
     pub(super) decisions: Vec<RunOnDecision>,
     /// Whether the refusals stop the tests running, as under `--run-on local`.
     pub(super) errors: bool,
+    pub(super) verbose: bool,
+    pub(super) columns: usize,
     pub(super) expected_text: &'static str,
+}
+
+pub(super) struct CausesTestCase {
+    pub(super) description: &'static str,
+    pub(super) decisions: Vec<RunOnDecision>,
+    pub(super) expected_causes: Vec<HeaderCause>,
+    pub(super) expected_rows: Vec<ExplainRow>,
 }
 
 pub(super) struct InspectionTestCase {
@@ -38,12 +48,6 @@ pub(super) struct ReadTestCase {
     pub(super) description: &'static str,
     pub(super) runner_json: &'static str,
     pub(super) expected_decisions: Option<Vec<(Option<String>, i64)>>,
-}
-
-pub(super) struct FragmentTestCase {
-    pub(super) description: &'static str,
-    pub(super) decisions: Vec<RunOnDecision>,
-    pub(super) expected_fragments: &'static [&'static str],
 }
 
 pub(super) struct LocalRefusalTestCase {

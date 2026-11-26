@@ -36,7 +36,7 @@ from tests.unit.src.sqlbuild.cli.commands.main.execution.helpers import (
         ScenarioCompilePresentationTestCase(
             "tty planning spinner owns rows",
             True,
-            "Compiled project.",
+            "\u2713 Project compiled",
             "Project compile  START",
             "operation_completed",
         ),

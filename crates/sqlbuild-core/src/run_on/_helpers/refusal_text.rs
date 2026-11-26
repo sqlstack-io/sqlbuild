@@ -4,7 +4,9 @@ use crate::cli_text::main::format_tree_connector::format_tree_connector;
 use crate::cli_text::models::CliStyle;
 use crate::format_command::main::render_help_lines::render_help_lines;
 use crate::run_on::_helpers::refusal_groups::names_item;
-use crate::run_on::constants::{EXPANDED_LABEL, NOTE_LABEL, USED_BY_LABEL};
+use crate::run_on::constants::{
+    EXPANDED_LABEL, NOTE_LABEL, RUN_ELSEWHERE_HELP_PREFIX, RUN_ELSEWHERE_HELP_SUFFIX, USED_BY_LABEL,
+};
 use crate::run_on::models::{LocalRefusal, RefusalGroup, RefusalOrigin};
 use crate::text::main::text_wrap::text_wrap;
 
@@ -72,13 +74,17 @@ pub(crate) fn group_lines(group: &RefusalGroup, block: &BlockStyle<'_>) -> (Vec<
     if group.unplaced {
         lines.extend(construct_rows(group, block));
         if group.origins.len() == 1 {
-            lines.extend(note_lines(&group.refusal, block));
+            let mut refusal: LocalRefusal = group.refusal.clone();
+            if refusal.notes.is_empty() && !refusal.reason.is_empty() {
+                refusal.notes.push(refusal.reason.clone());
+            }
+            lines.extend(note_lines(&refusal, block));
         }
-        lines.extend(help_lines(&group.refusal, style));
+        lines.extend(group_help(&group.refusal, block));
         return (lines, false);
     }
     lines.extend(note_lines(refusal, block));
-    lines.extend(help_lines(refusal, style));
+    lines.extend(group_help(refusal, block));
     let numbered: bool = group.origins.len() > 1;
     let mut hidden: bool = false;
     for (index, origin) in group.origins.iter().enumerate() {
@@ -303,6 +309,23 @@ fn note_lines(refusal: &LocalRefusal, block: &BlockStyle<'_>) -> Vec<String> {
         }
     }
     lines
+}
+
+/// The cause's own help; under `--run-on local` a cause without one says to run its items on the warehouse.
+fn group_help(refusal: &LocalRefusal, block: &BlockStyle<'_>) -> Vec<String> {
+    match (&refusal.help, block.errors) {
+        (None, true) => help_lines(
+            &LocalRefusal {
+                help: Some(format!(
+                    "{RUN_ELSEWHERE_HELP_PREFIX}{}{RUN_ELSEWHERE_HELP_SUFFIX}",
+                    block.nouns.1
+                )),
+                ..LocalRefusal::default()
+            },
+            block.style,
+        ),
+        _ => help_lines(refusal, block.style),
+    }
 }
 
 fn help_lines(refusal: &LocalRefusal, style: CliStyle) -> Vec<String> {

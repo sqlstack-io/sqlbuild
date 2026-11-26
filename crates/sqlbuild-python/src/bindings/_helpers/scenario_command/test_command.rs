@@ -78,6 +78,7 @@ const TARGET_DIR: &str = "target";
 const RUN_ON_SETTING: &str = "scenario_run_on";
 const SCENARIO_NOUNS: (&str, &str) = ("scenario", "scenarios");
 const JSON_SCENARIO_NAME_KEYS: [&str; 2] = ["scenario_name", "name"];
+const RETAIN_HINT: &str = "Rerun with --retain to inspect scenario-owned artifacts.";
 /// The rollup line after the rows names at most this many causes.
 const ROLLUP_CAUSES: usize = 5;
 
@@ -163,6 +164,28 @@ fn prepare<'py>(
         style,
         concurrency: concurrency.max(1),
         since_json: None,
+    })
+}
+
+/// The warehouse side of an auto run: its own run settings, compiled pipeline and scenarios.
+struct RemoteRun<'py> {
+    run: TestRun<'py>,
+    pipeline: Bound<'py, PyAny>,
+    scenarios: Bound<'py, PyTuple>,
+}
+
+/// Compile the project again for the warehouse, for the scenarios an auto run sends there.
+fn remote_run<'py>(request: &Bound<'py, PyAny>, local: &TestRun<'py>) -> PyResult<RemoteRun<'py>> {
+    let py: Python<'py> = request.py();
+    let mut run: TestRun<'py> = prepare(request, discover_project(py, request)?, false)?;
+    let planning: Bound<'py, PyAny> = planning_reporter(&run.stream, run.style)?;
+    let base: Option<BaseComparison> = since_base(request, &run)?;
+    let (pipeline, scenarios, _since_json) = compiled(request, &run, &planning, base)?;
+    run.since_json = local.since_json.clone();
+    Ok(RemoteRun {
+        run,
+        pipeline,
+        scenarios,
     })
 }
 
@@ -278,8 +301,8 @@ fn scenario_steps(row: &ScenarioResultRow) -> Vec<ExpectationStep> {
     steps
 }
 
-/// `Retained (N):` with each retained scenario's local DuckDB and relations; empty with none.
-fn retained_section(rows: &[ScenarioResultRow], style: CliStyle) -> String {
+/// `Retained (N):` with each retained scenario's local DuckDB, and its relations under `--retain`; empty with none.
+fn retained_section(rows: &[ScenarioResultRow], relations: bool, style: CliStyle) -> String {
     let retained: Vec<&ScenarioResultRow> = rows.iter().filter(|row| row.retained).collect();
     if retained.is_empty() {
         return String::new();
@@ -293,7 +316,12 @@ fn retained_section(rows: &[ScenarioResultRow], style: CliStyle) -> String {
         if let Some(path) = &row.local_duckdb_path {
             lines.push(format!("    {}{path}", style.muted("duckdb    ")));
         }
-        for relation in row.retained_relations.iter().flatten() {
+        for relation in row
+            .retained_relations
+            .iter()
+            .flatten()
+            .filter(|_| relations)
+        {
             lines.push(format!(
                 "    {}{} -> {}",
                 style.muted(&format!("{:<10}", relation.kind)),
@@ -365,6 +393,12 @@ fn finish(
                 text: path.clone(),
             });
         }
+        if error.is_some() && !row.retained && !row.local {
+            entry.fields.push(FailureField::Labelled {
+                label: "help".to_owned(),
+                text: RETAIN_HINT.to_owned(),
+            });
+        }
         failed.push((entry.name.clone(), reason));
         entries.push(entry);
     }
@@ -405,9 +439,11 @@ fn finish(
         ),
         RunOn::Auto => String::new(),
     });
-    if flag(request, "retain")? {
-        output.push_str(&retained_section(&rows, run.style));
-    }
+    output.push_str(&retained_section(
+        &rows,
+        flag(request, "retain")?,
+        run.style,
+    ));
     output.push_str(&render_failed_list(&failed, report.verbose, run.style));
     let local: usize = results
         .iter()
@@ -424,7 +460,10 @@ fn finish(
     if not_run > 0 {
         parts.push(format!("{not_run} can't run locally"));
     }
-    let mut details: Vec<String> = vec![parts.join(", ")];
+    let mut details: Vec<String> = Vec::new();
+    if !parts.is_empty() {
+        details.push(parts.join(", "));
+    }
     let statements: Option<StatementReport> = StatementReport::read_excluding(
         py,
         &StatementSource {
@@ -791,6 +830,12 @@ pub(crate) fn run_scenario_test_command(
         .filter(|decision| mode == RunOn::Local || decision.local())
         .map(|decision| decision.name.as_str())
         .collect();
+    let mut remote: Option<RemoteRun<'_>> =
+        if run.local && decisions.iter().any(|decision| !decision.local()) {
+            Some(remote_run(request, &run)?)
+        } else {
+            None
+        };
     let header: RunHeader = run_header(&decisions, mode, flag(request, "explain")?);
     write(
         &run.stream,
@@ -884,30 +929,20 @@ pub(crate) fn run_scenario_test_command(
         }
         run
     } else {
-        let mut remote: TestRun<'_> = prepare(request, discover_project(py, request)?, false)?;
-        let quiet: Bound<'_, PyAny> = Bound::new(
-            py,
-            sqlbuild_python_output::build_progress::models::PlanningProgressReporter::new(
-                py,
-                &remote.stream,
-                remote.style.use_color,
-            )?,
-        )?
-        .into_any();
-        let remote_base: Option<BaseComparison> = since_base(request, &remote)?;
-        let (remote_pipeline, remote_scenarios, _remote_since_json) =
-            compiled(request, &remote, &quiet, remote_base)?;
-        remote.since_json = run.since_json.clone();
+        let remote: RemoteRun<'_> = match remote.take() {
+            Some(remote) => remote,
+            None => remote_run(request, &run)?,
+        };
         results.extend(execute_batch(
             request,
-            &remote,
+            &remote.run,
             (
-                &remote_pipeline,
-                &named(&remote_scenarios, &warehouse_names)?,
+                &remote.pipeline,
+                &named(&remote.scenarios, &warehouse_names)?,
             ),
             (&section, false, &rows),
         )?);
-        remote
+        remote.run
     };
     let succeeded: bool = finish(
         request,
