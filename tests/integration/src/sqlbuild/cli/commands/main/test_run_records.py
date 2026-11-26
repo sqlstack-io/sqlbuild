@@ -101,7 +101,7 @@ _SUCCEEDED_TWO: str = '{"succeeded":2,"warned":0,"failed":0,"skipped":0,"not_sta
             ],
         ),
         RunRecordTestCase(
-            description="a failing model beside successes finishes partial",
+            description="a failing model beside successes fails the run",
             build_args=("--select", "stg_orders", "broken_orders"),
             expected_exit_code=1,
             expected_rows=[
@@ -112,7 +112,7 @@ _SUCCEEDED_TWO: str = '{"succeeded":2,"warned":0,"failed":0,"skipped":0,"not_sta
                     '["stg_orders","broken_orders"]',
                     "[]",
                     "[]",
-                    "partial",
+                    "failed",
                     '{"succeeded":1,"warned":0,"failed":1,"skipped":0,"not_started":0}',
                 ),
             ],
@@ -495,7 +495,7 @@ def test_given_a_killed_build_when_reading_its_runs_then_only_started_remains(
             expected_phases={"main": _PAIR},
             expected_absent_schemas=frozenset(),
             expected_warnings=(),
-            expected_finished_status="partial",
+            expected_finished_status="failed",
         ),
         RunRecordSchemasTestCase(
             description="a function's schema records the run that deploys it",

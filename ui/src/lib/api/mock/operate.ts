@@ -27,6 +27,7 @@ import { DISCOVERED_PLANS } from './discovered';
 import { BIG_GROUP, bigGroupFile, bigGroupSelect, bigGroupShape } from './big-group';
 import { resolveSelection, setJobResolver, writeSetOf } from './operate-graph';
 import type { RunEnd, RunRecord, RunScript } from './run-detail';
+import { NOT_RUN_AUDIT_RUN_ID, SEED_AUDIT_JOB, SEED_AUDIT_RUN_ID } from './seed-audit-run';
 
 const MIN = 60_000;
 export const IMAGE_ID = 'sha256:4be1c0d97e2a51f3c6a8b0e9d4f7a2c1e5b8d3f6a9c2e7b4d1f8a5c3e6b9d2f4';
@@ -148,6 +149,33 @@ export const JOB_DEFS: JobDef[] = [
     "shop_daily",
     description="Every model of the shop, daily",
     select="path:models",
+    owner="data-platform",
+)`
+		)
+	},
+	{
+		key: 'load_reference',
+		kind: 'job',
+		description: 'Reference seeds',
+		select: 'kind:seed',
+		exclude: [],
+		members: [],
+		overlap: 'queue',
+		onFailure: null,
+		pools: {},
+		priority: 0,
+		sourceFile: 'orchestration/jobs.py',
+		settings: { '--concurrency': '8' },
+		targets: null,
+		owner: 'data-platform',
+		criticalNodes: [],
+		declaration: decl(
+			'orchestration/jobs.py',
+			31,
+			`load_reference = job(
+    "load_reference",
+    description="Reference seeds",
+    select="kind:seed",
     owner="data-platform",
 )`
 		)
@@ -929,6 +957,7 @@ export function createOperateFixtures(now: number): OperateFixtures {
 			rerunOfRunId: seed.rerunOf ?? null,
 			memberAttempt: null,
 			narrowing: null,
+			command: null,
 			window: null,
 			requestedBy: seed.by,
 			priority: seed.priority ?? job?.priority ?? 0,
@@ -990,6 +1019,10 @@ export function createOperateFixtures(now: number): OperateFixtures {
 		return (now - t) / MIN - delaySec / 60;
 	};
 
+	// Every seed built, then an end-of-build audit failed (seed-audit-run.ts).
+	record({ id: SEED_AUDIT_RUN_ID, origin: 'manual', job: SEED_AUDIT_JOB, by: DEMO_USER, queuedAgo: 7.3, startedAgo: 7.2, durationMin: 34 / 60, end: 'check_failed', reason: 'worker executor completed and closed its connections' });
+	// The same job once audits with missing reads are not run: it succeeds, its audit not run.
+	record({ id: NOT_RUN_AUDIT_RUN_ID, origin: 'manual', job: SEED_AUDIT_JOB, by: DEMO_USER, queuedAgo: 5.1, startedAgo: 5, durationMin: 34 / 60 });
 	record({ id: 'run-9d21', origin: 'manual', job: 'core_build', by: OPS_USER, queuedAgo: 3.2, startedAgo: 3, durationMin: 9, running: true, warn: ['stg_payments'] });
 	record({ id: 'run-6b02', origin: 'sensor', job: 'load_sources', trigger: 'partner_feed_poll', runKey: 'orders_part_0412.csv', by: SENSOR_DAEMON, queuedAgo: 7.5, startedAgo: 7.2, durationMin: 12, running: true, cancel: { requestedAgoSec: 20, by: OPS_USER, sigtermAgoSec: 19, done: false } });
 	record({ id: 'run-6a90', origin: 'schedule', job: 'activity_microbatch', trigger: 'activity_microbatch', tick: 2, by: SCHEDULER, queuedAgo: at('activity_microbatch', 2, 0), startedAgo: at('activity_microbatch', 2, 6), durationMin: 60, running: true, lastHeartbeatAgoSec: 95 });
@@ -1243,7 +1276,7 @@ export function createOperateFixtures(now: number): OperateFixtures {
 					cursorBefore: `run_event:${4000 + i * 37}`,
 					cursorAfter: `run_event:${4037 + i * 37}`,
 					runRequests: ok ? 1 : 0,
-					skipReason: ok ? null : `${b.run.id} was partial; on-success conditions don't fire on partial runs`
+					skipReason: ok ? null : `${b.run.id} failed; on-success conditions don't fire on failed runs`
 				})
 			);
 			if (ok && runId) reqs.push({ runKey: b.run.id, runId, evaluationId, requestedAt: new Date(t).toISOString(), runStatus: 'success' });

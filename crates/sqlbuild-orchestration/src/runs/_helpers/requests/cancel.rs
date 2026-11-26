@@ -40,16 +40,19 @@ pub(crate) async fn cancel_person_run(
         authorize_execution(transaction, credentials, (&frozen, Action::RunCancel)).await?;
     let (transaction, applied) = change_run_in(
         transaction,
-        RunAuthority::Operator(&context),
-        &RunChangeRequest {
-            run_id: request.run_id,
-            event_id: request.event_id,
-            claim_id: None,
-            change: RunChange::CancelRequested {
-                actor: context.actor.clone(),
-                reason: request.reason.clone(),
+        (
+            RunAuthority::Operator(&context),
+            &RunChangeRequest {
+                run_id: request.run_id,
+                event_id: request.event_id,
+                claim_id: None,
+                change: RunChange::CancelRequested {
+                    actor: context.actor.clone(),
+                    reason: request.reason.clone(),
+                },
             },
-        },
+        ),
+        None,
     )
     .await?;
     commit(transaction).await?;

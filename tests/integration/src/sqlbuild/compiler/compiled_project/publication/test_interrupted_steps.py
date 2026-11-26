@@ -86,7 +86,7 @@ class DuckDbUnrecordedAdapter(DuckDbAdapter):
     [
         InterruptedStepsTestCase(
             description="one finished, one finishing in the grace and one ignoring the cancel",
-            expected_status="partial",
+            expected_status="failed",
             expected_statuses={
                 "asset:fulfil[pick]": "success",
                 "asset:fulfil[label]": "success",

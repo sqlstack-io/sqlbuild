@@ -253,6 +253,24 @@ REWRITE_CHECKOUT: str = (
             rewrites={"sql/models/customers.sql": CUSTOMERS_SQL.replace("not_null", "unique_x")},
         ),
         AdhocVerbTestCase(
+            description="audit reports a singular audit under its own check",
+            prerequisites=[SEED, BUILD],
+            command=["audit", "--select", "customers"],
+            expected_selection=["model:customers"],
+            expected_run_nodes=[
+                ("audit:customers_match_orders", "check", "success"),
+                ("audit:not_null:model:customers:id", "check", "success"),
+                ("model:customers", "node", "success"),
+            ],
+            files={
+                "sql/audits/singular/customers_match_orders.sql": (
+                    'AUDIT (name "customers_match_orders", severity error);\n'
+                    'SELECT c.id FROM __ref("customers") c CROSS JOIN __ref("orders") o '
+                    "WHERE c.id IS NULL\n"
+                ),
+            },
+        ),
+        AdhocVerbTestCase(
             description="test reports each verified SQL test and the model it tests",
             prerequisites=[],
             command=["test", "--select", "customers"],

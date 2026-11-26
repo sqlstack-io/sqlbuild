@@ -24,6 +24,8 @@ use crate::declarations::main::read_person_providers::read_person_providers;
 use crate::declarations::models::{
     JobDetailRecord, JobRecord, PersonTriggerChange, PersonTriggerRecord, ProvidersRead,
 };
+use crate::health::main::failing_forwarding::failing_forwarding;
+use crate::health::models::ServerHealth;
 use crate::node_states::main::list_person_catalog_nodes::list_person_catalog_nodes;
 use crate::node_states::main::read_person_node_states::read_person_node_states;
 use crate::node_states::models::{NodeStateCache, NodeStatesRecord};
@@ -52,16 +54,16 @@ use crate::sensors::models::{PersonSensorState, SensorEventChoice, SensorTrialEv
 use crate::snapshots::main::reads::list_person_snapshots::list_person_snapshots;
 use crate::snapshots::models::PublishedSnapshot;
 use crate::store::models::ControlStore;
-use crate::warehouse_history::main::read_person_cost_summary::read_person_cost_summary;
-use crate::warehouse_history::main::read_person_node_costs::read_person_node_costs;
-use crate::warehouse_history::main::read_person_node_runs::read_person_node_runs;
-use crate::warehouse_history::main::read_person_run_cost::read_person_run_cost;
-use crate::warehouse_history::main::read_person_run_events::read_person_run_events;
-use crate::warehouse_history::main::read_person_run_ignored_audits::read_person_run_ignored_audits;
-use crate::warehouse_history::main::read_person_run_node_error::read_person_run_node_error;
-use crate::warehouse_history::main::read_person_run_output::read_person_run_output;
-use crate::warehouse_history::main::read_person_run_statement_sql::read_person_run_statement_sql;
-use crate::warehouse_history::main::read_person_run_statements::read_person_run_statements;
+use crate::warehouse_history::main::checks::read_person_run_ignored_audits::read_person_run_ignored_audits;
+use crate::warehouse_history::main::costs::read_person_cost_summary::read_person_cost_summary;
+use crate::warehouse_history::main::costs::read_person_node_costs::read_person_node_costs;
+use crate::warehouse_history::main::costs::read_person_run_cost::read_person_run_cost;
+use crate::warehouse_history::main::runs::read_person_node_runs::read_person_node_runs;
+use crate::warehouse_history::main::runs::read_person_run_events::read_person_run_events;
+use crate::warehouse_history::main::runs::read_person_run_node_error::read_person_run_node_error;
+use crate::warehouse_history::main::runs::read_person_run_output::read_person_run_output;
+use crate::warehouse_history::main::runs::read_person_run_statement_sql::read_person_run_statement_sql;
+use crate::warehouse_history::main::runs::read_person_run_statements::read_person_run_statements;
 use crate::warehouse_history::models::{CostSummaryRecord, NodeCostRecord};
 use crate::warehouse_metadata::models::{CatalogNodeRecord, WarehouseResourceCostRecord};
 use futures_util::StreamExt;
@@ -774,6 +776,7 @@ pub(crate) async fn sensor_events(
                 status: StatusCode::BAD_REQUEST,
                 message: "choose at most one of latest, event and run".into(),
                 decision_id: None,
+                cause: None,
             });
         }
     };
@@ -790,6 +793,7 @@ pub(crate) async fn sensor_events(
         status: StatusCode::CONFLICT,
         message,
         decision_id: None,
+        cause: None,
     })
 }
 
@@ -843,12 +847,13 @@ pub(crate) async fn health(
         (status = 401, description = "Session rejected")), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn problems(
     State(store): State<ControlStore>,
-    Extension(default_role): Extension<DefaultRole>,
+    (Extension(default_role), Extension(health)): (Extension<DefaultRole>, Extension<ServerHealth>),
     Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
 ) -> Result<Json<PlatformProblems>, ApiError> {
-    Ok(Json(
-        read_person_problems(&store, principal, default_role).await?,
-    ))
+    Ok(Json(PlatformProblems {
+        failing_forwarding: failing_forwarding(&health),
+        ..read_person_problems(&store, principal, default_role).await?
+    }))
 }
 
 #[utoipa::path(get, path = "/api/control/platform/events", operation_id = "listPersonPlatformEvents",
@@ -877,5 +882,6 @@ fn not_found(message: &str) -> ApiError {
         status: StatusCode::NOT_FOUND,
         message: message.into(),
         decision_id: None,
+        cause: None,
     }
 }

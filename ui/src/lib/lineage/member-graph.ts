@@ -311,7 +311,7 @@ export function memberGraph(members: readonly JobGroupMember[], info: ReadonlyMa
 				count: inside.length,
 				ok: inside.filter((k) => status(k) === 'success').length,
 				stale: inside.filter((k) => needs(k).changed + needs(k).behind > 0).length,
-				failed: inside.filter((k) => status(k) === 'failed' || status(k) === 'partial').length
+				failed: inside.filter((k) => status(k) === 'failed').length
 			};
 		};
 		const place = (folder: string, box: string | null) => {

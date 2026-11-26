@@ -91,6 +91,9 @@ pub(super) fn audit_rows(test_case: &AuditRowTestCase) -> Vec<String> {
     for (attempt_id, outcome) in &test_case.recorded_outcomes {
         projection.record_audit_outcome(attempt_id, outcome);
     }
+    for name in test_case.unstarted {
+        projection.expect_no_start(name);
+    }
     let mut lines: Vec<String> = Vec::new();
     for (event_id, event_type) in [
         ("e1", "resource_attempt_started"),

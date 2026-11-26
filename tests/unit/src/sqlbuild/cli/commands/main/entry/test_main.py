@@ -747,8 +747,8 @@ def test_given_diff_command_arguments_when_running_with_dependencies_then_it_dis
                 "tests/scenarios/nested",
                 "--exclude",
                 "tests/scenarios/slow",
-                "--local",
-                "--strict",
+                "--run-on",
+                "local",
                 "--sync-snapshots",
                 "--force",
                 "--max-snapshot-rows",
@@ -774,8 +774,8 @@ def test_given_scenario_test_arguments_when_running_with_dependencies_then_dispa
                 request.selectors,
                 request.exclude,
                 request.retain,
-                request.local,
-                request.strict,
+                request.run_on,
+                request.verbose,
                 request.sync_snapshots,
                 request.refresh,
                 request.limit_inputs.force,
@@ -803,8 +803,8 @@ def test_given_scenario_test_arguments_when_running_with_dependencies_then_dispa
             test_case.expected_scenario_selectors,
             ("tests/scenarios/slow",),
             False,
-            True,
-            True,
+            "local",
+            False,
             True,
             False,
             True,
@@ -1055,35 +1055,6 @@ def test_given_load_flags_when_running_then_dispatches_expected_arguments(
             json_output_path=None,
         )
     ]
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
-        MainTestCase(
-            description="rejects local scenario retain flag",
-            argv=["scenario", "test", "order_totals_pass", "--local", "--retain"],
-            expected_exit_code=1,
-        )
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_local_scenario_test_with_retain_when_running_then_returns_cli_error(
-    test_case: MainTestCase,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    exit_code: int = _main_with_dependencies(
-        argv=test_case.argv,
-        handlers=build_handlers(),
-    )
-    rendered_stderr: str = capsys.readouterr().err
-
-    assert exit_code == test_case.expected_exit_code
-    assert "error[C452]: scenario test --local does not support --retain" in rendered_stderr
-    assert (
-        "Local scenario DuckDB files are always kept under target/run/scenarios/."
-        in rendered_stderr
-    )
 
 
 @pytest.mark.parametrize(

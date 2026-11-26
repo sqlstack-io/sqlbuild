@@ -23,6 +23,14 @@ impl WebhookSource {
             Self::SecurityAudit => "Security audit",
         }
     }
+
+    /// Its health component's name, such as `Platform event forwarding`.
+    pub(crate) const fn forwarding(self) -> &'static str {
+        match self {
+            Self::Platform => "Platform event forwarding",
+            Self::SecurityAudit => "Security audit event forwarding",
+        }
+    }
 }
 
 /// Neither errors nor Debug may expose an operator endpoint containing credentials.

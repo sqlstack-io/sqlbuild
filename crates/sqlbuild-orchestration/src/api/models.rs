@@ -12,7 +12,7 @@ use crate::api::_helpers::resources::{
     administrators, audit, changed_builds, changes, location_health, location_work,
     person_bootstrap, person_checks, person_cost, person_location_work, person_maintenance,
     person_node_sql, person_operations, person_plans, person_reads, person_republish,
-    person_selection, run_reads, runs, service_accounts, snapshots, trigger_reads,
+    person_selection, run_reads, runs, server_health, service_accounts, snapshots, trigger_reads,
     warehouse_metadata,
 };
 
@@ -99,6 +99,7 @@ use crate::api::_helpers::resources::{
     person_plans::diff,
     person_selection::evaluate,
     person_selection::vocabulary,
+    person_selection::past_runs,
     person_node_sql::read,
     password_sessions::login,
     password_sessions::current,
@@ -114,6 +115,9 @@ use crate::api::_helpers::resources::{
     changes::subscribe_person,
     location_health::report,
     location_health::recent,
+    server_health::livez,
+    server_health::health,
+    server_health::details,
     location_work::poll,
     location_work::complete,
     location_work::result,
@@ -279,6 +283,30 @@ pub struct ApiErrorBody {
     /// Existing durable denial audit ID; absent when no decision was recorded.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub decision_id: Option<uuid::Uuid>,
+    /// This request's ID, as the server log and the `x-request-id` header name it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub request_id: Option<uuid::Uuid>,
+    /// The control database failure behind the error, when one is.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cause: Option<ErrorCause>,
+}
+
+/// A control database failure as an error response names it: its case and since when it has been failing.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct ErrorCause {
+    pub case: crate::health::models::ControlCauseCase,
+    pub since: chrono::DateTime<chrono::Utc>,
+}
+
+/// The ID the request middleware gives each request.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct RequestId(pub(crate) uuid::Uuid);
+
+/// An error response's body and cause, which the request middleware completes with the request's ID and the cause's place.
+#[derive(Clone, Debug)]
+pub(crate) struct ErrorReply {
+    pub(crate) body: ApiErrorBody,
+    pub(crate) cause: Option<crate::health::models::ControlCause>,
 }
 
 /// How people sign in to this server.
@@ -737,6 +765,8 @@ pub struct ServerFacts {
     pub origin: Option<String>,
     /// Where run output is kept; `None` on a server that keeps none, which refuses output reads and batches.
     pub output: Option<crate::run_output::models::OutputStore>,
+    /// The server's health, kept in memory and shared with its scheduler.
+    pub health: crate::health::models::ServerHealth,
 }
 
 /// The server's version, storage, sign-in and retention, for administrators.

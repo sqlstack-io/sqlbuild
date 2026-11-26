@@ -5,6 +5,7 @@ pub mod compiler_guard;
 pub mod config_value_to_python;
 pub mod context_variable;
 pub mod error_text_fields;
+pub mod failure_reason;
 pub mod imported;
 pub mod json_value_to_python;
 pub mod keywords;

@@ -37,8 +37,6 @@ export function statusLine(row: RunRow, now: number): StatusLine {
 			return { text: progress.total > 1 ? `All ${progress.total} nodes succeeded` : progress.total ? '1 node succeeded' : 'Succeeded', tone: 'muted' };
 		case 'warn':
 			return { text: `Succeeded with ${plural(run.nodeCounts.warn, 'warning')}`, tone: 'warn' };
-		case 'partial':
-			return { text: `Partial · ${outcomeCounts(run.nodeCounts)}`, tone: 'error', title: run.statusReason ?? undefined };
 		case 'failed':
 			if (!run.startedAt) return { text: "Couldn't start", tone: 'error', title: run.statusReason ?? undefined };
 			return { text: outcomeCounts(run.nodeCounts) || 'Failed', tone: 'error', title: run.statusReason ?? undefined };

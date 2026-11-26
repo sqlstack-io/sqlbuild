@@ -669,3 +669,58 @@ class PartitionedCallFixtureE2ETestCase:
     expected_rows: str
     expected_exit_code: int
     expected_stdout_fragment: str
+
+
+@dataclass(frozen=True)
+class RunOnPrecedenceE2ETestCase:
+    """Where `test_run_on` set in each place sends a DuckDB project's tests."""
+
+    description: str
+    settings_toml: str
+    target_line: str
+    local_toml: str
+    run_on_args: tuple[str, ...]
+    expected_counts: tuple[int, int]
+
+
+@dataclass(frozen=True)
+class RunOnTextE2ETestCase:
+    """One `sqb test` invocation and the exact lines its output must contain."""
+
+    description: str
+    command: tuple[str, ...]
+    expected_exit_code: int
+    expected_text: str
+
+
+@dataclass(frozen=True)
+class RunOnFallbackProgressE2ETestCase:
+    """An `auto` run whose local attempt falls back: its final row and how often lines appear."""
+
+    description: str
+    concurrency: str
+    expected_row: str
+    expected_starts: int
+    expected_assertion_lines: int
+
+
+@dataclass(frozen=True)
+class ScenarioRunOnFlagsE2ETestCase:
+    """A `sqb scenario test` flag combination the command refuses."""
+
+    description: str
+    command: tuple[str, ...]
+    expected_fragment: str
+
+
+@dataclass(frozen=True)
+class RunOnLocalJsonE2ETestCase:
+    """A `sqb test --run-on local --json` run and where each test ran and why."""
+
+    description: str
+    project: str
+    expected_exit_code: int
+    expected_placements: Mapping[str, tuple[object, ...]]
+    expected_counts: tuple[int, int] | None
+    expected_refusal_places: frozenset[tuple[object, ...]]
+    expected_refused_tests: tuple[str, ...]

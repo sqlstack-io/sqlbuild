@@ -18,7 +18,7 @@ use crate::bindings::_helpers::location_command::constants::PLAN_FAILED_CODE;
 use crate::bindings::_helpers::location_command::types::HeldProject;
 use crate::bindings::_helpers::plan_command::plan::PlanProject;
 use crate::bindings::_helpers::plan_command::plan::location_plan;
-use crate::bindings::_helpers::review_command::support::attribute;
+use sqlbuild_python_base::records::main::fields::attribute_text::attribute_text as attribute;
 use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
 use sqlbuild_python_project::job_settings::main::pinned_plan::pinned_plan;

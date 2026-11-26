@@ -7,6 +7,7 @@
 	// (ui/src/lib/components/ui/button/no-adhoc-buttons.test.ts fails on a raw <button> elsewhere):
 	//   default        solid blue primary; one per bar
 	//   outline        quiet secondary action, transparent with a border
+	//   accent         tinted blue, built like `stale`: the useful next action beside a status (Rerun on a run that didn't succeed)
 	//   stale          tinted purple: "needs building" (Build N changed, Build what changed)
 	//   stale-outline  outlined lighter purple: nodes only behind an upstream rebuild (Rebuild N)
 	//   destructive    tinted red, built like `stale`: remove, revoke, disable
@@ -22,6 +23,7 @@
 			variant: {
 				default: "bg-primary text-primary-foreground hover:brightness-108",
 				outline: "border-input bg-transparent text-foreground hover:bg-(--sb-hover) aria-expanded:bg-(--sb-hover) aria-pressed:bg-(--sb-hover)",
+				accent: "border-primary/45 bg-primary/14 text-primary hover:bg-primary/22 aria-expanded:bg-primary/22",
 				// Purple means "needs building": tinted for building changed nodes, outlined for nodes only behind.
 				// Execute's solid blue stays the bar's one solid button.
 				stale: "border-(--sb-stale)/45 bg-(--sb-stale)/14 text-(--sb-stale) hover:bg-(--sb-stale)/22",

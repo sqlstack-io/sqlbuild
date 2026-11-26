@@ -16,6 +16,7 @@ use crate::native_commands::_helpers::location::execution::exchange_reply;
 use crate::native_commands::_helpers::location::execution::{
     open_location_runtime, stop_location_runtime,
 };
+use crate::native_commands::_helpers::location::health::{report_compiler_sinks, sink_due};
 use crate::native_commands::models::{
     LocationCompileRequest, LocationCompiler, LocationLoad, LocationPlanRequest,
     LocationRuntimeRequest, LocationServe,
@@ -34,14 +35,19 @@ pub(crate) async fn run_location_compiler(
     let result = async {
         loop {
             let due: Option<Instant> = discovery.next_due().filter(|_| compiler.is_some());
+            let sinks_due: Option<Instant> = compiler.as_ref().map(sink_due);
             let request: Option<LocationRuntimeRequest> = tokio::select! {
                 request = requests.recv() => match request {
                     Some(request) => Some(request),
                     None => break,
                 },
-                () = sleep_until(due) => None,
+                () = sleep_until(due.into_iter().chain(sinks_due).min()) => None,
             };
             let Some(request) = request else {
+                compiler = report_compiler_sinks(compiler.take(), (options, controls.1)).await?;
+                if due.is_none_or(|due| due > Instant::now()) {
+                    continue;
+                }
                 compiler = check_discovered(compiler.take(), &mut discovery, (controls, &requests))
                     .await?;
                 if requests.is_closed() {

@@ -436,6 +436,10 @@ pub struct PlanTextReport {
     pub ignore_audit_failure_jobs: Vec<String>,
     /// Each named job whose nodes run on its own warehouse, and that warehouse.
     pub job_warehouses: Vec<(String, String)>,
+    /// Audits selected by name, with `audit:` or as a past run's failed audits, sorted.
+    pub audits: Vec<String>,
+    /// End-of-build audits that won't run, each with the reads that don't exist in the target, sorted.
+    pub audits_not_run: Vec<(String, Vec<String>)>,
 }
 
 /// The structural kind of a rendered plan line.
@@ -460,6 +464,17 @@ pub enum CompletionState {
 pub struct SummaryCount {
     pub label: String,
     pub value: i64,
+}
+
+impl SummaryCount {
+    /// The count `value` under `label`, saturating at `i64::MAX`.
+    #[must_use]
+    pub fn of(label: &str, value: usize) -> Self {
+        Self {
+            label: label.to_owned(),
+            value: i64::try_from(value).unwrap_or(i64::MAX),
+        }
+    }
 }
 
 /// One aligned name/value row: the plain name sets the width, the styled name is shown.

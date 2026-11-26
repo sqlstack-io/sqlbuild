@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ApiClient, Capability } from '$lib/api';
-import { pageAvailable, pagesBeyondTarget, visibleNav } from './nav';
+import { pageAvailable, pageLabel, pagesBeyondTarget, visibleNav } from './nav';
 
 const serving = (...methods: (keyof ApiClient)[]) => ({ supports: (method: keyof ApiClient) => methods.includes(method) });
 
@@ -54,5 +54,19 @@ describe('pageAvailable', () => {
 		['/settings', true]
 	])('%s → %s', (path, expected) => {
 		expect(pageAvailable(client, path)).toBe(expected);
+	});
+});
+
+describe('pageLabel', () => {
+	it('names the page by its navigation entry, a known page outside it, or This page', () => {
+		expect(['/', '/runs', '/runs/0190d1a0', '/admin/audit', '/plan/rerun', '/status', '/nowhere'].map(pageLabel)).toEqual([
+			'Overview',
+			'Runs',
+			'Runs',
+			'Audit log',
+			'Plan',
+			'Status',
+			'This page'
+		]);
 	});
 });

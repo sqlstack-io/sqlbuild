@@ -64,7 +64,7 @@ const EXPIRED_CLAIMS: &str = "WITH logged AS (\
     WHERE event_type = 'run_claimed' AND producer = 'scheduler'), \
     ranked AS (SELECT CAST(run_id AS TEXT) AS run_id, ended_at, ROW_NUMBER() OVER (PARTITION BY location_id, target \
     ORDER BY ended_at DESC, run_id DESC) AS newest FROM sqb_runs \
-    WHERE ended_at IS NOT NULL AND status IN ('success', 'warn', 'partial', 'failed', 'cancelled', 'skipped')) \
+    WHERE ended_at IS NOT NULL AND status IN ('success', 'warn', 'failed', 'cancelled', 'skipped')) \
     SELECT logged.claim FROM ranked JOIN claimed ON claimed.run_id = ranked.run_id \
     JOIN logged ON logged.claim = claimed.claim \
     WHERE ranked.newest > $1 OR ranked.ended_at < $2 ORDER BY ranked.ended_at LIMIT $3";

@@ -942,6 +942,23 @@ impl BuildProgressCallbacks {
     }
 }
 
+/// What happens to local test progress in `auto`, where a local attempt can fall back.
+#[derive(Clone, Copy)]
+pub enum LocalAttemptStep<'a> {
+    /// When true, hold each test's lines on this reporter until its result is known.
+    Hold(&'a Bound<'a, PyAny>, bool),
+    /// Write the reporter's lines as they come again, with those still held.
+    Release(&'a Bound<'a, PyAny>),
+    /// Drop the lines of this result's attempt on the reporter: it runs again on the warehouse.
+    Abandon(&'a Bound<'a, PyAny>, &'a Bound<'a, PyAny>),
+    /// When true, hold every progress line of a batch of local scenario replays.
+    HoldReplays(Python<'a>, bool),
+    /// Write the held replay lines, if any, and write lines as they come again.
+    ReleaseReplays(Python<'a>),
+    /// Settle a finished replay while held: drop its lines when it falls back, else write them.
+    SettleReplay(&'a Bound<'a, PyAny>),
+}
+
 /// Render one live spinner row for all running items and grouped completed rows.
 #[pyclass(module = "sqlbuild._native", frozen)]
 pub struct NestedCommandProgressCallbacks {
@@ -1007,6 +1024,66 @@ impl NestedCommandProgressCallbacks {
             ),
         )?;
         flush(stream)
+    }
+
+    /// Hold each item's progress lines back until its result is known.
+    pub fn hold_items(&self, py: Python<'_>) -> PyResult<()> {
+        self.state().holding = true;
+        if let Some(projector) = self.native_projector(py)? {
+            projector.get().hold_resources();
+        }
+        Ok(())
+    }
+
+    /// Write item progress as it comes again, after any lines still held back.
+    pub fn release_items(&self, py: Python<'_>) -> PyResult<()> {
+        self.state().holding = false;
+        match self.native_projector(py)? {
+            Some(projector) => self.locked(py, || projector.get().stop_holding_resources(py)),
+            None => Ok(()),
+        }
+    }
+
+    /// Drop an abandoned attempt: its held lines, its terminal row and its place on the live row.
+    pub fn on_item_abandoned(
+        slf: &Bound<'_, Self>,
+        item_name: &str,
+        canonical_resource_id: &str,
+    ) -> PyResult<()> {
+        let py: Python<'_> = slf.py();
+        let reporter: &Self = slf.get();
+        if let Some(projector) = reporter.native_projector(py)? {
+            projector.get().discard_resource(canonical_resource_id)?;
+        }
+        let stopped: Option<Py<PyAny>> = reporter.locked(py, || {
+            reporter
+                .state()
+                .running
+                .retain(|(name, _)| name != item_name);
+            Self::refresh_live_row(slf)
+        })?;
+        if let Some(thread) = stopped {
+            join_spinner(thread.bind(py))?;
+        }
+        Ok(())
+    }
+
+    /// The invocation's native projector, when progress has one.
+    pub(crate) fn native_projector<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Option<Bound<'py, NativeProgressProjector>>> {
+        let Some(projector) = &self.projector else {
+            return Ok(None);
+        };
+        let Ok(native) = projector
+            .bind(py)
+            .clone()
+            .cast_into::<NativeProgressProjector>()
+        else {
+            return Ok(None);
+        };
+        Ok(Some(native))
     }
 
     pub(crate) fn clear_live_row(&self, py: Python<'_>) -> PyResult<()> {
@@ -1140,7 +1217,10 @@ impl NestedCommandProgressCallbacks {
                 .call_method("expect_resource_enrichment", (), Some(&options))?;
         }
         reporter.locked(py, || {
-            if reporter.sequential && reporter.state().running.is_empty() {
+            if reporter.sequential
+                && reporter.state().running.is_empty()
+                && !reporter.state().holding
+            {
                 reporter.clear_live_row(py)?;
                 reporter.write_group_header(py, &group)?;
             }
@@ -1183,6 +1263,20 @@ impl NestedCommandProgressCallbacks {
         let group: String = arguments.value("group_name")?.extract()?;
         let item_name: String = arguments.value("item_name")?.extract()?;
         let mut detail: String = optional_argument(&arguments, "detail")?.unwrap_or_default();
+        let resource_id: Option<String> = optional_argument(&arguments, "canonical_resource_id")?;
+        let held: Option<Bound<'_, NativeProgressProjector>> = match reporter.state().holding {
+            true => reporter.native_projector(py)?,
+            false => None,
+        };
+        let release = |projector: &Option<Bound<'_, NativeProgressProjector>>| match (
+            projector,
+            &resource_id,
+        ) {
+            (Some(projector), Some(resource_id)) => {
+                projector.get().release_resource(py, resource_id)
+            }
+            _ => Ok(()),
+        };
         let duration_ms: Option<f64> = match &reporter.projector {
             Some(projector) => {
                 let canonical: Option<String> =
@@ -1226,10 +1320,13 @@ impl NestedCommandProgressCallbacks {
                 };
                 reporter.clear_live_row(py)?;
                 reporter.write_group_header(py, &item_group)?;
+                release(&held)?;
                 write(
                     reporter.stream.bind(py),
                     &render_nested_item(&item, &reporter.layout(py)?, reporter.style),
                 )?;
+            } else {
+                release(&held)?;
             }
             let stopped: Option<Py<PyAny>> = Self::refresh_live_row(slf)?;
             flush(reporter.stream.bind(py))?;

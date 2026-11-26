@@ -417,3 +417,11 @@ class ClosingTerminationTestCase:
     description: str
     shutdown_timeout: str
     expected_exit_code: int
+
+
+@dataclass(frozen=True)
+class LocalStatementsTestCase:
+    description: str
+    args: tuple[str, ...]
+    sql: str
+    expected_rows: list[list[object]]

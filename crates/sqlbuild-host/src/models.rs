@@ -320,6 +320,8 @@ pub enum AuditOutcome {
     Error,
     Insufficient,
     Skipped,
+    /// An end-of-build audit that reads something the target doesn't have: neither a pass nor a failure.
+    NotRun,
 }
 
 impl ResultEnum for AuditOutcome {
@@ -329,6 +331,7 @@ impl ResultEnum for AuditOutcome {
         Self::Error,
         Self::Insufficient,
         Self::Skipped,
+        Self::NotRun,
     ];
 
     fn value(self) -> &'static str {
@@ -338,6 +341,7 @@ impl ResultEnum for AuditOutcome {
             Self::Error => "error",
             Self::Insufficient => "insufficient",
             Self::Skipped => "skipped",
+            Self::NotRun => "not_run",
         }
     }
 }
@@ -686,6 +690,8 @@ pub struct SqlTestExecutionResult<V> {
     pub error_message: Option<String>,
     pub real_model_count: Option<i64>,
     pub timeout: Option<ItemTimeoutReport>,
+    /// Why a local run failed where the warehouse would not: `test`, `category`, `construct`, `reason`.
+    pub local_refusal: Option<V>,
 }
 
 /// Everything one build executed, as the executor returns it. Mirrors `sqlbuild.executor.build.models.BuildExecutionResult`; `V` is a host value.
@@ -706,6 +712,8 @@ pub struct BuildExecutionResult<V> {
     pub warning_count: i64,
     pub insufficient_count: i64,
     pub ignored_audit_failure_count: i64,
+    /// End-of-build audits not run because the target lacks a read; in no other count.
+    pub not_run_count: i64,
     pub audit_result_projection_attempted_count: i64,
     pub audit_result_projection_written_count: i64,
     pub audit_result_projection_failed_count: i64,
@@ -778,4 +786,6 @@ pub struct ScenarioRunResult<V> {
     pub error_help: Option<String>,
     pub error_message: Option<String>,
     pub duration_ms: Option<f64>,
+    /// Why a local replay failed where the warehouse would not: `test`, `category`, `construct`, `reason`.
+    pub local_refusal: Option<V>,
 }

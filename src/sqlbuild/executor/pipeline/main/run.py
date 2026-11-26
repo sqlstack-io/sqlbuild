@@ -29,7 +29,13 @@ from sqlbuild.executor.pipeline._helpers.connections import (
     close_connections,
     prepare_build_connections,
 )
-from sqlbuild.executor.pipeline._helpers.graph_width import runnable_graph_width
+from sqlbuild.executor.pipeline._helpers.graph_width import (
+    sql_phase_concurrency,
+    sql_phase_has_work,
+)
+from sqlbuild.executor.pipeline._helpers.scenario import (
+    decide_scenario_run_on as decide_scenario_run_on,
+)
 from sqlbuild.executor.pipeline._helpers.scenario import (
     run_scenario_capture_pipeline as run_scenario_capture_pipeline,
 )
@@ -60,6 +66,7 @@ from sqlbuild.runtime.observability.classes.event_dispatcher import EventDispatc
 from sqlbuild.runtime.observability.main.create_lifecycle_event import create_lifecycle_event
 from sqlbuild.runtime.observability.main.current_event_dispatcher import current_event_dispatcher
 from sqlbuild.runtime.observability.main.run_scope import run_scope
+from sqlbuild.runtime.observability.types import JSONValue
 
 
 def run_build_pipeline(
@@ -72,8 +79,9 @@ def run_build_pipeline(
     callbacks: BuildCallbacks | None = None,
     customizations: BuildCustomizations | None = None,
     initial_state: BuildInitialState | None = None,
+    execution_announced: bool = False,
 ) -> BuildExecutionResult:
-    """Execute a full build pipeline: resolve settings, open connections, run plan, close."""
+    """Execute a build pipeline; a caller that ran work first announces its start itself."""
 
     plan = plannable_plan(plan)
     with run_scope(runtime.run_id) as identity:
@@ -109,6 +117,7 @@ def run_build_pipeline(
                         callbacks=callbacks,
                         customizations=customizations,
                         initial_state=initial_state,
+                        execution_announced=execution_announced,
                     )
                 except BaseException as error:
                     if dispatcher is not None:
@@ -152,9 +161,14 @@ def _run_build_pipeline(
     callbacks: BuildCallbacks | None = None,
     customizations: BuildCustomizations | None = None,
     initial_state: BuildInitialState | None = None,
+    execution_announced: bool = False,
 ) -> BuildExecutionResult:
     """Run the build while the public wrapper owns telemetry context."""
 
+    if not execution_announced:
+        _ = _publish_execution_start(plan=plan, max_concurrency=runtime.max_concurrency)
+    if not sql_phase_has_work(plan=plan):
+        return BuildExecutionResult(status=BuildStatus.SUCCESS)
     inputs: ResolvedBuildInputs = resolve_build_inputs(
         settings=settings,
         adapter=adapter,
@@ -163,8 +177,8 @@ def _run_build_pipeline(
         customizations=customizations,
         initial_state=initial_state,
     )
-    effective_concurrency: int = min(
-        max(1, runtime.max_concurrency), runnable_graph_width(plan=plan)
+    effective_concurrency: int = sql_phase_concurrency(
+        plan=plan, max_concurrency=runtime.max_concurrency
     )
     preparation: BuildConnectionPreparation = prepare_build_connections(
         plan=plan,
@@ -172,10 +186,6 @@ def _run_build_pipeline(
         connection_config=connection_config,
         connection_count=effective_concurrency,
         callbacks=inputs.callbacks,
-    )
-    _ = _publish_execution_start(
-        concurrency=effective_concurrency,
-        connections=len(preparation.worker_connections) + 1,
     )
     timing_tracker: BuildPhaseTimingTracker | None = BuildPhaseTimingTracker.current()
     execution_error: BaseException | None = None
@@ -219,16 +229,14 @@ def _run_build_pipeline(
         )
 
 
-def _publish_execution_start(*, concurrency: int, connections: int) -> None:
+def _publish_execution_start(*, plan: PlanOutput, max_concurrency: int) -> None:
     dispatcher: EventDispatcher | None = current_event_dispatcher()
-    if dispatcher is not None:
-        dispatcher.publish_lifecycle(
-            create_lifecycle_event(
-                event_type="invocation_phase",
-                payload={
-                    "phase": "started_execution",
-                    "count": concurrency,
-                    "detail": f"{connections} connections",
-                },
-            )
-        )
+    if dispatcher is None:
+        return
+    concurrency: int = sql_phase_concurrency(plan=plan, max_concurrency=max_concurrency)
+    payload: dict[str, JSONValue] = {"phase": "started_execution", "count": concurrency}
+    if sql_phase_has_work(plan=plan):
+        payload["detail"] = f"{concurrency + 1} connections"
+    dispatcher.publish_lifecycle(
+        create_lifecycle_event(event_type="invocation_phase", payload=payload)
+    )

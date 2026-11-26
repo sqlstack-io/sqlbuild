@@ -64,7 +64,7 @@ fn given_a_checked_sensor_when_people_read_its_state_then_listing_view_gates_it_
                 .await
                 .expect("triggers")
                 .remove(0);
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

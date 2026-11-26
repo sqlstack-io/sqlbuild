@@ -53,7 +53,6 @@ fn outcome(status: RunStatus) -> &'static str {
     match status {
         RunStatus::Success => "succeeded",
         RunStatus::Warn => "succeeded with warnings",
-        RunStatus::Partial => "partly succeeded",
         RunStatus::Failed => "failed",
         RunStatus::Cancelled => "cancelled",
         RunStatus::Skipped => "skipped",

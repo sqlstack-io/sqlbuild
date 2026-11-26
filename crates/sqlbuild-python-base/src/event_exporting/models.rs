@@ -3,6 +3,7 @@
 use crate::boundary::main::call_with::call_with;
 use crate::boundary::main::context_variable::context_variable;
 use crate::boundary::models::KeywordArguments;
+use crate::event_exporting::_helpers::closed_export::record_closed_export;
 use crate::event_exporting::_helpers::scope::CURRENT_SCOPE;
 use crate::event_exporting::_helpers::scope::ProviderSessionCloser;
 use crate::event_exporting::_helpers::scope::ScopeState;
@@ -584,9 +585,16 @@ impl EventExporterCommandScope {
             .unbind())
     }
 
-    /// Flush sink delivery before reverse-order provider teardown.
+    /// Flush sink delivery before reverse-order provider teardown, and keep what each sink delivered.
     pub(crate) fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let summary: Py<PyAny> = self.dispatcher.bind(py).call_method0("shutdown")?.unbind();
+        self.finalize_providers(py)?;
+        record_closed_export(summary.bind(py), self.teardown_failures()?);
+        Ok(summary)
+    }
+
+    /// Tear the sink providers down once delivery is idle, keeping each teardown that raised.
+    fn finalize_providers(&self, py: Python<'_>) -> PyResult<()> {
         let session: Py<PyAny> = {
             let mut state = self.locked()?;
             let Some(session) = state
@@ -594,10 +602,10 @@ impl EventExporterCommandScope {
                 .as_ref()
                 .map(|session| session.clone_ref(py))
             else {
-                return Ok(summary);
+                return Ok(());
             };
             if state.provider_close_registered {
-                return Ok(summary);
+                return Ok(());
             }
             state.provider_close_registered = true;
             session
@@ -610,7 +618,7 @@ impl EventExporterCommandScope {
         {
             self.locked()?.teardown_failures = teardown_failures(py, &error);
         }
-        Ok(summary)
+        Ok(())
     }
 
     /// Each sink provider whose teardown raised when the scope closed, with its error type.
@@ -657,4 +665,11 @@ impl EventExporterScopeContext {
         }
         Ok(false)
     }
+}
+
+/// What a closed command scope's sinks did: each sink's counts, and each sink provider whose teardown raised.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ClosedExport {
+    pub per_exporter: Vec<(String, sqlbuild_core::event_export::models::ExporterCounts)>,
+    pub teardown_failures: Vec<String>,
 }

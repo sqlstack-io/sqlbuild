@@ -7,9 +7,9 @@
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import { to } from '$lib/paths';
 	import PlayIcon from '@lucide/svelte/icons/play';
-	// Every rerun opens here first, like every Run button opens the plan page: it shows what the rerun repeats
-	// and nothing reruns until Run is pressed. A rerun repeats its run's frozen version and settings, so it is
-	// not planned against the current project.
+	// Every rerun opens here first, like every Run button opens the plan page: nothing reruns until Run is
+	// pressed. One run's rerun is the selection in the box, run as `sqb build <selection>` against the current
+	// publication; reruns of several runs repeat each run's frozen version and settings.
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import RotateCwIcon from '@lucide/svelte/icons/rotate-cw';
@@ -26,7 +26,14 @@
 	import { createResource } from '$lib/state/resource.svelte';
 	import { useCatalogNodes } from '$lib/state/catalog.svelte';
 	import { runStatusLabel } from '$lib/status';
-	import { rerunChoices } from '../../runs/[id]/utils';
+	import { rerunChoices, runFailures } from '../../runs/[id]/utils';
+	import { rerunRows } from '../../runs/[id]/utils/rerun-rows';
+	import SelectionBar from '$lib/components/selection/selection-bar.svelte';
+	import { createSelection } from '$lib/state/selection.svelte';
+	import type { SuggestionItem } from '$lib/selection/suggest';
+	import { nodeLabel } from '$lib/operate/labels';
+	import { buildRequest, copyCommand, runsNamed } from '$lib/selection/command';
+	import { namesRun, openingText, presetSuggestions, rerunItems, type RerunItem } from './utils/rerun-plan';
 
 	const runIds = page.url.searchParams.getAll('run');
 	const picked = page.url.searchParams.getAll('node');
@@ -42,33 +49,58 @@
 
 	const can = (c: Capability) => app.can(c);
 	const first = $derived(details.data?.[0] ?? null);
-	/** One run's choices, as its rerun button offers them; reruns of several runs only rerun all or from failure. */
-	const choices = $derived(single && first ? rerunChoices(first, app.client.supports('rerunSelectedNodes') ? picked : [], can) : []);
-	const offered = (m: RerunMode) => (single ? choices.some((c) => c.mode === m && !c.disabledReason) : m === 'all' || m === 'from_failure');
-	let mode = $state<RerunMode>(requested);
-	// A mode this run can't rerun, typed into the address, falls back to rerunning all.
+	// Reruns of several runs rerun all or from failure; any other mode in the address falls back to all.
+	let mode = $state<RerunMode>(requested === 'from_failure' ? 'from_failure' : 'all');
+	// One run: what it failed on, the presets (the run page's Rerun menu), and an editable selection they fill.
+	const runEvents = createResource((client, scope) => (single && client.supports('listRunEvents') ? client.listRunEvents(scope, runIds[0], { limit: 5000 }).then((p) => p.events) : Promise.resolve([])), runIds.map((id) => `run:${id}`));
+	const runStatements = createResource((client, scope) => (single && client.supports('listRunStatements') ? client.listRunStatements(scope, runIds[0]) : Promise.resolve([])), runIds.map((id) => `run:${id}`));
+	const failures = $derived(first ? runFailures(first.nodes, runEvents.data ?? [], runStatements.data ?? [], first.run.target, { node: () => null, audit: () => null }) : []);
+	const presets = $derived(first ? rerunRows({ failures, unfinished: first.rerunFromFailureNodes, total: first.nodes.length, jobKey: first.run.jobKey }) : []);
+	const selection = createSelection({ initial: { select: '', exclude: '' } });
+	let filled = false;
 	$effect(() => {
-		if (details.data && !offered(mode)) mode = 'all';
+		if (filled || !first || !runEvents.data) return;
+		filled = true;
+		selection.select = openingText(requested, picked, first.run.id, failures);
 	});
-	const nodesOf = (d: RunDetail): string[] => (mode === 'selected' ? picked : mode === 'from_failure' ? d.rerunFromFailureNodes : d.selection);
-	const blockedOf = (d: RunDetail): string | null => rerunChoices(d, [], can).find((c) => c.mode === (mode === 'selected' ? 'all' : mode))?.disabledReason ?? null;
+	const items = $derived<RerunItem[]>(first && selection.keys ? rerunItems([...selection.keys], first, failures) : []);
+	/** What Run submits for one run, and the command shown for it: the same tokens. */
+	const typed = $derived({ select: selection.select, exclude: selection.exclude });
+	const command = $derived(copyCommand(typed));
+	const auditCount = $derived(items.filter((i) => i.kind === 'audit').length);
+	const nodeCount = $derived(items.length - auditCount);
+	/** Where the plan came from, read from the selection alone: the runs its `run:`, `failed:` and `skipped:` name. */
+	const fromRuns = $derived(runsNamed(selection.select));
+	const nodesOf = (d: RunDetail): string[] => (mode === 'from_failure' ? d.rerunFromFailureNodes : d.selection);
+	const blockedOf = (d: RunDetail): string | null => rerunChoices(d, [], can).find((c) => c.mode === mode)?.disabledReason ?? null;
 	const rows = $derived((details.data ?? []).filter((d) => !done.has(d.run.id)).map((d) => ({ detail: d, nodes: nodesOf(d), blocked: blockedOf(d) })));
 	const ready = $derived(rows.filter((r) => !r.blocked && r.nodes.length));
-	const nodes = $derived(single && rows[0] ? rows[0].nodes : []);
-	const needs = $derived<Capability[]>(['run.rerun', ...((details.data ?? []).some((d) => d.run.rewriteHistory) ? (['run.rewrite_history'] as const) : [])]);
+	const nodes = $derived(items.filter((i) => i.kind === 'node').map((i) => i.key));
+	const needs = $derived<Capability[]>(single ? ['run.adhoc'] : ['run.rerun', ...((details.data ?? []).some((d) => d.run.rewriteHistory) ? (['run.rewrite_history'] as const) : [])]);
 	let view = $state<'nodes' | 'graph'>('nodes');
 	const drawable = $derived(nodes.filter((k) => byKey.has(k)));
 
 	function choose(next: RerunMode) {
 		mode = next;
-		void goto(to(rerunHref(remaining, next, next === 'selected' ? picked : [])), { replaceState: true, keepFocus: true, noScroll: true });
+		void goto(to(rerunHref(remaining, next)), { replaceState: true, keepFocus: true, noScroll: true });
 	}
 
 	const loadError = $derived(details.error ? String(details.error) : details.data && !details.data.length ? 'These runs were not found in this location.' : null);
-	const blockedReason = $derived(
-		!details.data ? 'Loading the runs' : !ready.length ? (rows.find((r) => r.blocked)?.blocked ?? 'Nothing to rerun') : rows.length > ready.length ? `${rows.length - ready.length} of these runs can't be rerun this way` : undefined
+	const singleBlocked = $derived(
+		!details.data ? 'Loading the run' : selection.problem ? 'Fix the selection first' : !selection.select.trim() ? 'Select what to rerun' : !selection.evaluation || selection.evaluating ? 'Resolving the selection' : !items.length ? 'Nothing to rerun' : undefined
 	);
-	const canRun = $derived(ready.length > 0);
+	const blockedReason = $derived(
+		single
+			? singleBlocked
+			: !details.data
+				? 'Loading the runs'
+				: !ready.length
+					? (rows.find((r) => r.blocked)?.blocked ?? 'Nothing to rerun')
+					: rows.length > ready.length
+						? `${rows.length - ready.length} of these runs can't be rerun this way`
+						: undefined
+	);
+	const canRun = $derived(single ? !blockedReason : ready.length > 0);
 
 	let launching = $state(false);
 	let launchError = $state<string | null>(null);
@@ -77,8 +109,21 @@
 		if (!scope || !canRun) return;
 		launching = true;
 		launchError = null;
+		// One run: the box's selection, as the command shown beside Run.
+		if (single) {
+			try {
+				const run = await app.client.launchAdhocRun(scope, buildRequest(typed));
+				selection.remember();
+				await goto(to(`/runs/${run.id}`));
+			} catch (error) {
+				launchError = error instanceof Error ? error.message : String(error);
+			} finally {
+				launching = false;
+			}
+			return;
+		}
 		const outcomes = await Promise.allSettled(
-			ready.map(({ detail }) => (mode === 'selected' ? app.client.rerunSelectedNodes(scope, detail.run.id, picked) : app.client.rerunRun(scope, detail.run.id, mode as Exclude<RerunMode, 'selected'>)))
+			ready.map(({ detail }) => app.client.rerunRun(scope, detail.run.id, mode as Exclude<RerunMode, 'selected'>))
 		);
 		launching = false;
 		const failed = ready.filter((_, i) => outcomes[i].status === 'rejected').map((r) => r.detail.run.id);
@@ -90,7 +135,7 @@
 			// Only the failed ones stay, here and in the address, so pressing Run again never repeats a rerun that started.
 			if (started.length) {
 				done = new Set([...done, ...startedFrom]);
-				await goto(to(rerunHref(remaining, mode, mode === 'selected' ? picked : [])), { replaceState: true, keepFocus: true, noScroll: true });
+				await goto(to(rerunHref(remaining, mode)), { replaceState: true, keepFocus: true, noScroll: true });
 			}
 			return;
 		}
@@ -98,10 +143,15 @@
 	}
 
 	const what = (d: RunDetail) => d.run.jobKey ?? 'ad-hoc run';
+	/** The presets, then the run selectors, the box suggests beside the usual ones; each only writes text. */
+	const runSuggestions = (id: string): SuggestionItem[] => [
+		...presetSuggestions(presets, id),
+		{ insert: `skipped:${id}`, type: 'skipped', label: id, hint: `what run ${shortRunId(id)} skipped`, complete: true }
+	];
 	const nodeColumns: TableColumn[] = [
-		{ id: 'node', label: 'Node', minWidth: 200 },
+		{ id: 'node', label: 'Node or audit', minWidth: 200 },
 		{ id: 'kind', label: 'Kind', width: '30%' },
-		{ id: 'last', label: 'Last time', width: '160px' }
+		{ id: 'last', label: 'Last result', width: '160px' }
 	];
 	const runColumns: TableColumn[] = [
 		{ id: 'run', label: 'Run', minWidth: 220 },
@@ -113,28 +163,30 @@
 <AppTopbar title="Plan" />
 
 <div class="flex min-h-0 flex-1 flex-col">
+	{#if single && first}
+		<!-- The box is the whole plan: Rerun opens it on failed:<run>+, and the suggestions only rewrite its text. -->
+		<div class="pick">
+			<SelectionBar {selection} names={first.nodes.map((n) => ({ value: nodeLabel(n.nodeKey), hint: n.kind ?? '' }))} total={first.nodes.length} build={false} runs={runSuggestions(first.run.id)} />
+		</div>
+	{:else}
 	<div class="cmd">
-		<span class="jobchip" data-testid="rerun-of">
-			<RotateCwIcon size={12} />
-			{#if single && first}
-				<span class="faint">Rerun of</span><a href={to(`/runs/${first.run.id}`)}>{what(first)} · {shortRunId(first.run.id)}</a>
-			{:else}
+			<span class="jobchip" data-testid="rerun-of">
+				<RotateCwIcon size={12} />
 				<span class="faint">Rerun</span><span>{remaining.length} runs</span>
-			{/if}
-		</span>
-		<SegmentedFilter
-			label="What to rerun"
-			value={mode}
-			options={single
-				? choices.map((c) => ({ value: c.mode, label: c.label, title: c.disabledReason ?? c.help, disabled: !!c.disabledReason }))
-				: [
-						{ value: 'all' as RerunMode, label: 'Rerun all' },
-						{ value: 'from_failure' as RerunMode, label: 'Rerun from failure' }
-					]}
-			onselect={choose}
-		/>
-		<HelpTip text="Repeats each run's own version and settings, as frozen when it started" label="About rerunning" />
-	</div>
+			</span>
+			<SegmentedFilter
+				label="What to rerun"
+				value={mode}
+				options={[
+					{ value: 'all' as RerunMode, label: 'Rerun all' },
+					{ value: 'from_failure' as RerunMode, label: 'Rerun from failure' }
+				]}
+				onselect={choose}
+			/>
+			<HelpTip text="Repeats each run's own version and settings, as frozen when it started" label="About rerunning" />
+		</div>
+
+	{/if}
 
 	{#if loadError}<p class="problem-bar">{loadError}</p>{/if}
 
@@ -144,20 +196,19 @@
 				<div class="loading" role="status"><RotateCwIcon size={14} class="animate-spin" /> Loading the run…</div>
 			{:else if single && first}
 				<div class="summary">
-					<b>{nodes.length}</b> {noun(nodes.length, 'node')}<span>·</span>{runStatusLabel[first.run.status].toLowerCase()} {formatAgo(first.run.endedAt, app.now)}
-					<div class="tabs"><SegmentedFilter label="View" bind:value={view} options={[{ value: 'nodes', label: 'Nodes' }, { value: 'graph', label: 'Graph' }]} /></div>
+					{#if nodeCount || !auditCount}<b>{nodeCount}</b> {noun(nodeCount, 'node')}{/if}{#if nodeCount && auditCount}<span>·</span>{/if}{#if auditCount}<b>{auditCount}</b> {noun(auditCount, 'audit')}{/if}{#each fromRuns as written (written)}{@const known = namesRun(written, first.run.id)}<span>·</span><span data-testid="rerun-from">from run {#if known}<a class="mono" href={to(`/runs/${first.run.id}`)}>{shortRunId(first.run.id)}</a> <span class="faint">({what(first)}, {runStatusLabel[first.run.status].toLowerCase()} {formatAgo(first.run.endedAt, app.now)})</span>{:else}<span class="mono">{written}</span>{/if}</span>{/each}
+					<div class="tabs"><SegmentedFilter label="View" bind:value={view} options={[{ value: 'nodes', label: 'List' }, { value: 'graph', label: 'Graph' }]} /></div>
 				</div>
 				{#if view === 'graph' && catalog.data}
 					{#if drawable.length}<div class="graph"><ScopeGraph keys={drawable} catalog={catalog.data} onselect={() => {}} /></div>{/if}
 				{:else}
-					<DataTable class="static compact" embedded columns={nodeColumns} rows={nodes} key={(key) => key} rowHeight={32} empty="Nothing to rerun.">
-						{#snippet row(key)}
-							{@const node = byKey.get(key)}
-							{@const outcome = first.nodes.find((n) => n.nodeKey === key)?.status}
+					<DataTable class="static compact" embedded columns={nodeColumns} rows={items} key={(i) => i.key} rowHeight={32} empty="Nothing to rerun.">
+						{#snippet row(item)}
+							{@const node = byKey.get(item.key)}
 							<tr>
-								<td><a href={to(`/catalog/${key}`)} class="mono">{key.slice(key.indexOf(':') + 1)}</a></td>
-								<td class="faint">{node ? kindLine(node) : ''}</td>
-								<td class="faint">{outcome ? `was ${outcome.replace('_', ' ')}` : ''}</td>
+								<td>{#if item.kind === 'audit'}<a href={to(`/checks?q=${item.name}`)} class="mono">{item.name}</a>{:else}<a href={to(`/catalog/${item.key}`)} class="mono">{item.name}</a>{/if}</td>
+								<td class="faint">{item.kind === 'audit' ? `Audit${item.where ? ` · ${item.where}` : ''}` : node ? kindLine(node) : ''}</td>
+								<td class:bad-text={item.last === 'failed'} class:faint={item.last !== 'failed'}>{item.last === 'success' ? 'built' : item.last ? item.last.replace('_', ' ') : '—'}</td>
 							</tr>
 						{/snippet}
 					</DataTable>
@@ -188,13 +239,25 @@
 
 	<div class="foot">
 		<div class="why">
-			{#if launchError}<span class="problem">{launchError}</span>{:else if blockedReason}<span class="faint">{blockedReason}</span>{/if}
+			{#if launchError}<span class="problem">{launchError}</span>{:else if blockedReason}<span class="faint">{blockedReason}</span>{:else if single}<code class="mono" data-testid="rerun-command">{command}</code>{/if}
 		</div>
-		<GatedButton requires="run.rerun" variant={canRun ? 'default' : 'outline'} disabled={!canRun} reason={blockedReason} busy={launching} onclick={launch}><PlayIcon class="size-3.5 fill-current stroke-none" />Run</GatedButton>
+		<GatedButton requires={single ? 'run.adhoc' : 'run.rerun'} variant={canRun ? 'default' : 'outline'} disabled={!canRun} reason={blockedReason} busy={launching} onclick={launch}><PlayIcon class="size-3.5 fill-current stroke-none" />Run</GatedButton>
 	</div>
 </div>
 
 <style>
+	.mono {
+		font-family: var(--font-mono);
+		font-size: 12.5px;
+	}
+	.pick {
+		padding: 4px 14px;
+		border-bottom: 1px solid var(--border-subtle);
+	}
+	.pick :global(.selection-bar) {
+		border-bottom: none;
+		background: transparent;
+	}
 	.cmd {
 		display: flex;
 		align-items: center;
@@ -212,10 +275,6 @@
 		border-radius: 2px;
 		background: var(--sidebar-accent);
 		font-size: 11.5px;
-	}
-	.jobchip a {
-		font-family: var(--font-mono);
-		color: var(--foreground);
 	}
 	.problem-bar {
 		margin: 0;

@@ -537,6 +537,12 @@ export class MockApiClient implements ApiClient {
 	platformHealth(...args: Parameters<PlatformApi['platformHealth']>) {
 		return this.#platform.platformHealth(...args);
 	}
+	readHealth() {
+		return this.#platform.readHealth();
+	}
+	readHealthDetails() {
+		return this.#platform.readHealthDetails();
+	}
 	listPlatformEventHistory(...args: Parameters<PlatformApi['listPlatformEventHistory']>) {
 		return this.#platform.listPlatformEventHistory(...args);
 	}

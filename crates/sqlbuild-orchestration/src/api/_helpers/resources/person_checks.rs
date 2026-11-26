@@ -13,9 +13,9 @@ use crate::credentials::models::{AuditContext, AuthenticatedPerson, DefaultRole}
 use crate::node_states::main::list_person_checks::list_person_checks;
 use crate::node_states::models::NodeStateCache;
 use crate::store::models::ControlStore;
-use crate::warehouse_history::main::read_person_check::read_person_check;
-use crate::warehouse_history::main::read_person_check_evidence::read_person_check_evidence;
-use crate::warehouse_history::main::read_person_check_sql::read_person_check_sql;
+use crate::warehouse_history::main::checks::read_person_check::read_person_check;
+use crate::warehouse_history::main::checks::read_person_check_evidence::read_person_check_evidence;
+use crate::warehouse_history::main::checks::read_person_check_sql::read_person_check_sql;
 use crate::warehouse_history::models::{CheckEvidence, CheckResult, CheckSql};
 
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/checks", operation_id = "listPersonChecks",

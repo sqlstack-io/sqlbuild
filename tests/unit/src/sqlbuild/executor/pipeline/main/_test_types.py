@@ -27,3 +27,12 @@ class RunTerminalTestCase:
     expected_event_type: str
     expected_error_type: str | None
     expected_failed_count: int | None
+
+
+@dataclass(frozen=True)
+class EmptySqlPhaseTestCase:
+    description: str
+    execution_announced: bool
+    expected_event_types: tuple[str, ...]
+    expected_phase: dict[str, object] | None
+    expected_connects: int

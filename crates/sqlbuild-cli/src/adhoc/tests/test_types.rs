@@ -60,3 +60,17 @@ pub(super) struct RefusedPartTestCase {
     pub(super) expected_code: Option<&'static str>,
     pub(super) expected_refused: Option<(&'static str, u32, &'static str, &'static str)>,
 }
+
+/// A command and the past runs its selectors name, and the keys it freezes or how it is refused.
+pub(super) struct RunSelectorPlanTestCase {
+    pub(super) description: &'static str,
+    pub(super) command: &'static [&'static str],
+    pub(super) expected_selection: Result<&'static [&'static str], &'static str>,
+}
+
+/// Command tokens and the run IDs their selectors name.
+pub(super) struct RunSelectorIdsTestCase {
+    pub(super) description: &'static str,
+    pub(super) texts: &'static [&'static str],
+    pub(super) expected_ids: &'static [&'static str],
+}

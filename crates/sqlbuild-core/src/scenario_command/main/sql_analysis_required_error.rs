@@ -12,7 +12,7 @@ pub fn sql_analysis_required_error(
     guidance: Option<(String, String)>,
 ) -> Option<ScenarioCommandError> {
     let subject: &str = match command {
-        SqlAnalysisCommand::LocalTest => "scenario test --local",
+        SqlAnalysisCommand::LocalTest => "scenario test --run-on local",
         SqlAnalysisCommand::Capture => "scenario capture",
     };
     if disabled_by_flag {

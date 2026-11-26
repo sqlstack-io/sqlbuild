@@ -79,3 +79,24 @@ pub(super) struct NamedAtomsTestCase {
     pub(super) selection: &'static str,
     pub(super) expected_atoms: &'static [&'static str],
 }
+
+pub(super) struct RunSelectorTestCase {
+    pub(super) description: &'static str,
+    pub(super) select: &'static [&'static str],
+    pub(super) exclude: &'static [&'static str],
+    pub(super) expected_keys: &'static [&'static str],
+}
+
+pub(super) struct RunSelectorErrorTestCase {
+    pub(super) description: &'static str,
+    /// Whether the command attached audits and past runs.
+    pub(super) attached: bool,
+    pub(super) select: &'static [&'static str],
+    pub(super) expected_error: SelectorFailure,
+}
+
+pub(super) struct RunSelectorIdsTestCase {
+    pub(super) description: &'static str,
+    pub(super) selectors: &'static [&'static str],
+    pub(super) expected_ids: &'static [&'static str],
+}

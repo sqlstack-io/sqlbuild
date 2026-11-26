@@ -79,6 +79,7 @@ export function toCheckEvidence(wire: Wire['CheckEvidence']): CheckEvidence {
 		evaluationId: wire.event_id,
 		columns: wire.columns,
 		rows: wire.rows as unknown as CheckEvidence['rows'],
-		truncated: wire.truncated === 'true'
+		truncated: wire.truncated === 'true',
+		executionError: wire.execution_error ?? null
 	};
 }

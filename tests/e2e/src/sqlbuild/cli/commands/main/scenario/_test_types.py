@@ -90,7 +90,7 @@ class ScenarioLocalRuntimeArtifactTestCase:
 
 @dataclass(frozen=True)
 class ScenarioLocalCliE2ETestCase:
-    """Test case for sqb scenario test --local verification."""
+    """Test case for sqb scenario test --run-on local verification."""
 
     description: str
     command: tuple[str, ...]
@@ -371,3 +371,13 @@ class CapturedLambdaScenarioTestCase:
     description: str
     scenario_name: str
     expected_stdout_fragment: str
+
+
+@dataclass(frozen=True)
+class GuardedScenarioRunOnTestCase:
+    """A scenario whose SQLQuack guard raises in DuckDB, run with one `--run-on` value."""
+
+    description: str
+    run_on: str
+    expected_text: str
+    expected_local_lines: int

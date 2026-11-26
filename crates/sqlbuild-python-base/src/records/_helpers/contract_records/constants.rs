@@ -148,6 +148,8 @@ const R_TARGET_CONFIG: RecordSpec = RecordSpec {
             FieldDefault::NativeCall(RecordId::TargetWarehousesConfig),
         ),
         FieldSpec::new("concurrency", FieldDefault::None),
+        FieldSpec::new("test_run_on", FieldDefault::None),
+        FieldSpec::new("scenario_run_on", FieldDefault::None),
         FieldSpec::new("catalog_connection", FieldDefault::None),
         FieldSpec::new("ignore_audit_failures", FieldDefault::None),
         FieldSpec::new("plan_from", FieldDefault::None),
@@ -210,6 +212,8 @@ const R_LOCAL_TARGET_CONFIG: RecordSpec = RecordSpec {
             FieldDefault::NativeCall(RecordId::TargetWarehousesConfig),
         ),
         FieldSpec::new("concurrency", FieldDefault::None),
+        FieldSpec::new("test_run_on", FieldDefault::None),
+        FieldSpec::new("scenario_run_on", FieldDefault::None),
         FieldSpec::new("catalog_connection", FieldDefault::None),
         FieldSpec::new("ignore_audit_failures", FieldDefault::None),
         FieldSpec::new("plan_from", FieldDefault::None),
@@ -246,6 +250,8 @@ const R_SETTINGS_CONFIG: RecordSpec = RecordSpec {
         FieldSpec::new("allow_warehouse_round_trips", FieldDefault::False),
         FieldSpec::new("ignore_audit_failures", FieldDefault::False),
         FieldSpec::new("record_run_host", FieldDefault::True),
+        FieldSpec::new("test_run_on", FieldDefault::Text("auto")),
+        FieldSpec::new("scenario_run_on", FieldDefault::Text("auto")),
     ],
 };
 const R_SCOPES_CONFIG: RecordSpec = RecordSpec {

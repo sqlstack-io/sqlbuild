@@ -58,7 +58,7 @@ fn given_coalescing_triggers_when_a_previous_run_has_been_claimed_then_new_ticks
                 .await
                 .expect("trigger")[0]
                 .trigger_id;
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -152,7 +152,7 @@ fn given_a_skip_overlap_job_when_a_tick_falls_due_during_its_run_then_the_tick_i
                 .await
                 .expect("trigger")[0]
                 .trigger_id;
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

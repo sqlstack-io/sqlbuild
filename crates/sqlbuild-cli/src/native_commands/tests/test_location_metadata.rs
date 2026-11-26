@@ -87,7 +87,7 @@ fn given_failed_metadata_read_when_back_at_statistics_then_page_shrinks_until_sc
             .iter()
             .position(|kind| *kind == test_case.failed_kind)
             .expect("kind is listed");
-        let wait = state.fail_read(test_case.page_size);
+        let wait = state.fail_read((test_case.page_size, false));
         assert!(wait.is_some(), "{}", test_case.description);
         let state = acknowledge_complete_pages(state, test_case.acknowledged_pages);
         assert_eq!(
@@ -111,7 +111,7 @@ fn given_repeated_failed_reads_when_retrying_then_only_page_size_errors_shrink_a
             description: "a permission or missing-table error never shrinks the page, and a request ends its wait",
             failures: vec![false, false, false],
             failures_after_request: vec![],
-            expected_waits: vec![Some(30), Some(60), Some(120)],
+            expected_waits: vec![Some(30), Some(60), Some(60)],
             expected_limit: MAX_HISTORY_PAGE_RECORDS,
             expected_halted: false,
             expected_paging: (true, true),
@@ -120,7 +120,7 @@ fn given_repeated_failed_reads_when_retrying_then_only_page_size_errors_shrink_a
             description: "the fifth failure in a row stops the sync, which then never pages",
             failures: vec![],
             failures_after_request: vec![false, false, false, false, false],
-            expected_waits: vec![Some(30), Some(60), Some(120), Some(240), None],
+            expected_waits: vec![Some(30), Some(60), Some(60), Some(60), None],
             expected_limit: MAX_HISTORY_PAGE_RECORDS,
             expected_halted: true,
             expected_paging: (true, false),
@@ -138,7 +138,7 @@ fn given_repeated_failed_reads_when_retrying_then_only_page_size_errors_shrink_a
             description: "a sync request resumes a stopped sync with a fresh count",
             failures: vec![false, false, false, false, false],
             failures_after_request: vec![false],
-            expected_waits: vec![Some(30), Some(60), Some(120), Some(240), None, Some(30)],
+            expected_waits: vec![Some(30), Some(60), Some(60), Some(60), None, Some(30)],
             expected_limit: MAX_HISTORY_PAGE_RECORDS,
             expected_halted: false,
             expected_paging: (true, false),
@@ -154,7 +154,11 @@ fn given_repeated_failed_reads_when_retrying_then_only_page_size_errors_shrink_a
         let mut waits: Vec<Option<u64>> = test_case
             .failures
             .into_iter()
-            .map(|page_size| state.fail_read(page_size).map(|wait| wait.as_secs()))
+            .map(|page_size| {
+                state
+                    .fail_read((page_size, false))
+                    .map(|wait| wait.as_secs())
+            })
             .collect();
         state.request_sync();
         (state.idle && state.sync_due(None)).then(|| state.begin_sync(Utc::now()));
@@ -163,7 +167,11 @@ fn given_repeated_failed_reads_when_retrying_then_only_page_size_errors_shrink_a
             test_case
                 .failures_after_request
                 .into_iter()
-                .map(|page_size| state.fail_read(page_size).map(|wait| wait.as_secs())),
+                .map(|page_size| {
+                    state
+                        .fail_read((page_size, false))
+                        .map(|wait| wait.as_secs())
+                }),
         );
         assert_eq!(
             (
@@ -233,7 +241,8 @@ fn given_a_stopped_sync_when_a_run_or_its_safety_sync_resumes_it_then_failed_rea
         let mut state = metadata_sync((one_location(), 1), (3600, test_case.safety_seconds));
         state.reads_wake_compute = test_case.billed;
         state.begin_sync(Utc::now());
-        let stopped: Vec<Option<Duration>> = (0..5).map(|_| state.fail_read(false)).collect();
+        let stopped: Vec<Option<Duration>> =
+            (0..5).map(|_| state.fail_read((false, false))).collect();
         let stopped_for: Duration = state.safety_at.saturating_duration_since(Instant::now());
         state.safety_at = Instant::now() + test_case.due_in;
         let runs_ended_at = test_case
@@ -242,7 +251,7 @@ fn given_a_stopped_sync_when_a_run_or_its_safety_sync_resumes_it_then_failed_rea
         let resumed: bool = state.idle && state.sync_due(runs_ended_at);
         resumed.then(|| state.begin_sync(Utc::now()));
         let paging: bool = state.paging();
-        let wait: Option<Duration> = state.fail_read(false);
+        let wait: Option<Duration> = state.fail_read((false, false));
         assert_eq!(
             (
                 stopped[4],
@@ -285,7 +294,7 @@ fn given_a_sync_stopped_mid_pass_when_a_later_run_resumes_it_then_the_pass_resta
         state.applied = true;
         state = acknowledge_complete_pages(state, statistics);
         (0..METADATA_FAILURE_LIMIT).for_each(|_| {
-            let _ = state.fail_read(false);
+            let _ = state.fail_read((false, false));
         });
         let stopped_at = state.cycle_started_at.expect("stop time");
         let resumed: bool = state.sync_due(Some(
@@ -753,6 +762,7 @@ fn given_a_failing_metadata_read_when_the_page_fails_then_the_cause_kind_and_pag
                     == ReadFailure::Read(WarehouseHistoryFailure {
                         reason: "permission denied for table _sqlbuild_audit_results".into(),
                         page_size: false,
+                        connection: false,
                     })
             },
             expected_line: "Warehouse history read failed for audit results (2000-row page): permission denied for table _sqlbuild_audit_results.",
@@ -999,6 +1009,7 @@ fn given_a_failed_read_when_reporting_health_then_it_carries_cause_error_and_whe
         ReadFailure::Read(WarehouseHistoryFailure {
             reason: "permission denied for table _sqlbuild_fingerprints".into(),
             page_size: false,
+            connection: false,
         })
     };
     let test_cases = [
@@ -1077,10 +1088,10 @@ fn given_a_failed_read_when_reporting_health_then_it_carries_cause_error_and_whe
         state.reads_wake_compute = test_case.billed;
         state.begin_sync(Utc::now());
         (0..test_case.failures_before).for_each(|_| {
-            let _ = state.fail_read(false);
+            let _ = state.fail_read((false, false));
         });
         let page_size: bool = test_case.failure.page_size();
-        let halts: bool = state.halts(page_size);
+        let halts: bool = state.halts((page_size, false));
         let now = Utc::now();
         let health = metadata_health_of(
             &state,

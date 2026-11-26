@@ -211,7 +211,7 @@ pub(crate) async fn transaction_contract(backend: Backend) -> Option<(usize, usi
         .await
         .expect("published triggers")[0]
         .trigger_id;
-    let lease = acquire_lease(store, Uuid::now_v7())
+    let lease = acquire_lease(store, (Uuid::now_v7(), None))
         .await
         .expect("acquire lease")
         .expect("elected");
@@ -302,7 +302,7 @@ pub(crate) async fn transaction_contract(backend: Backend) -> Option<(usize, usi
         events[1]["storage_id"].as_i64().expect("event cursor")
     );
     expire_lease(store).await;
-    let successor = acquire_lease(&second, Uuid::now_v7())
+    let successor = acquire_lease(&second, (Uuid::now_v7(), None))
         .await
         .expect("takeover")
         .expect("new leader");

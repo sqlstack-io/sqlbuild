@@ -70,6 +70,8 @@ pub(crate) const UI_INDEX_PATH: &str = "/index.html";
 pub(crate) const UI_IMMUTABLE_PREFIX: &str = "/_app/immutable/";
 /// The page's own meta policy carries every other directive; a meta tag cannot set frame-ancestors.
 pub(crate) const UI_FRAME_POLICY: &str = "frame-ancestors 'none'";
+/// The response header that names each request, as its error body and the server log do.
+pub(crate) const REQUEST_ID_HEADER: &str = "x-request-id";
 pub(crate) const API_PATH: &str = "/api";
 pub(crate) const API_PREFIX: &str = "/api/";
 pub(crate) const AUTH_PREFIX: &str = "/auth/";

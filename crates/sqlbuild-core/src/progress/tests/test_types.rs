@@ -55,6 +55,8 @@ pub(super) struct AuditRowTestCase {
     pub(super) resource_id: &'static str,
     pub(super) terminal_event: &'static str,
     pub(super) recorded_outcomes: Vec<(&'static str, &'static str)>,
+    /// Resources declared never to start, as an audit that isn't run is.
+    pub(super) unstarted: &'static [&'static str],
     pub(super) expected_lines: Vec<&'static str>,
 }
 

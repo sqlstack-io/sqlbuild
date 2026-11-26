@@ -165,6 +165,7 @@ export function toRun(wire: Wire['RunRecord'], locationId: string, childRunCount
 		rerunOfRunId: wire.rerun_of_run_id ?? null,
 		memberAttempt: wire.member_attempt ?? null,
 		narrowing: wire.narrowing ?? null,
+		command: wire.command ?? null,
 		window: wire.window ? { start: String(wire.window.start), end: String(wire.window.end) } : null,
 		requestedBy: requesterOf(wire),
 		priority: wire.priority,
@@ -255,7 +256,7 @@ function rowOf(run: Run, wire: Wire['RunRecord']): RunRow {
 function inTab(run: Run, tab: RunRowQuery['tab']): boolean {
 	if (tab === 'active') return isActiveRun(run.status);
 	if (tab === 'queued') return run.status === 'queued';
-	if (tab === 'failed') return run.status === 'failed' || run.status === 'partial' || run.status === 'presumed_failed';
+	if (tab === 'failed') return run.status === 'failed' || run.status === 'presumed_failed';
 	if (tab === 'cancelled') return run.status === 'cancelled';
 	return true;
 }
@@ -475,7 +476,7 @@ export function toRunEvent(wire: Wire['RunEventRecord'], runId: string): RunEven
 	};
 }
 
-const CHECK_OUTCOMES: Record<string, RunEventCheck['outcome']> = { pass: 'passed', warn: 'warned', error: 'failed' };
+const CHECK_OUTCOMES: Record<string, RunEventCheck['outcome']> = { pass: 'passed', warn: 'warned', error: 'failed', not_run: 'not-run' };
 
 /** A check result's name, outcome and rows from its event; a result with no name recorded is named by its outcome. */
 export function checkOf(wire: Wire['RunEventRecord']): RunEventCheck {

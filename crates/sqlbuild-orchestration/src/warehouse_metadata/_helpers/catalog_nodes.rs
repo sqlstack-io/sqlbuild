@@ -120,7 +120,7 @@ pub(crate) async fn latest_attempts(
     let (transaction, attempts): (_, Vec<Attempt>) = query_records(transaction,
         &format!("SELECT n.node_key,n.run_id,n.status,n.ended_at,n.finished_storage_id FROM (\
             SELECT run_id FROM ({newest} LIMIT $3) AS latest UNION \
-            SELECT run_id FROM (SELECT run_id FROM ({newest} LIMIT $4) AS recent WHERE status IN ('failed','partial','warn') \
+            SELECT run_id FROM (SELECT run_id FROM ({newest} LIMIT $4) AS recent WHERE status IN ('failed','warn') \
             ORDER BY queued_at DESC, run_id DESC LIMIT $3) AS failures) AS r \
          JOIN sqb_run_nodes n ON n.run_id=r.run_id WHERE n.kind='node' AND n.finished_storage_id IS NOT NULL \
          AND n.started_at IS NOT NULL AND n.status IN ('success','warn','failed')"),

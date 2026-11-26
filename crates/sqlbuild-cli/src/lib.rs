@@ -15,5 +15,6 @@ pub mod launcher;
 pub mod native_commands;
 pub mod person_login;
 pub mod replay;
+pub mod run_selectors;
 pub(crate) mod server_config;
 pub(crate) mod workers;

@@ -1,8 +1,11 @@
 //! A selection evaluates as `sqb build` resolves it, refusals point at their token, and the vocabulary counts nodes.
 
 use sqlbuild_orchestration::runs::models::{SelectionField, SelectionProblem, SelectionRefusal};
+use sqlbuild_orchestration::runs::types::PastRuns;
 
-use crate::adhoc::tests::helpers::{orders_publication, owned_evaluation};
+use crate::adhoc::tests::helpers::{
+    audited_orders_publication, orders_publication, owned_evaluation,
+};
 use crate::adhoc::tests::test_types::{
     RefusedPartTestCase, SelectionEvaluationTestCase, VocabularyTestCase,
 };
@@ -86,7 +89,7 @@ fn given_typed_selections_when_evaluated_then_keys_or_located_refusals_match_sqb
     let publication = orders_publication();
     for test_case in test_cases {
         let actual = publication
-            .evaluate(test_case.select, test_case.exclude)
+            .evaluate((test_case.select, test_case.exclude), &PastRuns::new())
             .map_err(|problem| {
                 Box::new(SelectionProblem {
                     help: None,
@@ -143,6 +146,27 @@ fn given_a_publication_when_its_vocabulary_is_read_then_each_value_counts_the_no
         },
     ];
     let vocabulary = orders_publication().vocabulary();
+    for test_case in test_cases {
+        let actual: Vec<(&str, u64)> = (test_case.entries_of)(&vocabulary)
+            .iter()
+            .map(|entry| (entry.value.as_str(), entry.count))
+            .collect();
+        assert_eq!(
+            actual, test_case.expected_entries,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_audits_when_the_vocabulary_is_read_then_each_audit_name_counts_its_targets() {
+    let test_cases = [VocabularyTestCase {
+        description: "a singular audit and an attached audit are each listed once, by name",
+        entries_of: |vocabulary| &vocabulary.audits,
+        expected_entries: &[("not_null_orders_id", 1), ("orders_match_payments", 1)],
+    }];
+    let vocabulary = audited_orders_publication().vocabulary();
     for test_case in test_cases {
         let actual: Vec<(&str, u64)> = (test_case.entries_of)(&vocabulary)
             .iter()
@@ -232,7 +256,9 @@ fn given_refused_selectors_when_evaluated_then_the_refused_part_its_type_and_val
             .select
             .split_once(" --exclude ")
             .unwrap_or((test_case.select, ""));
-        let problem = publication.evaluate(select, exclude).err();
+        let problem = publication
+            .evaluate((select, exclude), &PastRuns::new())
+            .err();
         assert_eq!(
             (
                 problem.as_ref().and_then(|problem| problem.code.clone()),

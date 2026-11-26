@@ -116,7 +116,7 @@ fn given_a_failed_member_when_its_dependents_react_then_each_dependency_policy_a
             )
             .await
             .expect("request group");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -166,7 +166,7 @@ fn given_a_failed_member_when_its_dependents_react_then_each_dependency_policy_a
                 .find(|record| record.run_id == group)
                 .expect("group");
             assert!(
-                matches!(parent.status, RunStatus::Failed | RunStatus::Partial),
+                parent.status == RunStatus::Failed,
                 "{}: {:?}",
                 test_case.description,
                 parent.status

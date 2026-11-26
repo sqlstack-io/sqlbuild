@@ -1,5 +1,6 @@
 //! `sqb test --inspect`: the resolved test plan without executing it.
 
+use crate::run_on::main::run_on_inspection_line::run_on_inspection_line;
 use crate::test_command::constants::ERROR_SEVERITY;
 use crate::test_command::models::{TestInspectionEntry, TestPlanWarning};
 
@@ -21,6 +22,9 @@ pub fn render_test_inspection(
     let mut text: String = "\nResolved test plan\n\n".to_owned();
     for entry in entries {
         text.push_str(&format!("{}\n", entry.label));
+        if let Some(decision) = &entry.run_on {
+            text.push_str(&run_on_inspection_line(decision));
+        }
         for (label, values) in [
             ("mocked sources", &entry.mocked_sources),
             ("mocked refs", &entry.mocked_refs),

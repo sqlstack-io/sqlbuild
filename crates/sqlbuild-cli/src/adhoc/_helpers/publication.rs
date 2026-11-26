@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 use std::sync::OnceLock;
 
 use sqlbuild_analysis::definition_changes::constants::PYTHON_NODE_KINDS;
+use sqlbuild_analysis::graph::constants::AUDIT_KIND;
 use sqlbuild_analysis::graph::main::attach_jobs::attach_jobs;
 use sqlbuild_analysis::graph::main::build_project_graph::build_project_graph;
 use sqlbuild_analysis::graph::models::{GraphResource, JobSelection, ProjectGraph};
@@ -22,6 +23,8 @@ pub(crate) struct IndexedPublication {
     pub(crate) jobs: PublishedJobs,
     /// SQL unit test names, and every other resource and job name, for splitting `test:` selectors.
     pub(crate) names: UnitTestSelectorNames,
+    /// Each audit's name and the node keys it is published under: one for a singular audit, one per target for an attached one.
+    pub(crate) audits: BTreeMap<String, Vec<String>>,
     /// `(source name, loader)` for every published source.
     pub(crate) sources: Vec<(String, Option<String>)>,
     /// The SQL resources' graph without jobs; most commands never name one.
@@ -88,7 +91,17 @@ impl IndexedPublication {
                 .map(|node| (node.name.clone(), node.kind.clone()))
                 .collect(),
         };
+        let mut audits: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        for resource in resources.iter().filter(|resource| is_audit(resource)) {
+            let name = name_of(&resource.key);
+            let name = name.split_once(':').map_or(name, |(name, _)| name);
+            audits
+                .entry(name.to_owned())
+                .or_default()
+                .push(resource.key.clone());
+        }
         Self {
+            audits,
             graph: build_project_graph(&graph_resources),
             with_jobs: [OnceLock::new(), OnceLock::new()],
             vocabulary: OnceLock::new(),
@@ -123,6 +136,11 @@ impl IndexedPublication {
             &self.no_python
         }
     }
+}
+
+/// An audit node, singular (`audit:<name>`) or attached (`audit:<name>:<kind>:<target>`).
+fn is_audit(resource: &PlannerResource) -> bool {
+    resource.key.split_once(':').map(|(kind, _)| kind) == Some(AUDIT_KIND)
 }
 
 pub(crate) fn is_sql_test(resource: &PlannerResource) -> bool {

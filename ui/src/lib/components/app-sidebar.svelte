@@ -5,6 +5,10 @@
 	import logoForLight from '$website/src/assets/logo-light.png';
 	import { page } from '$app/state';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
+	import ActivityIcon from '@lucide/svelte/icons/activity';
+
+	/** While the server can't serve pages, every entry but Status is greyed: it would only show the same outage. */
+	let { blocked = false }: { blocked?: boolean } = $props();
 	import { visibleNav, type NavBadge } from '$lib/nav';
 	import { app } from '$lib/state/app.svelte';
 	import { signOutFor } from '$lib/platform/sign-out';
@@ -61,7 +65,7 @@
 			{#each group.items as item (item.href)}
 				{@const Glyph = item.icon}
 				{@const count = item.badge && app.navCounts ? item.badge.value(app.navCounts) : 0}
-				<a href={to(item.href)} class="relative flex items-center gap-2.5 rounded-md px-3 py-[7px] text-[13px] {itemClass(item.href)}">
+				<a href={to(item.href)} class="relative flex items-center gap-2.5 rounded-md px-3 py-[7px] text-[13px] {itemClass(item.href)}" class:blocked aria-disabled={blocked || undefined} tabindex={blocked ? -1 : undefined}>
 					<span class="grid w-4 place-items-center opacity-80"><Glyph size={15} /></span>
 					{item.label}
 					{#if item.badge && count > 0}
@@ -79,8 +83,14 @@
 	</nav>
 
 	<div class="mt-2 flex flex-col gap-px border-t border-[var(--sidebar-border)] pt-2.5">
+		{#if app.client.supports('readHealth')}
+			<a href={to('/status')} class="flex items-center gap-2.5 rounded-md px-3 py-[7px] text-[13px] {itemClass('/status')}" data-testid="nav-status">
+				<span class="grid w-4 place-items-center opacity-80"><ActivityIcon size={15} /></span>
+				Status
+			</a>
+		{/if}
 		{#if app.client.supports('serverSettings')}
-		<a href={to(`/settings`)} class="flex items-center gap-2.5 rounded-md px-3 py-[7px] text-[13px] {itemClass('/settings')}">
+		<a href={to(`/settings`)} class="flex items-center gap-2.5 rounded-md px-3 py-[7px] text-[13px] {itemClass('/settings')}" class:blocked aria-disabled={blocked || undefined} tabindex={blocked ? -1 : undefined}>
 			<span class="grid w-4 place-items-center opacity-80"><SettingsIcon size={15} /></span>
 			Settings
 		</a>
@@ -110,5 +120,9 @@
 	}
 	.sb-nav {
 		scrollbar-width: thin;
+	}
+	.blocked {
+		pointer-events: none;
+		opacity: 0.45;
 	}
 </style>

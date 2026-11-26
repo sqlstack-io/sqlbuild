@@ -98,3 +98,16 @@ pub struct DiffStats {
     /// The removed and added lines read the same with every whitespace character taken out.
     pub whitespace_only: bool,
 }
+
+/// What a plan will run, by kind, for its one-line summary.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PlanSummaryCounts {
+    pub full_refresh: bool,
+    /// Models, seeds and functions.
+    pub selected: usize,
+    pub sources: usize,
+    pub reloads_sources: bool,
+    pub python: usize,
+    pub audits: usize,
+    pub audits_not_run: usize,
+}

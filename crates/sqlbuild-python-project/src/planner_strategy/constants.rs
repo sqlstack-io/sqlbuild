@@ -8,6 +8,9 @@ pub const MODEL_ATTACHMENT: &str = "model";
 
 pub const SOURCE_ATTACHMENT: &str = "source";
 
+/// Where a singular audit runs when it gates no model this build builds: after everything else.
+pub const END_ATTACHMENT: &str = "end";
+
 pub const INCREMENTAL_MATERIALIZATION: &str = "incremental";
 
 pub const MICROBATCH_MODE: &str = "microbatch";

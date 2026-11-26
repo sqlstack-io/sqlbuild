@@ -109,7 +109,7 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
             )
             .await
             .expect("register location instance");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -434,7 +434,7 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
                 complete_sensor(store, &lease, &stale).await,
                 Err(ControlError::Fenced)
             ));
-            let successor = acquire_lease(&replica, Uuid::now_v7())
+            let successor = acquire_lease(&replica, (Uuid::now_v7(), None))
                 .await
                 .expect("takeover")
                 .expect("leader");

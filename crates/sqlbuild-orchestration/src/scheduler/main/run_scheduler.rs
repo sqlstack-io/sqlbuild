@@ -5,6 +5,9 @@ use std::time::Duration;
 use tokio::sync::watch;
 use tokio::time::Instant;
 
+use crate::health::constants::WAITING_FOR_DATABASE;
+use crate::health::main::control_cause::control_cause;
+use crate::health::models::{ControlTarget, ServerHealth};
 use crate::scheduler::main::_scheduler_cycle::scheduler_cycle;
 use crate::scheduler::models::SchedulerState;
 use crate::scheduler::types::RunLauncher;
@@ -33,6 +36,7 @@ pub async fn run_scheduler(
                 }
                 Err(error) => Err(error),
             };
+            report_cycle(state.health.as_ref(), polled.as_ref().map(|_| ()));
             let retry = Instant::now() + Duration::from_secs(1);
             let due = match polled {
                 Ok(due) => due.min(retry),
@@ -52,4 +56,25 @@ pub async fn run_scheduler(
     .await;
     let stopped = launcher.shutdown(store, last_lease.as_ref()).await;
     result.and(stopped)
+}
+
+/// A cycle's result in the server's health: the lease moving to another server is no failure.
+fn report_cycle(health: Option<&ServerHealth>, result: Result<(), &ControlError>) {
+    let Some(health) = health else {
+        return;
+    };
+    let now = chrono::Utc::now();
+    match result {
+        Ok(()) | Err(ControlError::Fenced) => health.scheduler_succeeded(now),
+        Err(error) => {
+            let cause = control_cause(error, (&ControlTarget::default(), false))
+                .map(|cause| health.locate(cause));
+            let reason = match &cause {
+                Some(cause) if cause.unavailable() => WAITING_FOR_DATABASE.to_owned(),
+                Some(cause) => cause.message.clone(),
+                None => error.to_string(),
+            };
+            health.scheduler_failed(&reason, (now, cause.as_ref()));
+        }
+    }
 }

@@ -15,6 +15,7 @@ use crate::compiler::_helpers::sql_tests::cte_sql::{cte_definition_sql, leading_
 use crate::compiler::_helpers::sql_tests::helper_names::HELPER_PREFIX;
 use crate::compiler::_helpers::sql_tests::planning::REF_PREFIX;
 use crate::compiler::models::{SqlTestAssertionStep, SqlTestChainStep};
+use crate::compiler::types::PlacedComparisonSql;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 
@@ -477,11 +478,85 @@ impl RenderCteState {
     }
 
     fn definitions(&mut self) -> Vec<String> {
-        std::mem::take(&mut self.lifted)
-            .iter()
-            .map(|cte| cte_definition_sql(&cte.header, &cte.body))
+        self.placed_definitions()
+            .into_iter()
+            .map(|(definition, _, _)| definition)
             .collect()
     }
+
+    /// Each lifted CTE's definition, with its body text and what it stands for.
+    fn placed_definitions(&mut self) -> Vec<(String, String, String)> {
+        std::mem::take(&mut self.lifted)
+            .into_iter()
+            .map(|cte| {
+                (
+                    cte_definition_sql(&cte.header, &cte.body),
+                    cte.body,
+                    cte.origin,
+                )
+            })
+            .collect()
+    }
+}
+
+/// One CTE body's character range in a rendered comparison, and what it stands for.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ComparisonSegment {
+    pub(crate) start: usize,
+    pub(crate) end: usize,
+    pub(crate) origin: String,
+}
+
+/// The comparison SQL of one planned test and where each CTE body sits in it.
+#[derive(Debug)]
+pub(crate) struct PlacedComparison {
+    pub(crate) sql: String,
+    pub(crate) segments: Vec<ComparisonSegment>,
+}
+
+/// `WITH` and the definitions joined, then `rest`, with each body's character range.
+fn placed_statement(definitions: &[(String, String, String)], rest: &str) -> PlacedComparison {
+    let mut sql: String = "WITH ".to_owned();
+    let mut segments: Vec<ComparisonSegment> = Vec::new();
+    for (index, (definition, body, origin)) in definitions.iter().enumerate() {
+        if index > 0 {
+            sql.push_str(",\n");
+        }
+        let body: &str = body.trim_end();
+        if let Some(at) = definition.find(body).filter(|_| !body.is_empty()) {
+            let start: usize = sql[..].chars().count() + definition[..at].chars().count();
+            segments.push(ComparisonSegment {
+                start,
+                end: start + body.chars().count(),
+                origin: origin.clone(),
+            });
+        }
+        sql.push_str(definition);
+    }
+    sql.push('\n');
+    sql.push_str(rest);
+    PlacedComparison { sql, segments }
+}
+
+/// Render one planned test's comparison query with the place of each CTE body in it.
+pub(crate) fn render_placed_comparison(
+    request: &RenderRequest,
+) -> Result<PlacedComparison, String> {
+    let plain: RenderRequest = RenderRequest {
+        chain: request.chain.clone(),
+        assertions: request.assertions.clone(),
+        sql_analysis_enabled: request.sql_analysis_enabled,
+        set_difference_operator: request.set_difference_operator.clone(),
+        sql_analysis_dialect: request.sql_analysis_dialect.clone(),
+        probe_step_index: None,
+        actual_relations: HashMap::new(),
+        output_step_index: None,
+    };
+    let (sql, placed): (String, Option<PlacedComparison>) = render_comparison(&plain)?;
+    Ok(placed.unwrap_or(PlacedComparison {
+        sql,
+        segments: Vec::new(),
+    }))
 }
 
 fn collision_message(origin: &str, collisions: &[(&str, &LiftedCte)]) -> String {
@@ -576,6 +651,19 @@ pub(crate) fn rendered_chain_steps(
             step.expected_cte_sql.is_some() || assertions_use_actual(assertions, &actual_cte)
         })
         .collect()
+}
+
+/// One planned test's comparison SQL and each CTE body's start, end and origin in it.
+pub(crate) fn render_placed_request(request_json: &str) -> Result<PlacedComparisonSql, String> {
+    let request: RenderRequest =
+        serde_json::from_str(request_json).map_err(|error| error.to_string())?;
+    let placed: PlacedComparison = render_placed_comparison(&request)?;
+    let segments: Vec<(usize, usize, String)> = placed
+        .segments
+        .into_iter()
+        .map(|segment| (segment.start, segment.end, segment.origin))
+        .collect();
+    Ok((placed.sql, segments))
 }
 
 pub(crate) fn render_json(request_json: &str) -> Result<String, String> {
@@ -723,8 +811,15 @@ pub(crate) fn comparison_counts_sql(
 
 /// Render one planned test's comparison query, lifting authored CTE text verbatim.
 pub(crate) fn render_comparison_sql(request: &RenderRequest) -> Result<String, String> {
+    render_comparison(request).map(|(sql, _placed)| sql)
+}
+
+/// The comparison SQL, and the placed comparison with each CTE body's range when it has one.
+fn render_comparison(
+    request: &RenderRequest,
+) -> Result<(String, Option<PlacedComparison>), String> {
     if request.chain.is_empty() && request.assertions.is_empty() {
-        return Ok(String::new());
+        return Ok((String::new(), None));
     }
     let enabled = request.sql_analysis_enabled;
     let model_test = !request.assertions.is_empty()
@@ -737,6 +832,7 @@ pub(crate) fn render_comparison_sql(request: &RenderRequest) -> Result<String, S
         model_test,
     );
     let mut comparison_ctes: Vec<(String, String)> = Vec::new();
+    let mut comparison_origins: Vec<String> = Vec::new();
     let mut select_parts: Vec<String> = Vec::new();
     let rendered_steps = rendered_chain_steps(&request.chain, &request.assertions);
     let mut probe_actual_cte: Option<String> = None;
@@ -761,6 +857,7 @@ pub(crate) fn render_comparison_sql(request: &RenderRequest) -> Result<String, S
             None => cte_state.actual_step_sql(step, &suffix, enabled)?,
         };
         comparison_ctes.push((actual_cte.clone(), actual_sql));
+        comparison_origins.push(format!("model '{}'", step.model_name));
         if request.probe_step_index == Some(step_index) {
             probe_actual_cte = Some(actual_cte.clone());
         }
@@ -773,6 +870,7 @@ pub(crate) fn render_comparison_sql(request: &RenderRequest) -> Result<String, S
         };
         let expected_sql = cte_state.expected_step_sql(step, expected_input, enabled)?;
         comparison_ctes.push((expected_cte.clone(), expected_sql));
+        comparison_origins.push(format!("the expected rows of model '{}'", step.model_name));
         select_parts.push(format!(
             "SELECT {step_index} AS step_index, '{}' AS model_name, {}",
             escape_sql_string(&step.model_name),
@@ -786,7 +884,7 @@ pub(crate) fn render_comparison_sql(request: &RenderRequest) -> Result<String, S
 
     if request.output_step_index.is_some() {
         let Some(actual_cte) = output_actual_cte else {
-            return Ok(String::new());
+            return Ok((String::new(), None));
         };
         cte_state.verify_isolated_names(&comparison_ctes)?;
         cte_state.substitute(&substitutions);
@@ -797,7 +895,7 @@ pub(crate) fn render_comparison_sql(request: &RenderRequest) -> Result<String, S
                 .map(|(name, sql)| cte_definition_sql(name, sql)),
         );
         let statement = format!("WITH {}\nSELECT * FROM {actual_cte}", cte_parts.join(",\n"));
-        return Ok(pruned_statement(&statement, cte_state.dialect));
+        return Ok((pruned_statement(&statement, cte_state.dialect), None));
     }
 
     for (assertion_index, assertion) in request
@@ -810,6 +908,7 @@ pub(crate) fn render_comparison_sql(request: &RenderRequest) -> Result<String, S
         let assertion_cte = format!("__assert__{suffix}");
         let assertion_sql = cte_state.assertion_sql(assertion, enabled)?;
         comparison_ctes.push((assertion_cte.clone(), assertion_sql));
+        comparison_origins.push(format!("assertion '{}'", assertion.name));
         select_parts.push(format!(
             "SELECT {assertion_index} AS step_index, 'assertion {}' AS model_name, \
              (SELECT COUNT(*) FROM {assertion_cte}) AS actual_count, \
@@ -821,30 +920,40 @@ pub(crate) fn render_comparison_sql(request: &RenderRequest) -> Result<String, S
     }
 
     if select_parts.is_empty() {
-        return Ok(String::new());
+        return Ok((String::new(), None));
     }
     cte_state.verify_isolated_names(&comparison_ctes)?;
     cte_state.substitute(&substitutions);
     let dialect = cte_state.dialect;
-    let mut cte_parts = cte_state.definitions();
-    cte_parts.extend(
+    let mut placed_parts: Vec<(String, String, String)> = cte_state.placed_definitions();
+    placed_parts.extend(
         comparison_ctes
             .iter()
-            .map(|(name, sql)| cte_definition_sql(name, sql)),
+            .zip(&comparison_origins)
+            .map(|((name, sql), origin)| {
+                (cte_definition_sql(name, sql), sql.clone(), origin.clone())
+            }),
     );
+    let cte_parts: Vec<String> = placed_parts
+        .iter()
+        .map(|(definition, _, _)| definition.clone())
+        .collect();
     let single_read = !request.actual_relations.is_empty();
     if request.probe_step_index.is_some() {
-        return Ok(probe_actual_cte.map_or_else(String::new, |actual_cte| {
-            let statement = format!(
-                "WITH {}\nSELECT * FROM {actual_cte} WHERE 1 = 0",
-                cte_parts.join(",\n")
-            );
-            if single_read {
-                pruned_statement(&statement, dialect)
-            } else {
-                statement
-            }
-        }));
+        return Ok((
+            probe_actual_cte.map_or_else(String::new, |actual_cte| {
+                let statement = format!(
+                    "WITH {}\nSELECT * FROM {actual_cte} WHERE 1 = 0",
+                    cte_parts.join(",\n")
+                );
+                if single_read {
+                    pruned_statement(&statement, dialect)
+                } else {
+                    statement
+                }
+            }),
+            None,
+        ));
     }
     let statement = format!(
         "WITH {}\n{}",
@@ -852,9 +961,11 @@ pub(crate) fn render_comparison_sql(request: &RenderRequest) -> Result<String, S
         select_parts.join("\nUNION ALL\n")
     );
     if single_read {
-        return Ok(pruned_statement(&statement, dialect));
+        return Ok((pruned_statement(&statement, dialect), None));
     }
-    Ok(statement)
+    let placed: PlacedComparison =
+        placed_statement(&placed_parts, &select_parts.join("\nUNION ALL\n"));
+    Ok((statement, Some(placed)))
 }
 
 fn sanitize_cte_suffix(model_name: &str) -> String {

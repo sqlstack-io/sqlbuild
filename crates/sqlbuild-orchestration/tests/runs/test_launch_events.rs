@@ -18,7 +18,7 @@ use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
-use crate::warehouse_history::main::read_person_run_events::read_person_run_events;
+use crate::warehouse_history::main::runs::read_person_run_events::read_person_run_events;
 
 #[test]
 fn given_a_launched_run_when_its_events_are_read_then_the_launch_names_a_container_or_a_local_worker()
@@ -61,7 +61,7 @@ fn given_a_launched_run_when_its_events_are_read_then_the_launch_names_a_contain
                 &request((location, published.snapshot_id), 51, 0, &["orders"]),
             )
             .await;
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

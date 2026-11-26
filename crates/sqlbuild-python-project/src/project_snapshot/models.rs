@@ -14,7 +14,9 @@ use crate::project_snapshot::_helpers::snapshot::snapshot_execution::is_function
 use crate::project_snapshot::_helpers::snapshot::snapshot_execution::planned_key;
 use crate::project_snapshot::_helpers::snapshot::snapshot_execution::poisoned;
 use crate::project_snapshot::_helpers::snapshot::snapshot_execution::severity;
-use crate::project_snapshot::_helpers::snapshot::snapshot_logs::{node_log_changes, upload_loss};
+use crate::project_snapshot::_helpers::snapshot::snapshot_logs::{
+    node_log_changes, sink_deliveries, upload_loss,
+};
 use crate::project_snapshot::_helpers::snapshot::snapshot_worker::WorkerOwner;
 use crate::project_snapshot::_helpers::snapshot::snapshot_worker::unavailable;
 use crate::project_snapshot::types::NodeKeys;
@@ -54,6 +56,7 @@ use sqlbuild_orchestration::snapshots::models::SnapshotRecord;
 use sqlbuild_orchestration::worker::errors::WorkerError;
 use sqlbuild_orchestration::worker::main::connect_worker::connect_worker;
 use sqlbuild_orchestration::worker::main::start_worker::start_worker;
+use sqlbuild_python_base::event_exporting::main::take_closed_export::take_closed_export;
 use sqlbuild_python_base::invocation_phases::constants::MATCHED_PHASE;
 use sqlbuild_python_base::invocation_phases::main::phase_since::phase_since;
 use sqlbuild_python_base::native_host::main::publish_invocation_phase::publish_invocation_phase;
@@ -157,6 +160,8 @@ pub(crate) struct Completion {
     pub(crate) no_change_reason: Option<String>,
     pub(crate) error_code: Option<String>,
     pub(crate) error_message: Option<String>,
+    /// Where a failed model failed, such as `staging` or `post_hook`.
+    pub(crate) phase: Option<String>,
     /// The node skipped itself with a hard skip, so the nodes it blocks name it as their cause.
     pub(crate) skipped_itself: bool,
 }
@@ -170,6 +175,7 @@ impl Completion {
             no_change_reason: None,
             error_code: None,
             error_message: None,
+            phase: None,
             skipped_itself: false,
         }
     }
@@ -508,6 +514,7 @@ impl WorkerBuild {
                 error_code: completion.error_code,
                 skipped_because_of: skipped_because_of.clone(),
                 error_message: completion.error_message.as_deref().map(redact_error_text),
+                phase: completion.phase.filter(|_| outcome == NodeOutcome::Failed),
             },
         )?;
         let cause = match outcome {
@@ -627,9 +634,17 @@ impl WorkerBuild {
         Ok(())
     }
 
+    /// Whether the snapshot records `key` as a check, so its result is reported.
+    #[must_use]
+    pub fn records_check(&self, key: &str) -> bool {
+        self.attached.contains_key(key)
+    }
+
     /// A test or audit finished; a check the snapshot does not record is not reported.
     pub fn finish_attached(&self, py: Python<'_>, key: &str, outcome: NodeOutcome) -> PyResult<()> {
-        if outcome != NodeOutcome::Skipped && self.attached.contains_key(key) {
+        if !matches!(outcome, NodeOutcome::Skipped | NodeOutcome::NotRun)
+            && self.attached.contains_key(key)
+        {
             self.check_cancelled(py)?;
         }
         self.report_attached(py, key, outcome)
@@ -640,7 +655,7 @@ impl WorkerBuild {
         let Some(nodes) = self.attached.get(key) else {
             return Ok(());
         };
-        if outcome != NodeOutcome::Skipped {
+        if !matches!(outcome, NodeOutcome::Skipped | NodeOutcome::NotRun) {
             self.record_attached_start(py, key)?;
         }
         let outcome = if outcome == NodeOutcome::Failed
@@ -655,7 +670,7 @@ impl WorkerBuild {
         } else {
             self.finish_check(py, key, outcome)?;
         }
-        if outcome == NodeOutcome::Skipped {
+        if matches!(outcome, NodeOutcome::Skipped | NodeOutcome::NotRun) {
             return Ok(());
         }
         let mut checked = self.checked.lock().map_err(|_| poisoned())?;
@@ -873,6 +888,13 @@ impl WorkerBuild {
                 Some(value) => value.extract()?,
                 None => None,
             };
+            let phase: Option<String> = match result.getattr_opt("failed_phase")? {
+                Some(value) if !value.is_none() => Some(match value.getattr_opt("value")? {
+                    Some(inner) => inner.extract()?,
+                    None => value.str()?.extract()?,
+                }),
+                _ => None,
+            };
             let detail: Option<String> = match result.getattr_opt("error_detail")? {
                 Some(value) => value.extract()?,
                 None => None,
@@ -902,6 +924,7 @@ impl WorkerBuild {
                     table_rows,
                     error_code: error,
                     error_message: message,
+                    phase,
                     skipped_itself: outcome == NodeOutcome::Skipped
                         && skip_mode.as_deref() == Some(HARD_SKIP_MODE),
                     ..Completion::of(outcome)
@@ -1016,10 +1039,6 @@ impl WorkerBuild {
         let outcome = {
             let completed = self.completed.lock().map_err(|_| poisoned())?;
             let outcomes: Vec<NodeOutcome> = completed.values().copied().collect();
-            let good = completed.iter().any(|(key, value)| {
-                matches!(value, NodeOutcome::Success | NodeOutcome::Warn)
-                    && !source_needs_no_run(key)
-            });
             let bad = outcomes.iter().any(|value| {
                 matches!(
                     value,
@@ -1031,8 +1050,6 @@ impl WorkerBuild {
             });
             if cancelled {
                 RunOutcome::Cancelled
-            } else if bad && good {
-                RunOutcome::Partial
             } else if bad || exit_code != 0 {
                 RunOutcome::Failed
             } else if outcomes.contains(&NodeOutcome::Warn) {
@@ -1080,6 +1097,14 @@ impl WorkerBuild {
                     .bind(py)
                     .get()
                     .change(py, "worker-output-loss", change),
+            );
+        }
+        if let Some(change) = take_closed_export().and_then(sink_deliveries) {
+            drop(
+                self.worker
+                    .bind(py)
+                    .get()
+                    .change(py, "worker-sink-deliveries", change),
             );
         }
         let ignored: u32 = self.ignored_audit_failures.load(Ordering::SeqCst);

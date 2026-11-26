@@ -135,12 +135,12 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
         description="captured snapshot keeps local DuckDB by default",
         scenario_name="order_totals_pass",
         capture_command=("--no-color", "scenario", "capture", "order_totals_pass"),
-        command=("--no-color", "scenario", "test", "order_totals_pass", "--local"),
+        command=("--no-color", "scenario", "test", "order_totals_pass", "--run-on", "local"),
         expected_exit_code=0,
         expected_stdout_fragments=(
             "order_totals_pass",
             "Retained local DuckDB:",
-            "PASS=1  FAIL=0  ERROR=0  SKIP=0  TOTAL=1",
+            "PASS=1  FAIL=0  TOTAL=1",
         ),
         retained_duckdb_relative_path=Path("target/run/scenarios/order_totals_pass/local.duckdb"),
         retained_count_sql='SELECT COUNT(*) FROM "__sqb_local__source__raw_orders"',
@@ -152,14 +152,14 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
         description="malformed local JSONL errors and retains local DuckDB",
         scenario_name="order_totals_pass",
         capture_command=("--no-color", "scenario", "capture", "order_totals_pass"),
-        command=("--no-color", "scenario", "test", "order_totals_pass", "--local"),
+        command=("--no-color", "scenario", "test", "order_totals_pass", "--run-on", "local"),
         expected_exit_code=1,
         expected_stdout_fragments=(
             "order_totals_pass",
             "ERROR",
             "error[X604]:",
             "Retained local DuckDB:",
-            "PASS=0  FAIL=0  ERROR=1  SKIP=0  TOTAL=1",
+            "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
         ),
         retained_duckdb_relative_path=Path("target/run/scenarios/order_totals_pass/local.duckdb"),
         retained_count_sql='SELECT COUNT(*) FROM "__sqb_local__source__raw_orders"',
@@ -170,14 +170,14 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
         description="expected mismatch is local FAIL",
         scenario_name="order_totals_fail",
         capture_command=("--no-color", "scenario", "capture", "order_totals_fail"),
-        command=("--no-color", "scenario", "test", "order_totals_fail", "--local"),
+        command=("--no-color", "scenario", "test", "order_totals_fail", "--run-on", "local"),
         expected_exit_code=1,
         expected_stdout_fragments=(
             "order_totals_fail",
             "FAIL",
             "error[X506]:",
             "expect    expected order_totals",
-            "PASS=0  FAIL=1  ERROR=0  SKIP=0  TOTAL=1",
+            "PASS=0  FAIL=1  TOTAL=1",
         ),
         retained_duckdb_relative_path=Path("target/run/scenarios/order_totals_fail/local.duckdb"),
         retained_count_sql='SELECT COUNT(*) FROM "__sqb_local__source__raw_orders"',
@@ -189,14 +189,14 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
         description="local model execution error is ERROR",
         scenario_name="local_model_error",
         capture_command=("--no-color", "scenario", "capture", "local_model_error"),
-        command=("--no-color", "scenario", "test", "local_model_error", "--local"),
+        command=("--no-color", "scenario", "test", "local_model_error", "--run-on", "local"),
         expected_exit_code=1,
         expected_stdout_fragments=(
             "local_model_error",
             "ERROR",
             "error[X608]:",
             "not_a_number_",
-            "PASS=0  FAIL=0  ERROR=1  SKIP=0  TOTAL=1",
+            "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
         ),
         retained_duckdb_relative_path=Path("target/run/scenarios/local_model_error/local.duckdb"),
         retained_count_sql='SELECT COUNT(*) FROM "__sqb_local__source__raw_orders"',
@@ -226,11 +226,11 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
         description="local SQL function scenario passes",
         scenario_name="local_sql_function_pass",
         capture_command=("--no-color", "scenario", "capture", "local_sql_function_pass"),
-        command=("--no-color", "scenario", "test", "local_sql_function_pass", "--local"),
+        command=("--no-color", "scenario", "test", "local_sql_function_pass", "--run-on", "local"),
         expected_exit_code=0,
         expected_stdout_fragments=(
             "local_sql_function_pass",
-            "PASS=1  FAIL=0  ERROR=0  SKIP=0  TOTAL=1",
+            "PASS=1  FAIL=0  TOTAL=1",
         ),
         retained_duckdb_relative_path=Path(
             "target/run/scenarios/local_sql_function_pass/local.duckdb"
@@ -270,7 +270,14 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
         description="local SQL function setup error is ERROR",
         scenario_name="local_sql_function_setup_error",
         capture_command=("--no-color", "scenario", "capture", "local_sql_function_setup_error"),
-        command=("--no-color", "scenario", "test", "local_sql_function_setup_error", "--local"),
+        command=(
+            "--no-color",
+            "scenario",
+            "test",
+            "local_sql_function_setup_error",
+            "--run-on",
+            "local",
+        ),
         expected_exit_code=1,
         expected_stdout_fragments=(
             "local_sql_function_setup_error",
@@ -278,7 +285,7 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
             "error[X609]:",
             "local function 'bad_sql_function' failed",
             "missing_col",
-            "PASS=0  FAIL=0  ERROR=1  SKIP=0  TOTAL=1",
+            "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
         ),
         retained_duckdb_relative_path=Path(
             "target/run/scenarios/local_sql_function_setup_error/local.duckdb"
@@ -324,15 +331,16 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
             "scenario",
             "test",
             "local_sql_function_transpile_error",
-            "--local",
+            "--run-on",
+            "local",
         ),
         expected_exit_code=1,
         expected_stdout_fragments=(
             "local_sql_function_transpile_error",
             "ERROR",
             "error[X607]:",
-            "bad_transpile_function",
-            "PASS=0  FAIL=0  ERROR=1  SKIP=0  TOTAL=1",
+            "cannot run locally: SQLQuack converts Snowflake SQL only",
+            "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
         ),
         retained_duckdb_relative_path=Path(
             "target/run/scenarios/local_sql_function_transpile_error/local.duckdb"
@@ -369,14 +377,21 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
         description="local SQL function runtime error is ERROR",
         scenario_name="local_sql_function_runtime_error",
         capture_command=("--no-color", "scenario", "capture", "local_sql_function_runtime_error"),
-        command=("--no-color", "scenario", "test", "local_sql_function_runtime_error", "--local"),
+        command=(
+            "--no-color",
+            "scenario",
+            "test",
+            "local_sql_function_runtime_error",
+            "--run-on",
+            "local",
+        ),
         expected_exit_code=1,
         expected_stdout_fragments=(
             "local_sql_function_runtime_error",
             "ERROR",
             "error[X608]:",
             "Could not convert string",
-            "PASS=0  FAIL=0  ERROR=1  SKIP=0  TOTAL=1",
+            "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
         ),
         retained_duckdb_relative_path=Path(
             "target/run/scenarios/local_sql_function_runtime_error/local.duckdb"
@@ -413,11 +428,18 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
         description="local Python function scenario passes",
         scenario_name="local_python_function_pass",
         capture_command=("--no-color", "scenario", "capture", "local_python_function_pass"),
-        command=("--no-color", "scenario", "test", "local_python_function_pass", "--local"),
+        command=(
+            "--no-color",
+            "scenario",
+            "test",
+            "local_python_function_pass",
+            "--run-on",
+            "local",
+        ),
         expected_exit_code=0,
         expected_stdout_fragments=(
             "local_python_function_pass",
-            "PASS=1  FAIL=0  ERROR=0  SKIP=0  TOTAL=1",
+            "PASS=1  FAIL=0  TOTAL=1",
         ),
         retained_duckdb_relative_path=Path(
             "target/run/scenarios/local_python_function_pass/local.duckdb"
@@ -464,14 +486,21 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
         description="local Python function setup error is ERROR",
         scenario_name="local_python_function_error",
         capture_command=("--no-color", "scenario", "capture", "local_python_function_error"),
-        command=("--no-color", "scenario", "test", "local_python_function_error", "--local"),
+        command=(
+            "--no-color",
+            "scenario",
+            "test",
+            "local_python_function_error",
+            "--run-on",
+            "local",
+        ),
         expected_exit_code=1,
         expected_stdout_fragments=(
             "local_python_function_error",
             "ERROR",
             "error[X609]:",
             "cannot set database or schema",
-            "PASS=0  FAIL=0  ERROR=1  SKIP=0  TOTAL=1",
+            "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
         ),
         retained_duckdb_relative_path=Path(
             "target/run/scenarios/local_python_function_error/local.duckdb"
@@ -525,7 +554,8 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
             "scenario",
             "test",
             "local_python_function_runtime_error",
-            "--local",
+            "--run-on",
+            "local",
         ),
         expected_exit_code=1,
         expected_stdout_fragments=(
@@ -533,7 +563,7 @@ SCENARIO_LOCAL_DUCKDB_CASE_FIXTURES: tuple[ScenarioLocalRetainE2ETestCase, ...] 
             "ERROR",
             "error[X608]:",
             "python udf exploded",
-            "PASS=0  FAIL=0  ERROR=1  SKIP=0  TOTAL=1",
+            "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
         ),
         retained_duckdb_relative_path=Path(
             "target/run/scenarios/local_python_function_runtime_error/local.duckdb"
@@ -772,32 +802,31 @@ def test_given_scenario_project_with_python_hooks_when_running_cli_then_hooks_ex
     "test_case",
     (
         ScenarioLocalCliE2ETestCase(
-            description="missing snapshot skips by default",
-            command=("--no-color", "scenario", "test", "order_totals_pass", "--local"),
+            description="missing snapshot runs on the warehouse under auto",
+            command=("--no-color", "scenario", "test", "order_totals_pass"),
             expected_exit_code=0,
             expected_stdout_fragments=(
                 "order_totals_pass",
-                "SKIP",
-                "error[X601]:",
-                "PASS=0  FAIL=0  ERROR=0  SKIP=1  TOTAL=1",
+                "PASS  warehouse",
+                "PASS=1  FAIL=0  TOTAL=1  (0 local, 1 warehouse",
             ),
         ),
         ScenarioLocalCliE2ETestCase(
-            description="missing snapshot errors with strict",
+            description="missing snapshot errors locally",
             command=(
                 "--no-color",
                 "scenario",
                 "test",
                 "order_totals_pass",
-                "--local",
-                "--strict",
+                "--run-on",
+                "local",
             ),
             expected_exit_code=1,
             expected_stdout_fragments=(
                 "order_totals_pass",
                 "ERROR",
                 "error[X601]:",
-                "PASS=0  FAIL=0  ERROR=1  SKIP=0  TOTAL=1",
+                "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
             ),
         ),
     ),
@@ -831,12 +860,12 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
             description="captured snapshot keeps local DuckDB by default",
             scenario_name="order_totals_pass",
             capture_command=("--no-color", "scenario", "capture", "order_totals_pass"),
-            command=("--no-color", "scenario", "test", "order_totals_pass", "--local"),
+            command=("--no-color", "scenario", "test", "order_totals_pass", "--run-on", "local"),
             expected_exit_code=0,
             expected_stdout_fragments=(
                 "order_totals_pass",
                 "Retained local DuckDB:",
-                "PASS=1  FAIL=0  ERROR=0  SKIP=0  TOTAL=1",
+                "PASS=1  FAIL=0  TOTAL=1",
             ),
             retained_duckdb_relative_path=Path(
                 "target/run/scenarios/order_totals_pass/local.duckdb"
@@ -852,14 +881,14 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
             description="malformed local JSONL errors and retains local DuckDB",
             scenario_name="order_totals_pass",
             capture_command=("--no-color", "scenario", "capture", "order_totals_pass"),
-            command=("--no-color", "scenario", "test", "order_totals_pass", "--local"),
+            command=("--no-color", "scenario", "test", "order_totals_pass", "--run-on", "local"),
             expected_exit_code=1,
             expected_stdout_fragments=(
                 "order_totals_pass",
                 "ERROR",
                 "error[X604]:",
                 "Retained local DuckDB:",
-                "PASS=0  FAIL=0  ERROR=1  SKIP=0  TOTAL=1",
+                "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
             ),
             retained_duckdb_relative_path=Path(
                 "target/run/scenarios/order_totals_pass/local.duckdb"
@@ -872,14 +901,14 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
             description="expected mismatch is local FAIL",
             scenario_name="order_totals_fail",
             capture_command=("--no-color", "scenario", "capture", "order_totals_fail"),
-            command=("--no-color", "scenario", "test", "order_totals_fail", "--local"),
+            command=("--no-color", "scenario", "test", "order_totals_fail", "--run-on", "local"),
             expected_exit_code=1,
             expected_stdout_fragments=(
                 "order_totals_fail",
                 "FAIL",
                 "error[X506]:",
                 "expect    expected order_totals",
-                "PASS=0  FAIL=1  ERROR=0  SKIP=0  TOTAL=1",
+                "PASS=0  FAIL=1  TOTAL=1",
             ),
             retained_duckdb_relative_path=Path(
                 "target/run/scenarios/order_totals_fail/local.duckdb"
@@ -895,14 +924,14 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
             description="local model execution error is ERROR",
             scenario_name="local_model_error",
             capture_command=("--no-color", "scenario", "capture", "local_model_error"),
-            command=("--no-color", "scenario", "test", "local_model_error", "--local"),
+            command=("--no-color", "scenario", "test", "local_model_error", "--run-on", "local"),
             expected_exit_code=1,
             expected_stdout_fragments=(
                 "local_model_error",
                 "ERROR",
                 "error[X608]:",
                 "not_a_number_",
-                "PASS=0  FAIL=0  ERROR=1  SKIP=0  TOTAL=1",
+                "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
             ),
             retained_duckdb_relative_path=Path(
                 "target/run/scenarios/local_model_error/local.duckdb"
@@ -934,11 +963,18 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
             description="local SQL function scenario passes",
             scenario_name="local_sql_function_pass",
             capture_command=("--no-color", "scenario", "capture", "local_sql_function_pass"),
-            command=("--no-color", "scenario", "test", "local_sql_function_pass", "--local"),
+            command=(
+                "--no-color",
+                "scenario",
+                "test",
+                "local_sql_function_pass",
+                "--run-on",
+                "local",
+            ),
             expected_exit_code=0,
             expected_stdout_fragments=(
                 "local_sql_function_pass",
-                "PASS=1  FAIL=0  ERROR=0  SKIP=0  TOTAL=1",
+                "PASS=1  FAIL=0  TOTAL=1",
             ),
             retained_duckdb_relative_path=Path(
                 "target/run/scenarios/local_sql_function_pass/local.duckdb"
@@ -978,7 +1014,14 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
             description="local SQL function setup error is ERROR",
             scenario_name="local_sql_function_setup_error",
             capture_command=("--no-color", "scenario", "capture", "local_sql_function_setup_error"),
-            command=("--no-color", "scenario", "test", "local_sql_function_setup_error", "--local"),
+            command=(
+                "--no-color",
+                "scenario",
+                "test",
+                "local_sql_function_setup_error",
+                "--run-on",
+                "local",
+            ),
             expected_exit_code=1,
             expected_stdout_fragments=(
                 "local_sql_function_setup_error",
@@ -986,7 +1029,7 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
                 "error[X609]:",
                 "local function 'bad_sql_function' failed",
                 "missing_col",
-                "PASS=0  FAIL=0  ERROR=1  SKIP=0  TOTAL=1",
+                "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
             ),
             retained_duckdb_relative_path=Path(
                 "target/run/scenarios/local_sql_function_setup_error/local.duckdb"
@@ -1032,15 +1075,16 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
                 "scenario",
                 "test",
                 "local_sql_function_transpile_error",
-                "--local",
+                "--run-on",
+                "local",
             ),
             expected_exit_code=1,
             expected_stdout_fragments=(
                 "local_sql_function_transpile_error",
                 "ERROR",
                 "error[X607]:",
-                "bad_transpile_function",
-                "PASS=0  FAIL=0  ERROR=1  SKIP=0  TOTAL=1",
+                "cannot run locally: SQLQuack converts Snowflake SQL only",
+                "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
             ),
             retained_duckdb_relative_path=Path(
                 "target/run/scenarios/local_sql_function_transpile_error/local.duckdb"
@@ -1087,7 +1131,8 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
                 "scenario",
                 "test",
                 "local_sql_function_runtime_error",
-                "--local",
+                "--run-on",
+                "local",
             ),
             expected_exit_code=1,
             expected_stdout_fragments=(
@@ -1095,7 +1140,7 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
                 "ERROR",
                 "error[X608]:",
                 "Could not convert string",
-                "PASS=0  FAIL=0  ERROR=1  SKIP=0  TOTAL=1",
+                "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
             ),
             retained_duckdb_relative_path=Path(
                 "target/run/scenarios/local_sql_function_runtime_error/local.duckdb"
@@ -1132,11 +1177,18 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
             description="local Python function scenario passes",
             scenario_name="local_python_function_pass",
             capture_command=("--no-color", "scenario", "capture", "local_python_function_pass"),
-            command=("--no-color", "scenario", "test", "local_python_function_pass", "--local"),
+            command=(
+                "--no-color",
+                "scenario",
+                "test",
+                "local_python_function_pass",
+                "--run-on",
+                "local",
+            ),
             expected_exit_code=0,
             expected_stdout_fragments=(
                 "local_python_function_pass",
-                "PASS=1  FAIL=0  ERROR=0  SKIP=0  TOTAL=1",
+                "PASS=1  FAIL=0  TOTAL=1",
             ),
             retained_duckdb_relative_path=Path(
                 "target/run/scenarios/local_python_function_pass/local.duckdb"
@@ -1183,14 +1235,21 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
             description="local Python function setup error is ERROR",
             scenario_name="local_python_function_error",
             capture_command=("--no-color", "scenario", "capture", "local_python_function_error"),
-            command=("--no-color", "scenario", "test", "local_python_function_error", "--local"),
+            command=(
+                "--no-color",
+                "scenario",
+                "test",
+                "local_python_function_error",
+                "--run-on",
+                "local",
+            ),
             expected_exit_code=1,
             expected_stdout_fragments=(
                 "local_python_function_error",
                 "ERROR",
                 "error[X609]:",
                 "cannot set database or schema",
-                "PASS=0  FAIL=0  ERROR=1  SKIP=0  TOTAL=1",
+                "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
             ),
             retained_duckdb_relative_path=Path(
                 "target/run/scenarios/local_python_function_error/local.duckdb"
@@ -1244,7 +1303,8 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
                 "scenario",
                 "test",
                 "local_python_function_runtime_error",
-                "--local",
+                "--run-on",
+                "local",
             ),
             expected_exit_code=1,
             expected_stdout_fragments=(
@@ -1252,7 +1312,7 @@ def test_given_missing_snapshot_when_running_local_scenario_then_reports_expecte
                 "ERROR",
                 "error[X608]:",
                 "python udf exploded",
-                "PASS=0  FAIL=0  ERROR=1  SKIP=0  TOTAL=1",
+                "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
             ),
             retained_duckdb_relative_path=Path(
                 "target/run/scenarios/local_python_function_runtime_error/local.duckdb"
@@ -1330,7 +1390,7 @@ def test_given_captured_snapshot_when_running_local_scenario_then_manages_local_
     assert result.returncode == test_case.expected_exit_code, result.stdout + result.stderr
     expected_fragment: str
     for expected_fragment in test_case.expected_stdout_fragments:
-        assert expected_fragment in result.stdout
+        assert expected_fragment in result.stdout, result.stdout
     assert_local_duckdb_state(
         db_path=local_duckdb_path,
         stdout=result.stdout,
@@ -1349,11 +1409,11 @@ def test_given_captured_snapshot_when_running_local_scenario_then_manages_local_
         ScenarioLocalCommittedSnapshotE2ETestCase(
             description="replays committed local snapshot without capture",
             scenario_name="order_totals_pass",
-            command=("--no-color", "scenario", "test", "order_totals_pass", "--local"),
+            command=("--no-color", "scenario", "test", "order_totals_pass", "--run-on", "local"),
             expected_exit_code=0,
             expected_stdout_fragments=(
                 "order_totals_pass",
-                "PASS=1  FAIL=0  ERROR=0  SKIP=0  TOTAL=1",
+                "PASS=1  FAIL=0  TOTAL=1",
             ),
             unexpected_stdout_fragments=("Snapshot Capture",),
             retained_duckdb_relative_path=Path(
@@ -1416,7 +1476,8 @@ def test_given_committed_snapshot_when_running_local_scenario_then_replays_witho
                 "scenario",
                 "test",
                 "order_totals_pass",
-                "--local",
+                "--run-on",
+                "local",
                 "--sync-snapshots",
             ),
             expected_exit_code=0,
@@ -1428,7 +1489,7 @@ def test_given_committed_snapshot_when_running_local_scenario_then_replays_witho
                 "snapshot tests/_scenario_snapshots/order_totals_pass/scenario.json",
                 "SYNC_PASS=1  SYNC_FAIL=0",
                 "order_totals_pass",
-                "PASS=1  FAIL=0  ERROR=0  SKIP=0  TOTAL=1",
+                "PASS=1  FAIL=0  TOTAL=1",
             ),
         ),
         ScenarioLocalSnapshotSyncE2ETestCase(
@@ -1439,7 +1500,8 @@ def test_given_committed_snapshot_when_running_local_scenario_then_replays_witho
                 "scenario",
                 "test",
                 "order_totals_pass",
-                "--local",
+                "--run-on",
+                "local",
                 "--sync-snapshots",
             ),
             expected_exit_code=1,
@@ -1448,7 +1510,7 @@ def test_given_committed_snapshot_when_running_local_scenario_then_replays_witho
                 "order_totals_pass",
                 "ERROR",
                 "error[X604]:",
-                "PASS=0  FAIL=0  ERROR=1  SKIP=0  TOTAL=1",
+                "PASS=0  FAIL=0  ERROR=1  TOTAL=1",
             ),
             initial_capture=True,
             corrupt_jsonl=True,
@@ -1462,7 +1524,8 @@ def test_given_committed_snapshot_when_running_local_scenario_then_replays_witho
                 "scenario",
                 "test",
                 "order_totals_pass",
-                "--local",
+                "--run-on",
+                "local",
                 "--refresh",
             ),
             expected_exit_code=0,
@@ -1474,7 +1537,7 @@ def test_given_committed_snapshot_when_running_local_scenario_then_replays_witho
                 "snapshot tests/_scenario_snapshots/order_totals_pass/scenario.json",
                 "REFRESH_PASS=1  REFRESH_FAIL=0",
                 "order_totals_pass",
-                "PASS=1  FAIL=0  ERROR=0  SKIP=0  TOTAL=1",
+                "PASS=1  FAIL=0  TOTAL=1",
             ),
             initial_capture=True,
             corrupt_jsonl=True,
@@ -1487,7 +1550,8 @@ def test_given_committed_snapshot_when_running_local_scenario_then_replays_witho
                 "scenario",
                 "test",
                 "order_totals_pass",
-                "--local",
+                "--run-on",
+                "local",
                 "--sync-snapshots",
             ),
             expected_exit_code=0,
@@ -1499,7 +1563,7 @@ def test_given_committed_snapshot_when_running_local_scenario_then_replays_witho
                 "snapshot tests/_scenario_snapshots/order_totals_pass/scenario.json",
                 "SYNC_PASS=1  SYNC_FAIL=0",
                 "order_totals_pass",
-                "PASS=1  FAIL=0  ERROR=0  SKIP=0  TOTAL=1",
+                "PASS=1  FAIL=0  TOTAL=1",
             ),
             initial_capture=True,
             update_scenario_after_capture=True,
@@ -1735,11 +1799,12 @@ def test_given_unknown_scenario_selector_when_running_scenario_test_then_fails_c
                 "scenario",
                 "test",
                 "order_totals_pass",
-                "--local",
+                "--run-on",
+                "local",
             ),
             expected_exit_code=1,
             expected_stderr_fragments=(
-                "error[C455]: scenario test --local requires SQL analysis; "
+                "error[C455]: scenario test --run-on local requires SQL analysis; "
                 "sqlbuild_project.toml sets [settings] sql_analysis = false",
                 "= help: to run local scenario replay, snapshot sync, or snapshot refresh, "
                 "set this in sqlbuild_project.toml:\n"
@@ -1755,12 +1820,13 @@ def test_given_unknown_scenario_selector_when_running_scenario_test_then_fails_c
                 "scenario",
                 "test",
                 "order_totals_pass",
-                "--local",
+                "--run-on",
+                "local",
                 "--sync-snapshots",
             ),
             expected_exit_code=1,
             expected_stderr_fragments=(
-                "error[C455]: scenario test --local requires SQL analysis; "
+                "error[C455]: scenario test --run-on local requires SQL analysis; "
                 "sqlbuild_project.toml sets [settings] sql_analysis = false",
                 "= help: to run local scenario replay, snapshot sync, or snapshot refresh, "
                 "set this in sqlbuild_project.toml:\n"
@@ -1997,7 +2063,7 @@ def test_given_scenario_project_when_running_scenario_test_then_writes_runtime_a
             description="writes local fixture artifact",
             scenario_name="order_totals_pass",
             capture_command=("--no-color", "scenario", "capture", "order_totals_pass"),
-            command=("--no-color", "scenario", "test", "order_totals_pass", "--local"),
+            command=("--no-color", "scenario", "test", "order_totals_pass", "--run-on", "local"),
             expected_exit_code=0,
             artifact_relative_path=Path(
                 "target/run/scenarios/order_totals_pass/local/fixtures/source__raw_orders.sql"
@@ -2012,7 +2078,7 @@ def test_given_scenario_project_when_running_scenario_test_then_writes_runtime_a
             description="writes local model artifact",
             scenario_name="order_totals_pass",
             capture_command=("--no-color", "scenario", "capture", "order_totals_pass"),
-            command=("--no-color", "scenario", "test", "order_totals_pass", "--local"),
+            command=("--no-color", "scenario", "test", "order_totals_pass", "--run-on", "local"),
             expected_exit_code=0,
             artifact_relative_path=Path(
                 "target/run/scenarios/order_totals_pass/local/sql/models/order_totals.sql"
@@ -2026,7 +2092,7 @@ def test_given_scenario_project_when_running_scenario_test_then_writes_runtime_a
             description="writes local expected comparison artifact",
             scenario_name="order_totals_pass",
             capture_command=("--no-color", "scenario", "capture", "order_totals_pass"),
-            command=("--no-color", "scenario", "test", "order_totals_pass", "--local"),
+            command=("--no-color", "scenario", "test", "order_totals_pass", "--run-on", "local"),
             expected_exit_code=0,
             artifact_relative_path=Path(
                 "target/run/scenarios/order_totals_pass/local/expectations/expected__order_totals.sql"
@@ -2041,7 +2107,14 @@ def test_given_scenario_project_when_running_scenario_test_then_writes_runtime_a
             description="writes local SQL function artifact",
             scenario_name="local_sql_function_pass",
             capture_command=("--no-color", "scenario", "capture", "local_sql_function_pass"),
-            command=("--no-color", "scenario", "test", "local_sql_function_pass", "--local"),
+            command=(
+                "--no-color",
+                "scenario",
+                "test",
+                "local_sql_function_pass",
+                "--run-on",
+                "local",
+            ),
             expected_exit_code=0,
             artifact_relative_path=Path(
                 "target/run/scenarios/local_sql_function_pass/local/sql/functions/sql/is_large_order.sql"

@@ -8,3 +8,4 @@ pub mod register_scope;
 pub mod severity_from;
 pub mod severity_object;
 pub mod state_error;
+pub mod take_closed_export;

@@ -101,7 +101,7 @@ fn given_mixed_physical_and_parent_waiters_when_admitting_then_priority_and_queu
                 )
                 .await
                 .expect("queue group");
-                let lease = acquire_lease(store, Uuid::now_v7())
+                let lease = acquire_lease(store, (Uuid::now_v7(), None))
                     .await
                     .expect("elect")
                     .expect("leader");
@@ -203,7 +203,7 @@ fn given_group_children_sharing_a_limit_of_one_when_claiming_then_they_run_one_a
             )
             .await
             .expect("queue group");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -308,7 +308,7 @@ fn given_an_unserved_queued_group_when_dispatching_an_eligible_scope_then_unknow
                 .await
                 .expect("queue group");
             }
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -517,7 +517,7 @@ fn given_capacity_and_multistage_cycles_when_replicas_admit_and_resume_groups_th
                 publish_snapshot(store, &input)
                     .await
                     .expect("publish groups");
-                let lease = acquire_lease(store, Uuid::now_v7())
+                let lease = acquire_lease(store, (Uuid::now_v7(), None))
                     .await
                     .expect("elect")
                     .expect("leader");
@@ -703,7 +703,7 @@ fn given_an_older_blocked_allow_group_when_an_independent_generation_is_queued_t
                 .pools
                 .insert("orders_limit".into(), pool_slots(1, 100));
             queue(store, &physical).await;
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -827,7 +827,7 @@ fn given_a_large_healthy_project_with_blocked_groups_when_claiming_then_unrelate
             let published = publish_snapshot(store, &input)
                 .await
                 .expect("publish large project");
-            let elected = acquire_lease(store, Uuid::now_v7())
+            let elected = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

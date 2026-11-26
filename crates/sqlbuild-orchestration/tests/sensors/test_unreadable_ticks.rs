@@ -123,7 +123,7 @@ fn given_a_tick_an_earlier_release_stored_unreadable_when_people_read_the_sensor
                 .await
                 .expect("triggers")
                 .remove(0);
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

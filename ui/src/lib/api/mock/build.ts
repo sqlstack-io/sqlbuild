@@ -3,6 +3,7 @@
 // server derives it: scheduler run nodes plus builds outside the scheduler
 // (synced fingerprints), compared against the snapshot change feed.
 
+import { MISSING_OBJECT_ERROR, SEED_AUDIT_BINDING, SEED_AUDIT_CHECK } from './seed-audit-run';
 import { ApiError } from '../client';
 import { groupStatusOf, problemRunsOf } from '../http-overview';
 import { clearedAcknowledgements, withConditions } from '$lib/build-area/attention-conditions';
@@ -225,6 +226,11 @@ export class MockBuild {
 
 	getCheckEvidence(scope: Scope, checkId: string, evaluationId: string): Promise<CheckEvidence> {
 		if (!this.#ctx.can('view.evidence')) throw new ApiError('Missing permission: view.evidence', 403);
+		// The end-of-build audit of the failed mock run: its query could not run, so it has an error, not rows.
+		if (checkId === SEED_AUDIT_BINDING) {
+			this.#ctx.platform.recordEvidenceRead(scope, checkId, `Read the error of ${SEED_AUDIT_CHECK} (${evaluationId})`);
+			return this.#ctx.reply({ evaluationId, columns: [], rows: [], truncated: false, executionError: MISSING_OBJECT_ERROR });
+		}
 		const spec = CHECK_SPECS.find((s) => s.id === checkId);
 		const evaluation = spec && this.#evaluations(spec, this.#states(scope), 40).find((e) => e.id === evaluationId);
 		if (!spec || !evaluation) throw new ApiError(`Unknown evaluation ${evaluationId}`, 404);
@@ -232,7 +238,7 @@ export class MockBuild {
 		const count = Math.min(evaluation.evidenceCount ?? 0, 10);
 		const rows = Array.from({ length: count }, (_, i) => columns.map((col) => evidenceValue(col, hash(`${evaluationId}/${i}`))));
 		this.#ctx.platform.recordEvidenceRead(scope, checkId, `Read ${count} evidence rows of ${spec.name} (${evaluationId})`);
-		return this.#ctx.reply({ evaluationId, columns, rows, truncated: evaluation.evidenceTruncated || (evaluation.evidenceCount ?? 0) > count });
+		return this.#ctx.reply({ evaluationId, columns, rows, truncated: evaluation.evidenceTruncated || (evaluation.evidenceCount ?? 0) > count, executionError: null });
 	}
 
 	// ---- change feed ----
@@ -292,7 +298,6 @@ export class MockBuild {
 					total: recent.length,
 					success: recent.filter((r) => r.status === 'success').length,
 					warn: recent.filter((r) => r.status === 'warn').length,
-					partial: recent.filter((r) => r.status === 'partial').length,
 					failed: recent.filter((r) => r.status === 'failed' || r.status === 'presumed_failed').length,
 					active: recent.filter((r) => ['queued', 'launched', 'running', 'unresponsive'].includes(r.status)).length
 				},

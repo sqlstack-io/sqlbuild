@@ -1,5 +1,9 @@
+use std::collections::BTreeSet;
+
 use serde_json::Value;
+use sqlbuild_orchestration::runs::models::PastRunResults;
 use sqlbuild_orchestration::runs::models::PlannerResource;
+use sqlbuild_orchestration::runs::types::PastRuns;
 
 /// A published node as the planner receives it from the control plane.
 pub(super) fn resource(
@@ -30,7 +34,27 @@ pub(super) fn owned_plan(
 /// SQL models, a source with its loaders, Python nodes and a job, all published, indexed by the server's planner.
 pub(super) fn orders_publication()
 -> std::sync::Arc<dyn sqlbuild_orchestration::runs::types::PreparedPublication> {
-    let resources = vec![
+    publication_of(orders_resources())
+}
+
+/// [`orders_publication`] with a singular audit and an audit attached to a column of `orders`.
+pub(super) fn audited_orders_publication()
+-> std::sync::Arc<dyn sqlbuild_orchestration::runs::types::PreparedPublication> {
+    let mut resources = orders_resources();
+    resources.extend([
+        resource("audit:orders_match_payments", &["model:orders"], &[], None),
+        resource(
+            "audit:not_null_orders_id:model:orders:order_id",
+            &["model:orders"],
+            &[],
+            None,
+        ),
+    ]);
+    publication_of(resources)
+}
+
+fn orders_resources() -> Vec<PlannerResource> {
+    vec![
         resource(
             "model:stg_orders",
             &[],
@@ -78,7 +102,13 @@ pub(super) fn orders_publication()
             &[],
             Some("python/nodes/loaders"),
         ),
-    ];
+    ]
+}
+
+/// `resources` and the `carrier_sync` job, indexed by the server's planner.
+fn publication_of(
+    resources: Vec<PlannerResource>,
+) -> std::sync::Arc<dyn sqlbuild_orchestration::runs::types::PreparedPublication> {
     let jobs = sqlbuild_orchestration::runs::models::PublishedJobs {
         selections: std::collections::BTreeMap::from([(
             "carrier_sync".to_owned(),
@@ -136,4 +166,22 @@ pub(super) fn expected_pins(
             (selection, jobs, build)
         })
         .map_err(str::to_owned)
+}
+
+/// A past run where `stg_orders` and the end-of-build audit failed and `orders` was skipped.
+pub(super) fn past_runs() -> PastRuns {
+    let keys = |keys: &[&str]| {
+        keys.iter()
+            .map(|key| (*key).to_owned())
+            .collect::<BTreeSet<String>>()
+    };
+    PastRuns::from([(
+        "01a1d3b9".to_owned(),
+        PastRunResults {
+            run_id: uuid::Uuid::nil(),
+            selected: keys(&["model:stg_orders", "model:orders", "model:customers"]),
+            failed: keys(&["model:stg_orders", "audit:orders_match_payments"]),
+            skipped: keys(&["model:orders"]),
+        },
+    )])
 }

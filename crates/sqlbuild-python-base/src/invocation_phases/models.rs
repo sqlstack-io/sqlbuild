@@ -13,3 +13,19 @@ pub struct InvocationPhase<'a> {
     /// The phase's sub-steps or facts, joined with ` · `.
     pub detail: Option<String>,
 }
+
+/// A finished phase kept back until its summary is known: how long it took and its facts.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct HeldPhase {
+    pub duration_ms: Option<f64>,
+    pub detail: Option<String>,
+}
+
+impl From<InvocationPhase<'_>> for HeldPhase {
+    fn from(phase: InvocationPhase<'_>) -> Self {
+        Self {
+            duration_ms: phase.duration_ms,
+            detail: phase.detail,
+        }
+    }
+}

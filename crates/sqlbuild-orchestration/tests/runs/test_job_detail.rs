@@ -355,7 +355,7 @@ fn given_published_jobs_when_people_read_and_launch_them_then_listing_view_and_r
             )
             .await
             .expect("ordinary launch");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

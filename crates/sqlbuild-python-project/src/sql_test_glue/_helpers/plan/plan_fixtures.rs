@@ -3,10 +3,12 @@
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 
+use crate::planner_strategy::main::prewarm_fixture_reads::prewarm_fixture_reads;
 use crate::planner_strategy::models::RelationFixturePlanningContext;
 use crate::sql_test_glue::_helpers::inputs::fixture_validation::validated_fixtures;
 use crate::sql_test_glue::_helpers::plan::plan_driver::resolve_sql_test_model_chains;
 use crate::sql_test_glue::_helpers::plan::plan_values::model_payload;
+use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
@@ -101,6 +103,13 @@ pub(crate) fn validate<'py>(
             "zip() argument lengths differ",
         ));
     }
+    let mut names: Vec<String> = Vec::new();
+    for chain in &chains {
+        names.extend(chain.extract::<Vec<String>>()?);
+    }
+    names.sort_unstable();
+    names.dedup();
+    prewarm_fixture_reads(context, &names, &Dialect::of(inputs.1)?)?;
     let mut validated = tests.to_vec();
     let mut diagnostics: std::collections::BTreeMap<usize, Bound<'py, PyAny>> =
         std::collections::BTreeMap::new();

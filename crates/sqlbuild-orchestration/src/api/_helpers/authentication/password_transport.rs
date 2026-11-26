@@ -42,6 +42,7 @@ pub(crate) async fn guard(
             status: StatusCode::INTERNAL_SERVER_ERROR,
             message: "trusted request peer is unavailable".into(),
             decision_id: None,
+            cause: None,
         })?
         .0;
     let context = AuditContext {
@@ -66,6 +67,7 @@ pub(crate) async fn guard(
                           [trusted_proxy] allowed_hosts"
                     .into(),
                 decision_id: None,
+                cause: None,
             });
         }
     }
@@ -155,6 +157,7 @@ pub(crate) async fn authenticate(
             status: StatusCode::INTERNAL_SERVER_ERROR,
             message: "trusted authentication context is unavailable".into(),
             decision_id: None,
+            cause: None,
         })?;
     let access =
         if request.method().is_safe() || request.headers().contains_key(header::AUTHORIZATION) {

@@ -36,12 +36,12 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
         SensorTestCase {
             description: "SQLite terminal outcome sensor recovery",
             backend: Backend::Sqlite,
-            expected_runs: 104,
+            expected_runs: 102,
         },
         SensorTestCase {
             description: "PostgreSQL terminal outcome sensor recovery",
             backend: Backend::Postgres,
-            expected_runs: 104,
+            expected_runs: 102,
         },
     ];
     for test_case in test_cases {
@@ -68,14 +68,7 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
             input.documents.insert("groups".into(), json!({
                 "daily_orders": {"description": "Source group", "selection": ["orders", "customers"], "jobs": {"orders": []}}
             }));
-            let selectors = [
-                "completed",
-                "success",
-                "warn",
-                "partial",
-                "failed",
-                "cancelled",
-            ];
+            let selectors = ["completed", "success", "warn", "failed", "cancelled"];
             let mut sensors = serde_json::Map::new();
             for job_key in ["orders", "daily_orders"] {
                 for selector in selectors {
@@ -89,7 +82,7 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
                     ("both_completed", "completed", vec!["customers", "orders"]),
                     ("customers_completed", "completed", vec!["customers"]),
                     ("customers_success", "success", vec!["customers"]),
-                    ("customers_partial", "partial", vec!["customers"]),
+                    ("customers_failed", "failed", vec!["customers"]),
                     ("orders_completed", "completed", vec!["orders"]),
                 ] {
                     sensors.insert(format!("{job_key}_executed_{name}"), json!({
@@ -103,7 +96,7 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
             publish_snapshot(store, &input)
                 .await
                 .expect("publish sensors");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -119,11 +112,6 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
                     "warn",
                     RunOutcome::Warn,
                     [NodeOutcome::Warn, NodeOutcome::Success],
-                ),
-                (
-                    "partial",
-                    RunOutcome::Partial,
-                    [NodeOutcome::Success, NodeOutcome::Failed],
                 ),
                 (
                     "failed",
@@ -219,12 +207,12 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
                     ],
                 },
                 SensorExecutionTestCase {
-                    description: "partial outcome is independent of selected-node success",
-                    outcome: RunOutcome::Partial,
+                    description: "a failed run still counts a selected node that succeeded",
+                    outcome: RunOutcome::Failed,
                     nodes: [NodeOutcome::Success, NodeOutcome::Failed],
                     started: [true; 2],
-                    expected_selector: "partial",
-                    expected_filters: &["customers_completed", "customers_partial"],
+                    expected_selector: "failed",
+                    expected_filters: &["customers_completed", "customers_failed"],
                 },
                 SensorExecutionTestCase {
                     description: "warning is not successful execution",
@@ -244,18 +232,18 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
                 },
                 SensorExecutionTestCase {
                     description: "skipped selected node is not successful",
-                    outcome: RunOutcome::Partial,
+                    outcome: RunOutcome::Failed,
                     nodes: [NodeOutcome::Skipped, NodeOutcome::Success],
                     started: [false, true],
-                    expected_selector: "partial",
+                    expected_selector: "failed",
                     expected_filters: &["orders_completed"],
                 },
                 SensorExecutionTestCase {
-                    description: "a partial run's freshness-only node still does not qualify",
-                    outcome: RunOutcome::Partial,
+                    description: "a failed run's freshness-only node still does not qualify",
+                    outcome: RunOutcome::Failed,
                     nodes: [NodeOutcome::Success, NodeOutcome::Failed],
                     started: [false, true],
-                    expected_selector: "partial",
+                    expected_selector: "failed",
                     expected_filters: &[],
                 },
                 SensorExecutionTestCase {
@@ -318,7 +306,7 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
             let retry = RerunRequest {
                 run_id: Uuid::now_v7(),
                 source_run_id: source_ids[&(
-                    "partial outcome is independent of selected-node success",
+                    "a failed run still counts a selected node that succeeded",
                     "daily_orders",
                 )],
                 from_failure: true,

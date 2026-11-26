@@ -113,7 +113,7 @@ fn given_a_run_reporting_what_each_node_did_when_its_nodes_are_listed_then_rows_
                 &["customers", "inventory", "orders", "products"],
             );
             queue(store, &pinned).await;
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -132,6 +132,7 @@ fn given_a_run_reporting_what_each_node_did_when_its_nodes_are_listed_then_rows_
                         error_code: None,
                         skipped_because_of: None,
                         error_message: None,
+                        phase: None,
                     }
                 };
             for change in [
@@ -249,7 +250,7 @@ fn given_nodes_failed_for_missing_secrets_when_listed_then_only_those_unstarted_
                 &["customers", "inventory", "orders", "products"],
             );
             queue(store, &pinned).await;
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

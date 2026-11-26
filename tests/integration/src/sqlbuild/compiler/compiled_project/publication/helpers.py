@@ -19,6 +19,7 @@ import sqlite3
 import subprocess
 import sys
 import termios
+import threading
 import time
 from collections.abc import Callable, Iterator
 from contextlib import (
@@ -2519,3 +2520,169 @@ INGRESS_LOADER_FILES: dict[str, str] = {
         "    managed: true\n    write_strategy: table\n"
     ),
 }
+
+
+@contextmanager
+def outage_server(directory: Path, database_url: str) -> Iterator[tuple[str, Path]]:
+    """`sqb server` over a control database it may not reach yet, from the moment it listens."""
+    directory.mkdir(parents=True)
+    log: Path = directory / "server.log"
+    environment: dict[str, str] = os.environ.copy()
+    environment.pop("SQLBUILD_PLATFORM_WEBHOOK_URL", None)
+    environment.pop("SQLBUILD_SECURITY_AUDIT_WEBHOOK_URL", None)
+    environment["XDG_STATE_HOME"] = str(directory / "state")
+    environment["SQLBUILD_CONTROL_DATABASE_URL"] = database_url
+    with log.open("wb") as stderr:
+        process: subprocess.Popen[bytes] = subprocess.Popen(
+            [str(Path(sys.executable).with_name("sqb")), "server", "--port", "0", "--no-scheduler"],
+            cwd=directory,
+            env=environment,
+            stdout=subprocess.DEVNULL,
+            stderr=stderr,
+        )
+        try:
+            yield listening_address(process, log), log
+        finally:
+            process.terminate()
+            try:
+                _ = process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                _ = process.wait(timeout=5)
+
+
+def listening_address(process: subprocess.Popen[bytes], log: Path) -> str:
+    """The address a server answers on before its control database is open."""
+    deadline: float = time.monotonic() + 10
+    while "Control API listening: " not in log.read_text():
+        assert process.poll() is None, log.read_text()
+        assert time.monotonic() < deadline, "the server did not start listening"
+        time.sleep(0.02)
+    return "http://" + log.read_text().partition("Control API listening: ")[2].splitlines()[0]
+
+
+def http_reply(url: str) -> tuple[int, dict[str, str], str]:
+    """A GET's status, headers and body text, whatever the status."""
+    try:
+        with urlopen(url, timeout=10) as response:
+            return (
+                response.status,
+                {key.lower(): value for key, value in response.headers.items()},
+                response.read().decode(),
+            )
+    except HTTPError as error:
+        return (
+            error.code,
+            {key.lower(): value for key, value in error.headers.items()},
+            error.read().decode(),
+        )
+
+
+def health_report(url: str) -> dict[str, Any]:
+    """The server's health report, which it answers with 200 or 503."""
+    report: dict[str, Any] = json.loads(http_reply(f"{url}/api/health")[2])
+    return report
+
+
+def wait_for_health(
+    url: str, wanted: Callable[[dict[str, Any]], bool], seconds: float
+) -> dict[str, Any]:
+    """The first health report `wanted` accepts, read every half second."""
+    deadline: float = time.monotonic() + seconds
+    report: dict[str, Any] = health_report(url)
+    while not wanted(report) and time.monotonic() < deadline:
+        time.sleep(0.5)
+        report = health_report(url)
+    assert wanted(report), f"health never became what was wanted: {report}"
+    return report
+
+
+def control_database_row(report: dict[str, Any]) -> dict[str, Any]:
+    """The control database's row of a health report, by what anyone may see of it."""
+    rows: dict[str, dict[str, Any]] = {row["component"]: row for row in report["components"]}
+    row: dict[str, Any] = rows["control_database"]
+    return {"status": row["status"], "reason": row["reason"], "case": row.get("case")}
+
+
+def free_port() -> int:
+    """A local port nothing listens on yet."""
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port: int = probe.getsockname()[1]
+    return port
+
+
+@contextmanager
+def forwarded_port(port: int, target: tuple[str, int]) -> Iterator[None]:
+    """Accept on `port` and relay every connection to `target` until the block ends."""
+    listener: socket.socket = socket.create_server(("127.0.0.1", port))
+    stop: threading.Event = threading.Event()
+
+    def relay(source: socket.socket, sink: socket.socket) -> None:
+        with suppress(OSError):
+            while chunk := source.recv(65536):
+                sink.sendall(chunk)
+        with suppress(OSError):
+            sink.shutdown(socket.SHUT_WR)
+
+    def accept() -> None:
+        listener.settimeout(0.2)
+        while not stop.is_set():
+            try:
+                client, _ = listener.accept()
+            except TimeoutError:
+                continue
+            upstream: socket.socket = socket.create_connection(target)
+            threading.Thread(target=relay, args=(client, upstream), daemon=True).start()
+            threading.Thread(target=relay, args=(upstream, client), daemon=True).start()
+
+    acceptor: threading.Thread = threading.Thread(target=accept, daemon=True)
+    acceptor.start()
+    try:
+        yield
+    finally:
+        stop.set()
+        acceptor.join(timeout=2)
+        listener.close()
+
+
+def runtime_sink_totals(
+    project: Path, settled: Callable[[dict[str, Any]], bool], seconds: float
+) -> dict[str, Any]:
+    """The location interpreter's sink totals, asked every half second until `settled`."""
+    child: subprocess.Popen[str] = subprocess.Popen(
+        [
+            str(Path(sys.executable).with_name("sqb")),
+            "--project-dir",
+            str(project),
+            "location",
+            "runtime",
+            "--server",
+            "http://127.0.0.1:9",
+            "--location-id",
+            str(uuid4()),
+            "--target",
+            "development",
+        ],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+        cwd=project,
+    )
+    stdin, stdout = cast(Any, child.stdin), cast(Any, child.stdout)
+
+    def ask() -> dict[str, Any]:
+        stdin.write('{"sink_deliveries": {}}\n')
+        stdin.flush()
+        reply: dict[str, Any] = json.loads(stdout.readline())
+        return reply
+
+    deadline: float = time.monotonic() + seconds
+    totals: dict[str, Any] = ask()
+    while not settled(totals) and time.monotonic() < deadline:
+        time.sleep(0.5)
+        totals = ask()
+    stdin.close()
+    child.wait(timeout=60)
+    return totals

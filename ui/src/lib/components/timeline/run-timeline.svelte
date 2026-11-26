@@ -148,7 +148,7 @@
 		running: visibleRuns.filter((r) => r.status === 'running').length,
 		ok: visibleRuns.filter((r) => r.status === 'success').length,
 		warn: visibleRuns.filter((r) => r.status === 'warn').length,
-		fail: visibleRuns.filter((r) => r.status === 'failed' || r.status === 'partial' || r.status === 'presumed_failed').length
+		fail: visibleRuns.filter((r) => r.status === 'failed' || r.status === 'presumed_failed').length
 	});
 
 	// jobs with problems in the window first, then alphabetical

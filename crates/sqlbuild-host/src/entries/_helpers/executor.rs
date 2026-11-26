@@ -375,6 +375,26 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
         edge: HostEdge::Executor,
     },
     HostEntry {
+        name: "decide_sql_test_run_on",
+        kind: HostKind::Function,
+        edge: HostEdge::Executor,
+    },
+    HostEntry {
+        name: "local_test_adapter",
+        kind: HostKind::Function,
+        edge: HostEdge::Executor,
+    },
+    HostEntry {
+        name: "report_unplaced_sql_tests",
+        kind: HostKind::Function,
+        edge: HostEdge::Executor,
+    },
+    HostEntry {
+        name: "decide_scenario_run_on",
+        kind: HostKind::Function,
+        edge: HostEdge::Executor,
+    },
+    HostEntry {
         name: "select_scenario_snapshot_capture_candidates",
         kind: HostKind::Function,
         edge: HostEdge::Executor,

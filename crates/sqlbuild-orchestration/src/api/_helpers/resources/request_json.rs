@@ -121,5 +121,6 @@ fn rejection(status: StatusCode, message: String) -> ApiError {
         status,
         message,
         decision_id: None,
+        cause: None,
     }
 }

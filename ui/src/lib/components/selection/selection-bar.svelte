@@ -16,7 +16,7 @@
 	import { noun } from '$lib/format/plural';
 	import { buildHref, copyCommand, problemParts, problemText, problemToken } from '$lib/selection/command';
 	import { parseSelection } from '$lib/selection/syntax';
-	import type { NameEntry } from '$lib/selection/suggest';
+	import type { NameEntry, SuggestionItem } from '$lib/selection/suggest';
 	import type { SelectionState } from '$lib/state/selection.svelte';
 	import SelectionField from './selection-field.svelte';
 
@@ -26,6 +26,7 @@
 	let {
 		selection,
 		names,
+		runs = [],
 		total,
 		build = true,
 		copy: offerCopy = true,
@@ -36,6 +37,8 @@
 		selection: SelectionState;
 		/** Node names to suggest and pick. */
 		names: NameEntry[];
+		/** Run selectors the field offers first, such as the rerun plan's `failed:<id>+`. */
+		runs?: SuggestionItem[];
 		/** Every node, for the count when nothing narrows. */
 		total: number;
 		/** Offer Build these. */
@@ -101,6 +104,7 @@
 			placeholder="Select nodes: type, paste sqb syntax, or pick below"
 			vocabulary={selection.vocabulary}
 			{names}
+			{runs}
 			recent={selection.recent}
 			problem={selectProblem}
 			onrecent={(r) => {
@@ -113,7 +117,7 @@
 		<span class="sb-count" class:pending={selection.evaluating} aria-live="polite">
 			{#if !selection.active}All <b>{total.toLocaleString('en')}</b> nodes
 			{:else if problem}0 nodes
-			{:else if selection.evaluation}<b>{selection.evaluation.count.toLocaleString('en')}</b> {noun(selection.evaluation.count, 'node')}
+			{:else if selection.evaluation}{@const { count, audits } = selection.evaluation}{#if count - audits || !audits}<b>{(count - audits).toLocaleString('en')}</b> {noun(count - audits, 'node')}{/if}{#if count - audits && audits} · {/if}{#if audits}<b>{audits.toLocaleString('en')}</b> {noun(audits, 'audit')}{/if}
 			{:else}—{/if}
 		</span>
 		{#if offerCopy}<Button variant="outline" size="bar" disabled={blocked} onclick={copy} title={command}>{#if copied}<CheckIcon />Copied{:else}<CopyIcon />Copy as <code>sqb build -s …</code>{/if}</Button>{/if}

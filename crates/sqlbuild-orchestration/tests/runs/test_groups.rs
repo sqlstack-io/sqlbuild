@@ -17,7 +17,7 @@ use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::helpers::read_recall_events;
-use crate::warehouse_history::main::read_person_run_ignored_audits::read_person_run_ignored_audits;
+use crate::warehouse_history::main::checks::read_person_run_ignored_audits::read_person_run_ignored_audits;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -100,7 +100,7 @@ fn given_a_pinned_group_when_redeployed_and_cancelled_then_children_keep_scope_a
                     .await
                     .expect("retry group")
             );
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -138,6 +138,7 @@ fn given_a_pinned_group_when_redeployed_and_cancelled_then_children_keep_scope_a
                     error_code: None,
                     skipped_because_of: None,
                     error_message: None,
+                    phase: None,
                 },
                 RunChange::Finished {
                     outcome: RunOutcome::Success,
@@ -379,7 +380,7 @@ fn given_opposing_parent_and_child_limits_when_advancing_groups_then_both_groups
                 .await
                 .expect("request group");
             }
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");
@@ -518,7 +519,7 @@ fn given_group_members_with_different_audit_settings_when_run_then_each_keeps_it
             request_job_run(store, (&context, None), &request)
                 .await
                 .expect("request group");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

@@ -78,6 +78,8 @@ pub struct ProgressProjection {
     pub(crate) operation_starts: HashMap<String, ProgressEvent>,
     pub(crate) quiet_operation_ids: HashSet<String>,
     pub(crate) enriched_resource_names: HashSet<String>,
+    /// Resources that never start, such as an audit not run, so they show only their terminal row.
+    pub(crate) unstarted_resource_names: HashSet<String>,
     /// Audit outcomes by attempt, which the audit's own terminal row shows.
     pub(crate) audit_outcomes: HashMap<String, String>,
     pub(crate) resource_names: HashMap<String, String>,
@@ -135,6 +137,33 @@ impl ProgressProjection {
     pub fn expect_resource_enrichment(&mut self, resource_name: &str) {
         self.enriched_resource_names
             .insert(resource_name.to_owned());
+    }
+
+    /// Declare that this resource never starts, so its terminal row is its only row.
+    pub fn expect_no_start(&mut self, resource_name: &str) {
+        self.unstarted_resource_names
+            .insert(resource_name.to_owned());
+    }
+
+    /// Treat every pending terminal of this resource as shown, so no later attempt renders it.
+    pub fn forget_resource_attempts(&mut self, resource_id: &str) {
+        let pending: VecDeque<String> = self
+            .pending_terminal_ids_by_resource
+            .remove(resource_id)
+            .unwrap_or_default();
+        self.rendered_terminal_ids.extend(pending);
+    }
+
+    /// `forget_resource_attempts` for every resource reported under `resource_name`.
+    pub fn forget_resource_named(&mut self, resource_name: &str) {
+        let resource_ids: Vec<String> = self
+            .resource_ids_by_name
+            .get(resource_name)
+            .map(|ids| ids.iter().cloned().collect())
+            .unwrap_or_default();
+        for resource_id in resource_ids {
+            self.forget_resource_attempts(&resource_id);
+        }
     }
 
     /// Record how one audit attempt ended, before its terminal row renders.

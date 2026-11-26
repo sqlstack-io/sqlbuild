@@ -1,7 +1,7 @@
 //! Executor results matched to the canonical terminals of the installed event index.
 
+use crate::result_output::main::events::audit_identity::audit_identity;
 use crate::result_output::main::events::sql_test_identity::sql_test_identity;
-use crate::result_output::main::results::audit_check_id::audit_check_id;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyRef, PyResult, Python};
 use pyo3::types::{PyFloat, PyInt};
 use sqlbuild_core::nested_progress::main::audit_resource_id::audit_resource_id;
@@ -100,7 +100,7 @@ pub(crate) fn resource_identity(result: &Bound<'_, PyAny>) -> PyResult<Option<(S
             (resource.clone(), format!("check:{resource}"))
         }
         ResultKind::SqlTest => (name("test_name")?, sql_test_check_id(result)?),
-        ResultKind::Audit => (name("audit_name")?, audit_check_id(result)?),
+        ResultKind::Audit => (name("audit_name")?, audit_identity(result, "audit_name")?),
         ResultKind::CloneItem | ResultKind::Other => return Ok(None),
     }))
 }

@@ -14,4 +14,5 @@ pub mod is_planning_completion_message;
 pub mod is_planning_failure_message;
 pub mod machine_output_mode;
 pub mod progress_terminal_duration;
+pub mod statement_summary_delta;
 pub mod statement_summary_json;

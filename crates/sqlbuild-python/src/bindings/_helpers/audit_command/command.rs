@@ -15,7 +15,6 @@ use sqlbuild_core::audit_command::models::AuditCounts;
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::{AuditExecutionResult, AuditOutcome};
-use sqlbuild_orchestration::runs::models::NodeOutcome;
 
 use crate::bindings::_helpers::command_runtime::invocation::resolve_reported_command_invocation;
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
@@ -37,7 +36,7 @@ use sqlbuild_python_output::build_progress::main::write_execution_header::write_
 use sqlbuild_python_output::build_progress::models::AuditProgressReporter;
 use sqlbuild_python_output::build_progress::models::ConnectionProgressReporter;
 use sqlbuild_python_output::result_output::main::events::audit_identity::audit_identity;
-use sqlbuild_python_output::result_output::main::results::audit_check_id::audit_check_id;
+use sqlbuild_python_output::result_output::main::results::audit_check::audit_check;
 use sqlbuild_python_output::result_output::main::results::audit_execution_json::audit_execution_json;
 use sqlbuild_python_output::result_output::main::results::audit_projection::audit_projection;
 use sqlbuild_python_output::result_output::main::results::write_execution_json_output::write_execution_json_output;
@@ -74,13 +73,8 @@ struct AuditCallbackRelay {
 impl AuditCallbackRelay {
     fn on_result(&self, py: Python<'_>, result: Bound<'_, PyAny>) -> PyResult<()> {
         if let Some(worker) = &self.worker {
-            let outcome = match AuditExecutionResult::read(&result)?.outcome {
-                AuditOutcome::Pass => NodeOutcome::Success,
-                AuditOutcome::Warn | AuditOutcome::Insufficient => NodeOutcome::Warn,
-                AuditOutcome::Skipped => NodeOutcome::Skipped,
-                AuditOutcome::Error => NodeOutcome::Failed,
-            };
-            worker.finish_attached(py, &audit_check_id(&result)?, outcome)?;
+            let (key, outcome) = audit_check(worker, &result)?;
+            worker.finish_attached(py, &key, outcome)?;
         }
         call_with(
             &self.event_writer.bind(py).getattr("write_build_result")?,
@@ -508,7 +502,7 @@ fn complete(
             AuditOutcome::Warn => counts.warned += 1,
             AuditOutcome::Error => counts.failed += 1,
             AuditOutcome::Insufficient => counts.insufficient += 1,
-            AuditOutcome::Skipped => {}
+            AuditOutcome::Skipped | AuditOutcome::NotRun => {}
         }
     }
     let stream: Bound<'_, PyAny> = native_field(invocation, "progress_stream")?;

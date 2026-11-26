@@ -230,6 +230,7 @@ fn given_standalone_audit_when_projecting_then_row_names_target_and_outcome() {
             resource_id: "audit:not_null:seed:customers:customer_id",
             terminal_event: "resource_attempt_completed",
             recorded_outcomes: vec![("a1", "pass")],
+            unstarted: &[],
             expected_lines: vec![
                 "  audit     not_null (customers.customer_id) START",
                 "  audit     not_null (customers.customer_id) PASS 0.01s",
@@ -240,6 +241,7 @@ fn given_standalone_audit_when_projecting_then_row_names_target_and_outcome() {
             resource_id: "audit:not_null:source:raw_orders:order_id",
             terminal_event: "resource_attempt_completed",
             recorded_outcomes: vec![("a1", "warn")],
+            unstarted: &[],
             expected_lines: vec![
                 "  audit     not_null (raw_orders.order_id) START",
                 "  audit     not_null (raw_orders.order_id) WARN 0.01s",
@@ -250,6 +252,7 @@ fn given_standalone_audit_when_projecting_then_row_names_target_and_outcome() {
             resource_id: "audit:not_null:singular",
             terminal_event: "resource_attempt_failed",
             recorded_outcomes: vec![("a1", "error")],
+            unstarted: &[],
             expected_lines: vec![
                 "  audit     not_null START",
                 "  audit     not_null FAIL 0.01s",
@@ -260,10 +263,19 @@ fn given_standalone_audit_when_projecting_then_row_names_target_and_outcome() {
             resource_id: "audit:not_null:model:orders",
             terminal_event: "resource_attempt_completed",
             recorded_outcomes: vec![("a2", "warn")],
+            unstarted: &[],
             expected_lines: vec![
                 "  audit     not_null (orders) START",
                 "  audit     not_null (orders) PASS 0.01s",
             ],
+        },
+        AuditRowTestCase {
+            description: "an audit that isn't run shows only its NOT RUN row, never a start",
+            resource_id: "audit:not_null:end",
+            terminal_event: "resource_attempt_completed",
+            recorded_outcomes: vec![("a1", "not_run")],
+            unstarted: &["not_null"],
+            expected_lines: vec!["  audit     not_null NOT RUN 0.01s"],
         },
     ];
     for test_case in test_cases {
@@ -407,7 +419,7 @@ fn given_statement_summary_when_formatting_then_line_and_json_report_kinds_and_t
             summary: summary.clone(),
             timing: reported(1540.0, 260.0, 12),
             expected_line: Some(
-                "Statements: 12 (SELECT 7, CREATE 2, DROP 2, ALTER 1); compile 1.5s, execution 0.3s",
+                "Statements: 12 on the warehouse (SELECT 7, CREATE 2, DROP 2, ALTER 1); compile 1.5s, execution 0.3s",
             ),
             expected_json: serde_json::json!({
                 "total": 12,
@@ -426,7 +438,7 @@ fn given_statement_summary_when_formatting_then_line_and_json_report_kinds_and_t
             summary: summary.clone(),
             timing: reported(1000.0, 0.0, 10),
             expected_line: Some(
-                "Statements: 12 (SELECT 7, CREATE 2, DROP 2, ALTER 1); compile 1.0s, execution 0.0s (10 of 12 statements in query history)",
+                "Statements: 12 on the warehouse (SELECT 7, CREATE 2, DROP 2, ALTER 1); compile 1.0s, execution 0.0s (10 of 12 statements in query history)",
             ),
             expected_json: serde_json::json!({
                 "total": 12,
@@ -445,7 +457,7 @@ fn given_statement_summary_when_formatting_then_line_and_json_report_kinds_and_t
             summary: summary.clone(),
             timing: StatementTiming::NotReported("duckdb".to_owned()),
             expected_line: Some(
-                "Statements: 12 (SELECT 7, CREATE 2, DROP 2, ALTER 1); compile time not reported by duckdb",
+                "Statements: 12 on the warehouse (SELECT 7, CREATE 2, DROP 2, ALTER 1); compile time not reported by duckdb",
             ),
             expected_json: serde_json::json!({
                 "total": 12,
@@ -458,7 +470,7 @@ fn given_statement_summary_when_formatting_then_line_and_json_report_kinds_and_t
             summary: summary.clone(),
             timing: StatementTiming::Failed("query history read failed".to_owned()),
             expected_line: Some(
-                "Statements: 12 (SELECT 7, CREATE 2, DROP 2, ALTER 1); compile time unavailable (query history read failed)",
+                "Statements: 12 on the warehouse (SELECT 7, CREATE 2, DROP 2, ALTER 1); compile time unavailable (query history read failed)",
             ),
             expected_json: serde_json::json!({
                 "total": 12,

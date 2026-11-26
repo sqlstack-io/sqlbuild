@@ -2,6 +2,7 @@
 
 use reqwest::StatusCode;
 use serde_json::{Value, json};
+use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
 use uuid::Uuid;
 
 use crate::api::tests::helpers::stop_api;
@@ -248,7 +249,8 @@ fn given_checks_sharing_an_audit_name_when_people_read_them_then_binding_keys_an
                 evidence,
                 json!({"event_id": failed_id, "binding_key": orders_key,
                     "columns": ["amount", "is_late", "order_id"],
-                    "rows": [[1.5, null, "o-1"], [null, true, "o-2"]], "truncated": "false"}),
+                    "rows": [[1.5, null, "o-1"], [null, true, "o-2"]], "truncated": "false",
+                    "execution_error": null}),
                 "sorted keys become columns; missing keys become null cells"
             );
             let read = latest_audit(store).await;
@@ -260,6 +262,29 @@ fn given_checks_sharing_an_audit_name_when_people_read_them_then_binding_keys_an
             assert!(
                 !read.to_string().contains("o-1"),
                 "the audit never holds evidence"
+            );
+            let (_, customer_history) = get(
+                &client,
+                (&api.url, &viewer),
+                &format!("{base_path}/{customers_key}"),
+            )
+            .await;
+            let errored_id = customer_history[0]["event_id"].as_str().expect("event");
+            let (status, errored) = get(
+                &client,
+                (&api.url, &administrator),
+                &format!("{base_path}/{customers_key}/results/{errored_id}/evidence"),
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(
+                errored["execution_error"],
+                json!(redact_error_text(
+                    data["results"][2]["execution_error"]
+                        .as_str()
+                        .expect("error")
+                )),
+                "an audit whose query could not run keeps the warehouse's error, behind view.evidence"
             );
             let (status, mismatched) = get(
                 &client,

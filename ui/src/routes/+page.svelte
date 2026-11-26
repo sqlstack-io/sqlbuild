@@ -18,6 +18,7 @@
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
+	import { errorMessage } from '$lib/platform/labels';
 	import RunTimeline from '$lib/components/timeline/run-timeline.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
@@ -93,6 +94,22 @@
 	let acknowledging = $state<string | null>(null);
 	let acknowledgeError = $state<string | null>(null);
 	/** Acknowledges an item, or undoes that: a run by its ID, a condition as it looks now. */
+	let resuming = $state<string | null>(null);
+	/** Restart a run-history sync that failed reads stopped; the attention item clears once a sync succeeds. */
+	async function resume(key: string) {
+		const scope = app.scope;
+		if (!scope || resuming) return;
+		resuming = key;
+		acknowledgeError = null;
+		try {
+			await app.client.requestWarehouseSync(scope);
+		} catch (error) {
+			acknowledgeError = errorMessage(error);
+		} finally {
+			resuming = null;
+		}
+	}
+
 	async function acknowledge(item: AttentionItem, key: string, acknowledged: boolean) {
 		const scope = app.scope;
 		const condition = conditionFor(item);
@@ -162,7 +179,7 @@
 	const latest = $derived(data?.latestRun ?? null);
 	const latestText = $derived(latest ? `Last run ${runStatusLabel[latest.status].toLowerCase()} ${formatAgo(latest.endedAt, app.now)}` : 'No runs yet');
 	const m = $derived(data?.metrics);
-	const finished = $derived(m ? m.runs24h.success + m.runs24h.warn + m.runs24h.partial + m.runs24h.failed : 0);
+	const finished = $derived(m ? m.runs24h.success + m.runs24h.warn + m.runs24h.failed : 0);
 	const successRate = $derived(m && finished ? Math.round(((m.runs24h.success + m.runs24h.warn) / finished) * 100) : null);
 	// The last 7 days' query cost, for locations whose adapter reports cost and once any run has some.
 	const showCost = $derived(reportsCost(app.location?.target.adapter) && app.client.supports('getCostSummary'));
@@ -277,6 +294,9 @@
 										{/if}
 									</span>
 									<span class="issue-actions">
+										{#if item.kind === 'platform_event' && item.event.sync?.halted}
+											<GatedButton requires="connection.test" size="sm" variant="outline" busy={resuming === view.key} onclick={() => resume(view.key)} hint="Start the run-history sync again now"><span data-testid="attention-resume">Resume</span></GatedButton>
+										{/if}
 										{#if view.build}
 											{@const build = view.build}
 											<GatedButton requires="run.adhoc" size="sm" variant={build.variant} hint={build.tooltip ?? undefined} onclick={() => goto(to(build.href))}
@@ -321,7 +341,7 @@
 					<div class="metric">
 						<span class="metric-label">Runs · 24h</span>
 						<div><strong>{m.runs24h.total}</strong><small>{successRate === null ? 'none finished' : `${successRate}% succeeded`}</small></div>
-						<span class:warning-note={m.runs24h.partial + m.runs24h.failed > 0}>{m.runs24h.partial} partial · {m.runs24h.failed} failed · {m.runs24h.active} active</span>
+						<span class:warning-note={m.runs24h.failed > 0}>{m.runs24h.failed} failed · {m.runs24h.active} active</span>
 					</div>
 					<div class="metric">
 						<span class="metric-label">Checks passing</span>

@@ -46,7 +46,8 @@ _PROJECT_FILES: dict[str, str] = {
             expected_exit_code=0,
             expected_by_kind={"CREATE": 2, "DROP": 2, "WITH": 2},
             expected_line=(
-                "Statements: 6 (CREATE 2, DROP 2, WITH 2); compile time not reported by duckdb"
+                "Statements: 6 on the warehouse (CREATE 2, DROP 2, WITH 2); compile time not reported "
+                "by duckdb"
             ),
         ),
         # A failed comparison also reads its unexpected and missing sample rows (two more WITH).
@@ -56,7 +57,8 @@ _PROJECT_FILES: dict[str, str] = {
             expected_exit_code=1,
             expected_by_kind={"CREATE": 2, "DROP": 2, "WITH": 4},
             expected_line=(
-                "Statements: 8 (WITH 4, CREATE 2, DROP 2); compile time not reported by duckdb"
+                "Statements: 8 on the warehouse (WITH 4, CREATE 2, DROP 2); compile time not reported "
+                "by duckdb"
             ),
         ),
     ),
@@ -74,9 +76,11 @@ def test_given_sql_tests_when_running_then_statement_summary_counts_each_stateme
         tmp_path=tmp_path, project_name="statement_summary", repo_files=files
     )
 
-    text_run: CompletedProcess[str] = run_sqb(command=("--no-color", "test"), project_dir=project)
+    text_run: CompletedProcess[str] = run_sqb(
+        command=("--no-color", "test", "--run-on", "warehouse"), project_dir=project
+    )
     json_run: CompletedProcess[str] = run_sqb(
-        command=("--no-color", "test", "--json"), project_dir=project
+        command=("--no-color", "test", "--run-on", "warehouse", "--json"), project_dir=project
     )
 
     assert text_run.returncode == test_case.expected_exit_code, text_run.stdout + text_run.stderr
@@ -125,8 +129,8 @@ def test_given_scenarios_when_running_with_json_then_statement_summary_matches_p
         for kind, count in sorted(by_kind.items(), key=lambda item: (-item[1], item[0]))
     )
     assert (
-        f"Statements: {statements['total']} ({kinds}); compile time not reported by duckdb"
-        in result.stderr.splitlines()
+        f"Statements: {statements['total']} on the warehouse ({kinds}); compile time not "
+        "reported by duckdb" in result.stderr.splitlines()
     ), result.stderr
 
 

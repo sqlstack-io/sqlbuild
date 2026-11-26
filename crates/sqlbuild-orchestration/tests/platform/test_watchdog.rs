@@ -91,7 +91,7 @@ fn given_two_server_replicas_when_scheduling_is_stalled_then_health_facts_are_du
                 .await
                 .expect("current definition");
             for _ in 0..test_case.leaders {
-                acquire_lease(store, Uuid::now_v7())
+                acquire_lease(store, (Uuid::now_v7(), None))
                     .await
                     .expect("acquire lease")
                     .expect("leader");

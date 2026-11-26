@@ -66,7 +66,7 @@ fn given_requests_stored_before_0_245_when_the_server_reads_them_then_runs_claim
                     "on_failure": {"retries": 1, "retry_delay_seconds": 0}}}),
             );
             publish_snapshot(store, &input).await.expect("publish");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("elect")
                 .expect("leader");

@@ -152,7 +152,7 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
             request_run(store, &seed_run)
                 .await
                 .expect("nonempty metadata control");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let lease = acquire_lease(store, (Uuid::now_v7(), None))
                 .await
                 .expect("election")
                 .expect("leader");

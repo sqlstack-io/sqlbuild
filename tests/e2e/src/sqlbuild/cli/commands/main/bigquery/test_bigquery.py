@@ -17,7 +17,6 @@ from tests.e2e.src.sqlbuild.cli.commands.main.bigquery._test_types import (
     BigQueryIntermediateDagStrategyE2ETestCase,
     BigQueryModelBuildE2ETestCase,
     BigQueryNodeResultE2ETestCase,
-    BigQueryScenarioLocalReplayE2ETestCase,
     BigQueryScenarioRemoteE2ETestCase,
     BigQuerySnapshotApplyE2ETestCase,
     BigQuerySnapshotE2ETestCase,
@@ -50,10 +49,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.load.helpers import (
     build_schema_behavior_project_files,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.scenario.helpers import (
-    assert_optional_local_replay_rows,
-    build_real_warehouse_local_replay_project_files,
     build_real_warehouse_remote_scenario_project_files,
-    maybe_corrupt_scenario_snapshot_dialect,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     assert_dbt_profile_lifecycle,
@@ -341,167 +337,6 @@ def test_given_bigquery_local_config_when_running_query_then_outputs_expected_ro
         fragment: str
         for fragment in test_case.expected_stdout_fragments:
             assert fragment in result.stdout
-    finally:
-        cleanup_bigquery_dataset(dataset_name=dataset_name)
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
-        BigQueryScenarioLocalReplayE2ETestCase(
-            description="captures bigquery fixtures and replays transpilable SQL locally",
-            model_sql=(
-                "MODEL (description 'Test model.', materialized table);\n\n"
-                "SELECT\n"
-                "  customer_id,\n"
-                "  TIMESTAMP_TRUNC(event_ts, DAY) AS event_day,\n"
-                "  SUM(SAFE_CAST(amount_text AS INT64)) AS amount_cents,\n"
-                "  COUNT(*) AS event_count\n"
-                'FROM __source("raw_events")\n'
-                "GROUP BY customer_id, TIMESTAMP_TRUNC(event_ts, DAY)\n"
-            ),
-            scenario_sql=(
-                "SCENARIO (description 'Test scenario.');\n\n"
-                "WITH\n"
-                "__source__raw_events AS (\n"
-                "  SELECT 10 AS customer_id, TIMESTAMP '2026-01-01 08:15:00 UTC' "
-                "AS event_ts, '1500' AS amount_text\n"
-                "  UNION ALL\n"
-                "  SELECT 10 AS customer_id, TIMESTAMP '2026-01-01 10:30:00 UTC' "
-                "AS event_ts, '500' AS amount_text\n"
-                "),\n"
-                "__expected__event_rollup AS (\n"
-                "  SELECT 10 AS customer_id, "
-                "TIMESTAMP_TRUNC(TIMESTAMP '2026-01-01 00:00:00 UTC', DAY) AS event_day, "
-                "2000 AS amount_cents, 2 AS event_count\n"
-                ")\n"
-                "SELECT 1\n"
-            ),
-            expected_stdout_fragments=(
-                "transpilable_event_rollup",
-                "PASS",
-                "PASS=1  FAIL=0  ERROR=0  SKIP=0  TOTAL=1",
-            ),
-            expected_local_rows=((10, 2000, 2),),
-            local_rows_sql=(
-                "SELECT customer_id, amount_cents, event_count "
-                "FROM __sqb_local__model__event_rollup ORDER BY customer_id"
-            ),
-        ),
-        BigQueryScenarioLocalReplayE2ETestCase(
-            description="reports bigquery local transpilation failures as X607",
-            scenario_name="local_transpile_error",
-            model_sql=(
-                "MODEL (description 'Test model.', materialized table);\n\n"
-                "SELECT customer_id, SAFE_CAST(amount_text AS INT64) AS amount_cents\n"
-                'FROM __source("raw_events")\n'
-            ),
-            scenario_sql=(
-                "SCENARIO (description 'Test scenario.');\n\n"
-                "WITH\n"
-                "__source__raw_events AS (\n"
-                "  SELECT 10 AS customer_id, '1500' AS amount_text\n"
-                "),\n"
-                "__expected__event_rollup AS (\n"
-                "  SELECT 10 AS customer_id, '1500' AS amount_text\n"
-                ")\n"
-                "SELECT 1\n"
-            ),
-            expected_stdout_fragments=(
-                "local_transpile_error",
-                "ERROR",
-                "error[X607]",
-                "PASS=0  FAIL=0  ERROR=1  SKIP=0  TOTAL=1",
-            ),
-            expected_return_code=1,
-            corrupt_capture_dialect=True,
-        ),
-        BigQueryScenarioLocalReplayE2ETestCase(
-            description="reports bigquery local DuckDB execution failures as X608",
-            scenario_name="local_execution_error",
-            model_sql=(
-                "MODEL (description 'Test model.', materialized table);\n\n"
-                "SELECT\n"
-                "  customer_id,\n"
-                "  __sqb_missing_local_function(SAFE_CAST(amount_text AS INT64)) AS amount_cents\n"
-                'FROM __source("raw_events")\n'
-            ),
-            scenario_sql=(
-                "SCENARIO (description 'Test scenario.');\n\n"
-                "WITH\n"
-                "__source__raw_events AS (\n"
-                "  SELECT 10 AS customer_id, '1500' AS amount_text\n"
-                "),\n"
-                "__expected__event_rollup AS (\n"
-                "  SELECT 10 AS customer_id, 1500 AS amount_cents\n"
-                ")\n"
-                "SELECT 1\n"
-            ),
-            expected_stdout_fragments=(
-                "local_execution_error",
-                "ERROR",
-                "error[X608]",
-                "PASS=0  FAIL=0  ERROR=1  SKIP=0  TOTAL=1",
-            ),
-            expected_return_code=1,
-        ),
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_bigquery_scenario_capture_when_replaying_locally_then_transpilable_sql_passes(
-    tmp_path: Path,
-    test_case: BigQueryScenarioLocalReplayE2ETestCase,
-) -> None:
-    dataset_name: str = build_unique_dataset_name(prefix="sqlbuild_scenario_local")
-    project_dir: Path = prepare_inline_project(
-        tmp_path=tmp_path,
-        project_name="bigquery_scenario_local_replay",
-        repo_files=build_real_warehouse_local_replay_project_files(
-            project_toml=build_bigquery_project_toml(
-                project_name="bigquery_scenario_local_replay",
-                dataset_name=dataset_name,
-            ),
-            model_sql=test_case.model_sql,
-            scenario_sql=test_case.scenario_sql,
-            scenario_name=test_case.scenario_name,
-        ),
-    )
-    ensure_bigquery_dataset_ready(dataset_name=dataset_name)
-
-    try:
-        capture_result: subprocess.CompletedProcess[str] = run_sqb(
-            command=(
-                "--no-color",
-                "scenario",
-                "capture",
-                test_case.scenario_name,
-            ),
-            project_dir=project_dir,
-        )
-        assert capture_result.returncode == 0, capture_result.stdout + capture_result.stderr
-        maybe_corrupt_scenario_snapshot_dialect(
-            project_dir=project_dir,
-            scenario_name=test_case.scenario_name,
-            enabled=test_case.corrupt_capture_dialect,
-        )
-
-        replay_result: subprocess.CompletedProcess[str] = run_sqb(
-            command=("--no-color", "scenario", "test", test_case.scenario_name, "--local"),
-            project_dir=project_dir,
-        )
-
-        assert replay_result.returncode == test_case.expected_return_code, (
-            replay_result.stdout + replay_result.stderr
-        )
-        fragment: str
-        for fragment in test_case.expected_stdout_fragments:
-            assert fragment in replay_result.stdout
-        assert_optional_local_replay_rows(
-            project_dir=project_dir,
-            scenario_name=test_case.scenario_name,
-            local_rows_sql=test_case.local_rows_sql,
-            expected_local_rows=test_case.expected_local_rows,
-        )
     finally:
         cleanup_bigquery_dataset(dataset_name=dataset_name)
 

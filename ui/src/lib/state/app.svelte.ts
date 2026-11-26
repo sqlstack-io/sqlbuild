@@ -5,6 +5,7 @@ import { MockApiClient } from '$lib/api/mock/mock-client';
 import { bootFailure, type BootFailure } from '$lib/boot-failure';
 import { appPath, to } from '$lib/paths';
 import { withPrefetch } from './prefetch';
+import { health } from './health.svelte';
 import {
 	ApiError,
 	channelMatches,
@@ -53,7 +54,12 @@ class AppState {
 	/** Server-wide actions plus those allowed somewhere in the selected location. */
 	readonly capabilities = $derived([...(this.bootstrap?.capabilities ?? []), ...(this.location?.capabilities ?? [])]);
 
+	/** The bootstrap failed because the server or its control database is unavailable; it is read again on recovery. */
+	bootWaiting = $state(false);
+
 	#started = false;
+	#polling = false;
+	#booting = false;
 	#syncRefused = new Set<string>();
 
 	constructor() {
@@ -68,7 +74,8 @@ class AppState {
 	#signIn() {
 		if (!browser) return;
 		const path = appPath(window.location.pathname);
-		if (path === '/login') return;
+		// Status is public: it shows without a session.
+		if (path === '/login' || path === '/status') return;
 		window.location.assign(to(`/login?next=${encodeURIComponent(path + window.location.search)}`));
 	}
 
@@ -83,6 +90,12 @@ class AppState {
 		if (this.#started) return;
 		this.#started = true;
 		setInterval(() => (this.now = Date.now()), 1000);
+		health.start(this.client);
+		health.onRecovered(() => {
+			if (!this.bootstrap && !this.#booting) void this.#boot();
+			// The change feed backed off while the server couldn't answer; follow it again now.
+			else if (this.bootstrap) this.client.changes.follow(this.scope);
+		});
 		this.client.changes.onConnectionState((state) => (this.connection = state));
 		this.client.changes.subscribe((signal) => {
 			if (channelMatches(signal.channel, ['platform_events'])) void this.#loadPlatformEvents();
@@ -90,22 +103,44 @@ class AppState {
 			if (channelMatches(signal.channel, ['snapshot'])) void this.#loadSnapshot();
 			if (channelMatches(signal.channel, ['runs', 'triggers', 'checks'])) this.#navCounts.request();
 		});
+		await this.#boot();
+	}
+
+	/** Read who the person is and where they may look; while the server can't answer, the shell shows why and waits. */
+	async #boot(): Promise<void> {
+		this.#booting = true;
 		try {
 			this.bootstrap = await this.client.bootstrap();
 		} catch (error) {
+			this.#booting = false;
 			// A rejected session is already on its way to the login page.
 			if (error instanceof ApiError && error.status === 401) return;
+			if (unavailable(error)) {
+				this.bootWaiting = true;
+				void health.refresh();
+				// Health also reboots on recovery; this covers a refusal health never saw.
+				setTimeout(() => {
+					if (!this.bootstrap) void this.#boot();
+				}, health.retrySeconds * 1000);
+				return;
+			}
 			this.bootError = bootFailure(error);
 			return;
 		}
+		this.#booting = false;
+		this.bootWaiting = false;
 		this.#restoreScope();
 		this.client.changes.follow(this.scope);
 		void this.#loadPlatformEvents();
-		// Problems and sync reports come from time passing and location reports, so no change notice announces them.
-		setInterval(() => {
-			void this.#loadPlatformEvents();
-			void this.#loadWarehouseSync();
-		}, POLL_MS);
+		health.readDetails(this.can('user.manage'));
+		if (!this.#polling) {
+			this.#polling = true;
+			// Problems and sync reports come from time passing and location reports, so no change notice announces them.
+			setInterval(() => {
+				void this.#loadPlatformEvents();
+				void this.#loadWarehouseSync();
+			}, POLL_MS);
+		}
 		this.#loadScoped();
 	}
 
@@ -210,3 +245,8 @@ class AppState {
 }
 
 export const app = new AppState();
+
+/** The server answered that it can't serve, or didn't answer at all. */
+function unavailable(error: unknown): boolean {
+	return error instanceof ApiError ? error.status === 503 : true;
+}

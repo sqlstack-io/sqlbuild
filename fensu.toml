@@ -499,7 +499,22 @@ reason = "Native code resolves these through the sqlbuild._native_host name tabl
 
 [[targets.python.dead_code.roots]]
 modules = ["sqlbuild.executor.pipeline._helpers.scenario"]
-symbols = ["run_scenario_capture_pipeline", "run_scenario_local_test_pipeline", "run_scenario_test_pipeline", "select_scenario_snapshot_capture_candidates"]
+symbols = ["decide_scenario_run_on", "run_scenario_capture_pipeline", "run_scenario_local_test_pipeline", "run_scenario_test_pipeline", "select_scenario_snapshot_capture_candidates"]
+reason = "Native code resolves these through the sqlbuild._native_host name table."
+
+[[targets.python.dead_code.roots]]
+modules = ["sqlbuild.executor.local.main._decide_sql_test_run_on"]
+symbols = ["decide_sql_test_run_on"]
+reason = "Native code resolves these through the sqlbuild._native_host name table."
+
+[[targets.python.dead_code.roots]]
+modules = ["sqlbuild.executor.local.main._local_test_adapter"]
+symbols = ["local_test_adapter"]
+reason = "Native code resolves these through the sqlbuild._native_host name table."
+
+[[targets.python.dead_code.roots]]
+modules = ["sqlbuild.executor.local.main._report_unplaced_sql_tests"]
+symbols = ["report_unplaced_sql_tests"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."
 
 [[targets.python.dead_code.roots]]
@@ -1377,12 +1392,20 @@ path = "src/sqlbuild/adapters/sqlserver/classes/sqlserver_adapter.py"
 reason = "The SQL Server adapter intentionally keeps overrideable backend behavior on one class."
 
 [[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-compile/src/analysis/main/register_sql_test_comparisons.rs", "crates/sqlbuild-python-compile/src/rules/main/checking/register_project_tree_queries.rs", "crates/sqlbuild-python-compile/src/rules/main/custom/register_custom_rule_evidence.rs", "crates/sqlbuild-python-front/src/contracts/main/register_effective_config.rs", "crates/sqlbuild-python-front/src/discovery/main/failures/register_guidance.rs", "crates/sqlbuild-python-front/src/model_config/main/config/register_config_values.rs", "crates/sqlbuild-python-front/src/state_rows/main/migrations/register_migration_io.rs", "crates/sqlbuild-python-output/src/cost_telemetry/main/register_snowflake.rs", "crates/sqlbuild-python-planner/src/plan_output/main/register_display.rs", "crates/sqlbuild-python-planner/src/planner_resolution/main/references/register_refs.rs", "crates/sqlbuild-python-project/src/fingerprints/main/register_storage_io.rs"]
+reason = "Each registers its own module's Python functions; only the add-function calls are alike."
+
+[[dupes.allowlist]]
 paths = ["crates/sqlbuild-orchestration/src/declarations/main/published_job.rs", "crates/sqlbuild-orchestration/src/scheduler/main/active_job_run.rs"]
 reason = "Each reads one row by location, target and job key: the published job, decoded with its snapshot named when it no longer decodes, and the run a skip overlap yields to. Only the keyed one-row query shape is alike."
 
 [[dupes.allowlist]]
 paths = ["crates/sqlbuild-orchestration/src/platform/models.rs", "crates/sqlbuild-orchestration/src/runs/models.rs"]
 reason = "PlatformEvent::event_type and RunChange::event_type each name their own enum's stored event types, one arm per variant; only the variant-to-string match shape is alike."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-cli/src/person_login/main/read_past_runs.rs", "crates/sqlbuild-cli/src/person_login/main/read_sensor_events.rs", "crates/sqlbuild-cli/src/person_login/main/request_warehouse_sync.rs"]
+reason = "Each is the public entry for one request a saved `sqb login` session makes: it opens the session and calls its own transport request, which stays private to person_login. Only the open-session-then-call shape is alike; the requests, arguments and results differ."
 
 [[dupes.allowlist]]
 paths = ["scripts/native_layering/_helpers/layering.py", "src/sqlbuild/executor/dynamic_pauses/_helpers/scope.py"]
@@ -1734,8 +1757,8 @@ select = [
 
 [[targets.rust.threshold_overrides]]
 paths = ["crates/sqlbuild-python/Cargo.toml"]
-thresholds = { max_crate_code_lines = 51319 }
-reason = "The Python bindings crate is above the code-line limit; this caps it near its current size until it is split into crates by area. The location and plan bindings of the large-project server work and #1560 grew it to 51,122; moving them out would need new cross-crate imports or a policy exception. The dbt event stream moved to sqlbuild-python-output, and the location sync's dynamic-model resume came in (50,945). The CHI-1589 stop handling and dev error fields plus the CHI-1595/CHI-1593 env-file merge took it to 51,210 when combined. The CHI-1443 project layout's exported path constants and its event_sinks and extra_paths keys took it to 51,305, CHI-1650's older-table read of the two cost price columns to 51,311, and CHI-1666's build refusal of models that can't be planned to 51,319. The cap stays near its current size; lower it as code moves out."
+thresholds = { max_crate_code_lines = 51911 }
+reason = "The Python bindings crate is above the code-line limit; this caps it near its current size until it is split into crates by area. The location and plan bindings of the large-project server work and #1560 grew it to 51,122; moving them out would need new cross-crate imports or a policy exception. The dbt event stream moved to sqlbuild-python-output, and the location sync's dynamic-model resume came in (50,945). The CHI-1589 stop handling and dev error fields plus the CHI-1595/CHI-1593 env-file merge took it to 51,210 when combined. The CHI-1443 project layout's exported path constants and its event_sinks and extra_paths keys took it to 51,305, and CHI-1650's older-table read of the two cost price columns to 51,311. CHI-1666's build refusal of models that can't be planned added 8 lines, and CHI-1663's local test placement (local, warehouse and unplaced batches, run-on rows, census and JSON) took it to 51,911. The cap stays near its current size; lower it as code moves out."
 
 [[targets.rust.threshold_overrides]]
 paths = ["crates/sqlbuild-python/src/bindings/_helpers"]
@@ -2023,6 +2046,12 @@ rule = "FPRSH011"
 path = "crates/sqlbuild-orchestration/src/api/_helpers/resources/plain_http.rs"
 symbols = ["warn_plain_http"]
 reason = "Locations, workers and remote publication share this client; it warns once per process on stderr, before any request, when a bearer token would travel over plain HTTP to a non-loopback host."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSH011"
+path = "crates/sqlbuild-orchestration/src/health/main/log_cause.rs"
+symbols = ["log_cause"]
+reason = "The server log is where operators find a control database failure: the request it failed, the sentence the API returned, and each cause's own message, never a password or stack trace. Requests and the health probe that meet the failure have no caller to return it to beyond the response."
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS130"
@@ -2950,7 +2979,7 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/scenario_command/test_command.rs=13",
     "crates/sqlbuild-python/src/bindings/_helpers/scopes/scope_command.rs=8",
     "crates/sqlbuild-python/src/bindings/_helpers/seed_command/command.rs=14",
-    "crates/sqlbuild-python/src/bindings/_helpers/sql_test_command/test_command.rs=96",
+    "crates/sqlbuild-python/src/bindings/_helpers/sql_test_command/test_command.rs=115",
     "crates/sqlbuild-python/src/bindings/_helpers/workspace_commands/commands.rs=5",
 ]
 
@@ -3208,7 +3237,7 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/scenario_command/snapshot_sync.rs=1",
     "crates/sqlbuild-python/src/bindings/_helpers/scenario_command/test_command.rs=4",
     "crates/sqlbuild-python/src/bindings/_helpers/seed_command/command.rs=5",
-    "crates/sqlbuild-python/src/bindings/_helpers/sql_test_command/test_command.rs=4",
+    "crates/sqlbuild-python/src/bindings/_helpers/sql_test_command/test_command.rs=7",
 ]
 
 [targets.rust.rule_options.XSB075]

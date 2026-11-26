@@ -1,8 +1,8 @@
 //! The completion line, warnings, failures and skipped rollup printed after a build.
 
 use crate::build_progress::_helpers::footer::{
-    FooterCounts, count_results, failure_details, ignored_failure_details, python_failure_details,
-    skipped_rollup, warning_details,
+    FooterCounts, count_results, failure_details, ignored_failure_details, not_run_details,
+    python_failure_details, skipped_rollup, warning_details,
 };
 use crate::build_progress::constants::FAILED;
 use crate::build_progress::models::{BuildResultText, PythonNodeText};
@@ -33,8 +33,13 @@ pub fn format_build_footer(
 ) -> String {
     let counts: FooterCounts = count_results(result, python);
     let insufficient: i64 = result.insufficient_count;
-    let total: i64 =
-        counts.pass + counts.warn + counts.fail + counts.timeout + counts.skip + counts.ignored;
+    let total: i64 = counts.pass
+        + counts.warn
+        + counts.fail
+        + counts.timeout
+        + counts.skip
+        + counts.ignored
+        + counts.not_run;
     let mut summary_counts: Vec<SummaryCount> = vec![
         count("PASS", counts.pass),
         count("WARN", counts.warn),
@@ -49,8 +54,11 @@ pub fn format_build_footer(
     summary_counts.extend([
         count("INSUFFICIENT", insufficient),
         count("SKIP", counts.skip),
-        count("TOTAL", total + insufficient),
     ]);
+    if counts.not_run > 0 {
+        summary_counts.push(count("NOT_RUN", counts.not_run));
+    }
+    summary_counts.extend([count("TOTAL", total + insufficient)]);
     let summary: String =
         format_summary_footer(style, &summary_counts, Some(&format!("{elapsed:.2}s")));
     let python_failed: bool = python.iter().any(|node| node.status == FAILED);
@@ -69,5 +77,6 @@ pub fn format_build_footer(
     lines.extend(failure_details(result, style));
     lines.extend(python_failure_details(python, style));
     lines.extend(skipped_rollup(result, python, style));
+    lines.extend(not_run_details(result, style));
     lines.join("\n")
 }

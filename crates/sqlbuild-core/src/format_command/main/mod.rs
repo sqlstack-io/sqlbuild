@@ -4,6 +4,8 @@ pub mod format_path_selectors;
 pub mod lint_sql_paths;
 pub mod partition_lint_selectors;
 pub mod render_format_status;
+pub mod render_help_lines;
 pub mod render_lint_json;
 pub mod render_lint_text;
+pub mod render_violation_block;
 pub mod resolve_lint_paths;
