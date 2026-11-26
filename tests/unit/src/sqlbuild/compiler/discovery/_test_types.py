@@ -67,6 +67,21 @@ class DiscoverProjectInputsErrorTestCase:
 
 
 @dataclass(frozen=True)
+class SourceConnectionErrorTestCase:
+    description: str
+    repo_files: dict[str, str]
+    expected_error_fragment: str
+    expected_file: str
+
+
+@dataclass(frozen=True)
+class ConnectionRolesTestCase:
+    description: str
+    repo_files: dict[str, str]
+    expected_target_connection: str
+
+
+@dataclass(frozen=True)
 class DiscoverFactoryValidationTestCase:
     description: str
     repo_files: dict[str, str]

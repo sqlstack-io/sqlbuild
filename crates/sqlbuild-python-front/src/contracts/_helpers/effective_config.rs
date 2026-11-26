@@ -6,6 +6,7 @@ use std::hash::{Hash, Hasher};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, PyStringMethods, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyBytes, PyBytesMethods, PyDict, PyDictMethods, PyListMethods, PyString};
+use sqlbuild_config::effective::constants::CONNECTION_KIND_KEY;
 use sqlbuild_config::effective::errors::{EffectiveConfigError, MessagePart};
 use sqlbuild_config::effective::main::default_connection_name::default_connection_name;
 use sqlbuild_config::effective::main::effective_target_name::effective_target_name;
@@ -106,6 +107,31 @@ fn keys<'py>(mapping: &Bound<'py, PyAny>) -> PyResult<Vec<Key<'py>>> {
         .iter()
         .map(|name| key(&name))
         .collect()
+}
+
+/// The names in `connections` whose entry sets no `kind` in either file: the connections a target may default to.
+fn kindless_keys<'py>(
+    connections: &Bound<'py, PyAny>,
+    other: &Bound<'py, PyAny>,
+) -> PyResult<Vec<Key<'py>>> {
+    let other: &Bound<'py, PyDict> = other.downcast::<PyDict>()?;
+    let mut names: Vec<Key<'py>> = Vec::new();
+    for (name, connection) in connections.downcast::<PyDict>()?.iter() {
+        let sets_kind = |entry: &Bound<'py, PyAny>| -> PyResult<bool> {
+            entry.downcast::<PyDict>()?.contains(CONNECTION_KIND_KEY)
+        };
+        let elsewhere: Option<Bound<'py, PyAny>> = other.get_item(&name)?;
+        if !sets_kind(&connection)?
+            && !elsewhere
+                .as_ref()
+                .map(sets_kind)
+                .transpose()?
+                .unwrap_or(false)
+        {
+            names.push(key(&name)?);
+        }
+    }
+    Ok(names)
 }
 
 pub(crate) fn dictionary<'py>(
@@ -228,14 +254,16 @@ pub(crate) fn effective_config_target_fields<'py>(
         local.as_ref(),
     );
     let connection_name: usize = field_position("connection_name");
+    let project_connections: Bound<'py, PyAny> = native_field(&project_config, "connections")?;
+    let local_connections: Bound<'py, PyAny> = native_field(&local_config, "connections")?;
     let choice: ConnectionChoice<Key<'py>> = ConnectionChoice {
         target: name,
         selected: is_set(&merged.fields[connection_name])
             || is_set(&merged.fields[field_position("connection")])
             || native_field(&project_config, "connection")?.is_truthy()?
             || native_field(&local_config, "connection")?.is_truthy()?,
-        project_names: keys(&native_field(&project_config, "connections")?)?,
-        local_names: keys(&native_field(&local_config, "connections")?)?,
+        project_names: kindless_keys(&project_connections, &local_connections)?,
+        local_names: kindless_keys(&local_connections, &project_connections)?,
     };
     match default_connection_name(choice) {
         Ok(Some(only)) => {

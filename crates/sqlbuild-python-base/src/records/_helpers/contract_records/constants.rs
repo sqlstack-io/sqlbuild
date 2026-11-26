@@ -502,6 +502,7 @@ const R_PROJECT_CONFIG: RecordSpec = RecordSpec {
         FieldSpec::new("default_target", FieldDefault::None),
         FieldSpec::new("connection", FieldDefault::EmptyDict),
         FieldSpec::new("connections", FieldDefault::EmptyDict),
+        FieldSpec::new("recall_connections", FieldDefault::EmptyTuple),
         FieldSpec::new(
             "settings",
             FieldDefault::NativeCall(RecordId::SettingsConfig),
@@ -563,6 +564,7 @@ const R_LOCAL_CONFIG: RecordSpec = RecordSpec {
         FieldSpec::new("adapter", FieldDefault::None),
         FieldSpec::new("connection", FieldDefault::EmptyDict),
         FieldSpec::new("connections", FieldDefault::EmptyDict),
+        FieldSpec::new("recall_connections", FieldDefault::EmptyTuple),
         FieldSpec::new("targets", FieldDefault::EmptyDict),
         FieldSpec::new(
             "settings",

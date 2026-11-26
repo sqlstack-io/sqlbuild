@@ -21,6 +21,7 @@ sqlbuild-core.workspace = true
 sqlbuild-cursor.workspace = true
 sqlbuild-discovery.workspace = true
 sqlbuild-host.workspace = true
+sqlbuild-load.workspace = true
 sqlbuild-model-config.workspace = true
 sqlbuild-orchestration.workspace = true
 sqlbuild-pysource.workspace = true
@@ -32,6 +33,7 @@ sqlbuild-sqltext.workspace = true
 sqlbuild-state.workspace = true
 stacker.workspace = true
 tokio.workspace = true
+toml.workspace = true
 uuid.workspace = true
 
 [lints]

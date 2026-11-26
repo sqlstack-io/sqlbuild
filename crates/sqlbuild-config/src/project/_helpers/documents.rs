@@ -21,7 +21,7 @@ use crate::project::_helpers::sections::{
 };
 use crate::project::_helpers::sinks::load_sinks;
 use crate::project::_helpers::targets::{
-    load_connections, load_target_fields, local_target_config, project_target,
+    load_connections, load_target_fields, local_target_config, project_target, recall_connections,
 };
 use crate::project::_helpers::values::is_truthy;
 use crate::project::constants::{
@@ -185,6 +185,10 @@ fn identity(payload: &Entries) -> Loaded<Fields> {
             "connections",
             load_connections(get(payload, "connections"), PROJECT_FILE)?,
         ),
+        (
+            "recall_connections",
+            recall_connections(payload, PROJECT_FILE)?,
+        ),
     ])
 }
 
@@ -313,7 +317,11 @@ fn project_fields(payload: &Entries) -> Loaded<Fields> {
     fields.extend(sections(payload)?);
     fields.push(("targets", targets(payload)?));
     let operations = operations(payload)?;
-    let settings = &fields[5].1;
+    let settings: &Built = fields
+        .iter()
+        .find(|(name, _)| *name == SETTINGS_SECTION)
+        .map(|(_, settings)| settings)
+        .ok_or_else(|| ConfigFailure::at(PROJECT_FILE, "the loaded project has no settings"))?;
     reject_untracked_janitor(&operations[0].1, settings)?;
     fields.extend(operations);
     fields.push((
@@ -392,6 +400,10 @@ fn local_fields(payload: &Entries) -> Loaded<Fields> {
         (
             "connections",
             load_connections(get(payload, "connections"), LOCAL_FILE)?,
+        ),
+        (
+            "recall_connections",
+            recall_connections(payload, LOCAL_FILE)?,
         ),
     ];
     let targets: Vec<(String, Built)> = load_target_fields(get(payload, "targets"), LOCAL_FILE)?

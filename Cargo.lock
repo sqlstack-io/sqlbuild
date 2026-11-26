@@ -6752,6 +6752,7 @@ dependencies = [
  "sqlbuild-cursor",
  "sqlbuild-discovery",
  "sqlbuild-host",
+ "sqlbuild-load",
  "sqlbuild-model-config",
  "sqlbuild-orchestration",
  "sqlbuild-pysource",
@@ -6763,6 +6764,7 @@ dependencies = [
  "sqlbuild-state",
  "stacker",
  "tokio",
+ "toml",
  "uuid",
 ]
 

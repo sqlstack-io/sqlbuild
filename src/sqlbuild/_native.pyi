@@ -12557,6 +12557,7 @@ class ProjectConfig(NativeRecord):
     default_target: str | None
     connection: dict[str, object]
     connections: dict[str, dict[str, object]]
+    recall_connections: tuple[str, ...]
     settings: SettingsConfig
     scopes: ScopesConfig
     references: ReferencesConfig
@@ -12585,6 +12586,7 @@ class ProjectConfig(NativeRecord):
         default_target: str | None = ...,
         connection: dict[str, object] = ...,
         connections: dict[str, dict[str, object]] = ...,
+        recall_connections: tuple[str, ...] = ...,
         settings: SettingsConfig = ...,
         scopes: ScopesConfig = ...,
         references: ReferencesConfig = ...,
@@ -12615,6 +12617,7 @@ class LocalConfig(NativeRecord):
     adapter: str | None
     connection: dict[str, object]
     connections: dict[str, dict[str, object]]
+    recall_connections: tuple[str, ...]
     targets: dict[str, LocalTargetConfig]
     settings: SettingsConfig
     setting_overrides: frozenset[str]
@@ -12627,6 +12630,7 @@ class LocalConfig(NativeRecord):
         adapter: str | None = ...,
         connection: dict[str, object] = ...,
         connections: dict[str, dict[str, object]] = ...,
+        recall_connections: tuple[str, ...] = ...,
         targets: dict[str, LocalTargetConfig] = ...,
         settings: SettingsConfig = ...,
         setting_overrides: frozenset[str] = ...,
