@@ -291,6 +291,7 @@ from sqlbuild.executor.load.main.run import run_load_pipeline as run_load_pipeli
 from sqlbuild.executor.load.models import LoadCallbacks as LoadCallbacks
 from sqlbuild.executor.load.models import LoadExecutionResult as LoadExecutionResult
 from sqlbuild.executor.load.models import LoadRuntimeParams as LoadRuntimeParams
+from sqlbuild.executor.loads.main.plan_loads import plan_loads as plan_loads
 from sqlbuild.executor.old_name_views._helpers.janitor import (
     is_compatibility_view as is_compatibility_view,
 )

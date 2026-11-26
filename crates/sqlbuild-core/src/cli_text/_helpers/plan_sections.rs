@@ -10,9 +10,9 @@ use crate::cli_text::constants::{
     COLUMN_TYPE_CHANGED, CONFIG_CHANGED_REASON, CREATE_DYNAMIC_ACTION, CREATE_VIEW_ACTION,
     CUSTOM_ACTION, DIFF_HEADER_MARKER, EFFECTIVE_BATCH_SIZE_TOKEN, ERROR_ACTION,
     ERROR_SEVERITY_VALUE, FIRST_RUN_REASON, FORWARD_BACKFILL, FULL_BACKFILL, FULL_REFRESH_REASON,
-    INFO_SEVERITY_VALUE, NO_CHANGE_REASON, NORMAL_INCREMENTAL_REASON, QUERY_CHANGED_REASON,
-    REASON_GROUPS, SCHEMA_CHANGED_REASON, SKIP_ACTION, SOURCE_FRESHNESS_UNKNOWN_WARNING_TITLE,
-    STALE_INPUT_WARNING_TITLE, UNBOUNDED_RANGE,
+    INFO_SEVERITY_VALUE, NESTED_ROW_PREFIX, NO_CHANGE_REASON, NORMAL_INCREMENTAL_REASON,
+    QUERY_CHANGED_REASON, REASON_GROUPS, SCHEMA_CHANGED_REASON, SKIP_ACTION,
+    SOURCE_FRESHNESS_UNKNOWN_WARNING_TITLE, STALE_INPUT_WARNING_TITLE, UNBOUNDED_RANGE,
 };
 use crate::cli_text::models::{
     CliStyle, CursorPlanText, DisplayLimit, FunctionPlanText, ModelPlanText, PlanTextReport,
@@ -329,7 +329,11 @@ pub(crate) fn load_lines(report: &PlanTextReport, width: usize) -> Vec<String> {
                 load.sources.join(", ")
             };
             let mut lines: Vec<String> = vec![name_value_line(&load.name, &loads, width, true)];
-            lines.extend(load.lines.iter().map(|line| format!("    {line}")));
+            lines.extend(
+                load.lines
+                    .iter()
+                    .map(|line| format!("{NESTED_ROW_PREFIX}{line}")),
+            );
             lines
         },
     )

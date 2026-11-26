@@ -894,4 +894,9 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
         kind: HostKind::Function,
         edge: HostEdge::Executor,
     },
+    HostEntry {
+        name: "plan_loads",
+        kind: HostKind::Function,
+        edge: HostEdge::Executor,
+    },
 ];

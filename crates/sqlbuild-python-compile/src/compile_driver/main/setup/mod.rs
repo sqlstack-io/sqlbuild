@@ -29,3 +29,4 @@ pub mod register_targets;
 pub mod run_compile_only_pipeline;
 pub mod selected_target_settings;
 pub mod timing_tracker;
+pub mod with_planned_loads;

@@ -170,6 +170,7 @@ pub enum ExecutionResourceKind {
     Table,
     Custom,
     Snapshot,
+    Load,
 }
 
 impl ResultEnum for ExecutionResourceKind {
@@ -183,6 +184,7 @@ impl ResultEnum for ExecutionResourceKind {
         Self::Table,
         Self::Custom,
         Self::Snapshot,
+        Self::Load,
     ];
 
     fn value(self) -> &'static str {
@@ -196,6 +198,7 @@ impl ResultEnum for ExecutionResourceKind {
             Self::Table => "table",
             Self::Custom => "custom",
             Self::Snapshot => "snapshot",
+            Self::Load => "load",
         }
     }
 }

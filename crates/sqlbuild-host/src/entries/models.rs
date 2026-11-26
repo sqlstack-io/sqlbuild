@@ -387,6 +387,7 @@ pub enum ExecutorHost {
     DropReviewSchema,
     LeftoverReviewSchemas,
     ResumeExpiredDynamicHolds,
+    PlanLoads,
 }
 
 impl ExecutorHost {

@@ -1,4 +1,5 @@
 pub mod discovered_loads;
+pub mod planned_load_projects;
 pub mod reject_invalid_connection_configuration;
 pub mod reject_invalid_loads;
 pub mod reject_invalid_project_configuration;

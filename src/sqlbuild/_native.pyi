@@ -4063,7 +4063,15 @@ def run_sqlload_project(
     *,
     project: str,
     sessions: dict[str, dict[str, object]],
-    select: list[str],
+    tables: tuple[list[str], list[str]],
+    reload: bool = False,
+) -> str: ...
+def plan_sqlload_project(
+    *,
+    project: str,
+    sessions: dict[str, dict[str, object]],
+    tables: tuple[list[str], list[str]],
+    reload: bool = False,
 ) -> str: ...
 def resolve_adapter(*, adapter_name: str, project_dir: Path | None = None) -> BaseAdapter: ...
 

@@ -94,7 +94,9 @@ pub(crate) fn build_planner_scope<'py>(
         for source in sources(&project)?.try_iter()? {
             let source = source?;
             let entry: Bound<'py, PyAny> = source_entry(&source)?;
-            if !native_field(&entry, "loader")?.is_none() || !native_field(&entry, "load")?.is_none() {
+            if !native_field(&entry, "loader")?.is_none()
+                || !native_field(&entry, "load")?.is_none()
+            {
                 managed.insert(
                     crate::resource_views::main::source_reads::name::name(&source)?.extract()?,
                 );

@@ -35,3 +35,12 @@ pub struct LoadProblem {
     /// The keys from the `load:` mapping down to the setting, when the message names one.
     pub path: Vec<String>,
 }
+
+/// Where a load runs into: SQLBuild's target, the session it writes through, and its `loader_schema`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LoadTarget {
+    pub name: String,
+    pub session: String,
+    /// The target's `loader_schema`; without one SQLLoad writes to the load's `destination_schema`.
+    pub loader_schema: Option<String>,
+}

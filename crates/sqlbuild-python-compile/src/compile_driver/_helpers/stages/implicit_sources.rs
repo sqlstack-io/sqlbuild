@@ -7,6 +7,7 @@ use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
 use sqlbuild_python_base::compile_context::main::delta::injection::injection;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_rules::lint_text::main::dependency_sites::dependency_sites;
@@ -24,6 +25,8 @@ const SQL_FILE_FIELDS: [&str; 7] = [
 ];
 /// How a source reference's relation identity starts.
 const SOURCE_RELATION_PREFIX: &str = "source:";
+/// The load setting naming the schema its tables land in.
+const DESTINATION_SCHEMA_KEY: &str = "destination_schema";
 /// Between a load's name and the table it loads in a source's name.
 const LOAD_SEPARATOR: &str = "__";
 
@@ -63,6 +66,8 @@ pub(crate) fn with_implicit_load_sources(
             rebuilt.push(file);
             continue;
         }
+        let schema: Bound<'_, PyAny> =
+            mapping_get(&native_field(&load, "settings")?, DESTINATION_SCHEMA_KEY)?;
         let load: String = native_field(&load, "name")?.extract()?;
         let added: Vec<&String> = referenced
             .iter()
@@ -76,7 +81,7 @@ pub(crate) fn with_implicit_load_sources(
             .try_iter()?
             .collect::<PyResult<_>>()?;
         for name in added {
-            entries.push(implicit_entry(py, name, &load)?);
+            entries.push(implicit_entry(py, name, (&load, &schema))?);
         }
         rebuilt.push(replaced(
             &file,
@@ -139,14 +144,19 @@ fn filling_load<'a>(name: &str, loads: &'a [String]) -> Option<&'a String> {
         .max_by_key(|load| load.len())
 }
 
-/// The source entry of `name`, which the load `load` fills and nothing lists.
-fn implicit_entry<'py>(py: Python<'py>, name: &str, load: &str) -> PyResult<Bound<'py, PyAny>> {
+/// The source entry of `name`, which the load `load` fills into `schema` and nothing lists.
+fn implicit_entry<'py>(
+    py: Python<'py>,
+    name: &str,
+    (load, schema): (&str, &Bound<'py, PyAny>),
+) -> PyResult<Bound<'py, PyAny>> {
     new_record_with(
         py,
         RecordId::SourceEntry,
         &[
             ("name", PyString::new(py, name).into_any()),
             ("load", PyString::new(py, load).into_any()),
+            ("schema", schema.clone()),
             (
                 "description",
                 PyString::new(py, &format!("Loaded by load '{load}'.")).into_any(),

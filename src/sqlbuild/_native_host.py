@@ -459,6 +459,7 @@ _TARGETS: dict[str, tuple[str, str]] = {
         "run_audit_pipeline_with_callbacks",
     ),
     "run_build_pipeline": ("sqlbuild.executor.pipeline.main.run", "run_build_pipeline"),
+    "plan_loads": ("sqlbuild.executor.loads.main.plan_loads", "plan_loads"),
     "run_scenario_capture_pipeline": (
         "sqlbuild.executor.pipeline.main.run",
         "run_scenario_capture_pipeline",

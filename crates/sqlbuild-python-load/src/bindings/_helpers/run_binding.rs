@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use pyo3::exceptions::{PyKeyError, PyRuntimeError};
-use pyo3::prelude::{Bound, Py, PyAny, PyResult, Python, pyfunction};
+use pyo3::prelude::{Bound, Py, PyAny, PyResult, pyfunction};
 use pyo3::types::{PyAnyMethods, PyDict, PyDictMethods};
 use serde_json::{Value, json};
 use sqlload::adapters::session::models::SessionConnection;
@@ -11,18 +11,50 @@ use sqlload::loader::models::PlanOptions;
 
 use crate::bindings::constants::{ADAPTER, DATABASE, DESCRIPTION, OPENER};
 use crate::runs::main::run_project::run_project;
-use crate::runs::models::LoadedTable;
+use crate::runs::models::ProjectRun;
 use crate::sessions::main::session_connection::session_connection;
 
-/// Load `project` (SQLLoad TOML), its targets writing through `sessions`, each `{adapter, database, opener, description}`; each table's outcome as JSON.
+/// Load `project` (SQLLoad TOML) through `sessions`; `{tables, planned, missing}` JSON, nothing loaded when `require` misses.
 #[pyfunction]
-#[pyo3(signature = (*, project, sessions, select))]
+#[pyo3(signature = (*, project, sessions, tables, reload = false))]
 pub(crate) fn run_sqlload_project(
-    py: Python<'_>,
     project: &str,
     sessions: &Bound<'_, PyDict>,
-    select: Vec<String>,
+    tables: (Vec<String>, Vec<String>),
+    reload: bool,
 ) -> PyResult<String> {
+    let (select, require): (Vec<String>, Vec<String>) = tables;
+    let connections: BTreeMap<String, SessionConnection> = session_connections(sessions)?;
+    let options = PlanOptions {
+        select,
+        reload,
+        ..PlanOptions::default()
+    };
+    let project: String = project.to_owned();
+    let run: ProjectRun = sessions
+        .py()
+        .detach(move || run_project(&project, connections, (options, require)))
+        .map_err(PyRuntimeError::new_err)?;
+    let rows: Vec<Value> = run
+        .tables
+        .into_iter()
+        .map(|table| {
+            json!({
+                "table": table.table,
+                "rows": table.loaded.as_ref().ok(),
+                "error": table.loaded.as_ref().err(),
+                "changes": table.changes,
+                "retryable": table.retryable,
+            })
+        })
+        .collect();
+    Ok(json!({"tables": rows, "planned": run.planned, "missing": run.missing}).to_string())
+}
+
+/// Each of `sessions`, `{adapter, database, opener, description}` by name, as SQLLoad's session connection.
+pub(crate) fn session_connections(
+    sessions: &Bound<'_, PyDict>,
+) -> PyResult<BTreeMap<String, SessionConnection>> {
     let mut connections: BTreeMap<String, SessionConnection> = BTreeMap::new();
     for (name, session) in sessions.iter() {
         let session: &Bound<'_, PyDict> = session.downcast()?;
@@ -35,27 +67,7 @@ pub(crate) fn run_sqlload_project(
         .map_err(PyRuntimeError::new_err)?;
         connections.insert(name.extract()?, connection);
     }
-    let options = PlanOptions {
-        select,
-        ..PlanOptions::default()
-    };
-    let project: String = project.to_owned();
-    let tables: Vec<LoadedTable> = py
-        .detach(move || run_project(&project, connections, options))
-        .map_err(PyRuntimeError::new_err)?;
-    let rows: Vec<Value> = tables
-        .into_iter()
-        .map(|table| {
-            json!({
-                "table": table.table,
-                "rows": table.loaded.as_ref().ok(),
-                "error": table.loaded.as_ref().err(),
-                "changes": table.changes,
-                "retryable": table.retryable,
-            })
-        })
-        .collect();
-    Ok(Value::Array(rows).to_string())
+    Ok(connections)
 }
 
 fn required<'py>(session: &Bound<'py, PyDict>, key: &str) -> PyResult<Bound<'py, PyAny>> {

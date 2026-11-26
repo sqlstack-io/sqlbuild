@@ -105,6 +105,7 @@ pub(crate) fn check_selected_source_tables_exist<'py>(
     let readers = selected_source_readers(scope)?;
     let read_map = native_field(relations, "source_read_map")?;
     let listed = native_field(relations, "listed_source_names")?;
+    let loads_sources: bool = native_field(scope, "load_sources")?.is_truthy()?;
     let mut unlisted: Vec<(Bound<'py, PyAny>, Bound<'py, PyAny>, Vec<String>)> = Vec::new();
     for source in sqlbuild_python_project::compiled_views::main::project::sources::sources(project)?
         .try_iter()?
@@ -119,6 +120,9 @@ pub(crate) fn check_selected_source_tables_exist<'py>(
         let declared = source_entry(&source)?;
         let entry = mapping_get_or(&read_map, &name, &declared)?;
         if !external_table(&declared)? || !external_table(&entry)? {
+            continue;
+        }
+        if loads_sources && !native_field(&declared, "load")?.is_none() {
             continue;
         }
         if listed.contains(&name)? {

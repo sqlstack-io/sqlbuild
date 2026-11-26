@@ -1,6 +1,7 @@
 //! `sqb plan`: compile the plan pipeline and print the plan as text or JSON.
 
 use crate::bindings::_helpers::command_runtime::audit_failures::resolve_ignore_audit_failures;
+use sqlbuild_python_compile::compile_driver::main::setup::with_planned_loads::with_planned_loads;
 use sqlbuild_python_front::discovery::models::SecretPolicy;
 use sqlbuild_python_planner::planner_phases::constants::{BUILD_HISTORY, DISCOVERING, WRITING};
 use sqlbuild_python_planner::planner_phases::main::timing::timed::timed;
@@ -585,9 +586,20 @@ fn plan<'py>(
         write_progress(&invocation.stream, "\n")?;
     }
     let verbose: bool = native_field(request, "verbose")?.is_truthy()?;
-    let pipeline: Bound<'py, PyAny> = with_verbose_inspection(py, verbose, || {
+    let mut pipeline: Bound<'py, PyAny> = with_verbose_inspection(py, verbose, || {
         compile_pipeline(request, &invocation, project)
     })?;
+    if invocation.preview.is_none() && state.is_none() {
+        let context: &Bound<'py, PyAny> = &invocation.context;
+        pipeline = with_planned_loads(
+            &invocation.discovered,
+            &pipeline,
+            (
+                &native_field(context, "adapter")?,
+                &native_field(context, "connection_config")?,
+            ),
+        )?;
+    }
     let changed: Option<ChangedDecision> = changed_preview(request, &invocation, &pipeline)?;
     let output: Option<String> = timed(WRITING, || {
         write_output(

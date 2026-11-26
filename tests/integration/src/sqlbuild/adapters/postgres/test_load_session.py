@@ -77,10 +77,10 @@ def test_given_csv_files_when_loading_through_a_postgres_load_session_then_rows_
     errors: list[str | None] = []
     for file_name, text in test_case.files:
         (landing / file_name).write_text(text)
-        tables: list[dict[str, Any]] = json.loads(
-            run_sqlload_project(project=project, sessions={"warehouse": session}, select=[])
+        report: dict[str, Any] = json.loads(
+            run_sqlload_project(project=project, sessions={"warehouse": session}, tables=([], []))
         )
-        errors.extend(table["error"] for table in tables)
+        errors.extend(table["error"] for table in report["tables"])
     result: QueryResult = adapter.query(
         connection=connection,
         sql=f"SELECT id, name FROM {postgres_schema}.orders ORDER BY id",

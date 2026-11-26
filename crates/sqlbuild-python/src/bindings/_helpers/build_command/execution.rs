@@ -10,6 +10,7 @@ use sqlbuild_core::build_command::models::{RunContextFacts, SelectorFileFact};
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::{BuildExecutionResult, BuildStatus, ExecutionStatus};
+use sqlbuild_python_front::compile_driver::main::planned_load_projects::planned_load_projects;
 
 use crate::bindings::_helpers::build_command::invocation::BuildContext;
 use crate::bindings::_helpers::build_command::lifecycle::DirectPythonLifecycle;
@@ -375,6 +376,20 @@ pub(crate) fn execute_build_plan<'py>(
                 ),
                 ("loader_is_reload", request("reload_sources")?),
                 ("target_config", target_config.record(py)?),
+                (
+                    "load_projects",
+                    planned_load_projects(
+                        &discovered,
+                        (&project, &plan),
+                        (
+                            &native_field(&project, "effective_target_name")?
+                                .extract::<Option<String>>()?
+                                .unwrap_or_default(),
+                            target_config.loader_schema(),
+                        ),
+                    )?
+                    .into_any(),
+                ),
                 ("default_database", default_database),
                 ("default_schema", default_schema),
                 ("start_cursor_ts", start_ts.clone()),

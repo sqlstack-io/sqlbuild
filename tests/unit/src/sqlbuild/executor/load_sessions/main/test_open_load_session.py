@@ -98,5 +98,5 @@ def test_given_an_adapter_sqlload_cant_load_into_when_running_then_the_error_nam
                     "description": "",
                 }
             },
-            select=[],
+            tables=([], []),
         )

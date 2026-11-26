@@ -35,3 +35,5 @@ pub(crate) const LOAD_OWNED_KEYS: [(&str, &str); 9] = [
         "set it in the load, with SQLLoad's keys, under `load` or `load.tables`",
     ),
 ];
+/// The load setting naming the schema its tables land in, which the sources it fills read.
+pub(crate) const DESTINATION_SCHEMA_KEY: &str = "destination_schema";

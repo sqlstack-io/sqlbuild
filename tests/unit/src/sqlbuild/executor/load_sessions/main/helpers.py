@@ -17,7 +17,7 @@ def load_errors(*, project: str, adapter: BaseAdapter, base_connection: Any) -> 
             adapter=adapter, connection_config={}, base_connection=base_connection
         )
 
-    tables: list[dict[str, Any]] = json.loads(
+    report: dict[str, Any] = json.loads(
         run_sqlload_project(
             project=project,
             sessions={
@@ -28,7 +28,7 @@ def load_errors(*, project: str, adapter: BaseAdapter, base_connection: Any) -> 
                     "description": "a DuckDB file",
                 }
             },
-            select=[],
+            tables=([], []),
         )
     )
-    return [table["error"] for table in tables]
+    return [table["error"] for table in report["tables"]]

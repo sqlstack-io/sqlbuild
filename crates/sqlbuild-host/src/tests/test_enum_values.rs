@@ -65,7 +65,7 @@ fn given_result_enums_when_read_by_value_then_they_match_the_python_members() {
             parsed: parsed::<ExecutionResourceKind>(),
             expected_values: vec![
                 "source", "loader", "seed", "udf", "table_fn", "view", "table", "custom",
-                "snapshot",
+                "snapshot", "load",
             ],
         },
         EnumValueTestCase {

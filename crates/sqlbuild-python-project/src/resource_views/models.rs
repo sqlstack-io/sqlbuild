@@ -562,7 +562,8 @@ impl NativeSourceInput {
             let attached: &AttachedSource = &source.attached;
             Ok(SourceAssemblyRow {
                 name: attached.name.clone(),
-                managed: !native_field(attached.host.entry.bind(py), "loader")?.is_none(),
+                managed: !native_field(attached.host.entry.bind(py), "loader")?.is_none()
+                    || !native_field(attached.host.entry.bind(py), LOAD_FIELD)?.is_none(),
                 database: attached.database.clone(),
                 schema: attached.schema.clone(),
             })

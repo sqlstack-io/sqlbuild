@@ -13,6 +13,7 @@ from sqlbuild._native import (
     CompiledRelationLocation,
     DiscoveredLoaderFunction,
     FunctionPlanEntry,
+    LoadPlanEntry,
     ModelPlanEntry,
     SeedPlanEntry,
     SnapshotsConfig,
@@ -85,6 +86,7 @@ class BuildRuntimeParams:
     default_database: str | None = None
     default_schema: str | None = None
     effective_vars: dict[str, object] | None = None
+    load_projects: dict[str, tuple[str, str]] = field(default_factory=dict)
     use_color: bool = False
     providers: ProviderContainer | None = None
     microbatch_concurrency: bool = False
@@ -204,6 +206,7 @@ class BuildIndexes:
     source_load_entries_by_key: dict[CompiledObjectKey, SourceLoadPlanEntry] = field(
         default_factory=dict
     )
+    load_entries_by_key: dict[CompiledObjectKey, LoadPlanEntry] = field(default_factory=dict)
     test_entries_by_key: dict[CompiledObjectKey, SqlTestPlanEntry] = field(default_factory=dict)
     source_audits_by_source: dict[str, tuple[AuditPlanEntry, ...]] = field(default_factory=dict)
     seed_audits_by_seed: dict[str, tuple[AuditPlanEntry, ...]] = field(default_factory=dict)
