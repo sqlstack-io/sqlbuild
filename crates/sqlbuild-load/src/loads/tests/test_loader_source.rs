@@ -26,6 +26,8 @@ fn given_a_loader_when_declaring_its_python_source_then_it_carries_its_table_opt
             settings: toml::from_str(test_case.settings).expect("settings"),
             columns: vec![("id".to_owned(), "INTEGER".to_owned())],
             table: "orders".to_owned(),
+            on_schema_change: None,
+            fills_source: true,
         };
 
         let source = loader_source(&loader).map(|source| source.to_string());

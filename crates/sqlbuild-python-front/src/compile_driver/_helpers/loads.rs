@@ -74,6 +74,7 @@ pub(crate) fn declaration(
         sources.push(FilledSource {
             name: native_field(&entry, "name")?.extract()?,
             columns,
+            on_schema_change: native_field(&entry, "on_schema_change")?.extract()?,
         });
     }
     Ok(LoadDeclaration {

@@ -57,6 +57,7 @@ def run_load(
             error=table["error"],
             changes=tuple(table["changes"]),
             retryable=table["retryable"],
+            warnings=tuple(table["warnings"]),
         )
         for table in report["tables"]
     )

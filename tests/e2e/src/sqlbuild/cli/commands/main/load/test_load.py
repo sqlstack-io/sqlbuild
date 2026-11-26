@@ -33,6 +33,18 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
 )
 from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
+_SECOND_RUN_LOADER: str = (
+    "from pathlib import Path\n\n"
+    "from sqlbuild.loaders import loader\n\n\n"
+    "@loader({options})\n"
+    "def {name}(ctx):\n"
+    "    '''Test loader {name}.'''\n"
+    "    seen = Path(__file__).with_name('seen')\n"
+    "    again = seen.exists()\n"
+    "    seen.touch()\n"
+    "    return [{second} if again else {first}]\n"
+)
+
 
 @pytest.mark.parametrize(
     "test_case",
@@ -1750,46 +1762,79 @@ def test_given_loader_dependency_failure_when_loading_json_then_reports_skipped_
     "test_case",
     [
         SourceLoaderErrorE2ETestCase(
-            description="contract rejects extra returned columns",
+            description="on_schema_change fail refuses a column the data adds",
             command=("--no-color", "load"),
-            expected_error_fragment="contract has extra columns: extra_note",
+            expected_error_fragment=(
+                'new field extra_note is not in the table and on_schema_change = "fail"'
+            ),
             repo_files=build_schema_behavior_project_files(
                 source_yaml=(
                     "sources:\n"
                     "  - name: raw_contract_events\n    description: Test source "
                     "raw_contract_events.\n"
                     "    managed: true\n"
-                    "    contract: enforced\n"
+                    "    on_schema_change: fail\n"
                     "    columns:\n"
                     "      - name: event_id\n"
-                    "        type: INTEGER\n"
+                    "        type: BIGINT\n"
                 ),
                 node_files={
-                    "python/nodes/loaders/source_rows/loader.py": (
-                        "from sqlbuild.loaders import loader\n\n"
-                        "@loader(write_strategy='replace')\n"
-                        "def raw_contract_events(ctx):\n"
-                        "    '''Test loader raw_contract_events.'''\n    return "
-                        "[{'event_id': 1, 'extra_note': 'not declared'}]\n"
+                    "python/nodes/loaders/source_rows/loader.py": _SECOND_RUN_LOADER.format(
+                        options="write_strategy='append'",
+                        name="raw_contract_events",
+                        first="{'event_id': 1}",
+                        second="{'event_id': 2, 'extra_note': 'not declared'}",
                     ),
                     "python/nodes/loaders/source_rows/__init__.py": "from .loader import raw_contract_events\n",
                 },
             ),
         ),
         SourceLoaderErrorE2ETestCase(
-            description="contract rejects missing declared columns",
+            description="on_schema_change fail refuses a declared column the data lacks",
             command=("--no-color", "load"),
-            expected_error_fragment="contract missing columns: event_name",
+            expected_error_fragment=(
+                'declared column event_name is in none of the rows and on_schema_change = "fail"'
+            ),
             repo_files=build_schema_behavior_project_files(
                 source_yaml=(
                     "sources:\n"
                     "  - name: raw_contract_events\n    description: Test source "
                     "raw_contract_events.\n"
                     "    managed: true\n"
-                    "    contract: enforced\n"
+                    "    on_schema_change: fail\n"
                     "    columns:\n"
                     "      - name: event_id\n"
-                    "        type: INTEGER\n"
+                    "        type: BIGINT\n"
+                    "      - name: event_name\n"
+                    "        type: VARCHAR\n"
+                ),
+                node_files={
+                    "python/nodes/loaders/source_rows/loader.py": (
+                        "from sqlbuild.loaders import loader\n\n"
+                        "@loader(write_strategy='replace')\n"
+                        "def raw_contract_events(ctx):\n"
+                        "    '''Test loader raw_contract_events.'''\n    return [{'event_id': 1}]\n"
+                    ),
+                    "python/nodes/loaders/source_rows/__init__.py": "from .loader import raw_contract_events\n",
+                },
+            ),
+        ),
+        SourceLoaderErrorE2ETestCase(
+            description="a declared column the data lacks loads as NULL with a warning",
+            command=("--no-color", "load"),
+            expected_error_fragment=(
+                "declared column event_name is in none of the rows, so it loaded as NULL"
+            ),
+            expected_return_code=0,
+            repo_files=build_schema_behavior_project_files(
+                source_yaml=(
+                    "sources:\n"
+                    "  - name: raw_contract_events\n    description: Test source "
+                    "raw_contract_events.\n"
+                    "    managed: true\n"
+                    "    columns:\n"
+                    "      - name: event_id\n"
+                    "        type: BIGINT\n"
                     "      - name: event_name\n"
                     "        type: VARCHAR\n"
                 ),
@@ -1807,7 +1852,7 @@ def test_given_loader_dependency_failure_when_loading_json_then_reports_skipped_
         SourceLoaderErrorE2ETestCase(
             description="existing target rejects returned type changes",
             command=("--no-color", "load"),
-            expected_error_fragment="column 'amount' changed type",
+            expected_error_fragment="amount is int in the table but text in the source",
             repo_files=build_schema_behavior_project_files(
                 source_yaml=(
                     "sources:\n"
@@ -1815,44 +1860,39 @@ def test_given_loader_dependency_failure_when_loading_json_then_reports_skipped_
                     "    managed: true\n"
                     "    columns:\n"
                     "      - name: event_id\n"
-                    "        type: INTEGER\n"
-                    "      - name: load_seq\n"
-                    "        type: INTEGER\n"
+                    "        type: BIGINT\n"
                 ),
                 node_files={
-                    "python/nodes/loaders/source_rows/loader.py": (
-                        "from sqlbuild.loaders import loader\n\n"
-                        "@loader(write_strategy='append', cursor_column='load_seq')\n"
-                        "def raw_events(ctx):\n"
-                        "    '''Test loader raw_events.'''\n    if "
-                        "ctx.cursor_value is None:\n"
-                        "        return [{'event_id': 1, 'load_seq': 1, 'amount': 100}]\n"
-                        "    return [{'event_id': 2, 'load_seq': 2, 'amount': 'one hundred'}]\n"
+                    "python/nodes/loaders/source_rows/loader.py": _SECOND_RUN_LOADER.format(
+                        options="write_strategy='append'",
+                        name="raw_events",
+                        first="{'event_id': 1, 'amount': 100}",
+                        second="{'event_id': 2, 'amount': 'one hundred'}",
                     ),
                     "python/nodes/loaders/source_rows/__init__.py": "from .loader import raw_events\n",
                 },
             ),
         ),
         SourceLoaderErrorE2ETestCase(
-            description="intermediate contract rejects extra returned columns",
+            description="an intermediate loader's on_schema_change fail refuses a column the data adds",
             command=("--no-color", "load", "--select", "+raw_events"),
-            expected_error_fragment="contract has extra columns: extra_note",
+            expected_error_fragment=(
+                'new field extra_note is not in the table and on_schema_change = "fail"'
+            ),
             repo_files=build_schema_behavior_project_files(
                 source_yaml=(
                     "sources:\n  - name: raw_events\n    description: Test source "
                     "raw_events.\n    managed: true\n"
                 ),
                 node_files={
-                    "python/nodes/loaders/source_rows/fetch_events/loader.py": (
-                        "from sqlbuild.loaders import loader\n"
-                        "\n"
-                        "\n"
-                        "@loader(write_strategy='replace', contract='enforced', columns=[\n"
-                        "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                        "])\n"
-                        "def fetch_events(ctx):\n"
-                        "    '''Test loader fetch_events.'''\n"
-                        "    return [{'event_id': 1, 'extra_note': 'not declared'}]\n"
+                    "python/nodes/loaders/source_rows/fetch_events/loader.py": _SECOND_RUN_LOADER.format(
+                        options=(
+                            "write_strategy='append', on_schema_change='fail', "
+                            "columns=[{'name': 'event_id', 'type': 'BIGINT'}]"
+                        ),
+                        name="fetch_events",
+                        first="{'event_id': 1}",
+                        second="{'event_id': 2, 'extra_note': 'not declared'}",
                     ),
                     "python/nodes/loaders/source_rows/raw_events/loader.py": (
                         "from sqlbuild.loaders import loader\n"

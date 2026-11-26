@@ -10,6 +10,8 @@ pub(crate) const TABLES: &str = "tables";
 pub(crate) const INCLUDE: &str = "include";
 /// A table's pinned column types.
 pub(crate) const COLUMNS: &str = "columns";
+/// How a table's loads meet new and missing columns.
+pub(crate) const ON_SCHEMA_CHANGE: &str = "on_schema_change";
 /// A source's destination table name template.
 pub(crate) const TABLE_NAME: &str = "table_name";
 /// A table's own destination name.

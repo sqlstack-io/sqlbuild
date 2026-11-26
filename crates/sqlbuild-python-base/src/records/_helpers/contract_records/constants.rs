@@ -741,6 +741,7 @@ const R_SOURCE_ENTRY: RecordSpec = RecordSpec {
         FieldSpec::new("description", FieldDefault::None),
         FieldSpec::new("type_enforcement", FieldDefault::None),
         FieldSpec::new("contract", FieldDefault::None),
+        FieldSpec::new("on_schema_change", FieldDefault::None),
         FieldSpec::new("meta", FieldDefault::EmptyDict),
         FieldSpec::new("columns", FieldDefault::EmptyTuple),
         FieldSpec::new("audits", FieldDefault::EmptyTuple),

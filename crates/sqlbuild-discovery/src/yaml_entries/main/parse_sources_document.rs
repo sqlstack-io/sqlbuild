@@ -4,9 +4,8 @@ use sqlbuild_model_config::errors::ConfigError;
 use sqlbuild_model_config::types::{AuthoredNode, NodeKind};
 
 use crate::yaml_entries::_helpers::fields::{Site, get, reject_unknown_keys};
-use crate::yaml_entries::_helpers::loads::{filling_load, sources_load};
+use crate::yaml_entries::_helpers::loads::{document_source, sources_load};
 use crate::yaml_entries::_helpers::removed_integrations::reject_dlt_sources;
-use crate::yaml_entries::_helpers::sources::source_entry;
 use crate::yaml_entries::constants::{DESTINATION_SCHEMA_KEY, SOURCE_FILE_KEYS};
 use crate::yaml_entries::models::{ParsedLoad, ParsedSourceEntry, ParsedSourcesDocument};
 
@@ -51,16 +50,11 @@ pub fn parse_sources_document<N: AuthoredNode>(
                     "{path} sources must contain only mappings"
                 )));
             }
-            let entries: Vec<(N, N)> = item.entries();
-            let name: String = get(&entries, "name")
-                .and_then(AuthoredNode::text)
-                .unwrap_or_default();
-            let load: Option<String> = filling_load(&entries, (&name, load_name), path)?;
-            let mut source: ParsedSourceEntry<N> = source_entry(&entries, path)?;
-            if load.is_some() {
-                source.schema = destination_schema.clone();
-            }
-            source.load = load;
+            let source: ParsedSourceEntry<N> = document_source(
+                &item.entries(),
+                (load_name, destination_schema.as_ref()),
+                path,
+            )?;
             sources.push(source);
         }
     }

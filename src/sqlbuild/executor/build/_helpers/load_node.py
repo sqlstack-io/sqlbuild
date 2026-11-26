@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from itertools import chain
 from typing import Any
 
 from sqlbuild._native import CompiledObjectKey, CostContext, LoadPlanEntry, PlanOutput
@@ -64,6 +65,7 @@ def execute_build_load_node(
         error_message=error,
         result_payload=[_table_report(table=table) for table in tables],
         result_metadata={"tables": [table.table for table in tables]},
+        warning_messages=tuple(chain.from_iterable(table.warnings for table in tables)),
     )
     result_store: DirectNodeResultStore = build_direct_node_result_store(
         adapter=adapter,

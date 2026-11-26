@@ -20,23 +20,28 @@ pub(crate) fn loader_declaration(
             settings.insert(key.str()?.to_string(), value);
         }
     }
-    let (table, columns): (String, Vec<(String, String)>) =
-        match filled_source(source_files, &name)? {
-            Some(entry) => {
-                let table: Option<String> = native_field(&entry, "table")?.extract()?;
-                (
-                    table.unwrap_or_else(|| name.clone()),
-                    typed_columns(&entry)?,
-                )
-            }
-            None => {
-                let destination: Option<String> = native_field(loader, "destination")?.extract()?;
-                let table: String = destination
-                    .and_then(|destination| destination.rsplit('.').next().map(str::to_owned))
-                    .unwrap_or_else(|| name.clone());
-                (table, typed_columns(loader)?)
-            }
-        };
+    let filled: Option<Bound<'_, PyAny>> = filled_source(source_files, &name)?;
+    let on_schema_change: Option<String> = match &filled {
+        Some(entry) => native_field(entry, "on_schema_change")?.extract()?,
+        None => None,
+    };
+    let fills_source: bool = filled.is_some();
+    let (table, columns): (String, Vec<(String, String)>) = match filled {
+        Some(entry) => {
+            let table: Option<String> = native_field(&entry, "table")?.extract()?;
+            (
+                table.unwrap_or_else(|| name.clone()),
+                typed_columns(&entry)?,
+            )
+        }
+        None => {
+            let destination: Option<String> = native_field(loader, "destination")?.extract()?;
+            let table: String = destination
+                .and_then(|destination| destination.rsplit('.').next().map(str::to_owned))
+                .unwrap_or_else(|| name.clone());
+            (table, typed_columns(loader)?)
+        }
+    };
     Ok((
         LoaderDeclaration {
             name,
@@ -44,6 +49,8 @@ pub(crate) fn loader_declaration(
             connection: native_field(loader, "connection")?.extract()?,
             settings,
             columns,
+            on_schema_change,
+            fills_source,
             table,
         },
         module,

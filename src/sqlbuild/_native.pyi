@@ -12867,6 +12867,7 @@ class SourceEntry(NativeRecord):
     description: str | None
     type_enforcement: bool | None
     contract: str | None
+    on_schema_change: str | None
     meta: dict[str, object]
     columns: tuple[SourceColumnEntry, ...]
     audits: tuple[SchemaAuditInstance, ...]
@@ -12889,6 +12890,7 @@ class SourceEntry(NativeRecord):
         description: str | None = ...,
         type_enforcement: bool | None = ...,
         contract: str | None = ...,
+        on_schema_change: str | None = ...,
         meta: dict[str, object] = ...,
         columns: tuple[SourceColumnEntry, ...] = ...,
         audits: tuple[SchemaAuditInstance, ...] = ...,

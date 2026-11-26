@@ -55,6 +55,7 @@ pub(crate) fn run_report(run: ProjectRun) -> String {
                 "rows": table.loaded.as_ref().ok(),
                 "error": table.loaded.as_ref().err(),
                 "changes": table.changes,
+                "warnings": table.warnings,
                 "retryable": table.retryable,
             })
         })

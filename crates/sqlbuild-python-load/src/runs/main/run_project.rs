@@ -57,10 +57,11 @@ pub fn run_project(
         };
         let mut tables: Vec<LoadedTable> = Vec::new();
         for outcome in load_tables(&run, &plan, None).await {
-            let (loaded, changes) = match outcome.loaded {
-                Ok(loaded) => (Ok(loaded.rows), loaded.changes),
+            let (loaded, changes, warnings) = match outcome.loaded {
+                Ok(loaded) => (Ok(loaded.rows), loaded.changes, loaded.warnings),
                 Err(error) => (
                     Err(load_messages(&project, vec![error]).concat()),
+                    Vec::new(),
                     Vec::new(),
                 ),
             };
@@ -68,6 +69,7 @@ pub fn run_project(
                 table: outcome.table,
                 loaded,
                 changes,
+                warnings,
                 retryable: outcome.retryable,
             });
         }

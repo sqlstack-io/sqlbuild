@@ -1663,6 +1663,38 @@ def event_loaders():
             expected_error_fragment="is filled by @loader 'raw_orders', so it can't set write_strategy; set write_strategy= on @loader",
         ),
         DiscoverProjectInputsErrorTestCase(
+            description="on_schema_change takes one of SQLLoad's policies",
+            repo_files=base_repo_files()
+            | {
+                "sql/sources/raw.yml": (
+                    "sources:\n  - name: raw_orders\n    managed: true\n"
+                    "    on_schema_change: sync_all_columns\n"
+                ),
+                "python/nodes/loaders/raw_orders/loader.py": (
+                    "from sqlbuild.loaders import loader\n\n"
+                    "@loader(write_strategy='append')\n"
+                    "def raw_orders(ctx):\n    return []\n"
+                ),
+            },
+            expected_error_fragment=(
+                "'on_schema_change' must be one of: append_new_columns, ignore, fail"
+            ),
+        ),
+        DiscoverProjectInputsErrorTestCase(
+            description="a source nothing fills can't set on_schema_change",
+            repo_files=base_repo_files()
+            | {
+                "sql/sources/raw.yml": (
+                    "sources:\n  - name: raw_orders\n    on_schema_change: fail\n"
+                ),
+            },
+            expected_error_fragment=(
+                "source 'raw_orders' can't set on_schema_change; it says how the load or "
+                "@loader that fills a source meets new and missing columns, and nothing fills "
+                "this one"
+            ),
+        ),
+        DiscoverProjectInputsErrorTestCase(
             description="a terminal loader can't declare the source's columns",
             repo_files=base_repo_files()
             | {

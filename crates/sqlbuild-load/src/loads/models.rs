@@ -16,6 +16,8 @@ pub struct FilledSource {
     pub name: String,
     /// Each column with a declared `type`.
     pub columns: Vec<(String, String)>,
+    /// How the load meets new and missing columns, as the source declares it.
+    pub on_schema_change: Option<String>,
 }
 
 /// What a project's loads are checked against: its source connections and the warehouse kind its targets hold.
@@ -57,6 +59,10 @@ pub struct LoaderDeclaration {
     pub settings: toml::Table,
     /// The declared column types of what it fills.
     pub columns: Vec<(String, String)>,
+    /// The `on_schema_change` the source it fills declares; `None` when it fills none or that source sets none.
+    pub on_schema_change: Option<String>,
+    /// Whether it fills a source, which then decides its columns and `on_schema_change`.
+    pub fills_source: bool,
     /// The table it fills, which SQLBuild names.
     pub table: String,
 }

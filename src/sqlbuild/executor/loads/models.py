@@ -22,3 +22,4 @@ class LoadedTable:
     error: str | None
     changes: tuple[str, ...]
     retryable: bool
+    warnings: tuple[str, ...] = ()

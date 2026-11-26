@@ -3,8 +3,8 @@
 use sqlload::python_sources::models::PythonSource;
 
 use crate::loads::constants::{
-    COLUMNS, CONNECTION, LOADER_OWNED_KEYS, RENAMED_STRATEGY, REPLACE_STRATEGY, TABLE_NAME, TABLES,
-    WRITE_STRATEGY,
+    COLUMNS, CONNECTION, LOADER_OWNED_KEYS, ON_SCHEMA_CHANGE, RENAMED_STRATEGY, REPLACE_STRATEGY,
+    TABLE_NAME, TABLES, WRITE_STRATEGY,
 };
 use crate::loads::models::{LoadCheck, LoadProblem, LoaderDeclaration};
 
@@ -17,6 +17,15 @@ pub(crate) fn refused_option(loader: &LoaderDeclaration) -> Result<(), LoadProbl
                 path: vec![key.to_owned()],
             });
         }
+    }
+    if loader.fills_source && loader.settings.contains_key(ON_SCHEMA_CHANGE) {
+        return Err(LoadProblem {
+            message: format!(
+                "@loader can't set {ON_SCHEMA_CHANGE}; set it on the source it fills, in its \
+                 sources file"
+            ),
+            path: vec![ON_SCHEMA_CHANGE.to_owned()],
+        });
     }
     if loader
         .settings
@@ -71,6 +80,12 @@ pub(crate) fn table_settings(loader: &LoaderDeclaration) -> toml::Table {
             columns.insert(column.clone(), toml::Value::String(kind.clone()));
         }
         table.insert(COLUMNS.to_owned(), toml::Value::Table(columns));
+    }
+    if let Some(policy) = &loader.on_schema_change {
+        table.insert(
+            ON_SCHEMA_CHANGE.to_owned(),
+            toml::Value::String(policy.clone()),
+        );
     }
     table
 }

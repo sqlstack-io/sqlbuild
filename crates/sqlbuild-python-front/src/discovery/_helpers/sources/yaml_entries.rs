@@ -232,6 +232,10 @@ fn source_entry<'py>(
     fields.set_item("description", optional(py, source.description.as_ref()))?;
     fields.set_item("type_enforcement", source.type_enforcement)?;
     fields.set_item("contract", optional(py, source.contract.as_ref()))?;
+    fields.set_item(
+        "on_schema_change",
+        optional(py, source.on_schema_change.as_ref()),
+    )?;
     fields.set_item("meta", meta(py, source.meta.as_ref()))?;
     fields.set_item(
         "columns",

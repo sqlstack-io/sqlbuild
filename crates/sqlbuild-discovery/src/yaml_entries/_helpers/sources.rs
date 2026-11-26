@@ -13,7 +13,7 @@ use crate::yaml_entries::_helpers::removed_integrations::reject_ingestr_source;
 use crate::yaml_entries::constants::LOADER_OWNED_KEYS;
 use crate::yaml_entries::models::{ParsedSourceEntry, ParsedYamlColumn};
 
-const ENTRY_KEYS: [&str; 18] = [
+const ENTRY_KEYS: [&str; 19] = [
     "audits",
     "columns",
     "contract",
@@ -27,6 +27,7 @@ const ENTRY_KEYS: [&str; 18] = [
     "managed",
     "meta",
     "name",
+    "on_schema_change",
     "schema",
     "table",
     "type_enforcement",
@@ -35,6 +36,7 @@ const ENTRY_KEYS: [&str; 18] = [
 ];
 const COLUMN_KEYS: [&str; 6] = ["audits", "description", "meta", "name", "nullable", "type"];
 const CONTRACT_POLICIES: [&str; 2] = ["none", "enforced"];
+const SCHEMA_CHANGE_POLICIES: [&str; 3] = ["append_new_columns", "ignore", "fail"];
 
 /// What Python reads of an entry before its name: columns, typing, contract and expression.
 struct SourceShape<N> {
@@ -147,6 +149,7 @@ fn with_settings<N: AuthoredNode>(
     parsed.description = optional_text(entry, "description", site)?;
     parsed.type_enforcement = shape.type_enforcement;
     parsed.contract = shape.contract;
+    parsed.on_schema_change = schema_change_policy(entry, site)?;
     parsed.meta = optional_mapping(entry, "meta", site)?;
     parsed.columns = shape.columns;
     parsed.audits = parse_audit_list(get(entry, "audits"), path, "source", false)?;
@@ -190,4 +193,22 @@ fn validate_source<N: AuthoredNode>(
         ));
     }
     Ok(())
+}
+
+/// The entry's `on_schema_change`, one of SQLLoad's policies for new and missing columns.
+fn schema_change_policy<N: AuthoredNode>(
+    entry: &[(N, N)],
+    site: Site<'_>,
+) -> Result<Option<N>, ConfigError> {
+    let policy: Option<N> = optional_text(entry, "on_schema_change", site)?;
+    if policy
+        .as_ref()
+        .and_then(AuthoredNode::text)
+        .is_some_and(|text| !SCHEMA_CHANGE_POLICIES.contains(&text.as_str()))
+    {
+        return Err(
+            site.error("'on_schema_change' must be one of: append_new_columns, ignore, fail")
+        );
+    }
+    Ok(policy)
 }

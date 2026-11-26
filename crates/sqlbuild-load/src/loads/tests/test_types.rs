@@ -1,7 +1,13 @@
+/// Each listed source's name and its declared columns.
+pub(super) type ListedSources =
+    &'static [(&'static str, &'static [(&'static str, &'static str)])];
+
 pub(super) struct CheckLoadTestCase {
     pub(super) description: &'static str,
     pub(super) settings: &'static str,
-    pub(super) sources: &'static [(&'static str, &'static [(&'static str, &'static str)])],
+    pub(super) sources: ListedSources,
+    /// The `on_schema_change` every listed source declares.
+    pub(super) on_schema_change: Option<&'static str>,
     pub(super) expected_result: Result<&'static str, (&'static str, &'static [&'static str])>,
 }
 
@@ -21,6 +27,8 @@ pub(super) struct CheckLoaderTestCase {
     pub(super) description: &'static str,
     pub(super) connection: Option<&'static str>,
     pub(super) settings: &'static str,
+    /// The `on_schema_change` the source it fills declares.
+    pub(super) on_schema_change: Option<&'static str>,
     /// The expected table settings as TOML text, or the message.
     pub(super) expected_result: Result<&'static str, &'static str>,
 }

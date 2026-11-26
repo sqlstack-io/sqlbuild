@@ -8,6 +8,8 @@ pub struct LoadedTable {
     pub loaded: Result<u64, String>,
     /// SQLLoad's `created ...` and `altered ...` lines.
     pub changes: Vec<String>,
+    /// What the load warns of, such as declared columns the data lacked.
+    pub warnings: Vec<String>,
     /// Whether a failed load may succeed when run again unchanged.
     pub retryable: bool,
 }

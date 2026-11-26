@@ -1,7 +1,7 @@
 //! A load's settings before SQLLoad reads them: the connection it reads, and its sources' column types on its tables.
 
 use crate::loads::_helpers::naming::literal_tables;
-use crate::loads::constants::{COLUMNS, CONNECTION, INCLUDE, TABLES};
+use crate::loads::constants::{COLUMNS, CONNECTION, INCLUDE, ON_SCHEMA_CHANGE, TABLES};
 use crate::loads::models::{FilledSource, LoadCheck, LoadDeclaration, LoadProblem};
 
 /// A problem at `path` in the `load:` mapping.
@@ -72,7 +72,7 @@ pub(crate) fn with_source_columns(load: &LoadDeclaration) -> Result<toml::Table,
     Ok(settings)
 }
 
-/// `tables` with `source`'s column types pinned on the included table it loads from, or refusing a source no included table loads into.
+/// `tables` with `source`'s column types and `on_schema_change` on the included table it loads from, or refusing a source no included table loads into.
 fn with_columns(
     mut tables: toml::Table,
     (load, known): (&str, &[(String, String)]),
@@ -95,18 +95,37 @@ fn with_columns(
             ),
         ));
     };
-    if source.columns.is_empty() {
-        return Ok(tables);
-    }
-    let mut columns = toml::Table::new();
-    for (column, kind) in &source.columns {
-        columns.insert(column.clone(), toml::Value::String(kind.clone()));
-    }
     let table = tables
         .entry(key.clone())
         .or_insert_with(|| toml::Value::Table(toml::Table::new()));
-    if let Some(table) = table.as_table_mut() {
+    let Some(table) = table.as_table_mut() else {
+        return Ok(tables);
+    };
+    if let Some(policy) = &source.on_schema_change {
+        if table.contains_key(ON_SCHEMA_CHANGE) {
+            return Err(at(
+                &[TABLES, key, ON_SCHEMA_CHANGE],
+                format!(
+                    "source '{}' sets on_schema_change, so the load's table can't; keep it on \
+                     the source",
+                    source.name
+                ),
+            ));
+        }
+        table.insert(
+            ON_SCHEMA_CHANGE.to_owned(),
+            toml::Value::String(policy.clone()),
+        );
+    }
+    if !source.columns.is_empty() {
+        let mut columns = toml::Table::new();
+        for (column, kind) in &source.columns {
+            columns.insert(column.clone(), toml::Value::String(kind.clone()));
+        }
         table.insert(COLUMNS.to_owned(), toml::Value::Table(columns));
+    }
+    if table.is_empty() {
+        tables.remove(key);
     }
     Ok(tables)
 }

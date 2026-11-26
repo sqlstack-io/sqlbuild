@@ -104,6 +104,7 @@ def engine_result(
         skip_reason=None if run.skipped is None else run.skipped.reason,
         error_message="\n".join(errors) if errors else None,
         result_metadata={"changes": list(chain.from_iterable(t["changes"] for t in tables))},
+        warning_messages=tuple(chain.from_iterable(table["warnings"] for table in tables)),
     )
 
 

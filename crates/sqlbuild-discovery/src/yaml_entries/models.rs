@@ -91,6 +91,8 @@ pub struct ParsedSourceEntry<N> {
     /// The authored flag, or `True` implied by typed columns.
     pub type_enforcement: Option<bool>,
     pub contract: Option<N>,
+    /// How the load that fills it meets new and missing columns: SQLLoad's `on_schema_change`.
+    pub on_schema_change: Option<N>,
     pub meta: Option<N>,
     pub columns: Vec<ParsedYamlColumn<N>>,
     pub audits: Vec<ParsedAudit<N>>,
@@ -113,6 +115,7 @@ impl<N> ParsedSourceEntry<N> {
             description: None,
             type_enforcement: None,
             contract: None,
+            on_schema_change: None,
             meta: None,
             columns: Vec::new(),
             audits: Vec::new(),
