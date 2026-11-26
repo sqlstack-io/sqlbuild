@@ -62,7 +62,7 @@ const RECORD_FIELDS: [&str; 15] = [
 ];
 
 fn optional_text(value: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
-    match value.downcast::<PyString>() {
+    match value.cast::<PyString>() {
         Ok(text) => Ok(Some(text.to_string_lossy().into_owned())),
         Err(_) => Ok(None),
     }
@@ -164,7 +164,7 @@ pub(crate) fn command_output_to_json(record: &Bound<'_, PyAny>) -> PyResult<Stri
 fn occurred_at<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let py = value.py();
     let message = "occurred_at must be an ISO-8601 string";
-    let Ok(text) = value.downcast::<PyString>() else {
+    let Ok(text) = value.cast::<PyString>() else {
         return Err(validation_error(py, message));
     };
     let normalized = text.to_cow()?.replace('Z', "+00:00");
@@ -215,7 +215,7 @@ pub(crate) fn command_output_from_json<'py>(
                 false => error,
             }
         })?;
-    let Ok(data) = raw.downcast::<PyDict>() else {
+    let Ok(data) = raw.cast::<PyDict>() else {
         return Err(validation_error(py, "command output must be a JSON object"));
     };
     let mut keys: Vec<String> = Vec::new();
@@ -283,7 +283,7 @@ pub(crate) fn validate_depth(value: &Bound<'_, PyAny>, depth: usize) -> Result<(
             ),
         ));
     }
-    if let Ok(mapping) = value.downcast::<PyDict>() {
+    if let Ok(mapping) = value.cast::<PyDict>() {
         for item in mapping.values() {
             validate_depth(&item, depth + 1)?;
         }

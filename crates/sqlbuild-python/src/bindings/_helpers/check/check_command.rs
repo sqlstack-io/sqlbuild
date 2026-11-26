@@ -94,8 +94,7 @@ fn refuse_graph_selectors(py: Python<'_>, selectors: &[Bound<'_, PyAny>]) -> PyR
     for selector in selectors {
         for token in selector.call_method0("split")?.try_iter()? {
             for part in token?.call_method1("split", (",",))?.try_iter()? {
-                let parsed: Bound<'_, PyAny> =
-                    parse_project_selector(part?.downcast::<PyString>()?)?;
+                let parsed: Bound<'_, PyAny> = parse_project_selector(part?.cast::<PyString>()?)?;
                 if parsed.is_instance(&path_selector)?
                     || native_field(&parsed, "upstream")?.is_truthy()?
                     || native_field(&parsed, "downstream")?.is_truthy()?
@@ -152,7 +151,7 @@ fn selected_check_names<'py>(
             }
         }
         validate_check_selection(&non_checks).map_err(|error| selection_error(py, &error))?;
-        return selected.downcast_into().map_err(Into::into);
+        return selected.cast_into().map_err(Into::into);
     }
     let excluded: Bound<'py, PyAny> = if exclude.is_truthy()? {
         python_nodes(graph, (exclude, empty_tuple(py)))?

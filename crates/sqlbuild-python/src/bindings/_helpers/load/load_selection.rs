@@ -330,7 +330,7 @@ pub(crate) fn loader_defaults<'py>(
         Some(cli_vars.clone()).filter(|value| !value.is_none()),
         false,
     )?
-    .downcast_into()?;
+    .cast_into()?;
     let adapter_name: Bound<'py, PyAny> = resolve_effective_adapter_name(
         &native_field(discovered, "project_config")?,
         &native_field(discovered, "local_config")?,
@@ -398,7 +398,7 @@ pub(crate) fn loader_write_schemas<'py>(
     let mut intermediate_loaders: HashSet<String> = HashSet::new();
     for entry in entries {
         let meta: Bound<'py, PyAny> = native_field(entry, "meta")?;
-        let flag: Option<Bound<'py, PyAny>> = match meta.downcast::<PyDict>() {
+        let flag: Option<Bound<'py, PyAny>> = match meta.cast::<PyDict>() {
             Ok(meta) => meta.get_item(LOADER_NODE_KEY)?,
             Err(_) => None,
         };
@@ -427,7 +427,7 @@ pub(crate) fn loader_write_schemas<'py>(
         Some(cli_vars.clone()).filter(|value| !value.is_none()),
         false,
     )?
-    .downcast_into()?;
+    .cast_into()?;
     let Some(ignored) = non_empty_text(connection.get_item("schema")?)? else {
         return Ok(());
     };

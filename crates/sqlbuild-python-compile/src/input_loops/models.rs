@@ -162,8 +162,11 @@ pub struct LoopSwitches {
     pub require_sql_analysis: bool,
 }
 
-impl<'py> pyo3::FromPyObject<'py> for LoopSwitches {
-    fn extract_bound(value: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for LoopSwitches {
+    type Error = pyo3::PyErr;
+
+    fn extract(value: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        let value: &pyo3::Bound<'py, pyo3::PyAny> = &value;
         let (sql_analysis, no_sql_validation, defer_sql_validation, require_sql_analysis): (
             bool,
             bool,
@@ -412,8 +415,7 @@ impl NativeModelLoop {
             contracts: &contracts,
             syntax: &self.syntax,
         };
-        let validator: Bound<'py, NativeModelValidator> =
-            self.validator.bind(py).downcast()?.clone();
+        let validator: Bound<'py, NativeModelValidator> = self.validator.bind(py).cast()?.clone();
         let known: KnownResources<'_> = validator.get().known_resources();
         let resolver: &Bound<'py, PyAny> = &classes.external_resolver;
         let extended =
@@ -516,8 +518,7 @@ impl NativeModelLoop {
             model_file,
             header: header_facts,
         } = row;
-        let values: Bound<'py, PyDict> =
-            native_field(&config, VALUES_ATTRIBUTE)?.downcast_into()?;
+        let values: Bound<'py, PyDict> = native_field(&config, VALUES_ATTRIBUTE)?.cast_into()?;
         let schema: Option<ModelSchema<'py>> = model_schema(context, &values, name)?;
         let hooked: bool = hook_presence(&values)?;
         let python_hooks: Vec<Bound<'py, PyAny>> = if hooked {
@@ -804,11 +805,11 @@ impl NativeModelLoop {
     ) -> PyResult<Result<String, String>> {
         let incremental: bool = values.get_item(MATERIALIZED_KEY)?.is_some_and(|value| {
             value
-                .downcast::<PyString>()
+                .cast::<PyString>()
                 .is_ok_and(|text| text.to_string_lossy() == INCREMENTAL_MATERIALIZATION)
         });
         let cursor: Option<String> = match values.get_item(CURSOR_KEY)? {
-            Some(value) => match value.downcast::<PyString>() {
+            Some(value) => match value.cast::<PyString>() {
                 Ok(text) => Some(text.to_string_lossy().into_owned()),
                 Err(_) => None,
             },

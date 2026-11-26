@@ -86,13 +86,13 @@ pub(crate) fn test_model_query_overrides<'py>(
         let macro_source_sql: String = with_sql_macro_mocks(
             &model_input,
             macro_source_sql.extract()?,
-            (macro_mocks.downcast()?, &loaded_macros),
+            (macro_mocks.cast()?, &loaded_macros),
         )?;
         let expanded: Bound<'py, PyAny> = expansion_result(ExpansionRequest {
             sql: PyString::new(py, &macro_source_sql),
             file_path,
-            loaded_macros: loaded_macros.downcast()?.clone(),
-            macro_overrides: Some(macro_mocks.downcast()?.clone()),
+            loaded_macros: loaded_macros.cast()?.clone(),
+            macro_overrides: Some(macro_mocks.cast()?.clone()),
             macro_context: macro_context.clone(),
             declaration_resolver: (!declaration_resolver.is_none())
                 .then(|| declaration_resolver.clone()),

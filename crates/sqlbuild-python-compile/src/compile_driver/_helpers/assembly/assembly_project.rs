@@ -156,7 +156,7 @@ pub(crate) fn assembled_project<'py>(
 /// `value.strip()` when `value` is a string with non-blank text, else `None`.
 fn str_or_none<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = value.py();
-    if let Ok(text) = value.downcast::<PyString>()
+    if let Ok(text) = value.cast::<PyString>()
         && let Some(stripped) = configured_namespace(&text.to_cow()?)
     {
         return Ok(PyString::new(py, &stripped).into_any());

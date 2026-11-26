@@ -79,6 +79,6 @@ impl SurrogateText {
         }
         Ok(PyBytes::new(py, &encoded)
             .call_method1("decode", (UTF16, SURROGATE_PASS))?
-            .downcast_into()?)
+            .cast_into()?)
     }
 }

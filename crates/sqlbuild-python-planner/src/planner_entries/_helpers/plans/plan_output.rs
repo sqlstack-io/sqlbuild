@@ -721,7 +721,7 @@ pub(crate) fn plan_output_fields<'py>(
             build_source_load_entries(
                 &execution_order,
                 &selected_keys,
-                source_map.downcast::<PyDict>()?,
+                source_map.cast::<PyDict>()?,
                 reload_sources.is_truthy()?,
             )?,
         )?

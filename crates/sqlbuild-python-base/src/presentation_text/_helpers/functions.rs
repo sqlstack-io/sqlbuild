@@ -121,7 +121,7 @@ fn append_overflow_line<'py>(
 ) -> PyResult<Bound<'py, PyList>> {
     let arguments: KeywordArguments<'py> =
         KeywordArguments::read(py, "append_overflow_line", options, OVERFLOW_OPTIONS)?;
-    let lines: Bound<'py, PyList> = arguments.value("lines")?.downcast_into()?;
+    let lines: Bound<'py, PyList> = arguments.value("lines")?.cast_into()?;
     let total: i64 = arguments.value("total_count")?.extract()?;
     let visible: i64 = arguments.value("visible_count")?.extract()?;
     let indent: String = arguments.value("indent")?.extract()?;

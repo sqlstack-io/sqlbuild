@@ -98,13 +98,13 @@ pub(crate) fn finding_position<'py>(
 
 /// One rule-option value as a TOML literal, or the harness's usage error.
 fn option_literal(value: &Bound<'_, PyAny>) -> PyResult<TomlLiteral> {
-    if let Ok(flag) = value.downcast::<PyBool>() {
+    if let Ok(flag) = value.cast::<PyBool>() {
         return Ok(TomlLiteral::Bool(flag.is_true()));
     }
     if value.is_instance_of::<PyInt>() {
         return Ok(TomlLiteral::Integer(value.str()?.to_string()));
     }
-    if let Ok(text) = value.downcast::<PyString>() {
+    if let Ok(text) = value.cast::<PyString>() {
         return Ok(TomlLiteral::Text(text.to_str()?.to_owned()));
     }
     if value.is_instance_of::<PyList>() || value.is_instance_of::<PyTuple>() {

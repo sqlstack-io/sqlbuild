@@ -139,8 +139,8 @@ impl<'py> ModelVisibility<'py> {
                 native_field(&resolved, CONSTANT_VISIBILITY_FIELD)?,
             )?;
             (
-                native_field(&resolved, ENUMS_FIELD)?.downcast_into::<PyDict>()?,
-                native_field(&resolved, CONSTANTS_FIELD)?.downcast_into::<PyDict>()?,
+                native_field(&resolved, ENUMS_FIELD)?.cast_into::<PyDict>()?,
+                native_field(&resolved, CONSTANTS_FIELD)?.cast_into::<PyDict>()?,
             )
         } else {
             for field in [
@@ -171,7 +171,7 @@ impl<'py> ModelVisibility<'py> {
         ] {
             let inherited: Bound<'py, PyDict> = fields.get_item(field)?.map_or_else(
                 || Ok(PyDict::new(py)),
-                pyo3::types::PyAnyMethods::downcast_into::<PyDict>,
+                pyo3::Bound::<pyo3::PyAny>::cast_into::<PyDict>,
             )?;
             let visibility: Bound<'py, PyDict> = inherited.copy()?;
             for name in local.keys() {
@@ -191,7 +191,7 @@ impl<'py> ModelVisibility<'py> {
     ) -> PyResult<Bound<'py, PyAny>> {
         let resolver: &Bound<'py, PyAny> = &context.classes.visibility.resolver;
         let contexts: Bound<'py, NativeDeclarationContexts> =
-            native_field(resolver, "native_contexts")?.downcast_into()?;
+            native_field(resolver, "native_contexts")?.cast_into()?;
         let (resolved, _) = contexts.get().resolved_context(resolver, file_path, None)?;
         Ok(resolved)
     }
@@ -205,15 +205,15 @@ fn rebound<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = cached.py();
     let enum_visibility: Bound<'py, PyDict> =
-        native_field(cached, ENUM_VISIBILITY_FIELD)?.downcast_into()?;
+        native_field(cached, ENUM_VISIBILITY_FIELD)?.cast_into()?;
     let constant_visibility: Bound<'py, PyDict> =
-        native_field(cached, CONSTANT_VISIBILITY_FIELD)?.downcast_into()?;
+        native_field(cached, CONSTANT_VISIBILITY_FIELD)?.cast_into()?;
     if enum_visibility.is_empty() && constant_visibility.is_empty() {
         return Ok(cached.clone());
     }
     let resolver: &Bound<'py, PyAny> = &context.classes.visibility.resolver;
     let contexts: Bound<'py, NativeDeclarationContexts> =
-        native_field(resolver, "native_contexts")?.downcast_into()?;
+        native_field(resolver, "native_contexts")?.cast_into()?;
     let fields: Bound<'py, PyDict> = PyDict::new(py);
     for field in VISIBLE_FIELDS {
         fields.set_item(field, native_field(cached, field)?)?;
@@ -279,7 +279,7 @@ impl<'py> MacroScopes<'py> for VisibilityClasses<'py> {
             return Ok(None);
         }
         let contexts: Bound<'py, NativeDeclarationContexts> =
-            native_field(&self.resolver, NATIVE_CONTEXTS_ATTRIBUTE)?.downcast_into()?;
+            native_field(&self.resolver, NATIVE_CONTEXTS_ATTRIBUTE)?.cast_into()?;
         let (resolved, _) = contexts
             .get()
             .resolved_context(&self.resolver, path, None)?;

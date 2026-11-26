@@ -256,7 +256,7 @@ impl<'py> AuditScope<'_, 'py> {
         let run_scope: Option<String> = text_item(header, RUN_SCOPE_KEY)?;
         let always_run: bool = match header.get_item(ALWAYS_RUN_KEY)? {
             Some(value) => value
-                .downcast::<PyBool>()
+                .cast::<PyBool>()
                 .is_ok_and(pyo3::types::PyBoolMethods::is_true),
             None => false,
         };
@@ -572,7 +572,7 @@ impl<'py> AuditScope<'_, 'py> {
             .model_loop
             .validator
             .bind(self.context.host.py())
-            .downcast()?
+            .cast()?
             .clone();
         let known: KnownResources<'_> = validator.get().known_resources();
         record_source_reads(

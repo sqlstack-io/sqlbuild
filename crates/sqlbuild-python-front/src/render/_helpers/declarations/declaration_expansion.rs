@@ -265,17 +265,14 @@ fn visible_declaration<'py>(
     } else {
         (CONSTANTS, INACCESSIBLE_CONSTANTS)
     };
-    let visible: Bound<'py, PyDict> = request
-        .context
-        .getattr(visible_attribute)?
-        .downcast_into()?;
+    let visible: Bound<'py, PyDict> = request.context.getattr(visible_attribute)?.cast_into()?;
     if let Some(declaration) = visible.get_item(name)? {
         return Ok(declaration);
     }
     let inaccessible: Bound<'py, PyDict> = request
         .context
         .getattr(inaccessible_attribute)?
-        .downcast_into()?;
+        .cast_into()?;
     let error: DeclarationError = match inaccessible.get_item(name)? {
         Some(record) => DeclarationError::Inaccessible {
             kind: kind.to_owned(),
@@ -330,7 +327,7 @@ pub(crate) fn visibility<'py>(
     attribute: &str,
     name: &str,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let records: Bound<'py, PyDict> = request.context.getattr(attribute)?.downcast_into()?;
+    let records: Bound<'py, PyDict> = request.context.getattr(attribute)?.cast_into()?;
     Ok(records
         .get_item(name)?
         .unwrap_or_else(|| PyTuple::empty(records.py()).into_any()))

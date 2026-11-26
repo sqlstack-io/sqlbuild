@@ -157,7 +157,7 @@ pub(crate) fn effective_target_namespace<'py>(
     let run_id: Bound<'py, PyAny> = run_id(&py.None().into_bound(py))?;
     let resolved: Bound<'py, PyDict> =
         early_model_templates(values.as_any(), &effective_vars, (&target_name, &run_id))?
-            .downcast_into()?;
+            .cast_into()?;
     PyTuple::new(
         py,
         [

@@ -72,7 +72,7 @@ fn render_query<'py>(
     )?;
     object(
         py,
-        assert_no_unresolved_sql_markers(py, resolved.downcast::<PyString>()?, context)?,
+        assert_no_unresolved_sql_markers(py, resolved.cast::<PyString>()?, context)?,
     )?;
     Ok(resolved)
 }

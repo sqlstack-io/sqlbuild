@@ -39,7 +39,7 @@ fn active_snapshot<'py>(
 ) -> PyResult<Option<Bound<'py, NativeDirectorySnapshot>>> {
     let py: Python<'py> = project_dir.py();
     let active: Bound<'py, PyAny> = active_variable(py)?.call_method0("get")?;
-    let Ok(snapshot) = active.downcast_into::<NativeDirectorySnapshot>() else {
+    let Ok(snapshot) = active.cast_into::<NativeDirectorySnapshot>() else {
         return Ok(None);
     };
     if snapshot.get().project_dir.bind(py).eq(project_dir)? {
@@ -161,7 +161,7 @@ pub(crate) fn project_tree<'py>(
     let py: Python<'py> = project_dir.py();
     let memo: Bound<'py, PyDict> = snapshot_memo(project_dir)?;
     if let Some(tree) = memo.get_item(TREE_MEMO_KEY)?
-        && let Ok(tree) = tree.downcast_into::<NativeProjectTree>()
+        && let Ok(tree) = tree.cast_into::<NativeProjectTree>()
     {
         return Ok(tree);
     }

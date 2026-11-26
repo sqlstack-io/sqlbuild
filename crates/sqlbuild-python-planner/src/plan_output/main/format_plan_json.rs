@@ -176,8 +176,8 @@ fn mark_renames(result: &Bound<'_, PyDict>) -> PyResult<()> {
         return Ok(());
     };
     let mut renamed: HashMap<String, Bound<'_, PyDict>> = HashMap::new();
-    for model in models.downcast::<PyList>()?.iter() {
-        let model: Bound<'_, PyDict> = model.downcast_into::<PyDict>()?;
+    for model in models.cast::<PyList>()?.iter() {
+        let model: Bound<'_, PyDict> = model.cast_into::<PyDict>()?;
         let reason: Option<String> = model.get_item("reason")?.map(|r| r.extract()).transpose()?;
         if reason.as_deref() == Some(RENAMED_REASON)
             && let Some(name) = model.get_item("name")?
@@ -185,8 +185,8 @@ fn mark_renames(result: &Bound<'_, PyDict>) -> PyResult<()> {
             renamed.insert(name.extract()?, model);
         }
     }
-    for migration in migrations.downcast::<PyList>()?.iter() {
-        let migration: Bound<'_, PyDict> = migration.downcast_into::<PyDict>()?;
+    for migration in migrations.cast::<PyList>()?.iter() {
+        let migration: Bound<'_, PyDict> = migration.cast_into::<PyDict>()?;
         let model: Option<String> = migration
             .get_item("model")?
             .map(|m| m.extract())

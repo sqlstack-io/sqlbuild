@@ -203,7 +203,7 @@ impl<'py> HookRun<'_, '_, 'py> {
         position: HookPosition<'_>,
     ) -> PyResult<Bound<'py, PyAny>> {
         let py: Python<'py> = value.py();
-        if let Ok(text) = value.downcast::<PyString>() {
+        if let Ok(text) = value.cast::<PyString>() {
             let expanded: String = self.text(text.to_str()?, scope, position)?;
             return Ok(PyString::new(py, &expanded).into_any());
         }
@@ -217,14 +217,14 @@ impl<'py> HookRun<'_, '_, 'py> {
             return Ok(value.clone());
         }
         let (key, _) = position;
-        if let Ok(items) = value.downcast::<PyList>() {
+        if let Ok(items) = value.cast::<PyList>() {
             let mut expanded: Vec<Bound<'py, PyAny>> = Vec::with_capacity(items.len());
             for (index, item) in items.iter().enumerate() {
                 expanded.push(self.value(&item, scope, (key, Some(index)))?);
             }
             return Ok(PyList::new(py, expanded)?.into_any());
         }
-        if let Ok(items) = value.downcast::<PyTuple>() {
+        if let Ok(items) = value.cast::<PyTuple>() {
             let mut expanded: Vec<Bound<'py, PyAny>> = Vec::with_capacity(items.len());
             for (index, item) in items.iter().enumerate() {
                 expanded.push(self.value(&item, scope, (key, Some(index)))?);
@@ -298,7 +298,7 @@ impl<'py> HookRun<'_, '_, 'py> {
             &scope.consumer,
             (self.model.name, self.model.relative_path),
         )?);
-        let kwargs: Bound<'py, PyDict> = native_field(entry, KWARGS_ATTRIBUTE)?.downcast_into()?;
+        let kwargs: Bound<'py, PyDict> = native_field(entry, KWARGS_ATTRIBUTE)?.cast_into()?;
         let body: String = native_field(&definition, SQL_BODY_ATTRIBUTE)?.extract()?;
         let definition_path: Bound<'py, PyAny> =
             native_field(&definition, RELATIVE_PATH_ATTRIBUTE)?;

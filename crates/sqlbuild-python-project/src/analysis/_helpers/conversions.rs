@@ -15,20 +15,29 @@ struct RelationMap(Relations);
 /// One binding request: SQL, its referenced relations and per-request relation overrides.
 struct BindingRequestItem(BindingRequest);
 
-impl<'py> FromPyObject<'py> for ColumnList {
-    fn extract_bound(value: &Bound<'py, PyAny>) -> PyResult<Self> {
+impl<'py> FromPyObject<'_, 'py> for ColumnList {
+    type Error = pyo3::PyErr;
+
+    fn extract(value: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> PyResult<Self> {
+        let value: &Bound<'py, PyAny> = &value;
         columns(value).map(Self)
     }
 }
 
-impl<'py> FromPyObject<'py> for RelationMap {
-    fn extract_bound(value: &Bound<'py, PyAny>) -> PyResult<Self> {
+impl<'py> FromPyObject<'_, 'py> for RelationMap {
+    type Error = pyo3::PyErr;
+
+    fn extract(value: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> PyResult<Self> {
+        let value: &Bound<'py, PyAny> = &value;
         relations(value).map(Self)
     }
 }
 
-impl<'py> FromPyObject<'py> for BindingRequestItem {
-    fn extract_bound(value: &Bound<'py, PyAny>) -> PyResult<Self> {
+impl<'py> FromPyObject<'_, 'py> for BindingRequestItem {
+    type Error = pyo3::PyErr;
+
+    fn extract(value: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> PyResult<Self> {
+        let value: &Bound<'py, PyAny> = &value;
         let (sql, references, overrides): (String, Vec<(String, bool)>, RelationMap) =
             value.extract()?;
         Ok(Self((sql, references, overrides.0)))
@@ -37,7 +46,7 @@ impl<'py> FromPyObject<'py> for BindingRequestItem {
 
 pub(crate) fn columns(value: &Bound<'_, PyAny>) -> PyResult<Columns> {
     value
-        .downcast::<PyDict>()?
+        .cast::<PyDict>()?
         .iter()
         .map(|(name, data_type)| Ok((name.extract()?, data_type.extract()?)))
         .collect::<PyResult<Vec<_>>>()

@@ -479,7 +479,7 @@ fn execute<'py>(
         )
         .and_then(|value| pyo3::Bound::new(py, value))
         .map(pyo3::Bound::into_any)?
-        .downcast_into()?;
+        .cast_into()?;
     let connection: Bound<'py, PyAny> = ConnectionProgressReporter::new(
         py,
         Some(keywords(

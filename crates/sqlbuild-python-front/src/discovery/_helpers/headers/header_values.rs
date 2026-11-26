@@ -71,7 +71,7 @@ pub(crate) fn parse_header_values<'py>(
         header_cache(py).as_any().get_item(&header)?.extract()?;
     if !values.is_none() {
         let copied: Bound<'py, PyDict> = PyDict::new(py);
-        copied.update(values.downcast()?.as_mapping())?;
+        copied.update(values.cast()?.as_mapping())?;
         return Ok(copied);
     }
     let header_line: Option<usize> = request.get("header_line")?.extract()?;

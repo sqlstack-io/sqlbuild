@@ -127,7 +127,7 @@ fn debug_event_record_fields<'py>(
 
 /// Whether a logger name belongs to SQLBuild, with Python semantics for non-string names.
 fn internal_name(name: &Bound<'_, PyAny>) -> PyResult<bool> {
-    if let Ok(text) = name.downcast::<PyString>() {
+    if let Ok(text) = name.cast::<PyString>() {
         return Ok(internal_logger(text.to_str()?));
     }
     Ok(name.eq(LOGGER_ROOT_NAME)?
@@ -138,7 +138,7 @@ fn internal_name(name: &Bound<'_, PyAny>) -> PyResult<bool> {
 
 /// `record.__dict__`.
 fn record_values<'py>(record: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDict>> {
-    Ok(record.getattr("__dict__")?.downcast_into::<PyDict>()?)
+    Ok(record.getattr("__dict__")?.cast_into::<PyDict>()?)
 }
 
 /// `Ok(None)` for an `Exception`, which the caller swallows; other errors propagate.
@@ -348,7 +348,7 @@ fn compute_diagnostic_log_fields<'py>(
     include_sql_text: bool,
 ) -> PyResult<Option<Bound<'py, PyDict>>> {
     let name: Bound<'py, PyAny> = native_field(record, "name")?;
-    let Ok(name) = name.downcast::<PyString>() else {
+    let Ok(name) = name.cast::<PyString>() else {
         return Ok(None);
     };
     let values: Bound<'py, PyDict> = record_values(record)?;

@@ -11,7 +11,7 @@ pub fn audit_key_rows(audits: &Bound<'_, PyAny>) -> PyResult<Vec<(String, Option
     for audit in audits.try_iter()? {
         let audit: Bound<'_, PyAny> = audit?;
         let argument: Option<Bound<'_, PyAny>> = native_field(&audit, "arguments")?
-            .downcast::<PyDict>()?
+            .cast::<PyDict>()?
             .get_item(UNIQUE_AUDIT_COLUMN_ARGUMENT)?;
         rows.push((
             native_field(&audit, "definition_name")?.extract()?,

@@ -49,7 +49,7 @@ pub(crate) fn frozen_json<'py>(
 #[pyo3(signature = (*, value, field_name))]
 pub(crate) fn required_text_check(value: &Bound<'_, PyAny>, field_name: &str) -> PyResult<()> {
     let valid: bool = value
-        .downcast::<PyString>()
+        .cast::<PyString>()
         .is_ok_and(|text| text.len().is_ok_and(|length| length > 0));
     if !valid {
         return Err(validation_error(

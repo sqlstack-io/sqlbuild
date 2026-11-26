@@ -245,7 +245,7 @@ impl LocalFilesystemComputeLogStorage {
         let invocation_id = capture_id(invocation_id)?;
         checked(py, validate_capture_id(&invocation_id))?;
         let stream = stream_index(stream)?;
-        let Ok(bytes) = data.downcast::<PyBytes>() else {
+        let Ok(bytes) = data.cast::<PyBytes>() else {
             return Err(rejection(
                 py,
                 ComputeLogErrorKind::State,
@@ -272,7 +272,7 @@ impl LocalFilesystemComputeLogStorage {
         }
         let encoded: Bound<'_, PyAny> =
             host_entry(py, ExecutorHost::DiagnosticLogToJson)?.call1((record,))?;
-        let text: &str = encoded.downcast::<PyString>()?.to_str()?;
+        let text: &str = encoded.cast::<PyString>()?.to_str()?;
         let mut line: Vec<u8> = text.as_bytes().to_vec();
         line.push(b'\n');
         self.ensure_open(py)?;

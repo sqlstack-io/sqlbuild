@@ -105,10 +105,10 @@ impl<'py> CanonicalTypes<'py> {
         if value.is_none() {
             return Ok(JsonValue::Null);
         }
-        if let Ok(flag) = value.downcast::<PyBool>() {
+        if let Ok(flag) = value.cast::<PyBool>() {
             return Ok(JsonValue::Bool(pyo3::types::PyBoolMethods::is_true(flag)));
         }
-        if let Ok(string) = value.downcast::<PyString>() {
+        if let Ok(string) = value.cast::<PyString>() {
             return text(string);
         }
         if value.is_instance_of::<PyInt>() {
@@ -192,9 +192,9 @@ impl<'py> CanonicalTypes<'py> {
             let mut fields: Vec<JsonValue> = Vec::new();
             for field in self.fields.call1((value,))?.try_iter()? {
                 let name: Bound<'py, PyAny> = native_field(&field?, "name")?;
-                let item: Bound<'py, PyAny> = value.getattr(name.downcast::<PyString>()?)?;
+                let item: Bound<'py, PyAny> = value.getattr(name.cast::<PyString>()?)?;
                 fields.push(JsonValue::Array(vec![
-                    text(name.downcast::<PyString>()?)?,
+                    text(name.cast::<PyString>()?)?,
                     self.canonical(&item, depth + 1)?,
                 ]));
             }
@@ -220,7 +220,7 @@ pub(crate) fn canonical_context<'py>(
             types.canonical(&value, 0)?
         };
         fields.push(JsonValue::Array(vec![
-            text(name.downcast::<PyString>()?)?,
+            text(name.cast::<PyString>()?)?,
             canonical,
         ]));
     }
@@ -232,7 +232,7 @@ pub(crate) fn canonical_context<'py>(
 
 /// An inaccessible declaration name, which is always a string, as JSON.
 pub(crate) fn plain_json(value: &Bound<'_, PyAny>) -> PyResult<JsonValue> {
-    match value.downcast::<PyString>() {
+    match value.cast::<PyString>() {
         Ok(string) => text(string),
         Err(_) => Err(pyo3::exceptions::PyTypeError::new_err(format!(
             "Object of type {} is not JSON serializable",

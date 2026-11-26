@@ -1621,7 +1621,7 @@ impl NativeProjectView {
             .get_or_try_init(py, || {
                 let mut rows: Vec<ResourceRow> = Vec::new();
                 for model in self.fields.models.bind(py).iter() {
-                    let model: Bound<'_, NativeCompiledModel> = model.downcast_into()?;
+                    let model: Bound<'_, NativeCompiledModel> = model.cast_into()?;
                     rows.push(model_graph_row(model.get(), py)?);
                 }
                 let compiler: &CompilerHandles = &self.fields.compiler;
@@ -1677,8 +1677,11 @@ pub struct RelationKeyRow {
     pub audits: Vec<(String, Option<String>)>,
 }
 
-impl<'py> pyo3::FromPyObject<'py> for RelationKeyRow {
-    fn extract_bound(value: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for RelationKeyRow {
+    type Error = pyo3::PyErr;
+
+    fn extract(value: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        let value: &pyo3::Bound<'py, pyo3::PyAny> = &value;
         let (kind, name, materialized, mode, strategy, has_cursor, unique_key, columns, audits): RelationKeyTuple = pyo3::types::PyAnyMethods::extract(value)?;
         Ok(Self {
             kind,

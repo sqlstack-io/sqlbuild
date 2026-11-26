@@ -30,7 +30,7 @@ pub(crate) fn storage_key<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = values.py();
     if let Some(materialized) = values.get_item(MATERIALIZED_KEY)?
-        && let Ok(text) = materialized.downcast::<PyString>()
+        && let Ok(text) = materialized.cast::<PyString>()
         && let Ok(text) = text.to_str()
         && classes.table_backed.iter().any(|name| name == text)
     {

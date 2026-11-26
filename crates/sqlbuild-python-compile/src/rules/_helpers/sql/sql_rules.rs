@@ -154,7 +154,7 @@ pub(crate) fn run_planned_sql_rules<'py>(
         early_lint: if early_lint.is_none() {
             None
         } else {
-            Some(early_lint.downcast::<EarlySqlLint>()?.borrow())
+            Some(early_lint.cast::<EarlySqlLint>()?.borrow())
         },
     };
     let lint_key: String = settings_lint_key(&run.settings);
@@ -247,7 +247,7 @@ fn sql_rule_models<'py>(
 /// The model's SQL rule entry, or `None` when its config opts out of SQL analysis.
 fn sql_rule_model(model: Bound<'_, PyAny>, keyed: bool) -> PyResult<Option<SqlRuleModel<'_>>> {
     let py: Python<'_> = model.py();
-    if let Ok(view) = model.downcast::<NativeCompiledModel>() {
+    if let Ok(view) = model.cast::<NativeCompiledModel>() {
         let inputs: SqlRuleInputs = view.get().sql_rule_inputs(py, keyed)?;
         let excluded: bool = match inputs.excluded {
             Some(excluded) => excluded,
@@ -283,7 +283,7 @@ fn sql_rule_model(model: Bound<'_, PyAny>, keyed: bool) -> PyResult<Option<SqlRu
 
 /// The model's relative path as POSIX text; a native view answers from its recorded facts.
 fn model_posix_path(model: &Bound<'_, PyAny>) -> PyResult<String> {
-    if let Ok(view) = model.downcast::<NativeCompiledModel>() {
+    if let Ok(view) = model.cast::<NativeCompiledModel>() {
         return Ok(view.get().sql_rule_inputs(model.py(), false)?.posix_path);
     }
     native_field(model, "relative_path")?

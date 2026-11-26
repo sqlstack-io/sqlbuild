@@ -29,7 +29,7 @@ impl PythonInterpolationHost<'_> {
 
     fn text(&self, value: &Bound<'_, PyAny>) -> Result<String, String> {
         value
-            .downcast::<PyString>()
+            .cast::<PyString>()
             .map_err(|error| self.hold(error.into()))?
             .to_str()
             .map(str::to_owned)

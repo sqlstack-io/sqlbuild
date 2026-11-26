@@ -40,7 +40,7 @@ pub(crate) fn given_files(files: &Bound<'_, PyAny>) -> PyResult<Option<Vec<LintF
         return Ok(None);
     }
     files
-        .downcast::<PyDict>()?
+        .cast::<PyDict>()?
         .iter()
         .map(|(path, contents)| {
             Ok(LintFile {
@@ -60,7 +60,7 @@ pub(crate) fn compiled_expansion_records(
     if expansions.is_none() {
         return Ok(compiled);
     }
-    for (path, expansion) in expansions.downcast::<PyDict>()?.iter() {
+    for (path, expansion) in expansions.cast::<PyDict>()?.iter() {
         if !expansion.is_none() {
             compiled.insert(
                 path.extract()?,

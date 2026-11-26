@@ -68,7 +68,7 @@ fn relation_names(rows: Vec<(String, String)>) -> Vec<String> {
 
 /// The relations a model's reference rows bind; a native model answers from its record.
 fn model_relation_names(model: &Bound<'_, PyAny>) -> PyResult<(Vec<String>, bool)> {
-    if let Ok(view) = model.downcast::<NativeCompiledModel>() {
+    if let Ok(view) = model.cast::<NativeCompiledModel>() {
         let rows: Vec<ReferenceTuple> = view.get().reference_rows(model.py())?;
         let referenced: bool = !rows.is_empty();
         let names: Vec<String> = relation_names(
@@ -154,7 +154,7 @@ fn binding_shape<'py>(
     arguments.set_item("inputs", inputs)?;
     Ok(native_field(&catalog, "inferred_schema")?
         .call((), Some(&arguments))?
-        .downcast_into::<PyDict>()?)
+        .cast_into::<PyDict>()?)
 }
 
 fn or_generic<'py>(dialect: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
@@ -403,8 +403,8 @@ pub(crate) fn published_model_shape<'py>(
     let request = Request::new("published_model_shape", request)?;
     published_shape(
         &request.get("model")?,
-        request.get("columns")?.downcast()?,
-        request.get("inputs")?.downcast()?,
+        request.get("columns")?.cast()?,
+        request.get("inputs")?.cast()?,
         &request.get("profile")?,
     )
 }

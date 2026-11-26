@@ -22,7 +22,7 @@ pub(crate) fn lifecycle_event_object(
         return Ok(Some(object));
     }
     let encoded = host_entry(py, ExecutorHost::LifecycleEventToJson)?.call1((event,))?;
-    let text = escaped_text(encoded.downcast::<PyString>()?)?;
+    let text = escaped_text(encoded.cast::<PyString>()?)?;
     match parse_event(&text) {
         Ok(object) => Ok(Some(object)),
         Err(_unencodable) => Ok(None),

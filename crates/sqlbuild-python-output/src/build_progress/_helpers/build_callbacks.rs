@@ -143,10 +143,8 @@ pub(crate) fn relay<'py>(
     callbacks: &Bound<'py, PyAny>,
     forward: Forward,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let owned: Py<BuildProgressCallbacks> = callbacks
-        .downcast::<BuildProgressCallbacks>()?
-        .clone()
-        .unbind();
+    let owned: Py<BuildProgressCallbacks> =
+        callbacks.cast::<BuildProgressCallbacks>()?.clone().unbind();
     let call = move |arguments: &Bound<'_, PyTuple>,
                      _keywords: Option<&Bound<'_, PyDict>>|
           -> PyResult<()> { forward(owned.get(), arguments) };

@@ -111,7 +111,7 @@ fn target_field<'py>(
     };
     let mut variables: Vec<String> = Vec::new();
     for name in effective_vars.try_iter()? {
-        if let Ok(name) = name?.downcast::<PyString>() {
+        if let Ok(name) = name?.cast::<PyString>() {
             variables.push(name.to_cow()?.into_owned());
         }
     }

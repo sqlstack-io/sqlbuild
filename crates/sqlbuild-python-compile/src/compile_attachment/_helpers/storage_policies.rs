@@ -26,7 +26,7 @@ fn defaults_entry<'py>(
     if materialized.is_none() {
         return Ok(None);
     }
-    let name: &Bound<'py, PyString> = materialized.downcast()?;
+    let name: &Bound<'py, PyString> = materialized.cast()?;
     native_field(materialization_defaults, &name.to_cow()?).map(Some)
 }
 

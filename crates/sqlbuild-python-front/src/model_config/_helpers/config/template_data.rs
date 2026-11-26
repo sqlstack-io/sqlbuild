@@ -55,8 +55,8 @@ pub(crate) fn expand_template_data<'py>(
     expanded_template_data(
         &request.get("value")?,
         (
-            request.get("variables")?.downcast()?,
-            request.get("context_values")?.downcast()?,
+            request.get("variables")?.cast()?,
+            request.get("context_values")?.cast()?,
         ),
         (
             TemplateOptions {

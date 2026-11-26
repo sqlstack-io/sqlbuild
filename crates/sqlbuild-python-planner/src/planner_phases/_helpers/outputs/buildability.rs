@@ -187,11 +187,11 @@ fn deferred_model_names(
         return Ok(None);
     }
     let mut listed: Vec<RelationPlace> = Vec::new();
-    for relation in relations.downcast::<PyDict>()?.values() {
+    for relation in relations.cast::<PyDict>()?.values() {
         listed.push(relation_place(&relation)?);
     }
     let mut names: std::collections::HashSet<String> = std::collections::HashSet::new();
-    for (name, location) in locations.downcast::<PyDict>()? {
+    for (name, location) in locations.cast::<PyDict>()? {
         let place: RelationPlace = relation_place(&location)?;
         if listed.iter().any(|relation| same_place(relation, &place)) {
             names.insert(name.extract()?);
