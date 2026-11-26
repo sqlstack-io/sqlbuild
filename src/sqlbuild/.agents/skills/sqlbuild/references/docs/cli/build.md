@@ -254,7 +254,10 @@ Execution  sqb build  (concurrency: 1)
 ✓ Completed successfully  PASS=99  WARN=0  FAIL=0  INSUFFICIENT=0  SKIP=0  TOTAL=99  (2.13s)
 ```
 
-Each resource prints one row when it finishes, followed by its tests and audits. Rows for
+Each resource prints one row when it finishes, followed by its tests and audits. After the run,
+`sqb build` prints warnings, failures, resources that did not run, skipped resources and a
+`Failed (N):` list with one line per failed resource, then the completion line, which is always
+last. Rows for
 individual warehouse statements and for steps inside a resource, such as `Create staging relation`,
 `Promote relation`, `loader callable`, or audit evaluation, appear only with `sqb --debug build`.
 Without `--debug`, a statement that is still running after 30 seconds prints a `RUNNING` row every

@@ -10,6 +10,7 @@ Online: https://sqlbuild.com/docs/cli/test/
 
 - Usage
 - Flags
+- Output
 - Local and warehouse runs
 - Statement summary
 - Python tests
@@ -42,7 +43,7 @@ Positional `SELECTOR` arguments work like `--select`, and both forms can be comb
 | `--run-on auto\|local\|warehouse` | Where unit tests run; overrides the target's and `[settings]` `test_run_on`. See [Local and warehouse runs](#local-and-warehouse-runs) |
 | `--verbose` | Print every refusal that keeps a test off DuckDB in full, instead of the census |
 | `--since <ref>` | Run only the tests affected by changes since the merge base of `<ref>` and `HEAD` (see [Run only affected tests](#run-only-affected-tests)); `@base` reads `[git] base_ref` |
-| `--explain` | With `--since`, print why each selected test was selected |
+| `--explain` | Print where each test runs and why; with `--since`, also why it was selected |
 | `--sql` | Run only SQL tests |
 | `--python` | Run only [Python tests](#python-tests); cannot be combined with `--inspect` or `--since` |
 
@@ -62,50 +63,110 @@ declared parameter types and nullability, typed values, and a content fingerprin
 are strings in JSON so their scale is preserved. Each test check in JSON output reports its
 `duration_ms`.
 
-Each test row shows how many real (unmocked) models the test executes, such as `3 real models`. A
-test that runs past its [time limit](../concepts/testing-reference.md#time-limits) is reported as `TIMEOUT`,
+On terminals at least 120 columns wide, each test row also shows how many real (unmocked) models
+the test executes, such as `3 real models`. A test that runs past its [time limit](../concepts/testing-reference.md#time-limits) is reported as `TIMEOUT`,
 counted under `TIMEOUT=` and excluded from `FAIL=` in the summary line
 (`PASS=4  FAIL=0  TIMEOUT=1  TOTAL=5`), and the run continues with the remaining tests. In `--json`
 output, `summary.fail_count` still includes timed-out tests, and `summary.timeout_count` reports how
 many of them timed out. A timeout still fails the run: `sqb test` exits non-zero.
 
+## Output
+
+`sqb test` prints a header, one row per test, then what went wrong, with the summary line last:
+
+```
+Tests ready  5 selected, 4 local, 1 on the warehouse
+  note: 1 test runs on the warehouse: fn:HASH 1 (--explain for where)
+
+Execution  sqb test  (concurrency: 4)
+
+✓ Test functions prepared  (0.05s)
+
+  fct_orders  (2 tests)
+  1/5  test      totals_match            PASS   local        0.12s
+  2/5  test      refunds_net_out         FAIL   local        0.09s
+         └── expected  fct_orders        FAIL   2 rows differ
+
+  3/5  test      test_stg_orders         PASS   local        0.03s
+  4/5  test      test_dim_customers      PASS   local        0.04s
+  5/5  test      test_order_status       PASS   warehouse    0.84s
+
+Failures:
+
+  fct_orders__refunds_net_out  (test, local)
+    error     expected rows of fct_orders differ: 1 missing, 1 extra (2 expected, 2 actual)
+                 order_id  status
+              -  1002      refunded  missing
+              +  1002      shipped  extra
+              status: expected refunded, actual shipped  changed
+    test      tests/unit/fct_orders/refunds_net_out.sql
+
+Failed (1):
+  ✗ fct_orders__refunds_net_out  2 rows differ
+
+  4 local, 1 on the warehouse
+  Statements: 5 on the warehouse (CREATE 2, DROP 2, WITH 1); compile 0.4s, execution 0.1s
+✗ Completed with errors  PASS=4  FAIL=1  TOTAL=5  (1.32s)
+```
+
+- The header counts the selected tests and where they run.
+- A model that more than one test targets heads its tests, and each row shows the test without
+  the `<model>__` prefix. A long name is cut in the middle to fit the terminal.
+- A passing test is one row. A failed test also lists its expectations (`expected <model>`,
+  `assertion <name>`) and its error, cut to two lines. `--verbose` lists the expectations of
+  passing tests too.
+- In a terminal, a footer at the bottom shows the counts so far, how many tests are running, how
+  many finished and wait to print, and the test running longest. Results print in the order the
+  tests were selected. Without a terminal, a heartbeat line prints instead, as `sqb build` does.
+- After the run, `Failures:` gives each failed test's full name and its whole error, the
+  differing rows, the statement that failed with its compiled SQL under `target/run/tests/`, and
+  the test file. A code frame is shown only when the warehouse names the line; DuckDB's own
+  `LINE n:` frame is printed as DuckDB writes it.
+- `Failed (N):` lists each failed test with a short reason, at most 20 without `--verbose`.
+- The detail lines and the summary line come last.
+
 ## Local and warehouse runs
 
 Each SQL test runs locally in DuckDB or on the warehouse, decided per test at compile time; see
 [Running tests locally](../concepts/testing-reference.md#running-tests-locally). Each row names
-where its test ran, and the summary splits the total:
+where its test ran, and the detail line before the summary splits the total.
+
+In `auto`, the header has a `note:` line that counts the tests going to the warehouse by cause.
+`--explain` adds where each cause is written, one `[N] reason  place` row per place:
 
 ```
-fact_orders
-    test      test_fact_orders                    PASS  warehouse  1 real model  0.84s
-PASS=4  FAIL=0  TOTAL=4  (3 local, 1 warehouse)
-Statements: 5 on the warehouse (CREATE 2, DROP 2, WITH 1); compile 0.4s, execution 0.1s
+Tests ready  40 selected, 37 local, 3 on the warehouse
+  note: 3 tests run on the warehouse: fn:HASH 2, project function 1 (--explain for where)
+
+On the warehouse (3 tests)
+  [ 2] fn:HASH           @py.status_hash  sql/models/staging/_sqlbuild/_macros/python/hashing.py:6
+  [ 1] project function  customer_orders
 ```
 
-A test that does not run is an `ERROR` row with a short reason: `can't run locally` (`T007`, with
-`--run-on local`) or `needs the warehouse (no connection)` (`T008`, in `auto`). A local test whose
-converted SQL hits a SQLQuack guard or a DuckDB internal error while it runs is also `T007` with
-`--run-on local`; in `auto` it runs again on the warehouse.
+A test that hits a SQLQuack guard or a DuckDB internal error while it runs locally runs again on
+the warehouse in `auto`, and a `note:` line after the rows says how many moved and why.
+`--verbose` prints the full diagnostics after the run, as notes (`note[SQ0008]`), since these
+tests still ran.
 
-After the summary:
-
-- With `--run-on local`, `Can't run locally (N tests)` lists SQLQuack's diagnostics: code,
-  message, the model or test file position, the source line with a caret and label, notes and
-  help, and `= tests:` with every test the refusal blocks. A refusal in a model's SQL points at
-  the model file; one in a fixture or expected rows at the test file; one inside a macro expansion
-  at the call site, with the generated SQL as the source line; one in SQL SQLBuild generates at the
-  compiled test under `target/run/tests/`.
-- In `auto`, `On the warehouse (N tests)` counts the tests each refusal sends to the warehouse,
-  most tests first:
+With `--run-on local`, a test DuckDB can't run as the warehouse would is not run. The header
+draws where each test runs and the causes:
 
 ```
-On the warehouse (4 tests)
-  a known difference that isn't allowed: fn:HASH  3 tests
-  missing rule: node:method_call                  1 test
+Tests ready  40 selected, 37 local, 3 can't run locally
+
+Run on (40)
+├── local                    37   DuckDB
+└── can't run locally         3   2 causes, listed after the run
+    ├── fn:HASH               2   SQ0008 · 2 models
+    └── project function      1
 ```
 
-`--verbose` and `--inspect` print the full diagnostics instead, as notes (`note[SQ0003]`), since these
-tests still run; under `--run-on local` they are errors.
+Those tests get no row and are counted under `NOT_RUN=`, and the run fails. After `Failures:`,
+`Can't run locally (N tests):` gives one block per cause, with its notes and help once, then each
+place the construct is written: a macro gets one frame from the macro's own source and
+`= used by` with the models it expands into; a construct written in a model gets a frame for that
+model. A test that does not run for want of a warehouse connection (`T008`, in `auto`) is counted
+under `NOT_RUN=` too, with a `Not run (N): needs the warehouse (no connection)` line.
 
 With `--json`, each check has `run_on` (`local` or `warehouse`) and `run_on_reason` (the first
 refusal's `<category>: <construct>`, or `null`), `summary` has `local_count` and
@@ -116,7 +177,7 @@ the tests it blocks.
 
 ## Statement summary
 
-After the pass/fail summary, `sqb test` and `sqb scenario test` print how many warehouse statements
+Before the summary line, `sqb test` and `sqb scenario test` print how many warehouse statements
 the SQL tests or scenarios sent, by leading keyword, and how long the warehouse spent compiling and executing them.
 Statements of tests and scenarios that ran locally are not counted:
 
