@@ -17,6 +17,7 @@ Online: https://sqlbuild.com/docs/cli/plan/
 - Models that can't be planned
 - Missing upstream dependencies
 - Missing source tables
+- Loads
 
 Shows the execution plan without making any changes. Useful for inspecting change detection, backfill policies, and selector scope before building.
 
@@ -274,3 +275,17 @@ When a selected model reads an external source whose table does not exist in the
 planning fails with `S405` before anything runs. The error names each missing source, its table,
 the selected models that read it, and the source declaration file and line. See
 [Source freshness: Missing source tables](../concepts/planning/source-freshness.md#missing-source-tables).
+A source a [load](../concepts/sources.md#loads) fills is not checked this way when the plan runs
+the load, since the build creates its table first.
+
+## Loads
+
+The plan shows each load it runs under `Loads to load`, with SQLLoad's plan of it beneath: the
+objects it creates or alters, and how each table moves. `sqb plan --json` lists them under
+`loads`, each with `name`, `every_table`, the selected `sources` and the `plan` lines. When a
+load's tables don't include one a selected source or model reads, planning fails with `S304`:
+
+```
+error[S304]: load 'shop' loads no table into 'shop__refunds'; its tables load into shop__orders
+  = help: read a table the load includes, or include the table in the load
+```

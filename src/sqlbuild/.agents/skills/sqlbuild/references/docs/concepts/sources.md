@@ -13,6 +13,7 @@ Online: https://sqlbuild.com/docs/concepts/sources/
 - Source audits
 - Type enforcement
 - Managed sources (loaders)
+- Loads
 - Source freshness
 - Config reference
 - YAML that SQLBuild reads
@@ -127,6 +128,70 @@ sources:
 Managed sources support incremental write strategies (`table`, `append`, `delete_insert`, `merge`), cursor-based loading, and concurrent execution.
 
 See [Loaders](python-nodes/loaders.md) for the full guide on writing loader functions, write strategies, the loader context API, and auto-load behavior during builds.
+
+## Loads
+
+A sources file can declare one **load**: a SQLLoad source that fills the
+SQLBuild sources named after it. In SQLBuild terms, a SQLLoad source is a load and each of its
+tables is a source. The `load:` mapping takes exactly SQLLoad's source keys, read and checked by
+SQLLoad itself, with `name` naming the load:
+
+```yaml
+load:
+  name: shop
+  kind: postgres
+  connection: shop_db
+  include: [public.*]
+  write_strategy: merge
+  tables:
+    public.orders:
+      unique_key: id
+sources:
+  - name: shop__orders
+    description: Orders from the shop database
+    columns:
+      - name: id
+        type: INTEGER
+```
+
+The load reads a [source connection](project-configuration.md#warehouse-and-source-connections),
+a `[connections.<name>]` entry with a `kind`. Its tables land in the target's database, in the
+load's `destination_schema` when it sets one and otherwise the target's `loader_schema` (or its
+`schema`).
+
+**Sources it fills.** A load names each destination table as SQLLoad does, `{load}__{table}` by
+default, and the source of the same name is filled by it. Listing the source adds what a source
+can say: a description, column types, audits, freshness and contracts. A source the load fills
+can't set `database`, `schema`, `table`, `expression`, `managed` or a loading setting such as
+`write_strategy`; those belong to the load. Column types are declared on the sources, not under
+`load.tables`, and SQLLoad uses them as the table's pinned types.
+
+A model may read a table of the load without listing it: `__source("shop__customers")` makes the
+source, filled by `shop`. Compiling never connects to the load's connection. With a literal
+`include`, compiling fails when a source names a table the load doesn't include; with a pattern,
+the plan checks it once SQLLoad has listed the tables, and fails with `S304`.
+
+**Planning and building.** A load is one node in the graph, upstream of the sources it fills.
+`sqb plan` shows SQLLoad's plan of each load it runs, the routes, column types and write
+strategies `sqlload plan` prints, and `sqb build` runs each load before the models that read its
+tables, through the target's own warehouse connection:
+
+- selecting the load, with `load:shop`, `kind:load` or `+` expansion, loads every table it includes
+- selecting sources it fills, or models that read them when sources load automatically, loads only
+  those tables
+
+Each run records the load's report, the rows and changes of each table, as the load's node result.
+SQLLoad keeps its own state in its `_sqlload_*` tables beside the loaded ones.
+
+**Moving from `sqlload.toml`.** Each `[sources.<name>]` block moves into a sources file's `load:`
+mapping with the same keys, `name: <name>` added, and each `[sources.<name>.tables."<table>"]`
+block into `load.tables`. Move `columns` from the tables onto the sources the load fills. The
+connections move into `[connections.<name>]` unchanged, `${ENV:NAME}` references included; the
+target's `loader_schema` takes the place of the SQLLoad target's.
+
+Loads write to DuckDB, MotherDuck, Postgres, Snowflake, BigQuery and ClickHouse warehouses. A
+project on SQLite or SQL Server can't declare one, and a Databricks load fails when it runs: SQLLoad
+stages its files in a volume, which SQLBuild's Databricks connection doesn't name yet.
 
 ## Source freshness
 
