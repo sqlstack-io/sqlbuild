@@ -14368,6 +14368,27 @@ class SeedPlanEntry(NativeRecord):
         reason: PlanReason = ...,
     ) -> None: ...
 
+class LoadPlanEntry(NativeRecord):
+    """A load the plan runs: every table it loads, or only the selected sources' tables."""
+
+    key: CompiledObjectKey
+    name: str
+    sources: tuple[str, ...]
+    every_table: bool
+    fingerprint: str
+    is_reload: bool
+    plan_lines: tuple[str, ...]
+    def __init__(
+        self,
+        key: CompiledObjectKey,
+        name: str,
+        fingerprint: str,
+        sources: tuple[str, ...] = ...,
+        every_table: bool = ...,
+        is_reload: bool = ...,
+        plan_lines: tuple[str, ...] = ...,
+    ) -> None: ...
+
 class SourceLoadPlanEntry(NativeRecord):
     """Per-managed-source loader execution plan entry."""
 
@@ -14690,6 +14711,7 @@ class PlanOutput(NativeRecord):
     model_entries: tuple[ModelPlanEntry, ...]
     seed_entries: tuple[SeedPlanEntry, ...]
     source_load_entries: tuple[SourceLoadPlanEntry, ...]
+    load_entries: tuple[LoadPlanEntry, ...]
     function_entries: tuple[FunctionPlanEntry, ...]
     audit_entries: tuple[AuditPlanEntry, ...]
     test_entries: tuple[SqlTestPlanEntry, ...]
@@ -14729,6 +14751,7 @@ class PlanOutput(NativeRecord):
         model_entries: tuple[ModelPlanEntry, ...] = ...,
         seed_entries: tuple[SeedPlanEntry, ...] = ...,
         source_load_entries: tuple[SourceLoadPlanEntry, ...] = ...,
+        load_entries: tuple[LoadPlanEntry, ...] = ...,
         function_entries: tuple[FunctionPlanEntry, ...] = ...,
         audit_entries: tuple[AuditPlanEntry, ...] = ...,
         test_entries: tuple[SqlTestPlanEntry, ...] = ...,

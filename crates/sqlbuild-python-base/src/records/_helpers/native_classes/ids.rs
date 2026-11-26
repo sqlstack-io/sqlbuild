@@ -531,6 +531,7 @@ native_id_names! {
         RecordId::SourceFreshnessUnknown => "SourceFreshnessUnknown",
         RecordId::SourceFreshnessUnknownReason => "SourceFreshnessUnknownReason",
         RecordId::SourceFreshnessValueKind => "SourceFreshnessValueKind",
+        RecordId::LoadPlanEntry => "LoadPlanEntry",
         RecordId::SourceLoadPlanEntry => "SourceLoadPlanEntry",
         RecordId::SourceLocation => "SourceLocation",
         RecordId::SourceWriteStrategy => "SourceWriteStrategy",

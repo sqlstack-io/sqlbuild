@@ -27,6 +27,15 @@ fn given_plan_counts_when_summarised_then_only_what_runs_is_named() {
             expected_parts: &["3 selected", "1 source to reload", "2 Python nodes"],
         },
         PlanSummaryTestCase {
+            description: "a model and the load that fills its source",
+            counts: PlanSummaryCounts {
+                selected: 1,
+                loads: 1,
+                ..PlanSummaryCounts::default()
+            },
+            expected_parts: &["1 selected", "1 load to load"],
+        },
+        PlanSummaryTestCase {
             description: "a plan with nothing at all",
             counts: PlanSummaryCounts::default(),
             expected_parts: &["0 selected"],

@@ -524,6 +524,7 @@ pub enum RecordId {
     SourceFreshnessUnknown,
     SourceFreshnessUnknownReason,
     SourceFreshnessValueKind,
+    LoadPlanEntry,
     SourceLoadPlanEntry,
     SourceLocation,
     SourceWriteStrategy,

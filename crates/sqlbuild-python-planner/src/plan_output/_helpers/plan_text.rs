@@ -8,9 +8,9 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyString, PyTuple};
 use sqlbuild_analysis::node_set_dependencies::main::wait_changes::wait_changes;
 use sqlbuild_core::cli_text::models::{
-    CliStyle, CursorPlanText, DisplayLimit, FunctionPlanText, ModelPlanText, PlanTextReport,
-    PlanWarningText, ProviderUsageText, PythonPlanText, RenameHintText, SchemaFindingText,
-    SeedPlanText, SourceFreshnessText, SourceLoadPlanText,
+    CliStyle, CursorPlanText, DisplayLimit, FunctionPlanText, LoadPlanText, ModelPlanText,
+    PlanTextReport, PlanWarningText, ProviderUsageText, PythonPlanText, RenameHintText,
+    SchemaFindingText, SeedPlanText, SourceFreshnessText, SourceLoadPlanText,
 };
 use sqlbuild_core::plan_display::main::format_query_diff::format_query_diff;
 use std::collections::BTreeMap;
@@ -353,6 +353,16 @@ fn source_load_text(entry: &Bound<'_, PyAny>) -> PyResult<SourceLoadPlanText> {
     })
 }
 
+fn load_text(entry: &Bound<'_, PyAny>) -> PyResult<LoadPlanText> {
+    Ok(LoadPlanText {
+        name: text(&native_field(entry, "name")?)?,
+        every_table: native_field(entry, "every_table")?.is_truthy()?,
+        sources: texts(&native_field(entry, "sources")?)?,
+        is_reload: native_field(entry, "is_reload")?.is_truthy()?,
+        lines: texts(&native_field(entry, "plan_lines")?)?,
+    })
+}
+
 /// What a Python entry now also waits on, or no longer, since the build its identity was recorded by.
 pub(crate) fn entry_wait_changes(entry: &Bound<'_, PyAny>, name: &str) -> PyResult<Vec<String>> {
     let previous: Option<String> = native_field(entry, "previous_metadata_json")?.extract()?;
@@ -587,6 +597,10 @@ pub(crate) fn report(arguments: &KeywordArguments<'_>) -> PyResult<PlanTextRepor
         source_loads: items(&native_field(&plan, "source_load_entries")?)?
             .iter()
             .map(source_load_text)
+            .collect::<PyResult<_>>()?,
+        loads: items(&native_field(&plan, "load_entries")?)?
+            .iter()
+            .map(load_text)
             .collect::<PyResult<_>>()?,
         provider_usages: provider_usages(&plan, &python_entries)?,
         python_entries: python_entries

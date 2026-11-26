@@ -4,6 +4,7 @@ use crate::planner_entries::_helpers::entries::model_entries::scope_overlaps;
 use crate::planner_entries::_helpers::entries::values::{
     error_of, native, none, planner_model, planner_type, string,
 };
+use crate::planner_entries::_helpers::plans::load_entries::{PlannedLoads, planned_loads};
 use crate::planner_entries::models::PlanOutputInputs;
 use crate::planner_resolution::main::references::resolve_function_sql::resolve_function_sql;
 use crate::planner_strategy::main::audit_entries::build_selected_audit_entries::build_selected_audit_entries;
@@ -729,6 +730,25 @@ pub(crate) fn plan_output_fields<'py>(
         PyTuple::empty(py).into_any()
     };
     require_intermediate_loader_targets(&project, &snapshot, &source_map, &source_load_entries)?;
+    let (load_entries, added_load_keys): PlannedLoads<'py> =
+        if native_field(&scope, "load_sources")?.is_truthy()? {
+            planned_loads(
+                &project,
+                &selected_keys,
+                &source_map,
+                reload_sources.is_truthy()?,
+            )?
+        } else {
+            (Vec::new(), Vec::new())
+        };
+    let selected_keys: Bound<'py, PyAny> = if added_load_keys.is_empty() {
+        selected_keys
+    } else {
+        let mut keys: Vec<Bound<'py, PyAny>> =
+            selected_keys.try_iter()?.collect::<PyResult<_>>()?;
+        keys.extend(added_load_keys);
+        PyFrozenSet::new(py, keys)?.into_any()
+    };
     let functions = function_entries(
         (&project, &dialect, &snapshot),
         &relations,
@@ -795,6 +815,7 @@ pub(crate) fn plan_output_fields<'py>(
             )?
             .into_any(),
         ),
+        ("load_entries", tuple_of(py, load_entries)?),
         ("function_entries", tuple_of(py, functions)?),
         (
             "audit_entries",

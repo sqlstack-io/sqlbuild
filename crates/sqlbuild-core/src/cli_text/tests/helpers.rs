@@ -48,6 +48,7 @@ pub(super) fn plan_report(models: Vec<ModelPlanText>) -> PlanTextReport {
         functions: Vec::new(),
         seeds: Vec::new(),
         source_loads: Vec::new(),
+        loads: Vec::new(),
         python_entries: Vec::new(),
         provider_usages: Vec::new(),
         warnings: Vec::new(),

@@ -11,9 +11,9 @@ use crate::plan_output::_helpers::plan_json::providers_json;
 use crate::plan_output::_helpers::plan_json::python_entry_json;
 use crate::plan_output::_helpers::plan_json::retention_json;
 use crate::plan_output::_helpers::plan_json::seed_json;
-use crate::plan_output::_helpers::plan_json::source_load_json;
 use crate::plan_output::_helpers::plan_json::table_type_json;
 use crate::plan_output::_helpers::plan_json::warning_json;
+use crate::plan_output::_helpers::plan_json::{load_json, source_load_json};
 use crate::plan_output::_helpers::values::mapped;
 use crate::plan_output::constants::{
     CHANGED_KEY, CONCURRENCY_JOBS_KEY, FULL_REFRESH_JOBS_KEY, IGNORE_AUDIT_FAILURES_JOBS_KEY,
@@ -127,6 +127,10 @@ pub fn format_plan_json(py: Python<'_>, options: Option<Bound<'_, PyDict>>) -> P
         ],
     )?;
     mark_renames(&result)?;
+    let loads: Bound<'_, PyAny> = native_field(&plan, "load_entries")?;
+    if loads.is_truthy()? {
+        result.set_item("loads", mapped(&loads, load_json)?)?;
+    }
     let metadata: Bound<'_, PyAny> = native_field(&plan, "metadata")?;
     if metadata.is_truthy()? {
         result.set_item("metadata", &metadata)?;
