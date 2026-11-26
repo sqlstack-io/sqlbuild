@@ -1894,31 +1894,31 @@ reason = "Python passes the expansion state as one five-item tuple; StateInput r
 rule = "FPRSS012"
 path = "crates/sqlbuild-python-project/src/analysis_session/types.rs"
 symbols = ["PivotRequestTuple"]
-reason = "Python passes each of these records as one positional tuple; extract_bound reads it in a single tuple extraction and names each position, as the positional record it replaces did."
+reason = "Python passes each of these records as one positional tuple; extract reads it in a single tuple extraction and names each position, as the positional record it replaces did."
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS012"
 path = "crates/sqlbuild-python-project/src/compiled_project/types.rs"
 symbols = ["FunctionSettingsTuple", "TestBlockTuple"]
-reason = "Python passes each of these records as one positional tuple; extract_bound reads it in a single tuple extraction and names each position, as the positional record it replaces did."
+reason = "Python passes each of these records as one positional tuple; extract reads it in a single tuple extraction and names each position, as the positional record it replaces did."
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS012"
 path = "crates/sqlbuild-python-project/src/compiled_views/types.rs"
 symbols = ["RelationKeyTuple"]
-reason = "Python passes each of these records as one positional tuple; extract_bound reads it in a single tuple extraction and names each position, as the positional record it replaces did."
+reason = "Python passes each of these records as one positional tuple; extract reads it in a single tuple extraction and names each position, as the positional record it replaces did."
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS012"
 path = "crates/sqlbuild-python-project/src/analysis_session/models.rs"
-symbols = ["FamilyRow::extract_bound"]
-reason = "Python passes each of these records as one positional tuple; extract_bound reads it in a single tuple extraction and names each position, as the positional record it replaces did."
+symbols = ["FamilyRow::extract"]
+reason = "Python passes each of these records as one positional tuple; extract reads it in a single tuple extraction and names each position, as the positional record it replaces did."
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS012"
 path = "crates/sqlbuild-python-project/src/compiled_project/models.rs"
-symbols = ["FunctionRow::extract_bound", "TestFileRow::extract_bound", "ScenarioRow::extract_bound", "AuditBlockRow::extract_bound", "AuditFileRow::extract_bound", "PythonResourceRow::extract_bound", "ScenarioDescriptionRow::extract_bound", "HookDescriptionRow::extract_bound", "ProofPy::extract_bound", "AnalysisPy::extract_bound"]
-reason = "Python passes each of these records as one positional tuple; extract_bound reads it in a single tuple extraction and names each position, as the positional record it replaces did."
+symbols = ["FunctionRow::extract", "TestFileRow::extract", "ScenarioRow::extract", "AuditBlockRow::extract", "AuditFileRow::extract", "PythonResourceRow::extract", "ScenarioDescriptionRow::extract", "HookDescriptionRow::extract", "ProofPy::extract", "AnalysisPy::extract"]
+reason = "Python passes each of these records as one positional tuple; extract reads it in a single tuple extraction and names each position, as the positional record it replaces did."
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS201"
@@ -1935,8 +1935,8 @@ reason = "CompiledProjectGraph implement Debug manually because they cache Pytho
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS012"
 path = "crates/sqlbuild-python-project/src/graph/models.rs"
-symbols = ["ResourceRow::extract_bound"]
-reason = "Python passes each of these records as one positional tuple; extract_bound reads it in a single tuple extraction and names each position, as the positional record it replaces did."
+symbols = ["ResourceRow::extract"]
+reason = "Python passes each of these records as one positional tuple; extract reads it in a single tuple extraction and names each position, as the positional record it replaces did."
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS201"
@@ -1959,14 +1959,14 @@ reason = "AuditProjections, FunctionProjections, NativeCompiledFunction, SeedHan
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS012"
 path = "crates/sqlbuild-python-project/src/resource_views/models.rs"
-symbols = ["SeedNamespace::extract_bound"]
-reason = "Python passes each of these records as one positional tuple; extract_bound reads it in a single tuple extraction and names each position, as the positional record it replaces did."
+symbols = ["SeedNamespace::extract"]
+reason = "Python passes each of these records as one positional tuple; extract reads it in a single tuple extraction and names each position, as the positional record it replaces did."
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS012"
 path = "crates/sqlbuild-python-compile/src/compile_outputs/models.rs"
-symbols = ["SettingsRow::extract_bound"]
-reason = "Python passes each of these records as one positional tuple; extract_bound reads it in a single tuple extraction and names each position, as the positional record it replaces did."
+symbols = ["SettingsRow::extract"]
+reason = "Python passes each of these records as one positional tuple; extract reads it in a single tuple extraction and names each position, as the positional record it replaces did."
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS201"
@@ -1977,8 +1977,8 @@ reason = "NativeModelLoop implement Debug manually because they cache Python pro
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS012"
 path = "crates/sqlbuild-python-compile/src/input_loops/models.rs"
-symbols = ["LoopSwitches::extract_bound"]
-reason = "Python passes each of these records as one positional tuple; extract_bound reads it in a single tuple extraction and names each position, as the positional record it replaces did."
+symbols = ["LoopSwitches::extract"]
+reason = "Python passes each of these records as one positional tuple; extract reads it in a single tuple extraction and names each position, as the positional record it replaces did."
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS201"
