@@ -130,6 +130,7 @@ export type PlatformEventKind =
 	| 'trigger_skipped'
 	| 'sensor_rechecked'
 	| 'calendar_times_dropped'
+	| 'unreadable_event_skipped'
 	| 'scheduler_no_leader'
 	| 'location_broken'
 	| 'location_failing'

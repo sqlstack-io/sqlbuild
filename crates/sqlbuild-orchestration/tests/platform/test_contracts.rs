@@ -22,6 +22,8 @@ mod test_problems;
 mod test_provider_secrets;
 #[path = "test_types.rs"]
 mod test_types;
+#[path = "test_unreadable_events.rs"]
+mod test_unreadable_events;
 #[path = "test_watchdog.rs"]
 mod test_watchdog;
 #[path = "test_webhook.rs"]

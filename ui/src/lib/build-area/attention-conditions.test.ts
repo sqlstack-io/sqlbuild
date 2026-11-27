@@ -97,6 +97,13 @@ describe('server problems, whose event IDs are fixed per problem', () => {
 		expect(stateOf(item({ low_calendars: [cal('c-1'), cal('c-2')] }), [acknowledged(one)]).lapsed).toBe('1 more calendar running out of dates since it was acknowledged');
 	});
 
+	it('comes back when another stored event is skipped', () => {
+		const skip = (storage_id: number) => ({ ...place, storage_id, event_id: `e${storage_id}`, event_type: 'platform_run_failed', skipped_at: iso(-1), reason: 'missing field `trigger`' });
+		const one = item({ skipped_events: [skip(3)] });
+		expect(stateOf(item({ skipped_events: [skip(3)] }), [acknowledged(one)]).acknowledged).toBe(true);
+		expect(stateOf(item({ skipped_events: [skip(3), skip(5)] }), [acknowledged(one)]).lapsed).toBe('1 more stored event skipped since it was acknowledged');
+	});
+
 	it('tells one scheduler or location outage from the next', () => {
 		const outage = item({ scheduler_leader: false, scheduler_lease_expires_at: iso(-3) });
 		expect(stateOf(item({ scheduler_leader: false, scheduler_lease_expires_at: iso(-3) }), [acknowledged(outage)]).acknowledged).toBe(true);
@@ -154,6 +161,10 @@ describe('acknowledgements of conditions that cleared', () => {
 		const elsewhere = [ack('event:location_broken:loc-2:prod:billing · prod'), ack('event:tick_overdue:loc-1:prod:shop · prod'), ack('event:calendar_horizon_low:loc-2:dev:billing · dev')];
 		expect(read([built([])], elsewhere).clearedAcknowledgements).toEqual([]);
 		expect(read([built([])], [ack('event:scheduler_no_leader::')]).clearedAcknowledgements).toEqual([ack('event:scheduler_no_leader::')]);
+		// Skipped stored events without a target are listed to everyone; another target's are not.
+		expect(read([built([])], [ack('event:unreadable_event_skipped::')]).clearedAcknowledgements).toEqual([ack('event:unreadable_event_skipped::')]);
+		expect(read([built([])], [ack('event:unreadable_event_skipped:loc-2:prod:billing · prod')]).clearedAcknowledgements).toEqual([]);
+		expect(read([built([])], [ack('event:unreadable_event_skipped:loc-1:dev:shop · dev')]).clearedAcknowledgements).toHaveLength(1);
 		expect(read([built([])], [ack('event:location_broken:loc-1:dev:shop · dev')]).clearedAcknowledgements).toHaveLength(1);
 	});
 

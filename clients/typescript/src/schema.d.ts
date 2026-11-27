@@ -3955,9 +3955,26 @@ export interface components {
             times: string[];
             /** Format: uuid */
             trigger_id: string;
+        } | {
+            /** Format: uuid */
+            event_id: string;
+            /** @description The stored type, such as `platform_run_failed`. */
+            event_type: string;
+            /** @enum {string} */
+            kind: "unreadable_event_skipped";
+            /**
+             * Format: uuid
+             * @description The location target the event concerns, when it names or leads to one.
+             */
+            location_id?: string | null;
+            /** @description Why the event couldn't be read. */
+            reason: string;
+            /** Format: int64 */
+            storage_id: number;
+            target?: string | null;
         };
         /** @enum {string} */
-        PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "location_failing" | "launch_failed" | "run_failed" | "trigger_skipped" | "sensor_rechecked" | "calendar_times_dropped";
+        PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "location_failing" | "launch_failed" | "run_failed" | "trigger_skipped" | "sensor_rechecked" | "calendar_times_dropped" | "unreadable_event_skipped";
         /** @description Problems derived from live state when read; nothing here is stored. */
         PlatformProblems: {
             broken_locations: components["schemas"]["BrokenLocation"][];
@@ -3982,6 +3999,8 @@ export interface components {
              * @description When the last scheduler lease ran out, or will run out; absent until a server first leads.
              */
             scheduler_lease_expires_at?: string | null;
+            /** @description Stored events webhook delivery or a platform sensor skipped because this server can't read them, while they are kept and still can't be read. */
+            skipped_events?: components["schemas"]["SkippedEvent"][];
             /** @description Triggers skipped because their stored job or pinned snapshot can't be read, until their location publishes again. */
             skipped_triggers?: components["schemas"]["SkippedTrigger"][];
         };
@@ -5323,6 +5342,29 @@ export interface components {
              */
             failed: number;
             name: string;
+        };
+        /** @description A stored event webhook delivery or a platform sensor skipped because this server can't read it; it clears once the event can be read or is pruned. */
+        SkippedEvent: {
+            /** Format: uuid */
+            event_id: string;
+            /** @description The stored type, such as `platform_run_failed`. */
+            event_type: string;
+            /**
+             * Format: uuid
+             * @description The location target the event concerns; absent when it names none that can be read.
+             */
+            location_id?: string | null;
+            location_name?: string | null;
+            /** @description Why the event couldn't be read. */
+            reason: string;
+            /**
+             * Format: date-time
+             * @description When it was first skipped.
+             */
+            skipped_at: string;
+            /** Format: int64 */
+            storage_id: number;
+            target?: string | null;
         };
         /** @description A trigger the scheduler skips because its stored job or pinned snapshot can't be read, or a sensor whose check failed; it clears once its location publishes again or, for a sensor, a later check completes. */
         SkippedTrigger: {

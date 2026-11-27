@@ -1404,6 +1404,10 @@ paths = ["crates/sqlbuild-orchestration/src/platform/models.rs", "crates/sqlbuil
 reason = "PlatformEvent::event_type and RunChange::event_type each name their own enum's stored event types, one arm per variant; only the variant-to-string match shape is alike."
 
 [[dupes.allowlist]]
+paths = ["crates/sqlbuild-host/src/models.rs", "crates/sqlbuild-orchestration/src/platform/models.rs"]
+reason = "ExecutionPhase::value and PlatformEventKind::as_str each name their own enum's variants, one arm per variant, in crates that don't depend on each other; only the twelve-arm variant-to-string match shape is alike."
+
+[[dupes.allowlist]]
 paths = ["crates/sqlbuild-cli/src/person_login/main/read_past_runs.rs", "crates/sqlbuild-cli/src/person_login/main/read_sensor_events.rs", "crates/sqlbuild-cli/src/person_login/main/request_warehouse_sync.rs"]
 reason = "Each is the public entry for one request a saved `sqb login` session makes: it opens the session and calls its own transport request, which stays private to person_login. Only the open-session-then-call shape is alike; the requests, arguments and results differ."
 

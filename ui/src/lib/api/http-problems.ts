@@ -27,7 +27,7 @@ function failingMessage(place: string, location: Wire['FailingLocation']): strin
 	return `${place}: ${FAILED[location.state] ?? location.state}${error}. ${serving}`;
 }
 
-/** Live problems as active banner events: a stopped scheduler, each broken location, and late schedules, low calendars, skipped triggers, sensors checked again from scratch and calendars' dropped times per location. */
+/** Live problems as active banner events: a stopped scheduler, each broken location, and late schedules, low calendars, skipped triggers, sensors checked again from scratch, calendars' dropped times and skipped stored events per location. */
 export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number): PlatformEvent[] {
 	const events: PlatformEvent[] = [];
 	if (!problems.scheduler_leader) {
@@ -231,6 +231,27 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 					: `${calendars.length} calendars in ${place} dropped pending times, starting with ${first.name}, which won’t tick ${droppedTimes(first.times)}.`
 		});
 	}
+	const unread = new Map<string, Wire['SkippedEvent'][]>();
+	for (const event of problems.skipped_events ?? []) {
+		const key = event.location_id && event.target ? keyOf(event.location_id, event.target) : '';
+		unread.set(key, [...(unread.get(key) ?? []), event]);
+	}
+	for (const [key, items] of unread) {
+		const first = items.reduce((a, b) => (a.skipped_at <= b.skipped_at ? a : b));
+		const place = first.location_name && first.target ? placeOf(first.location_name, first.target) : null;
+		const what = items.length === 1 ? `A stored ${first.event_type} event` : `${items.length} stored events, starting with a ${first.event_type} event,`;
+		events.push({
+			id: `skipped:${key || 'server'}`,
+			kind: 'unreadable_event_skipped',
+			severity: 'warning',
+			occurredAt: first.skipped_at,
+			members: [...new Set(items.map((e) => String(e.storage_id)))].sort(),
+			active: true,
+			locationId: key || null,
+			subject: place,
+			message: `${what}${place ? ` in ${place}` : ''} can’t be read by this SQLBuild release, so webhooks and platform sensors skipped ${items.length === 1 ? 'it' : 'them'} and carried on: ${first.reason}.`
+		});
+	}
 	return events;
 }
 
@@ -330,6 +351,15 @@ function storedRecord(wire: Wire['PersonPlatformEvent'], names: Map<string, stri
 			return { ...base, kind: event.kind, severity: 'warning', message: `A trigger in ${place ?? 'a location'} was skipped: ${event.reason}.`, links: key ? [{ kind: 'trigger', id: event.trigger_id, name: 'trigger', locationId: key }] : [], payload: { snapshot_id: event.snapshot_id } };
 		case 'calendar_times_dropped':
 			return { ...base, kind: event.kind, severity: 'warning', message: `A calendar in ${place ?? 'a location'} dropped pending times ${droppedTimes(event.times)}: its previous definition couldn’t be read.`, links: key ? [{ kind: 'trigger', id: event.trigger_id, name: 'calendar', locationId: key }] : [], payload: { snapshot_id: event.snapshot_id, times: event.times.join(', ') } };
+		case 'unreadable_event_skipped':
+			return {
+				...base,
+				kind: event.kind,
+				severity: 'warning',
+				message: `A stored ${event.event_type} event${place ? ` in ${place}` : ''} couldn’t be read, so webhooks and platform sensors skipped it: ${event.reason}.`,
+				links: key ? [{ kind: 'location', id: key }] : [],
+				payload: { event_type: event.event_type, storage_id: String(event.storage_id) }
+			};
 		case 'sensor_rechecked':
 			return { ...base, kind: event.kind, severity: 'info', message: `A sensor in ${place ?? 'a location'} was checked again from scratch: its last check was recorded by an earlier SQLBuild release and couldn’t be read.`, links: key ? [{ kind: 'trigger', id: event.trigger_id, name: 'sensor', locationId: key }] : [], payload: { snapshot_id: event.snapshot_id, evaluation_id: event.evaluation_id } };
 		case 'launch_failed':

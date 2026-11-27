@@ -21,7 +21,7 @@ use crate::store::tests::store_helpers::{close_test_store, open_test_store, run}
 use crate::store::tests::store_test_types::Backend;
 
 /// Every kind a person reads from stored events, in the order `PlatformEventKind` sorts.
-const EVERY_READABLE_KIND: [PlatformEventKind; 8] = [
+const EVERY_READABLE_KIND: [PlatformEventKind; 9] = [
     PlatformEventKind::SchedulerNoLeader,
     PlatformEventKind::TickOverdue,
     PlatformEventKind::CalendarHorizonLow,
@@ -30,6 +30,7 @@ const EVERY_READABLE_KIND: [PlatformEventKind; 8] = [
     PlatformEventKind::TriggerSkipped,
     PlatformEventKind::SensorRechecked,
     PlatformEventKind::CalendarTimesDropped,
+    PlatformEventKind::UnreadableEventSkipped,
 ];
 
 #[test]
@@ -117,6 +118,14 @@ fn given_every_stored_event_kind_and_a_failing_sync_when_a_person_reads_problems
                     trigger_id,
                     snapshot_id,
                     evaluation_id: Uuid::now_v7(),
+                },
+                PlatformEvent::UnreadableEventSkipped {
+                    storage_id: 1,
+                    event_id: Uuid::now_v7(),
+                    event_type: "platform_run_failed".into(),
+                    location_id: Some(location_id),
+                    target: Some("development".into()),
+                    reason: "missing field `trigger`".into(),
                 },
                 PlatformEvent::CalendarTimesDropped {
                     trigger_id,

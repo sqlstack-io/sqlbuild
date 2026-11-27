@@ -10,14 +10,12 @@ use crate::credentials::models::{Action, DefaultRole};
 use crate::platform::models::{
     EventScope, PayloadScope, PersonPlatformEvent, PersonPlatformEventPage, PlatformEvent,
     PlatformEventEnvelope, PlatformEventPayload, StoredPlatformEvent, UnreadablePlatformEvent,
+    UnreadableRow,
 };
 use crate::store::errors::ControlError;
 use crate::store::main::{decode_row::decode_row, query::query, query_records::query_records};
 use crate::store::models::ControlStore;
 use crate::store::models::{ControlTransaction, Parameter};
-
-/// An unreadable event and the trigger or run its payload names, whose location target scopes it.
-type Unreadable = (UnreadablePlatformEvent, Option<Uuid>);
 
 /// Up to `limit` events before `before` without heartbeats, run failures or orphans, targets resolved, and where a further scan continues.
 pub(crate) async fn event_history(
@@ -39,7 +37,7 @@ pub(crate) async fn event_history(
         .then(|| rows.last().map(|row| row.storage_id))
         .flatten();
     let mut events: Vec<PlatformEventEnvelope> = Vec::new();
-    let mut unreadable: Vec<Unreadable> = Vec::new();
+    let mut unreadable: Vec<UnreadableRow> = Vec::new();
     for row in rows {
         match read_event(row) {
             Ok(envelope) => events.push(envelope),
@@ -59,8 +57,8 @@ pub(crate) async fn event_history(
             _ => {}
         }
     }
-    triggers.extend(unreadable.iter().filter_map(|(_, scope)| *scope));
-    runs.extend(unreadable.iter().filter_map(|(_, scope)| *scope));
+    triggers.extend(unreadable.iter().filter_map(|row| row.scope));
+    runs.extend(unreadable.iter().filter_map(|row| row.scope));
     let (transaction, mut scopes) =
         scopes_of(transaction, ("sqb_triggers", "trigger_id"), &triggers).await?;
     let (transaction, run_scopes) = scopes_of(transaction, ("sqb_runs", "run_id"), &runs).await?;
@@ -80,7 +78,9 @@ pub(crate) async fn event_history(
 }
 
 /// The row's event, or what is known about it and why it can't be read.
-fn read_event(row: StoredPlatformEvent) -> Result<PlatformEventEnvelope, Box<Unreadable>> {
+pub(crate) fn read_event(
+    row: StoredPlatformEvent,
+) -> Result<PlatformEventEnvelope, Box<UnreadableRow>> {
     let payload: Value = match row.payload {
         Value::String(text) => serde_json::from_str(&text).unwrap_or(Value::String(text)),
         payload => payload,
@@ -95,8 +95,8 @@ fn read_event(row: StoredPlatformEvent) -> Result<PlatformEventEnvelope, Box<Unr
         Err(error) => {
             let named: PayloadScope =
                 serde_json::from_value(payload["platform"].clone()).unwrap_or_default();
-            Err(Box::new((
-                UnreadablePlatformEvent {
+            Err(Box::new(UnreadableRow {
+                event: UnreadablePlatformEvent {
                     storage_id: row.storage_id,
                     event_id: row.event_id,
                     occurred_at: row.occurred_at,
@@ -105,15 +105,18 @@ fn read_event(row: StoredPlatformEvent) -> Result<PlatformEventEnvelope, Box<Unr
                     location_id: named.location_id,
                     target: named.target,
                 },
-                named.trigger_id.or(named.run_id),
-            )))
+                scope: named.trigger_id.or(named.run_id),
+            }))
         }
     }
 }
 
 /// An unreadable event's location target: the one it names, else its trigger's or run's.
-fn scoped(
-    (mut item, scope): Unreadable,
+pub(crate) fn scoped(
+    UnreadableRow {
+        event: mut item,
+        scope,
+    }: UnreadableRow,
     scopes: &BTreeMap<Uuid, (Uuid, String)>,
 ) -> UnreadablePlatformEvent {
     if item.location_id.is_none() || item.target.is_none() {
@@ -140,6 +143,11 @@ fn person_event(
             target,
             ..
         } => Some((*location_id, target.clone())),
+        PlatformEvent::UnreadableEventSkipped {
+            location_id,
+            target,
+            ..
+        } => location_id.zip(target.clone()),
         PlatformEvent::TickOverdue { trigger_id, .. }
         | PlatformEvent::CalendarHorizonLow { trigger_id, .. }
         | PlatformEvent::TriggerSkipped { trigger_id, .. }
@@ -164,7 +172,8 @@ fn person_event(
     })
 }
 
-async fn scopes_of(
+/// The location target of each trigger or run in `ids`, read from `table`'s `column`.
+pub(crate) async fn scopes_of(
     transaction: ControlTransaction,
     (table, column): (&str, &str),
     ids: &[Uuid],

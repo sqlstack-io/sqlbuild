@@ -155,6 +155,34 @@ describe('toPlatformEvents', () => {
 		);
 	});
 
+	it('lists stored events webhooks and sensors skipped per location target, and server-wide ones on their own', () => {
+		const skip = (storage_id: number, at: string, located: boolean) => ({
+			storage_id,
+			event_id: `e${storage_id}`,
+			event_type: 'platform_run_failed',
+			skipped_at: at,
+			reason: 'missing field `trigger`',
+			...(located ? { location_id: 'l1', location_name: 'orders', target: 'development' } : {})
+		});
+		const events = toPlatformEvents(
+			{
+				scheduler_leader: true,
+				broken_locations: [],
+				overdue_ticks: [],
+				skipped_events: [skip(9, '2026-11-08T11:40:00Z', true), skip(4, '2026-11-08T11:10:00Z', true), skip(2, '2026-11-08T11:00:00Z', false)]
+			},
+			NOW
+		);
+		expect(events.map((e) => [e.kind, e.severity, e.locationId, e.members, e.occurredAt])).toEqual([
+			['unreadable_event_skipped', 'warning', 'l1:development', ['4', '9'], '2026-11-08T11:10:00Z'],
+			['unreadable_event_skipped', 'warning', null, ['2'], '2026-11-08T11:00:00Z']
+		]);
+		expect(events[0].message).toBe(
+			'2 stored events, starting with a platform_run_failed event, in orders · development can’t be read by this SQLBuild release, so webhooks and platform sensors skipped them and carried on: missing field `trigger`.'
+		);
+		expect(events[1].message).toBe('A stored platform_run_failed event can’t be read by this SQLBuild release, so webhooks and platform sensors skipped it and carried on: missing field `trigger`.');
+	});
+
 	it('groups late ticks per location, dated and named by the oldest', () => {
 		const events = toPlatformEvents(
 			{
@@ -224,6 +252,21 @@ describe('toPlatformEventRecords', () => {
 		expect(records[1].message).toBe('Couldn’t read this cost_spike event of orders · development: this page doesn’t know events of kind cost_spike.');
 		expect(records[2]).toMatchObject({ severity: 'warning', subject: 'orders · development', message: 'Couldn’t read this platform_sync_stalled event of orders · development: unknown variant `sync_stalled`.' });
 		expect(records[3].message).toMatch(/^Couldn’t read this calendar_times_dropped event of orders · development: .+\.$/);
+	});
+
+	it('lists a skipped stored event in the history with what it was and why', () => {
+		const [record] = toPlatformEventRecords(
+			[],
+			[{ storage_id: 12, event_id: 'e12', occurred_at: '2026-11-08T11:00:00Z', location_id: 'l1', target: 'development', event: { kind: 'unreadable_event_skipped', storage_id: 3, event_id: 'e3', event_type: 'platform_run_failed', location_id: 'l1', target: 'development', reason: 'missing field `trigger`' } }],
+			new Map([['l1:development', 'orders']])
+		);
+		expect(record).toMatchObject({
+			kind: 'unreadable_event_skipped',
+			severity: 'warning',
+			locationId: 'l1:development',
+			message: 'A stored platform_run_failed event in orders · development couldn’t be read, so webhooks and platform sensors skipped it: missing field `trigger`.',
+			links: [{ kind: 'location', id: 'l1:development' }]
+		});
 	});
 
 	it('lists an open problem nothing was stored for first', () => {
