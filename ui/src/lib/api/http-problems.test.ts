@@ -10,7 +10,8 @@ const tick = (name: string, location: string, scheduledFor: string) => ({
 	location_id: location,
 	location_name: location === 'l1' ? 'orders' : 'inventory',
 	target: 'development',
-	scheduled_for: scheduledFor
+	scheduled_for: scheduledFor,
+	tier: 'needs_attention' as const
 });
 
 describe('toPlatformEvents', () => {
@@ -25,6 +26,12 @@ describe('toPlatformEvents', () => {
 		expect(stopsRuns(degraded)).toBe(true);
 		expect(failed.message).toMatch(/^orders · production: latest code failed to load: job loaders_job: path selectors require an explicit root\. Serving generation 11, published /);
 		expect([degraded.severity, degraded.state, degraded.message.split('. ')[0]]).toEqual(['critical', 'degraded', 'orders · production: the warehouse connection check failed']);
+	});
+
+	it("colours every location problem by the tier the server gives it, whatever its kind", () => {
+		const late = (tier: 'stops_runs' | 'needs_attention') => toPlatformEvents({ scheduler_leader: true, broken_locations: [], overdue_ticks: [{ ...tick('hourly_orders', 'l1', '2026-11-08T11:40:00Z'), tier }] }, NOW)[0];
+		expect([late('needs_attention').severity, stopsRuns(late('needs_attention'))]).toEqual(['warning', false]);
+		expect([late('stops_runs').severity, stopsRuns(late('stops_runs'))]).toEqual(['critical', true]);
 	});
 
 	it('makes a stalled sync a problem that needs a look, saying how far it got and for how long nothing moved', () => {
@@ -57,7 +64,7 @@ describe('toPlatformEvents', () => {
 	});
 
 	it('makes a sink that loses events, and a webhook the server can’t deliver to, problems since they began', () => {
-		const sink = { location_id: 'l1', location_name: 'orders', target: 'production', sink: 'kafka', since: '2026-11-08T11:42:00Z', reason: '8 of 8 events not delivered (8 failed)', run_id: 'r-9', last_success_at: null };
+		const sink = { tier: 'needs_attention' as const, location_id: 'l1', location_name: 'orders', target: 'production', sink: 'kafka', since: '2026-11-08T11:42:00Z', reason: '8 of 8 events not delivered (8 failed)', run_id: 'r-9', last_success_at: null };
 		const forwarding = { name: 'Platform event forwarding', since: '2026-11-08T11:50:00Z', reason: 'Can’t deliver platform events: the webhook answered HTTP 503; they are kept and retried every 5 s', last_success_at: null };
 		const events = toPlatformEvents({ scheduler_leader: true, broken_locations: [], overdue_ticks: [], failing_sinks: [sink], failing_forwarding: [forwarding] }, NOW);
 		const at = (iso: string) => formatClock(iso, NOW);
@@ -88,6 +95,7 @@ describe('toPlatformEvents', () => {
 
 	it('groups low calendars per location, dated and named by the one that runs out first', () => {
 		const calendar = (name: string, location: string, horizon_end: string | null) => ({
+			tier: 'needs_attention' as const,
 			trigger_id: `c-${name}`,
 			name,
 			location_id: location,
@@ -113,6 +121,7 @@ describe('toPlatformEvents', () => {
 
 	it('groups skipped triggers per location, dated and named by the first one skipped, with its reason', () => {
 		const skipped = (name: string, location: string, skipped_at: string) => ({
+			tier: 'needs_attention' as const,
 			trigger_id: `s-${name}`,
 			name,
 			location_id: location,
@@ -136,18 +145,18 @@ describe('toPlatformEvents', () => {
 		]);
 	});
 
-	it('lists sensors checked again from scratch apart from skipped triggers, under their own kind', () => {
+	it('lists sensors checked again from scratch apart from skipped triggers, under their own kind, as needing a look', () => {
 		const events = toPlatformEvents(
 			{
 				scheduler_leader: true,
 				broken_locations: [],
 				overdue_ticks: [],
-				rechecked_sensors: [{ trigger_id: 's-health', name: 'health_orders', location_id: 'l1', location_name: 'orders', target: 'development', rechecked_at: '2026-11-08T11:30:00Z' }]
+				rechecked_sensors: [{ tier: 'needs_attention', trigger_id: 's-health', name: 'health_orders', location_id: 'l1', location_name: 'orders', target: 'development', rechecked_at: '2026-11-08T11:30:00Z' }]
 			},
 			NOW
 		);
 		expect(events.map((e) => [e.kind, e.severity, e.locationId, e.members, e.message])).toEqual([
-			['sensor_rechecked', 'info', 'l1:development', ['s-health'], 'health_orders in orders · development is being checked again from scratch: its last check was recorded by an earlier SQLBuild release and can’t be read.']
+			['sensor_rechecked', 'warning', 'l1:development', ['s-health'], 'health_orders in orders · development is being checked again from scratch: its last check was recorded by an earlier SQLBuild release and can’t be read.']
 		]);
 	});
 
@@ -158,7 +167,7 @@ describe('toPlatformEvents', () => {
 				scheduler_leader: true,
 				broken_locations: [],
 				overdue_ticks: [],
-				dropped_calendar_times: [{ trigger_id: 'c-month', name: 'month_end', location_id: 'l1', location_name: 'orders', target: 'development', dropped_at: '2026-11-08T11:30:00Z', times }]
+				dropped_calendar_times: [{ tier: 'needs_attention', trigger_id: 'c-month', name: 'month_end', location_id: 'l1', location_name: 'orders', target: 'development', dropped_at: '2026-11-08T11:30:00Z', times }]
 			},
 			NOW
 		);
@@ -170,6 +179,7 @@ describe('toPlatformEvents', () => {
 
 	it('lists stored events webhooks and sensors skipped per location target, and server-wide ones on their own', () => {
 		const skip = (storage_id: number, at: string, located: boolean) => ({
+			tier: 'needs_attention' as const,
 			storage_id,
 			event_id: `e${storage_id}`,
 			event_type: 'platform_run_failed',

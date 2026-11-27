@@ -27,6 +27,11 @@ function failingMessage(place: string, location: Wire['FailingLocation']): strin
 	return `${place}: ${FAILED[location.state] ?? location.state}${error}. ${serving}`;
 }
 
+/** A location problem's colour and whether it stops runs, both from the tier the server gives every one. */
+function tierOf(tier: Wire['ProblemTier']): Pick<PlatformEvent, 'severity' | 'stopsRuns'> {
+	return tier === 'stops_runs' ? { severity: 'critical', stopsRuns: true } : { severity: 'warning', stopsRuns: false };
+}
+
 /** Live problems as active banner events: a stopped scheduler, each broken location, and late schedules, low calendars, skipped triggers, sensors checked again from scratch, calendars' dropped times and skipped stored events per location. */
 export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number): PlatformEvent[] {
 	const events: PlatformEvent[] = [];
@@ -49,8 +54,7 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 		events.push({
 			id: `broken:${keyOf(location.location_id, location.target)}`,
 			kind: 'location_broken',
-			severity: 'critical',
-			stopsRuns: location.tier === 'stops_runs',
+			...tierOf(location.tier),
 			occurredAt: location.last_seen_at,
 			// Its last check-in tells one outage from the next.
 			occurrence: location.last_seen_at,
@@ -65,9 +69,7 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 		events.push({
 			id: `failing:${keyOf(location.location_id, location.target)}`,
 			kind: 'location_failing',
-			// The server says whether it stops runs: a failed connection check does; a previous version, a failed plan or discover function doesn't.
-			severity: location.tier === 'stops_runs' ? 'critical' : 'warning',
-			stopsRuns: location.tier === 'stops_runs',
+			...tierOf(location.tier),
 			state: location.state,
 			occurredAt: location.failed_at,
 			// The failure's report time tells one failure from the next.
@@ -83,8 +85,7 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 		events.push({
 			id: `sync:${keyOf(sync.location_id, sync.target)}`,
 			kind: 'warehouse_sync_failed',
-			severity: 'warning',
-			stopsRuns: false,
+			...tierOf(sync.tier),
 			occurredAt: sync.since,
 			// The first failure in a row tells one failing streak from the next.
 			occurrence: sync.since,
@@ -101,8 +102,7 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 		events.push({
 			id: `stalled:${keyOf(sync.location_id, sync.target)}`,
 			kind: 'warehouse_sync_stalled',
-			severity: 'warning',
-			stopsRuns: sync.tier === 'stops_runs',
+			...tierOf(sync.tier),
 			occurredAt: sync.progressed_at,
 			// Its last progress tells one stall from the next.
 			occurrence: sync.progressed_at,
@@ -117,8 +117,7 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 		events.push({
 			id: `sink:${keyOf(sink.location_id, sink.target)}:${sink.sink}`,
 			kind: 'event_sink_failed',
-			severity: 'warning',
-			stopsRuns: false,
+			...tierOf(sink.tier),
 			occurredAt: sink.since,
 			// The first lossy run in a row tells one failing streak from the next.
 			occurrence: sink.since,
@@ -153,8 +152,7 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 		events.push({
 			id: `late:${key}`,
 			kind: 'tick_overdue',
-			severity: 'warning',
-			stopsRuns: false,
+			...tierOf(oldest.tier),
 			occurredAt: oldest.scheduled_for,
 			members: [...new Set(ticks.map((t) => t.trigger_id))].sort(),
 			active: true,
@@ -176,8 +174,7 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 		events.push({
 			id: `calendar:${key}`,
 			kind: 'calendar_horizon_low',
-			severity: 'warning',
-			stopsRuns: false,
+			...tierOf(soonest.tier),
 			occurredAt: ends(soonest),
 			members: [...new Set(calendars.map((c) => c.trigger_id))].sort(),
 			active: true,
@@ -200,8 +197,7 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 		events.push({
 			id: `skipped:${key}`,
 			kind: 'trigger_skipped',
-			severity: 'warning',
-			stopsRuns: false,
+			...tierOf(first.tier),
 			occurredAt: first.skipped_at,
 			members: [...new Set(triggers.map((t) => t.trigger_id))].sort(),
 			active: true,
@@ -224,8 +220,7 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 		events.push({
 			id: `rechecked:${key}`,
 			kind: 'sensor_rechecked',
-			severity: 'info',
-			stopsRuns: false,
+			...tierOf(first.tier),
 			occurredAt: first.rechecked_at,
 			members: [...new Set(sensors.map((s) => s.trigger_id))].sort(),
 			active: true,
@@ -248,8 +243,7 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 		events.push({
 			id: `dropped:${key}`,
 			kind: 'calendar_times_dropped',
-			severity: 'warning',
-			stopsRuns: false,
+			...tierOf(first.tier),
 			occurredAt: first.dropped_at,
 			members: [...new Set(calendars.map((c) => c.trigger_id))].sort(),
 			active: true,
@@ -273,8 +267,7 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 		events.push({
 			id: `skipped:${key || 'server'}`,
 			kind: 'unreadable_event_skipped',
-			severity: 'warning',
-			stopsRuns: false,
+			...tierOf(first.tier),
 			occurredAt: first.skipped_at,
 			members: [...new Set(items.map((e) => String(e.storage_id)))].sort(),
 			active: true,
