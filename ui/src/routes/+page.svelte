@@ -195,6 +195,24 @@
 	const showTimeline = $derived(app.client.supports('timeline'));
 	const canAcknowledge = $derived(app.client.supports('acknowledgeRun'));
 	const canAcknowledgeConditions = $derived(app.client.supports('acknowledgeCondition'));
+	const canDismissSkips = $derived(app.client.supports('dismissSkippedEvents'));
+	const DISMISS_HELP = 'Stop listing these skipped events for everyone; they stay in the problem history';
+	let dismissing = $state<string | null>(null);
+	/** Dismiss a target's skipped stored events for good; the Overview reads again without them. */
+	async function dismissSkips(key: string, storageIds: number[]) {
+		const scope = app.scope;
+		if (!scope || dismissing) return;
+		dismissing = key;
+		acknowledgeError = null;
+		try {
+			await app.client.dismissSkippedEvents(scope, storageIds);
+			overview.refresh();
+		} catch (error) {
+			acknowledgeError = errorMessage(error);
+		} finally {
+			dismissing = null;
+		}
+	}
 	const FAILING_CHECKS_HREF = '/checks?outcome=failing';
 
 </script>
@@ -294,6 +312,10 @@
 										{/if}
 									</span>
 									<span class="issue-actions">
+										{#if item.kind === 'platform_event' && item.event.kind === 'unreadable_event_skipped' && item.event.members?.length && canDismissSkips}
+											{@const storageIds = item.event.members.map(Number)}
+											<Button variant="outline" size="sm" title={DISMISS_HELP} disabled={dismissing === view.key} onclick={() => dismissSkips(view.key, storageIds)} data-testid="attention-dismiss">Dismiss</Button>
+										{/if}
 										{#if item.kind === 'platform_event' && item.event.sync?.halted}
 											<GatedButton requires="connection.test" size="sm" variant="outline" busy={resuming === view.key} onclick={() => resume(view.key)} hint="Start the run-history sync again now"><span data-testid="attention-resume">Resume</span></GatedButton>
 										{/if}

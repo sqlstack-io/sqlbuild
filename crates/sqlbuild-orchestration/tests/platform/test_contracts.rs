@@ -20,6 +20,8 @@ mod test_platform_event_reads;
 mod test_problems;
 #[path = "test_provider_secrets.rs"]
 mod test_provider_secrets;
+#[path = "test_skipped_event_dismissal.rs"]
+mod test_skipped_event_dismissal;
 #[path = "test_types.rs"]
 mod test_types;
 #[path = "test_unreadable_events.rs"]

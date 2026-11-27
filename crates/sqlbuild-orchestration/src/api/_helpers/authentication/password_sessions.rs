@@ -193,6 +193,10 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
                 .post(crate::api::_helpers::resources::person_operations::acknowledge_attention),
         )
         .route(
+            "/api/control/locations/{location_id}/targets/{target}/skipped-event-dismissals",
+            post(crate::api::_helpers::resources::person_operations::dismiss_skipped_event),
+        )
+        .route(
             "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/nodes",
             get(crate::api::_helpers::resources::person_reads::run_nodes),
         )

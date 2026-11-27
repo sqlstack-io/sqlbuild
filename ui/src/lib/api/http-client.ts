@@ -59,6 +59,7 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'getRunNodeError',
 	'acknowledgeRun',
 	'acknowledgeCondition',
+	'dismissSkippedEvents',
 	'cancelRun',
 	'cancelMatchingRuns',
 	'rerunRun',
@@ -621,6 +622,17 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			});
 			if (response.status === 401) onUnauthorized();
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
+		},
+		async dismissSkippedEvents(scope: Scope, storageIds: number[]): Promise<void> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			for (const storage_id of storageIds) {
+				const { error, response } = await http.POST('/api/control/locations/{location_id}/targets/{target}/skipped-event-dismissals', {
+					body: { event_id: newRequestId(), storage_id },
+					params: { path: { location_id: locationId, target }, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
+				});
+				if (response.status === 401) onUnauthorized();
+				if (!response.ok) throw new ApiError(errorText(error, response), response.status);
+			}
 		},
 		async rerunRun(scope: Scope, runId: string, mode: Exclude<RerunMode, 'selected'>): Promise<Run> {
 			const source = await requireRun(scope, runId);

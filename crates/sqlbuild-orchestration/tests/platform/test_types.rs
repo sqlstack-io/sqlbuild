@@ -173,3 +173,10 @@ pub(crate) struct UnreadableEventTestCase {
     /// What the problem says is wrong with the skipped event.
     pub(crate) expected_reason: &'static str,
 }
+
+pub(crate) struct SkippedEventDismissalTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The stored type of the skipped event the problem names.
+    pub(crate) expected_type: &'static str,
+}
