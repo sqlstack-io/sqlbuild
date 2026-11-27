@@ -17,7 +17,7 @@
 	import { createResource } from '$lib/state/resource.svelte';
 	import ServerStatus from './server-status.svelte';
 
-	const locations = createResource((client) => client.listLocations(), ['snapshot', 'platform_events']);
+	const locations = createResource((client) => client.listLocations(), ['snapshot', 'platform_events', 'warehouse_sync', 'location_health']);
 	let status = $state<ServerStatus>();
 
 	let query = $state('');

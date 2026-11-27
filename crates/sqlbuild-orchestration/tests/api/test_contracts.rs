@@ -82,6 +82,8 @@ mod test_external_sessions;
 mod test_ingestion_turns;
 #[path = "test_location_health.rs"]
 mod test_location_health;
+#[path = "test_location_health_feed.rs"]
+mod test_location_health_feed;
 #[path = "test_location_work.rs"]
 mod test_location_work;
 #[path = "test_maintenance.rs"]

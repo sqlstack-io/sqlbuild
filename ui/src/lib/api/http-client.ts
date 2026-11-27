@@ -282,6 +282,8 @@ export class HttpChangeFeed implements ChangeSubscription {
 export function channelOf(topic: string, scope: Scope): ChangedChannel {
 	if (topic.startsWith('snapshot:')) return `snapshot:${scope.locationId}`;
 	if (topic.startsWith('node_status:')) return `node_status:${scope.locationId}`;
+	if (topic.startsWith('warehouse_sync:')) return `warehouse_sync:${scope.locationId}`;
+	if (topic.startsWith('location_health:')) return `location_health:${scope.locationId}`;
 	return topic === 'runs' || topic === 'ticks' ? topic : 'all';
 }
 

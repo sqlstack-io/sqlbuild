@@ -736,3 +736,10 @@ pub(crate) struct PlanLoadFailureTestCase {
     pub(crate) load_error: Option<&'static str>,
     pub(crate) expected_message: &'static str,
 }
+
+pub(crate) struct LocationHealthFeedTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The topic each report reaches people's pages on: the failing sync, its completion, then a check-in.
+    pub(crate) expected_topics: [&'static str; 3],
+}

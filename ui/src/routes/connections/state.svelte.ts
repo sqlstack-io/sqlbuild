@@ -3,7 +3,7 @@ import { createResource } from '$lib/state/resource.svelte';
 
 /** The connections, grouped by their published settings. */
 export function createConnectionsState() {
-	const resource = createResource((client) => client.listWarehouseConnections(), ['warehouse_sync']);
+	const resource = createResource((client) => client.listWarehouseConnections(), ['warehouse_sync', 'location_health']);
 	const groups = $derived(groupConnections(resource.data ?? []));
 	return {
 		get resource() {

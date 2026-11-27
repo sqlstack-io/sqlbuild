@@ -8,7 +8,7 @@
 	import { createResource } from '$lib/state/resource.svelte';
 	import { heartbeatLate, openRecord, replicaLive, schedulerWords, sinkWords } from './utils';
 
-	const health = createResource((client) => client.platformHealth(), ['platform_events']);
+	const health = createResource((client) => client.platformHealth(), ['platform_events', 'warehouse_sync', 'location_health']);
 	// Without recorded history, the open server problems are the ones the problems read derives now.
 	const serverEvents = createResource(
 		(client) =>

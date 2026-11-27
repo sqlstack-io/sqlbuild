@@ -27,7 +27,7 @@
 	import LocationSecrets from './location-secrets.svelte';
 
 	const id = $derived(page.params.id ?? '');
-	const location = createResource((client) => client.getLocation(id), ['snapshot', 'warehouse_sync']);
+	const location = createResource((client) => client.getLocation(id), ['snapshot', 'warehouse_sync', 'location_health']);
 	// Without recorded history, the page lists the open problems the server derives now.
 	const history = $derived(app.client.supports('listPlatformEventHistory'));
 	const problems = createResource(
@@ -35,7 +35,7 @@
 			client.supports('listPlatformEventHistory')
 				? client.listPlatformEventHistory({ locationId: id })
 				: client.listPlatformEvents({ activeOnly: true }).then((events) => events.filter((e) => e.locationId === id).map(openRecord)),
-		['platform_events']
+		['platform_events', 'warehouse_sync', 'location_health']
 	);
 	const detail = $derived(location.data ?? null);
 	let problemView = $state<'open' | 'all'>('open');

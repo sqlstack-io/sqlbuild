@@ -100,6 +100,10 @@ pub(crate) enum Change {
     NodeStatus(Uuid, String),
     /// A condition was acknowledged or withdrawn; the Overview reloads on the runs topic.
     Attention(Uuid, String),
+    /// A location target checked in or reported health other than a warehouse sync, such as a load or connection check.
+    LocationHealth(Uuid, String),
+    /// A location target reported how its warehouse sync is going.
+    WarehouseSync(Uuid, String),
     Credentials,
 }
 
@@ -110,6 +114,10 @@ pub(crate) enum ChangeTopic {
     Ticks,
     Snapshot,
     NodeStatus,
+    /// Only people's feeds carry it, so the pages they watch reload; a location knows its own health.
+    LocationHealth,
+    /// Only people's feeds carry it, like `LocationHealth`.
+    WarehouseSync,
 }
 
 /// Fixed-size routing payloads fit PostgreSQL NOTIFY even with long target labels.

@@ -1,6 +1,7 @@
 //! Location sessions, liveness, reported generations and the leased work client.
 
 pub(crate) mod connection_tests;
+pub(crate) mod health_events;
 pub(crate) mod liveness;
 pub(crate) mod location_heartbeat;
 pub(crate) mod published_generation;

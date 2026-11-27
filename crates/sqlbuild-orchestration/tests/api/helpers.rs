@@ -3,8 +3,14 @@ use std::time::Duration;
 use crate::api::main::serve_api::serve_api;
 use crate::api::models::ApiAuthentication;
 use crate::api::tests::test_types::TestApi;
+use crate::platform::models::{
+    LocationHealth, WarehouseReadFailure, WarehouseSyncFailure, WarehouseSyncProgress,
+};
 use crate::runs::tests::test_types::ExactKeyPlanner;
 use crate::store::models::ControlStore;
+use crate::warehouse_metadata::models::{WarehouseHistoryKind, WarehouseStateLocation};
+use chrono::Utc;
+use uuid::Uuid;
 
 pub(crate) async fn start_api(store: &ControlStore) -> TestApi {
     start_api_with_authentication(store, ApiAuthentication::default()).await
@@ -192,4 +198,43 @@ pub(crate) fn pool_capped(
         );
     }
     warnings
+}
+
+/// A sync report of the reader session on the seeded `development` target: failing, or done.
+pub(crate) fn sync_report(
+    session_id: Uuid,
+    (failure, completed): (Option<WarehouseSyncFailure>, bool),
+) -> crate::platform::models::LocationHealthReport {
+    crate::platform::models::LocationHealthReport {
+        event_id: Uuid::now_v7(),
+        session_id,
+        target: "development".into(),
+        health: LocationHealth::WarehouseSync {
+            generation: 1,
+            location: WarehouseStateLocation {
+                database: None,
+                schema: "main".into(),
+            },
+            table: WarehouseHistoryKind::ALL[0],
+            failure,
+            records_sent: 0,
+            elapsed_millis: 10,
+            error: failure.map(|_| "IP is not allowed to access the warehouse".into()),
+            read_failure: failure.map(|_| WarehouseReadFailure::Unreachable {}),
+            page_limit: None,
+            progress: Some(WarehouseSyncProgress {
+                position: 14,
+                kinds: 14,
+                rows: 2446,
+                elapsed_millis: 23_200,
+                completed,
+                halted: false,
+            }),
+            next_sync_at: None,
+            mirrored_records: None,
+            failing_since: failure.map(|_| Utc::now()),
+            retry_at: None,
+            retry_seconds: None,
+        },
+    }
 }
