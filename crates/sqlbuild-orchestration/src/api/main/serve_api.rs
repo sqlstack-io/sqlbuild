@@ -10,6 +10,7 @@ use crate::api::main::openapi_document::openapi_document;
 use crate::api::models::{ApiAuthentication, GroupRole, ServerFacts};
 use crate::authorization::main::roles::publish_group_roles::publish_group_roles;
 use crate::health::main::probe_control_database::probe_control_database;
+use crate::health::models::ServerHealth;
 use crate::node_states::main::start_node_states::start_node_states;
 use crate::runs::types::RunHandoff;
 use crate::store::errors::ControlError;
@@ -35,7 +36,7 @@ pub async fn serve_api(
     let health = facts.health.clone();
     health.attach_store(&store);
     health.control_succeeded(chrono::Utc::now());
-    let probe = probe_control_database(store.clone(), health.clone(), stopped.clone());
+    let probing = (health.clone(), stopped.clone());
     let (node_states, refresh_node_states) = start_node_states(&store, &sender);
     let application = application_router(
         &store,
@@ -56,13 +57,41 @@ pub async fn serve_api(
         shutdown.await;
         stop.send_replace(true);
     });
+    let mut roles = background_roles(
+        (store.clone(), listener_changes, sender),
+        (refresh_node_states, probing),
+    );
     ready();
     tokio::select! {
         result = async { server.await } => { result?; Ok(()) },
-        result = changes::relay(store.clone(), listener_changes, sender) => result,
-        () = refresh_node_states => Ok(()),
-        () = probe => Ok(()),
+        Some(ended) = roles.join_next() => ended?,
     }
+}
+
+/// The change relay, the node-states refresh and the database probe, each its own task, so none can stop the accept loop's task from accepting; dropping the set stops them.
+fn background_roles(
+    (store, listener_changes, sender): (
+        ControlStore,
+        Option<sqlx_postgres::PgListener>,
+        tokio::sync::broadcast::Sender<crate::store::models::ChangeMessage>,
+    ),
+    (refresh_node_states, (health, stopped)): (
+        impl Future<Output = ()> + Send + 'static,
+        (ServerHealth, tokio::sync::watch::Receiver<bool>),
+    ),
+) -> tokio::task::JoinSet<Result<(), ControlError>> {
+    let probe = probe_control_database(store.clone(), health, stopped);
+    let mut roles = tokio::task::JoinSet::new();
+    roles.spawn(changes::relay(store, listener_changes, sender));
+    roles.spawn(async move {
+        refresh_node_states.await;
+        Ok(())
+    });
+    roles.spawn(async move {
+        probe.await;
+        Ok(())
+    });
+    roles
 }
 
 async fn prepare_store(

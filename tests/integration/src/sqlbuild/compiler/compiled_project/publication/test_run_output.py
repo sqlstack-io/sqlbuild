@@ -86,7 +86,15 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
             expected_lines=1,
             expected_error_lines=[],
             expected_logs=[("model:orders", "error", "x" * 4093 + "…")]
-            + [("model:orders", "info", f"line {n}") for n in range(1, 200)],
+            + [("model:orders", "info", f"line {n}") for n in range(1, 200)]
+            + [
+                (
+                    "model:orders",
+                    "warning",
+                    "50 more lines not kept as log lines; ctx.log keeps 200 per node, "
+                    "and print() output is kept in full in Output",
+                )
+            ],
         ),
     ],
     ids=lambda case: case.description,

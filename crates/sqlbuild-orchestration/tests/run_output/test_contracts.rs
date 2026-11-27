@@ -12,6 +12,8 @@ mod test_large;
 mod test_location;
 #[path = "test_logs.rs"]
 mod test_logs;
+#[path = "test_node_logs.rs"]
+mod test_node_logs;
 #[path = "test_reads.rs"]
 mod test_reads;
 #[path = "test_retention.rs"]

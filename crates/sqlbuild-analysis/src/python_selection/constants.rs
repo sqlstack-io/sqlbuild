@@ -11,6 +11,8 @@ pub(crate) const JOB_KIND: &str = "job";
 pub(crate) const NODE_KIND_KIND: &str = "kind";
 pub(crate) const SEED_KIND: &str = "seed";
 pub(crate) const SOURCE_KIND: &str = "source";
+/// `load:<name>` selects a load, a SQL graph node.
+pub(crate) const LOAD_KIND: &str = "load";
 pub(crate) const MODEL_RESOURCE: &str = "model";
 pub(crate) const SOURCE_RESOURCE: &str = "source";
 /// Resource types a SQL model may depend on.

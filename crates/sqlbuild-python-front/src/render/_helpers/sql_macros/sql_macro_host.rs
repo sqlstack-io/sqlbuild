@@ -299,7 +299,7 @@ fn mapping<'py>(context: &Bound<'py, PyAny>, field: &str) -> PyResult<Bound<'py,
     if context.is_none() || !context.hasattr(field)? {
         return Ok(PyDict::new(context.py()));
     }
-    Ok(native_field(context, field)?.downcast_into()?)
+    Ok(native_field(context, field)?.cast_into()?)
 }
 
 impl<'py> PyHost<'_, '_, 'py> {

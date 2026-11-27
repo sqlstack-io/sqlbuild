@@ -270,7 +270,7 @@ pub(crate) fn build_source_read_map<'py>(
         ),
     )?;
     let project = &args.value("project")?;
-    let source_map = args.value("source_map")?.downcast_into::<PyDict>()?;
+    let source_map = args.value("source_map")?.cast_into::<PyDict>()?;
     let source_map = &source_map;
     let selected_keys = &args.value("selected_keys")?;
     let project_config = &args.value("project_config")?;

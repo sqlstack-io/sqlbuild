@@ -5,6 +5,7 @@ use std::time::Duration;
 use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 
 use crate::store::errors::ControlError;
+use crate::tls::main::client_builder::client_builder;
 use crate::webhooks::constants::REQUEST_TIMEOUT_SECONDS;
 use crate::webhooks::models::{Webhook, WebhookSource};
 
@@ -16,7 +17,7 @@ pub fn connect_webhook(endpoint: &str, source: WebhookSource) -> Result<Webhook,
         return Err(ControlError::Invalid("webhook needs an HTTP(S) URL".into()));
     }
     let sink_id = sha256_hex(url.as_str().as_bytes());
-    let client = reqwest::Client::builder()
+    let client = client_builder()
         .redirect(reqwest::redirect::Policy::none())
         .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECONDS))
         .build()

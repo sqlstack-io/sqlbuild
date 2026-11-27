@@ -8,9 +8,9 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyString, PyTuple};
 use sqlbuild_analysis::node_set_dependencies::main::wait_changes::wait_changes;
 use sqlbuild_core::cli_text::models::{
-    CliStyle, CursorPlanText, DisplayLimit, FunctionPlanText, ModelPlanText, PlanTextReport,
-    PlanWarningText, ProviderUsageText, PythonPlanText, RenameHintText, SchemaFindingText,
-    SeedPlanText, SourceFreshnessText, SourceLoadPlanText,
+    CliStyle, CursorPlanText, DisplayLimit, FunctionPlanText, LoadPlanText, ModelPlanText,
+    PlanTextReport, PlanWarningText, ProviderUsageText, PythonPlanText, RenameHintText,
+    SchemaFindingText, SeedPlanText, SourceFreshnessText, SourceLoadPlanText,
 };
 use sqlbuild_core::plan_display::main::format_query_diff::format_query_diff;
 use std::collections::BTreeMap;
@@ -163,7 +163,7 @@ fn config_json<'py>(metadata_json: &Bound<'py, PyAny>) -> PyResult<Bound<'py, Py
         }
         Err(error) => return Err(error),
     };
-    let config: Bound<'_, PyAny> = match payload.downcast::<PyDict>() {
+    let config: Bound<'_, PyAny> = match payload.cast::<PyDict>() {
         Ok(payload) => payload
             .get_item("config")?
             .unwrap_or_else(|| PyDict::new(py).into_any()),
@@ -353,6 +353,16 @@ fn source_load_text(entry: &Bound<'_, PyAny>) -> PyResult<SourceLoadPlanText> {
     })
 }
 
+fn load_text(entry: &Bound<'_, PyAny>) -> PyResult<LoadPlanText> {
+    Ok(LoadPlanText {
+        name: text(&native_field(entry, "name")?)?,
+        every_table: native_field(entry, "every_table")?.is_truthy()?,
+        sources: texts(&native_field(entry, "sources")?)?,
+        is_reload: native_field(entry, "is_reload")?.is_truthy()?,
+        lines: texts(&native_field(entry, "plan_lines")?)?,
+    })
+}
+
 /// What a Python entry now also waits on, or no longer, since the build its identity was recorded by.
 pub(crate) fn entry_wait_changes(entry: &Bound<'_, PyAny>, name: &str) -> PyResult<Vec<String>> {
     let previous: Option<String> = native_field(entry, "previous_metadata_json")?.extract()?;
@@ -463,7 +473,7 @@ fn metadata_names(value: Option<Bound<'_, PyAny>>) -> PyResult<Vec<String>> {
 /// The metadata `selection_diagnostics.enabled` flag, when it is a bool.
 pub(crate) fn selection_diagnostics(metadata: &Bound<'_, PyAny>) -> PyResult<Option<bool>> {
     let diagnostics: Bound<'_, PyAny> = mapping_get(metadata, "selection_diagnostics")?;
-    let Ok(diagnostics) = diagnostics.downcast::<PyDict>() else {
+    let Ok(diagnostics) = diagnostics.cast::<PyDict>() else {
         return Ok(None);
     };
     match diagnostics.get_item("enabled")? {
@@ -476,7 +486,7 @@ pub(crate) fn selection_diagnostics(metadata: &Bound<'_, PyAny>) -> PyResult<Opt
 
 fn source_freshness(metadata: &Bound<'_, PyAny>) -> PyResult<Option<SourceFreshnessText>> {
     let freshness: Bound<'_, PyAny> = mapping_get(metadata, "direct_source_freshness")?;
-    let Ok(freshness) = freshness.downcast::<PyDict>() else {
+    let Ok(freshness) = freshness.cast::<PyDict>() else {
         return Ok(None);
     };
     let names = |key: &str| -> PyResult<Vec<String>> { metadata_names(freshness.get_item(key)?) };
@@ -587,6 +597,10 @@ pub(crate) fn report(arguments: &KeywordArguments<'_>) -> PyResult<PlanTextRepor
         source_loads: items(&native_field(&plan, "source_load_entries")?)?
             .iter()
             .map(source_load_text)
+            .collect::<PyResult<_>>()?,
+        loads: items(&native_field(&plan, "load_entries")?)?
+            .iter()
+            .map(load_text)
             .collect::<PyResult<_>>()?,
         provider_usages: provider_usages(&plan, &python_entries)?,
         python_entries: python_entries

@@ -18,7 +18,8 @@ dependencies = [
   "pydantic-settings>=2,<3",
   "PyYAML>=6.0.2",
   "sqlbuild-cli==0.262.0",  # x-release-please-version
-  "sqlquack==0.24.1",
+  "sqlload-api==0.87.0",
+  "sqlquack==0.25.0",
 ]
 
 [project.optional-dependencies]

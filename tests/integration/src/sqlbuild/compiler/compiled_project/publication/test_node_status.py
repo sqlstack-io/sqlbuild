@@ -94,7 +94,7 @@ _STEPS: frozenset[str] = frozenset({"asset:pick", "asset:pack", "asset:ship"})
                     "from python.nodes.steps import ship\n"
                     "\n"
                     "\n"
-                    "@loader(depends_on=[ship], write_strategy='table', columns=[{'name': 'step', 'type': 'INTEGER'}])\n"
+                    "@loader(depends_on=[ship], write_strategy='replace', columns=[{'name': 'step', 'type': 'BIGINT'}])\n"
                     "def fetch_steps(ctx):\n"
                     '    """Fetch the steps."""\n'
                     '    return [{"step": 1}]\n'
@@ -105,7 +105,7 @@ _STEPS: frozenset[str] = frozenset({"asset:pick", "asset:pack", "asset:ship"})
                     "from python.nodes.loads.fetch_steps.loader import fetch_steps\n"
                     "\n"
                     "\n"
-                    "@loader(depends_on=[fetch_steps])\n"
+                    "@loader(write_strategy='replace', depends_on=[fetch_steps])\n"
                     "def raw_steps(ctx):\n"
                     '    """Load the steps."""\n'
                     '    return [{"step": 1}]\n'
@@ -115,8 +115,7 @@ _STEPS: frozenset[str] = frozenset({"asset:pick", "asset:pack", "asset:ship"})
                     "from .raw_steps.loader import raw_steps\n"
                 ),
                 "sql/sources/raw.yml": (
-                    "sources:\n  - name: raw_steps\n    description: Steps.\n"
-                    "    managed: true\n    write_strategy: table\n"
+                    "sources:\n  - name: raw_steps\n    description: Steps.\n    managed: true\n"
                 ),
             },
             expected_statuses_during_second={

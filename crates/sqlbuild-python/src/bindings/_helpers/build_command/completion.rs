@@ -321,6 +321,7 @@ fn finalize_no_work(context: &BuildContext<'_>, pipeline: &Bound<'_, PyAny>) -> 
             &[
                 ("result", result),
                 ("plan", plan),
+                ("command", text(py, &context.command_name()?)),
                 ("run_id", run_id_for(pipeline, &record)?),
                 ("cost", cost_payload(py, &record)?),
             ],
@@ -518,7 +519,7 @@ pub(crate) fn complete_direct_build<'py>(
                 ("plan", plan),
                 ("python_node_results", outcome.python_results.clone()),
                 ("python_check_results", check_results.clone()),
-                ("command", text(py, "build")),
+                ("command", text(py, &context.command_name()?)),
                 ("run_id", run_id_for(pipeline, &record)?),
                 ("cost", cost_payload(py, &record)?),
                 ("execution_succeeded", boolean(py, exit_code == 0)),

@@ -114,7 +114,7 @@ impl SqlExpansionInputs {
             value_renderer: field("value_renderer")?,
             collection_rendering: field("collection_rendering")?,
             local_declarations: native_field(record, "local_declarations")?
-                .downcast_into::<PyDict>()?
+                .cast_into::<PyDict>()?
                 .unbind(),
             declaration_resolver: field("declaration_resolver")?,
         })
@@ -289,8 +289,11 @@ pub struct StateInput {
     pub consumer: Py<PyAny>,
 }
 
-impl<'py> pyo3::FromPyObject<'py> for StateInput {
-    fn extract_bound(value: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for StateInput {
+    type Error = pyo3::PyErr;
+
+    fn extract(value: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        let value: &pyo3::Bound<'py, pyo3::PyAny> = &value;
         let (loaded_macros, overrides, macro_context, declarations, consumer): StateTuple =
             pyo3::types::PyAnyMethods::extract(value)?;
         Ok(Self {

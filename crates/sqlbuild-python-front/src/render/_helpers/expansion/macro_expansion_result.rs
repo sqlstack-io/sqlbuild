@@ -274,11 +274,11 @@ pub(crate) fn expand_sql_macros<'py>(
         ),
     )?;
     expansion_result(ExpansionRequest {
-        sql: arguments.value("sql")?.downcast_into()?,
+        sql: arguments.value("sql")?.cast_into()?,
         file_path: arguments.value("file_path")?,
-        loaded_macros: arguments.value("loaded_macros")?.downcast_into()?,
+        loaded_macros: arguments.value("loaded_macros")?.cast_into()?,
         macro_overrides: optional(arguments.value("macro_overrides")?)
-            .map(Bound::downcast_into)
+            .map(Bound::cast_into)
             .transpose()?,
         macro_context: arguments.value("macro_context")?,
         declaration_resolver: optional(arguments.value("declaration_resolver")?),

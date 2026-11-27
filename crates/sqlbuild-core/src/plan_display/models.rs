@@ -106,6 +106,7 @@ pub struct PlanSummaryCounts {
     /// Models, seeds and functions.
     pub selected: usize,
     pub sources: usize,
+    pub loads: usize,
     pub reloads_sources: bool,
     pub python: usize,
     pub audits: usize,

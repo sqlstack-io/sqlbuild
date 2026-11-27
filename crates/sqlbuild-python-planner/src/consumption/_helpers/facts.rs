@@ -8,7 +8,7 @@ use std::collections::HashSet;
 use std::collections::VecDeque;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_core::fingerprint_identity::main::model_local_identity_hash::model_local_identity_hash;
 use sqlbuild_state::consumption::models::{ForcedRun, InputFact, NodeFacts, NodeKey, RelationKey};
 
@@ -95,6 +95,22 @@ fn source_versions(plan: &Bound<'_, PyAny>) -> PyResult<HashMap<String, Option<S
     }
     for load in native_field(plan, "source_load_entries")?.try_iter()? {
         versions.insert(native_field(&load?, "name")?.extract()?, None);
+    }
+    let source_map: Bound<'_, PyAny> = native_field(plan, "source_map")?;
+    for load in native_field(plan, "load_entries")?.try_iter()? {
+        let load: Bound<'_, PyAny> = load?;
+        let name: String = native_field(&load, "name")?.extract()?;
+        let every_table: bool = native_field(&load, "every_table")?.is_truthy()?;
+        let selected: Vec<String> = native_field(&load, "sources")?.extract()?;
+        for (source, entry) in source_map.cast::<PyDict>()?.iter() {
+            let source: String = source.extract()?;
+            let filled: Option<String> = native_field(&entry, "load")?.extract()?;
+            if filled.as_deref() == Some(name.as_str())
+                && (every_table || selected.contains(&source))
+            {
+                versions.insert(source, None);
+            }
+        }
     }
     Ok(versions)
 }

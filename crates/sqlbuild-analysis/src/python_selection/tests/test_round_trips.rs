@@ -265,3 +265,57 @@ fn given_whole_graph_boundaries_when_checked_without_a_selection_then_each_refus
         );
     }
 }
+
+#[test]
+fn given_an_intermediate_loader_when_selecting_downstream_then_its_terminal_source_and_readers_build()
+ {
+    let test_cases = [
+        RoundTripTestCase {
+            description: "downstream reaches the source the terminal loader fills, and its readers",
+            nodes: &[
+                ("fetch_scores", "loader", &[], &[]),
+                ("partner_scores", "loader", &["fetch_scores"], &[]),
+            ],
+            allow_warehouse_round_trips: false,
+            select: &["fetch_scores+"],
+            expected_selection: Ok((
+                &[
+                    ("model", "scored_orders"),
+                    ("source", "fetch_scores"),
+                    ("source", "partner_scores"),
+                ],
+                &["fetch_scores", "partner_scores"],
+            )),
+        },
+        RoundTripTestCase {
+            description: "an asset reading a model downstream of the filled source follows it",
+            nodes: &[
+                ("fetch_scores", "loader", &[], &[]),
+                ("partner_scores", "loader", &["fetch_scores"], &[]),
+                ("export_scores", "asset", &[], &[("model", "scored_orders")]),
+            ],
+            allow_warehouse_round_trips: false,
+            select: &["fetch_scores+"],
+            expected_selection: Ok((
+                &[
+                    ("model", "scored_orders"),
+                    ("source", "fetch_scores"),
+                    ("source", "partner_scores"),
+                ],
+                &["export_scores", "fetch_scores", "partner_scores"],
+            )),
+        },
+    ];
+    for test_case in test_cases {
+        assert_eq!(
+            round_trip_run(
+                test_case.nodes,
+                test_case.allow_warehouse_round_trips,
+                test_case.select
+            ),
+            expected_round_trip(test_case.expected_selection),
+            "{}",
+            test_case.description
+        );
+    }
+}

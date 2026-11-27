@@ -16,6 +16,7 @@ default = []
 extension-module = ["pyo3/extension-module"]
 
 [dependencies]
+sqlbuild-python-load.workspace = true
 chrono.workspace = true
 fensu-policy.workspace = true
 pyo3.workspace = true

@@ -170,12 +170,12 @@ static EXACT_KEY_PUBLICATIONS: crate::runs::models::PublicationCache =
     crate::runs::models::PublicationCache::new();
 
 impl crate::runs::types::CommandPlanner for ExactKeyPlanner {
-    fn prepare(
-        &self,
-        resources: Vec<crate::runs::models::PlannerResource>,
-        jobs: crate::runs::models::PublishedJobs,
-    ) -> std::sync::Arc<dyn crate::runs::types::PreparedPublication> {
-        std::sync::Arc::new(ExactKeyPublication { resources, jobs })
+    fn preparer(&self) -> crate::runs::types::Preparer {
+        |resources: Vec<crate::runs::models::PlannerResource>,
+         jobs: crate::runs::models::PublishedJobs|
+         -> std::sync::Arc<dyn crate::runs::types::PreparedPublication> {
+            std::sync::Arc::new(ExactKeyPublication { resources, jobs })
+        }
     }
 
     fn publications(&self) -> &crate::runs::models::PublicationCache {

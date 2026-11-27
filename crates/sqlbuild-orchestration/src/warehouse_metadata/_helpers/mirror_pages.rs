@@ -10,12 +10,12 @@ use uuid::Uuid;
 
 use crate::authorization::models::CurrentSnapshotId;
 use crate::platform::constants::LOCATION_RETENTION_DAYS;
-use crate::snapshots::main::reads::read_snapshot_nodes::read_snapshot_nodes;
+use crate::snapshots::main::reads::snapshot_nodes::snapshot_nodes;
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
 use crate::store::main::decompress::decompress;
 use crate::store::main::query::query;
-use crate::store::models::{Connection, ControlTransaction, Parameter};
+use crate::store::models::{ControlTransaction, Parameter};
 use crate::store::types::Row;
 use crate::warehouse_metadata::constants::PREVIEW_REQUIRED_TABLES;
 use crate::warehouse_metadata::models::{
@@ -92,15 +92,6 @@ pub(crate) fn page_tail(
     (parameters, tail)
 }
 
-/// The definition body as hexadecimal text, which a store returns far faster than bytes.
-fn body_hex(transaction: &ControlTransaction) -> String {
-    if matches!(transaction.connection, Some(Connection::Postgres(_))) {
-        "encode(t.body, 'hex')".to_owned()
-    } else {
-        "hex(t.body)".to_owned()
-    }
-}
-
 pub(crate) fn location(database: Option<String>, schema: String) -> StateLocation {
     StateLocation { database, schema }
 }
@@ -157,7 +148,7 @@ pub(crate) async fn preview_fingerprints(
     transaction: ControlTransaction,
     scope: (Uuid, &str),
 ) -> Result<(ControlTransaction, Vec<WarehouseFingerprintRecord>), ControlError> {
-    let sql: String = FINGERPRINTS_SQL.replace("{body}", &body_hex(&transaction));
+    let sql: String = FINGERPRINTS_SQL.replace("{body}", &transaction.hex_column("t.body"));
     let (transaction, rows) = query(transaction, &sql, scope_parameters(scope)).await?;
     let mut fingerprints: Vec<WarehouseFingerprintRecord> = Vec::with_capacity(rows.len());
     for mut row in rows {
@@ -277,7 +268,7 @@ pub(crate) async fn preview_synced_at(
     let Some(current) = current else {
         return Ok((transaction, None));
     };
-    let (transaction, nodes) = read_snapshot_nodes(transaction, current.snapshot_id, None).await?;
+    let nodes = snapshot_nodes(&transaction.store, current.snapshot_id).await?;
     let schemas: BTreeSet<(Option<String>, String)> = nodes
         .values()
         .filter_map(|node| {

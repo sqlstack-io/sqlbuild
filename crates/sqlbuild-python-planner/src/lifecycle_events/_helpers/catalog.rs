@@ -14,7 +14,7 @@ pub(crate) fn definition(
 ) -> PyResult<Option<EventDefinition>> {
     let (Ok(version), Ok(name)) = (
         schema_version.extract::<i64>(),
-        event_type.downcast::<PyString>(),
+        event_type.cast::<PyString>(),
     ) else {
         return Ok(None);
     };

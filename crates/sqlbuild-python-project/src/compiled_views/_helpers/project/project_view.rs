@@ -7,6 +7,7 @@ use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 
+use crate::compiled_views::_helpers::project::loads::{LoadFact, load_facts, load_records};
 use crate::graph::models::ResourceRow;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
@@ -92,6 +93,8 @@ pub(crate) struct ProjectFields {
     pub(crate) sql_analysis_dialect: Option<String>,
     pub(crate) enforce_explicit_references: bool,
     pub(crate) models: Py<PyTuple>,
+    /// The loads the project compiles.
+    pub(crate) loads: Vec<LoadFact>,
     pub(crate) boundary: BoundaryInputs,
     pub(crate) compiler: CompilerHandles,
 }
@@ -107,8 +110,9 @@ impl ProjectFields {
             sql_analysis_dialect: required(fields, "sql_analysis_dialect")?.extract()?,
             enforce_explicit_references: required(fields, ENFORCE_EXPLICIT_FIELD)?.extract()?,
             models: required(fields, MODELS_FIELD)?
-                .downcast_into::<PyTuple>()?
+                .cast_into::<PyTuple>()?
                 .unbind(),
+            loads: load_facts(&required(fields, "loads")?)?,
             boundary: BoundaryInputs {
                 effective_connection: required(fields, "effective_connection")?.unbind(),
                 effective_vars: required(fields, "effective_vars")?.unbind(),
@@ -188,6 +192,7 @@ impl ProjectFields {
             "compile_cache_dir",
             self.boundary.compile_cache_dir.bind(py),
         )?;
+        fields.set_item("loads", load_records(py, &self.loads)?)?;
         fields.set_item("loader_functions", self.boundary.loader_functions.bind(py))?;
         fields.set_item(
             "python_execution_inputs",

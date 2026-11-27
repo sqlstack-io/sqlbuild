@@ -342,6 +342,22 @@ pub(crate) fn seed_json<'py>(entry: &Bound<'py, PyAny>) -> PyResult<Bound<'py, P
     )
 }
 
+/// A planned load: what it loads, and SQLLoad's plan lines.
+pub(crate) fn load_json<'py>(entry: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+    let py: Python<'py> = entry.py();
+    Ok(dict(
+        py,
+        vec![
+            ("name", native_field(entry, "name")?),
+            ("every_table", native_field(entry, "every_table")?),
+            ("sources", native_field(entry, "sources")?),
+            ("is_reload", native_field(entry, "is_reload")?),
+            ("plan", native_field(entry, "plan_lines")?),
+        ],
+    )?
+    .into_any())
+}
+
 pub(crate) fn source_load_json<'py>(entry: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = entry.py();
     let load: Bound<'py, PyDict> = dict(

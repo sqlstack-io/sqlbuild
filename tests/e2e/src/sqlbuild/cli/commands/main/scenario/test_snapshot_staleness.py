@@ -67,4 +67,4 @@ def test_given_captured_snapshot_when_fixture_sql_changes_then_local_replay_repo
     )
 
     assert replayed.returncode == test_case.expected_exit_code, replayed.stdout + replayed.stderr
-    assert test_case.expected_stdout_fragment in replayed.stdout
+    assert test_case.expected_stdout_fragment in replayed.stdout, replayed.stdout

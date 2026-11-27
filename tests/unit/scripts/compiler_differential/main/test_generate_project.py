@@ -17,6 +17,7 @@ from scripts.compiler_differential.constants import (
 from scripts.compiler_differential.main.generate_project import generate_project
 from scripts.compiler_differential.models import GeneratedProject
 from tests.unit.scripts.compiler_differential.main._test_types import (
+    ExcludedFeaturePairTestCase,
     FeatureBlockWindowTestCase,
     RareFeatureSeedTestCase,
     SeedDeterminismTestCase,
@@ -150,3 +151,26 @@ def test_given_rare_block_seed_when_generating_then_outcome_is_declared(
 
 if __name__ == "__main__":
     pytest.main([__file__, "-vv"])
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ExcludedFeaturePairTestCase(
+            description="no seed loads through a @loader on a project adapter",
+            seeds=range(DEFAULT_SEED_COUNT * 8),
+            pair=("managed_source_loader", "project_adapter"),
+            expected_any_with_both=False,
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_excluded_feature_pair_when_choosing_blocks_then_no_seed_has_both(
+    test_case: ExcludedFeaturePairTestCase,
+) -> None:
+    any_with_both: bool = any(
+        set(test_case.pair) <= set(feature_blocks_for_seed(seed=seed, rng=random.Random(seed)))
+        for seed in test_case.seeds
+    )
+
+    assert any_with_both is test_case.expected_any_with_both

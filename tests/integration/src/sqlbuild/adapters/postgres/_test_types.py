@@ -94,3 +94,21 @@ class PostgresSeedTestCase:
     description: str
     csv_text: str
     expected_rows: tuple[tuple[object, ...], ...]
+
+
+@dataclass(frozen=True)
+class PostgresLoadSessionTestCase:
+    description: str
+    files: tuple[tuple[str, str], ...]
+    expected_rows: tuple[tuple[object, ...], ...]
+
+
+@dataclass(frozen=True)
+class PostgresLoadBuildTestCase:
+    """Postgres tables a load includes by pattern, and the rows the models built on them read."""
+
+    description: str
+    tables: tuple[tuple[str, tuple[tuple[int, str], ...]], ...]
+    expected_orders: tuple[tuple[int, str], ...]
+    expected_customers: tuple[tuple[int, str], ...]
+    expected_loaded: tuple[str, ...]

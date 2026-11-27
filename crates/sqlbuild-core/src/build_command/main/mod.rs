@@ -5,5 +5,6 @@ pub mod plan_safety_steps;
 pub mod python_node_failed;
 pub mod render_confirmation_prompt;
 pub mod render_phase_timings;
+pub mod render_python_node_log_line;
 pub mod render_python_node_rows;
 pub mod render_run_context;

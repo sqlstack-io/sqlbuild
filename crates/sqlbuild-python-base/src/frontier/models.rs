@@ -96,7 +96,7 @@ impl<'py> CaptureEncoder<'py> {
                 )),
             ));
         }
-        if let Ok(text) = value.downcast::<PyString>() {
+        if let Ok(text) = value.cast::<PyString>() {
             let encoded: JsonValue = text_value(text)?;
             return if value.len()? < SHARED_MIN_CHARS {
                 Ok(encoded)
@@ -107,7 +107,7 @@ impl<'py> CaptureEncoder<'py> {
         if value.is_none() {
             return Ok(JsonValue::Null);
         }
-        if let Ok(flag) = value.downcast::<PyBool>() {
+        if let Ok(flag) = value.cast::<PyBool>() {
             return Ok(JsonValue::Bool(flag.is_true()));
         }
         if value.is_instance_of::<PyInt>() {
@@ -255,7 +255,7 @@ impl<'py> CaptureEncoder<'py> {
         if plain {
             for key in value.try_iter()? {
                 let key: Bound<'py, PyAny> = key?;
-                if RESERVED_KEYS.contains(&key.downcast::<PyString>()?.to_cow()?.as_ref()) {
+                if RESERVED_KEYS.contains(&key.cast::<PyString>()?.to_cow()?.as_ref()) {
                     plain = false;
                     break;
                 }

@@ -46,7 +46,7 @@ pub(crate) fn host(
     children: HostChildren<HostHandle>,
 ) -> PyResult<PyConfigNode> {
     let node: PyNode<'_> = PyNode(value.clone());
-    let strict_text: bool = match value.downcast::<PyString>() {
+    let strict_text: bool = match value.cast::<PyString>() {
         Ok(text) => utf8_text(text)?,
         Err(_) => false,
     };
@@ -102,11 +102,11 @@ fn container(
         return Ok(None);
     }
     let open: Vec<usize> = [enclosing, &[address]].concat();
-    Ok(if let Ok(mapping) = value.downcast::<PyDict>() {
+    Ok(if let Ok(mapping) = value.cast::<PyDict>() {
         converted_entries(mapping, &open)?.map(HostChildren::Entries)
-    } else if let Ok(items) = value.downcast::<PyList>() {
+    } else if let Ok(items) = value.cast::<PyList>() {
         converted_items(items.iter(), &open)?.map(HostChildren::Items)
-    } else if let Ok(items) = value.downcast::<PyTuple>() {
+    } else if let Ok(items) = value.cast::<PyTuple>() {
         converted_items(items.iter(), &open)?.map(HostChildren::Items)
     } else {
         Some(HostChildren::None)
@@ -130,7 +130,7 @@ pub(crate) fn convert(value: &Bound<'_, PyAny>, open: &[usize]) -> PyResult<Opti
     if value.is_exact_instance_of::<PyFloat>() {
         return Ok(Some(ConfigNode::Float(value.extract::<f64>()?)));
     }
-    if let Ok(text) = value.downcast_exact::<PyString>()
+    if let Ok(text) = value.cast_exact::<PyString>()
         && utf8_text(text)?
     {
         return Ok(Some(ConfigNode::Str(text.to_str()?.to_owned())));

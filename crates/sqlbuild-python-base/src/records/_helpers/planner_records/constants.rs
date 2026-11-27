@@ -712,6 +712,19 @@ const R_SEED_PLAN_ENTRY: RecordSpec = RecordSpec {
         ),
     ],
 };
+const R_LOAD_PLAN_ENTRY: RecordSpec = RecordSpec {
+    name: "LoadPlanEntry",
+    doc: "A load the plan runs: every table it loads, or only the selected sources' tables.",
+    fields: &[
+        FieldSpec::required("key"),
+        FieldSpec::required("name"),
+        FieldSpec::new("sources", FieldDefault::EmptyTuple),
+        FieldSpec::new("every_table", FieldDefault::True),
+        FieldSpec::required("fingerprint"),
+        FieldSpec::new("is_reload", FieldDefault::False),
+        FieldSpec::new("plan_lines", FieldDefault::EmptyTuple),
+    ],
+};
 const R_SOURCE_LOAD_PLAN_ENTRY: RecordSpec = RecordSpec {
     name: "SourceLoadPlanEntry",
     doc: "Per-managed-source loader execution plan entry.",
@@ -918,6 +931,7 @@ const R_PLAN_OUTPUT: RecordSpec = RecordSpec {
         FieldSpec::new("model_entries", FieldDefault::EmptyTuple),
         FieldSpec::new("seed_entries", FieldDefault::EmptyTuple),
         FieldSpec::new("source_load_entries", FieldDefault::EmptyTuple),
+        FieldSpec::new("load_entries", FieldDefault::EmptyTuple),
         FieldSpec::new("function_entries", FieldDefault::EmptyTuple),
         FieldSpec::new("audit_entries", FieldDefault::EmptyTuple),
         FieldSpec::new("test_entries", FieldDefault::EmptyTuple),
@@ -998,6 +1012,7 @@ pub(crate) const PLANNER_RECORDS: &[RecordSpec] = &[
     R_MODEL_PLAN_ENTRY,
     R_CLONE_SOURCE_PLAN_ENTRY,
     R_SEED_PLAN_ENTRY,
+    R_LOAD_PLAN_ENTRY,
     R_SOURCE_LOAD_PLAN_ENTRY,
     R_FUNCTION_PLAN_ENTRY,
     R_AUDIT_PLAN_ENTRY,

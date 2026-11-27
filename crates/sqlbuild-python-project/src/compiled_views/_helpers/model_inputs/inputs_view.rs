@@ -88,7 +88,7 @@ impl InputsFields {
             effective_target_name: required(fields, "effective_target_name")?.extract()?,
             no_sql_validation: required(fields, NO_SQL_VALIDATION_FIELD)?.extract()?,
             model_inputs: required(fields, MODEL_INPUTS_FIELD)?
-                .downcast_into::<PyTuple>()?
+                .cast_into::<PyTuple>()?
                 .unbind(),
             boundary: BoundaryInputs {
                 project_config: required(fields, "project_config")?.unbind(),

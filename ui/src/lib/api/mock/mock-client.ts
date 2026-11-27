@@ -384,6 +384,12 @@ export class MockApiClient implements ApiClient {
 		this.#operate.acknowledgeCondition(key, shape, acknowledged, 'you', automatic?.withdraws);
 	}
 
+	async dismissSkippedEvents(scope: Scope, storageIds: number[]): Promise<void> {
+		this.#location(scope);
+		// The mock's events include no skipped stored events, so nothing changes.
+		return this.#reply(void storageIds);
+	}
+
 	async rerunRun(scope: Scope, runId: string, mode: Exclude<RerunMode, 'selected'>): Promise<Run> {
 		this.#location(scope);
 		return this.#operate.rerunRun(scope, runId, mode);

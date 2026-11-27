@@ -3,8 +3,6 @@ pub mod build_result_text;
 pub mod check_callback;
 pub mod format_build_footer_with;
 pub mod format_execution_header;
-pub mod format_expectation_detail;
-pub mod format_expectation_name;
 pub mod local_attempt;
 pub mod register_audit_progress;
 pub mod register_build_callbacks;

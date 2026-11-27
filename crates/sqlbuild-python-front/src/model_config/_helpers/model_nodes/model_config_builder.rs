@@ -65,7 +65,7 @@ impl ConfigBuildHost for PythonConfigHost<'_> {
     fn render(&self, value: &PyConfigNode, label: &str) -> PyResult<Result<String, String>> {
         let py: Python<'_> = self.environment.py();
         let object: Bound<'_, PyAny> = config_object(py, value)?;
-        if let Ok(text) = object.downcast_exact::<PyString>() {
+        if let Ok(text) = object.cast_exact::<PyString>() {
             return Ok(Ok(text.to_str()?.to_owned()));
         }
         match project_var_text(&object, label) {
@@ -81,7 +81,7 @@ impl ConfigBuildHost for PythonConfigHost<'_> {
         let py: Python<'_> = self.environment.py();
         let read = || -> PyResult<()> {
             let object: Bound<'_, PyAny> = config_object(py, value)?;
-            let text: Bound<'_, PyString> = match object.downcast::<PyString>() {
+            let text: Bound<'_, PyString> = match object.cast::<PyString>() {
                 Ok(text) => text.clone(),
                 Err(_) => object.str()?,
             };
@@ -139,7 +139,7 @@ pub(crate) fn header_entries(
         .collect();
     let mut entries: PyConfigEntries = Vec::with_capacity(header.len());
     for (key, value) in header.iter() {
-        let native: Option<PyConfigNode> = match key.downcast_exact::<PyString>() {
+        let native: Option<PyConfigNode> = match key.cast_exact::<PyString>() {
             Ok(key) => match key.to_str() {
                 Ok(key) => authored.get(key).and_then(|value| config_value(value)),
                 Err(_) => None,
@@ -152,7 +152,7 @@ pub(crate) fn header_entries(
         }
         let whole: bool = is_exact_container(&value)
             && key
-                .downcast_exact::<PyString>()
+                .cast_exact::<PyString>()
                 .is_ok_and(|key| key.to_str().is_ok_and(|key| carried_whole(key, facts)));
         let node: PyConfigNode = if whole {
             carried_node(&value)?
@@ -190,7 +190,7 @@ pub(crate) fn halted<'py>(
         ConfigBuildHalt::Host(error) => Err(error),
         ConfigBuildHalt::MissingPathDefault(key) => Err(PyKeyError::new_err(key)),
         ConfigBuildHalt::KeyNotText(key) => {
-            Err(match config_object(py, &key)?.downcast::<PyString>() {
+            Err(match config_object(py, &key)?.cast::<PyString>() {
                 Ok(_) => PyRuntimeError::new_err(BUILD_STOPPED),
                 Err(error) => error.into(),
             })

@@ -9,10 +9,12 @@ use pyo3::types::{PyDict, PyDictMethods};
 use pyo3::{pyclass, pymethods};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::python_plan::models::RoundTripLoader;
+use sqlbuild_core::build_command::main::render_python_node_log_line::render_python_node_log_line;
 use sqlbuild_core::build_command::main::render_python_node_rows::render_python_node_rows;
 use sqlbuild_core::build_command::models::PythonNodeRow;
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_host::entries::models::ExecutorHost;
+use sqlbuild_orchestration::runs::models::NodeLogLevel;
 
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
@@ -32,6 +34,7 @@ use sqlbuild_python_compile::compile_driver::main::setup::build_project_relation
 use sqlbuild_python_compile::compile_driver::main::setup::build_python_relation_targets::build_python_relation_targets;
 use sqlbuild_python_compile::compile_driver::main::setup::project_target_settings::project_target_settings;
 use sqlbuild_python_compile::compile_driver::models::TargetSettingsValues;
+use sqlbuild_python_front::compile_driver::main::planned_loader_projects::planned_loader_projects;
 use sqlbuild_python_project::graph::main::python_nodes::build_python_sql_run_lifecycle::build_python_sql_run_lifecycle;
 use sqlbuild_python_project::graph::main::python_nodes::native_run_lifecycle::native_run_lifecycle;
 use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;
@@ -111,6 +114,28 @@ impl PythonNodeReporter {
         self.worker
             .as_ref()
             .map_or(Ok(()), |worker| worker.cancel_asset(py, name))
+    }
+
+    /// A line the running asset `name` logged with `ctx.log`: printed now, and queued for a worker's server.
+    fn logged(&self, py: Python<'_>, name: &str, level: &str, message: &str) -> PyResult<()> {
+        if let Some(worker) = &self.worker {
+            let level: NodeLogLevel = match level {
+                "warning" => NodeLogLevel::Warning,
+                "error" => NodeLogLevel::Error,
+                _ => NodeLogLevel::Info,
+            };
+            worker.asset_log(name, (level, message));
+        }
+        emit(
+            self.stream.bind(py),
+            &render_python_node_log_line(
+                ("asset", name),
+                (level, message),
+                CliStyle {
+                    use_color: self.use_color,
+                },
+            ),
+        )
     }
 
     fn __call__(&self, py: Python<'_>, result: Bound<'_, PyAny>) -> PyResult<()> {
@@ -365,11 +390,14 @@ struct RuntimeParts<'a, 'py> {
     warehouses: BTreeMap<String, String>,
     /// The first server run of a worker's rerun chain; `None` outside a worker.
     root_run_id: Option<String>,
+    /// The most nodes the build runs at once, which ingress loaders run within.
+    concurrency: i64,
 }
 
 fn node_runtime<'py>(
     parts: &RuntimeParts<'_, 'py>,
-    connection: &Bound<'py, PyAny>,
+    (connection, on_log): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    loader_projects: &Bound<'py, PyDict>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = connection.py();
     let [start_ts, end_ts, start_int, end_int] = &parts.inputs.cursors;
@@ -404,6 +432,12 @@ fn node_runtime<'py>(
                 "chain_run_id",
                 pyo3::IntoPyObject::into_pyobject(parts.root_run_id.clone(), py)?.into_any(),
             ),
+            ("loader_projects", loader_projects.clone().into_any()),
+            (
+                "max_concurrency",
+                pyo3::IntoPyObject::into_pyobject(parts.concurrency, py)?.into_any(),
+            ),
+            ("on_log", on_log.clone()),
         ],
     )
 }
@@ -546,12 +580,23 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
     .and_then(|value| pyo3::IntoPyObjectExt::into_bound_py_any(value, py))?;
     let target_config: TargetSettingsValues =
         project_target_settings(&discovered, &project, (&connection_config, &adapter))?;
+    let defaults = target_config.node_locations(&adapter)?;
+    let loader_projects = planned_loader_projects(
+        &discovered,
+        &project,
+        (
+            native_field(&project, "effective_target_name")?
+                .extract::<Option<String>>()?
+                .as_deref(),
+            defaults.1.extract::<Option<String>>()?.as_deref(),
+        ),
+    )?;
     let parts: RuntimeParts<'_, 'py> = RuntimeParts {
         adapter: &adapter,
         connection_config: &connection_config,
         project: &project,
         reload: context.request_flag("reload_sources")?,
-        defaults: target_config.node_locations(&adapter)?,
+        defaults,
         target_config,
         relations: (relation_targets, project_relations),
         inputs,
@@ -560,6 +605,7 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
             .worker
             .as_ref()
             .map(|worker| worker.root_run_id().to_string()),
+        concurrency: context.concurrency()?.limit,
     };
     let reporter: Bound<'py, PythonNodeReporter> = Bound::new(
         py,
@@ -572,6 +618,7 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
     )?;
     let report = |method: &str| reporter.getattr(method);
     let (on_asset_start, on_node_cancelled) = (report("started")?, report("cancelled")?);
+    let on_log: Bound<'py, PyAny> = report("logged")?;
     let mut ingress_python: Bound<'py, PyAny> = tuple(py, &[])?;
     let mut ingress_loads: Bound<'py, PyAny> = tuple(py, &[])?;
     if ingress_names.is_truthy()? {
@@ -598,7 +645,10 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
                         native_field(&discovered, "loader_functions")?,
                     ),
                     ("source_map", lifecycle.source_map.clone()),
-                    ("runtime", node_runtime(&parts, &connection)?),
+                    (
+                        "runtime",
+                        node_runtime(&parts, (&connection, &on_log), &loader_projects)?,
+                    ),
                     ("callbacks", callbacks),
                 ],
             )
@@ -636,7 +686,10 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
                 ("python_graph", lifecycle.graph.clone()),
                 ("selected_python_names", names_set(py, &read_side)?),
                 ("scheduled_sql_names", names_set(py, &scheduled)?),
-                ("runtime", node_runtime(&parts, &connection)?),
+                (
+                    "runtime",
+                    node_runtime(&parts, (&connection, &on_log), &loader_projects)?,
+                ),
                 ("on_node_complete", reporter.clone().into_any()),
                 ("on_asset_start", on_asset_start.clone()),
                 ("on_node_cancelled", on_node_cancelled.clone()),

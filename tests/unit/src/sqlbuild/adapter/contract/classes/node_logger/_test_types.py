@@ -15,3 +15,10 @@ class NodeLoggerCallTestCase:
     description: str
     message: str
     expected_error: type[Exception]
+
+
+@dataclass(frozen=True)
+class RecorderForwardingTestCase:
+    description: str
+    level: LogLevel | None
+    expected_forwarded: tuple[tuple[LogLevel, str], ...]

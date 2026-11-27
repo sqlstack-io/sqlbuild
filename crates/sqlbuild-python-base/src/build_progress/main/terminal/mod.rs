@@ -2,6 +2,7 @@ pub mod claim;
 pub mod consume_terminal;
 pub mod flush;
 pub mod join_spinner;
+pub mod known_terminal_columns;
 pub mod projector;
 pub mod register_terminal;
 pub mod release;

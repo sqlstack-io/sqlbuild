@@ -93,7 +93,7 @@ pub(crate) fn discovered_names(inputs: &Bound<'_, PyAny>) -> PyResult<ResourceNa
 fn returns_table(file: &Bound<'_, PyAny>) -> PyResult<bool> {
     let headers: Bound<'_, PyAny> = native_field(file, "header_values")?;
     let returns: Bound<'_, PyAny> = mapping_get(&headers, RETURNS_KEY)?;
-    let Ok(returns) = returns.downcast::<PyDict>() else {
+    let Ok(returns) = returns.cast::<PyDict>() else {
         return Ok(false);
     };
     let keys: Vec<Bound<'_, PyAny>> = returns.keys().into_iter().collect();

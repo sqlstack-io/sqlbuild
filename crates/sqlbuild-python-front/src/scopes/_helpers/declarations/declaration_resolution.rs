@@ -72,7 +72,7 @@ impl NativeDeclarationContexts {
         .try_iter()?
         .collect::<PyResult<_>>()?;
         let cache: Bound<'py, PyDict> =
-            native_field(resolver, "contexts_by_directory")?.downcast_into()?;
+            native_field(resolver, "contexts_by_directory")?.cast_into()?;
         let specific: Bound<'py, PyAny> = native_field(resolver, "resource_specific")?;
         let mut cache_key: Option<Bound<'py, PyTuple>> = None;
         if let [record] = resources.as_slice()
@@ -279,11 +279,11 @@ impl NativeDeclarationContexts {
         let py: Python<'py> = context.py();
         let fields: Bound<'py, PyDict> = PyDict::new(py);
         for field in COPIED_FIELDS {
-            let mapping: Bound<'py, PyDict> = native_field(context, field)?.downcast_into()?;
+            let mapping: Bound<'py, PyDict> = native_field(context, field)?.cast_into()?;
             fields.set_item(field, mapping.copy()?)?;
         }
         for field in VISIBILITY_FIELDS {
-            let mapping: Bound<'py, PyDict> = native_field(context, field)?.downcast_into()?;
+            let mapping: Bound<'py, PyDict> = native_field(context, field)?.cast_into()?;
             fields.set_item(field, self.rebound_visibility(&mapping, consumer)?)?;
         }
         fields.set_item(intern!(py, "consumer"), consumer)?;

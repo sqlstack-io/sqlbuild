@@ -13,6 +13,7 @@ from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.classes.node_logger import NodeLogger
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.adapter.contract.models import LifeCycleEvent
+from sqlbuild.adapter.contract.types import LogLevel
 from sqlbuild.adapter.relations.main.resolve_qualified_name_parts import (
     resolve_qualified_name_parts,
 )
@@ -113,6 +114,7 @@ class PythonNodeExecutionResult:
     warning_messages: tuple[str, ...] = field(default_factory=tuple)
     error_detail: str | None = None
     lifecycle_events: tuple[LifeCycleEvent, ...] = field(default_factory=tuple)
+    dropped_log_lines: int = 0
 
 
 @dataclass(frozen=True)
@@ -163,6 +165,9 @@ class PythonNodeRuntime:
     session_warehouses: SessionWarehouses | None = None
     chain_run_id: str | None = None
     on_start: Callable[[str], None] | None = None
+    loader_projects: Mapping[str, tuple[str, str]] = field(default_factory=dict)
+    max_concurrency: int = 1
+    on_log: Callable[[str, LogLevel, str], None] | None = None
 
     def __post_init__(self) -> None:
         if self.node_warehouses and self.session_warehouses is None:

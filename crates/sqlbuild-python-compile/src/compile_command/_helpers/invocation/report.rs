@@ -195,7 +195,7 @@ impl<'py> ReportInputs<'py> {
             COMPILED_DIRECTORY
         };
         let path: Bound<'py, PyAny> = native_field(&self.written, "target_dir")?.div(directory)?;
-        let parts: Bound<'py, PyTuple> = native_field(&path, "parts")?.downcast_into()?;
+        let parts: Bound<'py, PyTuple> = native_field(&path, "parts")?.cast_into()?;
         for (index, part) in parts.iter().enumerate() {
             if part.eq(TARGET_DIRECTORY)? {
                 let kept: Bound<'py, PyTuple> = parts.get_slice(index, parts.len());

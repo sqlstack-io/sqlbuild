@@ -80,7 +80,7 @@ fn display_value(payload: &Bound<'_, PyAny>, key: &str, default: &str) -> PyResu
 fn progress_payload(payload: &Bound<'_, PyAny>) -> PyResult<ProgressPayload> {
     let metadata: Bound<'_, PyAny> = payload_value(payload, "metadata")?;
     let metadata_integer = |key: &str| -> PyResult<Option<i64>> {
-        if metadata.downcast::<PyMapping>().is_err() {
+        if metadata.cast::<PyMapping>().is_err() {
             return Ok(None);
         }
         strict_integer(&payload_value(&metadata, key)?)

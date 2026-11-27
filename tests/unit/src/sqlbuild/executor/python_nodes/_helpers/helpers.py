@@ -48,7 +48,6 @@ from sqlbuild.executor.python_nodes.models import (
 )
 from sqlbuild.executor.python_nodes.types import ExecutablePythonNode
 from sqlbuild.executor.scheduling.classes.session_warehouses import SessionWarehouses
-from sqlbuild.executor.scheduling.main._unlock_downstream import unlock_downstream_python_nodes
 from sqlbuild.executor.scheduling.models import LifecycleExecutionNode
 from sqlbuild.observability import LifecycleEvent
 from sqlbuild.providers import Provider
@@ -100,27 +99,6 @@ def execute_ordered_test_nodes(
 class ExecutionSlackProvider(Provider):
     provider_name: ClassVar[str] = "slack_provider"
     label: str = "slack"
-
-
-def apply_completion_order(
-    *,
-    completion_order: tuple[str, ...],
-    in_degree: dict[str, int],
-    ready: list[str],
-    downstream_names: dict[str, tuple[str, ...]],
-) -> tuple[dict[str, int], list[str]]:
-    updated_in_degree: dict[str, int] = dict(in_degree)
-    updated_ready: list[str] = list(ready)
-    completed_node_name: str
-    for completed_node_name in completion_order:
-        newly_ready: tuple[str, ...]
-        updated_in_degree, newly_ready = unlock_downstream_python_nodes(
-            completed_node_name=completed_node_name,
-            in_degree=updated_in_degree,
-            downstream_names=downstream_names,
-        )
-        updated_ready.extend(newly_ready)
-    return updated_in_degree, updated_ready
 
 
 class PythonNodeContextTestAdapter(BaseAdapter):
@@ -716,3 +694,38 @@ def raised_value_error(*, message: str) -> BaseException:
 
 def discovered_step(ctx: object, n: int = 1) -> None:
     del ctx, n
+
+
+@asset
+def log_two_order_steps(ctx: AssetContext) -> object:
+    """Log a step at info and one at warning."""
+
+    ctx.log.info("loaded 3 orders")
+    ctx.log.warning("1 order had no customer")
+    return ctx.result(payload={"orders": 3})
+
+
+@asset
+def log_past_the_cap(ctx: AssetContext) -> object:
+    """Log five lines more than a node keeps."""
+
+    for line in range(205):
+        ctx.log.info(f"order {line}")
+    return ctx.result(payload={"orders": 205})
+
+
+def logging_runtime(on_log: Callable[[str, Any, str], None]) -> PythonNodeRuntime:
+    """A runtime whose `on_log` receives each `ctx.log` line as it is logged."""
+
+    adapter: PythonNodeContextTestAdapter = PythonNodeContextTestAdapter()
+    return PythonNodeRuntime(
+        adapter=adapter,
+        connection_config={},
+        connection=object(),
+        run_id="log_run",
+        target="dev",
+        vars={},
+        is_reload=False,
+        persist_node_results=False,
+        on_log=on_log,
+    )

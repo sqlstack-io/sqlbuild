@@ -2,49 +2,42 @@ sources:
   - name: raw_countries
     description: Test source raw_countries.
     managed: true
-    write_strategy: table
     columns:
       - name: country_id
-        type: INTEGER
+        type: BIGINT
       - name: country_code
-        type: VARCHAR
+        type: TEXT
       - name: country_name
-        type: VARCHAR
+        type: TEXT
 
   - name: raw_webhook_events
     description: Test source raw_webhook_events.
     managed: true
-    write_strategy: append
     columns:
       - name: event_id
-        type: INTEGER
+        type: BIGINT
       - name: event_name
-        type: VARCHAR
+        type: TEXT
 
   - name: raw_order_events
     description: Test source raw_order_events.
     managed: true
-    write_strategy: delete_insert
-    cursor_column: event_at
     columns:
       - name: event_id
-        type: INTEGER
+        type: BIGINT
       - name: event_at
         type: TIMESTAMP
       - name: amount_cents
-        type: INTEGER
+        type: BIGINT
 
   - name: raw_customers
     description: Test source raw_customers.
     managed: true
-    write_strategy: merge
-    unique_key: customer_id
-    cursor_column: updated_at
     columns:
       - name: customer_id
-        type: INTEGER
+        type: BIGINT
       - name: plan_name
-        type: VARCHAR
+        type: TEXT
       - name: updated_at
         type: TIMESTAMP
 
@@ -53,8 +46,8 @@ sources:
     managed: true
     columns:
       - name: status_id
-        type: INTEGER
+        type: BIGINT
       - name: status_name
-        type: VARCHAR
+        type: TEXT
       - name: loaded_by
-        type: VARCHAR
+        type: TEXT

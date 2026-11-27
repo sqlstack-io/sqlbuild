@@ -30,7 +30,7 @@ _MATCHING_COLUMNS: str = (
 )
 _ENFORCED_DEFAULTS: str = 'contract = "enforced"\n'
 _CONFLICT_FRAGMENTS: tuple[str, ...] = (
-    "error[K011]",
+    "[K011]",
     "sql/models/order_totals.sql",
     "model 'order_totals': contract enforced requires staged table promotion",
     'sqlbuild_project.toml sets [settings] table_promotion_mode = "immediate"',
@@ -50,7 +50,7 @@ _CONFLICT_FRAGMENTS: tuple[str, ...] = (
             model_columns=_MATCHING_COLUMNS,
             expected_exit_code=0,
             expected_stdout_fragments=(
-                "expect    expected order_totals",
+                "PASS   warehouse",
                 "PASS=1  FAIL=0  TOTAL=1",
             ),
             expect_staged_promotion=True,
@@ -82,8 +82,9 @@ _CONFLICT_FRAGMENTS: tuple[str, ...] = (
             ),
             expected_exit_code=1,
             expected_stdout_fragments=(
-                "error[K008]",
-                "runtime contract missing columns: discount_amount",
+                "[K008]",
+                "runtime contract missing columns:",
+                "discount_amount",
                 "PASS=0  FAIL=1  TOTAL=1",
             ),
             expect_staged_promotion=True,
@@ -219,9 +220,7 @@ def test_given_warm_compile_when_promotion_setting_changes_then_k011_follows_the
         write_project_settings(project_dir=project_dir, base_toml=base_toml, settings=settings)
         result: subprocess.CompletedProcess[str] = run_reusable_compile(project_dir=project_dir)
         output: str = result.stdout + result.stderr
-        outcomes.append(
-            (result.returncode, COMPILE_REUSE_HIT_LINE in output, "error[K011]" in output)
-        )
+        outcomes.append((result.returncode, COMPILE_REUSE_HIT_LINE in output, "[K011]" in output))
 
     assert tuple(code for code, _, _ in outcomes) == test_case.expected_exit_codes
     assert tuple(reused for _, reused, _ in outcomes) == test_case.expected_reused

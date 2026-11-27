@@ -1,7 +1,10 @@
+pub mod bounded_log_message;
 pub mod download_person_output;
 pub mod enter_output_node;
 pub mod finish_output_upload;
 pub mod forward_output;
+pub mod node_log_change;
+pub mod node_log_overflow;
 pub mod open_output_store;
 pub mod prune_run_output;
 pub mod publish_output_batch;

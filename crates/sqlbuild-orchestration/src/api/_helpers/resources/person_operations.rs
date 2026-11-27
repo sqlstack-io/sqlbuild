@@ -8,11 +8,12 @@ use uuid::Uuid;
 
 use crate::acknowledgements::main::acknowledge_person_attention::acknowledge_person_attention;
 use crate::acknowledgements::main::acknowledge_person_run::acknowledge_person_run;
+use crate::acknowledgements::main::dismiss_person_skipped_event::dismiss_person_skipped_event;
 use crate::acknowledgements::main::list_person_acknowledgements::list_person_acknowledgements;
 use crate::acknowledgements::main::list_person_attention_acknowledgements::list_person_attention_acknowledgements;
 use crate::acknowledgements::models::{
     AcknowledgementRequest, AttentionAcknowledgementRequest, AttentionAcknowledgements,
-    RunAcknowledgement,
+    RunAcknowledgement, SkippedEventDismissalRequest,
 };
 use crate::api::errors::ApiError;
 use crate::api::models::{MutationResponse, RunsQuery, ServerFacts};
@@ -239,6 +240,33 @@ pub(crate) async fn acknowledge_attention(
             (&context, principal),
             (location_id, &target, &request),
             (default_role, facts.attention_snooze),
+        )
+        .await?,
+    }))
+}
+
+#[utoipa::path(post, path = "/api/control/locations/{location_id}/targets/{target}/skipped-event-dismissals", operation_id = "dismissSkippedEvent",
+    params(("location_id" = Uuid, Path), ("target" = String, Path), ("x-sqb-csrf" = String, Header)),
+    request_body = SkippedEventDismissalRequest,
+    responses((status = 200, body = MutationResponse, description = "Whether the skipped stored event's problem was dismissed now; it stays in the history"),
+        (status = 400, description = "No such skipped event, one of another target, or the event ID was reused"),
+        (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn dismiss_skipped_event(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    (Path((location_id, target)), Extension(default_role)): (
+        Path<(Uuid, String)>,
+        Extension<DefaultRole>,
+    ),
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+    Json(request): Json<SkippedEventDismissalRequest>,
+) -> Result<Json<MutationResponse>, ApiError> {
+    Ok(Json(MutationResponse {
+        applied: dismiss_person_skipped_event(
+            &store,
+            (&context, principal),
+            (location_id, &target, &request),
+            default_role,
         )
         .await?,
     }))

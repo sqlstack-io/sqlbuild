@@ -13,6 +13,7 @@ from sqlbuild._native import (
     DiscoveredProjectInputs,
     PlanOutput,
     discover_project_inputs,
+    loader_projects,
     run_compile_pipeline,
 )
 from sqlbuild.adapter.contract.types import TablePromotionMode
@@ -134,6 +135,9 @@ def run_concurrent_build(
                 microbatch_concurrency=(pipeline_result.project.settings.microbatch_concurrency),
                 microbatch_unaccounted_partition_policy=(
                     pipeline_result.project.settings.microbatch_unaccounted_partition_policy
+                ),
+                loader_projects=loader_projects(
+                    discovered_inputs=discovered, project=pipeline_result.project, schema="main"
                 ),
             ),
             customizations=BuildCustomizations(

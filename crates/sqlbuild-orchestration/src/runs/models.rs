@@ -1134,14 +1134,14 @@ impl Default for RunLogRetention {
 /// Prepared publications by snapshot ID; snapshots never change, so an entry stays valid until evicted.
 #[derive(Debug)]
 pub struct PublicationCache {
-    pub(crate) slots: std::sync::Mutex<SnapshotSlots>,
+    pub(crate) slots: std::sync::Mutex<crate::runs::types::SnapshotSlots>,
 }
 
 impl PublicationCache {
     #[must_use]
     pub const fn new() -> Self {
         Self {
-            slots: std::sync::Mutex::new(SnapshotSlots::new()),
+            slots: std::sync::Mutex::new(crate::runs::types::SnapshotSlots::new()),
         }
     }
 }
@@ -1150,32 +1150,6 @@ impl Default for PublicationCache {
     fn default() -> Self {
         Self::new()
     }
-}
-
-/// Publications prepared once per snapshot, least recently used first out within each location and target.
-#[derive(Debug)]
-pub(crate) struct SnapshotSlots {
-    /// Counts lookups, so a larger `used` is more recent.
-    pub(crate) clock: u64,
-    pub(crate) slots: Vec<SnapshotSlot>,
-}
-
-impl SnapshotSlots {
-    pub(crate) const fn new() -> Self {
-        Self {
-            clock: 0,
-            slots: Vec::new(),
-        }
-    }
-}
-
-/// One snapshot's publication, prepared by the first request that needs it while later ones wait.
-#[derive(Debug)]
-pub(crate) struct SnapshotSlot {
-    pub(crate) scope: (Uuid, String),
-    pub(crate) snapshot_id: Uuid,
-    pub(crate) used: u64,
-    pub(crate) cell: std::sync::Arc<tokio::sync::OnceCell<std::sync::Arc<CachedPublication>>>,
 }
 
 /// What every plan of one publication shares: the planner's index, each node's write-set facts and every node key.

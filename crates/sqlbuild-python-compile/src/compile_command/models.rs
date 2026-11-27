@@ -328,7 +328,7 @@ impl RecordedCompileOutput {
 
     /// Record the compile report; it is printed once the compile has been stored.
     pub fn record_stdout(&self, text: &Bound<'_, PyString>) -> PyResult<()> {
-        let recorded: Bound<'_, PyString> = text.add("\n")?.downcast_into()?;
+        let recorded: Bound<'_, PyString> = text.add("\n")?.cast_into()?;
         self.locked().1 = Some(recorded.unbind());
         Ok(())
     }

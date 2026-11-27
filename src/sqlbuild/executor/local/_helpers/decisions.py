@@ -14,8 +14,10 @@ from sqlbuild.executor.local._helpers.conversion import (
     check_all,
     local_check,
     use_conversion_cache,
+    use_local_inputs,
     warehouse_relations,
 )
+from sqlbuild.executor.local._helpers.local_inputs import local_inputs
 from sqlbuild.executor.local._helpers.positions import placed_refusal
 from sqlbuild.executor.local._helpers.schema import project_schema
 from sqlbuild.executor.local._helpers.session import session_time_zone
@@ -47,6 +49,7 @@ def decision_context(
     adapter: BaseAdapter,
     run_on: str,
     location: tuple[Path, Mapping[str, str]],
+    local_test_allow: Mapping[str, bool],
 ) -> DecisionContext:
     """The project's functions and schema, and every convertible test's SQL, converted up front."""
 
@@ -66,6 +69,12 @@ def decision_context(
     if run_on == RUN_ON_WAREHOUSE or dialect not in (CONVERTED_DIALECT, LOCAL_DIALECT):
         return context
     use_conversion_cache(location[0] / CONVERSION_CACHE_DIR)
+    use_local_inputs(
+        local_inputs(
+            project_dir=location[0],
+            allow=local_test_allow,
+        )
+    )
     rendered: dict[str, tuple[str, list[tuple[int, int, str]]]] = {
         entry.name: _rendered(entry=entry, context=context)
         for entry in test_entries
@@ -178,9 +187,14 @@ def _converted_decision(*, entry: SqlTestPlanEntry, context: DecisionContext) ->
     if conversion is None:
         return _bound_decision(name=entry.name, missing=check.missing)
     if conversion.converted:
-        return _relations_decision(
-            name=entry.name,
-            relations=warehouse_relations(sql=sql, schema=context.schema, conversion=conversion),
+        return replace(
+            _relations_decision(
+                name=entry.name,
+                relations=warehouse_relations(
+                    sql=sql, schema=context.schema, conversion=conversion
+                ),
+            ),
+            relied_on=conversion.relied_on,
         )
     sources: TestSources = _test_sources(entry=entry, context=context)
     return RunOnDecision(
@@ -209,6 +223,7 @@ def _test_sources(*, entry: SqlTestPlanEntry, context: DecisionContext) -> TestS
         models={model.name: model for model in getattr(context.project, "models", ())},
         chain_sql={step.model_name: step.resolved_sql for step in entry.chain},
         dialect=CONVERTED_DIALECT,
+        macros=getattr(context.project, "loaded_macros", None) or {},
     )
 
 
@@ -261,6 +276,7 @@ def _decision_payload(decision: RunOnDecision) -> dict[str, Any]:
         "run_on": decision.run_on,
         "reason": decision.reason,
         "refusals": [_refusal_payload(refusal) for refusal in decision.refusals],
+        "relied_on": list(decision.relied_on),
     }
 
 

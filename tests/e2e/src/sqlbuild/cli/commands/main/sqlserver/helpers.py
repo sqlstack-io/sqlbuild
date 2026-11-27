@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import os
+import runpy
 import uuid
 from pathlib import Path
 from typing import Any
 
 from sqlbuild.adapters.sqlserver.classes.sqlserver_adapter import SqlServerAdapter
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
-    prepare_source_loader_strategies,
+    WAFFLE_SHOP_DIR,
     prepare_waffle_shop,
     stringify_warehouse_rows,
 )
+
+_WAFFLE_LOADERS_FILE: str = "python/nodes/loaders/waffle_sources/loaders.py"
 
 
 def build_unique_schema_name(*, prefix: str) -> str:
@@ -44,29 +47,6 @@ def build_sqlserver_project_toml(
         "[targets.dev]\n"
         f'schema = "{schema_name}"\n'
         'defer_sources_to = "dev"\n\n'
-        "[defaults]\n"
-        'materialized = "table"\n'
-    )
-
-
-def build_sqlserver_source_deferral_project_toml(
-    *, project_name: str, dev_schema_name: str, prod_schema_name: str, config: dict[str, object]
-) -> str:
-    return (
-        f'name = "{project_name}"\n'
-        'adapter = "sqlserver"\n'
-        'default_target = "dev"\n\n'
-        "[connection]\n"
-        f'host = "{config["host"]}"\n'
-        f"port = {config['port']}\n"
-        f'database = "{config["database"]}"\n'
-        f'user = "{config["user"]}"\n'
-        f'password = "{config["password"]}"\n\n'
-        "[targets.dev]\n"
-        f'schema = "{dev_schema_name}"\n'
-        'defer_sources_to = "prod"\n\n'
-        "[targets.prod]\n"
-        f'schema = "{prod_schema_name}"\n\n'
         "[defaults]\n"
         'materialized = "table"\n'
     )
@@ -348,7 +328,41 @@ def prepare_sqlserver_waffle_shop(*, tmp_path: Path, config: dict[str, object]) 
             "      - name: ordered_at\n        type: DATETIME",
         ),
     )
+    raw_sources_text: str = raw_sources_path.read_text(encoding="utf-8")
+    raw_sources_path.write_text(
+        raw_sources_text.replace("    managed: true\n", f"    schema: {schema_name}\n"),
+        encoding="utf-8",
+    )
+    (project_dir / _WAFFLE_LOADERS_FILE).unlink()
     return project_dir, schema_name
+
+
+def write_sqlserver_waffle_sources(*, schema_name: str, config: dict[str, object]) -> None:
+    """Write the rows the waffle shop's loaders return, since loaders can't write to SQL Server."""
+
+    data: dict[str, Any] = runpy.run_path(str(WAFFLE_SHOP_DIR / _WAFFLE_LOADERS_FILE))
+    customers: str = ", ".join(
+        f"({row['id']}, '{row['first_name']}', '{row['last_name']}', '{row['email']}', "
+        f"'{row['created_at']}')"
+        for row in data["CUSTOMERS"]
+    )
+    orders: str = ", ".join(
+        f"({row[0]}, {row[1]}, {row[2]}, {row[3]}, '{row[4]}', '{row[5]}')"
+        for row in data["ORDERS"]
+    )
+    customers_relation: str = relation_name(schema_name=schema_name, name="raw_customers")
+    orders_relation: str = relation_name(schema_name=schema_name, name="raw_orders")
+    execute_sqlserver_sql(
+        sql=(
+            f"CREATE TABLE {customers_relation} (id INT, first_name NVARCHAR(100), "
+            "last_name NVARCHAR(100), email NVARCHAR(100), created_at DATETIME2); "
+            f"INSERT INTO {customers_relation} VALUES {customers}; "
+            f"CREATE TABLE {orders_relation} (id INT, customer_id INT, waffle_type_id INT, "
+            "quantity INT, ordered_at DATETIME, status NVARCHAR(100)); "
+            f"INSERT INTO {orders_relation} VALUES {orders}"
+        ),
+        config=config,
+    )
 
 
 def _rewrite(path: Path, replacement: tuple[str, str]) -> None:
@@ -358,37 +372,3 @@ def _rewrite(path: Path, replacement: tuple[str, str]) -> None:
     text: str = path.read_text(encoding="utf-8")
     assert old in text, f"{path} no longer contains {old!r}; update the SQL Server fixture"
     path.write_text(text.replace(old, new), encoding="utf-8")
-
-
-def prepare_sqlserver_source_loader_strategies(
-    *, tmp_path: Path, config: dict[str, object]
-) -> tuple[Path, str]:
-    schema_name: str = build_unique_schema_name(prefix="sqb_load")
-    project_dir: Path = prepare_source_loader_strategies(
-        tmp_path=tmp_path,
-        project_toml=build_sqlserver_project_toml(
-            project_name="source_loader_strategies",
-            schema_name=schema_name,
-            config=config,
-        ),
-    )
-    source_path: Path = project_dir / "sql" / "sources" / "raw.yml"
-    source_path.write_text(
-        source_path.read_text(encoding="utf-8").replace("type: TIMESTAMP", "type: DATETIME2"),
-        encoding="utf-8",
-    )
-    loader_path: Path = project_dir / "python" / "nodes" / "loaders" / "strategy_sources.py"
-    old_sql: str = (
-        'f"CREATE TABLE {ctx.destination} AS "\n'
-        "        \"SELECT 1 AS status_id, 'loaded' AS status_name, "
-        "'self_managed' AS loaded_by\""
-    )
-    new_sql: str = (
-        "\"SELECT 1 AS status_id, 'loaded' AS status_name, 'self_managed' AS loaded_by \"\n"
-        '        f"INTO {ctx.destination}"'
-    )
-    loader_path.write_text(
-        loader_path.read_text(encoding="utf-8").replace(old_sql, new_sql),
-        encoding="utf-8",
-    )
-    return project_dir, schema_name

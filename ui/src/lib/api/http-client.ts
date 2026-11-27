@@ -59,6 +59,7 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'getRunNodeError',
 	'acknowledgeRun',
 	'acknowledgeCondition',
+	'dismissSkippedEvents',
 	'cancelRun',
 	'cancelMatchingRuns',
 	'rerunRun',
@@ -282,6 +283,8 @@ export class HttpChangeFeed implements ChangeSubscription {
 export function channelOf(topic: string, scope: Scope): ChangedChannel {
 	if (topic.startsWith('snapshot:')) return `snapshot:${scope.locationId}`;
 	if (topic.startsWith('node_status:')) return `node_status:${scope.locationId}`;
+	if (topic.startsWith('warehouse_sync:')) return `warehouse_sync:${scope.locationId}`;
+	if (topic.startsWith('location_health:')) return `location_health:${scope.locationId}`;
 	return topic === 'runs' || topic === 'ticks' ? topic : 'all';
 }
 
@@ -622,6 +625,17 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			if (response.status === 401) onUnauthorized();
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 		},
+		async dismissSkippedEvents(scope: Scope, storageIds: number[]): Promise<void> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			for (const storage_id of storageIds) {
+				const { error, response } = await http.POST('/api/control/locations/{location_id}/targets/{target}/skipped-event-dismissals', {
+					body: { event_id: newRequestId(), storage_id },
+					params: { path: { location_id: locationId, target }, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
+				});
+				if (response.status === 401) onUnauthorized();
+				if (!response.ok) throw new ApiError(errorText(error, response), response.status);
+			}
+		},
 		async rerunRun(scope: Scope, runId: string, mode: Exclude<RerunMode, 'selected'>): Promise<Run> {
 			const source = await requireRun(scope, runId);
 			const body = { run_id: newRequestId(), source_run_id: runId, from_failure: mode === 'from_failure', priority: source.priority, reason: 'Rerun from the web UI' };
@@ -872,6 +886,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 				wire.event.kind !== 'run_failed' &&
 				(!query.kinds?.length || query.kinds.includes(wire.event.kind));
 			/** Each scan skips the events the person may not see, so one can come back short; keep scanning until enough match. */
+			const unreadable: Wire['UnreadablePlatformEvent'][] = [];
 			async function storedEvents(): Promise<Wire['PersonPlatformEvent'][]> {
 				const kept: Wire['PersonPlatformEvent'][] = [];
 				let before: number | undefined;
@@ -880,13 +895,14 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 					if (response.status === 401) onUnauthorized();
 					if (!data) throw new ApiError(errorText(error, response), response.status);
 					kept.push(...data.events.filter(wanted));
+					unreadable.push(...(data.unreadable ?? []).filter((item) => query.locationId === undefined || (item.location_id && item.target ? locationKey(item.location_id, item.target) : null) === query.locationId));
 					if (data.before === null || data.before === undefined) break;
 					before = data.before;
 				}
 				return kept.slice(0, limit);
 			}
 			const [open, stored, locations] = await Promise.all([problems().then((p) => toPlatformEvents(p, Date.now())), storedEvents(), bootstrapLocations()]);
-			const records = toPlatformEventRecords(open, stored, new Map(locations.map((l) => [l.id, l.name])));
+			const records = toPlatformEventRecords(open, stored, new Map(locations.map((l) => [l.id, l.name])), unreadable);
 			return records.filter(
 				(r) => (query.locationId === undefined || r.locationId === query.locationId) && (!query.kinds?.length || query.kinds.includes(r.kind)) && (!query.activeOnly || r.active)
 			);

@@ -64,6 +64,8 @@ const NODE_KINDS: [NodeKind; 3] = [
             "columns",
             "contract",
             "description",
+            "connection",
+            "settings",
         ],
     },
     NodeKind {
@@ -570,6 +572,12 @@ fn decorator_config<'py>(
             config.set_item("destination", get("destination")?)?;
             config.set_item("unique_key", get("unique_key")?)?;
             config.set_item("write_strategy", optional_value(&get("write_strategy")?)?)?;
+            for field in ["connection", "settings"] {
+                let value: Bound<'py, PyAny> = get(field)?;
+                if value.is_truthy()? {
+                    config.set_item(field, value)?;
+                }
+            }
         }
         "ASSET" => {
             config.set_item("columns", get("columns")?)?;

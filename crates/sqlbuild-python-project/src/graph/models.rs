@@ -129,8 +129,11 @@ pub struct ResourceRow {
     pub folder: Option<String>,
 }
 
-impl<'py> pyo3::FromPyObject<'py> for ResourceRow {
-    fn extract_bound(value: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for ResourceRow {
+    type Error = pyo3::PyErr;
+
+    fn extract(value: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        let value: &pyo3::Bound<'py, pyo3::PyAny> = &value;
         let (key, deps, tags, folder): (ObjectKey, Vec<ObjectKey>, Vec<String>, Option<String>) =
             pyo3::types::PyAnyMethods::extract(value)?;
         Ok(Self {

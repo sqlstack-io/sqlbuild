@@ -48,7 +48,7 @@ pub async fn read_person_node_status(
     let (mut transaction, mut nodes) = read_snapshot_nodes(
         transaction,
         snapshot.snapshot_id,
-        Some(&[options.node_key.clone()].into()),
+        &[options.node_key.clone()].into(),
     )
     .await?;
     let Some(node) = nodes.remove(&options.node_key) else {

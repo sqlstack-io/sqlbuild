@@ -360,6 +360,17 @@ pub struct SourceLoadPlanText {
     pub unique_key: Vec<String>,
 }
 
+/// One planned load: every table it loads, or the selected sources it fills, and SQLLoad's plan lines.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LoadPlanText {
+    pub name: String,
+    pub every_table: bool,
+    pub sources: Vec<String>,
+    pub is_reload: bool,
+    /// SQLLoad's plan of the load, as `sqlload plan` prints it.
+    pub lines: Vec<String>,
+}
+
 /// One planned Python node, with its rendered identity diffs.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PythonPlanText {
@@ -421,6 +432,7 @@ pub struct PlanTextReport {
     pub functions: Vec<FunctionPlanText>,
     pub seeds: Vec<SeedPlanText>,
     pub source_loads: Vec<SourceLoadPlanText>,
+    pub loads: Vec<LoadPlanText>,
     pub python_entries: Vec<PythonPlanText>,
     /// The plan's provider usages, then each Python entry's.
     pub provider_usages: Vec<ProviderUsageText>,

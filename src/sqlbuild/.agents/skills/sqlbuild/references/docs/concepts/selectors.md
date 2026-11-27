@@ -74,11 +74,12 @@ sqb build --select path:sql/models/intermediate
 
 Any name containing `/` is treated as a path selector, so `path:sql/models/marts` and a bare `sql/models/marts` work the same way. Path selectors require an explicit root directory: `sql/models/` for SQL models or `python/nodes/` for Python nodes. Nested paths work too: `sql/models/staging/orders` or `python/nodes/exports`.
 
-### Seed and source
+### Seed, source and load
 
 ```bash
 sqb build --select seed:waffle_types
 sqb build --select source:raw__orders
+sqb build --select load:shop+
 ```
 
 ### Kind
@@ -91,7 +92,7 @@ sqb build --select "kind:model,path:sql/models/marts"
 sqb build --select +kind:asset
 ```
 
-The kinds are `model`, `source`, `seed`, `udf`, `table_fn`, `asset`, `loader` and
+The kinds are `model`, `source`, `load`, `seed`, `udf`, `table_fn`, `asset`, `loader` and
 `check`, as the server's catalog names them, and `function`, which selects both `udf` and
 `table_fn`. Kind selectors compose with `+`, `,` and `--exclude`
 like tag selectors. An unknown kind is an error that names the closest kinds, and a kind your

@@ -36,7 +36,7 @@ sqb scenario test [flags]
 | `--max-snapshot-total-bytes` | Override total byte limit for capture |
 | `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `query` [warehouse group](/docs/concepts/adapters/snowflake#command-group-warehouses) and the connection warehouse |
 | `--since <ref>` | Run only the scenarios affected by changes since the merge base of `<ref>` and `HEAD`; `@base` reads `[git] base_ref` |
-| `--explain` | With `--since`, print why each selected scenario was selected |
+| `--explain` | Print where each scenario runs and why; with `--since`, also why it was selected |
 
 ### Affected scenarios
 
@@ -97,7 +97,7 @@ sqb scenario test --select revenue
 | `--run-on` | Where each scenario runs |
 |------|-------------|
 | `auto` (default) | Locally when its snapshot is fresh and SQLQuack converts all its SQL; otherwise on the warehouse |
-| `local` | Locally. A missing or stale snapshot, or SQL SQLQuack refuses, is an `ERROR`; nothing goes to the warehouse |
+| `local` | Locally. A scenario with a missing or stale snapshot, or SQL SQLQuack refuses, is not run and fails the run; nothing goes to the warehouse |
 | `warehouse` | On the warehouse |
 
 The setting comes from, in order: `--run-on`, the default target's `scenario_run_on`,
@@ -117,35 +117,71 @@ sqb scenario test --run-on local --refresh
 
 ### Output
 
-Scenarios report per-scenario PASS/FAIL, where each ran, and nested check rows:
+`sqb scenario test` prints its output the way [`sqb test`](/docs/cli/test#output) does: a header,
+one row per scenario, then failures, the reasons scenarios could not run locally, and the summary
+line last:
 
 ```
-daily_revenue_minimal                                            PASS  warehouse  0.84s
-    expect    expected daily_revenue                             PASS
-    expect    assertion no_negative_revenue                      PASS
+Scenarios ready  3 selected, 2 local, 1 on the warehouse
+  note: 1 scenario runs on the warehouse: snapshot stale 1 (--explain for where)
 
-PASS=1  FAIL=0  TOTAL=1  (0 local, 1 warehouse, 0.91s)
-Statements: 9 on the warehouse (CREATE 3, SELECT 3, DROP 2, ALTER 1); compile time not reported by duckdb
+Execution  sqb scenario test  (concurrency: 1, DuckDB and snowflake)
+
+  1/3  scenario  daily_revenue_minimal       PASS   local        0.21s
+  2/3  scenario  daily_revenue_multi_order   FAIL   local        0.34s
+         └── expected  daily_revenue         FAIL   2 rows differ
+  3/3  scenario  order_prices_retained       PASS   warehouse    0.84s
+
+Failures:
+
+  daily_revenue_multi_order  (scenario, local)
+    error     expected rows of daily_revenue differ: 1 missing, 1 extra (2 expected, 2 actual)
+    duckdb    target/run/scenarios/daily_revenue_multi_order/local.duckdb
+
+Failed (1):
+  ✗ daily_revenue_multi_order  2 rows differ
+
+  2 local, 1 on the warehouse
+  Statements: 9 on the warehouse (CREATE 3, SELECT 3, DROP 2, ALTER 1); compile time not reported by duckdb
+✗ Completed with errors  PASS=2  FAIL=1  TOTAL=3  (1.43s)
 ```
 
-Each scenario row shows its wall time and the summary shows the total. `--json` reports the same
-values as `scenarios[].duration_ms` and `summary.duration_ms`. The `Statements:` line and the JSON
-`statements` section are described in [Statement summary](/docs/cli/test#statement-summary).
+A passing scenario is one row; a failed one also lists its expected outputs and assertions and
+its error. `--verbose` lists them for passing scenarios too. The execution header names the
+engines that run: `DuckDB`, or `DuckDB and <adapter>` when some scenarios also run on the
+warehouse. With `--retain` or `--verbose`, a `Retained (N):` section lists the local DuckDB file
+each local run keeps; with `--retain` it also lists the warehouse relations each scenario kept. A
+failed local scenario always shows its DuckDB file under `Failures:`. A
+namespaced run prints `namespace <value> (from <source>)` under the header and in the detail
+lines. Each scenario row shows its wall time and the summary shows the total. `--json` reports
+the same values as `scenarios[].duration_ms` and `summary.duration_ms`. The `Statements:` line
+and the JSON `statements` section are described in
+[Statement summary](/docs/cli/test#statement-summary).
 
-A scenario that cannot run, such as one without a fresh snapshot under `--run-on local`, is
-`ERROR`, and the summary adds an `ERROR=` count:
+Under `--run-on local`, a scenario that cannot run locally, such as one without a fresh snapshot,
+gets no row and is counted under `NOT_RUN=`, and the run fails:
 
 ```
-PASS=2  FAIL=0  ERROR=1  TOTAL=3  (3 local, 0 warehouse, 1.20s)
+  Can't run locally (1): snapshot stale 1; see below
+
+Can't run locally (1 scenario):
+
+error: snapshot stale                                                         1 scenario · 1 model
+   └── order_prices_retained  1 scenario
+   = note: tests/_scenario_snapshots/order_prices_retained/scenario.json is not a fresh snapshot
+   = help: run these scenarios on the warehouse with --run-on auto
+
+  2 local, 1 can't run locally
+✗ Completed with errors  PASS=2  FAIL=0  NOT_RUN=1  TOTAL=3  (1.20s)
 ```
 
-After the summary, `--run-on local` lists why scenarios could not run locally (`Can't run locally`),
-and `auto` counts what sent scenarios to the warehouse (`On the warehouse`), as
-[`sqb test`](/docs/cli/test#local-and-warehouse-runs) does. A snapshot reason reads
-`snapshot stale: scenario:<name>` or `snapshot missing: scenario:<name>`. A scenario whose
-converted SQL hits a SQLQuack guard or a DuckDB internal error while it replays runs again on the
-warehouse in `auto`, with the reason `SQLQuack guard: <name>` or `DuckDB internal error: <message>`,
-and its local attempt prints nothing; with `--run-on local` it is an `ERROR` (`T007`). With `--json`, each
+The header and the grouped causes work as for [`sqb test`](/docs/cli/test#local-and-warehouse-runs):
+under `--run-on local` a `Run on` tree and a `Can't run locally (N scenarios):` section after the
+failures; in `auto` a `note:` line in the header, `--explain` for where each cause is, and
+`--verbose` for the full notes after the run. A scenario whose converted SQL hits a SQLQuack guard
+or a DuckDB internal error while it replays runs again on the warehouse in `auto`, with the
+reason `SQLQuack guard: <name>` or `DuckDB internal error: <message>`, and its local attempt
+prints nothing; with `--run-on local` it is not run. With `--json`, each
 scenario has `run_on` and `run_on_reason`, `summary` has `local_count` and `warehouse_count`, and
 the document has `refusals`, as for `sqb test`.
 

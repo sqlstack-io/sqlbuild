@@ -16,6 +16,8 @@ pub(crate) mod logical_state;
 pub(crate) mod replica_helpers;
 #[path = "schema/test_contracts.rs"]
 pub(crate) mod schema;
+#[path = "session_limits/test_contracts.rs"]
+mod session_limits;
 #[path = "helpers.rs"]
 pub(crate) mod store_helpers;
 #[path = "test_types.rs"]

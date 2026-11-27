@@ -173,11 +173,6 @@
    "FROM __ref(\"stg_support_0\")",
    ""
   ],
-  "sql/models/features/product_labels.sql": [
-   "SELECT id, label",
-   "FROM __source(\"loaded_products\")",
-   ""
-  ],
   "sql/models/features/shaped_stg_support_0.sql": [
    "SELECT CAST(id AS INTEGER) AS id, status",
    "FROM __ref(\"stg_support_0\")",
@@ -1361,75 +1356,6 @@
      ]
     }
    },
-   "model.generated_4.product_labels": {
-    "database": null,
-    "schema": "ci_checks",
-    "name": "product_labels",
-    "resource_type": "model",
-    "package_name": "generated_4",
-    "path": "sql/models/features/product_labels.sql",
-    "original_file_path": "sql/models/features/product_labels.sql",
-    "unique_id": "model.generated_4.product_labels",
-    "fqn": [
-     "generated_4",
-     "models",
-     "features",
-     "product_labels"
-    ],
-    "alias": "product_labels",
-    "config": {
-     "enabled": true,
-     "alias": null,
-     "schema": "ci_checks",
-     "database": null,
-     "tags": [],
-     "meta": {},
-     "group": null,
-     "materialized": "view",
-     "incremental_strategy": null,
-     "merge_exclude_columns": null,
-     "persist_docs": {},
-     "post-hook": [],
-     "pre-hook": [],
-     "quoting": {},
-     "column_types": {},
-     "full_refresh": null,
-     "unique_key": null,
-     "on_schema_change": "ignore",
-     "on_configuration_change": "apply",
-     "grants": {},
-     "packages": [],
-     "docs": {
-      "show": true,
-      "node_color": null
-     },
-     "contract": {
-      "enforced": false,
-      "alias_types": true
-     }
-    },
-    "tags": [],
-    "description": "Product labels from the loader",
-    "columns": {},
-    "meta": {},
-    "group": null,
-    "docs": {
-     "show": true,
-     "node_color": null
-    },
-    "patch_path": null,
-    "build_path": null,
-    "unrendered_config": {},
-    "config_call_dict": {},
-    "unrendered_config_call_dict": {},
-    "relation_name": "ci_checks.product_labels",
-    "depends_on": {
-     "macros": [],
-     "nodes": [
-      "source.generated_4.loaded_products"
-     ]
-    }
-   },
    "model.generated_4.shaped_stg_support_0": {
     "database": null,
     "schema": "ci_checks",
@@ -2517,62 +2443,6 @@
     "unrendered_config": {},
     "relation_name": null
    },
-   "source.generated_4.loaded_products": {
-    "database": null,
-    "schema": "ci_checks",
-    "name": "loaded_products",
-    "resource_type": "source",
-    "package_name": "generated_4",
-    "path": "sql/sources/managed.yml",
-    "original_file_path": "sql/sources/managed.yml",
-    "unique_id": "source.generated_4.loaded_products",
-    "fqn": [
-     "generated_4",
-     "loaded_products"
-    ],
-    "source_name": "loaded_products",
-    "source_description": "",
-    "loader": "",
-    "identifier": "loaded_products",
-    "quoting": {},
-    "loaded_at_field": null,
-    "freshness": null,
-    "external": null,
-    "description": "Products loaded by a project loader.",
-    "columns": {
-     "id": {
-      "name": "id",
-      "description": "",
-      "meta": {},
-      "data_type": "INTEGER",
-      "constraints": [],
-      "quote": null,
-      "tags": []
-     },
-     "label": {
-      "name": "label",
-      "description": "",
-      "meta": {},
-      "data_type": "VARCHAR",
-      "constraints": [],
-      "quote": null,
-      "tags": []
-     }
-    },
-    "meta": {
-     "sqlbuild": {
-      "loader": "loaded_products",
-      "auto_load": false,
-      "write_strategy": "table"
-     }
-    },
-    "source_meta": {},
-    "tags": [],
-    "config": {},
-    "patch_path": null,
-    "unrendered_config": {},
-    "relation_name": null
-   },
    "source.generated_4.open_events": {
     "database": null,
     "schema": "",
@@ -3017,9 +2887,6 @@
    "model.generated_4.guarded_stg_support_0": [
     "model.generated_4.stg_support_0"
    ],
-   "model.generated_4.product_labels": [
-    "source.generated_4.loaded_products"
-   ],
    "model.generated_4.shaped_stg_support_0": [
     "model.generated_4.stg_support_0"
    ],
@@ -3057,7 +2924,6 @@
     "source.generated_4.raw_events_0"
    ],
    "source.generated_4.configured_events": [],
-   "source.generated_4.loaded_products": [],
    "source.generated_4.open_events": [],
    "source.generated_4.raw_events_0": [],
    "seed.generated_4.lookup_0": [],

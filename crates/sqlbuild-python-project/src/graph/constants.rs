@@ -7,6 +7,8 @@ use sqlbuild_python_base::records::models::GetterEntry;
 
 /// The Python node kind whose functions load sources.
 pub(crate) const LOADER_KIND: &str = "loader";
+/// The resource type of a load's graph key.
+pub(crate) const LOAD_RESOURCE: &str = "load";
 
 /// The getter readers of this module's native pyclasses.
 pub const GETTERS: &[GetterEntry] = &[GetterEntry {

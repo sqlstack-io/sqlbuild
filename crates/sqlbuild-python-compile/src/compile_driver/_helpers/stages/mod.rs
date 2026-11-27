@@ -5,5 +5,7 @@ pub(crate) mod command;
 pub(crate) mod deferral;
 pub(crate) mod diff;
 pub(crate) mod discovery;
+pub(crate) mod implicit_sources;
+pub(crate) mod loader_settings;
 pub(crate) mod phases;
 pub(crate) mod selection_phases;

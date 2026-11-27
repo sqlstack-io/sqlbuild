@@ -14,6 +14,56 @@ rust-version.workspace = true
 # crate, so the extension build sees them too and stays unchanged. `make check-build-features`
 # fails when the two builds resolve a shared crate differently.
 [dependencies]
+zstd-safe = { workspace = true, features = ["alloc", "arrays", "legacy", "std", "zdict_builder"] }
+zstd-v014 = { workspace = true, features = ["default", "arrays", "legacy", "zdict_builder"] }
+polyval = { workspace = true, features = ["hazmat", "zeroize"] }
+ghash = { workspace = true, features = ["zeroize"] }
+cipher = { workspace = true, features = ["block-buffer", "block-padding", "rand_core", "stream-wrapper"] }
+aes-gcm = { workspace = true, features = ["aes", "zeroize"] }
+aes = { workspace = true, features = ["zeroize"] }
+aead = { workspace = true, features = ["rand_core"] }
+async-compression = { workspace = true, features = ["gzip", "tokio", "zstd"] }
+bitflags = { workspace = true, features = ["serde", "serde_core"] }
+chacha20 = { workspace = true, features = ["cipher", "legacy", "rng", "zeroize"] }
+compression-codecs = { workspace = true, features = ["flate2", "gzip", "libzstd", "memchr", "zstd", "zstd-safe"] }
+crc32fast = { workspace = true, features = ["default", "std"] }
+crypto-bigint = { workspace = true, features = ["default", "alloc", "getrandom", "hybrid-array", "rand_core", "subtle", "zeroize"] }
+curve25519-dalek = { workspace = true, features = ["default", "alloc", "digest", "precomputed-tables", "rand_core", "zeroize"] }
+digest = { workspace = true, features = ["default", "alloc", "block-api", "mac", "oid", "rand_core"] }
+ecdsa = { workspace = true, features = ["default", "algorithm", "alloc", "der", "digest", "getrandom", "pem", "pkcs8", "spki", "std"] }
+ed25519-dalek = { workspace = true, features = ["default", "alloc", "fast", "pem", "pkcs8", "rand_core", "signature", "zeroize"] }
+elliptic-curve = { workspace = true, features = ["default", "alloc", "arithmetic", "digest", "ecdh", "ff", "getrandom", "group", "pem", "pkcs8", "sec1", "std"] }
+flate2 = { workspace = true, features = ["default", "any_impl", "any_zlib", "miniz_oxide", "runtime_detection", "rust_backend", "zlib-rs"] }
+futures-util = { workspace = true, features = ["default", "alloc", "async-await", "async-await-macro", "channel", "futures-channel", "futures-io", "futures-macro", "futures-sink", "io", "memchr", "sink", "slab", "std"] }
+generic-array = { workspace = true, features = ["more_lengths", "zeroize"] }
+getrandom-v03 = { workspace = true, features = ["std"] }
+hashbrown = { workspace = true, features = ["inline-more"] }
+hybrid-array = { workspace = true, features = ["alloc", "ctutils", "extra-sizes", "subtle", "zeroize"] }
+hyper-rustls = { workspace = true, features = ["http1", "http2", "native-tokio", "ring", "rustls-native-certs", "tls12", "webpki-roots", "webpki-tokio"] }
+hyper-util = { workspace = true, features = ["default", "client", "client-legacy", "client-proxy", "http1", "http2", "server", "server-auto", "service", "tokio"] }
+md-5 = { workspace = true, features = ["default", "alloc", "oid"] }
+object_store = { workspace = true, features = ["aws-base", "base64", "cloud-base", "crc-fast", "form_urlencoded", "fs", "gcp-base", "http-body-util", "hyper", "md-5", "nix", "quick-xml", "rand", "reqwest", "ring", "rustls-pki-types", "serde", "serde_json", "serde_urlencoded", "tokio", "walkdir", "windows-sys"] }
+p256 = { workspace = true, features = ["default", "alloc", "arithmetic", "digest", "ecdh", "ecdsa", "ecdsa-core", "getrandom", "pem", "pkcs8", "precomputed-tables", "sha2", "sha256", "std"] }
+p384 = { workspace = true, features = ["default", "alloc", "arithmetic", "digest", "ecdh", "ecdsa", "ecdsa-core", "getrandom", "pem", "pkcs8", "precomputed-tables", "sha2", "sha384", "std"] }
+pkcs8 = { workspace = true, features = ["alloc", "encryption", "pem", "pkcs5", "std"] }
+rand = { workspace = true, features = ["default", "alloc", "std", "std_rng", "sys_rng", "thread_rng"] }
+reqwest-v012 = { workspace = true, features = ["__rustls", "__rustls-ring", "__tls", "json", "rustls-tls", "rustls-tls-native-roots", "rustls-tls-native-roots-no-provider", "rustls-tls-webpki-roots", "rustls-tls-webpki-roots-no-provider"] }
+reqwest = { workspace = true, features = ["__rustls", "__tls", "form", "gzip", "http2", "json", "query", "rustls-no-provider", "stream"] }
+ring = { workspace = true, features = ["default", "alloc", "dev_urandom_fallback", "std"] }
+rustls = { workspace = true, features = ["log", "logging", "ring", "std", "tls12"] }
+sha2-v011 = { workspace = true, features = ["default", "alloc", "oid"] }
+simd-adler32 = { workspace = true, features = ["std"] }
+tokio = { workspace = true, features = ["default", "bytes", "fs", "io-std", "io-util", "libc", "macros", "mio", "net", "process", "rt", "rt-multi-thread", "signal", "signal-hook-registry", "socket2", "sync", "time", "tokio-macros"] }
+tokio-rustls = { workspace = true, features = ["logging", "ring", "tls12"] }
+tokio-stream = { workspace = true, features = ["default", "fs", "net", "time"] }
+tokio-util = { workspace = true, features = ["default", "codec", "futures-util", "io", "libc", "rt"] }
+toml_edit = { workspace = true, features = ["default", "display", "parse"] }
+toml_writer = { workspace = true, features = ["default", "alloc", "std"] }
+tower = { workspace = true, features = ["balance", "buffer", "discover", "futures-core", "futures-util", "indexmap", "limit", "load", "load-shed", "make", "pin-project-lite", "ready-cache", "retry", "slab", "sync_wrapper", "timeout", "tokio", "tokio-util", "tracing", "util"] }
+tower-http = { workspace = true, features = ["compression-gzip", "decompression-gzip", "follow-redirect", "futures-core", "futures-util", "tokio-util", "tower"] }
+uuid = { workspace = true, features = ["default", "rng", "serde", "sha1", "std", "v4", "v5", "v7"] }
+zerocopy = { workspace = true, features = ["derive", "simd", "zerocopy-derive"] }
+zstd-sys = { workspace = true, features = ["default", "legacy", "std", "zdict_builder"] }
 arrayvec.workspace = true
 bstr.workspace = true
 either.workspace = true
@@ -25,15 +75,24 @@ thiserror.workspace = true
 # signal-hook's registry, in the extension only, enables these on the platforms that use them.
 [target.'cfg(unix)'.dependencies]
 errno.workspace = true
+bitflags = { workspace = true, features = ["std"] }
+byteorder = { workspace = true, features = ["default", "std"] }
+nix = { workspace = true, features = ["default", "fs", "mman", "resource"] }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys.workspace = true
+tokio = { workspace = true, features = ["windows-sys"] }
+windows-sys = { workspace = true, features = ["Wdk", "Wdk_Foundation", "Wdk_Storage", "Wdk_Storage_FileSystem", "Wdk_System", "Wdk_System_IO", "Win32", "Win32_Foundation", "Win32_Networking", "Win32_Networking_WinSock", "Win32_Security", "Win32_Security_Authentication", "Win32_Security_Authentication_Identity", "Win32_Security_Authorization", "Win32_Security_Credentials", "Win32_Security_Cryptography", "Win32_Storage", "Win32_Storage_FileSystem", "Win32_System", "Win32_System_Com", "Win32_System_Console", "Win32_System_Diagnostics", "Win32_System_Diagnostics_Debug", "Win32_System_Diagnostics_ToolHelp", "Win32_System_IO", "Win32_System_Ioctl", "Win32_System_JobObjects", "Win32_System_LibraryLoader", "Win32_System_Memory", "Win32_System_Pipes", "Win32_System_ProcessStatus", "Win32_System_SystemInformation", "Win32_System_SystemServices", "Win32_System_Threading", "Win32_System_WindowsProgramming", "Win32_UI", "Win32_UI_Shell"] }
+
+[target.'cfg(any(target_os = "macos", windows))'.dependencies]
+num-integer = { workspace = true, features = ["i128", "std"] }
+zeroize = { workspace = true, features = ["default", "alloc", "derive", "zeroize_derive"] }
 
 # Proc-macro dependencies resolve with build dependencies, so the syn features PyO3's macros use
 # are enabled here. The empty build script makes Cargo resolve them.
 [build-dependencies]
-syn-v2-macro-features.workspace = true
+syn-v2-macro-features = { workspace = true, features = ["clone-impls", "derive", "extra-traits", "fold", "full", "parsing", "printing", "proc-macro", "visit", "visit-mut"] }
 syn-v3-macro-features.workspace = true
+memchr = { workspace = true, features = ["alloc", "std"] }
 
 [lints]
 workspace = true

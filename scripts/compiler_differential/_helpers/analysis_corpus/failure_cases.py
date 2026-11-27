@@ -428,15 +428,15 @@ def _target_cases() -> tuple[FailureCase, ...]:
                 + '\n[targets.prod]\nschema = "prod"\nloader_schema = "raw"\n',
                 "python/nodes/loaders/orders/loader.py": (
                     "from sqlbuild.loaders import loader\n\n\n"
-                    "@loader\n"
+                    "@loader(write_strategy='replace')\n"
                     "def loaded_orders(ctx):\n"
                     '    """Load raw orders."""\n'
                     '    return [{"order_id": 1}]\n'
                 ),
                 "sql/sources/loaded.yml": (
                     "sources:\n  - name: loaded_orders\n    description: Loaded orders.\n"
-                    "    managed: true\n    write_strategy: table\n"
-                    "    columns:\n      - name: order_id\n        type: INTEGER\n"
+                    "    managed: true\n"
+                    "    columns:\n      - name: order_id\n        type: BIGINT\n"
                 ),
             },
         ),

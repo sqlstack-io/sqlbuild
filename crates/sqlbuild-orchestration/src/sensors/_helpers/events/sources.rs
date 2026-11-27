@@ -235,8 +235,7 @@ async fn source_page(
         .is_some()
         .then(|| page.last().cloned())
         .flatten();
-    let (transaction, nodes) =
-        read_snapshot_nodes(transaction, scope.snapshot_id, Some(&page)).await?;
+    let (transaction, nodes) = read_snapshot_nodes(transaction, scope.snapshot_id, &page).await?;
     Ok((
         transaction,
         (

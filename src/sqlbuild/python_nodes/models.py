@@ -13,6 +13,11 @@ from sqlbuild._native import (
     validate_audit_case,
 )
 from sqlbuild.compiler.auditing.types import AuditSeverity
+from sqlbuild.python_nodes._helpers.loader_normalization import (
+    bridged_names,
+    bridged_text,
+    bridged_write_strategy,
+)
 from sqlbuild.python_nodes.constants import RELATION_RENDERER
 from sqlbuild.python_nodes.types import NodeSetKind, PythonCheckSeverity, SqlResourceRefKind
 
@@ -100,17 +105,35 @@ class RetryPolicy:
 
 @dataclass(frozen=True)
 class LoaderDefinition:
-    """Metadata attached to a decorated source loader function."""
+    """A decorated source loader's metadata; `settings` are its SQLLoad table options."""
 
     name: str
     depends_on: tuple[Callable[..., object] | SqlResourceRef | NodeSetRef, ...] = ()
+    connection: str | None = None
     destination: str | None = None
-    write_strategy: SourceWriteStrategy | None = None
-    cursor_column: str | None = None
-    unique_key: tuple[str, ...] = ()
     columns: tuple[SourceColumnEntry, ...] = ()
-    contract: str | None = None
     description: str | None = None
+    settings: Mapping[str, object] = field(default_factory=dict)
+
+    @property
+    def write_strategy(self) -> SourceWriteStrategy | None:
+        """The write strategy, `replace` read as SQLBuild's `table`."""
+        return bridged_write_strategy(self.settings)
+
+    @property
+    def cursor_column(self) -> str | None:
+        """The cursor column SQLLoad reads new rows from."""
+        return bridged_text(settings=self.settings, key="cursor_column")
+
+    @property
+    def unique_key(self) -> tuple[str, ...]:
+        """The columns a merge matches rows on."""
+        return bridged_names(settings=self.settings, key="unique_key")
+
+    @property
+    def contract(self) -> str | None:
+        """Whether the declared columns define the table, as SQLLoad's `contract`."""
+        return bridged_text(settings=self.settings, key="contract")
 
 
 @dataclass(frozen=True)

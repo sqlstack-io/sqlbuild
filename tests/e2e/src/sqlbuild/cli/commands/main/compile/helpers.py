@@ -1796,7 +1796,7 @@ def _layered_write_sources(*, project_dir: Path, source_count: int) -> None:
     expression: "(SELECT {index} AS id, CAST({index} AS DOUBLE) AS amount, 'source' AS status)"
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
       - name: amount
         type: DOUBLE
       - name: status
@@ -1814,7 +1814,7 @@ def _layered_write_seeds(*, project_dir: Path, seed_count: int) -> None:
     description: Test seed seed_{index:05d}.
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
       - name: label
         type: VARCHAR"""
         for index in range(seed_count)
@@ -2969,7 +2969,7 @@ SQLSERVER_REQUIRE_SQL_ANALYSIS_PROJECT: str = (
 )
 SQLSERVER_EVENTS_SOURCE: str = (
     "sources:\n  - name: raw_events\n    description: Event feed.\n    columns:\n"
-    "      - name: id\n        type: INTEGER\n      - name: amount\n        type: INTEGER\n"
+    "      - name: id\n        type: BIGINT\n      - name: amount\n        type: BIGINT\n"
     "      - name: created_at\n        type: TIMESTAMP\n"
 )
 SQLSERVER_BRACKETED_CURSOR_MODEL: str = (
@@ -4302,7 +4302,7 @@ def staging_type_change(root: Path) -> None:
     """Change one staging output column type, which propagates downstream."""
 
     replace_project_text(
-        root, STG_ORDERS_MODEL, "  quantity,\n", "  CAST(quantity AS BIGINT) AS quantity,\n"
+        root, STG_ORDERS_MODEL, "  quantity,\n", "  CAST(quantity AS INTEGER) AS quantity,\n"
     )
 
 
@@ -4803,9 +4803,9 @@ _REFERENCE_CALL_SOURCES_YML: str = (
     "    table: raw_orders\n"
     "    columns:\n"
     "      - name: order_id\n"
-    "        type: INTEGER\n"
+    "        type: BIGINT\n"
     "      - name: amount_cents\n"
-    "        type: INTEGER\n"
+    "        type: BIGINT\n"
 )
 _REFERENCE_CALL_RAW_ORDERS_SQL: str = (
     "CREATE TABLE main.raw_orders AS "
@@ -5638,3 +5638,31 @@ def orchestration_sensor(select: str) -> str:
         "def regions_sensor(ctx: SensorContext):\n"
         "    return RunRequest(job='orders_job')\n"
     )
+
+
+def loaded_source_files(
+    *, project_toml: str, column_type: str, loader_columns: str
+) -> dict[str, str]:
+    """A project whose loader fills `raw_orders`, which declares `id` as `column_type`."""
+
+    return {
+        "sqlbuild_project.toml": project_toml,
+        "sql/sources/raw.yml": (
+            "sources:\n  - name: raw_orders\n    description: Orders.\n    managed: true\n"
+            f"    columns:\n      - name: id\n        type: {column_type}\n"
+        ),
+        "python/nodes/loaders/raw_orders/loader.py": (
+            "from sqlbuild.loaders import loader\n\n\n"
+            "@loader(write_strategy='replace')\n"
+            "def raw_orders(ctx):\n"
+            "    '''Load the orders.'''\n"
+            "    return [{'id': 1}]\n"
+        ),
+        "python/nodes/loaders/fetch_orders/loader.py": (
+            "from sqlbuild.loaders import loader\n\n\n"
+            f"@loader(write_strategy='replace', columns={loader_columns})\n"
+            "def fetch_orders(ctx):\n"
+            "    '''Fetch the orders.'''\n"
+            "    return [{'id': 1}]\n"
+        ),
+    }

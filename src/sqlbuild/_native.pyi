@@ -1878,6 +1878,8 @@ class NativeProjectView:
     @property
     def sql_scenarios(self) -> tuple[CompiledSqlScenario, ...]: ...
     @property
+    def loads(self) -> tuple[CompiledLoad, ...]: ...
+    @property
     def loader_functions(self) -> tuple[DiscoveredLoaderFunction, ...]: ...
     @property
     def python_execution_inputs(self) -> dict[str, tuple[str, Path]]: ...
@@ -3409,7 +3411,6 @@ def format_build_execution_json(
 def format_seed_execution_json(
     *, results: tuple[SeedExecutionResult, ...], plan: PlanOutput
 ) -> str: ...
-def format_load_execution_json(*, results: tuple[LoadExecutionResult, ...]) -> str: ...
 def format_clone_execution_json(
     *,
     result: CloneExecutionResult,
@@ -4057,6 +4058,28 @@ def project_relative_path(*, path: Path, project_dir: Path) -> Path: ...
 def resolve_target_config(
     *, project_config: ProjectConfig, local_config: LocalConfig, target_name: str
 ) -> TargetConfig: ...
+def run_sqlload_project(
+    *,
+    project: str,
+    sessions: dict[str, dict[str, object]],
+    tables: tuple[list[str], list[str]],
+    reload: bool = False,
+) -> str: ...
+def loader_projects(
+    *,
+    discovered_inputs: DiscoveredProjectInputs,
+    project: CompiledProjectView,
+    target: str | None = None,
+    schema: str | None = None,
+) -> dict[str, tuple[str, str]]: ...
+def run_sqlload_loader(*, loader: object, sessions: dict[str, dict[str, object]]) -> str: ...
+def plan_sqlload_project(
+    *,
+    project: str,
+    sessions: dict[str, dict[str, object]],
+    tables: tuple[list[str], list[str]],
+    reload: bool = False,
+) -> str: ...
 def resolve_adapter(*, adapter_name: str, project_dir: Path | None = None) -> BaseAdapter: ...
 
 class CommandWarehouseScopeInstall:
@@ -5088,30 +5111,6 @@ def resolve_test_name_width(test_entries: tuple[SqlTestPlanEntry, ...]) -> int: 
 def build_test_expectation_rows(
     result: SqlTestExecutionResult,
 ) -> tuple[NestedProgressChildRow, ...]: ...
-def select_load_entries(
-    *,
-    discovered_inputs: DiscoveredProjectInputs,
-    select: tuple[str, ...],
-    exclude: tuple[str, ...],
-    target_config: TargetConfig | None,
-    loader_default_database: str | None = None,
-    loader_default_schema: str | None = None,
-) -> tuple[SourceEntry, ...]: ...
-def select_load_reference_entries(
-    *,
-    discovered_inputs: DiscoveredProjectInputs,
-    selected_sources: tuple[SourceEntry, ...],
-    target_config: TargetConfig | None,
-    loader_default_database: str | None = None,
-    loader_default_schema: str | None = None,
-) -> tuple[SourceEntry, ...]: ...
-def resolve_loader_defaults(
-    *,
-    discovered_inputs: DiscoveredProjectInputs,
-    selected_target: str | None = None,
-    target_config: TargetConfig | None = None,
-    cli_vars: dict[str, object] | None = None,
-) -> tuple[str | None, str | None]: ...
 def write_runtime_target(
     *, target_dir: Path, plan_output: PlanOutput, result: BuildExecutionResult
 ) -> None: ...
@@ -5131,16 +5130,6 @@ class TransientStatusReporter:
     def redraw_transient_line(self) -> None: ...
     def report_preflight_progress(self, message: str) -> None: ...
     def write_blank_line(self) -> None: ...
-
-class LoadProgressReporter:
-    def __init__(
-        self, *, stream: TextIO, use_color: bool, source_order: dict[str, int], total_count: int
-    ) -> None: ...
-    def on_start(self, source: SourceEntry) -> None: ...
-    def on_progress(self, source: SourceEntry, message: str) -> None: ...
-    def on_complete(self, result: LoadExecutionResult) -> None: ...
-    def clear_transient_line(self) -> None: ...
-    def redraw_transient_line(self) -> None: ...
 
 class BuildProgressCallbacks:
     def __init__(
@@ -5194,18 +5183,25 @@ class NestedCommandProgressCallbacks:
         stream: TextIO,
         use_color: bool,
         name_width: int = 50,
-        concurrency: int = 1,
+        group_counts: Mapping[str, int] | None = None,
+        nouns: tuple[str, str] = ("test", "tests"),
+        verb: str = "Testing",
+        verbose: bool = False,
     ) -> None: ...
     def on_item_start(
         self, *, group_name: str, item_name: str, canonical_resource_name: str | None = None
     ) -> None: ...
+    def on_item_finished(self, item_name: str) -> None: ...
     def on_item_complete(
         self,
         *,
         group_name: str,
         item_name: str,
-        status_text: str,
+        status_text: str = "",
+        run_on: str = "",
         detail: str = "",
+        not_run: bool = False,
+        seconds: float | None = None,
         error_code: str | None = None,
         error_help: str | None = None,
         error_message: str | None = None,
@@ -6651,6 +6647,7 @@ class BuildCommandRequest(NativeRecord):
     test_timeout: str | None
     discovered_inputs: DiscoveredProjectInputs | None
     compiled_project: object | None
+    command_name: str
     def __init__(
         self,
         project_dir: Path | None = None,
@@ -6697,6 +6694,7 @@ class BuildCommandRequest(NativeRecord):
         test_timeout: str | None = None,
         discovered_inputs: DiscoveredProjectInputs | None = None,
         compiled_project: object | None = None,
+        command_name: str = "build",
     ) -> None: ...
 
 class CloneCommandRequest(NativeRecord):
@@ -9084,6 +9082,7 @@ class CompiledResourceType(StrEnum):
     AUDIT = "audit"
     SQL_TEST = "sql_test"
     SQL_SCENARIO = "sql_scenario"
+    LOAD = "load"
 
 class InferredNullability(StrEnum):
     """Conservative nullability state inferred for an output column."""
@@ -12557,6 +12556,7 @@ class ProjectConfig(NativeRecord):
     default_target: str | None
     connection: dict[str, object]
     connections: dict[str, dict[str, object]]
+    recall_connections: tuple[str, ...]
     settings: SettingsConfig
     scopes: ScopesConfig
     references: ReferencesConfig
@@ -12569,6 +12569,7 @@ class ProjectConfig(NativeRecord):
     materialization_defaults: MaterializationDefaultsConfig
     path_defaults: dict[str, dict[str, object]]
     vars: dict[str, str]
+    local_test_allow: dict[str, bool]
     targets: dict[str, TargetConfig]
     janitor: JanitorConfig
     migrations: MigrationsConfig
@@ -12585,6 +12586,7 @@ class ProjectConfig(NativeRecord):
         default_target: str | None = ...,
         connection: dict[str, object] = ...,
         connections: dict[str, dict[str, object]] = ...,
+        recall_connections: tuple[str, ...] = ...,
         settings: SettingsConfig = ...,
         scopes: ScopesConfig = ...,
         references: ReferencesConfig = ...,
@@ -12597,6 +12599,7 @@ class ProjectConfig(NativeRecord):
         materialization_defaults: MaterializationDefaultsConfig = ...,
         path_defaults: dict[str, dict[str, object]] = ...,
         vars: dict[str, str] = ...,
+        local_test_allow: dict[str, bool] = ...,
         targets: dict[str, TargetConfig] = ...,
         janitor: JanitorConfig = ...,
         migrations: MigrationsConfig = ...,
@@ -12615,6 +12618,7 @@ class LocalConfig(NativeRecord):
     adapter: str | None
     connection: dict[str, object]
     connections: dict[str, dict[str, object]]
+    recall_connections: tuple[str, ...]
     targets: dict[str, LocalTargetConfig]
     settings: SettingsConfig
     setting_overrides: frozenset[str]
@@ -12627,6 +12631,7 @@ class LocalConfig(NativeRecord):
         adapter: str | None = ...,
         connection: dict[str, object] = ...,
         connections: dict[str, dict[str, object]] = ...,
+        recall_connections: tuple[str, ...] = ...,
         targets: dict[str, LocalTargetConfig] = ...,
         settings: SettingsConfig = ...,
         setting_overrides: frozenset[str] = ...,
@@ -12860,6 +12865,7 @@ class SourceEntry(NativeRecord):
     table: str | None
     final: bool
     loader: str | None
+    load: str | None
     managed: bool
     freshness: SourceFreshnessConfig | None
     write_strategy: SourceWriteStrategy | None
@@ -12870,6 +12876,7 @@ class SourceEntry(NativeRecord):
     description: str | None
     type_enforcement: bool | None
     contract: str | None
+    on_schema_change: str | None
     meta: dict[str, object]
     columns: tuple[SourceColumnEntry, ...]
     audits: tuple[SchemaAuditInstance, ...]
@@ -12881,6 +12888,7 @@ class SourceEntry(NativeRecord):
         table: str | None = ...,
         final: bool = ...,
         loader: str | None = ...,
+        load: str | None = ...,
         managed: bool = ...,
         freshness: SourceFreshnessConfig | None = ...,
         write_strategy: SourceWriteStrategy | None = ...,
@@ -12891,6 +12899,7 @@ class SourceEntry(NativeRecord):
         description: str | None = ...,
         type_enforcement: bool | None = ...,
         contract: str | None = ...,
+        on_schema_change: str | None = ...,
         meta: dict[str, object] = ...,
         columns: tuple[SourceColumnEntry, ...] = ...,
         audits: tuple[SchemaAuditInstance, ...] = ...,
@@ -14353,6 +14362,27 @@ class SeedPlanEntry(NativeRecord):
         reason: PlanReason = ...,
     ) -> None: ...
 
+class LoadPlanEntry(NativeRecord):
+    """A load the plan runs: every table it loads, or only the selected sources' tables."""
+
+    key: CompiledObjectKey
+    name: str
+    sources: tuple[str, ...]
+    every_table: bool
+    fingerprint: str
+    is_reload: bool
+    plan_lines: tuple[str, ...]
+    def __init__(
+        self,
+        key: CompiledObjectKey,
+        name: str,
+        fingerprint: str,
+        sources: tuple[str, ...] = ...,
+        every_table: bool = ...,
+        is_reload: bool = ...,
+        plan_lines: tuple[str, ...] = ...,
+    ) -> None: ...
+
 class SourceLoadPlanEntry(NativeRecord):
     """Per-managed-source loader execution plan entry."""
 
@@ -14675,6 +14705,7 @@ class PlanOutput(NativeRecord):
     model_entries: tuple[ModelPlanEntry, ...]
     seed_entries: tuple[SeedPlanEntry, ...]
     source_load_entries: tuple[SourceLoadPlanEntry, ...]
+    load_entries: tuple[LoadPlanEntry, ...]
     function_entries: tuple[FunctionPlanEntry, ...]
     audit_entries: tuple[AuditPlanEntry, ...]
     test_entries: tuple[SqlTestPlanEntry, ...]
@@ -14714,6 +14745,7 @@ class PlanOutput(NativeRecord):
         model_entries: tuple[ModelPlanEntry, ...] = ...,
         seed_entries: tuple[SeedPlanEntry, ...] = ...,
         source_load_entries: tuple[SourceLoadPlanEntry, ...] = ...,
+        load_entries: tuple[LoadPlanEntry, ...] = ...,
         function_entries: tuple[FunctionPlanEntry, ...] = ...,
         audit_entries: tuple[AuditPlanEntry, ...] = ...,
         test_entries: tuple[SqlTestPlanEntry, ...] = ...,
@@ -14883,6 +14915,32 @@ class ConstantDeclaration(NativeRecord):
     @property
     def scalar_type(self) -> str: ...
 
+class DiscoveredLoad(NativeRecord):
+    """A sources file's load: a SQLLoad source under SQLBuild's name, settings as authored."""
+
+    name: str
+    settings: dict[str, object]
+    def __init__(self, name: str, settings: dict[str, object]) -> None: ...
+
+class CompiledLoad(NativeRecord):
+    """A load the project compiles: the SQLLoad source that fills the sources named after it."""
+
+    key: CompiledObjectKey
+    name: str
+    relative_path: Path
+    settings: dict[str, object]
+    sources: tuple[str, ...]
+    fingerprint: str
+    def __init__(
+        self,
+        key: CompiledObjectKey,
+        name: str,
+        relative_path: Path,
+        settings: dict[str, object],
+        fingerprint: str,
+        sources: tuple[str, ...] = ...,
+    ) -> None: ...
+
 class DiscoveredSourceFile(NativeRecord):
     """A discovered source declaration file and its raw contents."""
 
@@ -14890,12 +14948,14 @@ class DiscoveredSourceFile(NativeRecord):
     relative_path: Path
     contents: str
     source_entries: tuple[SourceEntry, ...]
+    load: DiscoveredLoad | None
     def __init__(
         self,
         file_path: Path,
         relative_path: Path,
         contents: str,
         source_entries: tuple[SourceEntry, ...],
+        load: DiscoveredLoad | None = ...,
     ) -> None: ...
 
 class DiscoveredSqlTestFile(NativeRecord):
@@ -15017,6 +15077,8 @@ class DiscoveredLoaderFunction(NativeRecord):
     columns: tuple[SourceColumnEntry, ...]
     contract: str | None
     description: str | None
+    connection: str | None
+    settings: dict[str, object]
     provider_usages: tuple[DiscoveredProviderUsage, ...]
     identity: PythonNodeIdentity | None
     def __init__(
@@ -15033,6 +15095,8 @@ class DiscoveredLoaderFunction(NativeRecord):
         columns: tuple[SourceColumnEntry, ...] = ...,
         contract: str | None = ...,
         description: str | None = ...,
+        connection: str | None = ...,
+        settings: dict[str, object] = ...,
         provider_usages: tuple[DiscoveredProviderUsage, ...] = ...,
         identity: PythonNodeIdentity | None = ...,
     ) -> None: ...
@@ -15928,6 +15992,7 @@ class CompiledProject(NativeRecord):
     audits: tuple[CompiledAuditView, ...]
     sql_tests: tuple[CompiledSqlTest, ...]
     sql_scenarios: tuple[CompiledSqlScenario, ...]
+    loads: tuple[CompiledLoad, ...]
     loader_functions: tuple[DiscoveredLoaderFunction, ...]
     hook_functions: tuple[DiscoveredHookFunction, ...]
     enforce_explicit_references: bool
@@ -15965,6 +16030,7 @@ class CompiledProject(NativeRecord):
         audits: tuple[CompiledAuditView, ...] = ...,
         sql_tests: tuple[CompiledSqlTest, ...] = ...,
         sql_scenarios: tuple[CompiledSqlScenario, ...] = ...,
+        loads: tuple[CompiledLoad, ...] = ...,
         loader_functions: tuple[DiscoveredLoaderFunction, ...] = ...,
         hook_functions: tuple[DiscoveredHookFunction, ...] = ...,
         enforce_explicit_references: bool = ...,

@@ -73,7 +73,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
                 expected="{'qty': 3}::VARIANT AS payload",
             ),
             scenario_name="orders__keep_payload",
-            expected_stdout_fragment="mismatched=1 missing=1",
+            expected_stdout_fragment="expected rows of stg_orders differ: 1 missing, 1 extra",
             expected_returncode=1,
         ),
     ],
@@ -105,7 +105,7 @@ def test_given_captured_variant_fixture_when_replaying_locally_then_the_scenario
 
     assert replayed.returncode == test_case.expected_returncode, replayed.stdout + replayed.stderr
     assert "X699" not in replayed.stdout
-    assert test_case.expected_stdout_fragment in replayed.stdout
+    assert test_case.expected_stdout_fragment in replayed.stdout, replayed.stdout
 
 
 @pytest.mark.parametrize(
@@ -130,7 +130,7 @@ def test_given_captured_variant_fixture_when_replaying_locally_then_the_scenario
             captured_payload_text='{\n  "note": "x",\n  "qty": 3\n}',
             expected_payload_json='{"qty": 2, "note": "x"}',
             expected_returncode=1,
-            expected_stdout_fragment="mismatched=1 missing=1",
+            expected_stdout_fragment="expected rows of stg_payloads differ: 1 missing, 1 extra",
         ),
     ],
     ids=lambda case: case.description,

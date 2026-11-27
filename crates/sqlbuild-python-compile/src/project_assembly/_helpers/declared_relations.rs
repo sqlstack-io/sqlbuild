@@ -209,7 +209,7 @@ pub(crate) fn declared_relations<'py>(
         declared.declare(&maps, &name, &columns)?;
         let contract: Option<Bound<'py, PyAny>> =
             native_field(&native_field(&model, "config")?, "values")?
-                .downcast_into::<PyDict>()?
+                .cast_into::<PyDict>()?
                 .get_item(CONTRACT_KEY)?;
         let enforced: bool = match contract {
             Some(contract) => contract.eq(ENFORCED_CONTRACT)?,

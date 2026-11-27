@@ -172,7 +172,7 @@ fn microbatch<'py>(
     if summary.is_none() {
         return Ok(summary);
     }
-    let state: &Bound<'py, PyDict> = summary.downcast()?;
+    let state: &Bound<'py, PyDict> = summary.cast()?;
     let intervals: Bound<'py, PyList> = PyList::empty(py);
     for interval in &result.microbatch_accounting_intervals {
         pyo3::types::PyListMethods::append(
@@ -423,31 +423,41 @@ pub(crate) fn python_node_assets<'py>(
     projection: &Projection<'py>,
     results: &[Bound<'py, PyAny>],
 ) -> PyResult<Vec<Bound<'py, PyDict>>> {
-    let mut assets: Vec<Bound<'py, PyDict>> = Vec::new();
+    terminal_rows(projection, results, |result| {
+        Ok(vec![
+            ("kind", value(result, "kind")?),
+            ("name", native_field(result, "node_name")?),
+            ("status", value(result, "status")?),
+            ("metadata", native_field(result, "metadata")?),
+            ("materialized", native_field(result, "materialized")?),
+            ("skip_mode", optional_value(result, "skip_mode")?),
+            ("skip_reason", native_field(result, "skip_reason")?),
+            ("error_message", native_field(result, "error_message")?),
+            (
+                "warnings",
+                or_none(native_field(result, "warning_messages")?)?,
+            ),
+            (
+                "dropped_log_lines",
+                or_none(native_field(result, "dropped_log_lines")?)?,
+            ),
+        ])
+    })
+}
+
+/// A row without `None` entries for each of `results` that recorded a terminal outcome.
+pub(crate) fn terminal_rows<'py>(
+    projection: &Projection<'py>,
+    results: &[Bound<'py, PyAny>],
+    row: impl Fn(&Bound<'py, PyAny>) -> PyResult<Vec<(&'static str, Bound<'py, PyAny>)>>,
+) -> PyResult<Vec<Bound<'py, PyDict>>> {
+    let mut rows: Vec<Bound<'py, PyDict>> = Vec::new();
     for result in results {
-        if !projection.terminal_recorded(result)? {
-            continue;
+        if projection.terminal_recorded(result)? {
+            rows.push(without_none(result.py(), row(result)?)?);
         }
-        let py: Python<'py> = result.py();
-        assets.push(without_none(
-            py,
-            vec![
-                ("kind", value(result, "kind")?),
-                ("name", native_field(result, "node_name")?),
-                ("status", value(result, "status")?),
-                ("metadata", native_field(result, "metadata")?),
-                ("materialized", native_field(result, "materialized")?),
-                ("skip_mode", optional_value(result, "skip_mode")?),
-                ("skip_reason", native_field(result, "skip_reason")?),
-                ("error_message", native_field(result, "error_message")?),
-                (
-                    "warnings",
-                    or_none(native_field(result, "warning_messages")?)?,
-                ),
-            ],
-        )?);
     }
-    Ok(assets)
+    Ok(rows)
 }
 
 /// One clone item asset under its resource type.

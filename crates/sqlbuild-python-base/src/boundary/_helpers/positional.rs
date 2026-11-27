@@ -64,8 +64,11 @@ macro_rules! positional_record {
     (@extract $name:ident {
         $($(#[$field_meta:meta])* $field_vis:vis $field:ident : $ty:ty),+ $(,)?
     }) => {
-        impl<'py> pyo3::FromPyObject<'py> for $name {
-            fn extract_bound(value: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        impl<'py> pyo3::FromPyObject<'_, 'py> for $name {
+            type Error = pyo3::PyErr;
+
+            fn extract(value: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+                let value: &pyo3::Bound<'py, pyo3::PyAny> = &value;
                 let ($($field,)+): ($($ty,)+) = pyo3::types::PyAnyMethods::extract(value)?;
                 Ok(Self { $($field),+ })
             }
@@ -74,10 +77,13 @@ macro_rules! positional_record {
     (@extract $name:ident <$lifetime:lifetime> {
         $($(#[$field_meta:meta])* $field_vis:vis $field:ident : $ty:ty),+ $(,)?
     }) => {
-        impl<$lifetime> pyo3::FromPyObject<$lifetime> for $name<$lifetime> {
-            fn extract_bound(
-                value: &pyo3::Bound<$lifetime, pyo3::PyAny>,
+        impl<$lifetime> pyo3::FromPyObject<'_, $lifetime> for $name<$lifetime> {
+            type Error = pyo3::PyErr;
+
+            fn extract(
+                value: pyo3::Borrowed<'_, $lifetime, pyo3::PyAny>,
             ) -> pyo3::PyResult<Self> {
+                let value: &pyo3::Bound<$lifetime, pyo3::PyAny> = &value;
                 let ($($field,)+): ($($ty,)+) = pyo3::types::PyAnyMethods::extract(value)?;
                 Ok(Self { $($field),+ })
             }

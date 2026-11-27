@@ -15,6 +15,7 @@ use crate::api::models::{OidcAuthentication, OidcRuntime};
 use crate::api::types::{OidcClient, OidcIdToken};
 use crate::credentials::models::{BuiltinRole, RoleKey, StoredOidcFlow};
 use crate::store::errors::ControlError;
+use crate::tls::main::client_builder::client_builder;
 
 pub(crate) fn configure(mut settings: OidcAuthentication) -> Result<OidcRuntime, ControlError> {
     settings.origin = parse_origin(&settings.origin, "OIDC")?;
@@ -47,7 +48,7 @@ pub(crate) fn configure(mut settings: OidcAuthentication) -> Result<OidcRuntime,
             Ok(ClientSecret::new(value))
         })
         .transpose()?;
-    let mut http = reqwest::Client::builder()
+    let mut http = client_builder()
         .redirect(reqwest::redirect::Policy::none())
         .timeout(Duration::from_secs(10));
     if let Some(path) = &settings.certificate_authority {

@@ -428,7 +428,7 @@ ATTACHMENT_CHECK_PROJECT_FILES: dict[str, str] = {
         "    description: Product catalogue.\n"
         "    columns:\n"
         "      - name: product_id\n"
-        "        type: INTEGER\n"
+        "        type: BIGINT\n"
         "        audits:\n"
         "          - not_null\n"
         "      - name: product_name\n"
@@ -443,11 +443,11 @@ ATTACHMENT_CHECK_PROJECT_FILES: dict[str, str] = {
         "      UNION ALL SELECT 2 AS order_id, 2 AS product_id\n"
         "    columns:\n"
         "      - name: order_id\n"
-        "        type: INTEGER\n"
+        "        type: BIGINT\n"
         "        audits:\n"
         "          - not_null\n"
         "      - name: product_id\n"
-        "        type: INTEGER\n"
+        "        type: BIGINT\n"
     ),
     "sql/models/orders.sql": (
         "MODEL (description 'Orders.',\n"

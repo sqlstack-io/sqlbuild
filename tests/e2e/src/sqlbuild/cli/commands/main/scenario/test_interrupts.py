@@ -22,6 +22,8 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
 _STOP_NOTICE: str = "Interrupted; cleaning up running scenarios..."
 _ABANDON_NOTICE: str = "Interrupted again; skipped scenario cleanup."
 _NOTICES: tuple[str, ...] = (_STOP_NOTICE, _ABANDON_NOTICE)
+_DEBUG: tuple[str, ...] = ("--debug",)
+"""`sqb scenario test` prints the START row a test waits for only with --debug."""
 
 
 @pytest.mark.parametrize(
@@ -31,12 +33,14 @@ _NOTICES: tuple[str, ...] = (_STOP_NOTICE, _ABANDON_NOTICE)
             description="sequential run cancels the in-flight statement",
             args=("test", "--concurrency", "1", "--json"),
             trigger="order_totals START",
+            global_args=_DEBUG,
             long_model=True,
         ),
         ScenarioInterruptE2ETestCase(
             description="concurrent run cancels every in-flight statement",
             args=("test", "--concurrency", "4", "--json"),
             trigger="order_totals START",
+            global_args=_DEBUG,
             long_model=True,
         ),
         ScenarioInterruptE2ETestCase(
@@ -70,6 +74,7 @@ def test_given_long_statement_when_interrupted_then_stops_promptly_and_cleans_up
         trigger=test_case.trigger,
         trigger_stream=test_case.trigger_stream,
         interrupt_count=test_case.interrupt_count,
+        global_args=test_case.global_args,
     )
 
     assert result.returncode != 0, result.output
@@ -77,7 +82,7 @@ def test_given_long_statement_when_interrupted_then_stops_promptly_and_cleans_up
     assert tuple(result.output.count(notice) for notice in _NOTICES) == (
         test_case.expected_notice_counts
     ), result.output
-    assert "expect    expected order_totals" not in result.output
+    assert "expected  order_totals" not in result.output
     assert (
         scenario_relation_names_if_present(db_path=project_dir / "scenario_interrupt.duckdb") == ()
     )
@@ -90,6 +95,7 @@ def test_given_long_statement_when_interrupted_then_stops_promptly_and_cleans_up
             description="local replay cancels the in-flight statement with clean json stdout",
             args=("test", "--run-on", "local", "--json"),
             trigger="order_totals START",
+            global_args=_DEBUG,
             long_model=True,
         ),
     ],
@@ -119,6 +125,7 @@ def test_given_local_replay_when_interrupted_then_stops_promptly_with_clean_json
         trigger=test_case.trigger,
         trigger_stream=test_case.trigger_stream,
         interrupt_count=test_case.interrupt_count,
+        global_args=test_case.global_args,
     )
 
     assert capture.returncode == 0, capture.stdout + capture.stderr
@@ -137,6 +144,7 @@ def test_given_local_replay_when_interrupted_then_stops_promptly_with_clean_json
             description="second interrupt abandons cleanup of busy workers",
             args=("test", "--concurrency", "4", "--json"),
             trigger="order_totals START",
+            global_args=_DEBUG,
             slow_hook_seconds=60.0,
             interrupt_count=2,
             expected_notice_counts=(1, 1),
@@ -166,6 +174,7 @@ def test_given_repeat_interrupt_when_workers_are_busy_then_exits_and_next_run_cl
         trigger=test_case.trigger,
         trigger_stream=test_case.trigger_stream,
         interrupt_count=test_case.interrupt_count,
+        global_args=test_case.global_args,
         hook_seconds=test_case.slow_hook_seconds,
     )
     leftovers: tuple[str, ...] = list_scenario_relation_names(db_path=db_path)

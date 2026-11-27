@@ -59,14 +59,13 @@ _MANAGED_SOURCE: str = (
     "sources:\n"
     "  - name: raw_events\n    description: Test source raw_events.\n"
     "    managed: true\n"
-    "    write_strategy: table\n"
     "    columns:\n"
     "      - name: event_id\n"
-    "        type: INTEGER\n"
+    "        type: BIGINT\n"
 )
 _MANAGED_SOURCE_LOADER: str = (
     "from sqlbuild.loaders import loader\n\n"
-    "@loader\n"
+    "@loader(write_strategy='replace')\n"
     "def raw_events(ctx):\n"
     "    '''Test loader raw_events.'''\n    return [{'event_id': 1}]\n"
 )

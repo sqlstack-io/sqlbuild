@@ -28,7 +28,7 @@ pub(crate) async fn publish_snapshot_with_defaults(
         documents,
         manifest_digest,
     } = prepare_snapshot(input)?;
-    let transaction = begin(store, TransactionMode::Write).await?;
+    let transaction = begin(store, TransactionMode::Publish).await?;
     let (transaction, previous) = query(transaction,
         "SELECT s.generation FROM sqb_current_snapshots c JOIN sqb_snapshots s ON s.snapshot_id=c.snapshot_id \
          WHERE c.location_id=$1 AND c.target=$2",

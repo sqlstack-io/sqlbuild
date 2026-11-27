@@ -44,6 +44,8 @@ _OPTIONAL_CEREMONY_PROJECT_FILES: dict[str, str] = {
     ),
 }
 
+_TEST_ROW: re.Pattern[str] = re.compile(r"^\s*\d+/\d+  test  ")
+
 
 def build_dynamic_pivot_test_project_files() -> dict[str, str]:
     """Build a Snowflake dynamic-pivot project for offline test-plan inspection."""
@@ -2716,3 +2718,9 @@ def refused_tests(refusals: Sequence[Mapping[str, Sequence[str]]]) -> list[str]:
     for refusal in refusals:
         names.extend(refusal["tests"])
     return sorted(names)
+
+
+def is_test_row(line: str) -> bool:
+    """Whether a screen line is a test's result row, `  N/M  test  <name>  STATUS ...`."""
+
+    return _TEST_ROW.match(line) is not None

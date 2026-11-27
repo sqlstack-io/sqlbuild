@@ -7,7 +7,7 @@ use crate::discovery::_helpers::records::yaml_records::YamlKind;
 use crate::discovery::_helpers::records::yaml_records::listing_tree;
 use crate::discovery::_helpers::records::yaml_records::load_files;
 use crate::discovery::_helpers::snapshots::snapshot::in_snapshot;
-use crate::discovery::_helpers::sources::yaml_entries::parse_sources_document;
+use crate::discovery::_helpers::sources::yaml_entries::parsed_sources_file;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyStringMethods, PyTuple};
 use pyo3::{IntoPyObjectExt, pyfunction};
@@ -41,6 +41,7 @@ pub fn discover_source_files<'py>(
             |(relative_path, file_path), built| {
                 let record = built.and_then(|(contents, loaded)| {
                     let shown: String = file_path.str()?.to_str()?.to_owned();
+                    let (sources, load) = parsed_sources_file(py, loaded, &shown)?;
                     new_record_with(
                         py,
                         RecordId::DiscoveredSourceFile,
@@ -48,10 +49,8 @@ pub fn discover_source_files<'py>(
                             ("file_path", file_path.clone()),
                             ("relative_path", relative_path.clone()),
                             ("contents", contents.into_bound_py_any(py)?),
-                            (
-                                "source_entries",
-                                parse_sources_document(py, loaded, &shown)?.into_any(),
-                            ),
+                            ("source_entries", sources.into_any()),
+                            ("load", load),
                         ],
                     )
                 });

@@ -10,3 +10,5 @@ mod helpers;
 mod retention;
 #[path = "test_types.rs"]
 mod test_types;
+#[path = "test_whole_snapshot.rs"]
+mod whole_snapshot;

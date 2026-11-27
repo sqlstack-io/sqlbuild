@@ -168,8 +168,7 @@ def run_test_pipeline(
             connections=connections,
             worker_count=worker_count,
             missing_functions_by_test=missing_functions_by_test,
-            on_test_start=resolved_callbacks.on_test_start,
-            on_test_complete=resolved_callbacks.on_test_complete,
+            callbacks=resolved_callbacks,
             run_id=canonical_run_id,
             timeouts=timeouts or RunItemTimeouts(),
             recovery=recovery,
@@ -191,12 +190,14 @@ def _run_tests(
     connections: tuple[Any, ...],
     worker_count: int,
     missing_functions_by_test: dict[CompiledObjectKey, tuple[str, ...]],
-    on_test_start: Callable[[SqlTestPlanEntry], None] | None,
-    on_test_complete: Callable[[SqlTestExecutionResult], None] | None,
+    callbacks: TestPipelineCallbacks,
     run_id: str,
     timeouts: RunItemTimeouts,
     recovery: ConnectionRecovery,
 ) -> tuple[SqlTestExecutionResult, ...]:
+    on_test_start: Callable[[SqlTestPlanEntry], None] | None = callbacks.on_test_start
+    on_test_finished: Callable[[SqlTestPlanEntry], None] | None = callbacks.on_test_finished
+    on_test_complete: Callable[[SqlTestExecutionResult], None] | None = callbacks.on_test_complete
     if worker_count == 1:
         serial_results: list[SqlTestExecutionResult] = []
         serial_connection: Any = connections[0]
@@ -236,6 +237,7 @@ def _run_tests(
                         connection_pool=connection_pool,
                         missing_functions=missing_functions_by_test.get(entry.key, ()),
                         on_test_start=on_test_start,
+                        on_test_finished=on_test_finished,
                         before_test_start=lambda index=index: start_coordinator.wait(index=index),
                         run_id=run_id,
                         timeouts=timeouts,
@@ -258,13 +260,14 @@ def _execute_test_entry_with_pooled_connection(
     connection_pool: queue.Queue[Any],
     missing_functions: tuple[str, ...],
     on_test_start: Callable[[SqlTestPlanEntry], None] | None,
+    on_test_finished: Callable[[SqlTestPlanEntry], None] | None,
     before_test_start: Callable[[], None] | None,
     run_id: str,
     timeouts: RunItemTimeouts,
 ) -> SqlTestExecutionResult:
     connection: Any = connection_pool.get()
     try:
-        return _execute_test_entry(
+        result: SqlTestExecutionResult = _execute_test_entry(
             entry=entry,
             adapter=adapter,
             connection=connection,
@@ -274,6 +277,9 @@ def _execute_test_entry_with_pooled_connection(
             run_id=run_id,
             timeouts=timeouts,
         )
+        if on_test_finished is not None:
+            on_test_finished(entry)
+        return result
     finally:
         connection_pool.put(connection)
 

@@ -44,6 +44,9 @@ use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::run_output::constants::UPLOAD_CLOSE_BUDGET;
 use sqlbuild_orchestration::run_output::main::finish_output_upload::finish_output_upload;
 use sqlbuild_orchestration::run_output::main::start_output_upload::start_output_upload;
+use sqlbuild_orchestration::run_output::models::NodeLogSender;
+use sqlbuild_orchestration::run_output::types::NodeLogReport;
+use sqlbuild_orchestration::runs::models::NodeLogLevel;
 use sqlbuild_orchestration::runs::models::NodeOutcome;
 use sqlbuild_orchestration::runs::models::RunChange;
 use sqlbuild_orchestration::runs::models::RunCommand;
@@ -222,6 +225,8 @@ pub struct WorkerBuild {
     deferred_cost: DeferredCost,
     /// Rows each running node has written so far, and when the worker last reported them.
     progress: Mutex<BTreeMap<String, RowProgress>>,
+    /// The `ctx.log` lines running nodes log, sent in the background as they arrive.
+    logs: NodeLogSender,
 }
 
 impl WorkerBuild {
@@ -229,7 +234,9 @@ impl WorkerBuild {
         worker: &Bound<'_, NativeOrchestrationWorker>,
         (attached, blocked, upstream): (NodeKeys, NodeKeys, NodeKeys),
     ) -> PyResult<Arc<Self>> {
+        let reporter: Py<NativeOrchestrationWorker> = worker.clone().unbind();
         let state = Arc::new(Self {
+            logs: NodeLogSender::new(Box::new(WorkerLogReport { worker: reporter })),
             execution: worker.get().execution(worker.py())?,
             worker: worker.clone().unbind(),
             completed: Mutex::default(),
@@ -836,6 +843,14 @@ impl WorkerBuild {
         )
     }
 
+    /// Queue a line the running asset `name` logged with `ctx.log`; a background thread sends it.
+    pub fn asset_log(&self, name: &str, (level, message): (NodeLogLevel, &str)) {
+        let key: String = format!("asset:{name}");
+        if self.execution.claim.request.selection.contains(&key) {
+            self.logs.push(&key, (level, message));
+        }
+    }
+
     /// Existing native progress callbacks publish selected-node evidence without Python relays.
     pub fn completed(&self, result: &Bound<'_, PyAny>, key: &str) -> PyResult<()> {
         if key.starts_with(SQL_TEST_KEY_PREFIX) {
@@ -910,11 +925,16 @@ impl WorkerBuild {
                 Some(value) => Vec::<LifeCycleEvent>::read(&value)?,
                 None => Vec::new(),
             };
+            result.py().detach(|| self.logs.flush(key));
             for (event_key, change) in node_log_changes(key, &events) {
+                if self.logs.was_sent(&event_key) {
+                    continue;
+                }
                 self.worker
                     .bind(result.py())
                     .get()
                     .change(result.py(), &event_key, change)?;
+                self.logs.mark_sent(&event_key);
             }
             self.complete_or_hold(
                 result.py(),
@@ -1089,6 +1109,7 @@ impl WorkerBuild {
             .map_err(|_| poisoned())?
             .clone()
             .unwrap_or_else(|| "worker executor completed and closed its connections".into());
+        py.detach(|| self.logs.close());
         let summary = py.detach(|| finish_output_upload(UPLOAD_CLOSE_BUDGET));
         if let Some((message, change)) = summary.as_ref().and_then(upload_loss) {
             write_stderr_line(py, &format!("Run output: {message}\n"))?;
@@ -1125,6 +1146,21 @@ impl WorkerBuild {
             },
         )?;
         Ok(outcome)
+    }
+}
+
+/// Sends a build's `ctx.log` lines through its orchestration worker, from the log sender's thread.
+#[derive(Debug)]
+struct WorkerLogReport {
+    worker: Py<NativeOrchestrationWorker>,
+}
+
+impl NodeLogReport for WorkerLogReport {
+    fn report(&self, key: &str, change: &RunChange) -> Result<(), String> {
+        self.worker
+            .get()
+            .send_change(key, change.clone())
+            .map_err(|error| error.to_string())
     }
 }
 
@@ -1171,7 +1207,14 @@ impl NativeOrchestrationWorker {
 
     /// A bounded retry keeps the event identity across an uncertain acknowledgement or busy store.
     pub fn change(&self, py: Python<'_>, key: &str, change: RunChange) -> PyResult<()> {
-        self.with_owner(py, |owner| {
+        py.detach(|| self.send_change(key, change))
+    }
+
+    /// `change` from a thread that holds no Python lock, such as the worker's log sender.
+    pub fn send_change(&self, key: &str, change: RunChange) -> PyResult<()> {
+        let owner = self.owner.lock().map_err(|_| unavailable())?;
+        let owner: &WorkerOwner = owner.as_ref().ok_or_else(unavailable)?;
+        {
             let event_id = Uuid::new_v5(&owner.session.execution.claim.claim_id, key.as_bytes());
             owner.runtime.block_on(async {
                 let mut attempts = 0;
@@ -1195,7 +1238,7 @@ impl NativeOrchestrationWorker {
                     }
                 }
             })
-        })
+        }
     }
 
     /// Verify this retained baseline before the caller applies run settings or opens a warehouse.

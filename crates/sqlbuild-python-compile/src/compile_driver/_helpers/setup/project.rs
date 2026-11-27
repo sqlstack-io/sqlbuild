@@ -1,8 +1,8 @@
 //! Compiled project and project graph construction: frontier stages, target defaults and checks.
 
+use crate::compile_driver::_helpers::setup::preserved_loader_schemas::preserved_loader_schemas;
 use crate::compile_driver::main::setup::attached_inputs::attached_inputs;
 use crate::compile_driver::main::setup::compile_adapter_context::compile_adapter_context;
-use crate::compile_driver::main::setup::preserved_loader_schemas::preserved_loader_schemas;
 use crate::compile_driver::main::setup::project_graph::project_graph;
 use crate::compile_driver::main::stages::monotonic::monotonic;
 use std::collections::HashSet;

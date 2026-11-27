@@ -1,15 +1,9 @@
-//! The output of a load with nothing selected.
+//! The output of a load in a project that loads nothing.
 
 use crate::cli_text::models::CliStyle;
-use crate::load_command::main::render_load_footer::render_load_footer;
-use crate::load_command::models::LoadCounts;
 
-/// A note that no managed sources were selected, then a zero-count completion line.
+/// A note that the project declares no load or `@loader`.
 #[must_use]
 pub fn render_empty_load(style: CliStyle) -> String {
-    format!(
-        "{}\n{}",
-        style.muted("  No managed sources selected."),
-        render_load_footer(&[], (LoadCounts::default(), 0.0), style)
-    )
+    style.muted("  Nothing to load: the project declares no load or @loader.")
 }

@@ -117,7 +117,7 @@ fn authored<'py>(
 ) -> PyResult<Bound<'py, PyDict>> {
     Ok(map_to_python(py, values)?
         .into_bound(py)
-        .downcast_into::<PyDict>()?)
+        .cast_into::<PyDict>()?)
 }
 
 /// `{key: value}` or `{}`, read back as Python reads the projected value.
@@ -386,7 +386,7 @@ pub(crate) fn discovery_session<'py>(
     let py: Python<'py> = project_dir.py();
     let memo: Bound<'py, PyDict> = snapshot_memo(project_dir)?;
     if let Some(session) = memo.get_item(SESSION_MEMO_KEY)?
-        && let Ok(session) = session.downcast_into::<NativeDiscoverySession>()
+        && let Ok(session) = session.cast_into::<NativeDiscoverySession>()
     {
         return Ok(session);
     }

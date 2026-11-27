@@ -13,6 +13,7 @@ use sqlbuild_orchestration::store::models::ControlStore;
 use crate::workers::_helpers::invocation::{arguments, environment, excluded};
 use crate::workers::constants::IMAGE_ID_HEX_LENGTH;
 use crate::workers::models::{DockerLauncher, DockerWorker, Launcher, RunDefaults, WorkerExit};
+use sqlbuild_orchestration::tls::main::client_builder::client_builder;
 
 impl DockerWorker {
     pub(in crate::workers) fn prepare(
@@ -265,7 +266,7 @@ fn docker_error(error: reqwest::Error) -> ControlError {
 
 #[cfg(unix)]
 fn docker_client(socket: &Path) -> Result<reqwest::Client, ControlError> {
-    reqwest::Client::builder()
+    client_builder()
         .no_proxy()
         .unix_socket(socket)
         .timeout(std::time::Duration::from_secs(5))

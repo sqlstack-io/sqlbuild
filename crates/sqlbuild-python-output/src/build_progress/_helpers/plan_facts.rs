@@ -89,6 +89,7 @@ pub(crate) fn build_plan_facts(plan: &Bound<'_, PyAny>) -> PyResult<BuildPlanFac
     let seeds: Vec<String> = names(plan, "seed_entries")?;
     let functions: Vec<String> = names(plan, "function_entries")?;
     let test_names: Vec<String> = names(plan, "test_entries")?;
+    let loads: usize = names(plan, "load_entries")?.len();
     let mut ordinals: Vec<(String, usize)> = Vec::new();
     let mut loaded_sources: usize = 0;
     for key in native_field(plan, "execution_order")?.try_iter()? {
@@ -110,7 +111,7 @@ pub(crate) fn build_plan_facts(plan: &Bound<'_, PyAny>) -> PyResult<BuildPlanFac
     row_names.extend(functions.iter().cloned());
     row_names.extend(test_names.iter().cloned());
     Ok(BuildPlanFacts {
-        total: model_count + seeds.len() + functions.len() + loaded_sources,
+        total: model_count + seeds.len() + functions.len() + loaded_sources + loads,
         ordinals,
         name_width: progress_name_width(&NameWidthInputs {
             names: row_names,

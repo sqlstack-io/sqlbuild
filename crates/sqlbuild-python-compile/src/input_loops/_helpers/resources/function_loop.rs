@@ -398,7 +398,7 @@ fn function_namespace(
     let mut header: [Option<String>; 2] = [None, None];
     for (slot, key) in header.iter_mut().zip([DATABASE_KEY, SCHEMA_KEY]) {
         if let Some(value) = header_values.get_item(key)?
-            && let Ok(text) = value.downcast::<PyString>()
+            && let Ok(text) = value.cast::<PyString>()
         {
             let text: String = text.to_string_lossy().into_owned();
             *slot = Some(header_template(
@@ -557,7 +557,7 @@ fn function_references(
         .model_loop
         .validator
         .bind(context.host.py())
-        .downcast()?
+        .cast()?
         .clone();
     let known: KnownResources<'_> = validator.get().known_resources();
     let calls: Vec<(&str, &str)> = references

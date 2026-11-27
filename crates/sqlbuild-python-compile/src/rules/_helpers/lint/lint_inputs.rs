@@ -37,7 +37,7 @@ pub(crate) fn model_lint_expansion(
     model: &Bound<'_, PyAny>,
 ) -> PyResult<Option<(PathBuf, CompiledSource)>> {
     let py: Python<'_> = model.py();
-    if let Ok(input) = model.downcast::<NativeModelInput>() {
+    if let Ok(input) = model.cast::<NativeModelInput>() {
         return input.get().read(py, |record, _| {
             let whole: &ExpansionRecord = &record.expansion;
             Ok(Some((
@@ -75,7 +75,7 @@ pub(crate) fn project_sql_expansions(
 ) -> PyResult<HashMap<PathBuf, CompiledSource>> {
     let py: Python<'_> = project.py();
     let mut expansions: HashMap<PathBuf, CompiledSource> = HashMap::new();
-    if let Ok(view) = project.downcast::<NativeProjectView>() {
+    if let Ok(view) = project.cast::<NativeProjectView>() {
         let owner = view.get().owner().bind(py).borrow();
         for record in owner.inputs() {
             let authored: &ExpansionRecord = &record.expansion;

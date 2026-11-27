@@ -7,6 +7,7 @@ use crate::health::constants::{
     TOO_MANY_CONNECTIONS_CODE,
 };
 use crate::health::models::ControlCauseCase;
+use crate::store::constants::{IDLE_IN_TRANSACTION_CODE, QUERY_CANCELED_CODE};
 
 /// A database error's case; a pool that waited with room to spare was trying to connect, as sqlx retries a refused connection until the wait ends.
 pub(crate) fn database_case(error: &sqlx_core::Error, pool_full: bool) -> ControlCauseCase {
@@ -37,6 +38,9 @@ pub(crate) fn code_case(code: &str) -> ControlCauseCase {
     }
     if code.starts_with(CONNECTION_CLASS) {
         return ControlCauseCase::Unreachable;
+    }
+    if [IDLE_IN_TRANSACTION_CODE, QUERY_CANCELED_CODE].contains(&code) {
+        return ControlCauseCase::SessionCutOff;
     }
     ControlCauseCase::Other
 }

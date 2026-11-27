@@ -130,6 +130,8 @@ export type PlatformEventKind =
 	| 'trigger_skipped'
 	| 'sensor_rechecked'
 	| 'calendar_times_dropped'
+	| 'unreadable_event_skipped'
+	| 'control_session_cut_off'
 	| 'scheduler_no_leader'
 	| 'location_broken'
 	| 'location_failing'
@@ -139,6 +141,7 @@ export type PlatformEventKind =
 	| 'warehouse_sync_failed'
 	| 'event_sink_failed'
 	| 'event_forwarding_failed'
+	| 'unreadable_event'
 	| 'heartbeat';
 export type PlatformEventSeverity = 'info' | 'warning' | 'critical';
 export type PlatformEvent = {

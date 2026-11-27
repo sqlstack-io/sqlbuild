@@ -7,6 +7,6 @@ use pyo3::types::PyString;
 pub fn py_strings<'py>(values: &Bound<'py, PyAny>) -> PyResult<Vec<Bound<'py, PyString>>> {
     values
         .try_iter()?
-        .map(|value| Ok(value?.downcast_into::<PyString>()?))
+        .map(|value| Ok(value?.cast_into::<PyString>()?))
         .collect()
 }

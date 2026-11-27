@@ -277,6 +277,7 @@ const BUILD_COMMAND_REQUEST: RecordSpec = RecordSpec {
         FieldSpec::new("test_timeout", FieldDefault::None),
         FieldSpec::new("discovered_inputs", FieldDefault::None),
         FieldSpec::new("compiled_project", FieldDefault::None),
+        FieldSpec::new("command_name", FieldDefault::Text("build")),
     ],
 };
 const BUILD_INVOCATION: RecordSpec = RecordSpec {

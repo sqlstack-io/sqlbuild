@@ -90,7 +90,7 @@ def _align_single_difference(
     unexpected_samples: tuple[SqlTestDifferenceSample, ...],
     missing_samples: tuple[SqlTestDifferenceSample, ...],
 ) -> tuple[SqlTestColumnDifference, ...]:
-    """Align values only when each set-difference direction contains exactly one row."""
+    """Align values when each direction holds one row and they share a value, so one row changed."""
 
     if step_result.unexpected_row_count != 1 or step_result.missing_row_count != 1:
         return ()
@@ -102,11 +102,14 @@ def _align_single_difference(
         return ()
     if tuple(name for name, _ in actual_values) != tuple(name for name, _ in expected_values):
         return ()
-    return tuple(
+    differences: tuple[SqlTestColumnDifference, ...] = tuple(
         SqlTestColumnDifference(name=name, actual=actual, expected=expected)
         for (name, actual), (_, expected) in zip(actual_values, expected_values, strict=True)
         if actual != expected
     )
+    if len(differences) == len(actual_values):
+        return ()
+    return differences
 
 
 def _fetch_difference_samples(

@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::api::models::{ApiAuthentication, HumanLogin};
-use crate::api::tests::changes_helpers::{next_notice, opened, request_person_feed};
+use crate::api::tests::changes_helpers::{next_notice, next_topic, opened, request_person_feed};
 use crate::api::tests::helpers::{start_api_with_authentication, stop_api};
 use crate::api::tests::node_states_helpers::{builds, notices, orders_snapshot, reader};
 use crate::api::tests::test_types::{
@@ -30,6 +30,7 @@ use crate::store::main::migrate_store::migrate_store;
 use crate::store::models::{ChangeMessage, ChangeTopic};
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
+use crate::tls::main::client_builder::client_builder;
 use crate::warehouse_metadata::main::ingest::ingest_fingerprints::ingest_fingerprints;
 use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 
@@ -69,7 +70,7 @@ fn given_held_node_states_when_people_revalidate_and_builds_land_then_only_chang
                 },
             )
             .await;
-            let client = reqwest::Client::new();
+            let client = client_builder().build().expect("HTTP client");
             let read = |path: &str, bearer: &str, tag: Option<&str>| {
                 let request = client
                     .get(format!(
@@ -324,7 +325,7 @@ fn given_changed_build_reports_when_people_read_node_states_then_only_the_curren
                 },
             )
             .await;
-            let client = reqwest::Client::new();
+            let client = client_builder().build().expect("HTTP client");
             let admin = roles.administrator.bearer.clone();
             let changed_build = || async {
                 let states: Value = client
@@ -439,6 +440,12 @@ fn given_changed_build_reports_when_people_read_node_states_then_only_the_curren
                     LocationState::ChangePlanFailed
                 ),
                 "{}: a failed plan of what changed is the location's health, not only a log line",
+                test_case.description
+            );
+            assert_eq!(
+                next_topic(&mut feed).await,
+                Some(format!("location_health:{location}")),
+                "{}: a location's health report reaches the people following its target",
                 test_case.description
             );
             let partial = ChangedBuildReport {

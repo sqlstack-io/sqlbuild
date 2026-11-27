@@ -4,7 +4,7 @@ from sqlbuild.loaders import loader
 from python.nodes.assets.prepare_raw_orders.asset import prepare_raw_orders
 
 
-@loader(depends_on=(prepare_raw_orders,))
+@loader(write_strategy="replace", depends_on=(prepare_raw_orders,))
 def raw_orders(ctx):
     """Load source rows after the preparation asset has completed."""
 

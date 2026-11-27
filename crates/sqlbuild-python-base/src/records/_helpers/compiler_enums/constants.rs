@@ -92,6 +92,7 @@ const E_COMPILED_RESOURCE_TYPE: EnumSpec = EnumSpec {
         ("AUDIT", "audit"),
         ("SQL_TEST", "sql_test"),
         ("SQL_SCENARIO", "sql_scenario"),
+        ("LOAD", "load"),
     ],
 };
 const E_INFERRED_NULLABILITY: EnumSpec = EnumSpec {

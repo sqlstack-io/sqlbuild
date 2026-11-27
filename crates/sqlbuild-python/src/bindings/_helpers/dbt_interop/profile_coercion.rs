@@ -28,7 +28,7 @@ fn coerce_dbt_profile_bool<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py
     if value.is_instance_of::<PyBool>() {
         return Ok(value.clone());
     }
-    if let Ok(text) = value.downcast::<PyString>()
+    if let Ok(text) = value.cast::<PyString>()
         && let Some(flag) = dbt_bool_text(text.to_str()?)
     {
         return Ok(PyBool::new(value.py(), flag).to_owned().into_any());
@@ -47,7 +47,7 @@ fn coerce_dbt_profile_number<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'
     if value.is_instance_of::<PyInt>() || value.is_instance_of::<PyFloat>() {
         return Ok(value.clone());
     }
-    let Ok(text) = value.downcast::<PyString>() else {
+    let Ok(text) = value.cast::<PyString>() else {
         return Err(coercion_error(value, "number")?);
     };
     let (stripped, parse): (&str, DbtNumberParse) = dbt_number_text(text.to_str()?);

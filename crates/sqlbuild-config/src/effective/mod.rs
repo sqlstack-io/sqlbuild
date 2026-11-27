@@ -1,7 +1,7 @@
 //! Effective configuration precedence: target selection, target merge, vars, connection, settings.
 
 pub(crate) mod _helpers;
-pub(crate) mod constants;
+pub mod constants;
 pub mod errors;
 pub mod main;
 pub mod models;

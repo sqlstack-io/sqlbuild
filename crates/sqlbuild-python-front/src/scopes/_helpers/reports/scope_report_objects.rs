@@ -143,7 +143,7 @@ pub(crate) fn python_to_json(value: &Bound<'_, PyAny>) -> PyResult<JsonValue> {
     if value.is_none() {
         return Ok(JsonValue::Null);
     }
-    if let Ok(flag) = value.downcast::<PyBool>() {
+    if let Ok(flag) = value.cast::<PyBool>() {
         return Ok(JsonValue::Bool(flag.is_true()));
     }
     let py: Python<'_> = value.py();
@@ -179,7 +179,7 @@ pub(crate) fn python_to_json(value: &Bound<'_, PyAny>) -> PyResult<JsonValue> {
         }
         return Ok(JsonValue::Array(items));
     }
-    if let Ok(mapping) = value.downcast::<PyDict>() {
+    if let Ok(mapping) = value.cast::<PyDict>() {
         let mut entries: Vec<(String, JsonValue)> = Vec::new();
         for (key, item) in mapping.iter() {
             entries.push((key.str()?.extract()?, python_to_json(&item)?));

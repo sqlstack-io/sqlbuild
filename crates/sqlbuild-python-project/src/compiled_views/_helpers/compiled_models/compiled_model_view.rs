@@ -110,7 +110,7 @@ pub(crate) fn compiled_record(
     let analysis: AnalysisRecord =
         analysis_record(py, input, session, (fallback, standalone_proof))?;
     let config: &Bound<'_, PyAny> = input.host.config.bind(py);
-    let values: Bound<'_, PyDict> = native_field(config, VALUES_ATTRIBUTE)?.downcast_into()?;
+    let values: Bound<'_, PyDict> = native_field(config, VALUES_ATTRIBUTE)?.cast_into()?;
     Ok(CompiledRecord {
         deps,
         destination: DestinationFact {

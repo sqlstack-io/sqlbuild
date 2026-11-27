@@ -3114,7 +3114,7 @@
       "name": "id",
       "description": "",
       "meta": {},
-      "data_type": "INTEGER",
+      "data_type": "BIGINT",
       "constraints": [],
       "quote": null,
       "tags": []

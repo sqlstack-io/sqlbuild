@@ -283,7 +283,7 @@ impl NativeModelFile {
     }
 
     pub(crate) fn __eq__(&self, py: Python<'_>, other: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
-        let Ok(other) = other.downcast::<NativeModelFile>() else {
+        let Ok(other) = other.cast::<NativeModelFile>() else {
             return Ok(py.NotImplemented());
         };
         let other: &NativeModelFile = other.get();

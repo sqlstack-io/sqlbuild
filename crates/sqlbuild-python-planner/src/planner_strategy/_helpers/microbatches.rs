@@ -266,7 +266,7 @@ pub(crate) fn microbatch_limit_config<'py>(
 ) -> PyResult<(MaybeValue<'py>, MaybeValue<'py>)> {
     let py: Python<'py> = values.py();
     let raw: Bound<'py, PyAny> = mapping_get(values, "microbatch_limit")?;
-    if let Ok(raw) = raw.downcast::<PyDict>() {
+    if let Ok(raw) = raw.cast::<PyDict>() {
         let max_batches: Option<Bound<'py, PyAny>> =
             positive_integer(raw.get_item("max_batches")?)?;
         let action: Option<Bound<'py, PyAny>> = raw

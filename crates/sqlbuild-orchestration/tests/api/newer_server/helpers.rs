@@ -10,6 +10,7 @@ use serde_json::Value;
 
 use crate::api::tests::test_types::{NewerEdit, NewerServer as Newer, TestApi};
 use crate::store::errors::ControlError;
+use crate::tls::main::client_builder::client_builder;
 
 /// Serve a newer server over `real` that makes `edit` to a worker's execution.
 pub(crate) async fn newer_server(real: &str, edit: NewerEdit) -> TestApi {
@@ -94,7 +95,9 @@ async fn forward(
 ) -> (StatusCode, reqwest::Response) {
     headers.remove(axum::http::header::HOST);
     headers.remove(axum::http::header::CONTENT_LENGTH);
-    let request = reqwest::Client::new()
+    let request = client_builder()
+        .build()
+        .expect("HTTP client")
         .request(
             method,
             format!("{}/api/runs/{run_id}/{endpoint}", newer.real),

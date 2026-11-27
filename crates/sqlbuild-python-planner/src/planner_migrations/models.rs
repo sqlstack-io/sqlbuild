@@ -483,7 +483,7 @@ impl MigrationStateInspection {
             };
             slf.borrow_mut()
                 .column_events
-                .extend(events.downcast::<PyTuple>()?.iter().map(Bound::unbind));
+                .extend(events.cast::<PyTuple>()?.iter().map(Bound::unbind));
         }
         Ok(())
     }
@@ -538,7 +538,7 @@ impl MigrationStateInspection {
             };
             slf.borrow_mut()
                 .old_name_facts
-                .extend(facts.downcast::<PyTuple>()?.iter().map(Bound::unbind));
+                .extend(facts.cast::<PyTuple>()?.iter().map(Bound::unbind));
             let Read::Known(moves) = reads.state_history(
                 py,
                 StateHistoryRead::MigrationEvents {
@@ -552,7 +552,7 @@ impl MigrationStateInspection {
             };
             slf.borrow_mut()
                 .old_name_moves
-                .extend(moves.downcast::<PyTuple>()?.iter().map(Bound::unbind));
+                .extend(moves.cast::<PyTuple>()?.iter().map(Bound::unbind));
         }
         Ok(())
     }
@@ -589,7 +589,7 @@ impl MigrationStateInspection {
             };
             slf.borrow_mut()
                 .events
-                .extend(events.downcast::<PyTuple>()?.iter().map(Bound::unbind));
+                .extend(events.cast::<PyTuple>()?.iter().map(Bound::unbind));
         }
         Ok(())
     }

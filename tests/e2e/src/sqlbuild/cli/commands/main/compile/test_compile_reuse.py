@@ -148,8 +148,8 @@ _CONTRACT_ERROR_MODEL: str = (
             edit=lambda root: replace_project_text(
                 root,
                 "sql/sources/raw.yml",
-                "      - name: quantity\n        type: INTEGER",
                 "      - name: quantity\n        type: BIGINT",
+                "      - name: quantity\n        type: INT8",
             ),
         ),
         CompileReuseInvalidationTestCase(

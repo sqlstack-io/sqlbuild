@@ -134,7 +134,7 @@ impl<W: Write> PayloadWriter<W> {
             return Ok(Value::String(text));
         }
         if value.is_exact_instance_of::<PyTuple>() {
-            let items: &Bound<'_, PyTuple> = value.downcast::<PyTuple>()?;
+            let items: &Bound<'_, PyTuple> = value.cast::<PyTuple>()?;
             let mut texts: Vec<Value> = Vec::with_capacity(items.len());
             for item in items.iter() {
                 let Some(text) = exact_text(&item)? else {
@@ -165,7 +165,7 @@ impl<W: Write> PayloadWriter<W> {
 
     /// An empty tuple as `null`; any other value pickled.
     fn declarations(&mut self, value: &Bound<'_, PyAny>) -> PyResult<Value> {
-        if value.is_exact_instance_of::<PyTuple>() && value.downcast::<PyTuple>()?.is_empty() {
+        if value.is_exact_instance_of::<PyTuple>() && value.cast::<PyTuple>()?.is_empty() {
             return Ok(Value::Null);
         }
         self.pickle(value)
@@ -186,7 +186,7 @@ impl<W: Write> PayloadWriter<W> {
             }
         }
         model.insert("config".to_owned(), Value::Object(config));
-        let facts: Map<String, Value> = match entry.model.downcast::<NativeCompiledModel>() {
+        let facts: Map<String, Value> = match entry.model.cast::<NativeCompiledModel>() {
             Ok(view) => self.native_model(py, view.get())?,
             Err(_) => self.record_model(&entry.model)?,
         };
@@ -275,7 +275,7 @@ impl<W: Write> PayloadWriter<W> {
 /// `[column, enum name]` for each enum-typed column, in column order.
 fn enum_type_names(columns: &Bound<'_, PyAny>) -> PyResult<Value> {
     let mut pairs: Vec<Value> = Vec::new();
-    for (column, declaration) in columns.downcast::<PyDict>()?.iter() {
+    for (column, declaration) in columns.cast::<PyDict>()?.iter() {
         let column: String = column.extract()?;
         let name: String = native_field(&declaration, "name")?.extract()?;
         pairs.push(json!([column, name]));
@@ -328,7 +328,7 @@ fn exact_text(value: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
     if !value.is_exact_instance_of::<PyString>() {
         return Ok(None);
     }
-    if let Ok(text) = value.downcast::<PyString>()?.to_str() {
+    if let Ok(text) = value.cast::<PyString>()?.to_str() {
         return Ok(Some(text.to_owned()));
     }
     Ok(None)

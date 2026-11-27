@@ -135,7 +135,7 @@ pub(crate) fn stop_output_capture_threads(py: Python<'_>) -> PyResult<()> {
         let Ok(worker) = thread.getattr(WORKER_ATTRIBUTE) else {
             continue;
         };
-        if let Ok(worker) = worker.downcast::<OutputDeliveryWorker>() {
+        if let Ok(worker) = worker.cast::<OutputDeliveryWorker>() {
             let shared = &worker.get().shared;
             let _held = shared.hold(py)?;
             {

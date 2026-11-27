@@ -3,8 +3,8 @@
 use serde_json::json;
 
 use crate::credentials::models::Action;
-use crate::run_output::_helpers::pages::{search_part, search_whole};
-use crate::run_output::_helpers::views::view_chunk_count;
+use crate::run_output::_helpers::reads::pages::{search_part, search_whole};
+use crate::run_output::_helpers::reads::views::view_chunk_count;
 use crate::run_output::constants::SEARCH_CHUNKS;
 use crate::run_output::models::{
     OutputSearch, OutputSearchQuery, OutputStore, OutputView, SearchDirection, ViewReader,

@@ -60,8 +60,7 @@ pub async fn read_person_run_node_error(
         let snapshot_id: Uuid = serde_json::from_value(row["snapshot_id"].clone())
             .map_err(|error| ControlError::Invalid(error.to_string()))?;
         let nodes;
-        (transaction, nodes) =
-            read_snapshot_nodes(transaction, snapshot_id, Some(&scope.nodes)).await?;
+        (transaction, nodes) = read_snapshot_nodes(transaction, snapshot_id, &scope.nodes).await?;
         result = Some(RunNodeFailure {
             node_key: node_key.into(),
             error_code: row["error_code"].as_str().map(str::to_owned),

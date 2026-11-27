@@ -58,6 +58,7 @@ from sqlbuild.executor.auditing.models import AuditExecutionResult
 from sqlbuild.executor.build._helpers.blocking import downstream_blocked_keys
 from sqlbuild.executor.build._helpers.end_audits import run_end_audits
 from sqlbuild.executor.build._helpers.indexes import build_execution_indexes
+from sqlbuild.executor.build._helpers.load_node import execute_build_load_node, failed_load_result
 from sqlbuild.executor.build._helpers.model_timeouts import (
     model_timeout_policy,
     timed_out_model_result,
@@ -894,6 +895,9 @@ class BuildScheduler:
         if key.resource_type == CompiledResourceType.SOURCE:
             return key in self._indexes.source_load_entries_by_key
 
+        if key.resource_type == CompiledResourceType.LOAD:
+            return key in self._indexes.load_entries_by_key
+
         if key.resource_type == CompiledResourceType.MODEL:
             if not self._run_audits:
                 return True
@@ -1113,6 +1117,16 @@ class BuildScheduler:
             return self._execute_seed_node(key=key, connection=connection)
         if key.resource_type == CompiledResourceType.SOURCE:
             return self._execute_source_node(key=key, connection=connection)
+        if key.resource_type == CompiledResourceType.LOAD:
+            return execute_build_load_node(
+                entry=self._indexes.load_entries_by_key[key],
+                plan=self._plan,
+                adapter=self._adapter,
+                connection_config=self._connection_config,
+                connection=connection,
+                runtime=self._runtime,
+                callbacks=self._callbacks,
+            )
         if key.resource_type in {CompiledResourceType.UDF, CompiledResourceType.TABLE_FN}:
             return self._execute_function_node(key=key, connection=connection)
         if key.resource_type == CompiledResourceType.SQL_TEST:
@@ -1207,6 +1221,8 @@ class BuildScheduler:
                 resource_kind=load_resource_kind(source),
                 error_message=error_message,
             )
+        if key.resource_type == CompiledResourceType.LOAD:
+            return failed_load_result(key=key, error_message=error_message)
         if key.resource_type in {CompiledResourceType.UDF, CompiledResourceType.TABLE_FN}:
             return FunctionExecutionResult(
                 function_name=key.name,

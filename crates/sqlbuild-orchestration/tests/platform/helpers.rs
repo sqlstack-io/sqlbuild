@@ -467,3 +467,44 @@ pub(crate) fn failing_sink_of(sink: &str, reason: &str) -> crate::platform::mode
         last_success_at: None,
     }
 }
+
+/// Deliver the webhook's events three times over; the last pass must find nothing left.
+pub(crate) async fn drain_webhook(store: &ControlStore, sink: &crate::webhooks::models::Webhook) {
+    let mut handled: Vec<usize> = Vec::new();
+    for _ in 0..3 {
+        handled.push(
+            crate::webhooks::_helpers::delivery::deliver_webhook(store, sink)
+                .await
+                .expect("delivery carries on"),
+        );
+    }
+    assert_eq!(
+        handled.last(),
+        Some(&0),
+        "delivery reaches the end: {handled:?}"
+    );
+}
+
+/// Skip every stored platform event this release can't read, as webhook delivery does.
+pub(crate) async fn skip_unreadable(store: &ControlStore) {
+    let (mut transaction, rows) =
+        crate::platform::main::installation::read_platform_events::read_platform_events(
+            crate::store::main::begin::begin(store, crate::store::models::TransactionMode::Write)
+                .await
+                .expect("write"),
+            0,
+        )
+        .await
+        .expect("read events");
+    for row in rows.into_iter().filter_map(Result::err) {
+        transaction = crate::platform::main::health::record_skipped_event::record_skipped_event(
+            transaction,
+            *row,
+        )
+        .await
+        .expect("record the skip");
+    }
+    crate::store::main::commit::commit(transaction)
+        .await
+        .expect("skipped");
+}

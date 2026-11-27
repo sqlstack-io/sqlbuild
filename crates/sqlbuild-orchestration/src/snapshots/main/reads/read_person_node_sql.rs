@@ -36,13 +36,23 @@ pub async fn read_person_node_sql(
     if let Some(record) = record {
         let nodes;
         (transaction, nodes) =
-            read_snapshot_nodes(transaction, record.snapshot_id, Some(&scope.nodes)).await?;
+            read_snapshot_nodes(transaction, record.snapshot_id, &scope.nodes).await?;
         if !nodes.is_empty() {
             let rows;
-            (transaction, rows) = query(transaction,
-                "SELECT s.node_key, s.kind, t.body FROM sqb_snapshot_sources s JOIN sqb_source_texts t ON t.text_hash=s.text_hash \
+            let select = format!(
+                "SELECT s.node_key, s.kind, {} AS body FROM sqb_snapshot_sources s JOIN sqb_source_texts t ON t.text_hash=s.text_hash \
                  WHERE s.snapshot_id=$1 AND s.node_key=$2 AND s.kind IN ('raw_sql','compiled_sql')",
-                vec![Parameter::Id(record.snapshot_id), Parameter::Text(node_key.into())]).await?;
+                transaction.hex_column("t.body"),
+            );
+            (transaction, rows) = query(
+                transaction,
+                &select,
+                vec![
+                    Parameter::Id(record.snapshot_id),
+                    Parameter::Text(node_key.into()),
+                ],
+            )
+            .await?;
             if let Some(node) = attach_sources(nodes, rows)?.remove(node_key) {
                 let documents;
                 (transaction, documents) = read_snapshot_documents(

@@ -10,13 +10,9 @@ from tests.e2e.src.sqlbuild.cli.commands.main.sqlite._test_types import (
     SqliteWaffleShopE2ETestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.sqlite.helpers import (
-    LOADED_EVENT_ROWS_SQL,
-    LOADED_EVENT_TYPES_SQL,
     LOADER_PROJECT_FILES,
-    SQLITE_FILE,
     prepare_sqlite_waffle_shop,
     run_sqb_commands,
-    sqlite_rows,
     waffle_row_counts,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
@@ -83,24 +79,16 @@ def test_given_waffle_shop_when_building_testing_and_rebuilding_on_sqlite_then_r
     "test_case",
     [
         SqliteLoaderE2ETestCase(
-            description="loaded timestamps and dates stay ISO text under their declared types",
-            builds=2,
-            relations=("raw_events", "events"),
-            expected_rows=(
-                (1, "2026-04-01 09:15:00", "2026-04-01", "2026-04-01 09:30:00"),
-                (2, "2026-04-02 08:45:30.25", "2026-04-02", None),
-            ),
-            expected_declared_types=(
-                ("event_id", "INTEGER"),
-                ("happened_at", "TIMESTAMP"),
-                ("event_day", "DATE"),
-                ("logged_at", "TIMESTAMP"),
+            description="a loader is refused at compile, since SQLLoad can't write to SQLite",
+            expected_fragment=(
+                "loads and loaders can't write to sqlite yet; SQLLoad loads into duckdb, "
+                "motherduck, snowflake, databricks, bigquery, postgres and clickhouse"
             ),
         ),
     ],
     ids=lambda case: case.description,
 )
-def test_given_loader_with_timestamps_when_building_on_sqlite_then_values_are_kept(
+def test_given_loader_when_compiling_on_sqlite_then_it_is_refused(
     tmp_path: Path, test_case: SqliteLoaderE2ETestCase
 ) -> None:
     project_dir: Path = prepare_inline_project(
@@ -108,19 +96,9 @@ def test_given_loader_with_timestamps_when_building_on_sqlite_then_values_are_ke
     )
 
     results: tuple[subprocess.CompletedProcess[str], ...] = run_sqb_commands(
-        project_dir=project_dir, commands=(("build",),) * test_case.builds
+        project_dir=project_dir, commands=(("compile",),)
     )
 
-    assert [result.returncode for result in results] == [0] * test_case.builds, [
-        result.stdout + result.stderr for result in results
-    ]
-    db_path: Path = project_dir / SQLITE_FILE
-    relation: str
-    for relation in test_case.relations:
-        assert (
-            sqlite_rows(db_path=db_path, sql=LOADED_EVENT_ROWS_SQL.format(relation=relation))
-            == test_case.expected_rows
-        )
-    assert sqlite_rows(db_path=db_path, sql=LOADED_EVENT_TYPES_SQL) == (
-        test_case.expected_declared_types
-    )
+    output: str = results[0].stdout + results[0].stderr
+    assert results[0].returncode != 0, output
+    assert test_case.expected_fragment in output

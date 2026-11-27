@@ -236,7 +236,7 @@ pub(crate) fn prepare_query_diff<'py>(
         Some(cli_vars.clone()).filter(|value| !value.is_none()),
     )
     .and_then(|value| pyo3::IntoPyObjectExt::into_bound_py_any(value, py))?
-    .downcast_into()?;
+    .cast_into()?;
     let label = |name: &str, default: &str| -> PyResult<String> {
         let value: Bound<'py, PyAny> = native_field(request, name)?;
         let text: String = if value.is_truthy()? {

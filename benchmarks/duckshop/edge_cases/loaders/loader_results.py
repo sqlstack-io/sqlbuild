@@ -11,13 +11,13 @@ from sqlbuild.loaders import loader
 from sqlbuild.refs import source
 
 
-@loader
+@loader(write_strategy="replace")
 def raw_order_events(ctx: LoaderContext) -> list[dict[str, object]]:
     """Order events."""
     return [{"event_id": 1}]
 
 
-@loader
+@loader(write_strategy="replace")
 def raw_customer_events(ctx: LoaderContext) -> list[dict[str, object]]:
     """Customer events."""
     return [{"event_id": 1}]

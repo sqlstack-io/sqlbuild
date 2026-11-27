@@ -5,6 +5,7 @@ pub mod execute;
 pub mod fixed_state_table_sql;
 pub mod integer_literal;
 pub mod literal;
+pub mod local_test_inputs_problem;
 pub mod optional_text;
 pub mod recorder_callbacks;
 pub mod register_audit_results_state;

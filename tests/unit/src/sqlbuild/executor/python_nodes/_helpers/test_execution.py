@@ -32,6 +32,7 @@ from sqlbuild.provider.classes.session import ProviderSession
 from sqlbuild.python_nodes.models import RetryPolicy
 from tests.unit.src.sqlbuild.executor.python_nodes._helpers._test_types import (
     PythonNodeExecutorTestCase,
+    PythonNodeLiveLogTestCase,
     PythonNodeRetryExecutorTestCase,
     PythonPostCallLifecycleTestCase,
 )
@@ -53,12 +54,70 @@ from tests.unit.src.sqlbuild.executor.python_nodes._helpers.helpers import (
     fail_orders,
     fetch_orders,
     hard_skip_empty_orders,
+    log_past_the_cap,
+    log_two_order_steps,
+    logging_runtime,
     missing_context_provider_task,
     provider_asset,
     provider_task,
     skip_empty_orders,
     successful_sibling,
 )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PythonNodeLiveLogTestCase(
+            description="each line reaches on_log as it is logged, with the node's name",
+            name="log_two_order_steps",
+            function=log_two_order_steps,
+            expected_forwarded=(
+                ("log_two_order_steps", "info", "loaded 3 orders"),
+                ("log_two_order_steps", "warning", "1 order had no customer"),
+            ),
+            expected_forwarded_count=2,
+            expected_dropped=0,
+        ),
+        PythonNodeLiveLogTestCase(
+            description="lines past the cap still reach on_log and the result counts them",
+            name="log_past_the_cap",
+            function=log_past_the_cap,
+            expected_forwarded=(
+                ("log_past_the_cap", "info", "order 0"),
+                ("log_past_the_cap", "info", "order 1"),
+            ),
+            expected_forwarded_count=205,
+            expected_dropped=5,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_an_asset_logging_when_it_runs_then_on_log_sees_each_line_and_the_result_counts_the_dropped(
+    test_case: PythonNodeLiveLogTestCase,
+) -> None:
+    forwarded: list[tuple[str, str, str]] = []
+    node: DiscoveredAssetFunction = DiscoveredAssetFunction(
+        file_path=Path("/project/assets/orders.py"),
+        relative_path=Path("python/nodes/assets/orders.py"),
+        name=test_case.name,
+        function=test_case.function,
+    )
+
+    result: PythonNodeExecutionResult = execute_ready_python_node(
+        node=node,
+        upstream_results=(),
+        statement_recorder=StatementRecorder(),
+        run_state=PythonNodeRunState(),
+        runtime=logging_runtime(
+            lambda name, level, message: forwarded.append((name, str(level), message))
+        ),
+    )
+
+    assert result.status == PythonNodeStatus.SUCCESS, result.error_message
+    assert tuple(forwarded[:2]) == test_case.expected_forwarded
+    assert len(forwarded) == test_case.expected_forwarded_count
+    assert result.dropped_log_lines == test_case.expected_dropped
 
 
 @pytest.mark.parametrize(

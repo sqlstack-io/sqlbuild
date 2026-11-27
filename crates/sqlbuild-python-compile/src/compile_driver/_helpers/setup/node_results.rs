@@ -1,8 +1,8 @@
 //! The schema a `preserve` target keeps Python node results in.
 
+use crate::compile_driver::_helpers::setup::expanded_loader_namespace::expanded_loader_namespace;
 use crate::compile_driver::_helpers::setup::model_free_locations::kept_loader_schema;
 use crate::compile_driver::_helpers::setup::targets::planner_error;
-use crate::compile_driver::main::setup::expanded_loader_namespace::expanded_loader_namespace;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods};

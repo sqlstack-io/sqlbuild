@@ -171,7 +171,7 @@ impl<'py> MacroClasses<'py> {
             .bind(py)
             .get_item("ref_functions")?
             .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("ref_functions"))?
-            .downcast_into::<PyDict>()?)
+            .cast_into::<PyDict>()?)
     }
 }
 

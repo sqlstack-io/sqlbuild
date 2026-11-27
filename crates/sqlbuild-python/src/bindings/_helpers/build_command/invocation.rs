@@ -52,6 +52,11 @@ impl<'py> BuildContext<'py> {
         self.request.py()
     }
 
+    /// The command the build runs as: `build`, or `load` for `sqb load`.
+    pub(crate) fn command_name(&self) -> PyResult<String> {
+        native_field(&self.request, "command_name")?.extract()
+    }
+
     pub(crate) fn request_flag(&self, name: &str) -> PyResult<bool> {
         native_field(&self.request, name)?.is_truthy()
     }

@@ -8,12 +8,12 @@ pub(crate) fn instance_secret_values(instances: &[Bound<'_, PyAny>]) -> PyResult
     let mut values: Vec<String> = Vec::new();
     for instance in instances {
         for name in instance.get_type().getattr("model_fields")?.try_iter()? {
-            let value = instance.getattr(name?.downcast_into::<PyString>()?)?;
+            let value = instance.getattr(name?.cast_into::<PyString>()?)?;
             if !value.hasattr("get_secret_value")? {
                 continue;
             }
             let secret = value.call_method0("get_secret_value")?;
-            let text = match secret.downcast::<PyBytes>() {
+            let text = match secret.cast::<PyBytes>() {
                 Ok(bytes) => String::from_utf8_lossy(bytes.as_bytes()).into_owned(),
                 Err(_) => secret.str()?.extract::<String>()?,
             };

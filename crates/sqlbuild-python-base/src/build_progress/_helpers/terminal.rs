@@ -11,6 +11,7 @@ use crate::build_progress::_helpers::transient_lines::shared_coordinator;
 use crate::records::main::fields::field::field as native_field;
 
 const DEFAULT_TERMINAL_SIZE: (i64, i64) = (120, 24);
+const UNKNOWN_TERMINAL_SIZE: (i64, i64) = (0, 0);
 const SPINNER_JOIN_SECONDS: f64 = 0.2;
 const EXIT_JOIN_SECONDS: f64 = 1.0;
 const SPINNER_THREAD_NAME: &str = "sqlbuild-progress-spinner";
@@ -18,13 +19,27 @@ const STOP_EVENT_ATTRIBUTE: &str = "_sqlbuild_stop_event";
 
 /// The current terminal width, `shutil.get_terminal_size(fallback=(120, 24)).columns`.
 pub(crate) fn terminal_columns(py: Python<'_>) -> PyResult<usize> {
+    Ok(usize::try_from(reported_columns(py, DEFAULT_TERMINAL_SIZE)?).unwrap_or(0))
+}
+
+/// The terminal's width as it reports it, or `COLUMNS`; `None` when neither says.
+pub(crate) fn known_terminal_columns(py: Python<'_>) -> PyResult<Option<usize>> {
+    Ok(
+        match usize::try_from(reported_columns(py, UNKNOWN_TERMINAL_SIZE)?) {
+            Ok(columns) if columns > 0 => Some(columns),
+            Ok(_) | Err(_) => None,
+        },
+    )
+}
+
+/// `shutil.get_terminal_size(fallback=fallback).columns`.
+fn reported_columns(py: Python<'_>, fallback: (i64, i64)) -> PyResult<i64> {
     let options: Bound<'_, PyDict> = PyDict::new(py);
-    options.set_item("fallback", DEFAULT_TERMINAL_SIZE)?;
-    let columns: i64 = imported(py, "shutil", "get_terminal_size")?
+    options.set_item("fallback", fallback)?;
+    imported(py, "shutil", "get_terminal_size")?
         .call((), Some(&options))?
         .getattr("columns")?
-        .extract()?;
-    Ok(usize::try_from(columns).unwrap_or(0))
+        .extract()
 }
 
 /// The process-wide coordinator of the one live transient line.

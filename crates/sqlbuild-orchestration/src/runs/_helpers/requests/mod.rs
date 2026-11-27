@@ -6,6 +6,7 @@ pub(in crate::runs) mod manual_rerun;
 pub(in crate::runs) mod past_runs;
 pub(in crate::runs) mod permissions;
 pub(in crate::runs) mod plan;
+pub(in crate::runs) mod prepared_calls;
 pub(in crate::runs) mod publication;
 pub(in crate::runs) mod rerun;
 pub(in crate::runs) mod run_id;

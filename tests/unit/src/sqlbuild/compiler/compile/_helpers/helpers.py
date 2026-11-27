@@ -403,14 +403,14 @@ def python_loader_files(*, depends_on: str, body: str) -> dict[str, str]:
     return {
         RAW_REGIONS_LOADER_PATH: (
             "from sqlbuild.loaders import loader\n\n\n"
-            "@loader\n"
+            "@loader(write_strategy='replace')\n"
             "def raw_regions(ctx):\n"
             "    '''Test loader raw_regions.'''\n    return [{'id': 1}]\n"
         ),
         RAW_CUSTOMERS_LOADER_PATH: (
             "from sqlbuild.loaders import loader\n\n"
             "from python.nodes.loaders.raw_regions.loader import raw_regions\n\n\n"
-            f"@loader(depends_on=[{depends_on}])\n"
+            f"@loader(write_strategy='replace', depends_on=[{depends_on}])\n"
             "def raw_customers(ctx):\n"
             f"{body}"
             "    return [{'id': 1}]\n"

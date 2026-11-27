@@ -19,6 +19,7 @@ use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
+use crate::tls::main::client_builder::client_builder;
 
 #[test]
 fn given_people_with_different_roles_when_they_bootstrap_and_subscribe_then_only_permitted_locations_and_topics_are_exposed()
@@ -71,7 +72,7 @@ fn given_people_with_different_roles_when_they_bootstrap_and_subscribe_then_only
                 },
             )
             .await;
-            let client = reqwest::Client::new();
+            let client = client_builder().build().expect("HTTP client");
             let bootstrap = |bearer: String| {
                 client
                     .get(format!("{}/api/control/bootstrap", api.url))

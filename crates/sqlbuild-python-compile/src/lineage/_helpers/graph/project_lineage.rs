@@ -110,7 +110,7 @@ pub(crate) fn fast_lineage<'py>(
     for model in models {
         let (has_star, star_resolved): (bool, bool) = star_flags(model)?;
         let expands_star: bool = has_star && !star_resolved;
-        let native_edges: Option<usize> = match model.downcast::<NativeCompiledModel>() {
+        let native_edges: Option<usize> = match model.cast::<NativeCompiledModel>() {
             Ok(view) if !expands_star => view.get().lineage_edge_count(py)?,
             _ => None,
         };

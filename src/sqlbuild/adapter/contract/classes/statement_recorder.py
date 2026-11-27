@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+import threading
+from collections.abc import Callable, Iterable
 
 from sqlbuild.adapter.contract.models import LifeCycleEvent
 from sqlbuild.adapter.contract.types import LifeCycleEventKind, LogLevel
@@ -11,8 +12,14 @@ from sqlbuild.adapter.contract.types import LifeCycleEventKind, LogLevel
 class StatementRecorder:
     """Mutable recorder for runtime lifecycle events."""
 
-    def __init__(self, events: list[LifeCycleEvent] | None = None) -> None:
-        self.events = events or []
+    def __init__(
+        self,
+        events: list[LifeCycleEvent] | None = None,
+        on_log: Callable[[LogLevel, str], None] | None = None,
+    ) -> None:
+        self.events = events if events is not None else []
+        self.on_log: Callable[[LogLevel, str], None] | None = on_log
+        self._log_lock: threading.Lock = threading.Lock()
 
     def record(self, statement: str) -> None:
         self.events.append(LifeCycleEvent(kind=LifeCycleEventKind.SQL, content=statement))
@@ -23,9 +30,14 @@ class StatementRecorder:
             self.events.append(LifeCycleEvent(kind=LifeCycleEventKind.SQL, content=statement))
 
     def log(self, *, message: str, level: LogLevel | None = None) -> None:
-        self.events.append(
-            LifeCycleEvent(kind=LifeCycleEventKind.LOG, content=message, level=level)
-        )
+        """Keep the line; a `ctx.log` line also goes to `on_log` at once, in the order kept."""
+
+        with self._log_lock:
+            self.events.append(
+                LifeCycleEvent(kind=LifeCycleEventKind.LOG, content=message, level=level)
+            )
+            if level is not None and self.on_log is not None:
+                self.on_log(level, message)
 
     def snapshot(self) -> tuple[LifeCycleEvent, ...]:
         return tuple(self.events)

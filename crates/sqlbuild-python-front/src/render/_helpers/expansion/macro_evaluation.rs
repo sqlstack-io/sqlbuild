@@ -93,7 +93,7 @@ pub(crate) fn evaluate_call<'py>(
     let result: Bound<'py, PyAny> =
         called_macro(run, (name, &loaded_macro), arguments, approved)
             .map_err(|error| macro_failure(classes, error, name, &expansion.file_label))?;
-    let Ok(sql) = result.downcast::<PyString>() else {
+    let Ok(sql) = result.cast::<PyString>() else {
         if top_level {
             let message: String = format!(
                 "Macro '@py.{name}' in '{}' must return a SQL string when used directly in SQL",

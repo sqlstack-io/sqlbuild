@@ -72,12 +72,16 @@ pub(crate) enum TransactionMode {
     Write,
     /// A write with SQLite foreign keys off, so a migration can rebuild a referenced table; it checks them before commit.
     Migrate,
+    /// A write that may run long, as publishing a large snapshot does: PostgreSQL holds it to the long statement and idle limits.
+    Publish,
 }
 
 /// An owned transaction; abandoning it rolls back, including when an async task is cancelled.
 #[derive(Debug)]
 pub(crate) struct ControlTransaction {
     pub(crate) connection: Option<Connection>,
+    /// The store it began on, for reads that run in their own short transactions, such as a whole snapshot's nodes.
+    pub(crate) store: ControlStore,
     pub(crate) now: DateTime<Utc>,
     pub(crate) changes: BTreeSet<Change>,
     pub(crate) notifications: Option<broadcast::Sender<ChangeMessage>>,
@@ -91,6 +95,17 @@ pub(crate) enum Connection {
     Postgres(sqlx_core::transaction::Transaction<'static, sqlx_postgres::Postgres>),
 }
 
+impl ControlTransaction {
+    /// `column`, a compressed body, selected as hexadecimal text, never as bytes, which the store returns one JSON number per byte.
+    pub(crate) fn hex_column(&self, column: &str) -> String {
+        if matches!(self.connection, Some(Connection::Postgres(_))) {
+            format!("encode({column}, 'hex')")
+        } else {
+            format!("hex({column})")
+        }
+    }
+}
+
 /// Transaction-local invalidations, not another durable lifecycle or event log.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Change {
@@ -100,6 +115,10 @@ pub(crate) enum Change {
     NodeStatus(Uuid, String),
     /// A condition was acknowledged or withdrawn; the Overview reloads on the runs topic.
     Attention(Uuid, String),
+    /// A location target checked in or reported health other than a warehouse sync, such as a load or connection check.
+    LocationHealth(Uuid, String),
+    /// A location target reported how its warehouse sync is going.
+    WarehouseSync(Uuid, String),
     Credentials,
 }
 
@@ -110,6 +129,10 @@ pub(crate) enum ChangeTopic {
     Ticks,
     Snapshot,
     NodeStatus,
+    /// Only people's feeds carry it, so the pages they watch reload; a location knows its own health.
+    LocationHealth,
+    /// Only people's feeds carry it, like `LocationHealth`.
+    WarehouseSync,
 }
 
 /// Fixed-size routing payloads fit PostgreSQL NOTIFY even with long target labels.

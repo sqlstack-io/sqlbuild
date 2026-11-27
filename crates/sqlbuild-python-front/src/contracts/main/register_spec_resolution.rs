@@ -1,7 +1,7 @@
 //! Register the spec resolution functions and classes.
 
+use crate::contracts::_helpers::loader_destination_parts::loader_destination_parts;
 use crate::contracts::_helpers::spec_resolution::scenario_local_type_overrides_for_dialect;
-use crate::contracts::main::loader_destination_parts::loader_destination_parts;
 use crate::contracts::main::matching_dynamic_families::matching_dynamic_families;
 use crate::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 use crate::contracts::main::resolve_effective_collection_rendering::resolve_effective_collection_rendering;

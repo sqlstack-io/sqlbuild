@@ -82,8 +82,9 @@ _DIAMOND_ONCE_RENDERED_FRAGMENTS: tuple[str, ...] = (
 )
 _DIAMOND_STDOUT_FRAGMENTS: tuple[str, ...] = (
     "PASS=1  FAIL=1  TOTAL=2",
-    "expect  assertion no_negative_large_orders",
-    "differing column large_count: actual=0, expected=3",
+    "\u2514\u2500\u2500 expected  customer_order_mix",
+    "FAIL   2 rows differ",
+    "large_count: expected 3, actual 0",
 )
 
 
@@ -110,12 +111,11 @@ _UNKNOWN_EXPECTED_COLUMN: dict[str, str] = {
 }
 _SUBSET_OUTCOME_FRAGMENTS: tuple[str, ...] = (
     "PASS=3  FAIL=1  TOTAL=4",
-    "unexpected sample 1: order_id=2, status=open; missing sample 1: order_id=2, status=closed",
-    "differing column status: actual=open, expected=closed",
+    "closed  missing",
+    "open  extra",
+    "status: expected closed, actual open",
 )
-_UNKNOWN_COLUMN_MESSAGE: str = (
-    "expected output 'orders' lists columns that model 'orders' does not output: region"
-)
+_UNKNOWN_COLUMN_MESSAGE: str = "expected output 'orders' lists columns that model 'orders'"
 
 
 @pytest.mark.parametrize(
@@ -598,7 +598,7 @@ def test_given_sql_test_when_inspecting_then_fixture_boundaries_and_chain_are_sh
             description="named case runs without sibling cases",
             case_name="open_case",
             expected_exit_code=0,
-            expected_stdout_fragments=("Test ready  1 selected", "PASS=1", "open_case"),
+            expected_stdout_fragments=("Tests ready  1 selected", "PASS=1", "open_case"),
         ),
         ParameterCaseSelectionE2ETestCase(
             description="unknown case reports available selected cases",
@@ -652,21 +652,22 @@ def test_given_parameterized_test_when_selecting_case_then_only_named_case_runs(
                 "Execution  sqb test  (concurrency: 5)",
                 "Connecting to duckdb (5 connections)...",
                 "\u2713 Warehouse connected  duckdb",
-                "expect  expected stg_orders",
-                "expect  expected fact_orders",
-                "expect  expected macro calculates_line_total_cents",
-                "expect  expected udf detects_completed_orders",
-                "expect  expected table_fn returns_customer_orders",
+                "test      test_stg_orders",
+                "test      test_fact_orders",
+                "test      calculates_line_total_cents",
+                "test      detects_completed_orders",
+                "test      returns_customer_orders",
+                "PASS   warehouse",
             ),
             expected_ordered_stdout_fragments=(
                 "Compiling project...",
-                "Compiled project. (<time>)",
+                "\u2713 Project compiled  (<time>)",
+                "Tests ready  5 selected, 5 on the warehouse",
                 "Execution  sqb test  (concurrency: 5)",
-                "Test ready  5 selected, 5 models",
                 "Connecting to duckdb (5 connections)...",
                 "\u2713 Warehouse connected  duckdb  (<time>)",
                 "Preparing test functions...",
-                "Prepared test functions. (<time>)",
+                "\u2713 Test functions prepared  (<time>)",
                 "fact_orders",
                 "PASS=<n>  FAIL=<n>  TOTAL=<n>",
             ),
@@ -751,13 +752,13 @@ def test_given_chain_sql_test_when_running_test_then_generated_sql_is_valid(
     )
 
     test_result: subprocess.CompletedProcess[str] = run_sqb(
-        command=("--no-color", "test"), project_dir=project_dir
+        command=("--no-color", "test", "--verbose"), project_dir=project_dir
     )
 
     assert test_result.returncode == 0, test_result.stdout + test_result.stderr
     assert "PASS=1" in test_result.stdout
-    assert "expect  expected stg_orders" in test_result.stdout
-    assert "expect  expected fact_orders" in test_result.stdout
+    assert "expected  stg_orders" in test_result.stdout
+    assert "expected  fact_orders" in test_result.stdout
     runtime_artifact_sql: str = (
         project_dir
         / "target"
@@ -802,7 +803,7 @@ def test_given_chain_sql_test_when_running_test_then_generated_sql_is_valid(
             expected_stdout_fragment="PASS=1",
             expected_stdout_fragments=(
                 "normalizes_status",
-                "expect  expected macro normalizes_status",
+                "expected  macro normalizes_status",
             ),
         )
     ],
@@ -827,7 +828,7 @@ def test_given_macro_sql_test_when_running_test_then_actual_and_expected_are_com
     assert "PASS=2" in build_result.stdout
 
     result: subprocess.CompletedProcess[str] = run_sqb(
-        command=("--no-color", "test"),
+        command=("--no-color", "test", "--verbose"),
         project_dir=project_dir,
     )
 
@@ -856,7 +857,7 @@ def test_given_macro_sql_test_when_running_test_then_actual_and_expected_are_com
             description="assertion-only SQL unit test passes when assertion returns zero rows",
             expected_exit_code=0,
             expected_stdout_fragment="PASS=1",
-            expected_stdout_fragments=("orders_assert", "expect  assertion no_negative_orders"),
+            expected_stdout_fragments=("orders_assert", "assertion no_negative_orders"),
         )
     ],
     ids=lambda case: case.description,
@@ -872,7 +873,7 @@ def test_given_assertion_only_sql_test_when_assertion_returns_zero_rows_then_it_
     )
 
     result: subprocess.CompletedProcess[str] = run_sqb(
-        command=("--no-color", "test"),
+        command=("--no-color", "test", "--verbose"),
         project_dir=project_dir,
     )
 
@@ -897,9 +898,9 @@ def test_given_assertion_only_sql_test_when_assertion_returns_zero_rows_then_it_
             expected_stdout_fragment="FAIL=1",
             expected_stdout_fragments=(
                 "orders_assert",
-                "expect  assertion no_negative_orders",
-                "FAIL  1 row",
-                "test 'orders_assert' failed for models: assertion no_negative_orders",
+                "\u2514\u2500\u2500 assertion no_negative_orders",
+                "FAIL   1 row",
+                "assertion no_negative_orders returned 1 row",
             ),
         )
     ],

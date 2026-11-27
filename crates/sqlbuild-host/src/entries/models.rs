@@ -76,7 +76,6 @@ pub enum AdapterHost {
     TableFreshnessRequest,
     BuiltinAdapter,
     FrameworkType,
-    LifeCycleEventKind,
     MigrationTransfer,
     RetentionScope,
     TableFreshnessStatus,
@@ -266,10 +265,7 @@ pub enum ExecutorHost {
     JanitorSkippedRelation,
     JanitorSkippedSchema,
     JanitorUsageCheck,
-    RunLoadPipeline,
-    LoadCallbacks,
     LoadExecutionResult,
-    LoadRuntimeParams,
     IsCompatibilityView,
     AuditExecutionError,
     WarehouseConnectionError,
@@ -286,6 +282,7 @@ pub enum ExecutorHost {
     DecideSqlTestRunOn,
     LocalTestAdapter,
     ReportUnplacedSqlTests,
+    CheckLocalTestInputs,
     DecideScenarioRunOn,
     SelectScenarioSnapshotCaptureCandidates,
     TestPipelineCallbacks,
@@ -387,6 +384,7 @@ pub enum ExecutorHost {
     DropReviewSchema,
     LeftoverReviewSchemas,
     ResumeExpiredDynamicHolds,
+    PlanLoads,
 }
 
 impl ExecutorHost {

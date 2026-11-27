@@ -2,8 +2,6 @@ sources:
   - name: raw_order_events
     description: Order events, read by announce_events.
     managed: true
-    write_strategy: table
   - name: raw_customer_events
     description: Customer events, read by announce_events.
     managed: true
-    write_strategy: table

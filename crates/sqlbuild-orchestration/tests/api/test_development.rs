@@ -25,6 +25,7 @@ use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::fault_types::TransactionFault;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
+use crate::tls::main::client_builder::client_builder;
 
 #[test]
 fn given_development_when_defaults_publish_then_identity_audit_and_trigger_pauses_commit_atomically()
@@ -133,7 +134,7 @@ fn given_development_when_defaults_publish_then_identity_audit_and_trigger_pause
                 },
             )
             .await;
-            let client = reqwest::Client::new();
+            let client = client_builder().build().expect("HTTP client");
             let bootstrap: serde_json::Value = client
                 .get(format!("{}/api/control/bootstrap", api.url))
                 .send()

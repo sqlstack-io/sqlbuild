@@ -81,7 +81,7 @@ fn state_value(value: &Bound<'_, PyAny>, column_type: StateColumnType) -> PyResu
     if value.is_none() {
         return Ok(StateValue::Null);
     }
-    if let Ok(text) = value.downcast::<PyString>() {
+    if let Ok(text) = value.cast::<PyString>() {
         return Ok(StateValue::Text(text.extract()?));
     }
     if column_type == StateColumnType::TextTimestamp && date_time_typed(value)? {

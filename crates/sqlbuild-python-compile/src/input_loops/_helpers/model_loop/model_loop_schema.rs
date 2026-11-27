@@ -39,7 +39,7 @@ pub(crate) fn model_schema<'py>(
     let Some(raw) = present(values, MODEL_SCHEMA_KEY)? else {
         return Ok(None);
     };
-    let Ok(name) = raw.downcast::<PyString>() else {
+    let Ok(name) = raw.cast::<PyString>() else {
         return Err(invalid_name(context, model_name));
     };
     if !name.call_method0(STRIP_METHOD)?.is_truthy()? {

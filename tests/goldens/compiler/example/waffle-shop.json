@@ -1804,7 +1804,7 @@
       "name": "id",
       "description": "",
       "meta": {},
-      "data_type": "INTEGER",
+      "data_type": "BIGINT",
       "constraints": [],
       "quote": null,
       "tags": []
@@ -1887,7 +1887,7 @@
       "name": "id",
       "description": "",
       "meta": {},
-      "data_type": "INTEGER",
+      "data_type": "BIGINT",
       "constraints": [],
       "quote": null,
       "tags": []
@@ -1896,7 +1896,7 @@
       "name": "customer_id",
       "description": "",
       "meta": {},
-      "data_type": "INTEGER",
+      "data_type": "BIGINT",
       "constraints": [],
       "quote": null,
       "tags": []
@@ -1905,7 +1905,7 @@
       "name": "waffle_type_id",
       "description": "",
       "meta": {},
-      "data_type": "INTEGER",
+      "data_type": "BIGINT",
       "constraints": [],
       "quote": null,
       "tags": []
@@ -1914,7 +1914,7 @@
       "name": "quantity",
       "description": "",
       "meta": {},
-      "data_type": "INTEGER",
+      "data_type": "BIGINT",
       "constraints": [],
       "quote": null,
       "tags": []

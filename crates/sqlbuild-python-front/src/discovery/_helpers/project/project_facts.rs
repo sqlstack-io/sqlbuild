@@ -133,6 +133,10 @@ pub(crate) fn source_file_fact(file: &Bound<'_, PyAny>) -> PyResult<SourceFileFa
     Ok(SourceFileFact {
         path: text(file, "relative_path")?,
         entries: each(file, "source_entries", source_fact)?,
+        load: match native_field(file, "load")? {
+            load if load.is_none() => None,
+            load => Some(text(&load, "name")?),
+        },
     })
 }
 

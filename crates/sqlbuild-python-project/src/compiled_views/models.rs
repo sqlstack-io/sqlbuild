@@ -1,5 +1,7 @@
 //! Public records of compiled views.
 
+use crate::compiled_views::_helpers::project::loads::load_records;
+use crate::graph::main::project::load_rows::load_rows;
 use sqlbuild_rules::engine::main::model_query_place::model_query_place;
 use sqlbuild_rules::models::ModelQueryPlace;
 
@@ -1488,6 +1490,11 @@ impl NativeProjectView {
     }
 
     #[getter]
+    pub fn loads<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
+        load_records(py, &self.fields.loads)
+    }
+
+    #[getter]
     pub fn python_execution_inputs(&self) -> BTreeMap<String, (String, PathBuf)> {
         self.fields.boundary.python_execution_inputs.clone()
     }
@@ -1621,7 +1628,7 @@ impl NativeProjectView {
             .get_or_try_init(py, || {
                 let mut rows: Vec<ResourceRow> = Vec::new();
                 for model in self.fields.models.bind(py).iter() {
-                    let model: Bound<'_, NativeCompiledModel> = model.downcast_into()?;
+                    let model: Bound<'_, NativeCompiledModel> = model.cast_into()?;
                     rows.push(model_graph_row(model.get(), py)?);
                 }
                 let compiler: &CompilerHandles = &self.fields.compiler;
@@ -1655,6 +1662,7 @@ impl NativeProjectView {
                         }
                     });
                 }
+                rows.extend(load_rows(load_records(py, &self.fields.loads)?.as_any())?);
                 self.owner.bind(py).borrow_mut().record_graph_build();
                 count_stage(py, LINEAGE_GRAPH_BUILDS, 1)?;
                 Py::new(py, project_graph(rows)?)
@@ -1677,8 +1685,11 @@ pub struct RelationKeyRow {
     pub audits: Vec<(String, Option<String>)>,
 }
 
-impl<'py> pyo3::FromPyObject<'py> for RelationKeyRow {
-    fn extract_bound(value: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for RelationKeyRow {
+    type Error = pyo3::PyErr;
+
+    fn extract(value: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        let value: &pyo3::Bound<'py, pyo3::PyAny> = &value;
         let (kind, name, materialized, mode, strategy, has_cursor, unique_key, columns, audits): RelationKeyTuple = pyo3::types::PyAnyMethods::extract(value)?;
         Ok(Self {
             kind,

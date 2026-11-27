@@ -6,6 +6,7 @@ use crate::compiled_views::main::project::seeds::seeds;
 use crate::compiled_views::main::project::sources::sources;
 use crate::compiled_views::main::project::sql_tests::sql_tests;
 use crate::graph::main::nodes::native_key::native_key;
+use crate::graph::main::project::load_rows::load_rows;
 use crate::planner_identity::_helpers::graph::TABLE_FN_TEST_MODE;
 use crate::references::types::ExecutionGates;
 use crate::resource_views::main::resource_reads::graph_row::graph_row;
@@ -32,6 +33,9 @@ pub fn execution_deps_with(
             let row = graph_row(&resource?)?;
             resources.push((row.key, row.deps));
         }
+    }
+    for row in load_rows(&native_field(project, "loads")?)? {
+        resources.push((row.key, row.deps));
     }
     let mut tests: Vec<ExecutionTest> = Vec::new();
     for test in sql_tests(project)?.try_iter()? {

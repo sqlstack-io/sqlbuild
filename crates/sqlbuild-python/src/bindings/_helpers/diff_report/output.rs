@@ -45,7 +45,7 @@ fn phase_seconds(value: Bound<'_, PyAny>) -> PyResult<Option<Vec<(String, f64)>>
     if value.is_none() {
         return Ok(None);
     }
-    let mapping: Bound<'_, PyDict> = value.downcast_into()?;
+    let mapping: Bound<'_, PyDict> = value.cast_into()?;
     let mut phases: Vec<(String, f64)> = Vec::new();
     for (phase, seconds) in mapping.iter() {
         phases.push((phase.extract()?, seconds.extract()?));

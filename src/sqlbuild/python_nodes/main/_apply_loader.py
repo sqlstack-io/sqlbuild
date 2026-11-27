@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any, cast
 
 from sqlbuild._native import SourceColumnEntry
@@ -10,10 +10,6 @@ from sqlbuild.python_nodes._helpers.attachment import attach_definition
 from sqlbuild.python_nodes._helpers.column_normalization import normalize_columns
 from sqlbuild.python_nodes._helpers.dependency_normalization import normalize_loader_dependencies
 from sqlbuild.python_nodes._helpers.description_resolution import resolve_description
-from sqlbuild.python_nodes._helpers.loader_normalization import (
-    normalize_unique_key,
-    normalize_write_strategy,
-)
 from sqlbuild.python_nodes.models import LoaderDefinition, NodeSetRef
 from sqlbuild.python_nodes.types import LoaderColumnSpec
 
@@ -24,15 +20,13 @@ def apply_loader(
     name: str | None = None,
     depends_on: tuple[Callable[..., object] | NodeSetRef, ...]
     | list[Callable[..., object] | NodeSetRef] = (),
+    connection: str | None = None,
     destination: str | None = None,
-    write_strategy: str | None = None,
-    cursor_column: str | None = None,
-    unique_key: str | Sequence[str] | None = None,
     columns: Sequence[LoaderColumnSpec | SourceColumnEntry] = (),
-    contract: str | None = None,
     description: str | None = None,
+    settings: Mapping[str, object] | None = None,
 ) -> Callable[..., object] | Callable[[Callable[..., object]], Callable[..., object]]:
-    """Apply SQLBuild loader metadata to a Python function."""
+    """Apply SQLBuild loader metadata, with SQLLoad's table options as `settings`, to a function."""
 
     normalized_deps: tuple[Callable[..., object] | NodeSetRef, ...] = normalize_loader_dependencies(
         depends_on
@@ -43,13 +37,11 @@ def apply_loader(
         definition: LoaderDefinition = LoaderDefinition(
             name=name or inner_function.__name__,
             depends_on=normalized_deps,
+            connection=connection,
             destination=destination,
-            write_strategy=normalize_write_strategy(write_strategy),
-            cursor_column=cursor_column,
-            unique_key=normalize_unique_key(unique_key),
             columns=normalize_columns(columns),
-            contract=contract,
             description=resolve_description(function=inner, description=description),
+            settings=dict(settings or {}),
         )
         return attach_definition(
             function=inner,
