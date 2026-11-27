@@ -221,11 +221,25 @@ async fn next_event(
                 if person && matches!(topic, ChangeTopic::Run(_)) {
                     continue;
                 }
+                if !person
+                    && matches!(
+                        topic,
+                        ChangeTopic::LocationHealth | ChangeTopic::WarehouseSync
+                    )
+                {
+                    continue;
+                }
                 match topic {
                     ChangeTopic::Runs => Some("runs".into()),
                     ChangeTopic::Run(id) => Some(format!("run:{id}")),
                     ChangeTopic::Ticks => Some("ticks".into()),
                     ChangeTopic::Snapshot => Some(format!("snapshot:{}", state.location_id)),
+                    ChangeTopic::LocationHealth => {
+                        Some(format!("location_health:{}", state.location_id))
+                    }
+                    ChangeTopic::WarehouseSync => {
+                        Some(format!("warehouse_sync:{}", state.location_id))
+                    }
                     ChangeTopic::NodeStatus => continue,
                 }
             }

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { HttpChangeFeed, createHttpClient, feedAllowed } from './http-client';
+import { HttpChangeFeed, channelOf, createHttpClient, feedAllowed } from './http-client';
 import { timingTitle } from '$lib/run/plan-timings';
 import type { ChangedSignal, ConnectionState } from './signals';
 
@@ -1003,6 +1003,15 @@ describe('node error text', () => {
 		await client.bootstrap();
 		await expect(client.getRunNodeError(ORDERS, RUN, 'model:orders')).rejects.toMatchObject({ status: 403 });
 		expect(paths.filter((p) => p.endsWith('/error'))).toHaveLength(0);
+	});
+});
+
+describe('channelOf', () => {
+	it("maps the server's warehouse sync and location health topics to the followed location's channels", () => {
+		const scope = { locationId: '0191f0aa-orders:development' };
+		expect(channelOf('warehouse_sync:0191f0aa-orders', scope)).toBe('warehouse_sync:0191f0aa-orders:development');
+		expect(channelOf('location_health:0191f0aa-orders', scope)).toBe('location_health:0191f0aa-orders:development');
+		expect(channelOf('something_newer:0191f0aa-orders', scope)).toBe('all');
 	});
 });
 

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { FakeControl, SYNC_REASON } from './support/fake-control';
+import { FakeControl, LOCATIONS, SYNC_REASON } from './support/fake-control';
 
 // A failing run-history sync is named in the top bar and on the attention list, and leaves both once it
 // works again; a sync failed reads stopped can be resumed from the list.
@@ -30,4 +30,24 @@ test('a sync that failed reads stopped can be resumed from the attention list', 
 	await expect(resume).toBeVisible({ timeout: 30_000 });
 	await resume.click();
 	await expect.poll(() => control.writes.filter((w) => w.path === '/warehouse-syncs').length).toBe(1);
+});
+
+test('a sync report that arrives after the location page loaded updates it without a reload', async ({ page }) => {
+	const control = new FakeControl({ shop: { sync: 'failed' } });
+	await control.install(page);
+	await page.goto(`/locations/${LOCATIONS.shop}:dev`);
+	const line = page.locator('.sync-now');
+	await expect(line).toContainText('failing', { timeout: 30_000 });
+	await page.evaluate(() => Object.assign(window, { stillLoaded: true }));
+	const syncNow = line.getByRole('button', { name: 'Sync now' });
+	await syncNow.click();
+	await expect.poll(() => control.writes.filter((w) => w.path === '/warehouse-syncs').length).toBe(1);
+	await expect(line).toContainText('syncing…');
+	await expect(syncNow).toBeDisabled();
+	// The location's successful report reaches the page as the server's change feed announces it.
+	control.targets.shop.sync = 'settled';
+	control.notify(`warehouse_sync:${LOCATIONS.shop}`);
+	await expect(line).toContainText(/synced (just now|\d+s ago)/, { timeout: 30_000 });
+	await expect(syncNow).toBeEnabled();
+	expect(await page.evaluate(() => (window as unknown as { stillLoaded?: boolean }).stillLoaded)).toBe(true);
 });

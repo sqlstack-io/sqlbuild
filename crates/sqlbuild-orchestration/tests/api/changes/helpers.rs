@@ -74,6 +74,22 @@ pub(crate) async fn next_topic(stream: &mut SseConnection) -> Option<String> {
         .map(|notice| notice["topic"].as_str().expect("topic").to_owned())
 }
 
+/// The next change event on `topic`, skipping others such as a location's health announcements.
+pub(crate) async fn next_notice_on(
+    stream: &mut SseConnection,
+    topic: &str,
+) -> Option<serde_json::Value> {
+    loop {
+        let notice: serde_json::Value = next_notice(stream).await?;
+        let on_topic: bool = notice["topic"]
+            .as_str()
+            .is_some_and(|name| name.split(':').next() == Some(topic));
+        if on_topic {
+            return Some(notice);
+        }
+    }
+}
+
 /// The next change event's data, such as a `node_status` event's version and states.
 pub(crate) async fn next_notice(stream: &mut SseConnection) -> Option<serde_json::Value> {
     tokio::time::timeout(Duration::from_secs(30), async {
