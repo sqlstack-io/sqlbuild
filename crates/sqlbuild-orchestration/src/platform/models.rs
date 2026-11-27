@@ -688,6 +688,47 @@ pub struct PersonPlatformEventPage {
     pub events: Vec<PersonPlatformEvent>,
     /// The `before` that continues the scan, absent once no older events remain; a page can be empty and still continue.
     pub before: Option<i64>,
+    /// Stored events of this scan that this server can't read, such as a kind or shape from another release; each is listed, never dropped.
+    #[serde(default)]
+    pub unreadable: Vec<UnreadablePlatformEvent>,
+}
+
+/// A stored platform event this server can't read: what is known about it and why reading it failed.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct UnreadablePlatformEvent {
+    pub storage_id: i64,
+    pub event_id: Uuid,
+    pub occurred_at: DateTime<Utc>,
+    /// The stored type, such as `platform_location_failing`.
+    pub event_type: String,
+    /// Why the event couldn't be read.
+    pub error: String,
+    /// The location target the event names, when it names one that can be read.
+    pub location_id: Option<Uuid>,
+    pub target: Option<String>,
+}
+
+/// The location target, trigger or run an unreadable event's payload names, each absent when it can't be read.
+#[derive(Debug, Default, Deserialize)]
+pub(crate) struct PayloadScope {
+    #[serde(default)]
+    pub(crate) location_id: Option<Uuid>,
+    #[serde(default)]
+    pub(crate) target: Option<String>,
+    #[serde(default)]
+    pub(crate) trigger_id: Option<Uuid>,
+    #[serde(default)]
+    pub(crate) run_id: Option<Uuid>,
+}
+
+/// A stored platform event row with its payload not yet read, so one row that can't be read never fails the rest.
+#[derive(Debug, Deserialize)]
+pub(crate) struct StoredPlatformEvent {
+    pub(crate) storage_id: i64,
+    pub(crate) event_id: Uuid,
+    pub(crate) occurred_at: DateTime<Utc>,
+    pub(crate) event_type: String,
+    pub(crate) payload: serde_json::Value,
 }
 
 /// The location target a trigger or run belongs to.

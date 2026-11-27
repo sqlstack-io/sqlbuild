@@ -151,3 +151,12 @@ pub(crate) struct LocationSinkTestCase {
     /// Each failing sink with its reason and run.
     pub(crate) expected_sinks: Vec<(String, String, Option<uuid::Uuid>)>,
 }
+
+pub(crate) struct PlatformEventReadTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The readable kinds the person sees, sorted.
+    pub(crate) expected_kinds: [crate::platform::models::PlatformEventKind; 8],
+    /// The stored type of the one event this server can't read.
+    pub(crate) expected_unreadable_type: &'static str,
+}

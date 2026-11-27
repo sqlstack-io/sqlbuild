@@ -80,6 +80,7 @@ export const eventKindLabel: Record<PlatformEventKind, string> = {
 	warehouse_sync_failed: 'Warehouse sync failing',
 	event_sink_failed: 'Event sink losing events',
 	event_forwarding_failed: 'Event forwarding failing',
+	unreadable_event: 'Problem couldn’t be read',
 	heartbeat: 'Server heartbeat'
 };
 

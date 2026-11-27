@@ -139,6 +139,7 @@ export type PlatformEventKind =
 	| 'warehouse_sync_failed'
 	| 'event_sink_failed'
 	| 'event_forwarding_failed'
+	| 'unreadable_event'
 	| 'heartbeat';
 export type PlatformEventSeverity = 'info' | 'warning' | 'critical';
 export type PlatformEvent = {

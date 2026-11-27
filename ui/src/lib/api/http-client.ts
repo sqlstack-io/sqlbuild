@@ -872,6 +872,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 				wire.event.kind !== 'run_failed' &&
 				(!query.kinds?.length || query.kinds.includes(wire.event.kind));
 			/** Each scan skips the events the person may not see, so one can come back short; keep scanning until enough match. */
+			const unreadable: Wire['UnreadablePlatformEvent'][] = [];
 			async function storedEvents(): Promise<Wire['PersonPlatformEvent'][]> {
 				const kept: Wire['PersonPlatformEvent'][] = [];
 				let before: number | undefined;
@@ -880,13 +881,14 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 					if (response.status === 401) onUnauthorized();
 					if (!data) throw new ApiError(errorText(error, response), response.status);
 					kept.push(...data.events.filter(wanted));
+					unreadable.push(...(data.unreadable ?? []).filter((item) => query.locationId === undefined || (item.location_id && item.target ? locationKey(item.location_id, item.target) : null) === query.locationId));
 					if (data.before === null || data.before === undefined) break;
 					before = data.before;
 				}
 				return kept.slice(0, limit);
 			}
 			const [open, stored, locations] = await Promise.all([problems().then((p) => toPlatformEvents(p, Date.now())), storedEvents(), bootstrapLocations()]);
-			const records = toPlatformEventRecords(open, stored, new Map(locations.map((l) => [l.id, l.name])));
+			const records = toPlatformEventRecords(open, stored, new Map(locations.map((l) => [l.id, l.name])), unreadable);
 			return records.filter(
 				(r) => (query.locationId === undefined || r.locationId === query.locationId) && (!query.kinds?.length || query.kinds.includes(r.kind)) && (!query.activeOnly || r.active)
 			);

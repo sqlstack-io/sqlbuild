@@ -202,6 +202,30 @@ describe('toPlatformEventRecords', () => {
 		expect(records[0]).toMatchObject({ subject: 'orders · development', message: "A run in orders · development couldn't start (image_missing).", links: [{ kind: 'run', id: 'r1', locationId: 'l1:development' }], payload: { code: 'image_missing' } });
 	});
 
+	it('lists a problem without a trigger, and gives an unknown, malformed or unreadable event a row of its own instead of failing the list', () => {
+		type Stored = Parameters<typeof toPlatformEventRecords>[1][number];
+		const records = toPlatformEventRecords(
+			[],
+			[
+				{ storage_id: 9, event_id: 'e9', occurred_at: '2026-11-08T11:00:00Z', location_id: 'l1', target: 'development', event: { kind: 'location_failing', location_id: 'l1', target: 'development', state: 'degraded', failed_at: '2026-11-08T11:00:00Z', error: 'IP is not allowed to access the warehouse', serving_generation: 3 } },
+				{ storage_id: 8, event_id: 'e8', occurred_at: '2026-11-08T10:50:00Z', location_id: 'l1', target: 'development', event: { kind: 'cost_spike', credits: 12 } } as unknown as Stored,
+				{ storage_id: 6, event_id: 'e6', occurred_at: '2026-11-08T10:30:00Z', location_id: 'l1', target: 'development', event: { kind: 'calendar_times_dropped', trigger_id: 't1', snapshot_id: 's1' } } as unknown as Stored
+			],
+			new Map([['l1:development', 'orders']]),
+			[{ storage_id: 7, event_id: 'e7', occurred_at: '2026-11-08T10:40:00Z', event_type: 'platform_sync_stalled', error: 'unknown variant `sync_stalled`', location_id: 'l1', target: 'development' }]
+		);
+		expect(records.map((r) => [r.id, r.kind])).toEqual([
+			['e9', 'location_failing'],
+			['e8', 'unreadable_event'],
+			['e7', 'unreadable_event'],
+			['e6', 'unreadable_event']
+		]);
+		expect(records[0]).toMatchObject({ message: 'orders · development: the warehouse connection check failed: IP is not allowed to access the warehouse.', links: [{ kind: 'location', id: 'l1:development' }] });
+		expect(records[1].message).toBe('Couldn’t read this cost_spike event of orders · development: this page doesn’t know events of kind cost_spike.');
+		expect(records[2]).toMatchObject({ severity: 'warning', subject: 'orders · development', message: 'Couldn’t read this platform_sync_stalled event of orders · development: unknown variant `sync_stalled`.' });
+		expect(records[3].message).toMatch(/^Couldn’t read this calendar_times_dropped event of orders · development: .+\.$/);
+	});
+
 	it('lists an open problem nothing was stored for first', () => {
 		const open = toPlatformEvents({ scheduler_leader: true, scheduler_lease_expires_at: null, broken_locations: [{ location_id: 'l2', location_name: 'inventory', target: 'development', last_seen_at: '2026-11-08T11:00:00Z' }], overdue_ticks: [] }, NOW);
 		const records = toPlatformEventRecords(open, [{ storage_id: 1, event_id: 'e1', occurred_at: '2026-11-08T09:00:00Z', location_id: 'l1', target: 'development', event: { kind: 'location_broken', location_id: 'l1', target: 'development', last_seen_at: '2026-11-08T08:59:00Z' } }], new Map());

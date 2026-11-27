@@ -249,9 +249,18 @@ export function toPlatformHealth(problems: Wire['PlatformProblems']): PlatformHe
 	};
 }
 
-/** Stored events newest first; an open problem marks the newest stored event of its kind and place as ongoing, or comes first when none was stored. */
-export function toPlatformEventRecords(open: PlatformEvent[], stored: Wire['PersonPlatformEvent'][], names: Map<string, string>): PlatformEventRecord[] {
-	const records = stored.flatMap((wire) => storedRecord(wire, names) ?? []);
+/** Stored events newest first; an open problem marks the newest stored event of its kind and place as ongoing, or comes first when none was stored. An event that can't be read is a row of its own, so it never hides the others. */
+export function toPlatformEventRecords(
+	open: PlatformEvent[],
+	stored: Wire['PersonPlatformEvent'][],
+	names: Map<string, string>,
+	unreadable: Wire['UnreadablePlatformEvent'][] = []
+): PlatformEventRecord[] {
+	const rows: { storage: number; records: () => PlatformEventRecord[] }[] = [
+		...stored.map((wire) => ({ storage: wire.storage_id, records: () => readStored(wire, names) })),
+		...unreadable.map((item) => ({ storage: item.storage_id, records: () => [unreadableRecord(item, names)] }))
+	];
+	const records = rows.sort((a, b) => b.storage - a.storage).flatMap((row) => row.records());
 	const unmatched: PlatformEventRecord[] = [];
 	for (const event of open) {
 		const latest = records.find((r) => !r.active && r.kind === event.kind && r.locationId === event.locationId);
@@ -261,8 +270,40 @@ export function toPlatformEventRecords(open: PlatformEvent[], stored: Wire['Pers
 	return [...unmatched, ...records];
 }
 
-/** Null for `run_failed`, which only the platform webhook receives; person reads never return it. */
-function storedRecord(wire: Wire['PersonPlatformEvent'], names: Map<string, string>): PlatformEventRecord | null {
+/** One stored event's record, or a row saying why it can't be shown: a kind this page doesn't know, or a shape it can't read. */
+function readStored(wire: Wire['PersonPlatformEvent'], names: Map<string, string>): PlatformEventRecord[] {
+	const kind = (wire.event as { kind?: unknown } | null)?.kind;
+	try {
+		const record = storedRecord(wire, names);
+		if (record === undefined) return [unreadableRecord({ ...wire, event_type: String(kind), error: `this page doesn’t know events of kind ${String(kind)}` }, names)];
+		return record ? [record] : [];
+	} catch (error) {
+		return [unreadableRecord({ ...wire, event_type: String(kind), error: error instanceof Error ? error.message : String(error) }, names)];
+	}
+}
+
+/** A stored event the server or this page can't read, listed with why, so the rest of the list still loads. */
+function unreadableRecord(item: Wire['UnreadablePlatformEvent'], names: Map<string, string>): PlatformEventRecord {
+	const key = item.location_id && item.target ? keyOf(item.location_id, item.target) : null;
+	const place = key && item.target ? placeOf(names.get(key) ?? 'A location', item.target) : null;
+	return {
+		id: item.event_id,
+		kind: 'unreadable_event',
+		severity: 'warning',
+		occurredAt: item.occurred_at,
+		active: false,
+		locationId: key,
+		subject: place,
+		message: `Couldn’t read this ${item.event_type} event${place ? ` of ${place}` : ''}: ${item.error}.`,
+		resolvedAt: null,
+		links: key ? [{ kind: 'location', id: key }] : [],
+		reactions: [],
+		payload: { event_type: item.event_type, error: item.error }
+	};
+}
+
+/** Null for `run_failed`, which only the platform webhook receives; person reads never return it; undefined for a kind this page doesn't know. */
+function storedRecord(wire: Wire['PersonPlatformEvent'], names: Map<string, string>): PlatformEventRecord | null | undefined {
 	const key = wire.location_id && wire.target ? keyOf(wire.location_id, wire.target) : null;
 	const place = key && wire.target ? placeOf(names.get(key) ?? 'A location', wire.target) : null;
 	const base = { id: wire.event_id, occurredAt: wire.occurred_at, active: false, locationId: key, subject: place, resolvedAt: null, reactions: [] };
@@ -297,6 +338,8 @@ function storedRecord(wire: Wire['PersonPlatformEvent'], names: Map<string, stri
 			return { ...base, kind: event.kind, severity: 'info', message: 'A server checked in.', links: [], payload: {} };
 		case 'run_failed':
 			return null;
+		default:
+			return undefined;
 	}
 }
 
