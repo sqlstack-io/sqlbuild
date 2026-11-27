@@ -832,6 +832,28 @@ describe('requestWarehouseSync', () => {
 	});
 });
 
+describe('dismissSkippedEvents', () => {
+	it('dismisses each skipped stored event of the target with its own CSRF-protected request', async () => {
+		const calls: Request[] = [];
+		vi.stubGlobal('document', { cookie: '__Host-sqb-csrf=token-1' });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				calls.push(request);
+				return Response.json({ applied: true });
+			})
+		);
+		const client = createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} });
+		expect(client.supports('dismissSkippedEvents')).toBe(true);
+		await client.dismissSkippedEvents(ORDERS, [4, 9]);
+		expect(calls.map((c) => [c.method, new URL(c.url).pathname, c.headers.get('x-sqb-csrf')])).toEqual([
+			['POST', '/api/control/locations/0191f0aa-orders/targets/development/skipped-event-dismissals', 'token-1'],
+			['POST', '/api/control/locations/0191f0aa-orders/targets/development/skipped-event-dismissals', 'token-1']
+		]);
+		expect((await Promise.all(calls.map((c) => c.json()))).map((body) => body.storage_id)).toEqual([4, 9]);
+	});
+});
+
 describe('testConnection', () => {
 	const record = (completed: string | null, outcome: unknown = null) => ({
 		generation: 1,

@@ -5,6 +5,7 @@ pub mod read_person_connection_test;
 pub mod read_person_location_health;
 pub(crate) mod record_skipped_event;
 pub(crate) mod record_trigger_problem;
+pub(crate) mod recorded_skip;
 pub mod report_location_health;
 pub mod report_remote_location_health;
 pub mod unallowed_secret_count;

@@ -42,6 +42,7 @@ use crate::api::_helpers::resources::{
     person_operations::acknowledge,
     person_operations::acknowledgements,
     person_operations::acknowledge_attention,
+    person_operations::dismiss_skipped_event,
     person_operations::attention_acknowledgements,
     person_reads::run_nodes,
     person_reads::nodes,

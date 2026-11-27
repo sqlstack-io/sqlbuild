@@ -1209,6 +1209,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/skipped-event-dismissals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["dismissSkippedEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/snapshots": {
         parameters: {
             query?: never;
@@ -5366,6 +5382,16 @@ export interface components {
             storage_id: number;
             target?: string | null;
         };
+        /** @description Dismisses the problem of one stored event webhooks and sensors skipped because it can't be read; an event ID applies once. */
+        SkippedEventDismissalRequest: {
+            /** Format: uuid */
+            event_id: string;
+            /**
+             * Format: int64
+             * @description The skipped stored event's storage ID, as the problem lists it.
+             */
+            storage_id: number;
+        };
         /** @description A trigger the scheduler skips because its stored job or pinned snapshot can't be read, or a sensor whose check failed; it clears once its location publishes again or, for a sensor, a later check completes. */
         SkippedTrigger: {
             /** Format: uuid */
@@ -9290,6 +9316,57 @@ export interface operations {
             };
             /** @description No such sensor, event or matching run, and why */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    dismissSkippedEvent: {
+        parameters: {
+            query?: never;
+            header: {
+                "x-sqb-csrf": string;
+            };
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkippedEventDismissalRequest"];
+            };
+        };
+        responses: {
+            /** @description Whether the skipped stored event's problem was dismissed now; it stays in the history */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            /** @description No such skipped event, one of another target, or the event ID was reused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

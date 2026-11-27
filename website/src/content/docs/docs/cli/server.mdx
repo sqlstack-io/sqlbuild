@@ -428,8 +428,9 @@ values.
 A stored event this server can't read never stops delivery. The webhook and platform sensors skip
 it and carry on with the next one, and it is listed as a problem on the Overview and its location's
 Problems panel with its stored type, its location target and why it can't be read. The problem stays
-while the event is kept (30 days) and still can't be read, and `unreadable_event_skipped` is sent
-once per skipped event.
+while the event is kept (30 days) and still can't be read, unless someone who can view the target
+dismisses it on the Overview: a dismissed event stays in the problem history and isn't listed again,
+even when it is skipped again. `unreadable_event_skipped` is sent once per skipped event.
 
 ### Fields of `run_failed`
 

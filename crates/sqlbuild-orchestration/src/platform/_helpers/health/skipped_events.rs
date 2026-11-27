@@ -1,20 +1,38 @@
-//! Stored events webhook delivery or a platform sensor skipped because they can't be read, while they are kept and still can't be read.
+//! Stored events webhook delivery or a platform sensor skipped because they can't be read, while they are kept, still can't be read and nobody dismissed them.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use uuid::Uuid;
 
+use crate::acknowledgements::constants::SKIP_DISMISSED;
 use crate::platform::_helpers::health::event_history::read_event;
 use crate::platform::constants::SKIPPED_TRIGGER_EVENTS;
 use crate::platform::models::{
-    ActiveLocation, PlatformEvent, PlatformEventEnvelope, SkippedEvent, StoredPlatformEvent,
+    ActiveLocation, DismissedSkip, PlatformEvent, PlatformEventEnvelope, SkippedEvent,
+    StoredPlatformEvent,
 };
 use crate::store::errors::ControlError;
 use crate::store::main::{decode_row::decode_row, query::query, query_records::query_records};
 use crate::store::models::{ControlTransaction, Parameter};
 
-/// Each recorded skip, newest first, whose event is still stored and still can't be read; one at an archived location is dropped.
+/// Each recorded skip, newest first, whose event is still stored, still can't be read and isn't dismissed; one at an archived location is dropped.
 pub(crate) async fn skipped_events(
+    transaction: ControlTransaction,
+) -> Result<(ControlTransaction, Vec<SkippedEvent>), ControlError> {
+    let (transaction, recorded) = recorded_skips(transaction).await?;
+    let (transaction, dismissed) = dismissed_skips(transaction).await?;
+    let skipped: Vec<SkippedEvent> = recorded
+        .into_iter()
+        .filter(|event| !dismissed.contains(&event.storage_id))
+        .collect();
+    if skipped.is_empty() {
+        return Ok((transaction, skipped));
+    }
+    open_skips(transaction, skipped).await
+}
+
+/// Every recorded skip the scan reads, newest first, whether or not it is still open.
+pub(crate) async fn recorded_skips(
     transaction: ControlTransaction,
 ) -> Result<(ControlTransaction, Vec<SkippedEvent>), ControlError> {
     let (transaction, skips): (ControlTransaction, Vec<PlatformEventEnvelope>) = query_records(
@@ -50,9 +68,33 @@ pub(crate) async fn skipped_events(
             });
         }
     }
-    if skipped.is_empty() {
-        return Ok((transaction, skipped));
+    Ok((transaction, skipped))
+}
+
+/// The stored events whose skip someone dismissed.
+pub(crate) async fn dismissed_skips(
+    transaction: ControlTransaction,
+) -> Result<(ControlTransaction, BTreeSet<i64>), ControlError> {
+    let (transaction, rows) = query(
+        transaction,
+        "SELECT scope_json FROM sqb_security_audit WHERE action=$1",
+        vec![Parameter::Text(SKIP_DISMISSED.to_owned())],
+    )
+    .await?;
+    let mut dismissed: BTreeSet<i64> = BTreeSet::new();
+    for row in rows {
+        let scope: DismissedSkip = serde_json::from_value(row["scope_json"].clone())
+            .map_err(|error| ControlError::Schema(format!("skipped event dismissal: {error}")))?;
+        dismissed.insert(scope.storage_id);
     }
+    Ok((transaction, dismissed))
+}
+
+/// The skips whose event is still stored and still can't be read, with their location's name.
+async fn open_skips(
+    transaction: ControlTransaction,
+    skipped: Vec<SkippedEvent>,
+) -> Result<(ControlTransaction, Vec<SkippedEvent>), ControlError> {
     let (transaction, rows): (ControlTransaction, Vec<StoredPlatformEvent>) = query_records(
         transaction,
         &format!(

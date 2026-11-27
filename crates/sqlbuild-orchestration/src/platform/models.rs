@@ -862,6 +862,12 @@ pub struct SkippedEvent {
     pub reason: String,
 }
 
+/// The stored event a dismissal of its skip names, read from the audit event's scope.
+#[derive(Debug, Deserialize)]
+pub(crate) struct DismissedSkip {
+    pub(crate) storage_id: i64,
+}
+
 /// A trigger the scheduler skips because its stored job or pinned snapshot can't be read, or a sensor whose check failed; it clears once its location publishes again or, for a sensor, a later check completes.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SkippedTrigger {
