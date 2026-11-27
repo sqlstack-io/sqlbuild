@@ -90,7 +90,9 @@ pub(crate) fn consume_resource_start(
         .insert(resource_id.clone(), resource_name.clone());
     let (projection, mut lines) = render_prior_attempts(projection, (resource_id, resource_name));
     let projection: ProgressProjection = store_attempt(projection, attempt_id, event);
-    if projection.unstarted_resource_names.contains(resource_name) {
+    if projection.unstarted_resource_names.contains(resource_name)
+        || projection.quiet(Some(resource_id.as_str()), resource_name)
+    {
         return (projection, lines);
     }
     if projection.settings.is_tty
@@ -136,7 +138,9 @@ pub(crate) fn consume_resource_terminal(
         .entry(resource_id.clone())
         .or_default()
         .push_back(attempt_id.clone());
-    if projection.enriched_resource_names.contains(resource_name) {
+    if projection.enriched_resource_names.contains(resource_name)
+        || projection.quiet(Some(resource_id.as_str()), resource_name)
+    {
         return (projection, Vec::new());
     }
     let (projection, line) = render_resource_terminal(projection, event, resource_name);
@@ -152,6 +156,9 @@ pub(crate) fn render_resource_terminal(
     let Some(attempt_id) = &event.resource_attempt_id else {
         return (projection, None);
     };
+    if projection.quiet(event.resource_id.as_deref(), resource_name) {
+        return (projection, None);
+    }
     if !projection.rendered_terminal_ids.insert(attempt_id.clone()) {
         return (projection, None);
     }

@@ -164,33 +164,20 @@ def test_given_run_on_set_in_several_places_when_testing_then_flag_target_settin
             command=("test", "--sql", "--run-on", "local"),
             expected_exit_code=1,
             expected_text=(
-                "PASS=1  FAIL=2  TOTAL=3  (3 local, 0 warehouse)\n"
+                "   = help: allow it for local tests in sqlbuild_project.toml with\n"
+                "           `[testing.local] allow = { hash = true }`;"
+                " `sqlquack explain hash` says when it is safe\n"
                 "\n"
-                "Can't run locally (2 tests)\n"
+                "   1. @py.status_hash  macro, 1 test \u00b7 1 model\n"
+                "       --> sql/models/staging/_sqlbuild/_macros/python/hashing.py:6:14\n"
+                "        |\n"
+                '      6 |     return f"HASH({column})"\n'
+                "        |              ^^^^^^^^^^^^ DuckDB computes its own hash, never Snowflake's\n"
+                "       = used by 1 model:\n"
+                "         stg_order_flags (1)\n"
                 "\n"
-                "error[SQ0008]: HASH gives a different value in DuckDB\n"
-                " --> sql/models/staging/stg_order_flags.sql:5:3\n"
-                "  |\n"
-                "5 |   HASH(status) AS status_hash\n"
-                "  |   ^^^^^^^^^^^^ DuckDB computes its own hash, never Snowflake's\n"
-                "  |\n"
-                "  = note: Equal inputs still get equal hashes within one run.\n"
-                "  = note: fine when: Joins, grouping, removing duplicates and spotting changed"
-                " rows by hash.\n"
-                "  = note: wrong when: Storing, comparing or sorting by the hash value itself:"
-                " it differs, with no error.\n"
-                "  = help: allow it with hash = true under [testing.local] allow in"
-                " sqlbuild_project.toml; `sqlquack\n"
-                "          explain hash` says when it is safe\n"
-                "  = expanded from @py.status_hash at"
-                " sql/models/staging/stg_order_flags.sql:5:3\n"
-                "  = tests: test_stg_order_flags\n"
-                "\n"
-                "error[SQ0008]: HASH gives a different value in DuckDB\n"
-                " --> sql/models/staging/stg_orders.sql:6:3\n"
-                "  |\n"
-                "6 |   HASH(status) AS status_hash\n"
-                "  |   ^^^^^^^^^^^^ DuckDB computes its own hash, never Snowflake's\n"
+                "   2. stg_orders  1 test\n"
+                "       --> sql/models/staging/stg_orders.sql:6:3\n"
             ),
         ),
         RunOnTextE2ETestCase(
@@ -249,7 +236,10 @@ def test_given_snowflake_project_when_tests_need_conversion_then_reports_sqlquac
                 "test_order_customers_unmocked",
             ),
             expected_exit_code=1,
-            expected_text="warehouse relation: RAW.SHOP.CUSTOMERS",
+            expected_text=(
+                "   \u2514\u2500\u2500 RAW.SHOP.CUSTOMERS  1 test   test_order_customers_unmocked\n"
+                "   = note: the test reads RAW.SHOP.CUSTOMERS, which only the warehouse has\n"
+            ),
         ),
     ),
     ids=lambda case: case.description,
@@ -280,10 +270,10 @@ def test_given_snowflake_test_reading_an_unmocked_source_when_testing_then_it_ne
             command=("test", "--sql", "--select", "test_order_statuses"),
             expected_exit_code=1,
             expected_text=(
-                "[T008] needs the warehouse (no connection)\n\n"
-                "PASS=0  FAIL=1  TOTAL=1  (0 local, 1 warehouse)\n\n"
-                "On the warehouse (1 test)\n"
-                "  SQLQuack guard: array_agg_order  1 test\n"
+                "  note: 1 test moved to the warehouse while running: SQLQuack guard 1"
+                " (--verbose for why)\n"
+                "\n"
+                "  Not run (1): needs the warehouse (no connection)\n"
             ),
         ),
         RunOnTextE2ETestCase(
@@ -291,11 +281,9 @@ def test_given_snowflake_test_reading_an_unmocked_source_when_testing_then_it_ne
             command=("test", "--sql", "--run-on", "local", "--select", "test_order_statuses"),
             expected_exit_code=1,
             expected_text=(
-                "Can't run locally (1 test)\n\n"
-                "error: SQLQuack guard: array_agg_order\n"
-                "  = note: SQLQuack's guard array_agg_order raised in DuckDB: ARRAY_AGG of several"
+                "   \u2514\u2500\u2500 array_agg_order  1 test   test_order_statuses\n"
+                "   = note: SQLQuack's guard array_agg_order raised in DuckDB: ARRAY_AGG of several"
                 " values in no defined order\n"
-                "  = tests: test_order_statuses\n"
             ),
         ),
     ),
@@ -326,20 +314,20 @@ def test_given_snowflake_test_whose_guard_raises_when_testing_then_it_needs_the_
             description="one test at a time",
             concurrency="1",
             expected_row=(
-                "test_order_statuses                                ERROR  warehouse"
-                "  (SQLQuack guard: array_agg_order)  1 real model\n"
+                "  note: 1 test moved to the warehouse while running: SQLQuack guard 1"
+                " (--verbose for why)\n"
             ),
-            expected_starts=1,
+            expected_starts=0,
             expected_assertion_lines=0,
         ),
         RunOnFallbackProgressE2ETestCase(
             description="four tests at a time",
             concurrency="4",
             expected_row=(
-                "test_order_statuses                                ERROR  warehouse"
-                "  (SQLQuack guard: array_agg_order)  1 real model\n"
+                "  note: 1 test moved to the warehouse while running: SQLQuack guard 1"
+                " (--verbose for why)\n"
             ),
-            expected_starts=1,
+            expected_starts=0,
             expected_assertion_lines=0,
         ),
     ),
@@ -482,7 +470,7 @@ if __name__ == "__main__":
             extra_files={},
             command=("test", "--sql", "--run-on", "local", "--select", "test_stg_orders"),
             expected_exit_code=0,
-            expected_text="PASS  local    relied on: HASH (allowed)  1 real model",
+            expected_text="relied on: HASH (allowed)  1 real model",
         ),
         LocalTestInputsE2ETestCase(
             description="inspect lists the allowance a local test relies on",
@@ -498,7 +486,7 @@ if __name__ == "__main__":
             extra_files={"tests/overrides/hash.sql": _HASH_OVERRIDE},
             command=("test", "--sql", "--run-on", "local", "--select", "test_stg_orders"),
             expected_exit_code=0,
-            expected_text="PASS  local    relied on: HASH (override)  1 real model",
+            expected_text="relied on: HASH (override)  1 real model",
         ),
         LocalTestInputsE2ETestCase(
             description="warehouse runs ignore the allowance",

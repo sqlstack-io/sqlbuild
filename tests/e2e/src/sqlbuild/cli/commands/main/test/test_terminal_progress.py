@@ -12,6 +12,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.test._test_types import (
     TerminalStepRowsE2ETestCase,
     TerminalTestProgressE2ETestCase,
 )
+from tests.e2e.src.sqlbuild.cli.commands.main.test.helpers import is_test_row
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     SPINNER_GLYPHS,
     assert_fragments_in_order,
@@ -38,16 +39,16 @@ _STEP_ROW_FRAGMENTS: tuple[str, ...] = (
             description="sequential and concurrent test rows leave no spinner or merged line",
             columns=100,
             concurrency_levels=(1, 8, 8, 8),
-            expected_group_headers=(
-                "table_fn returns_customer_orders",
-                "fact_orders",
-                "udf detects_completed_orders",
-                "macro calculates_line_total_cents",
-                "stg_orders",
+            expected_row_names=(
+                "returns_customer_orders",
+                "test_fact_orders",
+                "detects_completed_orders",
+                "calculates_line_total_cents",
+                "test_stg_orders",
             ),
             expected_screen_fragments=(
-                "✓ Warehouse connected  duckdb",
-                "Prepared test functions.",
+                "Tests ready  5 selected",
+                "\u2713 Test functions prepared",
                 "PASS=<n>  FAIL=<n>  TOTAL=<n>",
             ),
             expected_test_row_count=5,
@@ -82,14 +83,11 @@ def test_given_built_project_when_testing_in_terminal_then_no_spinner_row_surviv
         rendered: str = "\n".join(screen)
         assert result.returncode == 0, rendered
         assert not any(glyph in rendered for glyph in SPINNER_GLYPHS), rendered
-        assert not any(
-            line.lstrip().startswith("test ") and "statement" in line for line in screen
-        ), rendered
-        assert all(header in screen for header in test_case.expected_group_headers), rendered
-        assert (
-            sum(line.lstrip().startswith("test ") for line in screen)
-            == test_case.expected_test_row_count
-        ), rendered
+        rows: list[str] = list(filter(is_test_row, screen))
+        row_text: str = "\n".join(rows)
+        assert "statement" not in row_text, rendered
+        assert all(f"  {name}  " in row_text for name in test_case.expected_row_names), rendered
+        assert len(rows) == test_case.expected_test_row_count, rendered
         assert_fragments_in_order(rendered, test_case.expected_screen_fragments)
         assert test_case.expected_summary in rendered
 

@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
+use crate::progress::constants::SCENARIO_RESOURCE_PREFIX;
 use crate::progress::types::DifferenceSample;
 
 /// The payload fields of one lifecycle event that progress projection reads.
@@ -86,6 +87,10 @@ pub struct ProgressProjection {
     pub(crate) statement_starts: HashMap<String, ProgressEvent>,
     pub(crate) statement_query_ids: HashMap<String, String>,
     pub(crate) statements: StatementSummary,
+    /// Whether resources a result callback renders print no start or statement failure rows.
+    pub(crate) quiet_enriched: bool,
+    /// The phase and kind of each resource's failed statement, by resource name.
+    pub(crate) failed_statements: HashMap<String, (String, String)>,
 }
 
 /// The warehouse statements an invocation finished: how many of each leading keyword, and their query identifiers.
@@ -131,6 +136,38 @@ impl ProgressProjection {
             self.resource_ordinals.insert(name, ordinal);
         }
         self.resource_total = self.resource_total.max(total);
+    }
+
+    /// Print no start or statement failure rows for resources a result callback renders, unless debugging.
+    pub fn quiet_enriched_resources(&mut self) {
+        self.quiet_enriched = true;
+    }
+
+    /// The phase and kind of the statement that failed in resource `resource_name`, if one did.
+    #[must_use]
+    pub fn failed_statement(&self, resource_name: &str) -> Option<(String, String)> {
+        self.failed_statements.get(resource_name).cloned()
+    }
+
+    /// Whether a row of resource `resource_name`, or of a resource nested in a scenario it names, is left to its result callback.
+    pub(crate) fn quiet(&self, resource_id: Option<&str>, resource_name: &str) -> bool {
+        if !self.quiet_enriched || self.settings.debug {
+            return false;
+        }
+        let owner: Option<&str> = resource_id
+            .and_then(|id| id.strip_prefix(SCENARIO_RESOURCE_PREFIX))
+            .and_then(|scenario| scenario.split(':').next());
+        self.enriched_resource_names.contains(resource_name)
+            || owner.is_some_and(|owner| self.enriched_resource_names.contains(owner))
+    }
+
+    /// The name a resource's failed statement is kept under: its scenario's, for a resource nested in one.
+    pub(crate) fn statement_owner(resource_id: Option<&str>, resource_name: &str) -> String {
+        resource_id
+            .and_then(|id| id.strip_prefix(SCENARIO_RESOURCE_PREFIX))
+            .and_then(|scenario| scenario.split(':').next())
+            .unwrap_or(resource_name)
+            .to_owned()
     }
 
     /// Declare that a result callback will enrich this resource's terminal.

@@ -88,7 +88,11 @@ pub(crate) fn consume_operation_terminal(
         return (projection, None);
     };
     let failed: bool = event.event_type.ends_with(FAILED_SUFFIX);
-    if projection.quiet_operation_ids.remove(operation_id) && !failed {
+    let quiet_resource: bool = projection
+        .resource_names
+        .get(start.resource_id.as_deref().unwrap_or_default())
+        .is_some_and(|name| projection.quiet(start.resource_id.as_deref(), name));
+    if projection.quiet_operation_ids.remove(operation_id) && (!failed || quiet_resource) {
         return (projection, None);
     }
     let Some(label) = start

@@ -50,7 +50,7 @@ _PASSED_ASSERTION: dict[str, object] = {
             ),
             expected_exit_code=0,
             expected_stdout_fragments=(
-                "expect    assertion flags_match",
+                "PASS   warehouse",
                 "PASS=1  FAIL=0  TOTAL=1",
             ),
             expected_json_assertion_results=(_PASSED_ASSERTION,),
@@ -97,8 +97,8 @@ _PASSED_ASSERTION: dict[str, object] = {
             ),
             expected_exit_code=1,
             expected_stdout_fragments=(
-                "expect    assertion flags_match                              FAIL  1 row",
-                "assertion flags_match: failing_rows=1",
+                "FAIL   1 row",
+                "assertion flags_match returned 1 row",
             ),
             expected_json_assertion_results=(
                 {
@@ -120,8 +120,8 @@ _PASSED_ASSERTION: dict[str, object] = {
             ),
             expected_exit_code=1,
             expected_stdout_fragments=(
-                "expect    assertion flags_match                              ERROR",
-                "error[X507]",
+                "ERROR",
+                "[X507]",
                 "missing_rows",
             ),
             unexpected_stdout_fragments=("0 rows", "failing_rows="),

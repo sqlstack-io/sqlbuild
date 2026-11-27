@@ -1,9 +1,6 @@
-//! The completion line, warnings, failures and skipped rollup printed after a build.
+//! What a build prints after it runs: warnings, failures, not run, skipped, failed, then the completion line last.
 
-use crate::build_progress::_helpers::footer::{
-    FooterCounts, count_results, failure_details, ignored_failure_details, not_run_details,
-    python_failure_details, skipped_rollup, warning_details,
-};
+use crate::build_progress::_helpers::footer::{FooterCounts, count_results, footer_sections};
 use crate::build_progress::constants::FAILED;
 use crate::build_progress::models::{BuildResultText, PythonNodeText};
 use crate::cli_text::main::format_completion_line::format_completion_line;
@@ -71,12 +68,8 @@ pub fn format_build_footer(
     } else {
         (CompletionState::Ok, "Completed successfully".to_owned())
     };
-    let mut lines: Vec<String> = warning_details(result, python, style);
-    lines.extend(ignored_failure_details(result, style));
+    let mut lines: Vec<String> = footer_sections(result, python, style);
+    lines.push(String::new());
     lines.push(format_completion_line(style, state, &label, Some(&summary)));
-    lines.extend(failure_details(result, style));
-    lines.extend(python_failure_details(python, style));
-    lines.extend(skipped_rollup(result, python, style));
-    lines.extend(not_run_details(result, style));
     lines.join("\n")
 }

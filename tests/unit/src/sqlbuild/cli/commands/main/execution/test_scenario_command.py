@@ -36,7 +36,7 @@ from tests.unit.src.sqlbuild.cli.commands.main.execution.helpers import (
         ScenarioCompilePresentationTestCase(
             "tty planning spinner owns rows",
             True,
-            "Compiled project.",
+            "\u2713 Project compiled",
             "Project compile  START",
             "operation_completed",
         ),
@@ -74,7 +74,10 @@ def test_given_scenario_compile_when_running_then_presentation_has_one_owner(
     assert test_case.expected_fragment in stream.getvalue()
     assert test_case.unexpected_fragment not in stream.getvalue()
     assert "PASS=0  FAIL=0  TOTAL=0" in stream.getvalue()
-    assert tuple(event.event_type for event in events[-3:]) == (
+    operations: list[object] = [event.payload.get("operation_name") for event in events]
+    compile_start: int = operations.index("project_compile")
+    assert operations.count("project_compile") == 2
+    assert tuple(event.event_type for event in events[compile_start : compile_start + 3]) == (
         "operation_started",
         "invocation_phase",
         test_case.expected_terminal,

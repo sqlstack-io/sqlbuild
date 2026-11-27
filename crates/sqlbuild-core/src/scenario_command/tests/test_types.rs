@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use crate::nested_progress::models::NestedChildRow;
 use crate::scenario_command::errors::ScenarioCommandError;
 use crate::scenario_command::models::{
     CaptureRow, LocalRuntimeInputs, NamespaceCandidates, ScenarioFile, ScenarioNamespace,
@@ -40,16 +41,23 @@ pub(super) struct CapturedAtTestCase {
     pub(super) expected_text: &'static str,
 }
 
-pub(super) struct ResultRowTestCase {
+pub(super) struct ChildRowsTestCase {
     pub(super) description: &'static str,
     pub(super) row: ScenarioResultRow,
-    pub(super) use_color: bool,
+    pub(super) expected_rows: Vec<NestedChildRow>,
+}
+
+pub(super) struct RetainedTestCase {
+    pub(super) description: &'static str,
+    pub(super) rows: Vec<ScenarioResultRow>,
+    /// `--retain`, then `--verbose`.
+    pub(super) flags: (bool, bool),
     pub(super) expected_text: &'static str,
 }
 
-pub(super) struct FailuresTestCase {
+pub(super) struct NamespaceLineTestCase {
     pub(super) description: &'static str,
-    pub(super) rows: Vec<ScenarioResultRow>,
+    pub(super) namespace: ScenarioNamespace,
     pub(super) expected_text: &'static str,
 }
 

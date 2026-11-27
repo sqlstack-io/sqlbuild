@@ -99,6 +99,7 @@ pub(crate) fn run_scenario_capture_command(
             adapter: &adapter,
             kind: CompletionKind::Capture,
             style,
+            rows: None,
         },
     )?;
     let results: Vec<Bound<'_, PyAny>> = call_with(

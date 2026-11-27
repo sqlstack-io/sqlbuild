@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+from sqlbuild.executor.local.models import MacroPlace
+
 
 @dataclass(frozen=True)
 class ConversionWorkTestCase:
@@ -124,3 +126,23 @@ class ReliedOnTestCase:
     description: str
     known_differences: tuple[dict[str, str], ...]
     expected_relied_on: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class SqlbuildHelpTestCase:
+    """SQLQuack help text, and the help SQLBuild shows for it."""
+
+    description: str
+    help_text: str
+    expected_help: str
+
+
+@dataclass(frozen=True)
+class MacroPlaceTestCase:
+    """A macro's source, the construct refused in its output, and where its source writes it."""
+
+    description: str
+    call: str
+    token: str
+    raw_source: str
+    expected_place: MacroPlace | None

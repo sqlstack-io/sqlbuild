@@ -117,13 +117,18 @@ fn given_connection_and_header_when_formatting_then_lines_match() {
         },
         ProgressLineTestCase {
             description: "a header with a target lists it before concurrency",
-            line: execution_header_text(PLAIN, ("sqb build", Some("dev"), 4)),
+            line: execution_header_text(PLAIN, ("sqb build", Some("dev"), 4), None),
             expected_line: "Execution  sqb build  (target: dev, concurrency: 4)\n\n",
         },
         ProgressLineTestCase {
             description: "a header without a target lists only concurrency",
-            line: execution_header_text(PLAIN, ("sqb test", None, 1)),
+            line: execution_header_text(PLAIN, ("sqb test", None, 1), None),
             expected_line: "Execution  sqb test  (concurrency: 1)\n\n",
+        },
+        ProgressLineTestCase {
+            description: "a header with engines lists them after concurrency",
+            line: execution_header_text(PLAIN, ("sqb test", None, 8), Some("DuckDB and snowflake")),
+            expected_line: "Execution  sqb test  (concurrency: 8, DuckDB and snowflake)\n\n",
         },
         ProgressLineTestCase {
             description: "a compared model reads as expected",

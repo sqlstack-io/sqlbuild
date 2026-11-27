@@ -5183,18 +5183,25 @@ class NestedCommandProgressCallbacks:
         stream: TextIO,
         use_color: bool,
         name_width: int = 50,
-        concurrency: int = 1,
+        group_counts: Mapping[str, int] | None = None,
+        nouns: tuple[str, str] = ("test", "tests"),
+        verb: str = "Testing",
+        verbose: bool = False,
     ) -> None: ...
     def on_item_start(
         self, *, group_name: str, item_name: str, canonical_resource_name: str | None = None
     ) -> None: ...
+    def on_item_finished(self, item_name: str) -> None: ...
     def on_item_complete(
         self,
         *,
         group_name: str,
         item_name: str,
-        status_text: str,
+        status_text: str = "",
+        run_on: str = "",
         detail: str = "",
+        not_run: bool = False,
+        seconds: float | None = None,
         error_code: str | None = None,
         error_help: str | None = None,
         error_message: str | None = None,
