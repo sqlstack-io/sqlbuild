@@ -76,10 +76,12 @@ pub(crate) const KIND_WIDTH: usize = 10;
 pub(crate) const NESTED_PREFIX: &str = "    ";
 pub(crate) const UNKNOWN_RESOURCE_NAME: &str = "warehouse";
 /// Messages that complete a planning phase rather than update it.
-pub(crate) const PLANNING_COMPLETION_PREFIXES: [&str; 15] = [
+pub(crate) const PLANNING_COMPLETION_PREFIXES: [&str; 19] = [
+    "Analyzed ",
     "Built ",
     "Checked ",
     "Compiled ",
+    "Discovered ",
     "Evaluated ",
     "Applied ",
     "Finalized ",
@@ -92,7 +94,13 @@ pub(crate) const PLANNING_COMPLETION_PREFIXES: [&str; 15] = [
     "Refreshed ",
     "Resolved ",
     "Cloned ",
+    "Validated ",
+    "Wrote ",
 ];
+/// Completion verbs whose phase line takes a participle other than the verb itself.
+pub(crate) const IRREGULAR_PARTICIPLES: [(&str, &str); 1] = [("Wrote", "written")];
+/// Names a phase line keeps lowercase when they lead it.
+pub(crate) const LOWERCASE_NAMES: [&str; 1] = ["dbt"];
 /// Messages that end a planning phase with a failure.
 pub(crate) const PLANNING_FAILURE_PREFIXES: [&str; 1] = ["Failed "];
 pub(crate) const ASSERTION_PREFIX: &str = "assertion ";

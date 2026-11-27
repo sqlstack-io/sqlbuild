@@ -837,7 +837,7 @@ def run_fresh_process_inspection_command(
 
 
 _PLAN_PHASE_LINE: re.Pattern[str] = re.compile(
-    r"^(Inspected warehouse state|Generated plan)\. \((\d+\.\d+)s\)$", re.MULTILINE
+    r"^\S+ (Warehouse state inspected|Plan generated) +\((\d+\.\d+)s[;)]", re.MULTILINE
 )
 
 

@@ -25,7 +25,7 @@ from tests.unit.src.sqlbuild.presentation.helpers import use_color_terminal
             dry_run=False,
             expected_fragments=(
                 "Inspecting dbt project and profile...",
-                "Inspected dbt project and profile.",
+                "dbt project and profile inspected",
                 "SQLBuild project created",
                 "Setup summary:",
                 "Config file",

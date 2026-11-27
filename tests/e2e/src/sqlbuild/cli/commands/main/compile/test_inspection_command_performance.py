@@ -310,7 +310,7 @@ def test_given_benchmarks_of_two_sizes_when_planning_then_planning_work_scales_l
             description="models_3000_plan_phases_scale_linearly_from_1000_models",
             small_model_count=1_000,
             runs=2,
-            expected_phases=("Inspected warehouse state", "Generated plan"),
+            expected_phases=("Warehouse state inspected", "Plan generated"),
             expected_max_linear_factor=1.5,
             expected_max_large_phase_seconds=20.0,
         )

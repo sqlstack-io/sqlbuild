@@ -84,12 +84,12 @@ def test_given_local_project_when_running_compile_then_it_does_not_connect(
             description="persists phase timings for tty stdout",
             expected_exit_code=0,
             expected_stdout_fragments=(
-                "Discovered project.",
-                "Compiled project graph.",
-                "Analyzed column lineage.",
-                "Validated model contracts.",
-                "Evaluated rules.",
-                "Wrote compiled artifacts.",
+                "Project discovered",
+                "Project graph compiled",
+                "Column lineage analyzed",
+                "Model contracts validated",
+                "Rules evaluated",
+                "Compiled artifacts written",
             ),
         )
     ],
@@ -126,7 +126,7 @@ def test_given_tty_stdout_when_running_compile_then_it_persists_phase_timings(
     ):
         assert f"{message}\n" in rendered_stdout
     for fragment in test_case.expected_stdout_fragments:
-        assert f"\n{fragment} (" in rendered_stdout
+        assert f" {fragment}  (" in rendered_stdout
 
 
 @pytest.mark.parametrize(

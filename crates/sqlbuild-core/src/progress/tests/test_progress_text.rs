@@ -1,4 +1,5 @@
 use crate::cli_text::models::CliStyle;
+use crate::progress::main::completion_phase_line::completion_phase_line;
 use crate::progress::main::connection_phase_line::connection_phase_line;
 use crate::progress::main::connection_start_message::connection_start_message;
 use crate::progress::main::execution_header_text::execution_header_text;
@@ -56,6 +57,61 @@ fn given_planning_message_when_classifying_then_completions_are_recognized() {
         assert_eq!(
             is_planning_completion_message(test_case.message),
             test_case.expected_is_completion,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_completion_message_when_formatting_then_its_phase_line_names_what_was_done() {
+    let test_cases = [
+        ProgressLineTestCase {
+            description: "a regular verb follows what it completed",
+            line: completion_phase_line("Compiled project graph. (0.04s)", PLAIN)
+                .unwrap_or_default(),
+            expected_line: "\u{2713} Project graph compiled  (0.04s)",
+        },
+        ProgressLineTestCase {
+            description: "discovery completes as a phase line",
+            line: completion_phase_line("Discovered project. (0.02s)", PLAIN).unwrap_or_default(),
+            expected_line: "\u{2713} Project discovered  (0.02s)",
+        },
+        ProgressLineTestCase {
+            description: "lineage analysis completes as a phase line",
+            line: completion_phase_line("Analyzed column lineage. (0.00s)", PLAIN)
+                .unwrap_or_default(),
+            expected_line: "\u{2713} Column lineage analyzed  (0.00s)",
+        },
+        ProgressLineTestCase {
+            description: "contract validation completes as a phase line",
+            line: completion_phase_line("Validated model contracts. (0.00s)", PLAIN)
+                .unwrap_or_default(),
+            expected_line: "\u{2713} Model contracts validated  (0.00s)",
+        },
+        ProgressLineTestCase {
+            description: "an irregular verb takes its participle",
+            line: completion_phase_line("Wrote compiled artifacts. (0.00s)", PLAIN)
+                .unwrap_or_default(),
+            expected_line: "\u{2713} Compiled artifacts written  (0.00s)",
+        },
+        ProgressLineTestCase {
+            description: "a detail after a colon follows the label",
+            line: completion_phase_line("Checked relation usage: 2 of 4 in use. (0.00s)", PLAIN)
+                .unwrap_or_default(),
+            expected_line: "\u{2713} Relation usage checked  2 of 4 in use  (0.00s)",
+        },
+        ProgressLineTestCase {
+            description: "a leading name keeps its case",
+            line: completion_phase_line("Inspected dbt project and profile. (0.00s)", PLAIN)
+                .unwrap_or_default(),
+            expected_line: "\u{2713} dbt project and profile inspected  (0.00s)",
+        },
+    ];
+
+    for test_case in test_cases {
+        assert_eq!(
+            test_case.line, test_case.expected_line,
             "{}",
             test_case.description
         );

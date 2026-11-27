@@ -31,7 +31,7 @@ APPROVED_JANITOR: tuple[str, ...] = ("--no-color", "janitor", "--auto-approve")
             description="a view chain read by another user is in use and archived by default",
             janitor_command=APPROVED_JANITOR,
             expected_fragments=(
-                "Checked relation usage: 3 of 4 in use. (",
+                "Relation usage checked  3 of 4 in use  (",
                 "\nIn use\n",
                 ".old_orders  queried ",
                 " by {reader} (1 query in 7 days); frozen, still in use\n",
@@ -46,7 +46,7 @@ APPROVED_JANITOR: tuple[str, ...] = ("--no-color", "janitor", "--auto-approve")
             description="--keep-in-use keeps the read table and both views of the chain",
             janitor_command=(*APPROVED_JANITOR, "--keep-in-use"),
             expected_fragments=(
-                "Checked relation usage: 3 of 4 in use. (",
+                "Relation usage checked  3 of 4 in use  (",
                 "  kept (in use)          3\n",
                 "\nKept (in use)\n",
                 ".old_orders_v2  queried ",
