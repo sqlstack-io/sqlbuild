@@ -320,12 +320,9 @@ export function publishWords(result: RepublishResult | null, publishing: number 
 	if (snapshot) return { tone: 'ok', label: `version ${snapshot.generation} · ${formatAgo(snapshot.publishedAt, now)}`, title };
 	return { tone: 'never', label: 'nothing published yet', title };
 }
-/** Whether an open problem stops a location's runs: it isn't checking in, can't connect, or a failed deploy has nothing to fall back on. */
-export function stopsRuns(event: Pick<PlatformEvent, 'kind' | 'severity' | 'locationId' | 'stopsRuns'>): boolean {
-	if (!event.locationId) return false;
-	if (event.stopsRuns !== undefined) return event.stopsRuns;
-	if (event.kind === 'location_broken' || event.kind === 'connection_test_failed') return true;
-	return event.kind === 'location_failing' && event.severity === 'critical';
+/** Whether an open problem stops a location's runs, as the server says: it isn't checking in, can't connect, or a failed deploy has nothing to fall back on. */
+export function stopsRuns(event: Pick<PlatformEvent, 'locationId' | 'stopsRuns'>): boolean {
+	return event.locationId !== null && event.stopsRuns;
 }
 
 /** A location problem as the banner says it after the location's name: " can't connect", or ": schedule overdue". */
@@ -337,26 +334,6 @@ export function problemPhrase(event: Pick<PlatformEvent, 'kind' | 'severity' | '
 	if (event.kind === 'location_failing' && event.severity === 'critical') return ': deploy failed';
 	return `: ${eventKindLabel[event.kind].toLowerCase()}`;
 }
-
-/** What a location's health verdict weighs: its own state, and its open problems. */
-export type VerdictFacts = {
-	/** The server's health; null when it can't report it to this person. */
-	health: LocationHealth | null;
-	/** A process of the location checks in. */
-	live: boolean;
-	test: ConnectionTest | null;
-	/** When the version it runs was published; a test from before then doesn't count. */
-	deployedAt: string | null;
-	failedDeploy: boolean;
-	/** A failed deploy leaves a previous version running. */
-	fallback: boolean;
-	/** The location's open problems. */
-	events: readonly Pick<PlatformEvent, 'kind' | 'severity' | 'locationId' | 'state' | 'active'>[];
-	/** The sync as the page knows it, when it reads it itself. */
-	sync?: SyncNowState | null;
-	/** The server's verdict, which decides when present; the facts above then only name problems it doesn't cover. */
-	verdict?: LocationVerdictFact | null;
-};
 
 const verdictLabel: Record<LocationVerdictFact['fact'], string> = {
 	not_checking_in: 'Not checking in',
@@ -373,31 +350,15 @@ const verdictLabel: Record<LocationVerdictFact['fact'], string> = {
 	healthy: 'Healthy'
 };
 
-/** The verdict's tier: green only when nothing is open, red when runs can't happen. */
-export type VerdictTone = 'ok' | 'warning' | 'failed';
-export const verdictTone: Record<VerdictTone, string> = { ok: 'var(--sb-success)', warning: 'var(--sb-warning)', failed: 'var(--sb-error)' };
+/** The verdict's tier: green only when nothing is open, red when runs can't happen, grey when the person can't read it. */
+export type VerdictTone = 'ok' | 'warning' | 'failed' | 'unknown';
+export const verdictTone: Record<VerdictTone, string> = { ok: 'var(--sb-success)', warning: 'var(--sb-warning)', failed: 'var(--sb-error)', unknown: 'var(--sb-text-faint)' };
 
-/**
- * A location's health everywhere it is shown, naming its worst open fact. Red when runs can't happen,
- * amber when it works but needs a look, and "Healthy" only when nothing is open.
- */
-export function locationVerdict(f: VerdictFacts): { tone: VerdictTone; label: string } {
-	const open = f.events.filter((e) => e.active && e.severity !== 'info');
-	if (f.verdict && f.verdict.fact !== 'healthy') return { tone: f.verdict.stopsRuns ? 'failed' : 'warning', label: verdictLabel[f.verdict.fact] };
-	if (f.verdict) return open.length ? { tone: 'warning', label: eventKindLabel[open[0].kind] } : { tone: 'ok', label: 'Healthy' };
-	const has = (kind: PlatformEventKind) => open.some((e) => e.kind === kind);
-	const failing = open.find((e) => e.kind === 'location_failing');
-	if (!f.live || f.health === 'broken' || has('location_broken')) return { tone: 'failed', label: 'Not checking in' };
-	if (f.test?.outcome === 'failed' || f.health === 'degraded' || has('connection_test_failed') || failing?.state === 'degraded') return { tone: 'failed', label: 'Can’t connect' };
-	if ((f.failedDeploy && !f.fallback) || (failing && failing.severity === 'critical')) return { tone: 'failed', label: 'Deploy failed' };
-	if (f.failedDeploy) return { tone: 'warning', label: 'Deploy failed · running previous' };
-	if (f.health === 'falling_back' || failing?.state === 'falling_back') return { tone: 'warning', label: 'Running previous version' };
-	if (f.sync?.kind === 'failing' || has('warehouse_sync_failed')) return { tone: 'warning', label: 'Sync failing' };
-	if (f.sync?.kind === 'stalled' || has('warehouse_sync_stalled')) return { tone: 'warning', label: 'Sync stalled' };
-	if (f.health && f.health !== 'healthy') return { tone: 'warning', label: healthLabel[f.health] };
-	if (!f.test || (f.deployedAt && Date.parse(f.test.at) < Date.parse(f.deployedAt))) return { tone: 'warning', label: 'Not tested' };
-	if (open.length) return { tone: 'warning', label: eventKindLabel[open[0].kind] };
-	return { tone: 'ok', label: 'Healthy' };
+/** A location's health everywhere it is shown: the server's verdict, red when runs can't happen; null when the person can't read it. */
+export function locationVerdict(verdict: LocationVerdictFact | null): { tone: VerdictTone; label: string } {
+	if (!verdict) return { tone: 'unknown', label: 'Unknown' };
+	if (verdict.fact === 'healthy') return { tone: 'ok', label: verdictLabel.healthy };
+	return { tone: verdict.stopsRuns ? 'failed' : 'warning', label: verdictLabel[verdict.fact] };
 }
 
 /**

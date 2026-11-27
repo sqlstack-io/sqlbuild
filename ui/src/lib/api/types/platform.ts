@@ -175,8 +175,8 @@ export type LocationDetail = {
 	poolCapWarnings: PoolCapWarning[];
 	/** Providers the location's environment leaves required secrets unset for, from its newest publication. */
 	missingSecrets: MissingProviderSecrets[];
-	/** The server's verdict on the target; absent where the server doesn't give one, and the page judges by the same rule. */
-	verdict?: LocationVerdictFact | null;
+	/** The server's verdict on the target; null when the person can't read its health. */
+	verdict: LocationVerdictFact | null;
 };
 
 /** A target's worst open fact as the server names it, and whether it stops runs. */

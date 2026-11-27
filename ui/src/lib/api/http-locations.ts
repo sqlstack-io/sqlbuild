@@ -58,6 +58,7 @@ export function missingSecretsEventOf(locationKey: string, observations: Wire['L
 		id: `secrets:${locationKey}`,
 		kind: 'location_missing_secrets',
 		severity: 'warning',
+		stopsRuns: false,
 		occurredAt: latest.received_at,
 		members: [...new Set(variables)].sort(),
 		active: true,
@@ -197,19 +198,6 @@ export function verdictOf(verdict: Wire['LocationVerdict']): LocationVerdictFact
 	return { fact: verdict.fact, stopsRuns: verdict.tier === 'stops_runs' };
 }
 
-/** The sync from its reports, with what the server knows beyond them: a request waiting, when the running sync started, and whether it stalled. */
-export function withServerSync(sync: WarehouseSync | null, server: Wire['WarehouseSyncState']): WarehouseSync | null {
-	const requested = server.requested ? { at: server.requested.requested_at, by: server.requested.requested_by } : null;
-	const running = server.running;
-	if (!sync) return requested ? { lastSyncedAt: null, lastError: null, requested } : null;
-	return {
-		...sync,
-		requested,
-		syncing: running ? { position: running.position, kinds: running.kinds, table: running.table, rows: running.rows, startedAt: running.started_at } : null,
-		stalled: running?.stalled ?? false
-	};
-}
-
 const SYNC_STAGE: Record<Exclude<Wire['WarehouseSyncFailure'], 'busy'>, string> = {
 	watermark: 'reading where the last sync stopped',
 	read: 'reading the warehouse',
@@ -296,19 +284,23 @@ export function toWarehouseConnection(
 }
 
 /** When a table last synced cleanly, and which tables' newest sync failed; null without any sync report. */
-export function warehouseSyncOf(observations: Wire['LocationHealthObservation'][]): WarehouseSync | null {
+export function warehouseSyncOf(observations: Wire['LocationHealthObservation'][], server: Wire['WarehouseSyncState']): WarehouseSync | null {
 	const { syncs, newest } = syncsOf(observations);
-	if (!syncs.length) return null;
+	const requested = server.requested ? { at: server.requested.requested_at, by: server.requested.requested_by } : null;
+	const running = server.running;
+	const syncing = running ? { position: running.position, kinds: running.kinds, table: running.table, rows: running.rows, startedAt: running.started_at } : null;
+	if (!syncs.length) return requested ? { lastSyncedAt: null, lastError: null, requested, syncing, stalled: running?.stalled ?? false } : null;
 	const failing = [...newest.values()].flatMap(({ report: { health } }) =>
 		health.failure && health.failure !== 'busy' ? [`${health.table}: failed while ${SYNC_STAGE[health.failure]}${readCauseOf(health)}${health.error ? `: ${health.error}` : ''}`] : []
 	);
-	const running = syncs[0].report.health;
 	const done = syncs.find((s) => s.report.health.progress?.completed);
 	return {
 		lastSyncedAt: syncs.find((s) => !s.report.health.failure)?.received_at ?? null,
 		lastError: failing.length ? failing.sort().join('\n') : null,
 		lastReportedAt: syncs[0].received_at,
-		syncing: running.progress && !running.progress.completed && !running.progress.halted ? { position: running.progress.position, kinds: running.progress.kinds, table: running.table, rows: running.progress.rows } : null,
+		requested,
+		syncing,
+		stalled: running?.stalled ?? false,
 		completed: done?.report.health.progress ? { at: done.received_at, kinds: done.report.health.progress.kinds, rows: done.report.health.progress.rows, elapsedMs: done.report.health.progress.elapsed_millis } : null,
 		failing: failingSyncOf(syncs)
 	};
@@ -331,16 +323,12 @@ function failingSyncOf(syncs: Sync[]): WarehouseSync['failing'] {
 	};
 }
 
-/** Older than this, a sync report that left a sync running no longer shows it running: the location has stopped reporting. */
-export const SYNC_REPORT_STALE_MS = 10 * 60_000;
-
-/** The running sync, unless its newest report is stale. */
-export function liveSyncOf(sync: WarehouseSync | null | undefined, now: number) {
-	if (!sync?.syncing || !sync.lastReportedAt) return null;
-	return now - Date.parse(sync.lastReportedAt) < SYNC_REPORT_STALE_MS ? sync.syncing : null;
+/** The running sync, unless the server says it stalled. */
+export function liveSyncOf(sync: WarehouseSync | null | undefined) {
+	return sync?.syncing && !sync.stalled ? sync.syncing : null;
 }
 
 /** Plans, history and costs read the server's copy of the warehouse; until a first sync completes, it may be missing or partial. */
-export function firstSyncPending(sync: WarehouseSync | null | undefined, now: number): boolean {
-	return !!liveSyncOf(sync, now) && !sync?.completed;
+export function firstSyncPending(sync: WarehouseSync | null | undefined): boolean {
+	return !!liveSyncOf(sync) && !sync?.completed;
 }

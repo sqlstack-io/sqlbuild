@@ -10,7 +10,8 @@ const failing: WarehouseSync = {
 	lastReportedAt: '2026-11-27T03:50:00Z',
 	syncing: null,
 	completed: null,
-	failing: { since: '2026-11-26T03:10:00Z', reason: 'IP is not allowed to access the warehouse', halted: false, unreachable: true, retrySeconds: 60, retryAt: '2026-11-27T03:51:00Z' }
+	failing: { since: '2026-11-26T03:10:00Z', reason: 'IP is not allowed to access the warehouse', halted: false, unreachable: true, retrySeconds: 60, retryAt: '2026-11-27T03:51:00Z' },
+	stalled: false
 };
 /** The sync completing once the warehouse lets the location in again. */
 const recovered: WarehouseSync = {
@@ -19,7 +20,8 @@ const recovered: WarehouseSync = {
 	lastReportedAt: '2026-11-27T03:54:44Z',
 	syncing: null,
 	completed: { at: '2026-11-27T03:54:44Z', kinds: 14, rows: 2446, elapsedMs: 23_200 },
-	failing: null
+	failing: null,
+	stalled: false
 };
 
 describe('syncNowState', () => {
@@ -40,16 +42,10 @@ describe('syncNowState', () => {
 		expect(syncNowState({ ...failing, lastReportedAt: '2026-11-27T03:56:00Z' }, requested, NOW + 60_000).kind).toBe('failing');
 	});
 
-	it("takes the server's word on a stall over the page clock", () => {
+	it('shows a running sync with its progress, and as stalled only when the server says so, however old its last report', () => {
 		const running: WarehouseSync = { ...recovered, lastReportedAt: '2026-11-27T03:54:00Z', syncing: { position: 7, kinds: 14, table: 'run_results', rows: 1240 } };
-		expect(syncNowState({ ...running, stalled: true }, null, NOW).kind).toBe('stalled');
-		expect(syncNowState({ ...running, stalled: false }, null, NOW + 60 * 60_000).kind).toBe('running');
-	});
-
-	it('shows a running sync with its progress, and as stalled once no progress arrives for ten minutes', () => {
-		const running: WarehouseSync = { ...recovered, lastReportedAt: '2026-11-27T03:54:00Z', syncing: { position: 7, kinds: 14, table: 'run_results', rows: 1240 } };
-		expect(syncNowState(running, null, NOW).kind).toBe('running');
-		expect(syncNowState(running, null, Date.parse('2026-11-27T04:04:00Z'))).toMatchObject({ kind: 'stalled', progressAt: '2026-11-27T03:54:00Z' });
+		expect(syncNowState(running, null, NOW + 60 * 60_000).kind).toBe('running');
+		expect(syncNowState({ ...running, stalled: true }, null, NOW)).toMatchObject({ kind: 'stalled', progressAt: '2026-11-27T03:54:00Z' });
 	});
 
 	it('waits on a request the server reports, even one made on another page', () => {
@@ -73,29 +69,30 @@ describe('messageParts', () => {
 });
 
 describe('locationVerdict', () => {
-	it('names the worst open fact: red when runs stop, amber when it needs a look, Healthy only when nothing is open', async () => {
+	it("names the server's verdict: red when runs stop, amber when it needs a look, Healthy only when it says so", async () => {
 		const { locationVerdict } = await import('./labels');
-		const ok = { outcome: 'ok' as const, at: '2026-11-27T03:00:00Z', durationMs: 800, trigger: 'manual' as const, by: null, message: 'Connected' };
-		const base = { health: 'healthy' as const, live: true, test: ok, deployedAt: '2026-11-27T02:00:00Z', failedDeploy: false, fallback: false, events: [] };
-		const event = (kind: 'warehouse_sync_failed' | 'tick_overdue' | 'location_broken', severity: 'warning' | 'critical' = 'warning') => ({ kind, severity, locationId: 'l1', active: true });
-		expect(locationVerdict(base)).toEqual({ tone: 'ok', label: 'Healthy' });
-		expect(locationVerdict({ ...base, events: [event('tick_overdue')] })).toEqual({ tone: 'warning', label: 'Schedule overdue' });
-		expect(locationVerdict({ ...base, events: [event('tick_overdue'), event('warehouse_sync_failed')] })).toEqual({ tone: 'warning', label: 'Sync failing' });
-		expect(locationVerdict({ ...base, test: { ...ok, outcome: 'failed' }, events: [event('warehouse_sync_failed')] })).toEqual({ tone: 'failed', label: 'Can’t connect' });
-		expect(locationVerdict({ ...base, live: false })).toEqual({ tone: 'failed', label: 'Not checking in' });
-		expect(locationVerdict({ ...base, failedDeploy: true, fallback: true })).toEqual({ tone: 'warning', label: 'Deploy failed · running previous' });
-		expect(locationVerdict({ ...base, failedDeploy: true, fallback: false })).toEqual({ tone: 'failed', label: 'Deploy failed' });
-		expect(locationVerdict({ ...base, test: null })).toEqual({ tone: 'warning', label: 'Not tested' });
+		expect(locationVerdict({ fact: 'not_checking_in', stopsRuns: true })).toEqual({ tone: 'failed', label: 'Not checking in' });
+		expect(locationVerdict({ fact: 'cant_connect', stopsRuns: true })).toEqual({ tone: 'failed', label: 'Can’t connect' });
+		expect(locationVerdict({ fact: 'deploy_failed', stopsRuns: true })).toEqual({ tone: 'failed', label: 'Deploy failed' });
+		expect(locationVerdict({ fact: 'deploy_failed_on_previous', stopsRuns: false })).toEqual({ tone: 'warning', label: 'Running previous version' });
+		expect(locationVerdict({ fact: 'sync_failing', stopsRuns: false })).toEqual({ tone: 'warning', label: 'Sync failing' });
+		expect(locationVerdict({ fact: 'sync_stalled', stopsRuns: false })).toEqual({ tone: 'warning', label: 'Sync stalled' });
+		expect(locationVerdict({ fact: 'not_tested', stopsRuns: false })).toEqual({ tone: 'warning', label: 'Not tested' });
+		expect(locationVerdict({ fact: 'starting', stopsRuns: false })).toEqual({ tone: 'warning', label: 'Starting' });
+		expect(locationVerdict({ fact: 'healthy', stopsRuns: false })).toEqual({ tone: 'ok', label: 'Healthy' });
 	});
 
-	it("follows the server's verdict where it gives one, so the page and the server keep one rule", async () => {
+	it('says nothing it cannot know when the person may not read the health', async () => {
 		const { locationVerdict } = await import('./labels');
-		const ok = { outcome: 'ok' as const, at: '2026-11-27T03:00:00Z', durationMs: 800, trigger: 'manual' as const, by: null, message: 'Connected' };
-		const base = { health: 'healthy' as const, live: true, test: ok, deployedAt: '2026-11-27T02:00:00Z', failedDeploy: false, fallback: false, events: [] };
-		const overdue = { kind: 'tick_overdue' as const, severity: 'warning' as const, locationId: 'l1', active: true };
-		expect(locationVerdict({ ...base, verdict: { fact: 'cant_connect', stopsRuns: true } })).toEqual({ tone: 'failed', label: 'Can’t connect' });
-		expect(locationVerdict({ ...base, verdict: { fact: 'sync_stalled', stopsRuns: false } })).toEqual({ tone: 'warning', label: 'Sync stalled' });
-		expect(locationVerdict({ ...base, test: null, verdict: { fact: 'healthy', stopsRuns: false } })).toEqual({ tone: 'ok', label: 'Healthy' });
-		expect(locationVerdict({ ...base, events: [overdue], verdict: { fact: 'healthy', stopsRuns: false } })).toEqual({ tone: 'warning', label: 'Schedule overdue' });
+		expect(locationVerdict(null)).toEqual({ tone: 'unknown', label: 'Unknown' });
+	});
+});
+
+describe('stopsRuns', () => {
+	it("is the server's word on a location problem, whatever its kind or severity, and never a server-wide one", async () => {
+		const { stopsRuns } = await import('./labels');
+		expect(stopsRuns({ locationId: 'l1', stopsRuns: true })).toBe(true);
+		expect(stopsRuns({ locationId: 'l1', stopsRuns: false })).toBe(false);
+		expect(stopsRuns({ locationId: null, stopsRuns: true })).toBe(false);
 	});
 });

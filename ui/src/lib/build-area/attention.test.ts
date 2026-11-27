@@ -7,7 +7,7 @@ const now = Date.parse('2026-01-01T12:00:00Z');
 const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
 const event = (id: string, kind: PlatformEvent['kind'], locationId: string | null, over: Partial<PlatformEvent> = {}): AttentionItem => ({
 	kind: 'platform_event',
-	event: { id, kind, severity: 'warning', occurredAt: ago(5), active: true, locationId, subject: null, message: `${kind} message`, ...over }
+	event: { id, kind, severity: 'warning', stopsRuns: false, occurredAt: ago(5), active: true, locationId, subject: null, message: `${kind} message`, ...over }
 });
 const run = (id: string, jobKey: string | null): AttentionRun => ({ id, jobKey, kind: 'job', status: 'unresponsive', statusReason: null, nodeCounts: { success: 0, warn: 0, failed: 0, skipped: 0, running: 1, pending: 0 }, startedAt: ago(30), endedAt: null });
 const unresponsive = (id: string, jobKey: string | null, heardMinutesAgo: number): AttentionItem => ({ kind: 'run_unresponsive', run: run(id, jobKey), lastHeartbeatAt: ago(heardMinutesAgo), acknowledged: null });
@@ -17,7 +17,7 @@ describe('overview alerts', () => {
 	it("lists an overdue schedule under its own location's outage, else under the stopped scheduler, a location that can't run first", () => {
 		const views = attentionViews(
 			[
-				event('broken', 'location_broken', 'shop'),
+				event('broken', 'location_broken', 'shop', { stopsRuns: true }),
 				event('late-shop', 'tick_overdue', 'shop', { message: 'hourly is late' }),
 				event('late-other', 'tick_overdue', 'marketing', { message: 'daily is late' }),
 				event('stopped', 'scheduler_no_leader', null, { severity: 'critical' })
@@ -31,7 +31,7 @@ describe('overview alerts', () => {
 	});
 
 	it('keeps an overdue schedule as its own alert when its outage is acknowledged, so it isn’t hidden with it', () => {
-		const broken = event('broken', 'location_broken', 'shop');
+		const broken = event('broken', 'location_broken', 'shop', { stopsRuns: true });
 		const acknowledged = { ...broken, condition: { key: 'event:location_broken:shop:', shape: {}, acknowledged: { by: 'ada', at: ago(1), until: ago(-600) }, lapsed: null } } as AttentionItem;
 		const views = attentionViews([acknowledged, event('late-shop', 'tick_overdue', 'shop', { message: 'hourly is late' })], now);
 		expect(views.map(({ view }) => [view.key, view.consequences.length])).toEqual([
@@ -41,7 +41,7 @@ describe('overview alerts', () => {
 	});
 
 	it('keeps an overdue schedule as its own alert when nothing explains it, after a location that can’t run', () => {
-		const views = attentionViews([event('late', 'tick_overdue', 'shop'), event('broken', 'location_broken', 'marketing')], now);
+		const views = attentionViews([event('late', 'tick_overdue', 'shop'), event('broken', 'location_broken', 'marketing', { stopsRuns: true })], now);
 		expect(views.map(({ view }) => [view.key, view.tone])).toEqual([
 			['event:broken', 'error'],
 			['event:late', 'warning']
