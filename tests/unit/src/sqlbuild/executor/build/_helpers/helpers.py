@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 from unittest.mock import Mock
@@ -31,6 +32,11 @@ from sqlbuild.compiler.auditing.types import (
     AuditSeverity,
 )
 from sqlbuild.executor.auditing.models import AuditExecutionResult
+
+_LOADER_PROJECT: str = (
+    'default_target = "default"\n\n[connections]\n\n[targets.default]\n'
+    'connection = "sqlbuild_warehouse"\nloader_schema = "main"\n'
+)
 
 
 def build_audit_result(
@@ -138,6 +144,25 @@ def source_node_test_loader(_ctx: object) -> list[dict[str, object]]:
 
 def failing_source_node_test_loader(_ctx: object) -> list[dict[str, object]]:
     raise RuntimeError("loader failed intentionally")
+
+
+def build_loader_projects(*, loader_name: str) -> dict[str, tuple[str, str]]:
+    """The SQLLoad project and Python source compile plans for a DuckDB loader of id and status."""
+
+    source: dict[str, object] = {
+        "name": loader_name,
+        "module": "python/nodes/loaders/raw.py",
+        "settings": {
+            "table_name": loader_name,
+            "tables": {
+                loader_name: {
+                    "columns": {"id": "BIGINT", "status": "TEXT"},
+                    "write_strategy": "replace",
+                }
+            },
+        },
+    }
+    return {loader_name: (_LOADER_PROJECT, json.dumps(source))}
 
 
 def build_discovered_source_loader(*, loader_name: str) -> DiscoveredLoaderFunction:

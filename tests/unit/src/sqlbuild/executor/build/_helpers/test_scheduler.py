@@ -53,6 +53,7 @@ from tests.unit.src.sqlbuild.executor.build._helpers._test_types import (
 from tests.unit.src.sqlbuild.executor.build._helpers.helpers import (
     build_discovered_source_loader,
     build_failing_discovered_source_loader,
+    build_loader_projects,
     build_model_plan_entry,
     fetch_rows_or_empty,
 )
@@ -144,6 +145,7 @@ def test_given_managed_source_node_when_build_runs_then_records_loader_and_block
                     run_id="run-1",
                     run_audits=False,
                     run_tests=False,
+                    loader_projects=build_loader_projects(loader_name=loader_name),
                 ),
                 callbacks=BuildCallbacks(
                     on_node_start=lambda name, *, resource_kind: node_starts.append(

@@ -52,5 +52,12 @@ pub(super) struct SqlloadColumnTypeTestCase {
     pub(super) description: &'static str,
     pub(super) warehouse: sqlload::column_types::models::Warehouse,
     pub(super) declared: &'static str,
-    pub(super) expected: &'static str,
+    pub(super) expected_sqlload_type: &'static str,
+}
+
+pub(super) struct AdviceRoundTripTestCase {
+    pub(super) description: &'static str,
+    pub(super) warehouse: sqlload::column_types::models::Warehouse,
+    /// Whether declaring the advice for each logical type creates the type SQLLoad created.
+    pub(super) expected_advice_creates_exactly: bool,
 }

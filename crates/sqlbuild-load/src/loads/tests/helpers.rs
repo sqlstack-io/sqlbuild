@@ -1,4 +1,8 @@
-use sqlload::column_types::models::Warehouse;
+use sqlload::adapters::dispatch::main::dialect::sql_adapter::sql_adapter;
+use sqlload::column_types::models::{ColumnType, Warehouse};
+
+use crate::loads::_helpers::column_types::created_type;
+use crate::loads::main::declared_type_mismatch::declared_type_mismatch;
 
 use crate::loads::main::check_load::check_load;
 use crate::loads::models::{FilledSource, LoadCheck, LoadDeclaration};
@@ -47,4 +51,45 @@ pub(super) fn checked(
                 .unwrap_or_default()
         })
         .map_err(|problem| (problem.message, problem.path))
+}
+
+pub(super) const LOGICAL_TYPE_COUNT: usize = 15;
+
+/// Every logical type SQLLoad creates columns for.
+pub(super) fn logical_types() -> [ColumnType; LOGICAL_TYPE_COUNT] {
+    [
+        ColumnType::Bool,
+        ColumnType::SmallInt,
+        ColumnType::Int,
+        ColumnType::Decimal {
+            precision: 18,
+            scale: 2,
+        },
+        ColumnType::Float,
+        ColumnType::Text,
+        ColumnType::Varchar(20),
+        ColumnType::Date,
+        ColumnType::Time,
+        ColumnType::TimestampTz,
+        ColumnType::TimestampNtz,
+        ColumnType::Json,
+        ColumnType::Uuid,
+        ColumnType::Binary,
+        ColumnType::Array(Box::new(ColumnType::Int)),
+    ]
+}
+
+/// Whether declaring `column_type`'s advice in `warehouse` creates the type SQLLoad created for it.
+pub(super) fn advice_creates_exactly(warehouse: Warehouse, column_type: &ColumnType) -> bool {
+    let created: String = sql_adapter(warehouse)
+        .render_loader_logical_type(column_type)
+        .sql;
+    let advice: String = declared_type_mismatch(
+        &[("c".to_owned(), column_type.to_string())],
+        warehouse,
+        |_, _| false,
+    )
+    .map(|mismatch| mismatch.declare)
+    .unwrap_or_default();
+    created_type(&advice, warehouse).as_deref() == Some(created.as_str())
 }

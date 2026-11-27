@@ -2,12 +2,12 @@
 
 use sqlload::column_types::models::Warehouse;
 
+use crate::loads::_helpers::column_types::sqlload_column_type;
 use crate::loads::_helpers::naming::literal_tables;
 use crate::loads::constants::{
     COLUMNS, CONNECTION, FILES_KIND, INCLUDE, KIND, ON_SCHEMA_CHANGE, TABLE_NAME, TABLES,
     TEMPLATE_OPEN,
 };
-use crate::loads::main::sqlload_column_type::sqlload_column_type;
 use crate::loads::models::{FilledSource, LoadCheck, LoadDeclaration, LoadProblem};
 
 /// A problem at `path` in the `load:` mapping.
@@ -85,12 +85,9 @@ pub(crate) fn with_source_columns(
         for source in &load.sources {
             tables = with_columns(tables, (&load.name, &known), (source, warehouse))?;
         }
-    } else if let Some(known) = one_named_table(load) {
-        let filling = load
-            .sources
-            .iter()
-            .filter(|source| known.iter().any(|(_, table)| *table == source.name));
-        for source in filling {
+    } else if let Some((key, table)) = one_named_table(load) {
+        let known: [(String, String); 1] = [(key, table.to_owned())];
+        for source in load.sources.iter().filter(|source| source.name == table) {
             tables = with_columns(tables, (&load.name, &known), (source, warehouse))?;
         }
     }
@@ -158,12 +155,12 @@ fn with_columns(
 }
 
 /// The one table of a files load naming it with a literal `table_name`, keyed by the source as SQLLoad keys it, which is the load; a source it doesn't fill is S304's to report.
-fn one_named_table(load: &LoadDeclaration) -> Option<Vec<(String, String)>> {
+fn one_named_table(load: &LoadDeclaration) -> Option<(String, &str)> {
     if load.settings.get(KIND)?.as_str()? != FILES_KIND {
         return None;
     }
     let name: &str = load.settings.get(TABLE_NAME)?.as_str()?;
-    (!name.contains(TEMPLATE_OPEN)).then(|| vec![(load.name.clone(), name.to_owned())])
+    (!name.contains(TEMPLATE_OPEN)).then(|| (load.name.clone(), name))
 }
 
 /// Each column's declared type as SQLLoad reads it in `warehouse`.

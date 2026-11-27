@@ -1,3 +1,4 @@
+pub(crate) mod column_types;
 pub(crate) mod loaders;
 pub(crate) mod naming;
 pub(crate) mod problems;
