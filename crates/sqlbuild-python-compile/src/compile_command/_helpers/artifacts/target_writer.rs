@@ -585,7 +585,7 @@ pub(crate) fn resolved_plan<'py>(
     if let Some(planned_tests) = prepared.planned_tests {
         let planned: Bound<'py, PyAny> = planned_tests.call0()?;
         if !planned.is_none() {
-            let planned: Bound<'py, PlannedStaticSqlTests> = planned.downcast_into()?;
+            let planned: Bound<'py, PlannedStaticSqlTests> = planned.cast_into()?;
             if planned
                 .get()
                 .tests_root

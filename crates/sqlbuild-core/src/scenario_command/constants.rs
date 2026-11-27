@@ -12,9 +12,6 @@ pub(crate) const LOCAL_CONFIG_SOURCE: &str = "local config";
 pub(crate) const PROJECT_CONFIG_SOURCE: &str = "project config";
 
 pub(crate) const SCENARIO_NAME_WIDTH: usize = 64;
-pub(crate) const EXPECTATION_LABEL_WIDTH: usize = 10;
-pub(crate) const EXPECTATION_NAME_WIDTH: usize = 50;
-pub(crate) const EXPECTATION_ERROR_INDENT: usize = 14;
 pub(crate) const RETAINED_KIND_WIDTH: usize = 6;
 pub(crate) const CAPTURE_RELATION_KIND_WIDTH: usize = 8;
 pub(crate) const CAPTURE_RELATION_NAME_WIDTH: usize =
@@ -23,7 +20,6 @@ pub(crate) const BINARY_UNIT_SIZE: f64 = 1024.0;
 
 pub(crate) const PASS_STATUS: &str = "PASS";
 pub(crate) const FAIL_STATUS: &str = "FAIL";
-pub(crate) const ERROR_STATUS: &str = "ERROR";
 
 pub(crate) const DEFAULT_MAX_SNAPSHOT_ROWS_PER_RELATION: i64 = 10_000;
 pub(crate) const DEFAULT_MAX_SNAPSHOT_TOTAL_ROWS: i64 = 50_000;

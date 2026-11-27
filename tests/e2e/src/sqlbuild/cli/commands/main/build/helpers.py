@@ -5,6 +5,7 @@ import re
 import signal
 import sqlite3
 import subprocess
+import threading
 import time
 from contextlib import closing
 from itertools import takewhile
@@ -15,6 +16,7 @@ from typing import Any
 import duckdb
 
 from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
+    BlockedAssetBuild,
     ChangedBuildStep,
     ChangedWarehouse,
     DeferCloneBuildE2ETestCase,
@@ -784,7 +786,7 @@ def prepare_audit_read_plan_project(*, tmp_path: Path) -> Path:
             "sql/seeds/waffle_types.yml": (
                 "seeds:\n  - name: waffle_types\n    description: Test seed waffle_types.\n"
                 "    columns:\n"
-                "      - name: waffle_type_id\n        type: INTEGER\n"
+                "      - name: waffle_type_id\n        type: BIGINT\n"
             ),
             "sql/seeds/waffle_types.csv": "waffle_type_id\n1\n",
             "sql/models/stg_orders.sql": (
@@ -860,10 +862,10 @@ def explicit_reference_literal_loader(*, table: str) -> str:
 
     return (
         "from sqlbuild.loaders import loader\n\n\n"
-        "@loader\n"
+        "@loader(write_strategy='replace')\n"
         "def raw_regions(ctx):\n"
         "    '''Test loader raw_regions.'''\n    return [{'id': 1}]\n\n\n"
-        "@loader\n"
+        "@loader(write_strategy='replace')\n"
         "def raw_customers(ctx):\n"
         f'    """Test loader raw_customers."""\n    ctx.query("SELECT count(*) FROM {table}")\n'
         "    return [{'id': 1}]\n"
@@ -916,12 +918,12 @@ def python_node_selection_project_files(*, orders_sql: str) -> dict[str, str]:
             "  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n    table: raw_orders\n"
             "  - name: raw_customers\n    description: Test source raw_customers.\n"
-            "    managed: true\n    write_strategy: table\n"
-            "    columns:\n      - name: customer_id\n        type: INTEGER\n"
+            "    managed: true\n"
+            "    columns:\n      - name: customer_id\n        type: BIGINT\n"
         ),
         "python/nodes/loaders/customers/loader.py": (
             "from sqlbuild.loaders import loader\n\n\n"
-            "@loader\ndef raw_customers(ctx):\n"
+            "@loader(write_strategy='replace')\ndef raw_customers(ctx):\n"
             "    '''Test loader raw_customers.'''\n"
             "    return [{'customer_id': 99}]\n"
         ),
@@ -1202,7 +1204,7 @@ def seed_audit_files(status_values: tuple[str, ...]) -> dict[str, str]:
             "    description: Order statuses.\n"
             "    columns:\n"
             "      - name: status_id\n"
-            "        type: INTEGER\n"
+            "        type: BIGINT\n"
             "        audits: [not_null]\n"
             "      - name: status\n"
             "        type: VARCHAR\n"
@@ -1251,7 +1253,7 @@ def target_concurrency_project_files(
             "    description: Products.\n"
             "    columns:\n"
             "      - name: product_id\n"
-            "        type: INTEGER\n"
+            "        type: BIGINT\n"
         ),
         "sql/models/orders.sql": (
             "MODEL (description 'Orders.', materialized table);\n\nSELECT 1 AS order_id\n"
@@ -1531,7 +1533,7 @@ _TWO_GATE_LOADER: str = (
     "from sqlbuild.loaders import loader\n\n"
     "from python.nodes.tasks.ranking import rank_orders\n"
     "from python.nodes.tasks.scoring.asset import score_orders\n\n\n"
-    "@loader(depends_on=[score_orders, rank_orders])\n"
+    "@loader(write_strategy='replace', depends_on=[score_orders, rank_orders])\n"
     "def partner_scores(ctx):\n"
     '    """Load the scores the partner returned."""\n'
     "    result = ctx.result_of(node_function=score_orders)\n"
@@ -1736,8 +1738,8 @@ def node_result_source_yml(location: str) -> str:
 
     return (
         "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
-        f"    managed: true\n{location}    write_strategy: table\n"
-        "    columns:\n      - name: order_id\n        type: INTEGER\n"
+        f"    managed: true\n{location}"
+        "    columns:\n      - name: order_id\n        type: BIGINT\n"
     )
 
 
@@ -1786,3 +1788,81 @@ def window_floor_event_dates(project_dir: Path, model: str) -> tuple[str, ...]:
         sql=f"SELECT event_date FROM main.{model} ORDER BY event_date",
     )
     return tuple(str(row[0]) for row in rows)
+
+
+_BLOCKED_ASSET: str = '''\
+import pathlib
+import time
+
+from sqlbuild.assets import AssetContext, asset
+
+RELEASE = pathlib.Path({release!r})
+
+
+@asset(tags=["steps"])
+def stream_steps(ctx: AssetContext):
+    """Log the first step, then wait until the test lets the asset finish."""
+    ctx.log.info("step 1 of 2")
+    deadline = time.monotonic() + 60
+    while not RELEASE.exists():
+        if time.monotonic() > deadline:
+            raise TimeoutError("the test never released the asset")
+        time.sleep(0.05)
+    ctx.log.info("step 2 of 2")
+'''
+
+
+def blocked_asset_project(tmp_path: Path) -> tuple[Path, Path]:
+    """A DuckDB project whose asset logs a step and waits for the returned release file."""
+
+    release: Path = tmp_path / "release"
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="live_logs",
+        repo_files={
+            "sqlbuild_project.toml": (
+                'name = "live_logs"\nadapter = "duckdb"\n\n'
+                '[connection]\ndatabase = "warehouse.duckdb"\n'
+            ),
+            "sql/models/orders.sql": 'MODEL (description "Orders.");\nSELECT 1 AS amount\n',
+            **node_module_files(
+                "python/nodes/steps.py", _BLOCKED_ASSET.format(release=str(release))
+            ),
+        },
+    )
+    return project_dir, release
+
+
+def build_until_line(project_dir: Path, release: Path, line: str) -> BlockedAssetBuild:
+    """Build, reading the output until `line` shows, then release the asset and let it finish."""
+
+    build: subprocess.Popen[str] = subprocess.Popen(
+        (
+            str(REPO_ROOT / ".venv/bin/sqb"),
+            "--no-color",
+            "--project-dir",
+            str(project_dir),
+            "build",
+        ),
+        cwd=REPO_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    watchdog: threading.Timer = threading.Timer(120, build.kill)
+    watchdog.start()
+    assert build.stdout is not None
+    before: list[str] = []
+    shown_before_release: bool = any(
+        before.append(printed) or line in printed for printed in build.stdout
+    )
+    release.touch()
+    after: str = build.stdout.read()
+    returncode: int = build.wait(timeout=60)
+    watchdog.cancel()
+    build.stdout.close()
+    return BlockedAssetBuild(
+        shown_before_release=shown_before_release,
+        output="".join(before) + after,
+        returncode=returncode,
+    )

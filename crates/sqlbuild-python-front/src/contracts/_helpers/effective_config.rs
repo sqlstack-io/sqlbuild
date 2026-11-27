@@ -6,6 +6,7 @@ use std::hash::{Hash, Hasher};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, PyStringMethods, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyBytes, PyBytesMethods, PyDict, PyDictMethods, PyListMethods, PyString};
+use sqlbuild_config::effective::constants::CONNECTION_KIND_KEY;
 use sqlbuild_config::effective::errors::{EffectiveConfigError, MessagePart};
 use sqlbuild_config::effective::main::default_connection_name::default_connection_name;
 use sqlbuild_config::effective::main::effective_target_name::effective_target_name;
@@ -25,6 +26,13 @@ const SURROGATE_PASS: &str = "surrogatepass";
 pub(crate) struct Key<'py> {
     bytes: Vec<u8>,
     handle: Bound<'py, PyString>,
+}
+
+impl Key<'_> {
+    /// The key as text, lone surrogates replaced, for messages and fixed names.
+    pub(crate) fn text(&self) -> String {
+        String::from_utf8_lossy(&self.bytes).into_owned()
+    }
 }
 
 impl PartialEq for Key<'_> {
@@ -62,7 +70,7 @@ type FieldRow<'py> = (Option<&'static str>, &'static str, Value<'py>);
 pub(crate) type Outcome<'py, T> = (Option<T>, Option<Bound<'py, PyString>>);
 
 pub(crate) fn key<'py>(value: &Bound<'py, PyAny>) -> PyResult<Key<'py>> {
-    let handle: Bound<'py, PyString> = value.downcast::<PyString>()?.clone();
+    let handle: Bound<'py, PyString> = value.cast::<PyString>()?.clone();
     if let Ok(text) = handle.to_str() {
         return Ok(Key {
             bytes: text.as_bytes().to_vec(),
@@ -71,7 +79,7 @@ pub(crate) fn key<'py>(value: &Bound<'py, PyAny>) -> PyResult<Key<'py>> {
     }
     let bytes: Vec<u8> = handle
         .call_method1("encode", (UTF8, SURROGATE_PASS))?
-        .downcast_into::<PyBytes>()?
+        .cast_into::<PyBytes>()?
         .as_bytes()
         .to_vec();
     Ok(Key { bytes, handle })
@@ -86,7 +94,7 @@ pub(crate) fn optional_key<'py>(value: &Bound<'py, PyAny>) -> PyResult<Option<Ke
 
 pub(crate) fn pairs<'py>(mapping: &Bound<'py, PyAny>) -> PyResult<Pairs<'py>> {
     mapping
-        .downcast::<PyDict>()?
+        .cast::<PyDict>()?
         .iter()
         .map(|(name, value)| Ok((key(&name)?, value)))
         .collect()
@@ -94,11 +102,36 @@ pub(crate) fn pairs<'py>(mapping: &Bound<'py, PyAny>) -> PyResult<Pairs<'py>> {
 
 fn keys<'py>(mapping: &Bound<'py, PyAny>) -> PyResult<Vec<Key<'py>>> {
     mapping
-        .downcast::<PyDict>()?
+        .cast::<PyDict>()?
         .keys()
         .iter()
         .map(|name| key(&name))
         .collect()
+}
+
+/// The names in `connections` whose entry sets no `kind` in either file: the connections a target may default to.
+fn kindless_keys<'py>(
+    connections: &Bound<'py, PyAny>,
+    other: &Bound<'py, PyAny>,
+) -> PyResult<Vec<Key<'py>>> {
+    let other: &Bound<'py, PyDict> = other.cast::<PyDict>()?;
+    let mut names: Vec<Key<'py>> = Vec::new();
+    for (name, connection) in connections.cast::<PyDict>()?.iter() {
+        let sets_kind = |entry: &Bound<'py, PyAny>| -> PyResult<bool> {
+            entry.cast::<PyDict>()?.contains(CONNECTION_KIND_KEY)
+        };
+        let elsewhere: Option<Bound<'py, PyAny>> = other.get_item(&name)?;
+        if !sets_kind(&connection)?
+            && !elsewhere
+                .as_ref()
+                .map(sets_kind)
+                .transpose()?
+                .unwrap_or(false)
+        {
+            names.push(key(&name)?);
+        }
+    }
+    Ok(names)
 }
 
 pub(crate) fn dictionary<'py>(
@@ -174,7 +207,7 @@ pub(crate) fn message<'py>(
         .collect();
     Ok(PyString::new(py, "")
         .call_method1("join", (parts,))?
-        .downcast_into::<PyString>()?)
+        .cast_into::<PyString>()?)
 }
 
 /// `resolve_target_name`: the effective target, `None`, or the unknown-target message.
@@ -210,10 +243,10 @@ pub(crate) fn effective_config_target_fields<'py>(
     let (project_config, local_config) = configs;
     let name: Key<'py> = key(target_name)?;
     let project_target: Option<Bound<'py, PyAny>> = native_field(&project_config, "targets")?
-        .downcast::<PyDict>()?
+        .cast::<PyDict>()?
         .get_item(&name.handle)?;
     let local_target: Option<Bound<'py, PyAny>> = native_field(&local_config, "targets")?
-        .downcast::<PyDict>()?
+        .cast::<PyDict>()?
         .get_item(&name.handle)?;
     let local: Option<Layer<'py>> = local_target.as_ref().map(target_layer).transpose()?;
     let mut merged: Layer<'py> = merged_target(
@@ -221,14 +254,16 @@ pub(crate) fn effective_config_target_fields<'py>(
         local.as_ref(),
     );
     let connection_name: usize = field_position("connection_name");
+    let project_connections: Bound<'py, PyAny> = native_field(&project_config, "connections")?;
+    let local_connections: Bound<'py, PyAny> = native_field(&local_config, "connections")?;
     let choice: ConnectionChoice<Key<'py>> = ConnectionChoice {
         target: name,
         selected: is_set(&merged.fields[connection_name])
             || is_set(&merged.fields[field_position("connection")])
             || native_field(&project_config, "connection")?.is_truthy()?
             || native_field(&local_config, "connection")?.is_truthy()?,
-        project_names: keys(&native_field(&project_config, "connections")?)?,
-        local_names: keys(&native_field(&local_config, "connections")?)?,
+        project_names: kindless_keys(&project_connections, &local_connections)?,
+        local_names: kindless_keys(&local_connections, &project_connections)?,
     };
     match default_connection_name(choice) {
         Ok(Some(only)) => {
@@ -251,7 +286,7 @@ pub(crate) fn effective_config_target_fields<'py>(
 
 pub(crate) fn named<'py>(mapping: &Bound<'py, PyAny>) -> PyResult<Entries<Key<'py>, Pairs<'py>>> {
     mapping
-        .downcast::<PyDict>()?
+        .cast::<PyDict>()?
         .iter()
         .map(|(name, connection)| Ok((key(&name)?, pairs(&connection)?)))
         .collect()

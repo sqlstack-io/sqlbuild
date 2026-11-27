@@ -4,7 +4,7 @@ from python.nodes.tasks.scoring.asset import score_orders
 from sqlbuild.loaders import loader
 
 
-@loader(depends_on=[score_orders, fetch_rates])
+@loader(write_strategy="replace", depends_on=[score_orders, fetch_rates])
 def partner_scores(ctx):
     """Load the scores, gated by a read-side asset and an ingress asset."""
     result = ctx.result_of(node_function=score_orders)

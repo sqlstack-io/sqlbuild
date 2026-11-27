@@ -4,6 +4,9 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
+use crate::run_output::types::NodeLogReport;
+use crate::runs::models::RunChange;
+
 /// Where a server keeps run output: a local folder or an S3 prefix, and how much of a run it keeps.
 #[derive(Clone, Debug)]
 pub struct OutputStore {
@@ -230,7 +233,7 @@ pub struct OutputLine {
     pub level: Option<OutputLevel>,
     #[serde(
         default,
-        skip_serializing_if = "crate::run_output::_helpers::chunks::is_zero"
+        skip_serializing_if = "crate::run_output::_helpers::store::chunks::is_zero"
     )]
     pub omitted_before: i64,
 }
@@ -466,4 +469,37 @@ pub(crate) struct SearchTally {
     /// The first match at or after the line searched from, and the last at or before it.
     pub(crate) after: Option<i64>,
     pub(crate) upto: Option<i64>,
+}
+
+/// A worker's `ctx.log` lines, sent by a background thread about every second so a node never waits on the server.
+#[derive(Debug)]
+pub struct NodeLogSender {
+    pub(crate) shared: Arc<NodeLogShared>,
+    pub(crate) thread: std::sync::Mutex<Option<std::thread::JoinHandle<()>>>,
+}
+
+/// What the sender and its thread share: the waiting lines, the thread's wake-up, and how lines are reported.
+#[derive(Debug)]
+pub(crate) struct NodeLogShared {
+    pub(crate) state: std::sync::Mutex<NodeLogState>,
+    pub(crate) wake: std::sync::Condvar,
+    pub(crate) report: Box<dyn NodeLogReport>,
+}
+
+/// The lines waiting to be sent, and what each node has logged and had acknowledged.
+#[derive(Debug, Default)]
+pub(crate) struct NodeLogState {
+    /// Each waiting line as its node key, event key and change, in the order they were logged.
+    pub(crate) queue: std::collections::VecDeque<(String, String, RunChange)>,
+    /// When the oldest waiting line was logged.
+    pub(crate) oldest: Option<std::time::Instant>,
+    /// How many lines each node has logged, kept or not.
+    pub(crate) logged: std::collections::BTreeMap<String, usize>,
+    /// The event keys the server acknowledged.
+    pub(crate) sent: std::collections::BTreeSet<String>,
+    /// The nodes whose lines the thread is sending now.
+    pub(crate) sending: std::collections::BTreeSet<String>,
+    /// How many finishing nodes are waiting for their lines to go.
+    pub(crate) flushing: usize,
+    pub(crate) closing: bool,
 }

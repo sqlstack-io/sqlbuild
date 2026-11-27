@@ -148,7 +148,7 @@ pub(crate) fn scoped_declarations<'py>(
     let visibility = &context.classes.visibility;
     if visibility.projects {
         let contexts: Bound<'py, NativeDeclarationContexts> =
-            native_field(&visibility.resolver, NATIVE_CONTEXTS_ATTRIBUTE)?.downcast_into()?;
+            native_field(&visibility.resolver, NATIVE_CONTEXTS_ATTRIBUTE)?.cast_into()?;
         let (resolved, _) =
             contexts
                 .get()
@@ -184,7 +184,7 @@ pub(crate) fn file_declarations<'py>(
     fields.set_item("consumer", identity)?;
     if visibility.projects {
         let contexts: Bound<'py, NativeDeclarationContexts> =
-            native_field(&visibility.resolver, NATIVE_CONTEXTS_ATTRIBUTE)?.downcast_into()?;
+            native_field(&visibility.resolver, NATIVE_CONTEXTS_ATTRIBUTE)?.cast_into()?;
         let (resolved, _) =
             contexts
                 .get()
@@ -267,7 +267,7 @@ pub(crate) fn expanded_authored_sql<'py>(
             py.None().into_bound(py)
         } else {
             let contexts: Bound<'py, NativeDeclarationContexts> =
-                native_field(resolver, NATIVE_CONTEXTS_ATTRIBUTE)?.downcast_into()?;
+                native_field(resolver, NATIVE_CONTEXTS_ATTRIBUTE)?.cast_into()?;
             contexts
                 .get()
                 .resolved_context(resolver, file_path, None)?
@@ -443,9 +443,7 @@ fn same_value(current: &Bound<'_, PyAny>, changed: &Bound<'_, PyAny>) -> PyResul
     if !current.get_type().is(changed.get_type()) {
         return Ok(false);
     }
-    if let (Ok(current), Ok(changed)) =
-        (current.downcast::<PyTuple>(), changed.downcast::<PyTuple>())
-    {
+    if let (Ok(current), Ok(changed)) = (current.cast::<PyTuple>(), changed.cast::<PyTuple>()) {
         if current.len() != changed.len() {
             return Ok(false);
         }

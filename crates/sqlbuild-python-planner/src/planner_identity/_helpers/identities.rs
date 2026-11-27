@@ -329,7 +329,7 @@ pub(crate) fn with_honest_model_write_hashes<'py>(
     let model_changes: Bound<'py, PyDict> = PyDict::new(py);
     model_changes.update(
         native_field(&changes, "models")?
-            .downcast::<PyDict>()?
+            .cast::<PyDict>()?
             .as_mapping(),
     )?;
     for key in &scope.order {

@@ -65,7 +65,7 @@ pub(crate) fn lone_surrogate_site<'py>(
 
 /// Python's former `_reject_lone_surrogates` walk: dict keys then items, lists and tuples.
 fn surrogate_path(value: &Bound<'_, PyAny>, path: String) -> PyResult<Option<(String, usize)>> {
-    if let Ok(mapping) = value.downcast::<PyDict>() {
+    if let Ok(mapping) = value.cast::<PyDict>() {
         for (key, item) in mapping.iter() {
             if let Some(site) = surrogate_path(&key, format!("{path} key"))? {
                 return Ok(Some(site));
@@ -90,7 +90,7 @@ fn surrogate_path(value: &Bound<'_, PyAny>, path: String) -> PyResult<Option<(St
         }
         return Ok(None);
     }
-    let Ok(text) = value.downcast::<PyString>() else {
+    let Ok(text) = value.cast::<PyString>() else {
         return Ok(None);
     };
     Ok(first_surrogate_offset(text)?.map(|offset| (path, offset)))

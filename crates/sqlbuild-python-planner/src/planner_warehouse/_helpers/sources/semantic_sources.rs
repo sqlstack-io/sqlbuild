@@ -168,7 +168,7 @@ pub(crate) fn semantic_source_columns<'py>(
     let project = &args.value("project")?;
     let reads = args.value("reads")?;
     let source_read_map = &args.value("source_read_map")?;
-    let columns = args.value("columns")?.downcast_into::<PyDict>()?;
+    let columns = args.value("columns")?.cast_into::<PyDict>()?;
     let columns = &columns;
     let selected_keys = &args.value("selected_keys")?;
 

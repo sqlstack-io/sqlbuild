@@ -1,8 +1,5 @@
-//! `sqb load`: source and loader selection, progress and summary text, and the exit code.
+//! `sqb load`: the build selection that loads what the user selects, and the note when nothing can load.
 
-pub(crate) mod _helpers;
-pub(crate) mod constants;
-pub mod errors;
 pub mod main;
 pub mod models;
 

@@ -12,6 +12,7 @@ from sqlbuild.adapter.contract.types import LifeCycleEventKind, LogLevel
 from tests.unit.src.sqlbuild.adapter.contract.classes.node_logger._test_types import (
     NodeLoggerCallTestCase,
     NodeLoggerTestCase,
+    RecorderForwardingTestCase,
 )
 
 
@@ -41,6 +42,31 @@ def test_given_a_node_logger_when_logging_at_a_level_then_the_line_keeps_its_lev
     assert [(record.levelno, record.getMessage()) for record in caplog.records] == [
         (test_case.expected_python_level, "loaded 3 orders")
     ]
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        RecorderForwardingTestCase(
+            "a ctx.log line goes to on_log as it is kept",
+            LogLevel.WARNING,
+            ((LogLevel.WARNING, "loaded 3 orders"),),
+        ),
+        RecorderForwardingTestCase("a line the executor logs itself stays in the node", None, ()),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_recorder_with_on_log_when_a_line_is_logged_then_only_ctx_log_lines_are_forwarded(
+    test_case: RecorderForwardingTestCase,
+) -> None:
+    forwarded: list[tuple[LogLevel, str]] = []
+    recorder: StatementRecorder = StatementRecorder()
+    recorder.on_log = lambda level, message: forwarded.append((level, message))
+
+    recorder.log(message="loaded 3 orders", level=test_case.level)
+
+    assert tuple(forwarded) == test_case.expected_forwarded
+    assert [event.content for event in recorder.snapshot()] == ["loaded 3 orders"]
 
 
 @pytest.mark.parametrize(

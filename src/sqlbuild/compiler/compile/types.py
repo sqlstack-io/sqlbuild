@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     import sqlbuild._native as _native
     from sqlbuild._native import (
         CompiledLineageColumnFact,
+        CompiledLoad,
         CompiledObjectKey,
         CompiledRelationLocation,
         CompiledSeed,
@@ -253,6 +254,8 @@ class CompiledProjectView(Protocol):
     def sql_tests(self) -> tuple[CompiledSqlTest, ...]: ...
     @property
     def sql_scenarios(self) -> tuple[CompiledSqlScenario, ...]: ...
+    @property
+    def loads(self) -> tuple[CompiledLoad, ...]: ...
     @property
     def loader_functions(self) -> tuple[DiscoveredLoaderFunction, ...]: ...
     @property

@@ -522,7 +522,7 @@ fn analysis_sql(context: &LoopContext<'_, '_>, model: &OptOutModel<'_, '_>) -> P
 fn opted_out(values: &Bound<'_, PyDict>) -> PyResult<bool> {
     for key in OPT_OUT_KEYS {
         if let Some(value) = values.get_item(key)?
-            && value.downcast::<PyBool>().is_ok_and(|flag| !flag.is_true())
+            && value.cast::<PyBool>().is_ok_and(|flag| !flag.is_true())
         {
             return Ok(true);
         }
@@ -537,7 +537,7 @@ fn hook_statements(
     site: HookSite<'_>,
 ) -> PyResult<Vec<(Option<String>, String, String)>> {
     let sql_hook_entry: &Bound<'_, PyAny> = &context.classes.sql_hook_entry;
-    if let Ok(text) = value.downcast::<PyString>() {
+    if let Ok(text) = value.cast::<PyString>() {
         let label: String = site.label.unwrap_or_else(|| site.hook_name.to_owned());
         return Ok(vec![(Some(label), site.path, text.extract()?)]);
     }
@@ -587,7 +587,7 @@ fn placeholders(values: &Bound<'_, PyDict>) -> PyResult<Vec<(String, String)>> {
     let Some(raw) = present(values, PLACEHOLDERS_KEY)? else {
         return Ok(Vec::new());
     };
-    let Ok(raw) = raw.downcast::<PyDict>() else {
+    let Ok(raw) = raw.cast::<PyDict>() else {
         return Ok(Vec::new());
     };
     raw.iter()

@@ -79,8 +79,8 @@ class NestedProgressChildRowsTestCase:
     description: str
     item_name: str
     name_width: int
-    expected_fragments: tuple[str, ...]
-    unexpected_fragments: tuple[str, ...] = field(default_factory=tuple)
+    expected_output: str
+    verbose: bool = False
     status_text: str = "PASS"
     child_status_text: str = "PASS"
     error_code: str | None = None
@@ -153,7 +153,7 @@ class PlanningFinishTestCase:
 @dataclass(frozen=True)
 class NestedProgressConcurrentTestCase:
     description: str
-    concurrency: int
+    group_counts: dict[str, int]
     expected_output: str
 
 

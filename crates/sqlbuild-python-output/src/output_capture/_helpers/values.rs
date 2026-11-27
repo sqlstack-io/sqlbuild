@@ -37,7 +37,7 @@ pub(crate) fn pass_text(value: &Bound<'_, PyString>) -> PyResult<PassText> {
     }
     Ok(value
         .call_method1("encode", (UTF8, SURROGATE_PASS))?
-        .downcast_into::<PyBytes>()?
+        .cast_into::<PyBytes>()?
         .as_bytes()
         .to_vec())
 }
@@ -94,7 +94,7 @@ pub(crate) fn freeze<'py>(value: &Bound<'py, PyAny>, path: &str) -> PyResult<Bou
         let frozen: Bound<'py, PyDict> = PyDict::new(py);
         for item in mapping_items(value)?.try_iter()? {
             let (key, item): (Bound<'py, PyAny>, Bound<'py, PyAny>) = item?.extract()?;
-            let Ok(key_text) = key.downcast::<PyString>() else {
+            let Ok(key_text) = key.cast::<PyString>() else {
                 return Err(validation_error(
                     py,
                     &format!("{path} keys must be strings"),
@@ -126,7 +126,7 @@ pub(crate) fn json_value(value: &Bound<'_, PyAny>) -> PyResult<JsonValue> {
     if value.is_none() {
         return Ok(JsonValue::Null);
     }
-    if let Ok(flag) = value.downcast::<PyBool>() {
+    if let Ok(flag) = value.cast::<PyBool>() {
         return Ok(JsonValue::Bool(flag.is_truthy()?));
     }
     if value.is_instance_of::<PyInt>() {
@@ -138,7 +138,7 @@ pub(crate) fn json_value(value: &Bound<'_, PyAny>) -> PyResult<JsonValue> {
     if value.is_instance_of::<PyFloat>() {
         return Ok(JsonValue::Float(value.extract::<f64>()?));
     }
-    if let Ok(string) = value.downcast::<PyString>() {
+    if let Ok(string) = value.cast::<PyString>() {
         return text(string);
     }
     if value.is_instance_of::<PyTuple>() || value.is_instance_of::<PyList>() {

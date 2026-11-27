@@ -1,16 +1,14 @@
-//! Behaviour of the natively hosted macro records and the compiled project's lineage graph.
+//! Behaviour of the natively hosted macro records.
 
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::types::{PyDict, PyList, PyTuple, PyTupleMethods};
+use pyo3::types::{PyDict, PyTuple, PyTupleMethods};
 
 use crate::bindings::_helpers::record_behaviours::compiled::compile_input_error;
 use sqlbuild_python_base::boundary::main::call_argument::call_argument;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::render::main::declarations::constant_declaration_sql::constant_declaration_sql;
 use sqlbuild_python_front::render::main::declarations::render_enum_member_value::render_enum_member_value;
-use sqlbuild_python_project::graph::main::project::project_graph::project_graph;
-use sqlbuild_python_project::graph::models::ResourceRow;
 
 /// The parameter name through which a macro receives its context.
 const MACRO_CONTEXT_PARAMETER_NAME: &str = "ctx";
@@ -91,104 +89,4 @@ pub(crate) fn context_render_enum_member(
         .get_item(enum_name)?
         .get_item(member_name)?;
     render_enum_member_value(&value)?.into_py_any(instance.py())
-}
-
-/// `(resource type, name)` of one compiled object key.
-fn graph_key(key: &Bound<'_, PyAny>) -> PyResult<(String, String)> {
-    Ok((
-        native_field(key, "resource_type")?.str()?.extract()?,
-        native_field(key, "name")?.extract()?,
-    ))
-}
-
-/// `(resource type, name)` of each compiled object key.
-fn graph_keys(keys: &Bound<'_, PyAny>) -> PyResult<Vec<(String, String)>> {
-    keys.try_iter()?.map(|key| graph_key(&key?)).collect()
-}
-
-/// The texts of a list or tuple of tags; anything else has none.
-fn graph_tags(value: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
-    if !(value.is_instance_of::<PyList>() || value.is_instance_of::<PyTuple>()) {
-        return Ok(Vec::new());
-    }
-    value
-        .try_iter()?
-        .map(|item| item?.str()?.extract())
-        .collect()
-}
-
-/// A resource's tags and model folder.
-type ResourceTags = (Vec<String>, Option<String>);
-/// Reads one resource's tags and model folder.
-type DescribeResource = fn(&Bound<'_, PyAny>) -> PyResult<ResourceTags>;
-
-/// The graph rows of each resource in `resources`, with tags and folder from `describe`.
-fn resource_rows(
-    resources: &Bound<'_, PyAny>,
-    describe: DescribeResource,
-) -> PyResult<Vec<ResourceRow>> {
-    let mut rows: Vec<ResourceRow> = Vec::new();
-    for resource in resources.try_iter()? {
-        let resource: Bound<'_, PyAny> = resource?;
-        let (tags, folder) = describe(&resource)?;
-        rows.push(ResourceRow {
-            key: graph_key(&native_field(&resource, "key")?)?,
-            deps: graph_keys(&native_field(&resource, "deps")?)?,
-            tags,
-            folder,
-        });
-    }
-    Ok(rows)
-}
-
-/// A model's configured tags and folder.
-fn model_tags(model: &Bound<'_, PyAny>) -> PyResult<ResourceTags> {
-    let tags: Bound<'_, PyAny> =
-        native_field(&native_field(model, "config")?, "values")?.call_method1("get", ("tags",))?;
-    let folder: String = native_field(&native_field(model, "relative_path")?, "parent")?
-        .str()?
-        .extract()?;
-    Ok((graph_tags(&tags)?, Some(folder)))
-}
-
-/// A source has neither tags nor folder.
-fn source_tags(_source: &Bound<'_, PyAny>) -> PyResult<ResourceTags> {
-    Ok((Vec::new(), None))
-}
-
-/// A seed's schema entry tags.
-fn seed_tags(seed: &Bound<'_, PyAny>) -> PyResult<ResourceTags> {
-    let tags: Vec<String> = native_field(&native_field(seed, "schema_entry")?, "tags")?
-        .try_iter()?
-        .map(|tag| tag?.extract())
-        .collect::<PyResult<_>>()?;
-    Ok((tags, None))
-}
-
-/// A function's tags.
-fn function_tags(function: &Bound<'_, PyAny>) -> PyResult<ResourceTags> {
-    let tags: Vec<String> = native_field(function, "tags")?
-        .try_iter()?
-        .map(|tag| tag?.extract())
-        .collect::<PyResult<_>>()?;
-    Ok((tags, None))
-}
-
-/// `CompiledProject.lineage_graph`: lineage edges, tags, folders and names indexed natively.
-pub(crate) fn project_lineage_graph(instance: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
-    let mut rows: Vec<ResourceRow> = Vec::new();
-    rows.extend(resource_rows(
-        &native_field(instance, "models")?,
-        model_tags,
-    )?);
-    rows.extend(resource_rows(
-        &native_field(instance, "sources")?,
-        source_tags,
-    )?);
-    rows.extend(resource_rows(&native_field(instance, "seeds")?, seed_tags)?);
-    rows.extend(resource_rows(
-        &native_field(instance, "functions")?,
-        function_tags,
-    )?);
-    project_graph(rows)?.into_py_any(instance.py())
 }

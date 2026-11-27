@@ -128,7 +128,6 @@ REGION_PROVIDER_FILES: dict[str, str] = {
         "  - name: raw_regions\n"
         "    description: The region code the provider reads.\n"
         "    managed: true\n"
-        "    write_strategy: table\n"
         "    columns:\n"
         "      - name: code\n"
         "        type: BIGINT\n"
@@ -136,7 +135,7 @@ REGION_PROVIDER_FILES: dict[str, str] = {
     "python/nodes/loaders/regions/loader.py": (
         "from python.providers.region import Region\n"
         "from sqlbuild.loaders import loader\n\n\n"
-        "@loader\n"
+        "@loader(write_strategy='replace')\n"
         "def raw_regions(ctx, region: Region):\n"
         '    """Load the provider\'s region code."""\n'
         "    return [{'code': region.code}]\n"
@@ -2495,8 +2494,8 @@ INGRESS_LOADER_FILES: dict[str, str] = {
         "from python.nodes.ready.asset import ready\n"
         "\n"
         "\n"
-        "@loader(depends_on=[ready], write_strategy='table', "
-        "columns=[{'name': 'step', 'type': 'INTEGER'}])\n"
+        "@loader(depends_on=[ready], write_strategy='replace', "
+        "columns=[{'name': 'step', 'type': 'BIGINT'}])\n"
         "def fetch_steps(ctx):\n"
         '    """Fetch the steps."""\n'
         '    return [{"step": 1}]\n'
@@ -2507,7 +2506,7 @@ INGRESS_LOADER_FILES: dict[str, str] = {
         "from python.nodes.loads.fetch_steps.loader import fetch_steps\n"
         "\n"
         "\n"
-        "@loader(depends_on=[fetch_steps])\n"
+        "@loader(write_strategy='replace', depends_on=[fetch_steps])\n"
         "def raw_steps(ctx):\n"
         '    """Load the steps."""\n'
         '    return [{"step": 1}]\n'
@@ -2516,8 +2515,7 @@ INGRESS_LOADER_FILES: dict[str, str] = {
         "from .fetch_steps.loader import fetch_steps\nfrom .raw_steps.loader import raw_steps\n"
     ),
     "sql/sources/raw.yml": (
-        "sources:\n  - name: raw_steps\n    description: Steps.\n"
-        "    managed: true\n    write_strategy: table\n"
+        "sources:\n  - name: raw_steps\n    description: Steps.\n    managed: true\n"
     ),
 }
 
@@ -2686,3 +2684,50 @@ def runtime_sink_totals(
     stdin.close()
     child.wait(timeout=60)
     return totals
+
+
+def live_log_execution(description: str, steps: str) -> WorkerExecutionTestCase:
+    """A scheduled `steps_job` running the asset `steps` defines, for live-log tests."""
+
+    return WorkerExecutionTestCase(
+        description=description,
+        model_sql="SELECT 1 AS amount",
+        warehouse_query="",
+        expected_status="",
+        expected_rows=[],
+        files=node_module_files("python/nodes/steps.py", steps),
+        default_job_files={
+            "orchestration/jobs/steps_job.toml": (
+                'name = "steps_job"\n'
+                'description = "Run the steps."\n'
+                'select = "stream_steps"\n'
+                'schedule = { cron = "0 0 * * *", timezone = "UTC", '
+                'starts_at = "2000-01-01T00:00:00Z" }\n'
+            )
+        },
+    )
+
+
+def stored_node_logs(control_store: Path, run_id: str, node_key: str) -> list[tuple[str, str]]:
+    """The `ctx.log` lines stored for `node_key` in run `run_id`, as level and message."""
+
+    with sqlite3.connect(control_store) as control:
+        return control.execute(
+            "SELECT level, message FROM sqb_run_node_logs WHERE run_id=? AND node_key=? "
+            "ORDER BY logged_at, event_id",
+            (run_id, node_key),
+        ).fetchall()
+
+
+def marked_output(control_store: Path, run_id: str, node_key: str) -> list[str]:
+    """The output lines the server marked for `node_key` in run `run_id`, in order."""
+
+    with sqlite3.connect(control_store) as control:
+        return [
+            text
+            for (text,) in control.execute(
+                "SELECT text FROM sqb_run_output_marks WHERE run_id=? AND node_key=? "
+                "ORDER BY node_line",
+                (run_id, node_key),
+            ).fetchall()
+        ]

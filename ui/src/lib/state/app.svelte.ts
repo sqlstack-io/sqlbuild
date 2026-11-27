@@ -98,7 +98,7 @@ class AppState {
 		});
 		this.client.changes.onConnectionState((state) => (this.connection = state));
 		this.client.changes.subscribe((signal) => {
-			if (channelMatches(signal.channel, ['platform_events'])) void this.#loadPlatformEvents();
+			if (channelMatches(signal.channel, ['platform_events', 'warehouse_sync', 'location_health'])) void this.#loadPlatformEvents();
 			if (channelMatches(signal.channel, ['warehouse_sync'])) void this.#loadWarehouseSync();
 			if (channelMatches(signal.channel, ['snapshot'])) void this.#loadSnapshot();
 			if (channelMatches(signal.channel, ['runs', 'triggers', 'checks'])) this.#navCounts.request();

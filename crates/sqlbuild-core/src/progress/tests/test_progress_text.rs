@@ -1,4 +1,5 @@
 use crate::cli_text::models::CliStyle;
+use crate::progress::main::completion_phase_line::completion_phase_line;
 use crate::progress::main::connection_phase_line::connection_phase_line;
 use crate::progress::main::connection_start_message::connection_start_message;
 use crate::progress::main::execution_header_text::execution_header_text;
@@ -63,6 +64,79 @@ fn given_planning_message_when_classifying_then_completions_are_recognized() {
 }
 
 #[test]
+fn given_completion_message_when_formatting_then_its_phase_line_names_what_was_done() {
+    let test_cases = [
+        ProgressLineTestCase {
+            description: "a regular verb follows what it completed",
+            line: completion_phase_line("Compiled project graph. (0.04s)", PLAIN)
+                .unwrap_or_default(),
+            expected_line: "\u{2713} Project graph compiled  (0.04s)",
+        },
+        ProgressLineTestCase {
+            description: "discovery completes as a phase line",
+            line: completion_phase_line("Discovered project. (0.02s)", PLAIN).unwrap_or_default(),
+            expected_line: "\u{2713} Project discovered  (0.02s)",
+        },
+        ProgressLineTestCase {
+            description: "lineage analysis completes as a phase line",
+            line: completion_phase_line("Analyzed column lineage. (0.00s)", PLAIN)
+                .unwrap_or_default(),
+            expected_line: "\u{2713} Column lineage analyzed  (0.00s)",
+        },
+        ProgressLineTestCase {
+            description: "contract validation completes as a phase line",
+            line: completion_phase_line("Validated model contracts. (0.00s)", PLAIN)
+                .unwrap_or_default(),
+            expected_line: "\u{2713} Model contracts validated  (0.00s)",
+        },
+        ProgressLineTestCase {
+            description: "an irregular verb takes its participle",
+            line: completion_phase_line("Wrote compiled artifacts. (0.00s)", PLAIN)
+                .unwrap_or_default(),
+            expected_line: "\u{2713} Compiled artifacts written  (0.00s)",
+        },
+        ProgressLineTestCase {
+            description: "a detail after a colon follows the label",
+            line: completion_phase_line("Checked relation usage: 2 of 4 in use. (0.00s)", PLAIN)
+                .unwrap_or_default(),
+            expected_line: "\u{2713} Relation usage checked  2 of 4 in use  (0.00s)",
+        },
+        ProgressLineTestCase {
+            description: "a subject with its own clauses stays as written",
+            line: completion_phase_line(
+                "Evaluated rules. (0.25s; built-in 0.10s, custom 0.00s); skipped type-proof rules (SQBRCONTRACT105) because SQL analysis is disabled",
+                PLAIN,
+            )
+            .unwrap_or_default(),
+            expected_line: "",
+        },
+        ProgressLineTestCase {
+            description: "a detail may hold clauses of its own",
+            line: completion_phase_line(
+                "Compiled project: 1 existing rule failure; the change may not add or worsen any. (0.51s)",
+                PLAIN,
+            )
+            .unwrap_or_default(),
+            expected_line: "\u{2713} Project compiled  1 existing rule failure; the change may not add or worsen any  (0.51s)",
+        },
+        ProgressLineTestCase {
+            description: "a leading name keeps its case",
+            line: completion_phase_line("Inspected dbt project and profile. (0.00s)", PLAIN)
+                .unwrap_or_default(),
+            expected_line: "\u{2713} dbt project and profile inspected  (0.00s)",
+        },
+    ];
+
+    for test_case in test_cases {
+        assert_eq!(
+            test_case.line, test_case.expected_line,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
 fn given_planning_message_when_classifying_then_failures_are_recognized() {
     let test_cases = [
         CompletionMessageTestCase {
@@ -117,13 +191,18 @@ fn given_connection_and_header_when_formatting_then_lines_match() {
         },
         ProgressLineTestCase {
             description: "a header with a target lists it before concurrency",
-            line: execution_header_text(PLAIN, ("sqb build", Some("dev"), 4)),
+            line: execution_header_text(PLAIN, ("sqb build", Some("dev"), 4), None),
             expected_line: "Execution  sqb build  (target: dev, concurrency: 4)\n\n",
         },
         ProgressLineTestCase {
             description: "a header without a target lists only concurrency",
-            line: execution_header_text(PLAIN, ("sqb test", None, 1)),
+            line: execution_header_text(PLAIN, ("sqb test", None, 1), None),
             expected_line: "Execution  sqb test  (concurrency: 1)\n\n",
+        },
+        ProgressLineTestCase {
+            description: "a header with engines lists them after concurrency",
+            line: execution_header_text(PLAIN, ("sqb test", None, 8), Some("DuckDB and snowflake")),
+            expected_line: "Execution  sqb test  (concurrency: 8, DuckDB and snowflake)\n\n",
         },
         ProgressLineTestCase {
             description: "a compared model reads as expected",

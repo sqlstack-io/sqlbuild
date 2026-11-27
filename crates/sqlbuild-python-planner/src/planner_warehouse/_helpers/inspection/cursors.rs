@@ -67,6 +67,8 @@ use std::time::Instant;
 
 /// The adapter method that renders one cursor bound expression as text.
 pub(crate) const CURSOR_TEXT_METHOD: &str = "render_cursor_text";
+/// The adapter method that renders a cursor `MIN` or `MAX`, NULL when no row is read.
+const CURSOR_BOUND_METHOD: &str = "render_cursor_bound";
 
 /// Selection and policy inputs for cursor warehouse inspection.
 pub(crate) struct CursorInputs<'py> {
@@ -1156,19 +1158,13 @@ pub(crate) fn dialect_cursor_sql(
     dialect: &Bound<'_, Dialect>,
     query: &PhysicalCursorQuery,
 ) -> PyResult<String> {
-    let py = dialect.py();
-    let render = dialect.syntax(CURSOR_TEXT_METHOD)?;
+    let render: (Bound<'_, PyAny>, Bound<'_, PyAny>) = (
+        dialect.syntax(CURSOR_BOUND_METHOD)?,
+        dialect.syntax(CURSOR_TEXT_METHOD)?,
+    );
     let failure: RefCell<Option<PyErr>> = RefCell::new(None);
-    let sql: String = cursor_query_sql(query, &|expression: &str| {
-        call_with(
-            &render,
-            &[
-                ("expression", text(py, expression)),
-                ("cursor_type", text(py, &query.cursor_type)),
-            ],
-        )
-        .and_then(|rendered| rendered.extract::<String>())
-        .unwrap_or_else(|error| {
+    let sql: String = cursor_query_sql(query, &|function: &str| {
+        adapter_bound_text(&render, query, function).unwrap_or_else(|error| {
             failure.replace(Some(error));
             String::new()
         })
@@ -1179,6 +1175,31 @@ pub(crate) fn dialect_cursor_sql(
     }
 }
 
+/// The adapter's `MIN` or `MAX` of the query's cursor, read as text the way the adapter renders it.
+fn adapter_bound_text(
+    (bound, as_text): &(Bound<'_, PyAny>, Bound<'_, PyAny>),
+    query: &PhysicalCursorQuery,
+    function: &str,
+) -> PyResult<String> {
+    let py = bound.py();
+    let aggregate: String = call_with(
+        bound,
+        &[
+            ("function", text(py, function)),
+            ("operand", text(py, &query.cursor_column)),
+        ],
+    )?
+    .extract()?;
+    call_with(
+        as_text,
+        &[
+            ("expression", text(py, &aggregate)),
+            ("cursor_type", text(py, &query.cursor_type)),
+        ],
+    )?
+    .extract()
+}
+
 /// `UNION ALL` batches answering `queries`, bounds read as `dialect_cursor_sql` reads them.
 fn dialect_cursor_batches(
     dialect: &Bound<'_, Dialect>,
@@ -1187,19 +1208,13 @@ fn dialect_cursor_batches(
     if queries.len() <= 1 {
         return Ok(Vec::new());
     }
-    let py = dialect.py();
-    let render = dialect.syntax(CURSOR_TEXT_METHOD)?;
+    let render: (Bound<'_, PyAny>, Bound<'_, PyAny>) = (
+        dialect.syntax(CURSOR_BOUND_METHOD)?,
+        dialect.syntax(CURSOR_TEXT_METHOD)?,
+    );
     let failure: RefCell<Option<PyErr>> = RefCell::new(None);
-    let as_text = |query: &PhysicalCursorQuery, expression: &str| -> String {
-        call_with(
-            &render,
-            &[
-                ("expression", text(py, expression)),
-                ("cursor_type", text(py, &query.cursor_type)),
-            ],
-        )
-        .and_then(|rendered| rendered.extract::<String>())
-        .unwrap_or_else(|error| {
+    let as_text = |query: &PhysicalCursorQuery, function: &str| -> String {
+        adapter_bound_text(&render, query, function).unwrap_or_else(|error| {
             failure.replace(Some(error));
             String::new()
         })

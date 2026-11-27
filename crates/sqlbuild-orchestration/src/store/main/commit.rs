@@ -1,5 +1,6 @@
 //! Commit facts and their projections together.
 
+use crate::health::main::note_session_cut_off::note_session_cut_off;
 use crate::store::_helpers::changes::resolve_changes;
 use crate::store::constants::LARGE_WAL_BYTES;
 use crate::store::errors::ControlError;
@@ -7,6 +8,7 @@ use crate::store::models::{Connection, ControlTransaction};
 
 pub(crate) async fn commit(transaction: ControlTransaction) -> Result<(), ControlError> {
     let (mut transaction, messages) = resolve_changes(transaction).await?;
+    let store = transaction.store.clone();
     match transaction
         .connection
         .take()
@@ -31,14 +33,21 @@ pub(crate) async fn commit(transaction: ControlTransaction) -> Result<(), Contro
             for message in messages {
                 let payload = serde_json::to_string(&message)
                     .map_err(|error| ControlError::Invalid(error.to_string()))?;
-                sqlx_core::query::query(
+                if let Err(error) = sqlx_core::query::query(
                     "SELECT pg_notify('sqb_changes_' || md5(current_schema()), $1)",
                 )
                 .bind(payload)
                 .execute(&mut *transaction)
-                .await?;
+                .await
+                {
+                    note_session_cut_off(&store, &error);
+                    return Err(error.into());
+                }
             }
-            transaction.commit().await?;
+            if let Err(error) = transaction.commit().await {
+                note_session_cut_off(&store, &error);
+                return Err(error.into());
+            }
         }
     }
     Ok(())

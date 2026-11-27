@@ -23,12 +23,14 @@ members = [
     "crates/sqlbuild-refactor",
     "crates/sqlbuild-project",
     "crates/sqlbuild-cli",
+    "crates/sqlbuild-load",
     "crates/sqlbuild-python-base",
     "crates/sqlbuild-python-front",
     "crates/sqlbuild-python-project",
     "crates/sqlbuild-python-planner",
     "crates/sqlbuild-python-compile",
     "crates/sqlbuild-python-output",
+    "crates/sqlbuild-python-load",
     "crates/sqlbuild-python",
 ]
 resolver = "2"
@@ -61,15 +63,17 @@ order = [
     "sqlbuild-refactor",
     "sqlbuild-project",
     "sqlbuild-cli",
+    "sqlbuild-load",
     "sqlbuild-python-base",
     "sqlbuild-python-front",
     "sqlbuild-python-project",
     "sqlbuild-python-planner",
     "sqlbuild-python-compile",
     "sqlbuild-python-output",
+    "sqlbuild-python-load",
     "sqlbuild-python",
 ]
-python-boundary = ["sqlbuild-python-base", "sqlbuild-python-front", "sqlbuild-python-project", "sqlbuild-python-planner", "sqlbuild-python-compile", "sqlbuild-python-output", "sqlbuild-python"]
+python-boundary = ["sqlbuild-python-base", "sqlbuild-python-front", "sqlbuild-python-project", "sqlbuild-python-planner", "sqlbuild-python-compile", "sqlbuild-python-output", "sqlbuild-python-load", "sqlbuild-python"]
 polyglot-floor = "sqlbuild-analysis"
 
 [workspace.package]
@@ -111,7 +115,7 @@ keyring = { version = "3.6.3", default-features = false }
 # partly used 2 MiB page then stays resident in full, which raises peak memory.
 mimalloc = { version = "0.1", default-features = false, features = ["local_dynamic_tls", "no_thp"] }
 proc-macro2 = { version = "1", features = ["span-locations"] }
-pyo3 = { version = "0.26", features = ["abi3-py312"] }
+pyo3 = { version = "0.29", features = ["abi3-py312"] }
 rpassword = "7.5.4"
 rcgen = "0.14"
 polyglot-sql = { git = "https://github.com/sqlstack-io/polyglot.git", rev = "8767d688c5b504ad609645e27ab77a260d91c5a1", default-features = false, features = [
@@ -159,8 +163,17 @@ rusqlite = { version = "0.37", features = ["bundled", "column_decltype"] }
 rustix = { version = "1.1.4", default-features = false, features = ["event", "fs", "process", "pty", "std", "stdio", "termios"] }
 saphyr-parser = "0.1"
 regex = "1"
-object_store = { version = "0.13", default-features = false, features = ["fs", "aws"] }
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+# aws-base and ring, not aws: object_store's aws feature, like reqwest's rustls feature, compiles in
+# aws-lc-rs beside ring, after which rustls no longer picks its provider by itself. SQLLoad uses ring.
+object_store = { version = "0.14", default-features = false, features = ["fs", "aws-base", "reqwest", "ring"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "query", "rustls-no-provider"] }
+# The ring provider that `sqlbuild_orchestration::tls` installs before any client is built.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+# The loading engine behind loads, loaders and sinks: its library, without its CLI or its own DuckDB.
+sqlload = { version = "=0.89.1", default-features = false }
+sqlload-python-host = { version = "=0.89.1", default-features = false }
+arrow-array = { version = "60", default-features = false }
+arrow-schema = { version = "60", default-features = false }
 serde = { version = "1", features = ["derive"] }
 # Reports every field a decode ignores; a worker refuses a run request it can only partly read.
 serde_ignored = "0.1"
@@ -193,6 +206,8 @@ sqlbuild-config = { path = "crates/sqlbuild-config" }
 sqlbuild-core = { path = "crates/sqlbuild-core" }
 sqlbuild-cursor = { path = "crates/sqlbuild-cursor" }
 sqlbuild-discovery = { path = "crates/sqlbuild-discovery" }
+sqlbuild-load = { path = "crates/sqlbuild-load" }
+sqlbuild-python-load = { path = "crates/sqlbuild-python-load" }
 sqlbuild-host = { path = "crates/sqlbuild-host" }
 sqlbuild-render = { path = "crates/sqlbuild-render" }
 sqlbuild-refactor = { path = "crates/sqlbuild-refactor" }
@@ -215,22 +230,22 @@ sqlbuild-state = { path = "crates/sqlbuild-state" }
 # SQL lint Rules, quality Rules and the formatter.
 sqlclean = { git = "https://github.com/sqlstack-io/sqlclean.git", rev = "462a98779a2a11ff11884ff79feefbfb190ab8d1" }
 # SQL change fingerprints over SQLQuack's tokenizers.
-sqlquack-fingerprint = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "63d0ce3baf8c981fac3c7164cbeb653f3ddb83a9", features = ["bigquery", "databricks", "duckdb", "postgres", "snowflake", "sqlite", "sqlserver"] }
+sqlquack-fingerprint = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "9d74b31a8d4cb14aa98d994345d3c90167646c75", features = ["bigquery", "databricks", "duckdb", "postgres", "snowflake", "sqlite", "sqlserver"] }
 # Scopes, name resolution, types and lineage for the native analysis route.
-sqlquack-semantics = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "63d0ce3baf8c981fac3c7164cbeb653f3ddb83a9", features = ["bigquery", "clickhouse", "databricks", "duckdb", "postgres", "snowflake", "sqlite", "sqlserver"] }
+sqlquack-semantics = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "9d74b31a8d4cb14aa98d994345d3c90167646c75", features = ["bigquery", "clickhouse", "databricks", "duckdb", "postgres", "snowflake", "sqlite", "sqlserver"] }
 # SQLQuack's Snowflake-family parser and tokenizer, reached as SQLQuack exposes them.
-sqlquack-parse = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "63d0ce3baf8c981fac3c7164cbeb653f3ddb83a9" }
+sqlquack-parse = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "9d74b31a8d4cb14aa98d994345d3c90167646c75" }
 # SQLQuack's syntax tree and lossless tokens.
-sqlquack-syntax = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "63d0ce3baf8c981fac3c7164cbeb653f3ddb83a9" }
+sqlquack-syntax = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "9d74b31a8d4cb14aa98d994345d3c90167646c75" }
 # SQLQuack's tokenizer: lossless tokens and tokenize failures.
-sqlquack-tokenize = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "63d0ce3baf8c981fac3c7164cbeb653f3ddb83a9" }
-sqlquack-syntax-bigquery = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "63d0ce3baf8c981fac3c7164cbeb653f3ddb83a9" }
-sqlquack-syntax-clickhouse = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "63d0ce3baf8c981fac3c7164cbeb653f3ddb83a9" }
-sqlquack-syntax-databricks = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "63d0ce3baf8c981fac3c7164cbeb653f3ddb83a9" }
-sqlquack-syntax-duckdb = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "63d0ce3baf8c981fac3c7164cbeb653f3ddb83a9" }
-sqlquack-syntax-postgres = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "63d0ce3baf8c981fac3c7164cbeb653f3ddb83a9" }
-sqlquack-syntax-sqlite = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "63d0ce3baf8c981fac3c7164cbeb653f3ddb83a9" }
-sqlquack-syntax-sqlserver = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "63d0ce3baf8c981fac3c7164cbeb653f3ddb83a9" }
+sqlquack-tokenize = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "9d74b31a8d4cb14aa98d994345d3c90167646c75" }
+sqlquack-syntax-bigquery = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "9d74b31a8d4cb14aa98d994345d3c90167646c75" }
+sqlquack-syntax-clickhouse = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "9d74b31a8d4cb14aa98d994345d3c90167646c75" }
+sqlquack-syntax-databricks = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "9d74b31a8d4cb14aa98d994345d3c90167646c75" }
+sqlquack-syntax-duckdb = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "9d74b31a8d4cb14aa98d994345d3c90167646c75" }
+sqlquack-syntax-postgres = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "9d74b31a8d4cb14aa98d994345d3c90167646c75" }
+sqlquack-syntax-sqlite = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "9d74b31a8d4cb14aa98d994345d3c90167646c75" }
+sqlquack-syntax-sqlserver = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "9d74b31a8d4cb14aa98d994345d3c90167646c75" }
 stacker = "0.1"
 # Counts heap allocations in growth tests, which measure work instead of time.
 stats_alloc = "0.1"
@@ -241,6 +256,53 @@ toml = "0.9"
 toml_edit = { version = "0.25", default-features = false, features = ["parse"] }
 toml_parser = "1"
 walkdir = "2"
+
+# Named only by sqlbuild-build-features, which enables in the sqb build the features the extension
+# resolves for these crates (see its manifest); no other crate uses them.
+aead = { version = "0.6", default-features = false }
+aes = { version = "0.9", default-features = false }
+aes-gcm = { version = "0.11", default-features = false }
+async-compression = { version = "0.4", default-features = false }
+bitflags = { version = "2.13", default-features = false }
+byteorder = { version = "1.5", default-features = false }
+chacha20 = { version = "0.10", default-features = false }
+cipher = { version = "0.5", default-features = false }
+compression-codecs = { version = "0.4", default-features = false }
+crc32fast = { version = "1.5", default-features = false }
+crypto-bigint = { version = "0.7", default-features = false }
+curve25519-dalek = { version = "5.0", default-features = false }
+digest = { version = "0.11", default-features = false }
+ecdsa = { version = "0.17", default-features = false }
+ed25519-dalek = { version = "3.0", default-features = false }
+elliptic-curve = { version = "0.14", default-features = false }
+generic-array = { version = "0.14", default-features = false }
+getrandom-v03 = { package = "getrandom", version = "0.3", default-features = false }
+ghash = { version = "0.6", default-features = false }
+hashbrown = { version = "0.17", default-features = false }
+hybrid-array = { version = "0.4", default-features = false }
+hyper-rustls = { version = "0.27", default-features = false }
+hyper-util = { version = "0.1", default-features = false }
+md-5 = { version = "0.11", default-features = false }
+nix = { version = "0.31", default-features = false }
+num-integer = { version = "0.1", default-features = false }
+p256 = { version = "0.14", default-features = false }
+p384 = { version = "0.14", default-features = false }
+pkcs8 = { version = "0.11", default-features = false }
+polyval = { version = "0.7", default-features = false }
+rand = { version = "0.10", default-features = false }
+reqwest-v012 = { package = "reqwest", version = "0.12", default-features = false }
+ring = { version = "0.17", default-features = false }
+sha2-v011 = { package = "sha2", version = "0.11", default-features = false }
+simd-adler32 = { version = "0.3", default-features = false }
+tokio-rustls = { version = "0.26", default-features = false }
+tokio-stream = { version = "0.1", default-features = false }
+tokio-util = { version = "0.7", default-features = false }
+toml_writer = { version = "1.1", default-features = false }
+zerocopy = { version = "0.8", default-features = false }
+zeroize = { version = "1.9", default-features = false }
+zstd-safe = { version = "8.4", default-features = false }
+zstd-sys = { version = "2.2", default-features = false }
+zstd-v014 = { package = "zstd", version = "0.14", default-features = false }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

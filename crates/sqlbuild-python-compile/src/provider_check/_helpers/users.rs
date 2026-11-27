@@ -63,7 +63,7 @@ fn hook_name(entry: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
     if !entry.is_instance_of::<PyDict>() {
         return Ok(None);
     }
-    match entry.downcast::<PyDict>()?.get_item("name")? {
+    match entry.cast::<PyDict>()?.get_item("name")? {
         Some(name) if name.is_instance_of::<PyString>() => Ok(Some(name.extract()?)),
         _ => Ok(None),
     }

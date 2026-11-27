@@ -765,7 +765,7 @@ impl RecallWriter {
             )));
         }
         let data: Vec<u8> = native_field(record, "data")?
-            .downcast::<PyBytes>()
+            .cast::<PyBytes>()
             .map_err(|_| PyTypeError::new_err("record.data must be bytes"))?
             .as_bytes()
             .to_vec();

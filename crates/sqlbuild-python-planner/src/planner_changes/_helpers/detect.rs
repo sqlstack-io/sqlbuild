@@ -5,6 +5,7 @@ use std::collections::HashSet;
 use crate::planner_changes::main::native_enum::native_enum;
 use crate::planner_changes::main::planner_enum::planner_enum;
 use crate::planner_changes::models::ModelPass;
+use sqlbuild_analysis::analysis_route::main::same_column_type::same_column_type;
 use sqlbuild_analysis::planner_scope::constants::MODEL;
 use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
 
@@ -20,7 +21,7 @@ use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::q
 use sqlbuild_python_project::resource_views::main::function_reads::language::language;
 
 use sqlbuild_analysis::planner_changes::constants::{
-    CASE_FOLDING_DIALECT, EMPTY_FINGERPRINT_METADATA_JSON,
+    CASE_FOLDING_DIALECT, EMPTY_FINGERPRINT_METADATA_JSON, NULLABLE_WRAPPER_DIALECT,
 };
 use sqlbuild_analysis::planner_changes::main::detect_schema_changes::detect_schema_changes;
 use sqlbuild_analysis::planner_changes::main::metadata_changes::metadata_changes;
@@ -522,8 +523,13 @@ fn schema_findings_of<'py>(
 ) -> PyResult<Vec<SchemaFindingRow>> {
     let _py: Python<'py> = dialect.py();
     let dialect_name: Option<String> = dialect.extract()?;
-    let mut types_equal =
-        |left: &str, right: &str| -> PyResult<bool> { native_types_equal(dialect, left, right) };
+    let unwraps_nullable: bool = dialect_name.as_deref() == Some(NULLABLE_WRAPPER_DIALECT);
+    let mut types_equal = |expected: &str, listed: &str| -> PyResult<bool> {
+        Ok(
+            (unwraps_nullable && same_column_type(dialect_name.as_deref(), expected, listed))
+                || native_types_equal(dialect, expected, listed)?,
+        )
+    };
     let mut single_family_type = |name: &str| -> PyResult<Option<String>> {
         let Some(families) = &dynamic else {
             return Ok(None);

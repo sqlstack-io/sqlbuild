@@ -71,6 +71,8 @@ export const eventKindLabel: Record<PlatformEventKind, string> = {
 	trigger_skipped: 'Trigger skipped',
 	sensor_rechecked: 'Sensor checked again from scratch',
 	calendar_times_dropped: 'Calendar times dropped',
+	unreadable_event_skipped: 'Stored event skipped',
+	control_session_cut_off: 'Control database session cut off',
 	scheduler_no_leader: 'Scheduler stopped',
 	location_broken: 'Location not checking in',
 	location_failing: 'Location failing',
@@ -80,6 +82,7 @@ export const eventKindLabel: Record<PlatformEventKind, string> = {
 	warehouse_sync_failed: 'Warehouse sync failing',
 	event_sink_failed: 'Event sink losing events',
 	event_forwarding_failed: 'Event forwarding failing',
+	unreadable_event: 'Problem couldn’t be read',
 	heartbeat: 'Server heartbeat'
 };
 

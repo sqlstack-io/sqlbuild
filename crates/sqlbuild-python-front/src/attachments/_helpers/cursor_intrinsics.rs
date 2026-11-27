@@ -5,7 +5,7 @@ use crate::attachments::constants::MICROBATCH_START_SENTINEL;
 use crate::attachments::main::analysis_cursor_sql::analysis_cursor_sql;
 use crate::attachments::main::compile_input_error::compile_input_error;
 use crate::attachments::main::validated_model_cursor_sql::validated_model_cursor_sql;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use pyo3::prelude::{Bound, PyAny, PyResult};
 use pyo3::types::{PyString, PyStringMethods};
 use pyo3::{Python, pyfunction};
 use sqlbuild_attachments::cursor_intrinsics::main::replace_intrinsics::replace_intrinsics;
@@ -28,7 +28,7 @@ pub(crate) const RESERVED_CURSOR_MARKERS: [&str; 2] =
 
 /// `text` when it is a string, else `None`.
 pub(crate) fn text_value(value: &Bound<'_, PyAny>) -> Option<String> {
-    match value.downcast::<PyString>() {
+    match value.cast::<PyString>() {
         Ok(text) => Some(text.to_string_lossy().into_owned()),
         Err(_) => None,
     }

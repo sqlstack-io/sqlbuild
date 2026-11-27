@@ -9,3 +9,4 @@ pub(crate) mod observations;
 pub(crate) mod pool_cap_warnings;
 pub(crate) mod problems;
 pub(crate) mod recent_health;
+pub(crate) mod skipped_events;

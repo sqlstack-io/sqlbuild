@@ -58,7 +58,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 
 ORCHESTRATION_NAME_CONFLICT: str = (
-    "; model, source, seed, function, loader, asset, check, provider, hook, unit test, "
+    "; model, source, load, seed, function, loader, asset, check, provider, hook, unit test, "
     "scenario, job, job group, sensor, and calendar names must be globally unique; rename one of "
     "them (a job or job group takes its name from `name` in its TOML file, and a calendar or "
     "sensor from its `name` argument)"

@@ -2,37 +2,34 @@ sources:
   - name: raw_customers
     description: Test source raw_customers.
     managed: true
-    write_strategy: table
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
       - name: first_name
-        type: VARCHAR
+        type: TEXT
       - name: last_name
-        type: VARCHAR
+        type: TEXT
       - name: email
-        type: VARCHAR
+        type: TEXT
       - name: created_at
         type: TIMESTAMP
 
   - name: raw_orders
     description: Test source raw_orders.
     managed: true
-    write_strategy: delete_insert
-    cursor_column: ordered_at
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
       - name: customer_id
-        type: INTEGER
+        type: BIGINT
       - name: waffle_type_id
-        type: INTEGER
+        type: BIGINT
       - name: quantity
-        type: INTEGER
+        type: BIGINT
       - name: ordered_at
         type: TIMESTAMP
       - name: status
-        type: VARCHAR
+        type: TEXT
 
   - name: raw_payments
     description: Test source raw_payments.

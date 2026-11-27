@@ -3,6 +3,7 @@ pub(crate) mod snapshot_boundary;
 pub(crate) mod snapshot_declarations;
 pub(crate) mod snapshot_execution;
 pub(crate) mod snapshot_group_cycles;
+pub(crate) mod snapshot_loads;
 pub(crate) mod snapshot_logs;
 pub(crate) mod snapshot_models;
 pub(crate) mod snapshot_project;

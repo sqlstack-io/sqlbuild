@@ -19,6 +19,10 @@ use crate::compiled_project::models::NativeCompiledProject;
 use crate::compiled_views::main::compiled_models::audit_key_rows::audit_key_rows;
 
 pub(crate) const SOURCE_RESOURCE: &str = "source";
+/// The resource type of the load that fills a source.
+pub(crate) const LOAD_RESOURCE: &str = "load";
+/// The source entry field naming that load.
+pub(crate) const LOAD_FIELD: &str = "load";
 
 positional_record! {
     into;

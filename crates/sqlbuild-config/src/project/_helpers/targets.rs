@@ -78,6 +78,42 @@ pub(crate) fn load_connections(payload: Option<&ConfigValue>, file: ConfigFile) 
     Ok(Built::Dict(loaded))
 }
 
+/// The connections one file's `[recall]` and targets' `recall` tables name, which stay SQLBuild connections.
+pub(crate) fn recall_connections(payload: &Entries, file: ConfigFile) -> Loaded<Built> {
+    let mut sections: Vec<(String, &ConfigValue)> = Vec::new();
+    if let Some(recall) = get(payload, RECALL_SECTION) {
+        sections.push((RECALL_SECTION.to_owned(), recall));
+    }
+    for (name, target) in get(payload, "targets")
+        .and_then(ConfigValue::as_map)
+        .unwrap_or_default()
+    {
+        if let Some(recall) = target
+            .as_map()
+            .and_then(|target| get(target, RECALL_SECTION))
+        {
+            sections.push((
+                format!("targets.{}.{RECALL_SECTION}", key_name(name)),
+                recall,
+            ));
+        }
+    }
+    let mut names: Vec<String> = Vec::new();
+    for (label, recall) in sections {
+        let section =
+            recall_section(recall, &label).map_err(|message| ConfigFailure::at(file, message))?;
+        for name in [section.write_connection, section.read_connection]
+            .into_iter()
+            .flatten()
+        {
+            if !names.contains(&name) {
+                names.push(name);
+            }
+        }
+    }
+    Ok(Built::Tuple(names))
+}
+
 fn execution_limits(payload: Option<&ConfigValue>, label: &str, file: ConfigFile) -> Loaded<Built> {
     let mapping = coerce_mapping(payload, Place { file, label })?;
     validate_allowed_keys(mapping, &EXECUTION_LIMIT_KEYS, Place { file, label })?;

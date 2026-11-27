@@ -23,8 +23,8 @@ _SOURCES: str = (
     "sources:\n  - name: raw_orders\n    description: Orders feed.\n    expression: >-\n"
     "      (SELECT 1 AS order_id, 10 AS customer_id, CAST(5 AS DOUBLE) AS amount,\n"
     "      'placed' AS status, TIMESTAMP '2026-01-01 00:00:00' AS ordered_at)\n"
-    "    columns:\n      - name: order_id\n        type: INTEGER\n"
-    "      - name: customer_id\n        type: INTEGER\n      - name: amount\n        type: DOUBLE\n"
+    "    columns:\n      - name: order_id\n        type: BIGINT\n"
+    "      - name: customer_id\n        type: BIGINT\n      - name: amount\n        type: DOUBLE\n"
     "      - name: status\n        type: VARCHAR\n      - name: ordered_at\n        type: TIMESTAMP\n"
 )
 _FAILING_FILES: dict[str, str] = {
@@ -51,12 +51,12 @@ _METADATA_FILES: dict[str, str] = {
     "sql/sources/raw.yml": _SOURCES
     + (
         "  - name: raw_events\n    description: Loaded events.\n    managed: true\n"
-        "    write_strategy: append\n    contract: enforced\n    cursor_column: loaded_at\n"
-        "    columns:\n      - name: event_id\n        type: INTEGER\n"
-        "      - name: load_seq\n        type: INTEGER\n"
+        "    contract: enforced\n"
+        "    columns:\n      - name: event_id\n        type: BIGINT\n"
+        "      - name: load_seq\n        type: BIGINT\n"
     ),
     "python/nodes/loaders/raw_events/loader.py": (
-        "from sqlbuild.loaders import loader\n\n\n@loader\n"
+        "from sqlbuild.loaders import loader\n\n\n@loader(write_strategy='append', cursor_column='loaded_at')\n"
         "def raw_events(ctx):\n    '''Load events.'''\n"
         "    return [{'event_id': 1, 'load_seq': 1}]\n"
     ),

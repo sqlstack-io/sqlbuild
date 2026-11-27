@@ -585,6 +585,7 @@ pub(crate) fn read_native_project_view<'py>(
         "sql_lexical_syntax" => this.sql_lexical_syntax(py).into_bound_py_any(py),
         "compile_cache_dir" => this.compile_cache_dir(py).into_bound_py_any(py),
         "loader_functions" => this.loader_functions(py).into_bound_py_any(py),
+        "loads" => this.loads(py).and_then(|value| value.into_bound_py_any(py)),
         "python_execution_inputs" => this.python_execution_inputs().into_bound_py_any(py),
         "hook_functions" => this.hook_functions(py).into_bound_py_any(py),
         "sql_hook_files" => this.sql_hook_files(py).into_bound_py_any(py),
@@ -689,7 +690,7 @@ pub(crate) fn read_native_compiled_source<'py>(
     };
     Some(match name {
         "key" => this.key(py).and_then(|value| value.into_bound_py_any(py)),
-        "deps" => this.deps(py).into_bound_py_any(py),
+        "deps" => this.deps(py).and_then(|value| value.into_bound_py_any(py)),
         "name" => this.name(py).and_then(|value| value.into_bound_py_any(py)),
         "source_entry" => this
             .source_entry(py)

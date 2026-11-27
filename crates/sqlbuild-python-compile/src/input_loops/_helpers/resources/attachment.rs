@@ -48,8 +48,11 @@ const DESCRIPTION_KEY: &str = "description";
 const MEASUREMENT_MODE: &str = "MEASUREMENT";
 
 /// `getattr(value, name)` extracted.
-fn attr<'py, T: pyo3::FromPyObject<'py>>(value: &Bound<'py, PyAny>, name: &str) -> PyResult<T> {
-    native_field(value, name)?.extract()
+fn attr<'py, T: pyo3::prelude::FromPyObjectOwned<'py>>(
+    value: &Bound<'py, PyAny>,
+    name: &str,
+) -> PyResult<T> {
+    native_field(value, name)?.extract().map_err(Into::into)
 }
 
 /// `str(value.<name>)`.
@@ -166,7 +169,7 @@ pub(crate) fn attach_resources<'py>(
     )?;
     let discovered_inputs: &Bound<'py, PyAny> = &arguments.value("discovered_inputs")?;
     let native_project: &Bound<'py, NativeCompiledProject> =
-        &arguments.value("native_project")?.downcast_into()?;
+        &arguments.value("native_project")?.cast_into()?;
     let (effective_settings, target_config, adapter_name): (
         Bound<'py, PyAny>,
         Bound<'py, PyAny>,

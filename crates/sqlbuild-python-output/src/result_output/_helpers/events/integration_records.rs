@@ -81,7 +81,7 @@ fn model_microbatch<'py>(
         return Ok(JsonValue::Object(Vec::new()));
     }
     let values: Bound<'py, PyDict> = PyDict::new(py);
-    for (key, item) in rendered.downcast::<PyDict>()?.iter() {
+    for (key, item) in rendered.cast::<PyDict>()?.iter() {
         let key: String = key.extract()?;
         if !item.is_none() {
             values.set_item(key, item)?;

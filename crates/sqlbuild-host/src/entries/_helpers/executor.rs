@@ -290,22 +290,7 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
         edge: HostEdge::Executor,
     },
     HostEntry {
-        name: "run_load_pipeline",
-        kind: HostKind::Function,
-        edge: HostEdge::Executor,
-    },
-    HostEntry {
-        name: "LoadCallbacks",
-        kind: HostKind::Class,
-        edge: HostEdge::Executor,
-    },
-    HostEntry {
         name: "LoadExecutionResult",
-        kind: HostKind::Class,
-        edge: HostEdge::Executor,
-    },
-    HostEntry {
-        name: "LoadRuntimeParams",
         kind: HostKind::Class,
         edge: HostEdge::Executor,
     },
@@ -386,6 +371,11 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
     },
     HostEntry {
         name: "report_unplaced_sql_tests",
+        kind: HostKind::Function,
+        edge: HostEdge::Executor,
+    },
+    HostEntry {
+        name: "check_local_test_inputs",
         kind: HostKind::Function,
         edge: HostEdge::Executor,
     },
@@ -891,6 +881,11 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
     },
     HostEntry {
         name: "resume_expired_holds",
+        kind: HostKind::Function,
+        edge: HostEdge::Executor,
+    },
+    HostEntry {
+        name: "plan_loads",
         kind: HostKind::Function,
         edge: HostEdge::Executor,
     },

@@ -344,7 +344,7 @@ fn shared_sql(sql: &str, candidates: &[&Arc<str>]) -> Arc<str> {
 
 /// A dict's values in insertion order.
 fn dict_values<'py>(mapping: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyTuple>> {
-    let mapping: &Bound<'py, PyDict> = mapping.downcast()?;
+    let mapping: &Bound<'py, PyDict> = mapping.cast()?;
     PyTuple::new(py_of(mapping), mapping.values())
 }
 

@@ -26,7 +26,7 @@ pub fn resolve_cursor_input_roles<'py>(model: &Bound<'py, PyAny>) -> PyResult<Bo
     let rolling: bool = strategy.eq(ROLLING_WINDOW_STRATEGY)?;
     let mut filter: Bound<'py, PyDict> = PyDict::new(py);
     let mut watermark: Bound<'py, PyDict> = PyDict::new(py);
-    match authored.downcast::<PyDict>() {
+    match authored.cast::<PyDict>() {
         Ok(authored) if strategy.eq(WATERMARK_STRATEGY)? => {
             role_blocks(authored, (&filter, &watermark))?;
         }

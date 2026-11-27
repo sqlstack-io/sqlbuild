@@ -216,7 +216,7 @@ fn expand_authored(
     .and_then(|value| pyo3::IntoPyObjectExt::into_bound_py_any(value, py))?;
     let expanded: Bound<'_, PyAny> = expanded_template_data(
         PyString::new(py, &authored.warehouse).as_any(),
-        (runtime.get_item(1)?.downcast()?, &PyDict::new(py)),
+        (runtime.get_item(1)?.cast()?, &PyDict::new(py)),
         (
             TemplateOptions {
                 allow_context: false,

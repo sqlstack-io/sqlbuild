@@ -93,8 +93,7 @@ pub(crate) async fn publish_run_failure(
         .filter_map(|row| row["node_key"].as_str().map(str::to_owned))
         .collect();
     let snapshot_id = serde_json::from_value(run["snapshot_id"].clone()).map_err(invalid)?;
-    let (mut transaction, nodes) =
-        read_snapshot_nodes(transaction, snapshot_id, Some(&keys)).await?;
+    let (mut transaction, nodes) = read_snapshot_nodes(transaction, snapshot_id, &keys).await?;
     let links = Links {
         origin,
         run_id: request.run_id,

@@ -6,7 +6,7 @@ use crate::snapshots::models::SnapshotNode;
 use crate::store::errors::ControlError;
 use crate::store::main::decompress::decompress;
 use crate::store::main::query::query;
-use crate::store::models::{Connection, ControlTransaction, Parameter};
+use crate::store::models::{ControlTransaction, Parameter};
 use crate::store::types::Row;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -41,15 +41,6 @@ pub(crate) async fn query_bodies<K: ToString>(
 
 pub(crate) fn read_nodes(rows: Vec<Row>) -> Result<BTreeMap<String, SnapshotNode>, ControlError> {
     read_bodies(rows, "node_key")
-}
-
-/// `column`, a compressed body, as hexadecimal text in the transaction's SQL dialect.
-pub(crate) fn hex_column(transaction: &ControlTransaction, column: &str) -> String {
-    if matches!(transaction.connection, Some(Connection::Postgres(_))) {
-        format!("encode({column}, 'hex')")
-    } else {
-        format!("hex({column})")
-    }
 }
 
 fn read_bodies<T: DeserializeOwned>(

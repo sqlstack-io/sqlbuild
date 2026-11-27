@@ -28,19 +28,17 @@ _LOCAL_LINE: str = "table     order_id_lists__guarded/order_id_lists START"
             description="--run-on local makes it an error naming the guard",
             run_on="local",
             expected_text=(
-                "error[T007]: SQLQuack's guard array_agg_order raised in DuckDB: ARRAY_AGG of"
+                "   = note: SQLQuack's guard array_agg_order raised in DuckDB: ARRAY_AGG of"
                 " several values in no defined order\n"
-                "      = help: Run this scenario on the warehouse with --run-on warehouse.\n"
+                "   = help: run these scenarios on the warehouse with --run-on auto\n"
             ),
-            expected_local_lines=1,
+            expected_local_lines=0,
         ),
         GuardedScenarioRunOnTestCase(
             description="--run-on local lists it under Can't run locally",
             run_on="local",
-            expected_text=(
-                "Can't run locally (1 scenario)\n\nerror: SQLQuack guard: array_agg_order\n"
-            ),
-            expected_local_lines=1,
+            expected_text=("Can't run locally (1 scenario):\n\nerror: SQLQuack guard"),
+            expected_local_lines=0,
         ),
         GuardedScenarioRunOnTestCase(
             description="auto runs it again on the warehouse and hides the local attempt",

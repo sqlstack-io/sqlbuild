@@ -299,7 +299,7 @@ pub(crate) fn build_model_inputs<'py>(
     .map(pyo3::Bound::into_any)?;
     let files: Vec<Py<NativeModelFile>> = native_field(discovered_inputs, "model_files")?
         .try_iter()?
-        .map(|file| file?.extract())
+        .map(|file| file?.extract().map_err(Into::into))
         .collect::<PyResult<_>>()?;
     let inputs: Vec<Bound<'py, NativeModelInput>> = NativeModelLoop::run(
         native_loop.cast::<NativeModelLoop>()?,

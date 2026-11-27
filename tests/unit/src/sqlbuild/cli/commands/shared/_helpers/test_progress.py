@@ -207,32 +207,36 @@ def test_given_terminal_scheduler_state_when_reporting_then_output_explains_abor
     "test_case",
     [
         NestedProgressChildRowsTestCase(
-            description="completed item renders aligned child expectation rows without truncation",
-            item_name="test_fact_orders",
-            name_width=len("assertion line_totals_are_non_negative"),
-            expected_fragments=(
-                "test      test_fact_orders",
-                "expect  expected fact_orders",
-                "expect  assertion line_totals_are_non_negative",
-                "expected fact_orders                           PASS",
-            ),
-            unexpected_fragments=("...",),
-        ),
-        NestedProgressChildRowsTestCase(
-            description="execution error preserves status and nests diagnostic",
+            description="a passing item is one row without its children",
             item_name="test_daily_revenue_chain",
             name_width=len("test_daily_revenue_chain"),
-            status_text="ERROR",
-            child_status_text="ERROR",
+            expected_output="  1/1  test      test_daily_revenue_chain  PASS\n",
+        ),
+        NestedProgressChildRowsTestCase(
+            description="verbose shows a passing item's children, cutting long names in the middle",
+            item_name="test_daily_revenue_chain",
+            name_width=len("test_daily_revenue_chain"),
+            verbose=True,
+            expected_output=(
+                "  1/1  test      test_daily_revenue_chain  PASS\n"
+                "         ├── expected  fact_orders         PASS\n"
+                "         └── assertion line_totals_are_non_negative  PASS\n"
+            ),
+        ),
+        NestedProgressChildRowsTestCase(
+            description="a failed item shows its children and its error as the last child",
+            item_name="test_daily_revenue_chain",
+            name_width=len("test_daily_revenue_chain"),
+            status_text="FAIL",
+            child_status_text="FAIL",
             error_code="T002",
             error_message="execution error while running stg_orders",
-            expected_fragments=(
-                "test      test_daily_revenue_chain",
-                "ERROR",
-                "├── expect  expected fact_orders",
-                "└── error   [T002] execution error while running stg_orders",
+            expected_output=(
+                "  1/1  test      test_daily_revenue_chain  FAIL\n"
+                "         ├── expected  fact_orders         FAIL\n"
+                "         ├── assertion line_totals_are_non_negative  FAIL\n"
+                "         └── error     [T002] execution error while running stg_orders\n"
             ),
-            unexpected_fragments=("0 mismatched",),
         ),
     ],
     ids=lambda case: case.description,
@@ -247,6 +251,7 @@ def test_given_child_rows_when_completing_nested_progress_then_renders_aligned_e
         stream=stream,
         use_color=False,
         name_width=test_case.name_width,
+        verbose=test_case.verbose,
     )
 
     callbacks.on_item_start(group_name="fact_orders", item_name=test_case.item_name)
@@ -256,61 +261,72 @@ def test_given_child_rows_when_completing_nested_progress_then_renders_aligned_e
         status_text=test_case.status_text,
         child_rows=(
             NestedProgressChildRow(
-                label="expect",
-                name="expected fact_orders",
+                label="expected",
+                name="fact_orders",
                 status_text=test_case.child_status_text,
             ),
             NestedProgressChildRow(
-                label="expect",
-                name="assertion line_totals_are_non_negative",
+                label="assertion",
+                name="line_totals_are_non_negative",
                 status_text=test_case.child_status_text,
             ),
         ),
         error_code=test_case.error_code,
         error_message=test_case.error_message,
     )
-    output: str = stream.getvalue()
 
-    expected_fragment: str
-    for expected_fragment in test_case.expected_fragments:
-        assert expected_fragment in output
-    unexpected_fragment: str
-    for unexpected_fragment in test_case.unexpected_fragments:
-        assert unexpected_fragment not in output
+    assert stream.getvalue() == test_case.expected_output
 
 
 @pytest.mark.parametrize(
     "test_case",
     [
         NestedProgressConcurrentTestCase(
-            description="concurrent items print each group header with its completed row",
-            concurrency=2,
+            description="a group of one test shows its full name without a header",
+            group_counts={"stg_orders": 1, "fact_orders": 2},
             expected_output=(
-                "stg_orders\n"
-                "    test      test_stg_orders" + " " * 35 + " PASS\n"
+                "  1/3  test      test_stg_orders       PASS\n"
                 "\n"
-                "fact_orders\n"
-                "    test      test_fact_orders" + " " * 34 + " PASS\n"
+                "  fact_orders  (2 tests)\n"
+                "  2/3  test      dedupes               PASS\n"
+                "  3/3  test      totals                PASS\n"
+            ),
+        ),
+        NestedProgressConcurrentTestCase(
+            description="without group counts every row shows its full name",
+            group_counts={},
+            expected_output=(
+                "  1/3  test      test_stg_orders       PASS\n"
+                "  2/3  test      fact_orders__dedupes  PASS\n"
+                "  3/3  test      fact_orders__totals   PASS\n"
             ),
         ),
     ],
     ids=lambda case: case.description,
 )
-def test_given_overlapping_items_when_completing_out_of_order_then_headers_follow_results(
+def test_given_items_finishing_out_of_order_when_reported_then_rows_print_in_reported_order(
     test_case: NestedProgressConcurrentTestCase,
 ) -> None:
     stream: StringIO = StringIO()
     callbacks: NestedCommandProgressCallbacks = NestedCommandProgressCallbacks(
-        total=2, label="test", stream=stream, use_color=False, concurrency=test_case.concurrency
+        total=3,
+        label="test",
+        stream=stream,
+        use_color=False,
+        group_counts=test_case.group_counts,
     )
 
-    callbacks.on_item_start(group_name="fact_orders", item_name="test_fact_orders")
+    callbacks.on_item_start(group_name="fact_orders", item_name="fact_orders__totals")
+    callbacks.on_item_start(group_name="fact_orders", item_name="fact_orders__dedupes")
     callbacks.on_item_start(group_name="stg_orders", item_name="test_stg_orders")
     callbacks.on_item_complete(
         group_name="stg_orders", item_name="test_stg_orders", status_text="PASS"
     )
     callbacks.on_item_complete(
-        group_name="fact_orders", item_name="test_fact_orders", status_text="PASS"
+        group_name="fact_orders", item_name="fact_orders__dedupes", status_text="PASS"
+    )
+    callbacks.on_item_complete(
+        group_name="fact_orders", item_name="fact_orders__totals", status_text="PASS"
     )
 
     assert stream.getvalue() == test_case.expected_output

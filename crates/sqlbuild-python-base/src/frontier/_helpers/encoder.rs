@@ -75,7 +75,7 @@ pub(crate) fn qualified_name(value: &Bound<'_, PyAny>) -> PyResult<String> {
         return qualified_name(&value.get_type().into_any());
     }
     let name: String = name.str()?.to_str()?.to_owned();
-    match module.downcast::<PyString>() {
+    match module.cast::<PyString>() {
         Ok(module) => Ok(format!("{}:{name}", module.to_str()?)),
         Err(_) => Ok(name),
     }
@@ -139,7 +139,7 @@ pub(crate) fn instance_attributes<'py>(
             slots.try_iter()?.collect::<PyResult<_>>()?
         };
         for name in names {
-            let Ok(text) = name.downcast::<PyString>() else {
+            let Ok(text) = name.cast::<PyString>() else {
                 continue;
             };
             let text: String = text.to_str()?.to_owned();

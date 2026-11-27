@@ -31,6 +31,8 @@ pub struct SourceFact {
 pub struct SourceFileFact {
     pub path: String,
     pub entries: Vec<SourceFact>,
+    /// The name of the file's `load:`, when it declares one.
+    pub load: Option<String>,
 }
 
 /// The decorated Python node kinds, in the order discovery lists them.

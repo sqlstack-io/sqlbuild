@@ -3,7 +3,7 @@
 use pyo3::IntoPyObject;
 use pyo3::exceptions::{PyException, PyValueError};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::types::{PyBool, PyBoolMethods, PyInt, PyList, PyString, PyStringMethods, PyTuple};
+use pyo3::types::{PyBool, PyBoolMethods, PyInt, PyString, PyStringMethods, PyTuple};
 use sqlbuild_analysis::assembly::analysis_session::types::Pairs;
 use sqlbuild_analysis::assembly::project::errors::AssemblyError;
 use sqlbuild_analysis::assembly::project::main::environment_template_names::environment_template_names;
@@ -15,6 +15,7 @@ use sqlbuild_analysis::assembly::project::models::{
 use sqlbuild_core::panics::main::native_failure::native_failure;
 use sqlbuild_model_config::templates::models::Scalar;
 use sqlbuild_python_base::positional_record;
+use sqlbuild_python_base::records::main::fields::tag_texts::tag_texts;
 
 use crate::project_assembly::models::NativeProjectResources;
 use crate::project_assembly::models::NativeResourceFailure;
@@ -96,10 +97,10 @@ fn plain_scalar(value: &Bound<'_, PyAny>) -> PyResult<Option<Scalar>> {
     if value.is_none() {
         return Ok(Some(Scalar::Null));
     }
-    if let Ok(flag) = value.downcast_exact::<PyBool>() {
+    if let Ok(flag) = value.cast_exact::<PyBool>() {
         return Ok(Some(Scalar::Bool(flag.is_true())));
     }
-    if let Ok(text) = value.downcast_exact::<PyString>() {
+    if let Ok(text) = value.cast_exact::<PyString>() {
         return Ok(Some(Scalar::Text(text.to_str()?.to_owned())));
     }
     if value.is_exact_instance_of::<PyInt>() {
@@ -183,17 +184,6 @@ fn references(rows: Vec<ResourceReferenceRow>) -> Vec<Reference> {
         .collect()
 }
 
-/// Model config tags as the project graph indexes them.
-fn tags(value: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
-    if !(value.is_instance_of::<PyList>() || value.is_instance_of::<PyTuple>()) {
-        return Ok(Vec::new());
-    }
-    value
-        .try_iter()?
-        .map(|item| item?.str()?.extract::<String>())
-        .collect()
-}
-
 fn model_facts(model_input: &Bound<'_, PyAny>, checks: &Bound<'_, PyAny>) -> PyResult<ModelFacts> {
     let model_file: Bound<'_, PyAny> = native_field(model_input, "model_file")?;
     let reference_rows: Vec<ResourceReferenceRow> = input_reference_rows(model_input)?
@@ -225,7 +215,7 @@ fn model_facts(model_input: &Bound<'_, PyAny>, checks: &Bound<'_, PyAny>) -> PyR
         directory: native_field(&native_field(&model_file, "relative_path")?, "parent")?
             .str()?
             .to_string(),
-        tags: tags(
+        tags: tag_texts(
             &native_field(&native_field(model_input, "config")?, "values")?
                 .call_method1("get", ("tags",))?,
         )?,

@@ -244,6 +244,7 @@ pub const PROJECTED_ATTRIBUTES: [(&str, &[&str]); 15] = [
             "audits",
             "sql_tests",
             "sql_scenarios",
+            "loads",
             "loader_functions",
             "hook_functions",
             "enforce_explicit_references",

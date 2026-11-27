@@ -137,7 +137,7 @@ impl<'py> CursorSession<'py> {
         if grain.is_none() {
             return Ok(None);
         }
-        if let Ok(name) = grain.downcast::<PyString>() {
+        if let Ok(name) = grain.cast::<PyString>() {
             let name: String = name.to_str()?.to_owned();
             if let Some((_, known)) = GRAIN_NAMES.iter().find(|(known, _)| *known == name) {
                 return Ok(Some(*known));

@@ -2,7 +2,7 @@
 
 use crate::contracts::main::effective_config_vars::effective_config_vars;
 use crate::model_config::main::config::expanded_effective_vars::expanded_effective_vars;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 use pyo3::pyfunction;
 
 /// Merge effective vars using the locked precedence order.
@@ -22,5 +22,5 @@ pub fn build_effective_vars<'py>(
         cli_vars,
     )
     .and_then(|value| pyo3::IntoPyObjectExt::into_bound_py_any(value, py))?;
-    expanded_effective_vars(merged.downcast()?)
+    expanded_effective_vars(merged.cast()?)
 }

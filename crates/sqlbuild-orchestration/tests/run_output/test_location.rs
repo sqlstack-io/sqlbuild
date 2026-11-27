@@ -1,6 +1,6 @@
 //! With no setting output goes beside a SQLite store, or to the user's state folder with PostgreSQL whatever the working directory.
 
-use crate::run_output::_helpers::folders::default_folder;
+use crate::run_output::_helpers::store::folders::default_folder;
 use crate::run_output::main::open_output_store::open_output_store;
 use crate::run_output::models::OutputSettings;
 use crate::run_output::tests::helpers::platform_path;

@@ -62,7 +62,9 @@ pub(crate) fn project_catalog<'py>(
     if binding_catalog.is_none() {
         return Err(native_compiler_error(NO_CATALOG_MESSAGE));
     }
-    native_field(&binding_catalog, "native")?.extract()
+    native_field(&binding_catalog, "native")?
+        .extract()
+        .map_err(Into::into)
 }
 
 /// Models whose output names and lineage are the finished session's, so need no payload.

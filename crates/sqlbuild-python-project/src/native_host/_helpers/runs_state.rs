@@ -72,7 +72,7 @@ pub(crate) fn var_keys(cli_vars: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
         return Ok(Vec::new());
     }
     cli_vars
-        .downcast::<PyDict>()
+        .cast::<PyDict>()
         .map_err(|_| PyValueError::new_err("--vars is not a mapping"))?
         .iter()
         .map(|(key, _)| key.str()?.extract())

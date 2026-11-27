@@ -213,8 +213,8 @@ impl CallClassState {
             None
         } else {
             Some((
-                value_ids(&native_field(declarations, "constants")?.downcast_into()?)?,
-                value_ids(&native_field(declarations, "enums")?.downcast_into()?)?,
+                value_ids(&native_field(declarations, "constants")?.cast_into()?)?,
+                value_ids(&native_field(declarations, "enums")?.cast_into()?)?,
             ))
         };
         let store_token: Option<String> = if self.store_tokens {

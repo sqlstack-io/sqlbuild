@@ -48,6 +48,7 @@ use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::tests::helpers::{request, snapshot};
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
+use crate::tls::main::client_builder::client_builder;
 
 #[test]
 fn given_published_locations_and_scheduled_work_when_read_through_http_then_resources_and_histories_remain_scoped()
@@ -175,7 +176,7 @@ fn given_published_locations_and_scheduled_work_when_read_through_http_then_reso
             .await
             .expect("worker token");
             let api = start_api(store).await;
-            let client = reqwest::Client::builder()
+            let client = client_builder()
                 .timeout(Duration::from_secs(5))
                 .build()
                 .expect("HTTP client");

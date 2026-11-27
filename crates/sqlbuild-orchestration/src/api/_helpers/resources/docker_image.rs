@@ -7,6 +7,7 @@ use crate::api::constants::DOCKER_IMAGE_HEX_LENGTH;
 use crate::api::errors::ApiError;
 use crate::api::models::DockerImageSource;
 use crate::snapshots::models::SnapshotInput;
+use crate::tls::main::client_builder::client_builder;
 
 pub(crate) async fn pin(
     sources: &[DockerImageSource],
@@ -37,7 +38,7 @@ pub(crate) async fn pin(
 
 #[cfg(unix)]
 async fn inspect(source: &DockerImageSource) -> Result<String, ApiError> {
-    let client = reqwest::Client::builder()
+    let client = client_builder()
         .no_proxy()
         .unix_socket(source.socket.as_path())
         .timeout(std::time::Duration::from_secs(5))

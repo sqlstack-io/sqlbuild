@@ -24,7 +24,7 @@ pub(crate) fn rust_text(text: &Bound<'_, PyString>) -> PyResult<(String, bool)> 
         return Ok((plain.to_owned(), false));
     }
     let encoded: Bound<'_, PyAny> = text.call_method1("encode", (ENCODING, SURROGATE_HANDLER))?;
-    let bytes: &[u8] = encoded.downcast::<PyBytes>()?.as_bytes();
+    let bytes: &[u8] = encoded.cast::<PyBytes>()?.as_bytes();
     let mut mapped: Vec<u8> = Vec::with_capacity(bytes.len() + 1);
     let mut index: usize = 0;
     while index < bytes.len() {

@@ -9,6 +9,7 @@ use sqlbuild_python_base::records::main::construct::new_error::new_error;
 
 use crate::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 use crate::contracts::main::resolve_target_config::resolve_target_config;
+use crate::contracts::main::target_connection_problem::target_connection_problem;
 use crate::discovery::main::project::resolve_config_file_path::resolve_config_file_path;
 use crate::discovery::main::project::validate_local_sql_analysis::validate_local_sql_analysis;
 use pyo3::IntoPyObjectExt;
@@ -146,8 +147,21 @@ pub(crate) fn reject_invalid_target_connections(
             config.local_config,
             PyString::new(py, &name).as_any(),
         );
-        let Err(error) = resolved else {
-            continue;
+        let error: PyErr = match resolved {
+            Ok(resolved) => {
+                let Some(problem) = target_connection_problem(
+                    (config.project_config, config.local_config),
+                    (&name, &resolved),
+                )?
+                else {
+                    continue;
+                };
+                let config_path: Bound<'_, PyAny> =
+                    config.project_dir.div(PROJECT_CONFIG_FILENAME)?;
+                let message: String = format!("{} {problem}", config_path.str()?);
+                return Err(project_config_error(py, &message, None));
+            }
+            Err(error) => error,
         };
         if !error.is_instance(py, &spec_error) {
             return Err(error);

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import runpy
 import sqlite3
 import subprocess
 from collections.abc import Callable
@@ -766,7 +767,9 @@ _WAFFLE_SQLITE_UNSUPPORTED_FILES: tuple[str, ...] = (
     "tests/unit/test_is_completed_order_udf.sql",
     "sql/models/marts/daily_order_partitioned.sql",
 )
+_WAFFLE_LOADERS_FILE: str = "python/nodes/loaders/waffle_sources/loaders.py"
 _WAFFLE_SQLITE_REWRITES: tuple[tuple[str, str, str], ...] = (
+    ("sql/sources/raw.yml", "    managed: true\n", f"    schema: {SCHEMA}\n"),
     (
         "sql/models/marts/fact_orders.sql",
         '__udf("is_completed_order")(o.status) AS is_completed_order,',
@@ -812,7 +815,9 @@ WAFFLE_ROW_COUNT_RELATIONS: tuple[str, ...] = (
 def prepare_sqlite_waffle_shop(*, tmp_path: Path) -> Path:
     """Copy the waffle shop and adapt it to SQLite's documented platform limits.
 
-    SQLite has no CREATE FUNCTION, so SQL and Python functions and their unit tests are removed and
+    Loaders can't write to SQLite, so the two loaded tables are written into the database first
+    and read as plain sources. SQLite has no CREATE FUNCTION, so SQL and Python functions and their
+    unit tests are removed and
     the completed-order check is inlined. SQLite has no DATE_TRUNC, so the truncation macro uses
     SQLite date functions. `CAST(x AS DATE)` and `CAST(x AS TIMESTAMP)` keep only the leading number
     in SQLite, so the daily revenue model uses `date(...)`, the payments source writes timestamps
@@ -822,6 +827,7 @@ def prepare_sqlite_waffle_shop(*, tmp_path: Path) -> Path:
 
     project_dir: Path = prepare_waffle_shop(tmp_path)
     (project_dir / "sqlbuild_project.toml").write_text(_WAFFLE_SQLITE_TOML, encoding="utf-8")
+    _write_loaded_waffle_tables(project_dir)
     relative_path: str
     for relative_path in _WAFFLE_SQLITE_UNSUPPORTED_FILES:
         (project_dir / relative_path).unlink()
@@ -835,6 +841,38 @@ def prepare_sqlite_waffle_shop(*, tmp_path: Path) -> Path:
         encoding="utf-8",
     )
     return project_dir
+
+
+def _write_loaded_waffle_tables(project_dir: Path) -> None:
+    """Write the rows the waffle shop's loaders return as the tables its sources read."""
+
+    loaders_path: Path = project_dir / _WAFFLE_LOADERS_FILE
+    data: dict[str, Any] = runpy.run_path(str(loaders_path))
+    loaders_path.unlink()
+    customers: list[tuple[object, ...]] = [
+        (row["id"], row["first_name"], row["last_name"], row["email"], str(row["created_at"]))
+        for row in data["CUSTOMERS"]
+    ]
+    orders: list[tuple[object, ...]] = [(*row[:4], str(row[4]), row[5]) for row in data["ORDERS"]]
+    connection: sqlite3.Connection = sqlite3.connect(project_dir / WAFFLE_SQLITE_FILE)
+    try:
+        connection.execute(
+            f'CREATE TABLE "{SCHEMA}__raw_customers" (id INTEGER, first_name VARCHAR, '
+            "last_name VARCHAR, email VARCHAR, created_at TIMESTAMP)"
+        )
+        connection.executemany(
+            f'INSERT INTO "{SCHEMA}__raw_customers" VALUES (?, ?, ?, ?, ?)', customers
+        )
+        connection.execute(
+            f'CREATE TABLE "{SCHEMA}__raw_orders" (id INTEGER, customer_id INTEGER, '
+            "waffle_type_id INTEGER, quantity INTEGER, ordered_at TIMESTAMP, status VARCHAR)"
+        )
+        connection.executemany(
+            f'INSERT INTO "{SCHEMA}__raw_orders" VALUES (?, ?, ?, ?, ?, ?)', orders
+        )
+        connection.commit()
+    finally:
+        connection.close()
 
 
 def _replace_in_file(*, path: Path, old: str, new: str) -> None:
@@ -878,8 +916,6 @@ LOADER_PROJECT_FILES: dict[str, str] = {
   - name: raw_events
     description: Order events from a loader.
     managed: true
-    write_strategy: delete_insert
-    cursor_column: happened_at
     columns:
       - name: event_id
         type: INTEGER
@@ -896,7 +932,7 @@ LOADER_PROJECT_FILES: dict[str, str] = {
 from sqlbuild.loaders import loader
 
 
-@loader
+@loader(write_strategy='delete_insert', cursor_column='happened_at')
 def raw_events(ctx: object) -> list[dict[str, object]]:
     """Order events with naive, zoned and date values."""
     _ = ctx
@@ -921,9 +957,3 @@ def raw_events(ctx: object) -> list[dict[str, object]]:
 SELECT event_id, happened_at, event_day, logged_at FROM __source("raw_events")
 """,
 }
-LOADED_EVENT_ROWS_SQL: str = (
-    "SELECT event_id, happened_at, event_day, logged_at FROM analytics__{relation} ORDER BY 1"
-)
-LOADED_EVENT_TYPES_SQL: str = (
-    "SELECT name, type FROM pragma_table_info('analytics__raw_events') ORDER BY cid"
-)

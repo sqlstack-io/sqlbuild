@@ -125,9 +125,9 @@ pub(crate) fn planner_relations_context<'py>(
         let applied = object(
             py,
             apply_deferred_locations(
-                model_locations.downcast::<PyDict>()?,
-                seed_locations.downcast::<PyDict>()?,
-                deferred_locations.downcast::<PyDict>()?,
+                model_locations.cast::<PyDict>()?,
+                seed_locations.cast::<PyDict>()?,
+                deferred_locations.cast::<PyDict>()?,
                 &selected_keys,
             )?,
         )?;
@@ -179,7 +179,7 @@ pub(crate) fn planner_relations_context<'py>(
         py,
         with_declared_source_reads(
             &project,
-            source_map.downcast::<PyDict>()?,
+            source_map.cast::<PyDict>()?,
             &scope.field(py, "python_read_source_names")?,
         )?,
     )?;

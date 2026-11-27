@@ -248,10 +248,7 @@ pub(crate) fn execute_dbt_sqlbuild_work<'py>(
             ("callbacks", hooks),
         ],
     );
-    let closed = callbacks
-        .downcast::<BuildProgressCallbacks>()?
-        .get()
-        .close(py);
+    let closed = callbacks.cast::<BuildProgressCallbacks>()?.get().close(py);
     let result = ran?;
     closed?;
     let result = BuildExecutionResult::read(&result)?;

@@ -168,7 +168,7 @@ pub(crate) fn detect_stale_warning_changes<'py>(
     )?;
     let models = PyDict::new(py);
     for (name, change) in native_field(execution_changes, "models")?
-        .downcast::<PyDict>()?
+        .cast::<PyDict>()?
         .iter()
     {
         if reusable.contains(&name.extract::<String>()?) {

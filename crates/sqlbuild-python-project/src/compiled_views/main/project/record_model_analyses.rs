@@ -21,7 +21,11 @@ pub fn record_model_analyses<'py>(
     let views: Vec<PyRef<'py, NativeCompiledModel>> = models
         .iter()
         .filter(|model| model.is_instance_of::<NativeCompiledModel>())
-        .map(|model| model.extract::<PyRef<'py, NativeCompiledModel>>())
+        .map(|model| {
+            model
+                .extract::<PyRef<'py, NativeCompiledModel>>()
+                .map_err(Into::into)
+        })
         .collect::<PyResult<_>>()?;
     let mut transferred: usize = NativeCompiledProject::record_view_analyses(project, views)?;
     let nullable: Bound<'py, PyAny> = enum_member(py, RecordId::InferredNullability, "NULLABLE")?;

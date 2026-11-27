@@ -10,9 +10,9 @@ use crate::cli_text::constants::{
     COLUMN_TYPE_CHANGED, CONFIG_CHANGED_REASON, CREATE_DYNAMIC_ACTION, CREATE_VIEW_ACTION,
     CUSTOM_ACTION, DIFF_HEADER_MARKER, EFFECTIVE_BATCH_SIZE_TOKEN, ERROR_ACTION,
     ERROR_SEVERITY_VALUE, FIRST_RUN_REASON, FORWARD_BACKFILL, FULL_BACKFILL, FULL_REFRESH_REASON,
-    INFO_SEVERITY_VALUE, NO_CHANGE_REASON, NORMAL_INCREMENTAL_REASON, QUERY_CHANGED_REASON,
-    REASON_GROUPS, SCHEMA_CHANGED_REASON, SKIP_ACTION, SOURCE_FRESHNESS_UNKNOWN_WARNING_TITLE,
-    STALE_INPUT_WARNING_TITLE, UNBOUNDED_RANGE,
+    INFO_SEVERITY_VALUE, NESTED_ROW_PREFIX, NO_CHANGE_REASON, NORMAL_INCREMENTAL_REASON,
+    QUERY_CHANGED_REASON, REASON_GROUPS, SCHEMA_CHANGED_REASON, SKIP_ACTION,
+    SOURCE_FRESHNESS_UNKNOWN_WARNING_TITLE, STALE_INPUT_WARNING_TITLE, UNBOUNDED_RANGE,
 };
 use crate::cli_text::models::{
     CliStyle, CursorPlanText, DisplayLimit, FunctionPlanText, ModelPlanText, PlanTextReport,
@@ -68,7 +68,9 @@ pub(crate) fn ready_summary(report: &PlanTextReport, full_refresh: bool) -> Stri
         full_refresh,
         selected: report.models.len() + report.seeds.len() + report.functions.len(),
         sources: report.source_loads.len(),
-        reloads_sources: report.source_loads.iter().any(|load| load.is_reload),
+        loads: report.loads.len(),
+        reloads_sources: report.source_loads.iter().any(|load| load.is_reload)
+            || report.loads.iter().any(|load| load.is_reload),
         python: report.python_entries.len(),
         audits: report.audits.len(),
         audits_not_run: report.audits_not_run.len(),
@@ -304,6 +306,37 @@ pub(crate) fn source_load_lines(report: &PlanTextReport, width: usize) -> Vec<St
         ));
     }
     lines
+}
+
+/// The loads to load or reload, each with what it loads and SQLLoad's plan of it beneath.
+pub(crate) fn load_lines(report: &PlanTextReport, width: usize) -> Vec<String> {
+    if report.loads.is_empty() {
+        return Vec::new();
+    }
+    let action: &str = if report.loads.iter().any(|load| load.is_reload) {
+        "reload"
+    } else {
+        "load"
+    };
+    section_lines(
+        &format!("Loads to {action}"),
+        &report.loads,
+        &report.display,
+        |load| {
+            let loads: String = if load.every_table {
+                "every table".to_owned()
+            } else {
+                load.sources.join(", ")
+            };
+            let mut lines: Vec<String> = vec![name_value_line(&load.name, &loads, width, true)];
+            lines.extend(
+                load.lines
+                    .iter()
+                    .map(|line| format!("{NESTED_ROW_PREFIX}{line}")),
+            );
+            lines
+        },
+    )
 }
 
 fn microbatch_lines(cursor: &CursorPlanText) -> Vec<String> {

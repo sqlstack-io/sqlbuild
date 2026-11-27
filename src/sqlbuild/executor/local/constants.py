@@ -17,12 +17,30 @@ SNAPSHOT_INVALID_CATEGORY: str = "snapshot invalid"
 
 SQLQUACK_SOURCES_HELP: str = "a source file of the project (`sources/*.yml`)"
 SQLBUILD_SOURCES_HELP: str = "a source file of the project (`sql/sources/`)"
+COMMENT_PREFIXES: tuple[str, ...] = ("#", "--")
+CALL_OPEN: str = "("
+SQLQUACK_ALLOW_HELP: str = (
+    r"allow it with (?P<key>\w+) = true under \[testing\.local\] allow in sqlbuild_project\.toml"
+)
+SQLBUILD_ALLOW_HELP: str = (
+    "allow it for local tests in sqlbuild_project.toml with "
+    "`[testing.local] allow = {{ {key} = true }}`"
+)
 
 TIMEZONE_PARAMETER: str = "TIMEZONE"
 SESSION_PARAMETERS_KEY: str = "session_parameters"
 UTC_TIME_ZONE: str = "UTC"
 
 STATEMENT_CONSTRUCT: str = "statement"
+
+LOCAL_ALLOW_LOCATION: str = "[testing.local] allow in sqlbuild_project.toml"
+LOCAL_OVERRIDES_DIR: str = "tests/overrides"
+OVERRIDE_FILE_PATTERN: str = "*.sql"
+USER_OVERRIDE_DIFFERENCE: str = "user_override"
+FUNCTION_CONSTRUCT_PREFIX: str = "fn:"
+ALLOWED_LABEL: str = "allowed"
+OVERRIDE_LABEL: str = "override"
+LOCAL_INPUTS_CHECK_SQL: str = "SELECT 1 AS checked"
 
 CONVERSION_CACHE_DIR: str = "target/sqlquack-cache"
 CONVERSION_CACHE_INDEX: str = "used.json"

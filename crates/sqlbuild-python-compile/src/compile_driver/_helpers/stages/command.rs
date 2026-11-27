@@ -439,7 +439,7 @@ fn timings_ms<'py>(
     for (key, value) in timing_milliseconds(detailed_timings) {
         timings.set_item(key, value)?;
     }
-    timings.update(reuse_timings.downcast::<PyMapping>()?)?;
+    timings.update(reuse_timings.cast::<PyMapping>()?)?;
     timings.set_item("total_ms", elapsed_ms(py, total_start)?)?;
     Ok(timings)
 }

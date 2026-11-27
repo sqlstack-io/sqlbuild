@@ -37,6 +37,6 @@ pub fn build_effective_settings<'py>(
             .collect::<PyResult<_>>()?,
     )
     .and_then(|value| pyo3::IntoPyObjectExt::into_bound_py_any(value, py))?
-    .downcast_into()?;
+    .cast_into()?;
     new_record(py, RecordId::SettingsConfig, (), Some(&values))
 }

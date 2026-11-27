@@ -19,6 +19,7 @@ from tests.unit.src.sqlbuild.executor.build._helpers._test_types import (
 )
 from tests.unit.src.sqlbuild.executor.build._helpers.helpers import (
     build_discovered_source_loader,
+    build_loader_projects,
     build_source_load_plan_output,
 )
 
@@ -67,6 +68,7 @@ def test_given_build_source_node_when_executing_then_runs_loader_runtime(
                 run_id="run-1",
                 target="dev",
                 effective_vars={"region": "west"},
+                loader_projects=build_loader_projects(loader_name=test_case.loader_name),
             ),
             callbacks=BuildCallbacks(
                 on_progress=progress_events.append,
@@ -132,6 +134,7 @@ def test_given_runtime_location_when_executing_source_node_then_result_is_writte
                 run_id="run-1",
                 target="dev",
                 default_schema=test_case.runtime_schema,
+                loader_projects=build_loader_projects(loader_name="raw_orders_loader"),
             ),
             callbacks=BuildCallbacks(),
         )

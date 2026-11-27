@@ -19,13 +19,13 @@ use crate::job_settings::_helpers::named_job_build_settings::named_job_build_set
 use crate::job_settings::constants::{JOB_SETTING_COMMANDS, OPTIONS_TERMINATOR};
 
 /// One parsed argument, `None` when unset.
-fn argument<'py, T: pyo3::FromPyObject<'py>>(
+fn argument<'py, T: pyo3::prelude::FromPyObjectOwned<'py>>(
     namespace: &Bound<'py, PyDict>,
     name: &str,
 ) -> PyResult<Option<T>> {
     Ok(namespace
         .get_item(name)?
-        .map(|value| value.extract::<Option<T>>())
+        .map(|value| value.extract::<Option<T>>().map_err(Into::into))
         .transpose()?
         .flatten())
 }

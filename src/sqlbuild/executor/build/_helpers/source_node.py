@@ -89,6 +89,7 @@ def execute_build_source_node(
             result_store=result_store,
             schema_prepared=schema_prepared,
             project_relations=runtime.project_relations,
+            loader_projects=runtime.loader_projects,
             on_rows_written=_rows_written_for(
                 key=f"source:{source_entry.name}", callbacks=callbacks
             ),

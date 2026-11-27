@@ -47,9 +47,9 @@ _PROJECT_FILES: dict[str, str] = {
             new_name=None,
             destination="sql/models/finance/fact_orders.sql",
             expected_lines=(
-                "Planned edits to 1 file.",
+                "✓ Edits to 1 file planned",
                 "Writing 1 file...",
-                "Wrote 1 file.",
+                "✓ 1 file written",
                 "Compiled: ok, 1 file changed",
             ),
         ),
@@ -60,9 +60,9 @@ _PROJECT_FILES: dict[str, str] = {
             new_name="order_amount",
             destination=None,
             expected_lines=(
-                "Planned edits to 1 file.",
+                "✓ Edits to 1 file planned",
                 "Writing 1 file...",
-                "Wrote 1 file.",
+                "✓ 1 file written",
                 "Compiled: ok, 1 file changed",
             ),
         ),
@@ -73,9 +73,9 @@ _PROJECT_FILES: dict[str, str] = {
             new_name="stg_order_lines",
             destination=None,
             expected_lines=(
-                "Planned edits to 2 files.",
+                "✓ Edits to 2 files planned",
                 "Writing 2 files...",
-                "Wrote 2 files.",
+                "✓ 2 files written",
                 "Compiled: ok, 2 files changed",
             ),
         ),
@@ -109,7 +109,7 @@ def test_given_refactor_when_running_then_progress_messages_agree_in_number(
     assert exit_code == 0, lines
     expected: str
     for expected in test_case.expected_lines:
-        assert expected in lines, lines
+        assert expected in lines, "\n".join(lines)
 
 
 @pytest.mark.parametrize(

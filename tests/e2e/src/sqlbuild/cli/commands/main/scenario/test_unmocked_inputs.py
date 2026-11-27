@@ -24,9 +24,9 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             expected_fragments=(
                 "model 'order_reps' reads 'stg_sales_reps', which is not mocked",
                 "Add a CTE named __ref__stg_sales_reps AS (...)",
-                "requires 8 sources without fixtures: raw_reps_0, raw_reps_1, raw_reps_2,"
-                " raw_reps_3, raw_reps_4 and 3 more.",
-                "Failures:\n\n  order_reps_unmocked\n    error[S504]:",
+                "requires 8 sources without fixtures: raw_reps_0, raw_reps_1, raw_reps_2,",
+                "raw_reps_3, raw_reps_4 and 3 more.",
+                "Failures:\n\n  order_reps_unmocked  (scenario, warehouse)\n    error     [S504]",
             ),
             unexpected_fragment="requires source 'raw_reps_0'",
         ),
@@ -52,7 +52,7 @@ def test_given_scenario_with_unmocked_model_input_when_testing_then_reports_the_
     for fragment in test_case.expected_fragments:
         assert fragment in output, output
     assert test_case.unexpected_fragment not in output, output
-    assert output.rstrip().splitlines()[-1].startswith("Scenario execution failed"), output
+    assert output.rstrip().splitlines()[-1].startswith("\u2717 Completed with errors"), output
 
 
 if __name__ == "__main__":

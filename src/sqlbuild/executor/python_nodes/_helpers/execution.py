@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import logging
 import time
 from collections.abc import Callable
@@ -32,6 +33,7 @@ from sqlbuild.executor.python_nodes._helpers.results import (
     evaluate_python_node_fan_in,
     normalize_python_node_return,
 )
+from sqlbuild.executor.python_nodes.constants import NODE_LOG_LINES_KEPT
 from sqlbuild.executor.python_nodes.models import (
     AssetContext,
     PythonNodeExecutionResult,
@@ -123,6 +125,10 @@ def _execute_ready_node(
             phase="execute",
         ),
     ):
+        recorder: StatementRecorder = StatementRecorder(
+            events=statement_recorder.events,
+            on_log=None if runtime.on_log is None else functools.partial(runtime.on_log, node.name),
+        )
         with ResourceAttemptLifecycle(
             resource_id=f"{node_kind.value}:{node.name}",
             resource_kind=node_kind.value,
@@ -134,15 +140,18 @@ def _execute_ready_node(
                 node_kind=node_kind,
                 upstream_results=upstream_results,
                 runtime=runtime,
-                statement_recorder=statement_recorder,
+                statement_recorder=recorder,
                 logger=logger,
                 run_state=run_state,
                 result_store=result_store,
                 sleep=sleep,
                 monotonic=monotonic,
             )
+            logged: tuple[LifeCycleEvent, ...] = _logged_events(recorder)
             result: PythonNodeExecutionResult = replace(
-                outcome, lifecycle_events=_logged_events(statement_recorder)
+                outcome,
+                lifecycle_events=logged,
+                dropped_log_lines=max(0, len(logged) - NODE_LOG_LINES_KEPT),
             )
             if on_result is not None:
                 on_result(node=node, result=result)

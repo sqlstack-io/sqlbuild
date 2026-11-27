@@ -511,10 +511,15 @@ pub(crate) async fn add_old_form_sensor(
         "when": {"kind": "platform_event", "kinds": ["tick_overdue"]},
         "minimum_interval_seconds": 1
     });
-    let (transaction, rows) = query(
-        begin(store, TransactionMode::Write).await.expect("seed"),
-        "SELECT d.body FROM sqb_snapshot_documents s JOIN sqb_documents d ON d.document_hash=s.document_hash \
+    let transaction = begin(store, TransactionMode::Write).await.expect("seed");
+    let select = format!(
+        "SELECT {} AS body FROM sqb_snapshot_documents s JOIN sqb_documents d ON d.document_hash=s.document_hash \
          WHERE s.snapshot_id=$1 AND s.kind='triggers'",
+        transaction.hex_column("d.body"),
+    );
+    let (transaction, rows) = query(
+        transaction,
+        &select,
         vec![Parameter::Id(snapshot.snapshot_id)],
     )
     .await
@@ -652,10 +657,15 @@ pub(crate) async fn watch_kinds(
     snapshot: &crate::snapshots::models::SnapshotRecord,
     watched: &[(&str, &[&str])],
 ) {
-    let (mut transaction, rows) = query(
-        begin(store, TransactionMode::Write).await.expect("seed"),
-        "SELECT d.body FROM sqb_snapshot_documents s JOIN sqb_documents d ON d.document_hash=s.document_hash \
+    let transaction = begin(store, TransactionMode::Write).await.expect("seed");
+    let select = format!(
+        "SELECT {} AS body FROM sqb_snapshot_documents s JOIN sqb_documents d ON d.document_hash=s.document_hash \
          WHERE s.snapshot_id=$1 AND s.kind='triggers'",
+        transaction.hex_column("d.body"),
+    );
+    let (mut transaction, rows) = query(
+        transaction,
+        &select,
         vec![Parameter::Id(snapshot.snapshot_id)],
     )
     .await

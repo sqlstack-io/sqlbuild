@@ -73,7 +73,7 @@ impl<'py> PythonHost<'py> {
                     ))));
                 }
             };
-        let Ok(parsed) = parsed.downcast_into::<PyDict>() else {
+        let Ok(parsed) = parsed.cast_into::<PyDict>() else {
             return Ok(Err(TypeFailure::ArgumentType(
                 "--vars must be a JSON object".to_owned(),
             )));
@@ -129,7 +129,7 @@ impl PythonHost<'_> {
         if object.is_none() {
             return Ok(Value::None);
         }
-        if let Ok(flag) = object.downcast::<PyBool>() {
+        if let Ok(flag) = object.cast::<PyBool>() {
             return Ok(Value::Bool(flag.is_true()));
         }
         if object.is_exact_instance_of::<PyInt>() {
@@ -138,14 +138,14 @@ impl PythonHost<'_> {
         if object.is_exact_instance_of::<PyString>() {
             return Ok(Value::Str(object.extract()?));
         }
-        if let Ok(items) = object.downcast_exact::<PyList>() {
+        if let Ok(items) = object.cast_exact::<PyList>() {
             let mut values: Vec<Value> = Vec::with_capacity(items.len());
             for item in items.iter() {
                 values.push(self.value_of(&item)?);
             }
             return Ok(Value::List(values));
         }
-        if let Ok(dict) = object.downcast_exact::<PyDict>()
+        if let Ok(dict) = object.cast_exact::<PyDict>()
             && dict.is_empty()
         {
             return Ok(Value::EmptyDict);
@@ -276,7 +276,7 @@ pub(crate) fn parse_cli_invocation<'py>(
     let defaults: Bound<'py, PyList> = py
         .get_type::<PyList>()
         .call1((args.getattr("__dict__")?.call_method0("items")?,))?
-        .downcast_into::<PyList>()?;
+        .cast_into::<PyList>()?;
     let columns: i64 = py
         .import("shutil")?
         .call_method0("get_terminal_size")?

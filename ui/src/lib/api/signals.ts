@@ -16,7 +16,9 @@ export type ChangedChannel =
 	| 'platform_events'
 	| `snapshot:${string}`
 	| `node_status:${string}`
-	| `warehouse_sync:${string}`;
+	| `warehouse_sync:${string}`
+	/** A location target checked in or reported its load, connection check or other health. */
+	| `location_health:${string}`;
 
 export type ChangedSignal = { channel: ChangedChannel; at: string; nodeStatus?: NodeStatusDelta };
 

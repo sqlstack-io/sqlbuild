@@ -142,34 +142,3 @@ pub(crate) fn truthy<N: AuthoredNode>(node: &N) -> bool {
             .is_none_or(|number| number.classify() != FpCategory::Zero),
     }
 }
-
-/// A string or list of strings, each `strip()`ped and non-empty; `error` words the failure.
-pub(crate) fn stripped_strings<N: AuthoredNode>(
-    value: &N,
-    error: impl Fn(&str) -> ConfigError,
-) -> Result<Vec<String>, ConfigError> {
-    match value.kind() {
-        NodeKind::Str => {
-            let stripped: String = python_strip(&value.text().unwrap_or_default()).to_owned();
-            if stripped.is_empty() {
-                return Err(error("must be non-empty"));
-            }
-            Ok(vec![stripped])
-        }
-        NodeKind::List => {
-            let mut strings: Vec<String> = Vec::new();
-            for item in value.items() {
-                let stripped: String = item
-                    .text()
-                    .map(|text| python_strip(&text).to_owned())
-                    .unwrap_or_default();
-                if stripped.is_empty() {
-                    return Err(error("must contain only non-empty strings"));
-                }
-                strings.push(stripped);
-            }
-            Ok(strings)
-        }
-        _ => Err(error("must be a string or list")),
-    }
-}

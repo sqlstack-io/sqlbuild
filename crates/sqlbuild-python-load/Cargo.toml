@@ -1,0 +1,22 @@
+[package]
+name = "sqlbuild-python-load"
+version.workspace = true
+description = "Loads on SQLLoad's engine as PyO3 bindings: SQLBuild's warehouse connections as SQLLoad's caller sessions, and the runs that load through them."
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+# SQLLoad's own minimum.
+rust-version = "1.95"
+
+[dependencies]
+arrow-array.workspace = true
+arrow-schema.workspace = true
+pyo3.workspace = true
+serde_json.workspace = true
+sqlbuild-load.workspace = true
+sqlload.workspace = true
+sqlload-python-host.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

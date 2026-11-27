@@ -136,12 +136,24 @@ When a request fails because of the control database, the error says why instead
 | `restarting` | The control database is restarting |
 | `pool_exhausted` | All 10 control database connections were busy for 30 s |
 | `locked` | The control database is locked by another process |
+| `session_cut_off` | The control database cut off a server session that ran past its limit: `<the error's own message>` |
 | `other` | Control database error: `<the error's own message>` |
 
 The response body carries `error` (the message), `cause` with `case` and `since`, and
 `request_id`, which every response also sends as `x-request-id`. The server log has each failure
 with its request ID and every cause's own message, never the password. Any other unknown path
 under `/api/` is a JSON `404`, never the UI's page.
+
+The control database holds each of the server's PostgreSQL sessions to two limits: a statement
+may run for 5 minutes, and a transaction may sit idle between statements for 2 minutes.
+Migrations and snapshot publications get 30 minutes for both. A session past a limit is cut off
+and its transaction rolled back, so a stuck task never holds a transaction open. The server logs
+it, the control database reads as `session_cut_off` until the next health check, and a
+`control_session_cut_off` platform event is sent.
+
+After a publication, the server reads each new snapshot's nodes once, a page at a time, and
+shares that one decoded copy between every reader. These reads stay within a fixed memory budget:
+one that would exceed it waits for the others to finish, rather than growing the server's memory.
 
 `sqb server` listens before it opens its control database. While the database can't be reached,
 for example because its host doesn't resolve, the server answers `/livez`, `/api/health` and the
@@ -442,6 +454,8 @@ forwarding**.
 | `trigger_skipped` | The scheduler skips a trigger whose stored job or snapshot can't be read, or a sensor whose check failed; the sensor is checked again a minute later | `trigger_id`, `snapshot_id`, `reason` |
 | `sensor_rechecked` | A sensor's last check can't be read, so it is checked again from scratch | `trigger_id`, `snapshot_id`, `evaluation_id` |
 | `calendar_times_dropped` | A publish drops a calendar schedule's due times | `trigger_id`, `snapshot_id`, `times` |
+| `unreadable_event_skipped` | The webhook or a platform sensor skipped a stored event this server can't read, such as one an earlier release stored in an older shape | `storage_id`, `event_id`, `event_type`, `location_id`, `target`, `reason` |
+| `control_session_cut_off` | The control database cut off one of the server's sessions: a statement ran past 5 minutes, or a transaction sat idle past 2 minutes, and was rolled back | `idle` (the transaction sat idle), `cut_at`, `error` |
 
 Each condition is sent once when it starts, not on every 30-second scan. Monitor heartbeats from
 outside the server too: a stopped server can't report its own outage.
@@ -451,6 +465,13 @@ credentials redacted, cut to 2,000 characters. It is the first error since the s
 completed check in that snapshot: a later attempt that fails differently sends no new event and
 doesn't replace it. Everyone who can view the target sees the reason, and it can quote stored
 values.
+
+A stored event this server can't read never stops delivery. The webhook and platform sensors skip
+it and carry on with the next one, and it is listed as a problem on the Overview and its location's
+Problems panel with its stored type, its location target and why it can't be read. The problem stays
+while the event is kept (30 days) and still can't be read, unless someone who can view the target
+dismisses it on the Overview: a dismissed event stays in the problem history and isn't listed again,
+even when it is skipped again. `unreadable_event_skipped` is sent once per skipped event.
 
 ### Fields of `run_failed`
 

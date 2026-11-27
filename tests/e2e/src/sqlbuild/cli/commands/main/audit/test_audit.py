@@ -31,7 +31,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
             ),
             expected_ordered_stdout_fragments=(
                 "Compiling project...",
-                "Compiled project. (<time>)",
+                "\u2713 Project compiled  (<time>)",
                 "Execution  sqb audit  (concurrency: 1)",
                 "Audit (28 selected, 12 models)",
                 "Connecting to duckdb...",

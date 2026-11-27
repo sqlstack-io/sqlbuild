@@ -502,6 +502,7 @@ const R_PROJECT_CONFIG: RecordSpec = RecordSpec {
         FieldSpec::new("default_target", FieldDefault::None),
         FieldSpec::new("connection", FieldDefault::EmptyDict),
         FieldSpec::new("connections", FieldDefault::EmptyDict),
+        FieldSpec::new("recall_connections", FieldDefault::EmptyTuple),
         FieldSpec::new(
             "settings",
             FieldDefault::NativeCall(RecordId::SettingsConfig),
@@ -532,6 +533,7 @@ const R_PROJECT_CONFIG: RecordSpec = RecordSpec {
         ),
         FieldSpec::new("path_defaults", FieldDefault::EmptyDict),
         FieldSpec::new("vars", FieldDefault::EmptyDict),
+        FieldSpec::new("local_test_allow", FieldDefault::EmptyDict),
         FieldSpec::new("targets", FieldDefault::EmptyDict),
         FieldSpec::new("janitor", FieldDefault::NativeCall(RecordId::JanitorConfig)),
         FieldSpec::new(
@@ -563,6 +565,7 @@ const R_LOCAL_CONFIG: RecordSpec = RecordSpec {
         FieldSpec::new("adapter", FieldDefault::None),
         FieldSpec::new("connection", FieldDefault::EmptyDict),
         FieldSpec::new("connections", FieldDefault::EmptyDict),
+        FieldSpec::new("recall_connections", FieldDefault::EmptyTuple),
         FieldSpec::new("targets", FieldDefault::EmptyDict),
         FieldSpec::new(
             "settings",
@@ -728,6 +731,7 @@ const R_SOURCE_ENTRY: RecordSpec = RecordSpec {
         FieldSpec::new("table", FieldDefault::None),
         FieldSpec::new("final", FieldDefault::False),
         FieldSpec::new("loader", FieldDefault::None),
+        FieldSpec::new("load", FieldDefault::None),
         FieldSpec::new("managed", FieldDefault::False),
         FieldSpec::new("freshness", FieldDefault::None),
         FieldSpec::new("write_strategy", FieldDefault::None),
@@ -738,6 +742,7 @@ const R_SOURCE_ENTRY: RecordSpec = RecordSpec {
         FieldSpec::new("description", FieldDefault::None),
         FieldSpec::new("type_enforcement", FieldDefault::None),
         FieldSpec::new("contract", FieldDefault::None),
+        FieldSpec::new("on_schema_change", FieldDefault::None),
         FieldSpec::new("meta", FieldDefault::EmptyDict),
         FieldSpec::new("columns", FieldDefault::EmptyTuple),
         FieldSpec::new("audits", FieldDefault::EmptyTuple),

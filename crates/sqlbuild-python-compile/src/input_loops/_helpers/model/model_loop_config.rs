@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyStringMethods, PyTuple};
 use sqlbuild_discovery::model_files::main::config_value::config_value;
 use sqlbuild_discovery::model_files::models::HeaderFacts;
@@ -175,7 +175,7 @@ fn metadata_nodes(
     };
     let mut nodes = base.as_ref().clone();
     for key in metadata.keys() {
-        let Ok(text) = key.downcast_exact::<PyString>() else {
+        let Ok(text) = key.cast_exact::<PyString>() else {
             return Ok(None);
         };
         let text = text.to_str()?;
@@ -204,7 +204,7 @@ fn reusable_metadata<'py>(
         return Ok(Some(PyDict::new(py)));
     }
     for key in header.keys() {
-        let reusable_key: bool = key.downcast::<PyString>().is_ok_and(|key| {
+        let reusable_key: bool = key.cast::<PyString>().is_ok_and(|key| {
             key.to_str()
                 .is_ok_and(|key| key == COLUMNS_KEY || key == DESCRIPTION_KEY)
         });

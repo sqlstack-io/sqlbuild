@@ -64,7 +64,7 @@ impl<'py> Encoder<'py> {
         if value.is_none() {
             return Ok(JsonValue::Null);
         }
-        if let Ok(flag) = value.downcast::<PyBool>() {
+        if let Ok(flag) = value.cast::<PyBool>() {
             return Ok(JsonValue::Bool(flag.is_true()));
         }
         if value.is_instance_of::<PyInt>() {
@@ -81,7 +81,7 @@ impl<'py> Encoder<'py> {
                     .collect::<PyResult<_>>()?,
             ));
         }
-        if let Ok(mapping) = value.downcast::<PyDict>() {
+        if let Ok(mapping) = value.cast::<PyDict>() {
             return self.object(mapping);
         }
         if self.default_str {
@@ -142,7 +142,7 @@ impl<'py> Encoder<'py> {
                 python_float_repr(number)
             });
         }
-        if let Ok(flag) = key.downcast::<PyBool>() {
+        if let Ok(flag) = key.cast::<PyBool>() {
             return Ok(if flag.is_true() { "true" } else { "false" }.to_owned());
         }
         if key.is_none() {

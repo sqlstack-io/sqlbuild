@@ -8,6 +8,7 @@ use sqlbuild_orchestration::declarations::models::TriggerRecord;
 use uuid::Uuid;
 
 use crate::test_types::TestControl;
+use sqlbuild_orchestration::tls::main::client_builder::client_builder;
 
 /// The JSON result, asserting that `--json` prints nothing else.
 pub(crate) fn administer(control: &TestControl, arguments: &[&str]) -> Value {
@@ -96,7 +97,9 @@ pub(crate) async fn read_triggers(
             target,
             "triggers",
         ]);
-    reqwest::Client::new()
+    client_builder()
+        .build()
+        .expect("HTTP client")
         .get(endpoint)
         .bearer_auth(bearer)
         .timeout(std::time::Duration::from_secs(5))
@@ -134,7 +137,7 @@ pub(crate) fn audit_actions(control: &TestControl, bearer: &str) -> Vec<String> 
 
 /// The status of reading the bootstrap with `key` from an address the server doesn't name.
 pub(crate) async fn keyed_bootstrap_status(url: &str, key: &str) -> u16 {
-    reqwest::Client::builder()
+    client_builder()
         .timeout(std::time::Duration::from_secs(5))
         .build()
         .expect("HTTP client")

@@ -72,7 +72,7 @@ pub(crate) fn frozen<'py>(
         let copied: Bound<'py, PyDict> = PyDict::new(py);
         for item in mapping_items(value)?.try_iter()? {
             let (key, item): (Bound<'py, PyAny>, Bound<'py, PyAny>) = item?.extract()?;
-            let Ok(name) = key.downcast::<PyString>() else {
+            let Ok(name) = key.cast::<PyString>() else {
                 return Err(validation_error(
                     py,
                     &format!("{} keys must be strings", rendered_path(path)),

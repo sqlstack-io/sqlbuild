@@ -2,7 +2,7 @@
 
 use std::time::{Duration, Instant};
 
-use crate::run_output::_helpers::upload::attached;
+use crate::run_output::_helpers::worker::upload::attached;
 use crate::run_output::models::UploadSummary;
 
 /// `None` when this process sent no run output.

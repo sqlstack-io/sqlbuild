@@ -28,7 +28,7 @@ pub(crate) fn plain_value(value: &Bound<'_, PyAny>) -> PyResult<Value> {
     if value.is_none() {
         return Ok(Value::Null);
     }
-    if let Ok(flag) = value.downcast::<PyBool>() {
+    if let Ok(flag) = value.cast::<PyBool>() {
         return Ok(Value::Bool(flag.is_true()));
     }
     if value.is_instance_of::<PyInt>() {
@@ -37,7 +37,7 @@ pub(crate) fn plain_value(value: &Bound<'_, PyAny>) -> PyResult<Value> {
     if value.is_instance_of::<PyFloat>() {
         return Ok(Number::from_f64(value.extract::<f64>()?).map_or(Value::Null, Value::Number));
     }
-    if let Ok(text) = value.downcast::<PyString>() {
+    if let Ok(text) = value.cast::<PyString>() {
         return Ok(Value::String(text.to_str()?.to_owned()));
     }
     if value.is_instance_of::<PyList>() || value.is_instance_of::<PyTuple>() {
@@ -47,7 +47,7 @@ pub(crate) fn plain_value(value: &Bound<'_, PyAny>) -> PyResult<Value> {
             .collect::<PyResult<Vec<Value>>>()
             .map(Value::Array);
     }
-    if let Ok(mapping) = value.downcast::<PyDict>() {
+    if let Ok(mapping) = value.cast::<PyDict>() {
         return object_value(mapping);
     }
     if let Ok(record) = value.cast::<NativeRecord>() {
@@ -87,7 +87,7 @@ fn object_like_value(value: &Bound<'_, PyAny>) -> PyResult<Value> {
 fn dataclass_value(value: &Bound<'_, PyAny>) -> PyResult<Value> {
     let mut entries: Vec<(String, Value)> = Vec::new();
     if let Ok(attributes) = native_field(value, INSTANCE_DICT) {
-        for (key, item) in attributes.downcast::<PyDict>()?.iter() {
+        for (key, item) in attributes.cast::<PyDict>()?.iter() {
             let name: String = key.str()?.to_str()?.to_owned();
             if !name.starts_with(PRIVATE_PREFIX) {
                 entries.push((name, plain_value(&item)?));
@@ -120,7 +120,7 @@ fn integer_value(value: &Bound<'_, PyAny>) -> PyResult<Value> {
 pub(crate) fn object_value(mapping: &Bound<'_, PyDict>) -> PyResult<Value> {
     let mut entries: Vec<(String, Value)> = Vec::new();
     for (key, item) in mapping.iter() {
-        let Ok(key) = key.downcast::<PyString>() else {
+        let Ok(key) = key.cast::<PyString>() else {
             return Err(value_error("Dict key must be str"));
         };
         entries.push((key.to_str()?.to_owned(), plain_value(&item)?));

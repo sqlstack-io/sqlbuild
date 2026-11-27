@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use crate::nested_progress::models::NestedChildRow;
 use crate::scenario_command::errors::ScenarioCommandError;
 use crate::scenario_command::models::{
     AssertionRow, CaptureRelationRow, CodedText, ExpectationSql, ExpectedRow, NamespaceCandidates,
@@ -106,6 +107,7 @@ pub(super) fn failing_result_row() -> ScenarioResultRow {
             },
             AssertionRow {
                 name: "ok".to_owned(),
+                failing_row_count: Some(0),
                 ..AssertionRow::default()
             },
         ],
@@ -187,4 +189,14 @@ pub(super) fn selected_names(
                 .collect()
         })
         .map_err(|error| (error.code, error.message))
+}
+
+/// A child row with `label`, `name`, `status` and `detail`.
+pub(super) fn child(label: &str, name: &str, status: &str, detail: &str) -> NestedChildRow {
+    NestedChildRow {
+        label: label.to_owned(),
+        name: name.to_owned(),
+        status_text: status.to_owned(),
+        detail: detail.to_owned(),
+    }
 }

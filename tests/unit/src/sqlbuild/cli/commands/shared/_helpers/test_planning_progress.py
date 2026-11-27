@@ -42,7 +42,7 @@ from tests.unit.src.sqlbuild.presentation.classes.helpers import (
                 "Applied clone plan. (0.10s)",
                 "sqb clone",
             ),
-            expected_output=("Applying clone plan...\nApplied clone plan. (0.10s)\nsqb clone\n"),
+            expected_output=("Applying clone plan...\n✓ Clone plan applied  (0.10s)\nsqb clone\n"),
         ),
     ],
     ids=lambda case: case.description,
@@ -80,7 +80,7 @@ def test_given_planning_messages_when_reporting_then_writes_expected_output(
         PlanningPhaseEndTestCase(
             description="prepared clone plan ends its phase before later output",
             messages=("Preparing clone plan...", "Prepared clone plan. (0.10s)"),
-            expected_lines=("Prepared clone plan. (0.10s)", "error[E001]: later output", ""),
+            expected_lines=("✓ Clone plan prepared  (0.10s)", "error[E001]: later output", ""),
         ),
     ),
     ids=lambda case: case.description,

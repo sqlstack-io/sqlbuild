@@ -28,12 +28,12 @@ _PROJECT_FILES: dict[str, str] = {
         '[targets.prod]\nschema = "prod"\nloader_schema = "raw_prod"\n'
     ),
     "sql/sources/raw.yml": (
-        "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n    managed: true\n    write_strategy: table\n"
-        "    columns:\n      - name: order_id\n        type: INTEGER\n"
+        "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n    managed: true\n"
+        "    columns:\n      - name: order_id\n        type: BIGINT\n"
     ),
     "python/nodes/loaders/raw/loader.py": (
         "from sqlbuild.loaders import loader\n\n\n"
-        "@loader\ndef raw_orders(ctx):\n    '''Test loader raw_orders.'''\n    return [{'order_id': 9}]\n"
+        "@loader(write_strategy='replace')\ndef raw_orders(ctx):\n    '''Test loader raw_orders.'''\n    return [{'order_id': 9}]\n"
     ),
     "sql/models/sales/_sqlbuild/_hooks/python/count.py": (
         "from sqlbuild.hooks import hook\nfrom sqlbuild.refs import source\n\n\n"

@@ -27,13 +27,14 @@ from sqlbuild.executor.load.main._resource_kind import load_resource_kind
 from sqlbuild.executor.load.main._skipped_result import skipped_load_result
 from sqlbuild.executor.load.models import LoadExecutionResult, LoadRuntimeParams
 from sqlbuild.executor.node_results.main._direct_store import build_direct_node_result_store
-from sqlbuild.executor.python_nodes._helpers.discovered_items import parallel_set
+from sqlbuild.executor.python_nodes._helpers.discovered_items import parallel_set, shares_warehouse
 from sqlbuild.executor.python_nodes._helpers.fingerprinting import (
     try_write_python_node_identity_fingerprint,
 )
 from sqlbuild.executor.python_nodes._helpers.lifecycle_nodes import build_ingress_lifecycle_nodes
 from sqlbuild.executor.python_nodes._helpers.node_warehouse import node_runtime
 from sqlbuild.executor.python_nodes.classes.discovered_item_pool import DiscoveredItemPool
+from sqlbuild.executor.python_nodes.classes.ingress_loader_pool import IngressLoaderPool
 from sqlbuild.executor.python_nodes.classes.ingress_results import IngressResultAccumulator
 from sqlbuild.executor.python_nodes.main._ready import run_ready_python_node
 from sqlbuild.executor.python_nodes.models import (
@@ -113,19 +114,24 @@ def execute_ingress_python_loader_nodes(
     )
     node_runtime: PythonNodeRuntime = replace(runtime, result_store=resolved_result_store)
 
-    scheduler_result: LifecycleSchedulerResult = run_lifecycle_scheduler(
-        nodes=lifecycle_nodes,
-        handler=lambda node: _execute_ingress_lifecycle_node(
+    def execute(
+        *, node: LifecycleExecutionNode, on_runtime: PythonNodeRuntime
+    ) -> LifecycleNodeResult:
+        return _execute_ingress_lifecycle_node(
             node=node,
             python_graph=python_graph,
             loader_by_name=loader_by_name,
             source_by_loader_name=source_by_loader_name,
             source_map=source_map,
-            runtime=node_runtime,
+            runtime=on_runtime,
             callbacks=resolved_callbacks,
             run_state=run_state,
             results=results,
-        ),
+        )
+
+    scheduler_result: LifecycleSchedulerResult = run_lifecycle_scheduler(
+        nodes=lifecycle_nodes,
+        handler=lambda node: execute(node=node, on_runtime=node_runtime),
         concurrency=_item_concurrency(
             nodes=lifecycle_nodes,
             python_graph=python_graph,
@@ -133,6 +139,7 @@ def execute_ingress_python_loader_nodes(
             callbacks=resolved_callbacks,
             run_state=run_state,
             results=results,
+            loaders=(runtime, execute),
         ),
     )
     _record_scheduler_skips(
@@ -158,8 +165,12 @@ def _item_concurrency(
     callbacks: IngressCallbacks,
     run_state: PythonNodeRunState,
     results: IngressResultAccumulator,
+    loaders: tuple[
+        PythonNodeRuntime,
+        Callable[..., LifecycleNodeResult],
+    ],
 ) -> LifecycleConcurrency | None:
-    """How ingress runs discovered items beside each other; `None` when none may."""
+    """How ingress runs discovered items and loaders beside each other; `None` when none may."""
 
     parallel: dict[str, tuple[str, int]] = {}
     lifecycle_node: LifecycleExecutionNode
@@ -171,9 +182,22 @@ def _item_concurrency(
         )
         if limited is not None:
             parallel[lifecycle_node.name] = limited
-    if not parallel:
+    loader_runtime, execute = loaders
+    loader_names: frozenset[str] = (
+        frozenset(
+            node.name
+            for node in nodes
+            if python_graph.nodes_by_name[node.name].kind == PythonNodeKind.LOADER
+        )
+        if runtime.max_concurrency > 1 and shares_warehouse(runtime)
+        else frozenset()
+    )
+    if not parallel and not loader_names:
         return None
     by_name: dict[str, LifecycleExecutionNode] = {node.name: node for node in nodes}
+    loader_pool: IngressLoaderPool = IngressLoaderPool(
+        runtime=loader_runtime, eligible=lambda node: node.name in loader_names, execute=execute
+    )
 
     def run(progress: LifecycleProgress) -> None:
         def complete_item(*, node: ExecutablePythonNode, result: PythonNodeExecutionResult) -> None:
@@ -209,7 +233,15 @@ def _item_concurrency(
             ),
         ).run(thread_limit=sum(dict(parallel.values()).values()))
 
-    return LifecycleConcurrency(eligible=lambda node: node.name in parallel, run=run)
+    def run_ready(progress: LifecycleProgress) -> None:
+        if progress.ready[0] in loader_names:
+            loader_pool.run(progress)
+        else:
+            run(progress)
+
+    return LifecycleConcurrency(
+        eligible=lambda node: node.name in parallel or node.name in loader_names, run=run_ready
+    )
 
 
 def _python_upstream_results(
@@ -398,6 +430,7 @@ def _execute_ingress_loader(
                         providers=runtime.providers,
                         result_store=runtime.result_store,
                         project_relations=runtime.project_relations,
+                        loader_projects=runtime.loader_projects,
                     ),
                     statement_recorder=StatementRecorder(),
                     loader_ref_entries=_loader_ref_entries(

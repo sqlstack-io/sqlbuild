@@ -6,11 +6,12 @@ use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 
 use crate::api::errors::ClientError;
 use crate::api::models::ControlClient;
+use crate::tls::main::client_builder::client_builder;
 
 pub(crate) fn http_client(authorization: HeaderValue) -> Result<reqwest::Client, ClientError> {
     let mut headers = HeaderMap::new();
     headers.insert(AUTHORIZATION, authorization);
-    Ok(reqwest::Client::builder()
+    Ok(client_builder()
         .default_headers(headers)
         .redirect(reqwest::redirect::Policy::none())
         .timeout(Duration::from_secs(30))

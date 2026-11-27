@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 use std::future::Future;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 use serde_json::Value;
 use tokio::sync::OnceCell;
@@ -12,28 +12,28 @@ use crate::authorization::main::decisions::authorize_person::authorize_person;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::declarations::main::frozen_definitions::frozen_definitions;
 use crate::runs::constants::PUBLICATIONS_PER_TARGET;
-use crate::runs::models::{
-    CachedPublication, PlannerResource, PublishedJobs, SnapshotSlot, SnapshotSlots,
-};
+use crate::runs::models::{CachedPublication, PlannerResource, PublishedJobs};
 use crate::runs::types::CommandPlanner;
+use crate::runs::types::SnapshotSlots;
 use crate::snapshots::main::reads::read_current_record::read_current_record;
-use crate::snapshots::main::reads::read_kind_nodes::read_kind_nodes;
 use crate::snapshots::main::reads::read_snapshot_keys::read_snapshot_keys;
+use crate::snapshots::main::reads::snapshot_cell::snapshot_cell;
+use crate::snapshots::main::reads::snapshot_nodes::snapshot_nodes;
 use crate::snapshots::main::write_sets::writer_nodes::writer_nodes;
 use crate::snapshots::models::{SnapshotNode, SnapshotRecord};
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};
 use crate::store::models::{ControlStore, ControlTransaction, TransactionMode};
 
-/// Graph kinds in the order the CLI builds its project graph: models, sources, seeds, then functions.
-const GRAPH_KINDS: [&str; 5] = ["model", "source", "seed", "udf", "table_fn"];
+/// Graph kinds in the order the CLI builds its project graph: models, sources, seeds, functions, then loads.
+const GRAPH_KINDS: [&str; 6] = ["model", "source", "seed", "udf", "table_fn", "load"];
 /// Python node kinds, in the order the CLI discovers them.
 const PYTHON_NODE_KINDS: [&str; 3] = ["asset", "loader", "check"];
 /// SQL unit tests, which `test:` selects; each lists the models it tests.
 const SQL_TEST_KIND: &str = "sql_test";
 /// Every kind planning reads a definition of; audits, macros and scenarios are neither selected nor written.
-const PLANNED_KINDS: [&str; 9] = [
-    "model", "source", "seed", "udf", "table_fn", "asset", "loader", "check", "sql_test",
+const PLANNED_KINDS: [&str; 10] = [
+    "model", "source", "seed", "udf", "table_fn", "load", "asset", "loader", "check", "sql_test",
 ];
 /// Where a SQL unit test's definition lists the models it tests.
 const SQL_TEST_MODELS_POINTER: &str = "/test/payload/expected_model_names";
@@ -138,42 +138,7 @@ fn slot(
     slots: &Mutex<SnapshotSlots>,
     (scope, snapshot_id): ((Uuid, String), Uuid),
 ) -> Arc<OnceCell<Arc<CachedPublication>>> {
-    let mut state = slots.lock().unwrap_or_else(PoisonError::into_inner);
-    state.clock += 1;
-    let now = state.clock;
-    if let Some(slot) = state
-        .slots
-        .iter_mut()
-        .find(|slot| slot.snapshot_id == snapshot_id)
-    {
-        slot.used = now;
-        return Arc::clone(&slot.cell);
-    }
-    let cell = Arc::new(OnceCell::new());
-    state.slots.push(SnapshotSlot {
-        scope: scope.clone(),
-        snapshot_id,
-        used: now,
-        cell: Arc::clone(&cell),
-    });
-    loop {
-        let in_scope = state
-            .slots
-            .iter()
-            .enumerate()
-            .filter(|(_, slot)| slot.scope == scope);
-        if in_scope.clone().count() <= PUBLICATIONS_PER_TARGET {
-            break;
-        }
-        let Some(oldest) = in_scope
-            .min_by_key(|(_, slot)| slot.used)
-            .map(|(index, _)| index)
-        else {
-            break;
-        };
-        state.slots.remove(oldest);
-    }
-    cell
+    snapshot_cell(slots, (scope, snapshot_id), PUBLICATIONS_PER_TARGET)
 }
 
 /// Read what planning needs from one snapshot and index it with the planner.
@@ -183,7 +148,7 @@ async fn read_publication(
     snapshot_id: Uuid,
 ) -> Result<(ControlTransaction, CachedPublication), ControlError> {
     let (transaction, node_keys) = read_snapshot_keys(transaction, snapshot_id).await?;
-    let (transaction, nodes) = read_kind_nodes(transaction, snapshot_id, &PLANNED_KINDS).await?;
+    let nodes = snapshot_nodes(&transaction.store, snapshot_id).await?;
     let (transaction, definitions) = frozen_definitions(transaction, snapshot_id).await?;
     let definitions = definitions?;
     let jobs = PublishedJobs {
@@ -209,11 +174,22 @@ async fn read_publication(
             .map(|(name, job)| (name, job.settings))
             .collect(),
     };
+    let preparer = planner.preparer();
+    let (prepared, writers) = tokio::task::spawn_blocking(move || {
+        let planned = nodes
+            .iter()
+            .filter(|(_, node)| PLANNED_KINDS.contains(&node.kind.as_str()));
+        (
+            preparer(planner_resources(&nodes), jobs),
+            writer_nodes(planned),
+        )
+    })
+    .await?;
     Ok((
         transaction,
         CachedPublication {
-            prepared: planner.prepare(planner_resources(&nodes), jobs),
-            writers: writer_nodes(&nodes),
+            prepared,
+            writers,
             node_keys,
         },
     ))

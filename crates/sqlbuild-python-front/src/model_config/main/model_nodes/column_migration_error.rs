@@ -20,7 +20,7 @@ pub fn column_migration_error(
     let materialized: Option<String> = match values.get_item(MATERIALIZED_KEY)? {
         None => None,
         Some(value) if value.is_none() => None,
-        Some(value) => match value.downcast::<PyString>() {
+        Some(value) => match value.cast::<PyString>() {
             Ok(text) => Some(text.to_str()?.to_owned()),
             Err(_) => return Ok(Some(ConfigError::config_value_type(MATERIALIZED_KEY))),
         },

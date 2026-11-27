@@ -63,12 +63,12 @@ fn substituted<'py>(
 ) -> PyResult<(String, Vec<SpanRow>)> {
     let py: Python<'py> = sql.py();
     let sources = InterpolationSources(
-        effective_vars.downcast()?.clone(),
+        effective_vars.cast()?.clone(),
         unicode_environment(py)?,
         if context_values.is_none() {
             None
         } else {
-            Some(context_values.downcast()?.clone())
+            Some(context_values.cast()?.clone())
         },
         native_attr(py, NativeAttr::RenderProjectVarText)?,
         syntax.cloned(),
@@ -216,7 +216,7 @@ pub(crate) fn authored_expansion(sources: AuthoredSources<'_, '_>) -> PyResult<A
     let request: ExpansionRequest<'_> = ExpansionRequest {
         sql: PyString::new(py, &declared),
         file_path: sources.file_path.clone(),
-        loaded_macros: sources.loaded_macros.downcast()?.clone(),
+        loaded_macros: sources.loaded_macros.cast()?.clone(),
         macro_overrides: None,
         macro_context: sources.macro_context.clone(),
         declaration_resolver: sources.declaration_resolver,

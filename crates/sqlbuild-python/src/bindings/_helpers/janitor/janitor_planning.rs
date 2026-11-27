@@ -375,13 +375,13 @@ fn optional_keys(value: &Bound<'_, PyAny>) -> PyResult<Vec<Key>> {
     keys_of(value)
 }
 
-fn value_or<'py, T: pyo3::FromPyObject<'py>>(
+fn value_or<'py, T: pyo3::prelude::FromPyObjectOwned<'py>>(
     arguments: &KeywordArguments<'py>,
     name: &str,
     default: T,
 ) -> PyResult<T> {
     if arguments.passed(name)? {
-        return arguments.value(name)?.extract();
+        return arguments.value(name)?.extract().map_err(Into::into);
     }
     Ok(default)
 }

@@ -63,6 +63,7 @@ pub(crate) fn build_planner_scope<'py>(
         native_field(&project, "lineage_graph")?.cast_into()?;
     let lineage = lineage.borrow();
     let selected = args.value("selected_keys")?;
+    let caller_resolved_loader_upstream: bool = !selected.is_none();
     let (mut selected, audits) = if selected.is_none() {
         resolve_planner_keys(&project, lineage.graph(), (&select, &exclude))?
     } else {
@@ -84,7 +85,7 @@ pub(crate) fn build_planner_scope<'py>(
         source_selectors(&sent, names, &selected, true).map_err(|error| carrier.error(error))?;
     let named_sources =
         source_selectors(&sent, names, &selected, false).map_err(|error| carrier.error(error))?;
-    let mut executable = if auto_load {
+    let mut executable = if auto_load && !caller_resolved_loader_upstream {
         source_keys
     } else {
         HashSet::new()
@@ -93,7 +94,10 @@ pub(crate) fn build_planner_scope<'py>(
         let mut managed: HashSet<String> = HashSet::new();
         for source in sources(&project)?.try_iter()? {
             let source = source?;
-            if !native_field(&source_entry(&source)?, "loader")?.is_none() {
+            let entry: Bound<'py, PyAny> = source_entry(&source)?;
+            if !native_field(&entry, "loader")?.is_none()
+                || !native_field(&entry, "load")?.is_none()
+            {
                 managed.insert(
                     crate::resource_views::main::source_reads::name::name(&source)?.extract()?,
                 );

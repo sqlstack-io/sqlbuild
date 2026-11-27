@@ -118,7 +118,7 @@ def prepare_python_dag_project(root: Path) -> Path:
                 "",
                 "@loader(",
                 "    depends_on=(prepare_orders,),",
-                "    columns=[{'name': 'order_id', 'type': 'integer'}],",
+                "    columns=[{'name': 'order_id', 'type': 'BIGINT'}],",
                 ")",
                 "def warehouse_export(ctx):",
                 "    '''Test loader warehouse_export.'''",

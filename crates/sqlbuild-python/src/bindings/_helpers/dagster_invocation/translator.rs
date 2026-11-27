@@ -171,7 +171,7 @@ fn fallback_description(node: &Bound<'_, PyAny>) -> PyResult<String> {
 /// A string field, or `None` when the field is not text.
 fn text_field(node: &Bound<'_, PyAny>, key: &str) -> PyResult<Option<String>> {
     let value: Bound<'_, PyAny> = get(node, key)?;
-    match value.downcast::<PyString>() {
+    match value.cast::<PyString>() {
         Ok(value) => Ok(Some(value.to_string_lossy().into_owned())),
         Err(_) => Ok(None),
     }

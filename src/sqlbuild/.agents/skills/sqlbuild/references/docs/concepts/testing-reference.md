@@ -439,7 +439,7 @@ credentials.
 | Setting | Where each test runs |
 | --- | --- |
 | `auto` (default) | Locally when [SQLQuack](https://github.com/sqlstack-io/sqlquack) converts its comparison SQL to DuckDB, otherwise on the warehouse |
-| `local` | Locally. A test SQLQuack refuses is an `ERROR` (`T007`, `can't run locally`); it is never skipped or sent to the warehouse |
+| `local` | Locally. A test SQLQuack refuses is not run (`NOT_RUN=`, `T007` in `--json`) and fails the run; it is never sent to the warehouse |
 | `warehouse` | On the warehouse, as every test ran before |
 
 The setting comes from, in order: `--run-on`, the selected target's `test_run_on` (a target in
@@ -485,15 +485,63 @@ How SQLBuild decides, at compile time, before anything runs:
 `a known difference that isn't allowed: fn:HASH`. The full diagnostics follow the plan.
 
 In `auto`, when the warehouse connection cannot be made, the local tests still run and each
-warehouse test is an `ERROR` (`T008`, `needs the warehouse (no connection)`).
+warehouse test is not run (`NOT_RUN=`, `T008` in `--json`), and a
+`Not run (N): needs the warehouse (no connection)` line says why.
 
 Some problems only show when a test runs. SQLQuack's converted SQL raises, instead of returning a
 different value, for inputs DuckDB would read differently from Snowflake, and DuckDB can fail with
 an internal error on SQL it accepted. In `auto` such a test runs again on the warehouse, with the
 reason `SQLQuack guard: <name>`, such as `SQLQuack guard: array_agg_order`, or
 `DuckDB internal error: <message>`. The local attempt prints nothing; the test's row shows
-`warehouse  (<reason>)`. With `--run-on local` it is an `ERROR` (`T007`) that names the guard. An error Snowflake would raise too, such as a value that isn't a number, is the test's
+`warehouse`, and a `note:` line after the rows counts the tests that moved and why. With
+`--run-on local` it is not run, and `Can't run locally` names the guard. An error Snowflake would raise too, such as a value that isn't a number, is the test's
 own result wherever it runs.
+
+### Allowing known differences and overrides
+
+In a Snowflake project, a test SQLQuack refuses only because a construct behaves differently in
+DuckDB, such as `HASH`, can still run locally. Allow the known difference for local tests in
+`sqlbuild_project.toml`:
+
+```toml
+[testing.local]
+allow = { hash = true }
+```
+
+Or replace the function for local tests with a SQLQuack override in `tests/overrides/`, one file per
+function, in SQLQuack's `FUNCTION()` format:
+
+```sql
+-- tests/overrides/hash.sql
+FUNCTION (
+  arguments (x VARCHAR),
+  returns NUMBER(19,0),
+  replaces HASH,
+  dialect duckdb
+);
+hash(x)
+```
+
+A test that relies on either says so in its row and in `sqb test --inspect`:
+
+```
+    test      test_stg_orders            PASS  local    relied on: HASH (allowed)  1 real model
+```
+
+The refusal's help names the setting: `allow it with hash = true under [testing.local] allow in
+sqlbuild_project.toml`. `sqlquack explain <name>` says when a known difference is safe to allow.
+
+Details:
+
+- The names are SQLQuack's known-difference names. A name SQLQuack doesn't know fails compile, with
+  the nearest name it knows.
+- Two override files replacing one function, or a file SQLQuack can't read, fail compile, naming
+  the files.
+- Allowances and overrides apply to local runs only. Warehouse tests, builds and deploys never read
+  them.
+- Editing an allowance or an override converts the tests again; the conversion cache keys on both.
+- `[testing.local] allow` is for Snowflake projects. In a project on any other adapter it fails
+  compile.
 
 ## Skipping SQL analysis
 

@@ -11,6 +11,7 @@ use uuid::Uuid;
 use crate::admin_helpers::administer;
 use crate::helpers::{api_ready, start_control};
 use crate::test_types::LocationHealthTestCase;
+use sqlbuild_orchestration::tls::main::client_builder::client_builder;
 
 #[test]
 fn given_location_health_reports_when_checking_health_then_down_falling_back_or_missing_secret_locations_exit_nonzero()
@@ -115,7 +116,7 @@ fn given_location_health_reports_when_checking_health_then_down_falling_back_or_
     runtime.block_on(async {
         let mut control = start_control(&["server", "--port", "0", "--no-scheduler"]);
         let url = api_ready(&mut control).await;
-        let client = reqwest::Client::new();
+        let client = client_builder().build().expect("HTTP client");
         for test_case in test_cases {
             let location = administer(
                 &control,

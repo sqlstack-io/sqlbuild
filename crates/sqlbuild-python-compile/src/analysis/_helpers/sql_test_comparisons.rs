@@ -3,8 +3,8 @@
 use std::collections::HashMap;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods};
-use pyo3::{FromPyObject, pyfunction};
 use serde_json::{Value, json};
 use sqlbuild_analysis::compiler::main::missing_expected_columns::missing_expected_columns;
 use sqlbuild_analysis::compiler::main::scenario_expected_comparison_sql::scenario_expected_comparison_sql;
@@ -44,7 +44,7 @@ impl RenderSettings {
     }
 }
 
-fn optional_value<T: for<'py> FromPyObject<'py>>(
+fn optional_value<T: for<'py> pyo3::prelude::FromPyObjectOwned<'py>>(
     options: Option<&Bound<'_, PyDict>>,
     name: &str,
 ) -> PyResult<Option<T>> {
@@ -53,7 +53,7 @@ fn optional_value<T: for<'py> FromPyObject<'py>>(
         None => None,
     };
     match value {
-        Some(value) if !value.is_none() => Ok(Some(value.extract()?)),
+        Some(value) if !value.is_none() => Ok(Some(value.extract().map_err(Into::into)?)),
         _ => Ok(None),
     }
 }

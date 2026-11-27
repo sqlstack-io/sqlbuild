@@ -102,17 +102,91 @@ sources:
   - name: raw_customers
     description: Customers
     managed: true
-    write_strategy: table
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
       - name: name
         type: VARCHAR
 ```
 
-Managed sources support incremental write strategies (`table`, `append`, `delete_insert`, `merge`), cursor-based loading, and concurrent execution.
+How the rows are written, such as `write_strategy`, `cursor_column` and `unique_key`, is set on the
+`@loader` as SQLLoad's table options, not in the sources file (see
+[Write strategies](/docs/concepts/python-nodes/loaders#write-strategies)).
+
+Managed sources support SQLLoad's write strategies (`replace`, `append`, `delete_insert`, `merge`), cursor-based loading, and concurrent execution.
 
 See [Loaders](/docs/concepts/python-nodes/loaders) for the full guide on writing loader functions, write strategies, the loader context API, and auto-load behavior during builds.
+
+## Loads
+
+A sources file can declare one **load**: a SQLLoad source that fills the
+SQLBuild sources named after it. In SQLBuild terms, a SQLLoad source is a load and each of its
+tables is a source. The `load:` mapping takes exactly SQLLoad's source keys, read and checked by
+SQLLoad itself, with `name` naming the load:
+
+```yaml
+load:
+  name: shop
+  kind: postgres
+  connection: shop_db
+  include: [public.*]
+  write_strategy: merge
+  tables:
+    public.orders:
+      unique_key: id
+sources:
+  - name: shop__orders
+    description: Orders from the shop database
+    columns:
+      - name: id
+        type: BIGINT
+```
+
+The load reads a [source connection](/docs/concepts/project-configuration#warehouse-and-source-connections),
+a `[connections.<name>]` entry with a `kind`. Its tables land in the target's database, in the
+first schema of:
+
+1. the load's own `destination_schema`
+2. the target's `loader_schema`
+3. the target's `schema`
+
+This is the order SQLLoad uses, and the sources the load fills read the same schema.
+
+**Sources it fills.** A load names each destination table as SQLLoad does, `{load}__{table}` by
+default, and the source of the same name is filled by it. Listing the source adds what a source
+can say: a description, column types, audits, freshness and contracts. A source the load fills
+can't set `database`, `schema`, `table`, `expression`, `managed` or a loading setting such as
+`write_strategy`; those belong to the load. Column types are declared on the sources, not under
+`load.tables`, and SQLLoad uses them as the table's pinned types. A source's
+[`on_schema_change`](/docs/concepts/python-nodes/loaders#schema-changes) goes to its table the same
+way, and the load's `tables` can't set it for that table too.
+
+A model may read a table of the load without listing it: `__source("shop__customers")` makes the
+source, filled by `shop`. Compiling never connects to the load's connection. With a literal
+`include`, compiling fails when a source names a table the load doesn't include; with a pattern,
+the plan checks it once SQLLoad has listed the tables, and fails with `S304`.
+
+**Planning and building.** A load is one node in the graph, upstream of the sources it fills.
+`sqb plan` shows SQLLoad's plan of each load it runs, the routes, column types and write
+strategies `sqlload plan` prints, and `sqb build` runs each load before the models that read its
+tables, through the target's own warehouse connection:
+
+- selecting the load, with `load:shop`, `kind:load` or `+` expansion, loads every table it includes
+- selecting sources it fills, or models that read them when sources load automatically, loads only
+  those tables
+
+Each run records the load's report, the rows and changes of each table, as the load's node result.
+SQLLoad keeps its own state in its `_sqlload_*` tables beside the loaded ones.
+
+**Moving from `sqlload.toml`.** Each `[sources.<name>]` block moves into a sources file's `load:`
+mapping with the same keys, `name: <name>` added, and each `[sources.<name>.tables."<table>"]`
+block into `load.tables`. Move `columns` from the tables onto the sources the load fills. The
+connections move into `[connections.<name>]` unchanged, `${ENV:NAME}` references included; the
+target's `loader_schema` takes the place of the SQLLoad target's.
+
+Loads write to DuckDB, MotherDuck, Postgres, Snowflake, BigQuery and ClickHouse warehouses. A
+project on SQLite, SQL Server or a custom adapter can't declare one, and a Databricks load fails when it runs: SQLLoad
+stages its files in a volume, which SQLBuild's Databricks connection doesn't name yet.
 
 ## Source freshness
 
@@ -262,17 +336,18 @@ without building.
 | `expression` | Inline SQL expression (alternative to table reference) |
 | `final` | ClickHouse only. Set to `true` to read the source with `FINAL`, so a `ReplacingMergeTree` table returns one row per key (see [ClickHouse](/docs/concepts/adapters/clickhouse#reading-replacingmergetree-sources)). Other adapters reject it with `A010`. |
 | `managed` | Set to `true` to bind the source to the `@loader` function of the same name (see [Loaders](/docs/concepts/python-nodes/loaders)) |
-| `write_strategy` | How the loader writes data: `table`, `append`, `delete_insert`, or `merge` (requires `managed: true`) |
-| `cursor_column` | Column for incremental cursor tracking (required for `delete_insert` and `merge`) |
-| `unique_key` | Merge key column(s) (required for `merge`) |
 | `freshness` | Source freshness observation config (see [Source freshness](#source-freshness)) |
 | `description` | Required human-readable description ([Descriptions](/docs/concepts/models/configuration#descriptions)) |
 | `type_enforcement` | Override implicit type enforcement (`true`/`false`). Defaults to `true` when any column declares a type. |
 | `contract` | `enforced` or `none`. When enforced, downstream models validate configured column references against source columns. |
+| `on_schema_change` | A source a load or `@loader` fills: `append_new_columns` (default), `ignore` or `fail` (see [Schema changes](/docs/concepts/python-nodes/loaders#schema-changes)) |
 | `columns` | Column declarations with `name`, `type`, `nullable`, `description`, `meta`, and `audits` |
 | `audits` | Source-level audits |
 | `meta` | Free-form metadata mapping |
-| `load_batch_size` | Positive row batch size for managed loaders |
+
+A source can't set `write_strategy`, `cursor_column`, `unique_key` or `load_batch_size`: a managed
+source's `@loader` sets how it loads, and a load-filled source's load does. Compile stops with
+`D006`, naming what to use instead.
 
 A sources file contains only `sources`. Unknown keys in a sources file, a source, a source column,
 `freshness`, or `freshness.age_policy` fail discovery with `D006`, naming the key and suggesting the

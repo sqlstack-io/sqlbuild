@@ -3,7 +3,8 @@ use crate::project_validation::models::{
     NodeKind, ProjectFacts, SeedFileFact, SourceFact, SourceFileFact,
 };
 use crate::project_validation::tests::helpers::{
-    model, model_at, named, node, on, path_default_facts, seed_header_outcome, validation_outcome,
+    collision, model, model_at, named, node, on, path_default_facts, seed_header_outcome,
+    validation_outcome,
 };
 use crate::project_validation::tests::test_types::{
     SeedHeaderTestCase, ValidationTestCase, failure,
@@ -43,6 +44,46 @@ fn given_discovered_facts_when_validating_then_reports_python_first_conflict() {
             ),
         },
         ValidationTestCase {
+            description: "two sources files declare loads of one name",
+            facts: ProjectFacts {
+                sources: vec![
+                    SourceFileFact {
+                        path: "sql/sources/shop.yml".to_owned(),
+                        entries: Vec::new(),
+                        load: Some("shop".to_owned()),
+                    },
+                    SourceFileFact {
+                        path: "sql/sources/more_shop.yml".to_owned(),
+                        entries: Vec::new(),
+                        load: Some("shop".to_owned()),
+                    },
+                ],
+                ..ProjectFacts::default()
+            },
+            expected_failure: failure(
+                FailureKind::Conflict,
+                "Duplicate load 'shop' in sql/sources/shop.yml and sql/sources/more_shop.yml; \
+                 each sources file declares at most one load, and load names are unique",
+            ),
+        },
+        ValidationTestCase {
+            description: "a load and a model share a name",
+            facts: ProjectFacts {
+                models: vec![model("shop")],
+                sources: vec![SourceFileFact {
+                    path: "sql/sources/shop.yml".to_owned(),
+                    entries: Vec::new(),
+                    load: Some("shop".to_owned()),
+                }],
+                ..ProjectFacts::default()
+            },
+            expected_failure: collision(
+                "Project resource name 'shop' is declared as both model in sql/models/shop.sql \
+                 and load in sql/sources/shop.yml",
+                "",
+            ),
+        },
+        ValidationTestCase {
             description: "a source and a model share a logical relation name",
             facts: ProjectFacts {
                 models: vec![model("orders")],
@@ -52,6 +93,7 @@ fn given_discovered_facts_when_validating_then_reports_python_first_conflict() {
                         name: "orders".to_owned(),
                         ..SourceFact::default()
                     }],
+                    load: None,
                 }],
                 ..ProjectFacts::default()
             },

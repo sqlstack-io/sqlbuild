@@ -687,6 +687,11 @@ class ClickHouseAdapter(
             return super().cursor_type_range(cursor_type=cursor_type)
         return (LOWEST_TIMESTAMP_CURSOR, HIGHEST_TIMESTAMP_CURSOR)
 
+    def render_cursor_bound(self, *, function: str, operand: str) -> str:
+        """The OrNull form: plain min and max read no rows as the type default, such as 1970."""
+
+        return f"{function.lower()}OrNull({operand})"
+
     def render_cursor_bound_literal(self, *, value: str, cursor_type: str | None) -> str:
         if cursor_type == CursorKind.INTEGER:
             return value
@@ -723,10 +728,8 @@ class ClickHouseAdapter(
             if is_date
             else self.render_cursor_bound_literal(value=maximum_allowed, cursor_type=cursor_type)
         )
-        return (
-            f"SELECT max({quoted_cursor}) FROM {relation} "
-            f"WHERE {quoted_cursor} <= {maximum_literal}"
-        )
+        maximum: str = self.render_cursor_bound(function="MAX", operand=quoted_cursor)
+        return f"SELECT {maximum} FROM {relation} WHERE {quoted_cursor} <= {maximum_literal}"
 
     def render_current_timestamp(self) -> str:
         return "now64(6, 'UTC')"

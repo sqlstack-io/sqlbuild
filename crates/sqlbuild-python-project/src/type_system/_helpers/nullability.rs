@@ -19,7 +19,7 @@ fn member<'py>(args: &Bound<'py, PyAny>, value: &str) -> PyResult<Bound<'py, PyA
 
 /// The text of one argument; an argument that is not a string matches no state.
 fn argument_text(value: &Bound<'_, PyAny>) -> String {
-    match value.downcast::<PyString>() {
+    match value.cast::<PyString>() {
         Ok(text) => text.to_string(),
         Err(_) => String::new(),
     }

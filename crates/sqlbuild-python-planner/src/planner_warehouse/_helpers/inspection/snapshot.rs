@@ -532,10 +532,7 @@ fn gather_fingerprints<'py>(
                 )?;
             }
         }
-        for (name, fingerprint) in native_field(&set, "fingerprints")?
-            .downcast::<PyDict>()?
-            .iter()
-        {
+        for (name, fingerprint) in native_field(&set, "fingerprints")?.cast::<PyDict>()?.iter() {
             let node_type: String = native_field(&fingerprint, "node_type")?.extract()?;
             if node_type == NODE_TYPE_MODEL {
                 models.set_item(name, fingerprint)?;
@@ -855,8 +852,8 @@ pub(crate) fn gather_redirected_cursor_snapshots<'py>(
     let dialect = Dialect::passed(args.value("dialect")?)?;
     let reads = PlannerReads::passed(args.value("reads")?)?;
     let existing_relations = args.value("existing_relations")?;
-    let existing_relations = existing_relations.downcast::<PyDict>()?;
-    let target_relations = args.value("target_relations")?.downcast_into::<PyDict>()?;
+    let existing_relations = existing_relations.cast::<PyDict>()?;
+    let target_relations = args.value("target_relations")?.cast_into::<PyDict>()?;
     let cursor_scope = &args.value("cursor_scope")?;
     let full_refresh_model_names = &args.value("full_refresh_model_names")?;
     let deferred_locations = &args.value("deferred_locations")?;
@@ -896,7 +893,7 @@ pub(crate) fn gather_redirected_cursor_snapshots<'py>(
             origin_cursor_column_overrides: if origin_cursor_columns.is_none() {
                 None
             } else {
-                Some(origin_cursor_columns.downcast_into::<PyDict>()?)
+                Some(origin_cursor_columns.cast_into::<PyDict>()?)
             },
             existing_columns: None,
         },

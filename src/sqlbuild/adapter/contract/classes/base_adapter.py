@@ -413,10 +413,8 @@ class BaseAdapter(RetentionAdapterMixin, RunsTableMixin, StrictAdapter):
             if is_date
             else self.render_cursor_bound_literal(value=maximum_allowed, cursor_type=cursor_type)
         )
-        return (
-            f"SELECT MAX({quoted_cursor}) FROM {relation} "
-            f"WHERE {quoted_cursor} <= {maximum_literal}"
-        )
+        maximum: str = self.render_cursor_bound(function="MAX", operand=quoted_cursor)
+        return f"SELECT {maximum} FROM {relation} WHERE {quoted_cursor} <= {maximum_literal}"
 
     def build_cursor_filter(
         self,
@@ -1644,7 +1642,9 @@ class BaseAdapter(RetentionAdapterMixin, RunsTableMixin, StrictAdapter):
                 expression=cursor_column,
                 cursor_type=None if start_cursor is None else start_cursor.kind,
             )
-            projections += f", MIN({operand}), MAX({operand})"
+            minimum: str = self.render_cursor_bound(function="MIN", operand=operand)
+            maximum: str = self.render_cursor_bound(function="MAX", operand=operand)
+            projections += f", {minimum}, {maximum}"
         query: str = f"SELECT {projections} FROM {relation}"
         if cursor_filter:
             query += f" WHERE {cursor_filter}"

@@ -19,12 +19,10 @@ pub(crate) async fn job_write_set(
     snapshot_id: Uuid,
     (selection, settings): (&BTreeSet<String>, &BTreeMap<String, Value>),
 ) -> Result<(ControlTransaction, BTreeSet<String>), ControlError> {
-    let (transaction, selected) =
-        read_snapshot_nodes(transaction, snapshot_id, Some(selection)).await?;
+    let (transaction, selected) = read_snapshot_nodes(transaction, snapshot_id, selection).await?;
     let (mut written, candidates, model_reads) =
         selected_writers(&writer_nodes(&selected), loads_model_sources(settings));
-    let (transaction, sources) =
-        read_snapshot_nodes(transaction, snapshot_id, Some(&candidates)).await?;
+    let (transaction, sources) = read_snapshot_nodes(transaction, snapshot_id, &candidates).await?;
     written.extend(managed_sources(&writer_nodes(&sources), &model_reads));
     Ok((transaction, written))
 }

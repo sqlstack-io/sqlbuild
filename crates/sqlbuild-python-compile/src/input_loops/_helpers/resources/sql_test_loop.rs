@@ -576,9 +576,9 @@ impl<'py> TestScope<'_, 'py> {
             )));
         }
         let enum_visibility: Bound<'py, PyDict> =
-            native_field(declarations, ENUM_VISIBILITY)?.downcast_into()?;
+            native_field(declarations, ENUM_VISIBILITY)?.cast_into()?;
         let constant_visibility: Bound<'py, PyDict> =
-            native_field(declarations, CONSTANT_VISIBILITY)?.downcast_into()?;
+            native_field(declarations, CONSTANT_VISIBILITY)?.cast_into()?;
         for reference in scans.iter().flat_map(|scan| scan.references.iter()) {
             let visibility: &Bound<'py, PyDict> = match reference.kind {
                 sqlbuild_sqltext::compiler::models::DeclarationReferenceKind::Enum => {
@@ -603,9 +603,9 @@ impl<'py> TestScope<'_, 'py> {
             }
         }
         let macro_records: Bound<'py, PyDict> =
-            native_field(declarations, MACRO_RECORDS)?.downcast_into()?;
+            native_field(declarations, MACRO_RECORDS)?.cast_into()?;
         let macro_visibility: Bound<'py, PyDict> =
-            native_field(declarations, MACRO_VISIBILITY)?.downcast_into()?;
+            native_field(declarations, MACRO_VISIBILITY)?.cast_into()?;
         for name in top_level_macro_names(sql, &self.model_loop.syntax)
             .map_err(|message| self.error(message))?
         {

@@ -24,7 +24,7 @@ _LOADERS_MODULE: str = "python/nodes/loaders/orders.py"
 _ASSETS_MODULE: str = "python/nodes/assets/exports.py"
 _LOADERS_PATH: str = "python/nodes/loaders/orders/staged_orders/loader.py"
 _ASSETS_PATH: str = "python/nodes/assets/exports/export_orders/asset.py"
-_ORIGINAL_COLUMNS: str = 'LoaderColumnSpec(name="order_id", type="INTEGER")'
+_ORIGINAL_COLUMNS: str = 'LoaderColumnSpec(name="order_id", type="BIGINT")'
 _ORIGINAL_RETRY: str = "RetryPolicy(max_attempts=2, retry_on=RuntimeError)"
 
 
@@ -36,7 +36,7 @@ _ORIGINAL_RETRY: str = "RetryPolicy(max_attempts=2, retry_on=RuntimeError)"
             edited_path=_LOADERS_PATH,
             original_text=_ORIGINAL_COLUMNS,
             edited_text=(
-                'LoaderColumnSpec(name="order_id", type="INTEGER", '
+                'LoaderColumnSpec(name="order_id", type="BIGINT", '
                 'description="Staged order identifier")'
             ),
             expected_asset_identity_status="unchanged",
@@ -80,13 +80,13 @@ def test_given_built_python_nodes_when_editing_decorator_inputs_then_identity_tr
                 STAGED_ORDER_COLUMNS = [{_ORIGINAL_COLUMNS}]
 
 
-                @loader(write_strategy="table", columns=STAGED_ORDER_COLUMNS)
+                @loader(write_strategy="replace", columns=STAGED_ORDER_COLUMNS)
                 def staged_orders(ctx):
                     '''Test loader staged_orders.'''
                     return [{{"order_id": 1}}]
 
 
-                @loader(depends_on=[staged_orders])
+                @loader(write_strategy='replace', depends_on=[staged_orders])
                 def raw_orders(ctx):
                     '''Test loader raw_orders.'''
                     staged = ctx.loader(staged_orders).destination
@@ -101,10 +101,9 @@ def test_given_built_python_nodes_when_editing_decorator_inputs_then_identity_tr
                   - name: raw_orders
                     description: Test source raw_orders.
                     managed: true
-                    write_strategy: table
                     columns:
                       - name: order_id
-                        type: INTEGER
+                        type: BIGINT
                 """
             ).lstrip(),
             **node_module_files(

@@ -10,6 +10,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.load._test_types import (
     ChainedLoaderFailureE2ETestCase,
     ChainedLoaderPruningE2ETestCase,
     ChainedLoaderSelectionE2ETestCase,
+    HttpLoaderE2ETestCase,
     IntermediateLoaderDefaultE2ETestCase,
     IntermediateLoaderStrategyE2ETestCase,
     LoaderWaffleShopE2ETestCase,
@@ -23,6 +24,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.load.helpers import (
     assert_source_only_ingress_dependency_case,
     build_loader_waffle_shop_project_files,
     build_schema_behavior_project_files,
+    serve_orders_api,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     prepare_inline_project,
@@ -32,6 +34,18 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     table_exists,
 )
 from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
+
+_SECOND_RUN_LOADER: str = (
+    "from pathlib import Path\n\n"
+    "from sqlbuild.loaders import loader\n\n\n"
+    "@loader({options})\n"
+    "def {name}(ctx):\n"
+    "    '''Test loader {name}.'''\n"
+    "    seen = Path(__file__).with_name('seen')\n"
+    "    again = seen.exists()\n"
+    "    seen.touch()\n"
+    "    return [{second} if again else {first}]\n"
+)
 
 
 @pytest.mark.parametrize(
@@ -137,20 +151,18 @@ def test_given_non_contract_loader_when_late_column_appears_then_existing_target
                 "sources:\n"
                 "  - name: raw_events\n    description: Test source raw_events.\n"
                 "    managed: true\n"
-                "    write_strategy: append\n"
-                "    cursor_column: load_seq\n"
                 "    columns:\n"
                 "      - name: event_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
                 "      - name: load_seq\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
             ),
             node_files={
                 "python/nodes/loaders/source_rows/loader.py": (
                     "from sqlbuild.loaders import loader\n\n"
-                    "@loader\n"
+                    "@loader(write_strategy='append', cursor_column='load_seq')\n"
                     "def raw_events(ctx):\n"
-                    "    '''Test loader raw_events.'''\n    if ctx.current_cursor_value is None:\n"
+                    "    '''Test loader raw_events.'''\n    if ctx.cursor_value is None:\n"
                     "        return [{'event_id': 1, 'load_seq': 1}]\n"
                     "    return [{'event_id': 2, 'load_seq': 2, 'note': 'late-note'}]\n"
                 ),
@@ -178,6 +190,68 @@ def test_given_non_contract_loader_when_late_column_appears_then_existing_target
     rows: list[tuple[object, ...]] = query_duckdb(
         db_path=db_path,
         sql="SELECT event_id, note FROM raw_events ORDER BY event_id",
+    )
+    assert tuple(rows) == test_case.expected_rows
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        HttpLoaderE2ETestCase(
+            description="ctx.http pages through the loader's connection in SQLLoad",
+            loader_body="    return ctx.http().paginate('/orders', paginator=sl.single())\n",
+            expected_rows=((1, 10), (2, 20), (3, 30)),
+        ),
+        HttpLoaderE2ETestCase(
+            description="ctx.http yields its job, with headers added to the connection's",
+            loader_body=(
+                "    yield ctx.http(headers={'X-Trace': 'loader'}).paginate(\n"
+                "        '/orders', paginator=sl.single()\n"
+                "    )\n"
+            ),
+            expected_rows=((1, 10), (2, 20), (3, 30)),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_http_loader_when_loading_then_sqlload_runs_its_requests(
+    tmp_path: Path,
+    test_case: HttpLoaderE2ETestCase,
+) -> None:
+    with serve_orders_api() as base_url:
+        project_dir: Path = prepare_inline_project(
+            tmp_path=tmp_path,
+            project_name="http_loader",
+            repo_files={
+                "sqlbuild_project.toml": (
+                    'name = "http_loader"\nadapter = "duckdb"\n\n'
+                    '[connection]\ndatabase = "http_loader.duckdb"\n\n'
+                    f'[connections.shop]\nkind = "http"\nbase_url = "{base_url}"\n'
+                ),
+                "sql/sources/raw.yml": (
+                    "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
+                    "    managed: true\n"
+                    "    columns:\n"
+                    "      - name: order_id\n        type: BIGINT\n"
+                    "      - name: amount\n        type: BIGINT\n"
+                ),
+                "python/nodes/loaders/raw_orders/loader.py": (
+                    "import sqlload_api as sl\n\nfrom sqlbuild.loaders import loader\n\n\n"
+                    "@loader(connection='shop', write_strategy='replace')\n"
+                    "def raw_orders(ctx):\n"
+                    "    '''Test loader raw_orders.'''\n" + test_case.loader_body
+                ),
+            },
+        )
+        result: subprocess.CompletedProcess[str] = run_sqb(
+            command=("--no-color", "load"),
+            project_dir=project_dir,
+        )
+
+    assert result.returncode == test_case.expected_return_code, result.stdout + result.stderr
+    rows: list[tuple[object, ...]] = query_duckdb(
+        db_path=project_dir / "http_loader.duckdb",
+        sql="SELECT order_id, amount FROM raw_orders ORDER BY order_id",
     )
     assert tuple(rows) == test_case.expected_rows
 
@@ -316,10 +390,8 @@ def test_given_two_terminal_sources_when_sharing_intermediate_then_intermediate_
                 "sources:\n"
                 "  - name: raw_orders\n    description: Test source raw_orders.\n"
                 "    managed: true\n"
-                "    write_strategy: table\n"
                 "  - name: raw_order_metrics\n    description: Test source raw_order_metrics.\n"
                 "    managed: true\n"
-                "    write_strategy: table\n"
             ),
             node_files={
                 "python/nodes/loaders/source_rows/fetch_orders/loader.py": (
@@ -327,15 +399,15 @@ def test_given_two_terminal_sources_when_sharing_intermediate_then_intermediate_
                     "\n"
                     "\n"
                     "@loader(write_strategy='append', cursor_column='load_seq', columns=[\n"
-                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                    "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
+                    "    {'name': 'event_id', 'type': 'BIGINT'},\n"
+                    "    {'name': 'load_seq', 'type': 'BIGINT'},\n"
                     "])\n"
                     "def fetch_orders(ctx):\n"
                     "    '''Test loader fetch_orders.'''\n"
-                    "    if ctx.current_cursor_value is None:\n"
+                    "    if ctx.cursor_value is None:\n"
                     "        next_seq = 1\n"
                     "    else:\n"
-                    "        next_seq = ctx.current_cursor_value + 1\n"
+                    "        next_seq = ctx.cursor_value + 1\n"
                     "    return [{'event_id': next_seq, 'load_seq': next_seq}]\n"
                 ),
                 "python/nodes/loaders/source_rows/raw_orders/loader.py": (
@@ -344,7 +416,7 @@ def test_given_two_terminal_sources_when_sharing_intermediate_then_intermediate_
                     "fetch_orders\n"
                     "\n"
                     "\n"
-                    "@loader(depends_on=[fetch_orders])\n"
+                    "@loader(write_strategy='replace', depends_on=[fetch_orders])\n"
                     "def raw_orders(ctx):\n"
                     "    '''Test loader raw_orders.'''\n"
                     "    orders = ctx.loader(fetch_orders)\n"
@@ -359,7 +431,7 @@ def test_given_two_terminal_sources_when_sharing_intermediate_then_intermediate_
                     "fetch_orders\n"
                     "\n"
                     "\n"
-                    "@loader(depends_on=[fetch_orders])\n"
+                    "@loader(write_strategy='replace', depends_on=[fetch_orders])\n"
                     "def raw_order_metrics(ctx):\n"
                     "    '''Test loader raw_order_metrics.'''\n"
                     "    orders = ctx.loader(fetch_orders)\n"
@@ -427,7 +499,7 @@ def test_given_chained_loader_project_when_loading_source_then_runs_dependencies
                 "    managed: true\n"
                 "    columns:\n"
                 "      - name: event_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
                 "      - name: status\n"
                 "        type: VARCHAR\n"
             ),
@@ -436,9 +508,9 @@ def test_given_chained_loader_project_when_loading_source_then_runs_dependencies
                     "from sqlbuild.loaders import loader\n"
                     "\n"
                     "\n"
-                    "@loader(write_strategy='table', cursor_column='load_seq', columns=[\n"
-                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                    "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
+                    "@loader(write_strategy='append', cursor_column='load_seq', columns=[\n"
+                    "    {'name': 'event_id', 'type': 'BIGINT'},\n"
+                    "    {'name': 'load_seq', 'type': 'BIGINT'},\n"
                     "])\n"
                     "def fetch_events(ctx):\n"
                     "    '''Test loader fetch_events.'''\n"
@@ -516,7 +588,7 @@ def test_given_chained_loader_project_when_building_source_model_then_runs_loade
                 "    managed: true\n"
                 "    columns:\n"
                 "      - name: event_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
                 "      - name: status\n"
                 "        type: VARCHAR\n"
             ),
@@ -525,8 +597,8 @@ def test_given_chained_loader_project_when_building_source_model_then_runs_loade
                     "from sqlbuild.loaders import loader\n"
                     "\n"
                     "\n"
-                    "@loader(write_strategy='table', columns=[\n"
-                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
+                    "@loader(write_strategy='replace', columns=[\n"
+                    "    {'name': 'event_id', 'type': 'BIGINT'},\n"
                     "])\n"
                     "def fetch_events(ctx):\n"
                     "    '''Test loader fetch_events.'''\n"
@@ -612,7 +684,7 @@ def test_given_chained_loader_project_when_running_source_model_then_runs_loader
                 "    managed: true\n"
                 "    columns:\n"
                 "      - name: event_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
                 "      - name: status\n"
                 "        type: VARCHAR\n"
             ),
@@ -621,8 +693,8 @@ def test_given_chained_loader_project_when_running_source_model_then_runs_loader
                     "from sqlbuild.loaders import loader\n"
                     "\n"
                     "\n"
-                    "@loader(write_strategy='table', columns=[\n"
-                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
+                    "@loader(write_strategy='replace', columns=[\n"
+                    "    {'name': 'event_id', 'type': 'BIGINT'},\n"
                     "])\n"
                     "def fetch_events(ctx):\n"
                     "    '''Test loader fetch_events.'''\n"
@@ -709,17 +781,16 @@ def test_given_source_loader_reads_unselected_task_payload_when_loading_then_run
                     "sources:\n"
                     "  - name: raw_events\n    description: Test source raw_events.\n"
                     "    managed: true\n"
-                    "    write_strategy: table\n"
                     "    columns:\n"
                     "      - name: event_id\n"
-                    "        type: INTEGER\n"
+                    "        type: BIGINT\n"
                 ),
                 node_files={
                     **node_module_files(
                         "python/nodes/loaders/source_rows.py",
                         "from sqlbuild.loaders import loader\n"
                         f"from {dependency_module} import prepare_events\n\n"
-                        "@loader(depends_on=[prepare_events])\n"
+                        "@loader(write_strategy='replace', depends_on=[prepare_events])\n"
                         "def raw_events(ctx):\n"
                         "    '''Test loader raw_events.'''\n    payload = "
                         "ctx.result_of(node_function=prepare_events).payload\n"
@@ -731,6 +802,7 @@ def test_given_source_loader_reads_unselected_task_payload_when_loading_then_run
                 f"{test_case.decorator_import}\n"
                 f"@{test_case.decorator_name}\n"
                 "def prepare_events(ctx):\n"
+                "    '''Prepare the events.'''\n"
                 "    return ctx.result(payload={'event_id': 1}, materialized=True)\n"
             ),
         },
@@ -765,7 +837,7 @@ def test_given_source_loader_reads_unselected_task_payload_when_loading_then_run
             setup_command=("--no-color", "load", "--select", "fetch_events"),
             command=("--no-color", "load", "--select", "raw_events"),
             expected_return_code=0,
-            expected_stdout_fragments=("Sources (1)", "source    raw_events"),
+            expected_stdout_fragments=("Sources to load (1)", "source    raw_events"),
             expected_intermediate_rows=((1, 1), (2, 1)),
             expected_terminal_rows=((1,), (2,)),
         ),
@@ -775,7 +847,7 @@ def test_given_source_loader_reads_unselected_task_payload_when_loading_then_run
             command=("--no-color", "load", "--select", "+raw_events"),
             expected_return_code=0,
             expected_stdout_fragments=(
-                "Loaders (1)",
+                "Loaders to load (1)",
                 "loader    fetch_events",
                 "source    raw_events",
             ),
@@ -814,8 +886,8 @@ def test_given_source_only_selection_when_upstream_ingress_exists_then_enforces_
             command=("--no-color", "load", "--select", "raw_rollup"),
             expected_return_code=1,
             expected_error_fragment=(
-                "requires intermediate loader 'fetch_pages', but its target relation "
-                "'__loader__fetch_pages' does not exist"
+                "requires intermediate loader 'normalize_pages', but its target relation "
+                "'__loader__normalize_pages' does not exist"
             ),
         ),
     ],
@@ -842,8 +914,8 @@ def test_given_source_only_selection_when_skipping_complex_intermediates_then_va
                     "from sqlbuild.loaders import loader\n"
                     "\n"
                     "\n"
-                    "@loader(write_strategy='table', columns=[\n"
-                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
+                    "@loader(write_strategy='replace', columns=[\n"
+                    "    {'name': 'event_id', 'type': 'BIGINT'},\n"
                     "])\n"
                     "def fetch_events(ctx):\n"
                     "    '''Test loader fetch_events.'''\n"
@@ -853,8 +925,8 @@ def test_given_source_only_selection_when_skipping_complex_intermediates_then_va
                     "from sqlbuild.loaders import loader\n"
                     "\n"
                     "\n"
-                    "@loader(write_strategy='table', columns=[\n"
-                    "    {'name': 'price_id', 'type': 'INTEGER'},\n"
+                    "@loader(write_strategy='replace', columns=[\n"
+                    "    {'name': 'price_id', 'type': 'BIGINT'},\n"
                     "])\n"
                     "def fetch_prices(ctx):\n"
                     "    '''Test loader fetch_prices.'''\n"
@@ -881,8 +953,8 @@ def test_given_source_only_selection_when_skipping_complex_intermediates_then_va
                     "from sqlbuild.loaders import loader\n"
                     "\n"
                     "\n"
-                    "@loader(write_strategy='table', columns=[\n"
-                    "    {'name': 'page_id', 'type': 'INTEGER'},\n"
+                    "@loader(write_strategy='replace', columns=[\n"
+                    "    {'name': 'page_id', 'type': 'BIGINT'},\n"
                     "])\n"
                     "def fetch_pages(ctx):\n"
                     "    '''Test loader fetch_pages.'''\n"
@@ -893,8 +965,8 @@ def test_given_source_only_selection_when_skipping_complex_intermediates_then_va
                     "from python.nodes.loaders.source_rows.fetch_pages.loader import fetch_pages\n"
                     "\n"
                     "\n"
-                    "@loader(depends_on=[fetch_pages], write_strategy='table', "
-                    "columns=[{'name': 'page_id', 'type': 'INTEGER'}])\n"
+                    "@loader(depends_on=[fetch_pages], write_strategy='replace', "
+                    "columns=[{'name': 'page_id', 'type': 'BIGINT'}])\n"
                     "def normalize_pages(ctx):\n"
                     "    '''Test loader normalize_pages.'''\n"
                     "    pages = ctx.loader(fetch_pages)\n"
@@ -953,10 +1025,9 @@ def test_given_source_only_selection_when_skipping_complex_intermediates_then_va
             expected_raw_events_exists=False,
             expected_intermediate_rows=((1, 1), (2, 1)),
             expected_stdout_fragments=(
-                "Loaders (1)",
+                "Loaders to load (1)",
                 "  fetch_events",
                 "loader    fetch_events",
-                "Sources (0)",
             ),
         ),
         ChainedLoaderSelectionE2ETestCase(
@@ -965,10 +1036,10 @@ def test_given_source_only_selection_when_skipping_complex_intermediates_then_va
             expected_raw_events_exists=True,
             expected_intermediate_rows=((1, 1), (2, 1)),
             expected_stdout_fragments=(
-                "Loaders (1)",
+                "Loaders to load (1)",
                 "  fetch_events",
                 "loader    fetch_events",
-                "Sources (1)",
+                "Sources to load (1)",
                 "source    raw_events",
             ),
         ),
@@ -978,10 +1049,10 @@ def test_given_source_only_selection_when_skipping_complex_intermediates_then_va
             expected_raw_events_exists=True,
             expected_intermediate_rows=((1, 1), (2, 1)),
             expected_stdout_fragments=(
-                "Loaders (1)",
+                "Loaders to load (1)",
                 "  fetch_events",
                 "loader    fetch_events",
-                "Sources (1)",
+                "Sources to load (1)",
                 "source    raw_events",
             ),
         ),
@@ -991,11 +1062,35 @@ def test_given_source_only_selection_when_skipping_complex_intermediates_then_va
             expected_raw_events_exists=True,
             expected_intermediate_rows=((1, 1), (2, 1)),
             expected_stdout_fragments=(
-                "Loaders (1)",
+                "Loaders to load (1)",
                 "  fetch_events",
                 "loader    fetch_events",
-                "Sources (1)",
+                "Sources to load (1)",
                 "source    raw_events",
+            ),
+        ),
+        ChainedLoaderSelectionE2ETestCase(
+            description="a build downstream of an intermediate loader loads its source and builds readers",
+            command=("--no-color", "build", "--select", "fetch_events+"),
+            expected_raw_events_exists=True,
+            expected_intermediate_rows=((1, 1), (2, 1)),
+            expected_stdout_fragments=(
+                "loader    fetch_events",
+                "source    raw_events",
+                "table     event_ids",
+                "PASS=3",
+            ),
+        ),
+        ChainedLoaderSelectionE2ETestCase(
+            description="a plain build loads the chain and builds readers",
+            command=("--no-color", "build"),
+            expected_raw_events_exists=True,
+            expected_intermediate_rows=((1, 1), (2, 1)),
+            expected_stdout_fragments=(
+                "loader    fetch_events",
+                "source    raw_events",
+                "table     event_ids",
+                "PASS=3",
             ),
         ),
     ],
@@ -1018,9 +1113,9 @@ def test_given_chained_loader_project_when_selecting_loader_then_expands_expecte
                     "from sqlbuild.loaders import loader\n"
                     "\n"
                     "\n"
-                    "@loader(write_strategy='table', columns=[\n"
-                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                    "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
+                    "@loader(write_strategy='replace', columns=[\n"
+                    "    {'name': 'event_id', 'type': 'BIGINT'},\n"
+                    "    {'name': 'load_seq', 'type': 'BIGINT'},\n"
                     "])\n"
                     "def fetch_events(ctx):\n"
                     "    '''Test loader fetch_events.'''\n"
@@ -1038,6 +1133,10 @@ def test_given_chained_loader_project_when_selecting_loader_then_expands_expecte
                     "    events = ctx.loader(fetch_events)\n"
                     '    ctx.execute_sql(f"CREATE OR REPLACE TABLE {ctx.destination} '
                     'AS SELECT event_id FROM {events.destination}")\n'
+                ),
+                "sql/models/event_ids.sql": (
+                    'MODEL (description "Loaded event ids.", materialized table);\n\n'
+                    'SELECT event_id FROM __source("raw_events")\n'
                 ),
                 "python/nodes/loaders/source_rows/__init__.py": (
                     "from .fetch_events.loader import fetch_events\n"
@@ -1070,10 +1169,11 @@ def test_given_chained_loader_project_when_selecting_loader_then_expands_expecte
     "test_case",
     [
         ChainedLoaderPruningE2ETestCase(
-            description="excluding required intermediate prunes terminal source",
+            description="excluding a required intermediate that was never loaded stops the load",
             command=("--no-color", "load", "--select", "+raw_events", "--exclude", "fetch_events"),
             expected_raw_events_exists=False,
             expected_intermediate_exists=False,
+            expected_return_code=1,
         ),
         ChainedLoaderPruningE2ETestCase(
             description="excluding downstream from intermediate prunes terminal source",
@@ -1108,8 +1208,8 @@ def test_given_chained_loader_project_when_excluding_dependency_then_prunes_depe
                     "from sqlbuild.loaders import loader\n"
                     "\n"
                     "\n"
-                    "@loader(write_strategy='table', columns=[\n"
-                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
+                    "@loader(write_strategy='replace', columns=[\n"
+                    "    {'name': 'event_id', 'type': 'BIGINT'},\n"
                     "])\n"
                     "def fetch_events(ctx):\n"
                     "    '''Test loader fetch_events.'''\n"
@@ -1179,8 +1279,8 @@ def test_given_chained_loader_project_when_intermediate_has_custom_target_then_r
                     "from sqlbuild.loaders import loader\n"
                     "\n"
                     "\n"
-                    "@loader(destination='custom_fetch_events', write_strategy='table', columns=[\n"
-                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
+                    "@loader(destination='custom_fetch_events', write_strategy='replace', columns=[\n"
+                    "    {'name': 'event_id', 'type': 'BIGINT'},\n"
                     "])\n"
                     "def fetch_events(ctx):\n"
                     "    '''Test loader fetch_events.'''\n"
@@ -1235,13 +1335,13 @@ def test_given_chained_loader_project_when_intermediate_has_custom_target_then_r
             loader_py=(
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader(write_strategy='append', columns=[\n"
-                "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                "    {'name': 'amount', 'type': 'INTEGER'},\n"
+                "    {'name': 'event_id', 'type': 'BIGINT'},\n"
+                "    {'name': 'amount', 'type': 'BIGINT'},\n"
                 "])\n"
                 "def fetch_events(ctx):\n"
                 "    '''Test loader fetch_events.'''\n    return [{'event_id': 1, "
                 "'amount': 100}, {'event_id': 2, 'amount': 200}]\n\n"
-                "@loader(depends_on=[fetch_events])\n"
+                "@loader(write_strategy='replace', depends_on=[fetch_events])\n"
                 "def raw_events(ctx):\n"
                 "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
                 "    cursor = ctx.query(\n"
@@ -1263,12 +1363,12 @@ def test_given_chained_loader_project_when_intermediate_has_custom_target_then_r
                 "    unique_key='event_id',\n"
                 "    cursor_column='load_seq',\n"
                 "    columns=[\n"
-                "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                "    {'name': 'amount', 'type': 'INTEGER'},\n"
-                "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
+                "    {'name': 'event_id', 'type': 'BIGINT'},\n"
+                "    {'name': 'amount', 'type': 'BIGINT'},\n"
+                "    {'name': 'load_seq', 'type': 'BIGINT'},\n"
                 "])\n"
                 "def fetch_events(ctx):\n"
-                "    '''Test loader fetch_events.'''\n    if ctx.current_cursor_value is None:\n"
+                "    '''Test loader fetch_events.'''\n    if ctx.cursor_value is None:\n"
                 "        return [\n"
                 "            {'event_id': 1, 'amount': 100, 'load_seq': 1},\n"
                 "            {'event_id': 2, 'amount': 200, 'load_seq': 1},\n"
@@ -1277,7 +1377,7 @@ def test_given_chained_loader_project_when_intermediate_has_custom_target_then_r
                 "        {'event_id': 1, 'amount': 150, 'load_seq': 2},\n"
                 "        {'event_id': 3, 'amount': 300, 'load_seq': 2},\n"
                 "    ]\n\n"
-                "@loader(depends_on=[fetch_events])\n"
+                "@loader(write_strategy='replace', depends_on=[fetch_events])\n"
                 "def raw_events(ctx):\n"
                 "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
                 "    cursor = ctx.query(\n"
@@ -1295,12 +1395,12 @@ def test_given_chained_loader_project_when_intermediate_has_custom_target_then_r
             loader_py=(
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader(write_strategy='delete_insert', cursor_column='load_seq', columns=[\n"
-                "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                "    {'name': 'amount', 'type': 'INTEGER'},\n"
-                "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
+                "    {'name': 'event_id', 'type': 'BIGINT'},\n"
+                "    {'name': 'amount', 'type': 'BIGINT'},\n"
+                "    {'name': 'load_seq', 'type': 'BIGINT'},\n"
                 "])\n"
                 "def fetch_events(ctx):\n"
-                "    '''Test loader fetch_events.'''\n    if ctx.current_cursor_value "
+                "    '''Test loader fetch_events.'''\n    if ctx.cursor_value "
                 "is not None:\n"
                 "        return [\n"
                 "            {'event_id': 2, 'amount': 250, 'load_seq': 1},\n"
@@ -1310,7 +1410,7 @@ def test_given_chained_loader_project_when_intermediate_has_custom_target_then_r
                 "        {'event_id': 1, 'amount': 100, 'load_seq': 1},\n"
                 "        {'event_id': 2, 'amount': 200, 'load_seq': 1},\n"
                 "    ]\n\n"
-                "@loader(depends_on=[fetch_events])\n"
+                "@loader(write_strategy='replace', depends_on=[fetch_events])\n"
                 "def raw_events(ctx):\n"
                 "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
                 "    cursor = ctx.query(\n"
@@ -1338,12 +1438,11 @@ def test_given_chained_loader_project_when_intermediate_uses_strategy_then_appli
                 "sources:\n"
                 "  - name: raw_events\n    description: Test source raw_events.\n"
                 "    managed: true\n"
-                "    write_strategy: table\n"
                 "    columns:\n"
                 "      - name: event_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
                 "      - name: amount\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
             ),
             node_files={
                 **node_module_files("python/nodes/loaders/source_rows.py", test_case.loader_py)
@@ -1453,7 +1552,7 @@ def test_given_intermediate_loader_without_write_strategy_when_loading_twice_the
             command=("--no-color", "load"),
             expected_ok_rows=((1,),),
             expected_error_fragment="boom",
-            expected_skip_fragment="FAIL=1  SKIP=1",
+            expected_skip_fragment="FAIL=1  INSUFFICIENT=0  SKIP=1",
         )
     ],
     ids=lambda case: case.description,
@@ -1472,15 +1571,14 @@ def test_given_loader_dependency_failure_when_loading_then_only_dependents_skip(
                 "    managed: true\n"
                 "  - name: raw_ok\n    description: Test source raw_ok.\n"
                 "    managed: true\n"
-                "    write_strategy: table\n"
             ),
             node_files={
                 "python/nodes/loaders/source_rows/fetch_bad/loader.py": (
                     "from sqlbuild.loaders import loader\n"
                     "\n"
                     "\n"
-                    "@loader(write_strategy='table', columns=[\n"
-                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
+                    "@loader(write_strategy='replace', columns=[\n"
+                    "    {'name': 'event_id', 'type': 'BIGINT'},\n"
                     "])\n"
                     "def fetch_bad(ctx):\n"
                     "    '''Test loader fetch_bad.'''\n"
@@ -1502,7 +1600,7 @@ def test_given_loader_dependency_failure_when_loading_then_only_dependents_skip(
                     "from sqlbuild.loaders import loader\n"
                     "\n"
                     "\n"
-                    "@loader\n"
+                    "@loader(write_strategy='replace')\n"
                     "def raw_ok(ctx):\n"
                     "    '''Test loader raw_ok.'''\n"
                     "    return [{'event_id': 1}]\n"
@@ -1560,15 +1658,14 @@ def test_given_loader_dependency_failure_when_building_then_only_dependents_skip
                 "    managed: true\n"
                 "  - name: raw_ok\n    description: Test source raw_ok.\n"
                 "    managed: true\n"
-                "    write_strategy: table\n"
             ),
             node_files={
                 "python/nodes/loaders/source_rows/fetch_bad/loader.py": (
                     "from sqlbuild.loaders import loader\n"
                     "\n"
                     "\n"
-                    "@loader(write_strategy='table', columns=[\n"
-                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
+                    "@loader(write_strategy='replace', columns=[\n"
+                    "    {'name': 'event_id', 'type': 'BIGINT'},\n"
                     "])\n"
                     "def fetch_bad(ctx):\n"
                     "    '''Test loader fetch_bad.'''\n"
@@ -1590,7 +1687,7 @@ def test_given_loader_dependency_failure_when_building_then_only_dependents_skip
                     "from sqlbuild.loaders import loader\n"
                     "\n"
                     "\n"
-                    "@loader\n"
+                    "@loader(write_strategy='replace')\n"
                     "def raw_ok(ctx):\n"
                     "    '''Test loader raw_ok.'''\n"
                     "    return [{'event_id': 1}]\n"
@@ -1660,15 +1757,14 @@ def test_given_loader_dependency_failure_when_loading_json_then_reports_skipped_
                 "    managed: true\n"
                 "  - name: raw_ok\n    description: Test source raw_ok.\n"
                 "    managed: true\n"
-                "    write_strategy: table\n"
             ),
             node_files={
                 "python/nodes/loaders/source_rows/fetch_bad/loader.py": (
                     "from sqlbuild.loaders import loader\n"
                     "\n"
                     "\n"
-                    "@loader(write_strategy='table', columns=[\n"
-                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
+                    "@loader(write_strategy='replace', columns=[\n"
+                    "    {'name': 'event_id', 'type': 'BIGINT'},\n"
                     "])\n"
                     "def fetch_bad(ctx):\n"
                     "    '''Test loader fetch_bad.'''\n"
@@ -1690,7 +1786,7 @@ def test_given_loader_dependency_failure_when_loading_json_then_reports_skipped_
                     "from sqlbuild.loaders import loader\n"
                     "\n"
                     "\n"
-                    "@loader\n"
+                    "@loader(write_strategy='replace')\n"
                     "def raw_ok(ctx):\n"
                     "    '''Test loader raw_ok.'''\n"
                     "    return [{'event_id': 1}]\n"
@@ -1730,55 +1826,86 @@ def test_given_loader_dependency_failure_when_loading_json_then_reports_skipped_
     "test_case",
     [
         SourceLoaderErrorE2ETestCase(
-            description="contract rejects extra returned columns",
+            description="on_schema_change fail refuses a column the data adds",
             command=("--no-color", "load"),
-            expected_error_fragment="contract has extra columns: extra_note",
+            expected_error_fragment=(
+                'new field extra_note is not in the table and on_schema_change = "fail"'
+            ),
             repo_files=build_schema_behavior_project_files(
                 source_yaml=(
                     "sources:\n"
                     "  - name: raw_contract_events\n    description: Test source "
                     "raw_contract_events.\n"
                     "    managed: true\n"
-                    "    write_strategy: table\n"
-                    "    contract: enforced\n"
+                    "    on_schema_change: fail\n"
                     "    columns:\n"
                     "      - name: event_id\n"
-                    "        type: INTEGER\n"
+                    "        type: BIGINT\n"
                 ),
                 node_files={
-                    "python/nodes/loaders/source_rows/loader.py": (
-                        "from sqlbuild.loaders import loader\n\n"
-                        "@loader\n"
-                        "def raw_contract_events(ctx):\n"
-                        "    '''Test loader raw_contract_events.'''\n    return "
-                        "[{'event_id': 1, 'extra_note': 'not declared'}]\n"
+                    "python/nodes/loaders/source_rows/loader.py": _SECOND_RUN_LOADER.format(
+                        options="write_strategy='append'",
+                        name="raw_contract_events",
+                        first="{'event_id': 1}",
+                        second="{'event_id': 2, 'extra_note': 'not declared'}",
                     ),
                     "python/nodes/loaders/source_rows/__init__.py": "from .loader import raw_contract_events\n",
                 },
             ),
         ),
         SourceLoaderErrorE2ETestCase(
-            description="contract rejects missing declared columns",
+            description="on_schema_change fail refuses a declared column the data lacks",
             command=("--no-color", "load"),
-            expected_error_fragment="contract missing columns: event_name",
+            expected_error_fragment=(
+                'declared column event_name is in none of the rows and on_schema_change = "fail"'
+            ),
             repo_files=build_schema_behavior_project_files(
                 source_yaml=(
                     "sources:\n"
                     "  - name: raw_contract_events\n    description: Test source "
                     "raw_contract_events.\n"
                     "    managed: true\n"
-                    "    write_strategy: table\n"
-                    "    contract: enforced\n"
+                    "    on_schema_change: fail\n"
                     "    columns:\n"
                     "      - name: event_id\n"
-                    "        type: INTEGER\n"
+                    "        type: BIGINT\n"
                     "      - name: event_name\n"
                     "        type: VARCHAR\n"
                 ),
                 node_files={
                     "python/nodes/loaders/source_rows/loader.py": (
                         "from sqlbuild.loaders import loader\n\n"
-                        "@loader\n"
+                        "@loader(write_strategy='replace')\n"
+                        "def raw_contract_events(ctx):\n"
+                        "    '''Test loader raw_contract_events.'''\n    return [{'event_id': 1}]\n"
+                    ),
+                    "python/nodes/loaders/source_rows/__init__.py": "from .loader import raw_contract_events\n",
+                },
+            ),
+        ),
+        SourceLoaderErrorE2ETestCase(
+            description="a declared column the data lacks loads as NULL with a warning",
+            command=("--no-color", "load"),
+            expected_error_fragment=(
+                "declared column event_name is in none of the rows, so it loaded as NULL"
+            ),
+            expected_return_code=0,
+            repo_files=build_schema_behavior_project_files(
+                source_yaml=(
+                    "sources:\n"
+                    "  - name: raw_contract_events\n    description: Test source "
+                    "raw_contract_events.\n"
+                    "    managed: true\n"
+                    "    columns:\n"
+                    "      - name: event_id\n"
+                    "        type: BIGINT\n"
+                    "      - name: event_name\n"
+                    "        type: VARCHAR\n"
+                ),
+                node_files={
+                    "python/nodes/loaders/source_rows/loader.py": (
+                        "from sqlbuild.loaders import loader\n\n"
+                        "@loader(write_strategy='replace')\n"
                         "def raw_contract_events(ctx):\n"
                         "    '''Test loader raw_contract_events.'''\n    return [{'event_id': 1}]\n"
                     ),
@@ -1789,54 +1916,47 @@ def test_given_loader_dependency_failure_when_loading_json_then_reports_skipped_
         SourceLoaderErrorE2ETestCase(
             description="existing target rejects returned type changes",
             command=("--no-color", "load"),
-            expected_error_fragment="column 'amount' changed type",
+            expected_error_fragment="amount is int in the table but text in the source",
             repo_files=build_schema_behavior_project_files(
                 source_yaml=(
                     "sources:\n"
                     "  - name: raw_events\n    description: Test source raw_events.\n"
                     "    managed: true\n"
-                    "    write_strategy: append\n"
-                    "    cursor_column: load_seq\n"
                     "    columns:\n"
                     "      - name: event_id\n"
-                    "        type: INTEGER\n"
-                    "      - name: load_seq\n"
-                    "        type: INTEGER\n"
+                    "        type: BIGINT\n"
                 ),
                 node_files={
-                    "python/nodes/loaders/source_rows/loader.py": (
-                        "from sqlbuild.loaders import loader\n\n"
-                        "@loader\n"
-                        "def raw_events(ctx):\n"
-                        "    '''Test loader raw_events.'''\n    if "
-                        "ctx.current_cursor_value is None:\n"
-                        "        return [{'event_id': 1, 'load_seq': 1, 'amount': 100}]\n"
-                        "    return [{'event_id': 2, 'load_seq': 2, 'amount': 'one hundred'}]\n"
+                    "python/nodes/loaders/source_rows/loader.py": _SECOND_RUN_LOADER.format(
+                        options="write_strategy='append'",
+                        name="raw_events",
+                        first="{'event_id': 1, 'amount': 100}",
+                        second="{'event_id': 2, 'amount': 'one hundred'}",
                     ),
                     "python/nodes/loaders/source_rows/__init__.py": "from .loader import raw_events\n",
                 },
             ),
         ),
         SourceLoaderErrorE2ETestCase(
-            description="intermediate contract rejects extra returned columns",
+            description="an intermediate loader's on_schema_change fail refuses a column the data adds",
             command=("--no-color", "load", "--select", "+raw_events"),
-            expected_error_fragment="contract has extra columns: extra_note",
+            expected_error_fragment=(
+                'new field extra_note is not in the table and on_schema_change = "fail"'
+            ),
             repo_files=build_schema_behavior_project_files(
                 source_yaml=(
                     "sources:\n  - name: raw_events\n    description: Test source "
                     "raw_events.\n    managed: true\n"
                 ),
                 node_files={
-                    "python/nodes/loaders/source_rows/fetch_events/loader.py": (
-                        "from sqlbuild.loaders import loader\n"
-                        "\n"
-                        "\n"
-                        "@loader(write_strategy='table', contract='enforced', columns=[\n"
-                        "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                        "])\n"
-                        "def fetch_events(ctx):\n"
-                        "    '''Test loader fetch_events.'''\n"
-                        "    return [{'event_id': 1, 'extra_note': 'not declared'}]\n"
+                    "python/nodes/loaders/source_rows/fetch_events/loader.py": _SECOND_RUN_LOADER.format(
+                        options=(
+                            "write_strategy='append', on_schema_change='fail', "
+                            "columns=[{'name': 'event_id', 'type': 'BIGINT'}]"
+                        ),
+                        name="fetch_events",
+                        first="{'event_id': 1}",
+                        second="{'event_id': 2, 'extra_note': 'not declared'}",
                     ),
                     "python/nodes/loaders/source_rows/raw_events/loader.py": (
                         "from sqlbuild.loaders import loader\n"
@@ -1854,6 +1974,26 @@ def test_given_loader_dependency_failure_when_loading_json_then_reports_skipped_
                     "python/nodes/loaders/source_rows/__init__.py": (
                         "from .fetch_events.loader import fetch_events\n"
                         "from .raw_events.loader import raw_events\n"
+                    ),
+                },
+            ),
+        ),
+        SourceLoaderErrorE2ETestCase(
+            description="ctx.http needs the loader to name a connection",
+            command=("--no-color", "load"),
+            expected_error_fragment="ctx.http() needs @loader(connection=...) naming an http",
+            repo_files=build_schema_behavior_project_files(
+                source_yaml=(
+                    "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
+                    "    managed: true\n"
+                ),
+                node_files={
+                    "python/nodes/loaders/raw_orders/loader.py": (
+                        "import sqlload_api as sl\n\nfrom sqlbuild.loaders import loader\n\n\n"
+                        "@loader(write_strategy='replace')\n"
+                        "def raw_orders(ctx):\n"
+                        "    '''Test loader raw_orders.'''\n"
+                        "    return ctx.http().paginate('/orders', paginator=sl.single())\n"
                     ),
                 },
             ),

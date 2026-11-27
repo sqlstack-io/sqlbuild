@@ -23,3 +23,4 @@ CONNECTION_PRIVATE_MEMORY_DATABASE_KEYS: dict[str, str] = {
     "motherduck": "database",
     "sqlite": "path",
 }
+NODE_LOG_LINES_KEPT: int = 200

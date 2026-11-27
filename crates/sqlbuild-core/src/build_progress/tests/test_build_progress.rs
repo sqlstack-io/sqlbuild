@@ -34,7 +34,7 @@ fn given_build_results_when_formatting_footer_then_matches_python_layout() {
             },
             python: Vec::new(),
             use_color: false,
-            expected_text: "\u{2713} Completed successfully  PASS=1  WARN=0  FAIL=0  INSUFFICIENT=0  SKIP=0  TOTAL=1  (1.50s)",
+            expected_text: "\n✓ Completed successfully  PASS=1  WARN=0  FAIL=0  INSUFFICIENT=0  SKIP=0  TOTAL=1  (1.50s)",
         },
         FooterTestCase {
             description: "warnings, failures and skipped nodes each get a section",
@@ -61,7 +61,7 @@ fn given_build_results_when_formatting_footer_then_matches_python_layout() {
                 warnings: Vec::new(),
             }],
             use_color: false,
-            expected_text: "\nWarnings:\n\n  orders\n    audit not_null returned 2 rows\n\n\u{2717} Completed with errors  PASS=1  WARN=1  FAIL=2  INSUFFICIENT=0  SKIP=1  TOTAL=5  (1.50s)\n\nFailures:\n\n  customers  (staging)\n    error     [E100] boom\n    delta table kept for inspection: orders__delta\n\n\nPython node failures:\n\n  asset     refresh                                            Python node failed\n\nSkipped (1): payments",
+            expected_text: "\nWarnings:\n\n  orders\n    audit not_null returned 2 rows\n\n\nFailures:\n\n  customers  (staging)\n    error     [E100] boom\n    delta table kept for inspection: orders__delta\n\n\nPython node failures:\n\n  asset     refresh                                            Python node failed\n\nSkipped (1): payments\n\nFailed (2):\n  ✗ customers  [E100] boom\n  ✗ refresh\n\n✗ Completed with errors  PASS=1  WARN=1  FAIL=2  INSUFFICIENT=0  SKIP=1  TOTAL=5  (1.50s)",
         },
     ];
 

@@ -75,7 +75,7 @@ pub(crate) fn materialization_is_table_backed(
     kwargs: Option<&Bound<'_, PyDict>>,
 ) -> PyResult<Py<PyAny>> {
     let materialized: Bound<'_, PyAny> = call_argument((args, kwargs), "materialized", 0)?;
-    let backed: bool = match materialized.downcast::<PyString>() {
+    let backed: bool = match materialized.cast::<PyString>() {
         Ok(value) => TABLE_BACKED.contains(&value.extract::<String>()?.as_str()),
         Err(_) => false,
     };

@@ -24,7 +24,7 @@ pub fn cursor_integer<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyA
     if instance_of(value, RecordId::DateValue)? || instance_of(value, RecordId::TimestampValue)? {
         return Err(algebra_error(py, TIMESTAMP_AS_INTEGER));
     }
-    if let Ok(text) = value.downcast::<PyString>()
+    if let Ok(text) = value.cast::<PyString>()
         && let Some(parsed) = parse_integer_text(text.to_str()?)
     {
         return Ok(parsed.into_pyobject(py)?.into_any());

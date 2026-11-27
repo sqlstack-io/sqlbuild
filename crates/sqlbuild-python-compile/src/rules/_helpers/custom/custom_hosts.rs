@@ -404,7 +404,7 @@ fn write_payload_file(path: &Path, request: &HostRequest<'_, '_>) -> PyResult<()
 pub(crate) fn pickled<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyBytes>> {
     Ok(imported(value.py(), "pickle", "dumps")?
         .call1((value,))?
-        .downcast_into()?)
+        .cast_into()?)
 }
 
 /// Usable CPUs: the process CPU count capped by any cgroup CPU quota.

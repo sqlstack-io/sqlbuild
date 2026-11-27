@@ -4,7 +4,7 @@ use crate::model_config::_helpers::config::template_data::MODEL_CONFIG_LABEL;
 use crate::model_config::_helpers::config::template_data::RUN_ID_KEY;
 use crate::model_config::_helpers::config::template_data::RUN_TARGET_KEY;
 use crate::model_config::main::config::expanded_template_data::expanded_template_data;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_model_config::templates::models::TemplateOptions;
 
@@ -20,7 +20,7 @@ pub fn early_model_templates<'py>(
     context_values.set_item(RUN_TARGET_KEY, target_name)?;
     expanded_template_data(
         values,
-        (effective_vars.downcast()?, &context_values),
+        (effective_vars.cast()?, &context_values),
         (
             TemplateOptions {
                 allow_context: true,

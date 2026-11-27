@@ -44,12 +44,8 @@ pub(crate) async fn load_group(
         .iter()
         .filter_map(|row| row["node_key"].as_str().map(str::to_owned))
         .collect();
-    let (transaction, nodes) = read_snapshot_nodes(
-        transaction,
-        parent.request_json.snapshot_id,
-        Some(&failures),
-    )
-    .await?;
+    let (transaction, nodes) =
+        read_snapshot_nodes(transaction, parent.request_json.snapshot_id, &failures).await?;
     let critical_failed = nodes
         .values()
         .any(|node| node.definition["config"]["critical"].as_bool() == Some(true));

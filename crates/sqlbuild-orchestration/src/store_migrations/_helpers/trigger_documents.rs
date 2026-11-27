@@ -13,13 +13,12 @@ pub(crate) async fn rewrite_trigger_documents(
     transaction: ControlTransaction,
     edit: impl Fn(&mut Map<String, Value>) -> Result<bool, ControlError> + Send,
 ) -> Result<ControlTransaction, ControlError> {
-    let (mut transaction, rows) = query(
-        transaction,
-        "SELECT document_hash, body FROM sqb_documents WHERE document_hash IN \
+    let select = format!(
+        "SELECT document_hash, {} AS body FROM sqb_documents WHERE document_hash IN \
          (SELECT document_hash FROM sqb_snapshot_documents WHERE kind='triggers')",
-        Vec::new(),
-    )
-    .await?;
+        transaction.hex_column("body"),
+    );
+    let (mut transaction, rows) = query(transaction, &select, Vec::new()).await?;
     for row in rows {
         let mut document: Value = serde_json::from_slice(&decompress(&row["body"])?)
             .map_err(|error| ControlError::Invalid(error.to_string()))?;

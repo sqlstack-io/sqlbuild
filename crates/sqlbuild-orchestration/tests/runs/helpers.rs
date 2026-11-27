@@ -476,7 +476,7 @@ pub(crate) fn cache_id(number: u8) -> Uuid {
 
 /// The cached publication of `snapshot` in target `scope`, built as `marked(snapshot)`, its mark, and whether this lookup built it.
 pub(crate) async fn cache_lookup(
-    slots: &std::sync::Mutex<crate::runs::models::SnapshotSlots>,
+    slots: &std::sync::Mutex<crate::runs::types::SnapshotSlots>,
     (scope, snapshot): (u8, u8),
 ) -> (u8, bool) {
     let built = std::cell::Cell::new(false);

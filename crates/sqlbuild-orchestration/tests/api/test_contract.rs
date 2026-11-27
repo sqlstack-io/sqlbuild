@@ -27,6 +27,7 @@ use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::tests::helpers::{queue, request, snapshot};
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
+use crate::tls::main::client_builder::client_builder;
 
 #[test]
 fn given_a_real_http_server_when_locations_and_workers_report_then_scopes_retries_and_terminal_expiry_are_enforced()
@@ -72,7 +73,7 @@ fn given_a_real_http_server_when_locations_and_workers_report_then_scopes_retrie
             .await
             .expect("location credential");
             let api = start_api(store).await;
-            let client = reqwest::Client::builder()
+            let client = client_builder()
                 .timeout(Duration::from_secs(5))
                 .build()
                 .expect("HTTP client");

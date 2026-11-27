@@ -407,7 +407,7 @@ fn run_model_diff(
         )?),
     )
     .and_then(|value| pyo3::IntoPyObjectExt::into_bound_py_any(value, py))?
-    .downcast_into()?;
+    .cast_into()?;
     let selected: Bound<'_, PyAny> = pipeline.get_item(2)?;
     if !selected.is_truthy()? {
         return Err(rejected(

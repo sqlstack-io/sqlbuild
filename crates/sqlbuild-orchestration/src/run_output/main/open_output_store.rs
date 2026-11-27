@@ -8,11 +8,12 @@ use object_store::aws::AmazonS3Builder;
 use object_store::local::LocalFileSystem;
 use object_store::path::Path;
 
-use crate::run_output::_helpers::folders::{default_folder, user_folders};
+use crate::run_output::_helpers::store::folders::{default_folder, user_folders};
 use crate::run_output::constants::{FILE_SCHEME, S3_SCHEME};
 use crate::run_output::models::{OutputSettings, OutputStore};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
+use crate::tls::main::install_crypto_provider::install_crypto_provider;
 
 /// A local folder is created when missing; an S3 store takes its credentials from the standard AWS environment or role.
 pub fn open_output_store(
@@ -36,6 +37,7 @@ pub fn open_output_store(
                 Path::default(),
             )
         } else if let Some(rest) = location.strip_prefix(S3_SCHEME) {
+            install_crypto_provider();
             let (bucket, prefix) = rest.split_once('/').unwrap_or((rest, ""));
             if bucket.is_empty() {
                 return Err(ControlError::Invalid(

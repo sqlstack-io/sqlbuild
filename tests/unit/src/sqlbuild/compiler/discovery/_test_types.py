@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+from sqlbuild._native import SourceWriteStrategy
+
 
 @dataclass(frozen=True)
 class InvalidEventExporterConfigTestCase:
@@ -67,6 +69,21 @@ class DiscoverProjectInputsErrorTestCase:
 
 
 @dataclass(frozen=True)
+class SourceConnectionErrorTestCase:
+    description: str
+    repo_files: dict[str, str]
+    expected_error_fragment: str
+    expected_file: str
+
+
+@dataclass(frozen=True)
+class ConnectionRolesTestCase:
+    description: str
+    repo_files: dict[str, str]
+    expected_target_connection: str
+
+
+@dataclass(frozen=True)
 class DiscoverFactoryValidationTestCase:
     description: str
     repo_files: dict[str, str]
@@ -120,3 +137,27 @@ class InvalidRecallSinkTestCase:
     expected_error: type[Exception]
     expected_code: str
     expected_message: str
+
+
+@dataclass(frozen=True)
+class LoadDiscoveryTestCase:
+    description: str
+    repo_files: dict[str, str]
+    expected_loads: tuple[tuple[str, str | None], ...]
+
+
+@dataclass(frozen=True)
+class LoadErrorTestCase:
+    description: str
+    repo_files: dict[str, str]
+    expected_error_class: type[Exception]
+    expected_error_fragment: str
+
+
+@dataclass(frozen=True)
+class LoaderSettingsTestCase:
+    """A loader's SQLLoad table options, and the loading facts of the source it fills."""
+
+    description: str
+    decorator: str
+    expected_entry: tuple[SourceWriteStrategy | None, str | None, tuple[str, ...]]

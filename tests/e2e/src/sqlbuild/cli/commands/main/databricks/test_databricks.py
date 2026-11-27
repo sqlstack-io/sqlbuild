@@ -289,14 +289,14 @@ def test_given_physical_source_without_freshness_when_running_on_databricks_then
                 "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
                 "])\n"
                 "def fetch_events(ctx):\n"
-                "    '''Test loader fetch_events.'''\n    if ctx.current_cursor_value is None:\n"
+                "    '''Test loader fetch_events.'''\n    if ctx.cursor_value is None:\n"
                 "        next_seq = 1\n"
                 "    else:\n"
-                "        next_seq = ctx.current_cursor_value + 1\n"
+                "        next_seq = ctx.cursor_value + 1\n"
                 "    return [\n"
                 "        {'event_id': next_seq, 'amount': next_seq * 100, 'load_seq': next_seq}\n"
                 "    ]\n\n"
-                "@loader(depends_on=[fetch_events])\n"
+                "@loader(write_strategy='replace', depends_on=[fetch_events])\n"
                 "def raw_events(ctx):\n"
                 "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
                 "    cursor = ctx.query(\n"
@@ -324,7 +324,7 @@ def test_given_physical_source_without_freshness_when_running_on_databricks_then
                 "    ],\n"
                 ")\n"
                 "def fetch_events(ctx):\n"
-                "    '''Test loader fetch_events.'''\n    if ctx.current_cursor_value is None:\n"
+                "    '''Test loader fetch_events.'''\n    if ctx.cursor_value is None:\n"
                 "        return [\n"
                 "            {'event_id': 1, 'amount': 100, 'load_seq': 1},\n"
                 "            {'event_id': 2, 'amount': 200, 'load_seq': 1},\n"
@@ -333,7 +333,7 @@ def test_given_physical_source_without_freshness_when_running_on_databricks_then
                 "        {'event_id': 1, 'amount': 150, 'load_seq': 2},\n"
                 "        {'event_id': 3, 'amount': 300, 'load_seq': 2},\n"
                 "    ]\n\n"
-                "@loader(depends_on=[fetch_events])\n"
+                "@loader(write_strategy='replace', depends_on=[fetch_events])\n"
                 "def raw_events(ctx):\n"
                 "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
                 "    cursor = ctx.query(\n"
@@ -356,7 +356,7 @@ def test_given_physical_source_without_freshness_when_running_on_databricks_then
                 "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
                 "])\n"
                 "def fetch_events(ctx):\n"
-                "    '''Test loader fetch_events.'''\n    if ctx.current_cursor_value is None:\n"
+                "    '''Test loader fetch_events.'''\n    if ctx.cursor_value is None:\n"
                 "        return [\n"
                 "            {'event_id': 1, 'amount': 100, 'load_seq': 1},\n"
                 "            {'event_id': 2, 'amount': 200, 'load_seq': 1},\n"
@@ -365,7 +365,7 @@ def test_given_physical_source_without_freshness_when_running_on_databricks_then
                 "        {'event_id': 2, 'amount': 250, 'load_seq': 1},\n"
                 "        {'event_id': 3, 'amount': 300, 'load_seq': 1},\n"
                 "    ]\n\n"
-                "@loader(depends_on=[fetch_events])\n"
+                "@loader(write_strategy='replace', depends_on=[fetch_events])\n"
                 "def raw_events(ctx):\n"
                 "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
                 "    cursor = ctx.query(\n"
@@ -394,7 +394,6 @@ def test_given_intermediate_strategy_project_when_loading_twice_on_databricks_th
                 "sources:\n"
                 "  - name: raw_events\n    description: Test source raw_events.\n"
                 "    managed: true\n"
-                "    write_strategy: table\n"
                 "    columns:\n"
                 "      - name: event_id\n"
                 "        type: INTEGER\n"
@@ -716,10 +715,10 @@ def test_given_snapshot_project_when_building_on_databricks_then_scd2_history_is
             description="runs databricks scenario remotely and retains inspectable artifacts",
             expected_stdout_fragments=(
                 "remote_event_rollup",
-                "Retained relations:",
-                "source raw_events -> __sqb_",
-                "model  stg_events -> __sqb_",
-                "model  event_rollup -> __sqb_",
+                "Retained (1):",
+                "source    raw_events -> __sqb_",
+                "model     stg_events -> __sqb_",
+                "model     event_rollup -> __sqb_",
                 "PASS=1  FAIL=0  TOTAL=1",
             ),
             expected_retained_suffix_counts={

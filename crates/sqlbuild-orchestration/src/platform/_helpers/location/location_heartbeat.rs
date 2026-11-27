@@ -1,4 +1,4 @@
-//! A heartbeat replaces one instance's liveness, never appending an execution fact.
+//! A heartbeat replaces one instance's liveness, never appending an execution fact; a new one reaches the pages people watch.
 
 use serde_json::json;
 use uuid::Uuid;
@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::platform::models::LocationHealthReport;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
-use crate::store::models::{ControlTransaction, Parameter};
+use crate::store::models::{Change, ControlTransaction, Parameter};
 
 pub(crate) async fn location_heartbeat(
     transaction: ControlTransaction,
@@ -41,10 +41,13 @@ pub(crate) async fn location_heartbeat(
         }
     }
     let now = transaction.now;
-    let (transaction, _) = query(transaction,
+    let (mut transaction, _) = query(transaction,
         "INSERT INTO sqb_location_instances (instance_id, location_id, target, last_seen_at, health_json) \
          VALUES ($1, $2, $3, $4, $5) ON CONFLICT (instance_id) DO UPDATE SET last_seen_at=$4, health_json=$5",
         vec![Parameter::Id(report.session_id), Parameter::Id(location_id), Parameter::Text(report.target.clone()),
              Parameter::Time(now), Parameter::Json(json!(report))]).await?;
+    transaction
+        .changes
+        .insert(Change::LocationHealth(location_id, report.target.clone()));
     Ok((transaction, true))
 }

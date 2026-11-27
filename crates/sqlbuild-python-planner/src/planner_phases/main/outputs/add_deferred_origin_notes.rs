@@ -45,7 +45,7 @@ pub fn add_deferred_origin_notes<'py>(
         if names.binary_search(&name).is_err() {
             continue;
         }
-        let Some(location) = locations.downcast::<PyDict>()?.get_item(&name)? else {
+        let Some(location) = locations.cast::<PyDict>()?.get_item(&name)? else {
             continue;
         };
         if native_field(&location, "name")?

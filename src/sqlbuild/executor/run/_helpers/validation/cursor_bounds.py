@@ -573,8 +573,11 @@ def _execute_watermark_query(
 
     bounds: str = "min,max" if read_minimum else "max"
     identity: str = f"({query_index}/{total}): {relation}.{cursor_column} [{bounds}]"
+    maximum: str = adapter.render_cursor_bound(function="MAX", operand=cursor_column)
     select_sql: str = (
-        f"MIN({cursor_column}), MAX({cursor_column})" if read_minimum else f"MAX({cursor_column})"
+        f"{adapter.render_cursor_bound(function='MIN', operand=cursor_column)}, {maximum}"
+        if read_minimum
+        else maximum
     )
     sql: str = f"SELECT {select_sql} FROM {relation}"
     if on_progress is not None:
@@ -713,7 +716,8 @@ def _query_target_max(
     ):
         return None
     operand: str = adapter.render_cursor_operand(expression=cursor_column, cursor_type=cursor_type)
-    sql: str = f"SELECT MAX({operand}) FROM {target_relation}"
+    maximum: str = adapter.render_cursor_bound(function="MAX", operand=operand)
+    sql: str = f"SELECT {maximum} FROM {target_relation}"
     cursor: Any = adapter.execute(connection=connection, sql=sql)
     row: Any = cursor.fetchone()
     if row is None or row[0] is None:

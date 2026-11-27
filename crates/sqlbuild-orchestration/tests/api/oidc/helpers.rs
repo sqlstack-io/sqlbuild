@@ -28,6 +28,7 @@ use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionSc
 use crate::store::errors::ControlError;
 use crate::store::main::commit::commit;
 use crate::store::models::ControlStore;
+use crate::tls::main::client_builder::client_builder;
 
 pub(crate) async fn start_provider() -> TestProvider {
     let directory = tempfile::tempdir().expect("disposable provider certificates");
@@ -79,7 +80,7 @@ pub(crate) async fn start_provider() -> TestProvider {
         .expect("TLS listener")
         .handle(handle.clone());
     let task = tokio::spawn(server.serve(router.into_make_service()));
-    let client = reqwest::Client::builder()
+    let client = client_builder()
         .add_root_certificate(reqwest::Certificate::from_pem(pem.as_bytes()).expect("root"))
         .redirect(reqwest::redirect::Policy::none())
         .timeout(std::time::Duration::from_secs(5))

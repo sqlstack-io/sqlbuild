@@ -54,7 +54,7 @@ pub(crate) fn is_exact_int(value: &Bound<'_, PyAny>) -> bool {
 
 /// `invocation_id` as text, rejecting non-strings as invalid capture ids.
 pub(crate) fn capture_id(value: &Bound<'_, PyAny>) -> PyResult<String> {
-    if let Ok(text) = value.downcast::<PyString>() {
+    if let Ok(text) = value.cast::<PyString>() {
         return Ok(text.to_str()?.to_owned());
     }
     Err(rejection(

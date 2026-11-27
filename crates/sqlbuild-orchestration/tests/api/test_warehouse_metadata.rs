@@ -31,6 +31,7 @@ use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::fault_types::TransactionFault;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
+use crate::tls::main::client_builder::client_builder;
 use crate::warehouse_metadata::constants::MAX_HISTORY_PAGE_RECORDS;
 use crate::warehouse_metadata::models::{MetadataBatch, WarehouseHistoryKind};
 
@@ -129,7 +130,7 @@ fn given_warehouse_observations_when_pages_retry_then_scope_history_and_atomicit
             .await
             .expect("token");
             let api = start_api(store).await;
-            let client = reqwest::Client::new();
+            let client = client_builder().build().expect("HTTP client");
             let url = format!(
                 "{}/api/locations/{location}/targets/development/metadata",
                 api.url

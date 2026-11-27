@@ -3,7 +3,8 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::planner_identity::constants::{
-    DBT_REF_RESOURCE, MODEL_RESOURCE, SEED_RESOURCE, SOURCE_RESOURCE, SQL_TEST_RESOURCE,
+    DBT_REF_RESOURCE, LOAD_RESOURCE, MODEL_RESOURCE, SEED_RESOURCE, SOURCE_RESOURCE,
+    SQL_TEST_RESOURCE,
 };
 use crate::planner_identity::models::{AvailableUpstreams, GraphKey, MissingUpstream};
 
@@ -17,8 +18,13 @@ pub fn missing_upstreams(
     let mut missing: HashMap<GraphKey, Vec<GraphKey>> = HashMap::new();
     for selected_key in selected_keys {
         for dep_key in upstream_deps.get(selected_key).into_iter().flatten() {
-            if [SQL_TEST_RESOURCE, DBT_REF_RESOURCE, SOURCE_RESOURCE]
-                .contains(&dep_key.kind.as_str())
+            if [
+                SQL_TEST_RESOURCE,
+                DBT_REF_RESOURCE,
+                SOURCE_RESOURCE,
+                LOAD_RESOURCE,
+            ]
+            .contains(&dep_key.kind.as_str())
                 || selected.contains(dep_key)
                 || available.satisfied_keys.contains(dep_key)
                 || match &available.deferred_relations {

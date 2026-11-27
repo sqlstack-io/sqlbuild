@@ -71,7 +71,7 @@ def run_namespaced_scenario(project: Path, namespace: str, *, retain: bool = Fal
         "scenario_namespace": namespace,
         "scenario_namespace_source": "cli",
     }
-    assert f"Scenario namespace: {namespace} (source: cli)" in result.stderr
+    assert f"namespace  {namespace} (from cli)" in result.stderr
 
 
 def build_scenario_project_files() -> dict[str, str]:
@@ -519,7 +519,6 @@ def maybe_write_stale_order_totals_scenario(*, project_dir: Path, enabled: bool)
 def assert_local_duckdb_state(
     *,
     db_path: Path,
-    stdout: str,
     expected_exists: bool,
     query_when_exists: bool,
     count_sql: str,
@@ -531,7 +530,6 @@ def assert_local_duckdb_state(
 
     assert db_path.exists() is expected_exists
     for _ in range(int(query_when_exists)):
-        assert f"Retained local DuckDB: {db_path.as_posix()}" in stdout
         rows: list[tuple[object, ...]] = query_duckdb(db_path=db_path, sql=count_sql)
         assert rows == [(expected_count,)]
         for value_rows_sql in (rows_sql,) * int(rows_sql is not None):
@@ -812,6 +810,7 @@ def interrupt_scenario_run(
     trigger_stream: str,
     interrupt_count: int,
     hook_seconds: float = 0.0,
+    global_args: tuple[str, ...] = (),
 ) -> InterruptedScenarioRun:
     """Interrupt a scenario command once ``trigger`` is printed on ``trigger_stream``."""
 
@@ -819,6 +818,7 @@ def interrupt_scenario_run(
         [
             str(Path(sys.executable).with_name("sqb")),
             "--no-color",
+            *global_args,
             "--project-dir",
             str(project_dir),
             "scenario",
@@ -1340,6 +1340,85 @@ def build_snowflake_guarded_scenario_project_files() -> dict[str, str]:
     }
 
 
+SNOWFLAKE_MACRO_SCENARIOS: tuple[str, ...] = (
+    "order_ids__plain",
+    "order_flags__macros",
+    "order_fingerprints__hash",
+)
+
+
+def _snowflake_macro(*, arguments: str, returns: str, body: str) -> str:
+    return (
+        'MACRO (\n  description "Synthetic macro.",\n'
+        f"  arguments ({arguments}),\n  returns {returns},\n);\n\n{body}\n"
+    )
+
+
+def _snowflake_order_scenario(*, name: str, model: str, expected: str) -> str:
+    return (
+        f"SCENARIO (description 'Scenario {name}.');\nWITH\n"
+        f"__source__raw_orders AS ({SNOWFLAKE_ORDER_IDS_FIXTURE_SQL}),\n"
+        f"__expected__{model} AS (SELECT {expected})\nSELECT 1\n"
+    )
+
+
+def build_snowflake_macro_scenario_project_files() -> dict[str, str]:
+    """An offline Snowflake project whose macros use RLIKE, a VARIANT path, NUMBER and HASH."""
+
+    macros: str = "sql/models/orders/_sqlbuild/_macros/sql"
+    return {
+        "sqlbuild_project.toml": build_offline_snowflake_project_toml(),
+        "sql/sources/raw.yml": (
+            "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
+            "    schema: main\n    table: raw_orders\n    columns:\n"
+            '      - {name: order_id, type: "NUMBER(38,0)"}\n'
+        ),
+        f"{macros}/is_placeholder.sql": _snowflake_macro(
+            arguments="name VARCHAR",
+            returns="BOOLEAN",
+            body="COALESCE(UPPER(@name) RLIKE 'UNKNOWN|N/A', FALSE)",
+        ),
+        f"{macros}/payload_status.sql": _snowflake_macro(
+            arguments="payload VARIANT", returns="VARCHAR", body="@payload:status::VARCHAR"
+        ),
+        f"{macros}/order_rank.sql": _snowflake_macro(
+            arguments="order_id NUMBER", returns="NUMBER", body="CAST(@order_id AS INTEGER)"
+        ),
+        f"{macros}/order_fingerprint.sql": _snowflake_macro(
+            arguments="order_id NUMBER", returns="NUMBER", body="HASH(@order_id)"
+        ),
+        "sql/models/orders/order_ids.sql": (
+            'MODEL (description "Every order id.");\nSELECT order_id FROM __source("raw_orders")\n'
+        ),
+        "sql/models/orders/order_flags.sql": (
+            'MODEL (description "Order flags from Snowflake-only macros.");\n'
+            "SELECT order_id,\n"
+            "  @sql.is_placeholder('UNKNOWN') AS is_placeholder,\n"
+            "  @sql.payload_status(OBJECT_CONSTRUCT('status', 'open')) AS status,\n"
+            "  @sql.order_rank(order_id) AS order_rank\n"
+            'FROM __source("raw_orders")\n'
+        ),
+        "sql/models/orders/order_fingerprints.sql": (
+            'MODEL (description "Order fingerprints.");\n'
+            "SELECT order_id, @sql.order_fingerprint(order_id) AS fingerprint\n"
+            'FROM __source("raw_orders")\n'
+        ),
+        "tests/scenarios/order_ids__plain.sql": _snowflake_order_scenario(
+            name="order_ids__plain", model="order_ids", expected="1 AS order_id"
+        ),
+        "tests/scenarios/order_flags__macros.sql": _snowflake_order_scenario(
+            name="order_flags__macros",
+            model="order_flags",
+            expected="1 AS order_id, TRUE AS is_placeholder, 'open' AS status, 1 AS order_rank",
+        ),
+        "tests/scenarios/order_fingerprints__hash.sql": _snowflake_order_scenario(
+            name="order_fingerprints__hash",
+            model="order_fingerprints",
+            expected="1 AS order_id, 0 AS fingerprint",
+        ),
+    }
+
+
 def write_snowflake_order_ids_snapshot(
     *,
     project_dir: Path,
@@ -1395,4 +1474,26 @@ def write_snowflake_order_ids_snapshot(
     }
     (snapshot_root / "scenario.json").write_text(
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+    )
+
+
+def prepare_snowflake_macro_scenario_project(*, tmp_path: Path) -> Path:
+    """Write the Snowflake macro project and a fresh snapshot for each of its scenarios."""
+
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="snowflake_macro_scenarios",
+        repo_files=build_snowflake_macro_scenario_project_files(),
+    )
+    scenario_name: str
+    for scenario_name in SNOWFLAKE_MACRO_SCENARIOS:
+        write_snowflake_order_ids_snapshot(project_dir=project_dir, scenario_name=scenario_name)
+    return project_dir
+
+
+def scenario_result_rows(*, output: str, name: str) -> list[tuple[str, str]]:
+    """The status and run-on place of each result row of scenario `name` in `output`."""
+
+    return re.findall(
+        rf"^\s*\d+/\d+\s+scenario\s+{re.escape(name)}\s+(\S+)\s+(\S+)", output, flags=re.MULTILINE
     )

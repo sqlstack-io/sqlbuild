@@ -2,8 +2,29 @@
 
 use sqlbuild_core::constants::STATE_TABLE_NAMES;
 
-/// SQLBuild state tables the janitor never acts on.
-pub const BUILT_IN_EXCLUDE_PATTERNS: [&str; 14] = STATE_TABLE_NAMES;
+/// SQLLoad's own relations: run log and state, stage probe, a load's staging tables and CDC tombstones.
+pub const SQLLOAD_TABLE_PATTERNS: [&str; 4] = [
+    "_sqlload_*",
+    "__sqlload_*",
+    "*__sqlload_staging_*",
+    "*__sqlload_deletes",
+];
+/// SQLBuild's state tables and SQLLoad's own relations, which the janitor never acts on.
+pub const BUILT_IN_EXCLUDE_PATTERNS: [&str;
+    STATE_TABLE_NAMES.len() + SQLLOAD_TABLE_PATTERNS.len()] = {
+    let mut patterns = [""; STATE_TABLE_NAMES.len() + SQLLOAD_TABLE_PATTERNS.len()];
+    let mut index = 0;
+    while index < STATE_TABLE_NAMES.len() {
+        patterns[index] = STATE_TABLE_NAMES[index];
+        index += 1;
+    }
+    let mut offset = 0;
+    while offset < SQLLOAD_TABLE_PATTERNS.len() {
+        patterns[index + offset] = SQLLOAD_TABLE_PATTERNS[offset];
+        offset += 1;
+    }
+    patterns
+};
 /// Prefix of every strict janitor archive name.
 pub const ARCHIVE_NAME_PREFIX: &str = "_SQB_ARCHIVE__";
 /// Separator between archive name segments.

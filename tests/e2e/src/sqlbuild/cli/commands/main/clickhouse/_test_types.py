@@ -86,6 +86,8 @@ class ClickHouseWaffleShopE2ETestCase:
     expected_return_codes: tuple[int, int, int]
     expected_summary_fragments: tuple[str, str, str]
     expected_row_counts: dict[str, int]
+    replanned_model: str
+    expected_replan: tuple[str, int]
 
 
 @dataclass(frozen=True)
@@ -376,3 +378,14 @@ class ClickHouseJanitorUsageUncheckedE2ETestCase:
     connection_settings: str
     grants: tuple[str, ...]
     expected_fragments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ClickHouseNativeColumnTypesE2ETestCase:
+    """Columns declared as ClickHouse types, a loader's rows, and the columns and rows created."""
+
+    description: str
+    columns: tuple[tuple[str, str], ...]
+    rows: str
+    expected_types: tuple[tuple[str, str], ...]
+    expected_rows: tuple[tuple[object, ...], ...]

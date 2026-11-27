@@ -13,13 +13,16 @@ pub fn publish_plan_summary(
 ) -> PyResult<()> {
     let count = |name: &str| -> PyResult<usize> { native_field(plan_output, name)?.len() };
     let mut reloads_sources: bool = false;
-    for load in native_field(plan_output, "source_load_entries")?.try_iter()? {
-        reloads_sources |= native_field(&load?, "is_reload")?.is_truthy()?;
+    for field in ["source_load_entries", "load_entries"] {
+        for load in native_field(plan_output, field)?.try_iter()? {
+            reloads_sources |= native_field(&load?, "is_reload")?.is_truthy()?;
+        }
     }
     let counts: PlanSummaryCounts = PlanSummaryCounts {
         full_refresh: false,
         selected: count("model_entries")? + count("seed_entries")? + count("function_entries")?,
         sources: count("source_load_entries")?,
+        loads: count("load_entries")?,
         reloads_sources,
         python: python_entries.len()?,
         audits: count("selected_audit_names")?,
@@ -29,7 +32,7 @@ pub fn publish_plan_summary(
         plan_output.py(),
         (
             plan_summary_parts(&counts).join(" · "),
-            counts.selected + counts.sources + counts.python,
+            counts.selected + counts.sources + counts.loads + counts.python,
         ),
     )
 }

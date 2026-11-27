@@ -91,10 +91,11 @@ database = "ANALYTICS"
 schema = "DEV_ALICE"
 ```
 
-When the project defines exactly one named connection, across `sqlbuild_project.toml` and
-`sqlbuild_local.toml`, a target that doesn't set `connection` uses it. With several named
-connections, every target must choose one; SQLBuild rejects a target without `connection` while
-loading configuration.
+When the project defines exactly one named connection without a `kind`, across
+`sqlbuild_project.toml` and `sqlbuild_local.toml`, a target that doesn't set `connection` uses it.
+Source connections (see [Warehouse and source connections](#warehouse-and-source-connections))
+don't count. With several such connections, every target must choose one; SQLBuild rejects a
+target without `connection` while loading configuration.
 
 ```toml
 [connections.local]
@@ -146,6 +147,83 @@ target's, as described in [Targets](#targets).
 A target that names an unknown connection fails when the configuration loads, before anything
 connects.
 
+### Warehouse and source connections
+
+A connection describes how to reach one system. How the project uses it decides what it is:
+
+| Connection | What it is | Its settings |
+|------------|------------|--------------|
+| Named by a target's `connection` or `catalog_connection`, by `[recall]`'s `read_connection` or `write_connection`, or the top-level `[connection]` | A warehouse connection | The adapter's settings, as on each [adapter's page](/docs/concepts/adapters/duckdb) |
+| Any other connection without `kind` | A warehouse connection, such as one a target uses by default | The adapter's settings |
+| Any other connection with `kind` | A source connection, which loads and loaders read from | SQLLoad's settings for that `kind`, checked by SQLLoad |
+
+A warehouse connection may set `kind`, but only to the project's `adapter`. SQLBuild leaves `kind`
+out of the settings the warehouse driver receives. A target whose connection has another `kind`
+fails when the configuration loads:
+
+```text
+target 'dev' uses connection 'shop' (http), which can't hold models; this project's targets need snowflake connections
+```
+
+The settings that only `http` connections take (`base_url`, `auth`, `headers`, `rate_limit`,
+`max_in_flight` and `retries`) are refused on a warehouse connection, naming the connection and
+the setting:
+
+```text
+connections.warehouse: rate_limit is for http connections; a warehouse connection can't take it
+```
+
+Source connections take SQLLoad's kinds and settings, the same as `[connections.*]` in
+`sqlload.toml`, so a block moves between the two files unchanged. The kinds are `postgres`, `s3`,
+`gcs`, `filesystem`, `sftp`, `odbc`, `google_sheets`, `http`, `duckdb`, `motherduck`,
+`clickhouse`, `snowflake`, `databricks` and `bigquery`. An `http` connection carries its API's
+`base_url`, `auth`, `rate_limit` and `retries`, which every loader using the connection shares.
+SQLLoad checks each source connection when the configuration loads, with environment references
+left unexpanded, so the check needs no secrets; an unknown setting or kind fails with SQLLoad's
+message and the file that defines the connection:
+
+```text
+sqlbuild_project.toml unknown field `rate_limt`, expected one of `base_url`, `auth`, `token`, …
+in `connections.shop`
+```
+
+SQLBuild expands `${ENV:...}` references in a source connection, as everywhere else in the file,
+when a load or loader uses it.
+
+Use decides the role, so a Postgres project can read another Postgres database. The target names
+the warehouse connection; the connection no target names, with `kind = "postgres"`, is a source
+connection:
+
+```toml
+name = "orders"
+adapter = "postgres"
+
+[connections.warehouse]
+host = "warehouse.internal"
+dbname = "analytics"
+user = "${ENV:WAREHOUSE_USER}"
+password = "${ENV:WAREHOUSE_PASSWORD}"
+
+[connections.shop_db]
+kind = "postgres"
+host = "shop.internal"
+database = "shop"
+user = "${ENV:SHOP_USER}"
+password = "${ENV:SHOP_PASSWORD}"
+
+[connections.storefront_api]
+kind = "http"
+base_url = "https://api.storefront.example"
+auth = { kind = "bearer" }
+token = "${ENV:STOREFRONT_TOKEN}"
+rate_limit = "10/s"
+retries = 3
+
+[targets.dev]
+connection = "warehouse"
+schema = "dev"
+```
+
 ## Targets
 
 A target is a named build context - the database and schema you build into, plus execution policy (for example `dev` and `prod`). Each target references a named connection (or uses the only one defined; see [Named connections](#named-connections)) and can configure:
@@ -155,7 +233,7 @@ A target is a named build context - the database and schema you build into, plus
 | `schema` | Schema for all models in this target; required for named targets |
 | `loader_schema` | Default write schema for managed source loaders; falls back to `schema`. Required when `schema` is `preserve` and the project has loaders, assets or checks, because their [results](/docs/concepts/python-nodes/overview#result-persistence) go there |
 | `database` | Database for all models in this target |
-| `connection` | Name from `[connections.<name>]` used for endpoint, authentication, and compute; optional when exactly one named connection is defined |
+| `connection` | Name from `[connections.<name>]` used for endpoint, authentication, and compute; optional when exactly one named connection without `kind` is defined; it must be a warehouse connection (see [Warehouse and source connections](#warehouse-and-source-connections)) |
 | `vars` | Target-specific project variables |
 | `defer_sources_to` | Target name to read managed source data from (see [Loaders](/docs/concepts/python-nodes/loaders#source-deferral)) |
 | `clone` | Clone policy (see below) |
@@ -809,6 +887,22 @@ Local type overrides for DuckDB replay are configured per adapter dialect:
 
 See [Scenarios](/docs/concepts/scenarios) for details on local type overrides and capture limits.
 
+## Testing
+
+The SQLQuack known differences that local unit tests may rely on, by name:
+
+```toml
+[testing.local]
+allow = { hash = true }
+```
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `testing.local.allow` | none | Each known difference's name, `true` to allow it or `false` to refuse it. Snowflake projects only |
+
+See [Allowing known differences and overrides](/docs/concepts/testing-reference#allowing-known-differences-and-overrides),
+which also covers the overrides in `tests/overrides/`.
+
 ## Git
 
 The branch that `--since @base` compares against:
@@ -965,7 +1059,9 @@ Python is supported only under `python/`, `rules/`, `orchestration/`, `sql/hooks
 
 The project's `tests/` directory holds SQL tests and scenarios, and pytest tests of project Python
 under `tests/python/nodes/`, `tests/python/providers/` and `tests/orchestration/`, which `sqb test`
-runs; see [Python tests](/docs/cli/test#python-tests). Orchestrator code such as Dagster or Rivers
+runs; see [Python tests](/docs/cli/test#python-tests). `tests/overrides/` holds the SQLQuack
+overrides local unit tests use; see
+[Allowing known differences and overrides](/docs/concepts/testing-reference#allowing-known-differences-and-overrides). Orchestrator code such as Dagster or Rivers
 definitions lives outside the SQLBuild project directory and points at it; see
 [Dagster](/docs/integrations/dagster) and [Rivers](/docs/integrations/rivers).
 

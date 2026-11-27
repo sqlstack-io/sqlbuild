@@ -361,3 +361,89 @@ pub(super) async fn retention_counts(store: &ControlStore) -> (i64, i64) {
     let count = |name: &str| rows[0][name].as_i64().expect("count");
     (count("texts"), count("orphans"))
 }
+
+/// The two-node test snapshot read by `current_snapshot`, the shared whole-snapshot read twice at once, and a one-node selection; every body must arrive as hexadecimal text.
+pub(super) async fn whole_snapshot_reads(
+    backend: Backend,
+) -> Option<crate::snapshots::tests::test_types::WholeSnapshotReads> {
+    use crate::snapshots::main::reads::read_snapshot_nodes::read_snapshot_nodes;
+    use crate::snapshots::main::reads::snapshot_nodes::snapshot_nodes;
+
+    let test_store = open_test_store(backend).await?;
+    let store = &test_store.store;
+    migrate_store(store).await.expect("migrate");
+    let location = create_location(store, "orders", "test-admin")
+        .await
+        .expect("create test location");
+    let published = publish_snapshot(store, &snapshot(location))
+        .await
+        .expect("publish");
+    let current = current_snapshot(store, location, "development")
+        .await
+        .expect("current snapshot")
+        .expect("published snapshot");
+    let (first, second) = tokio::join!(
+        snapshot_nodes(store, published.snapshot_id),
+        snapshot_nodes(store, published.snapshot_id)
+    );
+    let (first, second) = (first.expect("shared read"), second.expect("shared read"));
+    let transaction = begin(store, TransactionMode::Read).await.expect("read");
+    let (transaction, selected) = read_snapshot_nodes(
+        transaction,
+        published.snapshot_id,
+        &["orders".to_owned()].into(),
+    )
+    .await
+    .expect("selected read");
+    commit(transaction).await.expect("close read");
+    let reads = crate::snapshots::tests::test_types::WholeSnapshotReads {
+        current_nodes: current.nodes.len(),
+        current_sources: current
+            .nodes
+            .values()
+            .filter(|node| node.compiled_sql.is_some())
+            .count(),
+        current_documents: current.documents.len(),
+        shared_nodes: first.len(),
+        selected_nodes: selected.len(),
+        one_shared_copy: std::sync::Arc::ptr_eq(&first, &second),
+    };
+    close_test_store(test_store).await;
+    Some(reads)
+}
+
+/// Whether a whole-snapshot read finished within half a second while another holder had the whole memory budget, and the nodes it read once the budget was free.
+pub(super) async fn budgeted_read(backend: Backend) -> Option<(bool, usize)> {
+    use crate::snapshots::_helpers::whole_snapshot::read_budgeted;
+    use crate::snapshots::constants::SNAPSHOT_DECODE_BUDGET_MIB;
+    use crate::snapshots::models::SnapshotNodeCache;
+
+    let test_store = open_test_store(backend).await?;
+    let store = &test_store.store;
+    migrate_store(store).await.expect("migrate");
+    let location = create_location(store, "orders", "test-admin")
+        .await
+        .expect("create test location");
+    let published = publish_snapshot(store, &snapshot(location))
+        .await
+        .expect("publish");
+    let cache = SnapshotNodeCache::new();
+    let held = cache
+        .budget
+        .acquire_many(SNAPSHOT_DECODE_BUDGET_MIB)
+        .await
+        .expect("hold the budget");
+    let finished_while_held = tokio::time::timeout(
+        std::time::Duration::from_millis(500),
+        read_budgeted(&cache, store, published.snapshot_id),
+    )
+    .await
+    .is_ok();
+    drop(held);
+    let nodes = read_budgeted(&cache, store, published.snapshot_id)
+        .await
+        .expect("read once the budget is free")
+        .len();
+    close_test_store(test_store).await;
+    Some((finished_while_held, nodes))
+}

@@ -70,12 +70,12 @@ fn exact_integer(value: &Bound<'_, PyAny>) -> PyResult<Option<JsonValue>> {
 
 fn object_key(key: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
     if key.is_exact_instance_of::<PyString>() {
-        return exact_text(key.downcast::<PyString>()?);
+        return exact_text(key.cast::<PyString>()?);
     }
     if key.is_none() {
         return Ok(Some("null".to_owned()));
     }
-    if let Ok(flag) = key.downcast_exact::<PyBool>() {
+    if let Ok(flag) = key.cast_exact::<PyBool>() {
         return Ok(Some(flag.is_true().to_string()));
     }
     if key.is_exact_instance_of::<PyInt>() {
@@ -89,7 +89,7 @@ pub(crate) fn json_cell(value: &Bound<'_, PyAny>) -> PyResult<Option<JsonValue>>
     if value.is_none() {
         return Ok(Some(JsonValue::Null));
     }
-    if let Ok(flag) = value.downcast_exact::<PyBool>() {
+    if let Ok(flag) = value.cast_exact::<PyBool>() {
         return Ok(Some(JsonValue::Bool(flag.is_true())));
     }
     if value.is_exact_instance_of::<PyInt>() {
@@ -99,7 +99,7 @@ pub(crate) fn json_cell(value: &Bound<'_, PyAny>) -> PyResult<Option<JsonValue>>
         return Ok(Some(JsonValue::Float(value.extract()?)));
     }
     if value.is_exact_instance_of::<PyString>() {
-        return Ok(exact_text(value.downcast::<PyString>()?)?.map(JsonValue::String));
+        return Ok(exact_text(value.cast::<PyString>()?)?.map(JsonValue::String));
     }
     if value.is_exact_instance_of::<PyList>() || value.is_exact_instance_of::<PyTuple>() {
         let mut items: Vec<JsonValue> = Vec::new();
@@ -111,7 +111,7 @@ pub(crate) fn json_cell(value: &Bound<'_, PyAny>) -> PyResult<Option<JsonValue>>
         }
         return Ok(Some(JsonValue::Array(items)));
     }
-    if let Ok(mapping) = value.downcast_exact::<PyDict>() {
+    if let Ok(mapping) = value.cast_exact::<PyDict>() {
         let mut entries: Vec<(String, JsonValue)> = Vec::new();
         for (key, item) in mapping.iter() {
             let Some(key) = object_key(&key)? else {

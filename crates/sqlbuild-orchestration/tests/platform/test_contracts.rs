@@ -14,12 +14,18 @@ mod test_failing_syncs;
 mod test_installation;
 #[path = "test_location_state.rs"]
 mod test_location_state;
+#[path = "test_platform_event_reads.rs"]
+mod test_platform_event_reads;
 #[path = "test_problems.rs"]
 mod test_problems;
 #[path = "test_provider_secrets.rs"]
 mod test_provider_secrets;
+#[path = "test_skipped_event_dismissal.rs"]
+mod test_skipped_event_dismissal;
 #[path = "test_types.rs"]
 mod test_types;
+#[path = "test_unreadable_events.rs"]
+mod test_unreadable_events;
 #[path = "test_watchdog.rs"]
 mod test_watchdog;
 #[path = "test_webhook.rs"]

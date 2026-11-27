@@ -232,3 +232,14 @@ class PostgresTemporaryTestFunctionsE2ETestCase:
     connection_option: str
     expected_exit_code: int
     expected_stdout_fragment: str
+
+
+@dataclass(frozen=True)
+class PostgresNativeColumnTypesE2ETestCase:
+    """Columns declared as Postgres types, a loader's rows, and the columns and rows it creates."""
+
+    description: str
+    columns: tuple[tuple[str, str], ...]
+    rows: str
+    expected_types: tuple[tuple[str, str], ...]
+    expected_rows: tuple[tuple[object, ...], ...]

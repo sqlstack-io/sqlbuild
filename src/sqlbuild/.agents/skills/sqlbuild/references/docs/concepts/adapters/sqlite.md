@@ -77,8 +77,7 @@ SQLite stores values by type affinity, so SQLBuild keeps column types explicitly
 - Timestamps and dates are ISO-8601 text. `CAST(x AS TIMESTAMP)` and `CAST(x AS DATE)` do not
   produce timestamps in SQLite (they keep only the leading number), so write timestamps as text
   literals or use SQLite date functions. Compile warns with `B104` at each such cast in model SQL. SQLBuild never applies such a cast itself: source,
-  contract and type-change casts to a date or time type keep the stored text, and source loaders
-  write Python `datetime` values as UTC text in the form `YYYY-MM-DD HH:MM:SS[.ffffff]`.
+  contract and type-change casts to a date or time type keep the stored text.
 - Cursor windows, watermarks and window deletes compare timestamp cursors as UTC text in the
   form `YYYY-MM-DD HH:MM:SS[.ffffff]`, so values written with a `T` separator, fractional seconds
   or a UTC offset fall in the right window. A value with an offset belongs to the window of its UTC
@@ -110,7 +109,7 @@ SQLite stores values by type affinity, so SQLBuild keeps column types explicitly
 | `sqb diff`, `sqb clone` | Supported; clones are physical copies |
 | Scenarios, `sqb scenario capture` | Supported on SQLite; see below |
 | Statement time limits | Connection interrupt |
-| `sqb load`: Python loaders | Supported |
+| Loads and `@loader` | Not supported: SQLLoad can't write to SQLite, so compile refuses a project that declares either |
 
 ## Scenarios
 

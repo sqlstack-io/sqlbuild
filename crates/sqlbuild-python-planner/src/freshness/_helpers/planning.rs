@@ -84,10 +84,7 @@ fn previous_records<'py>(
         else {
             continue;
         };
-        for (identity, candidate) in native_field(&previous, "records")?
-            .downcast::<PyDict>()?
-            .iter()
-        {
+        for (identity, candidate) in native_field(&previous, "records")?.cast::<PyDict>()?.iter() {
             let replace: bool = match merged.get_item(&identity)? {
                 None => true,
                 Some(current) => native_field(&candidate, "observed_at")?
@@ -220,7 +217,7 @@ pub(crate) fn build_direct_source_freshness_planning_result<'py>(
         }
     }
     let batch: Bound<'py, PyAny> = adapter_batch(&observer, &adapter_sources)?;
-    unknown_sources.update(native_field(&batch, "unknown")?.downcast()?)?;
+    unknown_sources.update(native_field(&batch, "unknown")?.cast()?)?;
     let observations: Bound<'py, PyAny> = native_field(&batch, "observations")?;
     let mut observed_records: Vec<Bound<'py, PyAny>> = Vec::new();
     let changed: Bound<'py, PySet> = PySet::empty(py)?;
@@ -366,7 +363,7 @@ pub(crate) fn build_direct_source_freshness_propagation_result<'py>(
     let error_status: Bound<'py, PyAny> =
         enum_member(py, RecordId::SourceFreshnessAgeStatus, "ERROR")?;
     for (identity, status) in native_field(source_freshness, "age_statuses")?
-        .downcast::<PyDict>()?
+        .cast::<PyDict>()?
         .iter()
     {
         if status.ne(&error_status)? {

@@ -5,7 +5,6 @@ pub mod discard_reports;
 pub mod format_build_execution_json;
 pub mod format_build_execution_json_with;
 pub mod format_clone_execution_json;
-pub mod format_load_execution_json;
 pub mod format_scenario_execution_json_with;
 pub mod format_scenario_snapshot_execution_json;
 pub mod format_seed_execution_json;

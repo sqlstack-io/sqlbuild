@@ -3,7 +3,7 @@
 use std::sync::PoisonError;
 use std::time::Instant;
 
-use crate::run_output::_helpers::upload::attached;
+use crate::run_output::_helpers::worker::upload::attached;
 use crate::run_output::constants::UPLOAD_STALL;
 
 /// Waits while too many batches are queued (only a sender stalled past `UPLOAD_STALL` loses output); call it holding no lock and no GIL.

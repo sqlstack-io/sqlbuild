@@ -49,6 +49,16 @@ fn declarations<'a>(facts: &'a ProjectFacts, seeds: &'a [NamedPath]) -> Vec<Decl
             });
         }
     }
+    for file in &facts.sources {
+        if let Some(name) = &file.load {
+            declared.push(DeclaredName {
+                name,
+                kind: "load",
+                path: &file.path,
+                orchestration: false,
+            });
+        }
+    }
     for seed in seeds {
         declared.push(DeclaredName {
             name: &seed.name,
@@ -141,7 +151,7 @@ fn name_conflict(first: &DeclaredName<'_>, second: &DeclaredName<'_>) -> Validat
         ""
     };
     conflict(format!(
-        "Project resource name '{}' is declared as both {} in {} and {} in {}; model, source, seed, function, loader, asset, check, provider, \
+        "Project resource name '{}' is declared as both {} in {} and {} in {}; model, source, load, seed, function, loader, asset, check, provider, \
          hook, unit test, scenario, job, job group, sensor, and calendar names must be \
          globally unique; rename one of them{advice}",
         first.name, first.kind, first.path, second.kind, second.path

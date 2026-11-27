@@ -154,7 +154,7 @@ impl Conversion {
         if value.is_none() {
             return Ok(JsonValue::Null);
         }
-        if let Ok(flag) = value.downcast::<PyBool>() {
+        if let Ok(flag) = value.cast::<PyBool>() {
             return Ok(JsonValue::Bool(flag.is_true()));
         }
         if value.is_instance_of::<PyInt>() {
@@ -163,13 +163,13 @@ impl Conversion {
         if value.is_instance_of::<PyFloat>() {
             return Ok(JsonValue::Float(value.extract::<f64>()?));
         }
-        if let Ok(text) = value.downcast::<PyString>() {
+        if let Ok(text) = value.cast::<PyString>() {
             return self.text(text);
         }
         if value.is_instance_of::<PyList>() || value.is_instance_of::<PyTuple>() {
             return self.array(value);
         }
-        if let Ok(mapping) = value.downcast::<PyDict>() {
+        if let Ok(mapping) = value.cast::<PyDict>() {
             return self.object(mapping);
         }
         let name: String = value.get_type().name()?.to_string();
@@ -230,7 +230,7 @@ impl Conversion {
 
     /// A string key, or the text `json.dumps` writes for a scalar key orjson rejects.
     fn object_key(&mut self, key: &Bound<'_, PyAny>) -> PyResult<String> {
-        if let Ok(text) = key.downcast::<PyString>() {
+        if let Ok(text) = key.cast::<PyString>() {
             return match self.text(text)? {
                 JsonValue::String(text) => Ok(text),
                 _ => Err(native_compiler_error(SURROGATE_KEY)),
@@ -240,7 +240,7 @@ impl Conversion {
         if key.is_none() {
             return Ok("null".to_owned());
         }
-        if let Ok(flag) = key.downcast::<PyBool>() {
+        if let Ok(flag) = key.cast::<PyBool>() {
             return Ok(if flag.is_true() { "true" } else { "false" }.to_owned());
         }
         if key.is_instance_of::<PyInt>() {

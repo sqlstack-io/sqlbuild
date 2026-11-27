@@ -90,7 +90,7 @@ impl HookSignatures {
                 return Err(compile_error(context.classes, &message, None));
             };
             let kwargs: Vec<String> = native_field(entry, KWARGS_FIELD)?
-                .downcast_into::<PyDict>()?
+                .cast_into::<PyDict>()?
                 .keys()
                 .extract()?;
             let parameters: Vec<HookParameter> = self.parameters(context, &name, &function)?;
