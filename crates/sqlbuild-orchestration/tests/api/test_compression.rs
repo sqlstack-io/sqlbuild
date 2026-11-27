@@ -78,7 +78,8 @@ fn given_a_signed_in_browser_when_requesting_then_only_people_reads_are_compress
             },
         )
         .await;
-        let client = client_builder().build().expect("HTTP client");
+        // A dependency may turn on reqwest's gzip, which would decode and drop the header read here.
+        let client = client_builder().no_gzip().build().expect("HTTP client");
         let session = format!("__Host-sqb-session={}", roles.administrator.bearer);
         for test_case in test_cases {
             let path = test_case
