@@ -4,7 +4,7 @@ sources:
     managed: true
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
       - name: first_name
         type: VARCHAR
       - name: last_name
@@ -12,22 +12,22 @@ sources:
       - name: email
         type: VARCHAR
       - name: created_at
-        type: timestamp_ntz
+        type: TIMESTAMP
 
   - name: raw_orders
     description: Test source raw_orders.
     managed: true
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
       - name: customer_id
-        type: INTEGER
+        type: BIGINT
       - name: waffle_type_id
-        type: INTEGER
+        type: BIGINT
       - name: quantity
-        type: INTEGER
+        type: BIGINT
       - name: ordered_at
-        type: timestamp_ntz
+        type: TIMESTAMP
       - name: status
         type: VARCHAR
 

@@ -5638,3 +5638,31 @@ def orchestration_sensor(select: str) -> str:
         "def regions_sensor(ctx: SensorContext):\n"
         "    return RunRequest(job='orders_job')\n"
     )
+
+
+def loaded_source_files(
+    *, project_toml: str, column_type: str, loader_columns: str
+) -> dict[str, str]:
+    """A project whose loader fills `raw_orders`, which declares `id` as `column_type`."""
+
+    return {
+        "sqlbuild_project.toml": project_toml,
+        "sql/sources/raw.yml": (
+            "sources:\n  - name: raw_orders\n    description: Orders.\n    managed: true\n"
+            f"    columns:\n      - name: id\n        type: {column_type}\n"
+        ),
+        "python/nodes/loaders/raw_orders/loader.py": (
+            "from sqlbuild.loaders import loader\n\n\n"
+            "@loader(write_strategy='replace')\n"
+            "def raw_orders(ctx):\n"
+            "    '''Load the orders.'''\n"
+            "    return [{'id': 1}]\n"
+        ),
+        "python/nodes/loaders/fetch_orders/loader.py": (
+            "from sqlbuild.loaders import loader\n\n\n"
+            f"@loader(write_strategy='replace', columns={loader_columns})\n"
+            "def fetch_orders(ctx):\n"
+            "    '''Fetch the orders.'''\n"
+            "    return [{'id': 1}]\n"
+        ),
+    }

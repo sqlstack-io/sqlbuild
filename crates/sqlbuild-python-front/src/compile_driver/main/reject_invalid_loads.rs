@@ -8,6 +8,7 @@ use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 
+use crate::compile_driver::_helpers::declared_types::declared_type_problem;
 use crate::compile_driver::_helpers::loads::{declaration, load_check};
 use crate::compile_driver::models::ProjectConfiguration;
 
@@ -35,6 +36,15 @@ pub fn reject_invalid_loads(
         };
         let declaration: LoadDeclaration = declaration(&file, &load)?;
         let Err(problem) = check_load(checking, &declaration) else {
+            if let Some(message) = declaration.sources.iter().find_map(|source| {
+                declared_type_problem(
+                    checking,
+                    (&format!("source '{}'", source.name), &source.columns),
+                    |mismatch| format!("`type: {}`", mismatch.created),
+                )
+            }) {
+                return Err(fail(format!("{shown}: {message}")));
+            }
             continue;
         };
         let contents: String = native_field(&file, "contents")?.extract()?;

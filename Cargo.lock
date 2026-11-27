@@ -7021,9 +7021,9 @@ dependencies = [
 
 [[package]]
 name = "sqlload"
-version = "0.86.0"
+version = "0.87.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7516ef10a6edbbf97e01048379fb0910ba35b7c07f464e897c941dfa334cfdd"
+checksum = "6076581e3898dbfc24e71bfa3d3e1d6f3f2f2ae6611eaaa26cac7b58eb538249"
 dependencies = [
  "aes 0.8.4",
  "arrow-array",
@@ -7096,9 +7096,9 @@ dependencies = [
 
 [[package]]
 name = "sqlload-python-host"
-version = "0.86.0"
+version = "0.87.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15925d0be960a31a0ea7534bba10b6d9dd21206e7b6df35c76535d1bee33422e"
+checksum = "7bddd8cefd2f6915aebc0d0d44f5a205bb48ad24d520e763c0664a6ba6be68e8"
 dependencies = [
  "arrow-array",
  "arrow-pyarrow",

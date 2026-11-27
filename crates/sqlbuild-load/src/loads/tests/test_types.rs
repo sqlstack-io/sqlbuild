@@ -39,3 +39,11 @@ pub(super) struct LoaderSourceTestCase {
     pub(super) settings: &'static str,
     pub(super) expected_source: &'static str,
 }
+
+pub(super) struct DeclaredTypeTestCase {
+    pub(super) description: &'static str,
+    pub(super) warehouse: sqlload::column_types::models::Warehouse,
+    pub(super) declared: &'static str,
+    /// The type SQLLoad creates when it differs from the declared one, compared by name.
+    pub(super) expected_created: Option<&'static str>,
+}

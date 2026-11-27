@@ -34,7 +34,7 @@ sources:
     description: Orders
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
 """
 _ORDER_NAMES: str = """MODEL (
   materialized view,

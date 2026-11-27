@@ -4,6 +4,6 @@ sources:
     managed: true
     columns:
       - name: order_id
-        type: INTEGER
+        type: BIGINT
       - name: score
-        type: INTEGER
+        type: BIGINT

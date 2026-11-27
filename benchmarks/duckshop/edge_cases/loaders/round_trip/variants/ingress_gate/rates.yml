@@ -4,4 +4,4 @@ sources:
     managed: true
     columns:
       - name: rate
-        type: INTEGER
+        type: BIGINT

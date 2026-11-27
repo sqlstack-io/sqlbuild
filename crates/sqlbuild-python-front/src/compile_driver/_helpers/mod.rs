@@ -1,4 +1,5 @@
 pub(crate) mod config_validation;
+pub(crate) mod declared_types;
 pub(crate) mod load_projects;
 pub(crate) mod loaders;
 pub(crate) mod loads;

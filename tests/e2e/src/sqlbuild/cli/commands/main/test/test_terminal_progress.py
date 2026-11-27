@@ -182,7 +182,6 @@ def test_given_built_project_when_running_in_terminal_then_statement_rows_follow
             expected_screen_fragments=(
                 "Create staging relation  START",
                 "Create staging relation  OK",
-                "loader callable  START",
             ),
         ),
     ],

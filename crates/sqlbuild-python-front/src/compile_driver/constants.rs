@@ -6,3 +6,5 @@ pub(crate) const LOADER_TARGET: &str = "default";
 pub(crate) const LOADER_SCHEMA: &str = "main";
 /// Where a project keeps the SQLQuack overrides its local tests use.
 pub(crate) const LOCAL_OVERRIDES_DIR: &str = "tests/overrides";
+/// The `@loader` option that makes SQLLoad write a loader's rows; without it a loader that fills a source writes its own table.
+pub(crate) const WRITE_STRATEGY_KEY: &str = "write_strategy";

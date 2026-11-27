@@ -110,7 +110,7 @@ PROJECT_FILES: dict[str, str] = {
             managed: true
             columns:
               - name: event_id
-                type: INTEGER
+                type: BIGINT
         """
     ).strip()
     + "\n",

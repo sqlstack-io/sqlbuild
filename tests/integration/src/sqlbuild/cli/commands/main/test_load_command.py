@@ -79,7 +79,7 @@ sources:
     managed: true
     columns:
       - name: order_id
-        type: INTEGER
+        type: BIGINT
       - name: status
         type: VARCHAR
 """.strip()
@@ -218,7 +218,7 @@ sources:
     description: Test source raw_orders.
     columns:
       - name: order_id
-        type: INTEGER
+        type: BIGINT
       - name: status
         type: VARCHAR
 """.strip()
@@ -266,7 +266,7 @@ sources:
     managed: true
     columns:
       - name: order_id
-        type: INTEGER
+        type: BIGINT
       - name: status
         type: VARCHAR
 """.strip()
@@ -278,7 +278,7 @@ sources:
         "@loader(\n"
         '    write_strategy="replace",\n'
         "    columns=[\n"
-        '        {"name": "order_id", "type": "INTEGER"},\n'
+        '        {"name": "order_id", "type": "BIGINT"},\n'
         '        {"name": "status", "type": "VARCHAR"},\n'
         "    ],\n"
         ")\n"
@@ -328,7 +328,7 @@ sources:
     managed: true
     columns:
       - name: order_id
-        type: INTEGER
+        type: BIGINT
       - name: status
         type: VARCHAR
 """.strip()
@@ -374,7 +374,7 @@ sources:
       SELECT 22 AS order_id, 'expression' AS status
     columns:
       - name: order_id
-        type: INTEGER
+        type: BIGINT
       - name: status
         type: VARCHAR
 """.strip()
@@ -436,7 +436,7 @@ sources:
     audits: [source_status]
     columns:
       - name: order_id
-        type: INTEGER
+        type: BIGINT
       - name: status
         type: VARCHAR
 """.strip()
@@ -542,7 +542,7 @@ sources:
     managed: true
     columns:
       - name: order_id
-        type: INTEGER
+        type: BIGINT
       - name: status
         type: VARCHAR
   - name: raw_customers
@@ -550,7 +550,7 @@ sources:
     managed: true
     columns:
       - name: customer_id
-        type: INTEGER
+        type: BIGINT
       - name: name
         type: VARCHAR
 """.strip()
@@ -578,7 +578,7 @@ sources:
     managed: true
     columns:
       - name: order_id
-        type: INTEGER
+        type: BIGINT
       - name: status
         type: VARCHAR
 """.strip()
@@ -615,7 +615,7 @@ sources:
     managed: true
     columns:
       - name: order_id
-        type: INTEGER
+        type: BIGINT
       - name: status
         type: VARCHAR
 """.strip()
@@ -661,7 +661,7 @@ sources:
     managed: true
     columns:
       - name: order_id
-        type: INTEGER
+        type: BIGINT
       - name: status
         type: VARCHAR
   - name: raw_events
@@ -716,7 +716,7 @@ sources:
     managed: true
     columns:
       - name: order_id
-        type: INTEGER
+        type: BIGINT
       - name: status
         type: VARCHAR
 """.strip()
@@ -1873,7 +1873,7 @@ sources:
     managed: true
     columns:
       - name: order_id
-        type: INTEGER
+        type: BIGINT
       - name: status
         type: VARCHAR
 """.strip()
@@ -1918,7 +1918,7 @@ sources:
     managed: true
     columns:
       - name: order_id
-        type: INTEGER
+        type: BIGINT
       - name: status
         type: VARCHAR
   - name: raw_events
@@ -1973,7 +1973,7 @@ sources:
     managed: true
     columns:
       - name: order_id
-        type: INTEGER
+        type: BIGINT
       - name: status
         type: VARCHAR
 """.strip()
@@ -2068,7 +2068,7 @@ sources:
     managed: true
     columns:
       - name: event_id
-        type: INTEGER
+        type: BIGINT
       - name: cursor_seen
         type: VARCHAR
 """.strip()
@@ -2100,11 +2100,11 @@ sources:
     managed: true
     columns:
       - name: customer_id
-        type: INTEGER
+        type: BIGINT
       - name: name
         type: VARCHAR
       - name: updated_at
-        type: INTEGER
+        type: BIGINT
 """.strip()
             + "\n",
             "python/nodes/loaders/raw/loader.py": """
@@ -2141,13 +2141,13 @@ sources:
     managed: true
     columns:
       - name: entity_id
-        type: INTEGER
+        type: BIGINT
       - name: source
         type: VARCHAR
       - name: value
         type: VARCHAR
       - name: version
-        type: INTEGER
+        type: BIGINT
 """.strip()
             + "\n",
             "python/nodes/loaders/raw/loader.py": """
@@ -2181,7 +2181,7 @@ sources:
     managed: true
     columns:
       - name: event_id
-        type: INTEGER
+        type: BIGINT
       - name: status
         type: VARCHAR
 """.strip()
@@ -2228,7 +2228,7 @@ sources:
     managed: true
     columns:
       - name: event_at
-        type: timestamp_ntz
+        type: TIMESTAMP
       - name: status
         type: VARCHAR
 """.strip()
@@ -2278,7 +2278,7 @@ sources:
     managed: true
     columns:
       - name: event_id
-        type: INTEGER
+        type: BIGINT
       - name: status
         type: VARCHAR
 """.strip()
@@ -2315,7 +2315,7 @@ sources:
     managed: true
     columns:
       - name: run_number
-        type: INTEGER
+        type: BIGINT
       - name: cursor_seen
         type: VARCHAR
 """.strip()
@@ -2348,7 +2348,7 @@ sources:
     managed: true
     columns:
       - name: event_id
-        type: INTEGER
+        type: BIGINT
       - name: cursor_seen
         type: VARCHAR
 """.strip()
@@ -2379,7 +2379,7 @@ sources:
     managed: true
     columns:
       - name: event_id
-        type: INTEGER
+        type: BIGINT
       - name: cursor_seen
         type: VARCHAR
 """.strip()
@@ -2434,7 +2434,7 @@ sources:
     managed: true
     columns:
       - name: seq
-        type: INTEGER
+        type: BIGINT
       - name: cursor_start
         type: VARCHAR
       - name: cursor_end
@@ -2464,7 +2464,7 @@ sources:
     managed: true
     columns:
       - name: seen_at
-        type: timestamp_ntz
+        type: TIMESTAMP
       - name: cursor_start
         type: VARCHAR
       - name: cursor_end
@@ -2501,7 +2501,7 @@ sources:
     managed: true
     columns:
       - name: event_id
-        type: INTEGER
+        type: BIGINT
       - name: cursor_seen
         type: VARCHAR
 """.strip()
@@ -2533,11 +2533,11 @@ sources:
     managed: true
     columns:
       - name: customer_id
-        type: INTEGER
+        type: BIGINT
       - name: name
         type: VARCHAR
       - name: updated_at
-        type: INTEGER
+        type: BIGINT
 """.strip()
                 + "\n",
                 "python/nodes/loaders/raw/loader.py": """
@@ -2574,13 +2574,13 @@ sources:
     managed: true
     columns:
       - name: entity_id
-        type: INTEGER
+        type: BIGINT
       - name: source
         type: VARCHAR
       - name: value
         type: VARCHAR
       - name: version
-        type: INTEGER
+        type: BIGINT
 """.strip()
                 + "\n",
                 "python/nodes/loaders/raw/loader.py": """
@@ -2614,7 +2614,7 @@ sources:
     managed: true
     columns:
       - name: event_id
-        type: INTEGER
+        type: BIGINT
       - name: status
         type: VARCHAR
 """.strip()
@@ -2661,7 +2661,7 @@ sources:
     managed: true
     columns:
       - name: event_at
-        type: timestamp_ntz
+        type: TIMESTAMP
       - name: status
         type: VARCHAR
 """.strip()
@@ -2713,7 +2713,7 @@ sources:
     managed: true
     columns:
       - name: event_id
-        type: INTEGER
+        type: BIGINT
       - name: status
         type: VARCHAR
 """.strip()
@@ -2784,7 +2784,7 @@ sources:
     managed: true
     columns:
       - name: run_number
-        type: INTEGER
+        type: BIGINT
       - name: cursor_seen
         type: VARCHAR
 """.strip()
@@ -2817,7 +2817,7 @@ sources:
     managed: true
     columns:
       - name: event_id
-        type: INTEGER
+        type: BIGINT
       - name: cursor_seen
         type: VARCHAR
 """.strip()
@@ -2848,7 +2848,7 @@ sources:
     managed: true
     columns:
       - name: event_id
-        type: INTEGER
+        type: BIGINT
       - name: cursor_seen
         type: VARCHAR
 """.strip()
@@ -3014,7 +3014,7 @@ sources:
     managed: true
     columns:
       - name: upstream_count
-        type: INTEGER
+        type: BIGINT
 """.strip()
                 + "\n",
                 "python/nodes/loaders/raw/fetch_a/loader.py": (
@@ -3024,7 +3024,7 @@ sources:
                     "from python.nodes.loaders.raw._sync import barrier, finished, lock\n"
                     "\n"
                     "\n"
-                    "@loader(write_strategy='replace', columns=[{'name': 'id', 'type': 'INTEGER'}])\n"
+                    "@loader(write_strategy='replace', columns=[{'name': 'id', 'type': 'BIGINT'}])\n"
                     "def fetch_a(ctx):\n"
                     "    '''Test loader fetch_a.'''\n"
                     "    barrier.wait(timeout=1)\n"
@@ -3040,7 +3040,7 @@ sources:
                     "from python.nodes.loaders.raw._sync import barrier, finished, lock\n"
                     "\n"
                     "\n"
-                    "@loader(write_strategy='replace', columns=[{'name': 'id', 'type': 'INTEGER'}])\n"
+                    "@loader(write_strategy='replace', columns=[{'name': 'id', 'type': 'BIGINT'}])\n"
                     "def fetch_b(ctx):\n"
                     "    '''Test loader fetch_b.'''\n"
                     "    barrier.wait(timeout=1)\n"
@@ -3126,7 +3126,7 @@ sources:
     managed: true
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
       - name: notes
         type: VARCHAR
 """.strip()
@@ -3321,7 +3321,7 @@ sources:
     managed: true
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
       - name: status
         type: VARCHAR
 """.strip()
@@ -3378,7 +3378,7 @@ sources:
     managed: true
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
       - name: status
         type: VARCHAR
 """.strip()
@@ -3443,7 +3443,7 @@ sources:
     managed: true
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
       - name: status
         type: VARCHAR
 """.strip()
@@ -3476,7 +3476,7 @@ sources:
     managed: true
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
       - name: status
         type: VARCHAR
 """.strip()
@@ -3509,7 +3509,7 @@ sources:
     managed: true
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
 """.strip()
                 + "\n",
                 "python/nodes/loaders/raw/loader.py": """
@@ -3540,7 +3540,7 @@ sources:
     managed: true
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
 """.strip()
                 + "\n",
                 "python/nodes/loaders/raw/loader.py": """
@@ -3572,7 +3572,7 @@ sources:
     managed: true
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
 """.strip()
                 + "\n",
                 "python/nodes/loaders/raw/loader.py": """
@@ -3636,7 +3636,7 @@ sources:
     managed: true
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
 """.strip()
                 + "\n",
                 "python/nodes/loaders/raw/loader.py": """
@@ -3699,7 +3699,7 @@ sources:
     managed: true
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
       - name: status
         type: VARCHAR
 """.strip()
@@ -3765,7 +3765,7 @@ sources:
     managed: true
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
 """.strip()
                 + "\n",
                 "python/nodes/loaders/raw/loader.py": """
@@ -3948,7 +3948,7 @@ sources:
     managed: true
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
 """.strip()
                 + "\n",
                 "python/nodes/loaders/raw/loader.py": """
@@ -3980,7 +3980,7 @@ sources:
     managed: true
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
       - name: status
         type: VARCHAR
 """.strip()
@@ -4014,7 +4014,7 @@ sources:
     managed: true
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
       - name: status
         type: VARCHAR
 """.strip()

@@ -4,10 +4,10 @@ sources:
     managed: true
     columns:
       - name: order_id
-        type: INTEGER
+        type: BIGINT
       - name: customer_id
-        type: INTEGER
+        type: BIGINT
       - name: amount_cents
-        type: INTEGER
+        type: BIGINT
       - name: load_batch
-        type: INTEGER
+        type: BIGINT

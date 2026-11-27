@@ -61,7 +61,7 @@ sources:
     description: Orders
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
 """
 _CUSTOMER_IDS_MODEL: str = """MODEL (
   materialized view,
@@ -1701,7 +1701,7 @@ def event_loaders():
                 "sql/sources/raw.yml": "sources:\n  - name: raw_orders\n    managed: true\n",
                 "python/nodes/loaders/raw_orders/loader.py": (
                     "from sqlbuild.loaders import loader\n\n"
-                    "@loader(columns=[{'name': 'id', 'type': 'INTEGER'}])\n"
+                    "@loader(columns=[{'name': 'id', 'type': 'BIGINT'}])\n"
                     "def raw_orders(ctx):\n    return []\n"
                 ),
             },
@@ -1802,7 +1802,7 @@ seeds:
   - name: export_customers
     columns:
       - name: customer_id
-        type: INTEGER
+        type: BIGINT
 """.strip()
                 + "\n",
                 "sql/seeds/export_customers.csv": "customer_id\n1\n",

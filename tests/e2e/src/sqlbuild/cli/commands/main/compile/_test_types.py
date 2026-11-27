@@ -1497,3 +1497,13 @@ class LoaderOptionsCompileTestCase:
     loader_options: str
     expected_exit_code: int
     expected_stderr_fragment: str
+
+
+@dataclass(frozen=True)
+class DeclaredTypeCompileTestCase:
+    """A project whose loaded source declares a column type, and what `sqb compile` says of it."""
+
+    description: str
+    repo_files: dict[str, str]
+    expected_exit_code: int
+    expected_stderr_fragment: str

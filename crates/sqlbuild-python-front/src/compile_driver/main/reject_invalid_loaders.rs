@@ -7,8 +7,10 @@ use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 
+use crate::compile_driver::_helpers::declared_types::declared_type_problem;
 use crate::compile_driver::_helpers::loaders::loader_declaration;
 use crate::compile_driver::_helpers::loads::load_check;
+use crate::compile_driver::constants::WRITE_STRATEGY_KEY;
 use crate::compile_driver::models::ProjectConfiguration;
 
 /// Reject the first loader SQLLoad refuses, or any loader when the project's warehouse can't hold one.
@@ -34,6 +36,28 @@ pub fn reject_invalid_loaders(
         };
         if let Err(problem) = check_loader(checking, &declaration) {
             return Err(fail(format!("{place}: {}", problem.message)));
+        }
+        let owner: String = match declaration.fills_source {
+            true => format!("source '{}'", declaration.name),
+            false => "it".to_owned(),
+        };
+        let self_managed: bool =
+            declaration.fills_source && !declaration.settings.contains_key(WRITE_STRATEGY_KEY);
+        let columns: &[(String, String)] = match self_managed {
+            true => &[],
+            false => &declaration.columns,
+        };
+        let declared = declared_type_problem(checking, (&owner, columns), |mismatch| {
+            match declaration.fills_source {
+                true => format!("`type: {}` in its sources file", mismatch.created),
+                false => format!(
+                    "{{'name': '{}', 'type': '{}'}} in columns=",
+                    mismatch.column, mismatch.created
+                ),
+            }
+        });
+        if let Some(message) = declared {
+            return Err(fail(format!("{place}: {message}")));
         }
     }
     Ok(())

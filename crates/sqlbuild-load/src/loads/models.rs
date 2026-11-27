@@ -20,6 +20,15 @@ pub struct FilledSource {
     pub on_schema_change: Option<String>,
 }
 
+/// A declared column type SQLLoad creates as another type.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TypeMismatch {
+    pub column: String,
+    pub declared: String,
+    /// The type SQLLoad creates for `declared`, as the warehouse spells it.
+    pub created: String,
+}
+
 /// What a project's loads are checked against: its source connections and the warehouse kind its targets hold.
 #[derive(Clone, Debug)]
 pub struct LoadCheck {

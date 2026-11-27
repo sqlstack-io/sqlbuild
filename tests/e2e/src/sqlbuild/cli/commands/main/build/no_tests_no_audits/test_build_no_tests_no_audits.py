@@ -210,7 +210,7 @@ def test_given_factory_generated_nodes_when_running_commands_then_lifecycle_succ
                 "    managed: true\n"
                 "    columns:\n"
                 "      - name: order_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
             ),
             "sql/models/fact_orders.sql": (
                 'MODEL (description "Test model fact_orders.", materialized '
@@ -365,7 +365,7 @@ def test_given_existing_intermediate_target_when_running_source_only_then_reuses
                 "\n"
                 "\n"
                 "@loader(write_strategy='replace', columns=[\n"
-                "    {'name': 'event_id', 'type': 'INTEGER'},\n"
+                "    {'name': 'event_id', 'type': 'BIGINT'},\n"
                 "])\n"
                 "def fetch_events(ctx):\n"
                 "    '''Test loader fetch_events.'''\n"
@@ -719,9 +719,9 @@ def test_given_task_loader_source_model_chain_when_running_model_then_task_runs_
                 "    managed: true\n"
                 "    columns:\n"
                 "      - name: order_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
                 "      - name: amount_cents\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
             ),
             "sql/models/fact_orders.sql": (
                 "MODEL (description 'Test model fact_orders.', materialized table);\n\n"
@@ -777,9 +777,9 @@ def test_given_model_and_task_selector_when_running_run_then_task_can_read_built
                 "    expression: SELECT 1 AS order_id, 100 AS amount_cents\n"
                 "    columns:\n"
                 "      - name: order_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
                 "      - name: amount_cents\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
             ),
             "sql/models/fact_orders.sql": (
                 "MODEL (description 'Test model fact_orders.', materialized table);\n\n"
@@ -853,7 +853,7 @@ def test_given_asset_depends_on_terminal_model_when_running_run_then_asset_reads
                 "    expression: SELECT 1 AS order_id\n"
                 "    columns:\n"
                 "      - name: order_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
             ),
             "sql/models/fact_orders.sql": (
                 'MODEL (description "Test model fact_orders.", materialized '
@@ -1001,9 +1001,9 @@ def test_given_source_task_asset_selection_when_running_run_then_task_reads_load
                 "    managed: true\n"
                 "    columns:\n"
                 "      - name: order_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
                 "      - name: amount_cents\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
             ),
             "python/nodes/tasks/orders/asset.py": (
                 "from sqlbuild.refs import source\n"
@@ -1163,7 +1163,7 @@ def test_given_independent_python_and_sql_selectors_when_running_run_then_all_br
                 "    expression: SELECT 1 AS order_id\n"
                 "    columns:\n"
                 "      - name: order_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
             ),
             "sql/models/fact_orders.sql": (
                 'MODEL (description "Test model fact_orders.", materialized '
@@ -1249,9 +1249,9 @@ def test_given_task_depends_on_model_when_running_run_then_task_runs_before_down
                 "    expression: SELECT 1 AS order_id, 100 AS amount_cents\n"
                 "    columns:\n"
                 "      - name: order_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
                 "      - name: amount_cents\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
             ),
             "sql/models/stg_orders.sql": (
                 'MODEL (description "Test model stg_orders.", materialized '
@@ -1334,9 +1334,9 @@ def test_given_task_depends_on_source_when_running_run_then_task_runs_after_sour
                 "    managed: true\n"
                 "    columns:\n"
                 "      - name: order_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
                 "      - name: amount_cents\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
             ),
             "python/nodes/tasks/profile/asset.py": (
                 "from sqlbuild.refs import source\n"
@@ -1404,7 +1404,7 @@ def test_given_sql_ready_task_fails_when_running_run_then_footer_json_and_exit_f
                 "    expression: SELECT 1 AS order_id\n"
                 "    columns:\n"
                 "      - name: order_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
             ),
             "sql/models/stg_orders.sql": (
                 'MODEL (description "Test model stg_orders.", materialized '
@@ -1493,7 +1493,7 @@ def test_given_task_depends_on_terminal_loader_when_running_run_then_command_rej
                 "    managed: true\n"
                 "    columns:\n"
                 "      - name: order_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
             ),
             "python/nodes/tasks/orders/asset.py": (
                 "from python.nodes.loaders.orders.loader import raw_orders\n"
@@ -1555,8 +1555,8 @@ def test_given_task_asset_depend_on_intermediate_loader_when_running_run_then_lo
                 "    destination='stage_orders',\n"
                 "    write_strategy='replace',\n"
                 "    columns=[\n"
-                "        {'name': 'order_id', 'type': 'INTEGER'},\n"
-                "        {'name': 'amount_cents', 'type': 'INTEGER'},\n"
+                "        {'name': 'order_id', 'type': 'BIGINT'},\n"
+                "        {'name': 'amount_cents', 'type': 'BIGINT'},\n"
                 "    ],\n"
                 ")\n"
                 "def stage_orders(ctx):\n"
@@ -1638,7 +1638,7 @@ def test_given_loader_task_loader_chain_when_running_model_then_ingress_orders_c
                 "@loader(\n"
                 "    destination='window_orders',\n"
                 "    write_strategy='replace',\n"
-                "    columns=[{'name': 'order_id', 'type': 'INTEGER'}],\n"
+                "    columns=[{'name': 'order_id', 'type': 'BIGINT'}],\n"
                 ")\n"
                 "def load_window_orders(ctx):\n"
                 "    '''Test loader load_window_orders.'''\n    return [{'order_id': 1}]\n"
@@ -1673,7 +1673,7 @@ def test_given_loader_task_loader_chain_when_running_model_then_ingress_orders_c
                 "    managed: true\n"
                 "    columns:\n"
                 "      - name: order_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
             ),
             "sql/models/fact_orders.sql": (
                 'MODEL (description "Test model fact_orders.", materialized '
@@ -1759,7 +1759,7 @@ def test_given_task_asset_loader_chain_when_running_model_then_ingress_orders_ch
                 "    managed: true\n"
                 "    columns:\n"
                 "      - name: order_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
             ),
             "sql/models/fact_orders.sql": (
                 'MODEL (description "Test model fact_orders.", materialized '
@@ -1813,7 +1813,7 @@ def test_given_loader_asset_loader_chain_when_running_model_then_ingress_orders_
                 "@loader(\n"
                 "    destination='window_orders',\n"
                 "    write_strategy='replace',\n"
-                "    columns=[{'name': 'order_id', 'type': 'INTEGER'}],\n"
+                "    columns=[{'name': 'order_id', 'type': 'BIGINT'}],\n"
                 ")\n"
                 "def load_window_orders(ctx):\n"
                 "    '''Test loader load_window_orders.'''\n    return [{'order_id': 1}]\n"
@@ -1848,7 +1848,7 @@ def test_given_loader_asset_loader_chain_when_running_model_then_ingress_orders_
                 "    managed: true\n"
                 "    columns:\n"
                 "      - name: order_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
             ),
             "sql/models/fact_orders.sql": (
                 'MODEL (description "Test model fact_orders.", materialized '
@@ -1902,7 +1902,7 @@ def test_given_loader_loader_chain_when_running_model_then_ingress_orders_chain(
                 "@loader(\n"
                 "    destination='window_orders',\n"
                 "    write_strategy='replace',\n"
-                "    columns=[{'name': 'order_id', 'type': 'INTEGER'}],\n"
+                "    columns=[{'name': 'order_id', 'type': 'BIGINT'}],\n"
                 ")\n"
                 "def load_window_orders(ctx):\n"
                 "    '''Test loader load_window_orders.'''\n    return [{'order_id': 1}]\n"
@@ -1923,7 +1923,7 @@ def test_given_loader_loader_chain_when_running_model_then_ingress_orders_chain(
                 "    managed: true\n"
                 "    columns:\n"
                 "      - name: order_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
             ),
             "sql/models/fact_orders.sql": (
                 'MODEL (description "Test model fact_orders.", materialized '
@@ -1977,7 +1977,7 @@ def test_given_loader_task_asset_loader_model_task_asset_task_spine_when_running
                 "@loader(\n"
                 "    destination='window_orders',\n"
                 "    write_strategy='replace',\n"
-                "    columns=[{'name': 'order_id', 'type': 'INTEGER'}],\n"
+                "    columns=[{'name': 'order_id', 'type': 'BIGINT'}],\n"
                 ")\n"
                 "def load_window_orders(ctx):\n"
                 "    '''Test loader load_window_orders.'''\n    return [{'order_id': 7}]\n"
@@ -2020,7 +2020,7 @@ def test_given_loader_task_asset_loader_model_task_asset_task_spine_when_running
                 "    managed: true\n"
                 "    columns:\n"
                 "      - name: order_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
             ),
             "sql/models/fact_orders.sql": (
                 'MODEL (description "Test model fact_orders.", materialized '
@@ -2129,7 +2129,7 @@ def test_given_source_task_loader_chain_when_running_run_then_command_rejects_bo
                 "    expression: SELECT 1 AS order_id\n"
                 "    columns:\n"
                 "      - name: order_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
             ),
             "python/nodes/tasks/orders/asset.py": (
                 "from sqlbuild.refs import source\n"
@@ -2144,7 +2144,7 @@ def test_given_source_task_loader_chain_when_running_run_then_command_rejects_bo
                 "@loader(\n"
                 "    destination='stage_orders',\n"
                 "    write_strategy='replace',\n"
-                "    columns=[{'name': 'order_id', 'type': 'INTEGER'}],\n"
+                "    columns=[{'name': 'order_id', 'type': 'BIGINT'}],\n"
                 "    depends_on=(prepare_orders,),\n"
                 ")\n"
                 "def stage_orders(ctx):\n"
@@ -2205,7 +2205,7 @@ def test_given_model_task_loader_chain_when_running_run_then_command_rejects_bou
                 "    expression: SELECT 1 AS order_id\n"
                 "    columns:\n"
                 "      - name: order_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
             ),
             "sql/models/stg_orders.sql": (
                 'MODEL (description "Test model stg_orders.", materialized '
@@ -2224,7 +2224,7 @@ def test_given_model_task_loader_chain_when_running_run_then_command_rejects_bou
                 "@loader(\n"
                 "    destination='stage_orders',\n"
                 "    write_strategy='replace',\n"
-                "    columns=[{'name': 'order_id', 'type': 'INTEGER'}],\n"
+                "    columns=[{'name': 'order_id', 'type': 'BIGINT'}],\n"
                 "    depends_on=(prepare_orders,),\n"
                 ")\n"
                 "def stage_orders(ctx):\n"

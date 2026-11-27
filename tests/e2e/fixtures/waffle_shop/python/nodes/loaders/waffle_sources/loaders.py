@@ -1,5 +1,6 @@
 from collections.abc import Iterator
 from datetime import datetime
+from typing import Any
 
 from sqlbuild.factories import factory
 from sqlbuild.loaders import loader
@@ -65,10 +66,12 @@ def waffle_sources_loaders() -> list[object]:
         return CUSTOMERS
 
     @loader(write_strategy="delete_insert", cursor_column="ordered_at")
-    def raw_orders(ctx: object) -> Iterator[dict[str, object]]:
+    def raw_orders(ctx: Any) -> Iterator[dict[str, object]]:
         """Test loader raw_orders."""
-        _ = ctx
+        start: datetime | None = ctx.cursor_value
         for order_id, customer_id, waffle_type_id, quantity, ordered_at, status in ORDERS:
+            if start is not None and ordered_at < start:
+                continue
             yield {
                 "id": order_id,
                 "customer_id": customer_id,

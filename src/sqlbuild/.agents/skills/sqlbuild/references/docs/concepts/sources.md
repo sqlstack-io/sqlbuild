@@ -154,7 +154,7 @@ sources:
     description: Orders from the shop database
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
 ```
 
 The load reads a [source connection](project-configuration.md#warehouse-and-source-connections),

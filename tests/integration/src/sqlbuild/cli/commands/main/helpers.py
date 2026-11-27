@@ -552,7 +552,7 @@ def write_dropped_relation_project(
         "  - name: order_statuses\n    description: Test seed order_statuses.\n"
         "    columns:\n"
         "      - name: status_code\n"
-        "        type: INTEGER\n"
+        "        type: BIGINT\n"
         "      - name: status_name\n"
         "        type: VARCHAR\n",
         encoding="utf-8",
@@ -707,7 +707,7 @@ def write_expression_source_project(
         f'    expression: "{source_expression}"\n'
         "    columns:\n"
         "      - name: order_id\n"
-        "        type: INTEGER\n",
+        "        type: BIGINT\n",
         encoding="utf-8",
     )
     (project_dir / "sql" / "models" / "orders.sql").write_text(model_sql, encoding="utf-8")
@@ -1108,7 +1108,7 @@ def write_orders_project(project_dir: Path) -> None:
     models_dir.mkdir(parents=True)
     (models_dir / "orders.sql").write_text(
         'MODEL (description "Orders.", materialized table, contract enforced, '
-        'columns (order_id (type "INTEGER"), loaded_at (type "INTEGER")));\n\n'
+        'columns (order_id (type "BIGINT"), loaded_at (type "BIGINT")));\n\n'
         "SELECT CAST(1 AS INTEGER) AS order_id, CAST(1 AS INTEGER) AS loaded_at\n",
         encoding="utf-8",
     )
@@ -1264,10 +1264,10 @@ def write_enum_project(*, root: Path, model_sql: str, contract: str) -> None:
         "sources:\n"
         "  - name: web_orders\n    description: Web orders.\n    contract: enforced\n"
         '    expression: "(SELECT CAST(1 AS INTEGER) AS order_id)"\n'
-        "    columns:\n      - name: order_id\n        type: INTEGER\n"
+        "    columns:\n      - name: order_id\n        type: BIGINT\n"
         "  - name: partner_orders\n    description: Partner orders.\n    contract: enforced\n"
         '    expression: "(SELECT CAST(2 AS INTEGER) AS order_id)"\n'
-        "    columns:\n      - name: order_id\n        type: INTEGER\n"
+        "    columns:\n      - name: order_id\n        type: BIGINT\n"
     )
     (root / "sql" / "models" / "orders.sql").write_text(
         f"MODEL (\n  description 'Orders from every channel.',\n  contract {contract},\n"
@@ -1586,7 +1586,7 @@ RUN_RECORD_MARTS_FILES: dict[str, str] = {
     "sql/sources/landed.yml": (
         "sources:\n  - name: landed_events\n    description: Loaded events.\n    schema: landing\n"
         "    managed: true\n    columns:\n"
-        "      - name: event_id\n        type: INTEGER\n"
+        "      - name: event_id\n        type: BIGINT\n"
     ),
     "sql/models/upper/revenue_upper.sql": (
         "MODEL (description 'Revenue under an upper-case schema name.', materialized table);\n"
@@ -1618,7 +1618,7 @@ RUN_RECORD_MARTS_FILES: dict[str, str] = {
     "sql/seeds/regions.csv": "region_id\n1\n",
     "sql/seeds/regions.yml": (
         "seeds:\n  - name: regions\n    description: Regions.\n    columns:\n"
-        "      - name: region_id\n        type: INTEGER\n"
+        "      - name: region_id\n        type: BIGINT\n"
     ),
 }
 

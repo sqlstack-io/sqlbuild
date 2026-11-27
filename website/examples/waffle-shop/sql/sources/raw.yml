@@ -4,7 +4,7 @@ sources:
     managed: true
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
       - name: first_name
         type: VARCHAR
       - name: last_name
@@ -19,13 +19,13 @@ sources:
     managed: true
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
       - name: customer_id
-        type: INTEGER
+        type: BIGINT
       - name: waffle_type_id
-        type: INTEGER
+        type: BIGINT
       - name: quantity
-        type: INTEGER
+        type: BIGINT
       - name: ordered_at
         type: TIMESTAMP
       - name: status

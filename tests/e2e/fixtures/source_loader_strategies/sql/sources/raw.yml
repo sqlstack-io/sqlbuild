@@ -4,7 +4,7 @@ sources:
     managed: true
     columns:
       - name: country_id
-        type: INTEGER
+        type: BIGINT
       - name: country_code
         type: VARCHAR
       - name: country_name
@@ -15,7 +15,7 @@ sources:
     managed: true
     columns:
       - name: event_id
-        type: INTEGER
+        type: BIGINT
       - name: event_name
         type: VARCHAR
 
@@ -24,29 +24,29 @@ sources:
     managed: true
     columns:
       - name: event_id
-        type: INTEGER
+        type: BIGINT
       - name: event_at
-        type: timestamp_ntz
+        type: TIMESTAMP
       - name: amount_cents
-        type: INTEGER
+        type: BIGINT
 
   - name: raw_customers
     description: Test source raw_customers.
     managed: true
     columns:
       - name: customer_id
-        type: INTEGER
+        type: BIGINT
       - name: plan_name
         type: VARCHAR
       - name: updated_at
-        type: timestamp_ntz
+        type: TIMESTAMP
 
   - name: raw_loader_status
     description: Test source raw_loader_status.
     managed: true
     columns:
       - name: status_id
-        type: INTEGER
+        type: BIGINT
       - name: status_name
         type: VARCHAR
       - name: loaded_by

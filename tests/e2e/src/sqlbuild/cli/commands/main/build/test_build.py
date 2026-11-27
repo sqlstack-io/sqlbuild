@@ -709,7 +709,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "    managed: true\n"
                     "    columns:\n"
                     "      - name: order_id\n"
-                    "        type: INTEGER\n"
+                    "        type: BIGINT\n"
                 ),
                 "sql/models/fact_orders.sql": (
                     'MODEL (description "Test model fact_orders.", materialized '
@@ -758,7 +758,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "    managed: true\n"
                     "    columns:\n"
                     "      - name: order_id\n"
-                    "        type: INTEGER\n"
+                    "        type: BIGINT\n"
                 ),
                 "sql/models/fact_orders.sql": (
                     'MODEL (description "Test model fact_orders.", materialized '
@@ -841,7 +841,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "    expression: SELECT 1 AS order_id\n"
                     "    columns:\n"
                     "      - name: order_id\n"
-                    "        type: INTEGER\n"
+                    "        type: BIGINT\n"
                 ),
                 "sql/models/fact_orders.sql": (
                     'MODEL (description "Test model fact_orders.", materialized '
@@ -882,7 +882,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "    expression: SELECT 1 AS order_id\n"
                     "    columns:\n"
                     "      - name: order_id\n"
-                    "        type: INTEGER\n"
+                    "        type: BIGINT\n"
                 ),
                 "sql/models/fact_orders.sql": (
                     'MODEL (description "Test model fact_orders.", materialized '
@@ -924,7 +924,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "    expression: SELECT 1 AS order_id\n"
                     "    columns:\n"
                     "      - name: order_id\n"
-                    "        type: INTEGER\n"
+                    "        type: BIGINT\n"
                 ),
                 "sql/models/fact_orders.sql": (
                     'MODEL (description "Test model fact_orders.", materialized '
@@ -984,7 +984,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "    managed: true\n"
                     "    columns:\n"
                     "      - name: order_id\n"
-                    "        type: INTEGER\n"
+                    "        type: BIGINT\n"
                 ),
                 "sql/models/fact_orders.sql": (
                     'MODEL (description "Test model fact_orders.", materialized '
@@ -1035,7 +1035,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "    managed: true\n"
                     "    columns:\n"
                     "      - name: order_id\n"
-                    "        type: INTEGER\n"
+                    "        type: BIGINT\n"
                 ),
                 "python/nodes/tasks/profile/asset.py": (
                     "from pathlib import Path\n"
@@ -1116,7 +1116,7 @@ def test_given_python_lifecycle_edge_case_when_building_then_direct_build_harden
                     "\n"
                     "\n"
                     "@loader(write_strategy='replace', columns=[\n"
-                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
+                    "    {'name': 'event_id', 'type': 'BIGINT'},\n"
                     "])\n"
                     "def fetch_events(ctx):\n"
                     "    '''Test loader fetch_events.'''\n"
@@ -1178,7 +1178,7 @@ def test_given_python_lifecycle_edge_case_when_building_then_direct_build_harden
                     "    managed: true\n"
                     "    columns:\n"
                     "      - name: event_id\n"
-                    "        type: INTEGER\n"
+                    "        type: BIGINT\n"
                 ),
             },
             expected_exit_code=0,
@@ -1237,7 +1237,7 @@ def test_given_direct_source_only_build_when_loader_has_ingress_then_enforces_so
                     "\n"
                     "\n"
                     "@loader(write_strategy='replace', columns=[\n"
-                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
+                    "    {'name': 'event_id', 'type': 'BIGINT'},\n"
                     "])\n"
                     "def fetch_events(ctx):\n"
                     "    '''Test loader fetch_events.'''\n"
@@ -1425,7 +1425,7 @@ def test_given_python_sql_python_spine_when_building_then_orders_python_around_s
                 "@loader(\n"
                 "    destination='window_orders',\n"
                 "    write_strategy='replace',\n"
-                "    columns=[{'name': 'order_id', 'type': 'INTEGER'}],\n"
+                "    columns=[{'name': 'order_id', 'type': 'BIGINT'}],\n"
                 ")\n"
                 "def load_window_orders(ctx):\n"
                 "    '''Test loader load_window_orders.'''\n    return [{'order_id': 7}]\n"
@@ -1468,7 +1468,7 @@ def test_given_python_sql_python_spine_when_building_then_orders_python_around_s
                 "    managed: true\n"
                 "    columns:\n"
                 "      - name: order_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
             ),
             "sql/models/fact_orders.sql": (
                 'MODEL (description "Test model fact_orders.", materialized '
@@ -1745,7 +1745,7 @@ def test_given_prior_loader_result_when_later_task_reads_result_then_uses_loader
                 "    managed: true\n"
                 "    columns:\n"
                 "      - name: event_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
             ),
             "sql/models/fact_events.sql": (
                 'MODEL (description "Test model fact_events.", materialized '
@@ -1815,7 +1815,7 @@ def test_given_prior_loader_result_when_later_task_reads_result_then_uses_loader
                     "    managed: true\n"
                     "    columns:\n"
                     "      - name: event_id\n"
-                    "        type: INTEGER\n"
+                    "        type: BIGINT\n"
                 ),
                 "sql/models/fact_events.sql": (
                     'MODEL (description "Test model fact_events.", materialized '
@@ -1857,7 +1857,7 @@ def test_given_prior_loader_result_when_later_task_reads_result_then_uses_loader
                     "    managed: true\n"
                     "    columns:\n"
                     "      - name: event_id\n"
-                    "        type: INTEGER\n"
+                    "        type: BIGINT\n"
                 ),
                 "sql/models/fact_events.sql": (
                     'MODEL (description "Test model fact_events.", materialized '
@@ -2013,7 +2013,7 @@ def test_given_local_target_override_when_running_python_then_every_context_sees
                 "    managed: true\n"
                 "    columns:\n"
                 "      - name: order_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
             ),
             **dict(test_case.extra_files),
         },
@@ -2187,7 +2187,7 @@ def test_given_ctx_templated_target_schema_when_running_then_python_sees_no_load
                 "    schema: raw\n"
                 "    columns:\n"
                 "      - name: order_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
             ),
         },
     )

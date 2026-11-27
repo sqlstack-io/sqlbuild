@@ -92,8 +92,15 @@ SELECT id, name FROM __source("raw_customers")
 ## Column types
 
 A column declared in the source's `columns` with a `type` gets that type, and its values are cast
-to it. Declare the type SQLLoad creates, such as `BIGINT` for whole numbers on DuckDB. SQLLoad
-infers the type of every other column from its values:
+to it. Declare the type SQLLoad creates for it, in the warehouse's own spelling or a synonym:
+compile fails with the declaration to write when they differ, such as
+
+```
+@loader 'raw_customers': source 'raw_customers' declares column id as INTEGER, which SQLLoad
+creates as BIGINT in DuckDB; declare `type: BIGINT` in its sources file
+```
+
+SQLLoad infers the type of every other column from its values:
 
 | Python value | Column type (DuckDB) |
 |--------------|----------------------|
@@ -121,6 +128,8 @@ Details:
   as `int` and `str`, makes it a text column.
 - A value that can't be cast to the declared type, such as `"two"` in a `BIGINT` column, fails the
   load, naming the column.
+- An intermediate loader's `columns` are checked the same way. A self-managed loader writes its own
+  table, so its source's types aren't.
 
 ## Schema changes
 

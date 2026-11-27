@@ -784,7 +784,7 @@ def prepare_audit_read_plan_project(*, tmp_path: Path) -> Path:
             "sql/seeds/waffle_types.yml": (
                 "seeds:\n  - name: waffle_types\n    description: Test seed waffle_types.\n"
                 "    columns:\n"
-                "      - name: waffle_type_id\n        type: INTEGER\n"
+                "      - name: waffle_type_id\n        type: BIGINT\n"
             ),
             "sql/seeds/waffle_types.csv": "waffle_type_id\n1\n",
             "sql/models/stg_orders.sql": (
@@ -917,7 +917,7 @@ def python_node_selection_project_files(*, orders_sql: str) -> dict[str, str]:
             "    schema: main\n    table: raw_orders\n"
             "  - name: raw_customers\n    description: Test source raw_customers.\n"
             "    managed: true\n"
-            "    columns:\n      - name: customer_id\n        type: INTEGER\n"
+            "    columns:\n      - name: customer_id\n        type: BIGINT\n"
         ),
         "python/nodes/loaders/customers/loader.py": (
             "from sqlbuild.loaders import loader\n\n\n"
@@ -1202,7 +1202,7 @@ def seed_audit_files(status_values: tuple[str, ...]) -> dict[str, str]:
             "    description: Order statuses.\n"
             "    columns:\n"
             "      - name: status_id\n"
-            "        type: INTEGER\n"
+            "        type: BIGINT\n"
             "        audits: [not_null]\n"
             "      - name: status\n"
             "        type: VARCHAR\n"
@@ -1251,7 +1251,7 @@ def target_concurrency_project_files(
             "    description: Products.\n"
             "    columns:\n"
             "      - name: product_id\n"
-            "        type: INTEGER\n"
+            "        type: BIGINT\n"
         ),
         "sql/models/orders.sql": (
             "MODEL (description 'Orders.', materialized table);\n\nSELECT 1 AS order_id\n"
@@ -1737,7 +1737,7 @@ def node_result_source_yml(location: str) -> str:
     return (
         "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
         f"    managed: true\n{location}"
-        "    columns:\n      - name: order_id\n        type: INTEGER\n"
+        "    columns:\n      - name: order_id\n        type: BIGINT\n"
     )
 
 

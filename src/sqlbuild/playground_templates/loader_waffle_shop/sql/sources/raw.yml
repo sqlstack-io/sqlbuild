@@ -5,25 +5,25 @@ sources:
     managed: true
     columns:
       - name: order_id
-        type: INTEGER
+        type: BIGINT
       - name: customer_id
-        type: INTEGER
+        type: BIGINT
       - name: waffle_type
         type: VARCHAR
       - name: quantity
-        type: INTEGER
+        type: BIGINT
       - name: price_cents
-        type: INTEGER
+        type: BIGINT
       - name: load_seq
-        type: INTEGER
+        type: BIGINT
   - name: raw_customers
     description: Raw customers loaded by the Python loader
     contract: enforced
     managed: true
     columns:
       - name: customer_id
-        type: INTEGER
+        type: BIGINT
       - name: plan_name
         type: VARCHAR
       - name: load_seq
-        type: INTEGER
+        type: BIGINT
