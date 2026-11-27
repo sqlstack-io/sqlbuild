@@ -555,7 +555,7 @@ def test_given_source_conflicts_when_overwriting_then_preserves_retained_metadat
         type: VARCHAR # keep comment
         description: identifier
       - name: obsolete
-        type: INTEGER
+        type: BIGINT
         description: remove this metadata
 """,
         encoding="utf-8",

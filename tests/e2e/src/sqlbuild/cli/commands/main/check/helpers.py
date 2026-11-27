@@ -138,7 +138,7 @@ sources:
     managed: true
     columns:
       - name: order_id
-        type: INTEGER
+        type: BIGINT
 """,
             "python/nodes/checks/raw/checks.py": """
 from sqlbuild.checks import check

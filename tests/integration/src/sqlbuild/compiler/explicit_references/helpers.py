@@ -114,9 +114,9 @@ _MANAGED: dict[str, str] = {
     "sql/sources/raw.yml": (
         "sources:\n"
         "  - name: raw_regions\n    description: Raw regions.\n    managed: true\n"
-        "    columns:\n      - name: id\n        type: INTEGER\n"
+        "    columns:\n      - name: id\n        type: BIGINT\n"
         "  - name: raw_customers\n    description: Raw customers.\n    managed: true\n"
-        "    columns:\n      - name: id\n        type: INTEGER\n"
+        "    columns:\n      - name: id\n        type: BIGINT\n"
     ),
 }
 _EXTERNAL: dict[str, str] = {

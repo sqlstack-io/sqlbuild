@@ -89,9 +89,9 @@ def generated_assembly_files(*, rng: random.Random, model_count: int) -> dict[st
         "sql/seeds/lookups.yml": (
             "seeds:\n"
             f"  - name: countries\n    description: Countries.\n{rng.choice(_SEED_NAMESPACES)}"
-            "    columns:\n      - name: n\n        type: INTEGER\n"
+            "    columns:\n      - name: n\n        type: BIGINT\n"
             f"  - name: regions\n    description: Regions.\n{rng.choice(_SEED_NAMESPACES)}"
-            "    columns:\n      - name: n\n        type: INTEGER\n"
+            "    columns:\n      - name: n\n        type: BIGINT\n"
         ),
         "sql/seeds/countries.csv": "n\n1\n",
         "sql/seeds/regions.csv": "n\n2\n",
@@ -99,10 +99,10 @@ def generated_assembly_files(*, rng: random.Random, model_count: int) -> dict[st
             "sources:\n"
             "  - name: raw_orders\n    description: Raw orders.\n    managed: true\n"
             f"{rng.choice(_SOURCE_NAMESPACES)}"
-            "    columns:\n      - name: n\n        type: INTEGER\n"
+            "    columns:\n      - name: n\n        type: BIGINT\n"
             "  - name: landing_orders\n    description: Landing orders.\n"
             f"{rng.choice(_SOURCE_NAMESPACES)}"
-            "    columns:\n      - name: n\n        type: INTEGER\n"
+            "    columns:\n      - name: n\n        type: BIGINT\n"
         ),
         "python/nodes/loaders/raw/loader.py": (
             "from sqlbuild.loaders import loader\n\n\n"
@@ -132,7 +132,7 @@ def seed_yml(schema: str) -> str:
 
     return (
         "seeds:\n  - name: countries\n    description: Countries.\n"
-        f'    schema: "{schema}"\n    columns:\n      - name: n\n        type: INTEGER\n'
+        f'    schema: "{schema}"\n    columns:\n      - name: n\n        type: BIGINT\n'
     )
 
 
@@ -272,7 +272,7 @@ _EDGE_MODEL: str = (
 )
 _EDGE_SOURCE: str = (
     "sources:\n  - name: raw_orders\n    description: Raw orders.\n    managed: true\n"
-    "{ns}    columns:\n      - name: n\n        type: INTEGER\n"
+    "{ns}    columns:\n      - name: n\n        type: BIGINT\n"
 )
 _EDGE_LOADER: str = (
     "from sqlbuild.loaders import loader\n\n\n"
@@ -295,7 +295,7 @@ _EDGE_VARS: dict[str, object] = {
 def _edge_seeds(*namespaces: str) -> str:
     return "seeds:\n" + "".join(
         f"  - name: s{index}\n    description: Seed {index}.\n{namespace}"
-        "    columns:\n      - name: n\n        type: INTEGER\n"
+        "    columns:\n      - name: n\n        type: BIGINT\n"
         for index, namespace in enumerate(namespaces)
     )
 

@@ -46,9 +46,9 @@ _SOURCES: str = """sources:
       TIMESTAMP '2026-01-01 00:00:00' AS ordered_at, DATE '2026-01-01' AS order_date)
     columns:
       - name: order_id
-        type: INTEGER
+        type: BIGINT
       - name: customer_id
-        type: INTEGER
+        type: BIGINT
       - name: amount
         type: DOUBLE
       - name: status
@@ -461,8 +461,8 @@ _LOADED_SOURCE: str = (
     "  - name: raw_events\n    description: Loaded events.\n    managed: true\n"
     "    contract: enforced\n"
     "    columns:\n"
-    "      - name: event_id\n        type: INTEGER\n"
-    "      - name: load_seq\n        type: INTEGER\n"
+    "      - name: event_id\n        type: BIGINT\n"
+    "      - name: load_seq\n        type: BIGINT\n"
 )
 _LOADER: str = (
     "from sqlbuild.loaders import loader\n\n\n"
