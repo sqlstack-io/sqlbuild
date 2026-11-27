@@ -1067,3 +1067,24 @@ class RuntimeSinkTestCase:
     sink_source: str
     # Each sink's name, and whether it failed every event it accepted.
     expected_sinks: tuple[tuple[str, bool], ...]
+
+
+@dataclass(frozen=True)
+class LiveLogTestCase:
+    """An asset that logs or prints its first step, then waits for the test to release it."""
+
+    description: str
+    first_step: str
+    expected_live_logs: list[tuple[str, str]]
+    expected_live_output: list[str]
+    expected_logs: list[tuple[str, str]]
+
+
+@dataclass(frozen=True)
+class LogOverflowTestCase:
+    """An asset that logs more `ctx.log` lines than a node keeps."""
+
+    description: str
+    lines: int
+    expected_kept: int
+    expected_last_log: tuple[str, str]

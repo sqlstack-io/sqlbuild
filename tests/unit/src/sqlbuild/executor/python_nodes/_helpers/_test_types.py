@@ -280,3 +280,15 @@ class DiscoveredItemNodeTestCase:
     expected_args: dict[str, object] | None
     expected_item: str | None
     expected_failure: str | None
+
+
+@dataclass(frozen=True)
+class PythonNodeLiveLogTestCase:
+    """An asset that logs, and what its runtime's `on_log` sees and its result counts."""
+
+    description: str
+    name: str
+    function: Callable[..., object]
+    expected_forwarded: tuple[tuple[str, str, str], ...]
+    expected_forwarded_count: int
+    expected_dropped: int

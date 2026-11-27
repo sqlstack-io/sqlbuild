@@ -5,6 +5,7 @@ import re
 import signal
 import sqlite3
 import subprocess
+import threading
 import time
 from contextlib import closing
 from itertools import takewhile
@@ -15,6 +16,7 @@ from typing import Any
 import duckdb
 
 from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
+    BlockedAssetBuild,
     ChangedBuildStep,
     ChangedWarehouse,
     DeferCloneBuildE2ETestCase,
@@ -1786,3 +1788,83 @@ def window_floor_event_dates(project_dir: Path, model: str) -> tuple[str, ...]:
         sql=f"SELECT event_date FROM main.{model} ORDER BY event_date",
     )
     return tuple(str(row[0]) for row in rows)
+
+
+_BLOCKED_ASSET: str = '''\
+import pathlib
+import time
+
+from sqlbuild.assets import AssetContext, asset
+
+RELEASE = pathlib.Path({release!r})
+
+
+@asset(tags=["steps"])
+def stream_steps(ctx: AssetContext):
+    """Log the first step, then wait until the test lets the asset finish."""
+    ctx.log.info("step 1 of 2")
+    deadline = time.monotonic() + 60
+    while not RELEASE.exists():
+        if time.monotonic() > deadline:
+            raise TimeoutError("the test never released the asset")
+        time.sleep(0.05)
+    ctx.log.info("step 2 of 2")
+'''
+
+
+def blocked_asset_project(tmp_path: Path) -> tuple[Path, Path]:
+    """A DuckDB project whose asset logs a step and waits for the returned release file."""
+
+    release: Path = tmp_path / "release"
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="live_logs",
+        repo_files={
+            "sqlbuild_project.toml": (
+                'name = "live_logs"\nadapter = "duckdb"\n\n'
+                '[connection]\ndatabase = "warehouse.duckdb"\n'
+            ),
+            "sql/models/orders.sql": 'MODEL (description "Orders.");\nSELECT 1 AS amount\n',
+            **node_module_files(
+                "python/nodes/steps.py", _BLOCKED_ASSET.format(release=str(release))
+            ),
+        },
+    )
+    return project_dir, release
+
+
+def build_until_line(project_dir: Path, release: Path, line: str) -> BlockedAssetBuild:
+    """Build, reading the output until `line` shows, then release the asset and let it finish."""
+
+    build: subprocess.Popen[str] = subprocess.Popen(
+        (
+            str(REPO_ROOT / ".venv/bin/sqb"),
+            "--no-color",
+            "--project-dir",
+            str(project_dir),
+            "build",
+        ),
+        cwd=REPO_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    watchdog: threading.Timer = threading.Timer(120, build.kill)
+    watchdog.start()
+    assert build.stdout is not None
+    before: list[str] = []
+    for printed in build.stdout:
+        before.append(printed)
+        if line in printed:
+            break
+    shown_before_release: bool = line in before[-1] if before else False
+    release.touch()
+    after: str = build.stdout.read()
+    returncode: int = build.wait(timeout=60)
+    watchdog.cancel()
+    build.stdout.close()
+    return BlockedAssetBuild(
+        shown_before_release=shown_before_release,
+        output="".join(before) + after,
+        returncode=returncode,
+    )

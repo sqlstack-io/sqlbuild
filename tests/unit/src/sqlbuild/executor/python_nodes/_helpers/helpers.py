@@ -694,3 +694,38 @@ def raised_value_error(*, message: str) -> BaseException:
 
 def discovered_step(ctx: object, n: int = 1) -> None:
     del ctx, n
+
+
+@asset
+def log_two_order_steps(ctx: AssetContext) -> object:
+    """Log a step at info and one at warning."""
+
+    ctx.log.info("loaded 3 orders")
+    ctx.log.warning("1 order had no customer")
+    return ctx.result(payload={"orders": 3})
+
+
+@asset
+def log_past_the_cap(ctx: AssetContext) -> object:
+    """Log five lines more than a node keeps."""
+
+    for line in range(205):
+        ctx.log.info(f"order {line}")
+    return ctx.result(payload={"orders": 205})
+
+
+def logging_runtime(on_log: Callable[[str, Any, str], None]) -> PythonNodeRuntime:
+    """A runtime whose `on_log` receives each `ctx.log` line as it is logged."""
+
+    adapter: PythonNodeContextTestAdapter = PythonNodeContextTestAdapter()
+    return PythonNodeRuntime(
+        adapter=adapter,
+        connection_config={},
+        connection=object(),
+        run_id="log_run",
+        target="dev",
+        vars={},
+        is_reload=False,
+        persist_node_results=False,
+        on_log=on_log,
+    )
