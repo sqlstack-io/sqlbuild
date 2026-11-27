@@ -636,6 +636,8 @@ pub(crate) struct Scanned {
     pub(crate) last: Option<i64>,
     /// Whether the page was full, so more may follow.
     pub(crate) full: bool,
+    /// Rows of a kind the sensor watches that can't be read, passed over in reading order.
+    pub(crate) unreadable: Vec<crate::platform::models::UnreadableRow>,
 }
 
 /// The oldest event a sensor has not handled, or how far its cursor may move without one.

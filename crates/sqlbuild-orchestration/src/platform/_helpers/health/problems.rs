@@ -6,6 +6,7 @@ use uuid::Uuid;
 use crate::declarations::models::Schedule;
 use crate::platform::_helpers::health::failing_locations::failing_locations;
 use crate::platform::_helpers::health::failing_sinks::{failing_sinks, sink_reports};
+use crate::platform::_helpers::health::skipped_events::skipped_events;
 use crate::platform::constants::LOCATION_SILENCE_SECONDS;
 use std::collections::BTreeSet;
 
@@ -63,6 +64,7 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
     let (transaction, problems) = trigger_problems(transaction).await?;
     let (transaction, failing) = failing_locations(transaction).await?;
     let (transaction, sinks) = sink_reports(transaction).await?;
+    let (transaction, skipped_events) = skipped_events(transaction).await?;
     commit(transaction).await?;
     let schedules: Vec<RunningSchedule> = schedules
         .into_iter()
@@ -88,6 +90,7 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
         skipped_triggers: problems.skipped,
         rechecked_sensors: problems.rechecked,
         dropped_calendar_times: problems.dropped,
+        skipped_events,
         now,
         lease: leases.into_iter().next().map(decode_row).transpose()?,
         broken: locations

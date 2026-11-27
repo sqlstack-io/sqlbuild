@@ -1,4 +1,4 @@
-//! People see the scheduler's state, and broken locations, late ticks, low calendars, skipped triggers and re-checked sensors only for targets they list.
+//! People see the scheduler's state and stored events nothing could read, and broken locations, late ticks, low calendars, skipped triggers and re-checked sensors only for targets they list.
 
 use std::collections::BTreeSet;
 
@@ -48,6 +48,11 @@ pub async fn read_person_problems(
             scan.dropped_calendar_times
                 .iter()
                 .map(|calendar| (calendar.location_id, calendar.target.clone())),
+        )
+        .chain(
+            scan.skipped_events
+                .iter()
+                .filter_map(|event| event.location_id.zip(event.target.clone())),
         )
         .collect::<BTreeSet<_>>()
     {
@@ -109,6 +114,16 @@ pub async fn read_person_problems(
             .dropped_calendar_times
             .into_iter()
             .filter(|calendar| listed.contains(&(calendar.location_id, calendar.target.clone())))
+            .collect(),
+        skipped_events: scan
+            .skipped_events
+            .into_iter()
+            .filter(|event| {
+                event
+                    .location_id
+                    .zip(event.target.clone())
+                    .is_none_or(|scope| listed.contains(&scope))
+            })
             .collect(),
     })
 }

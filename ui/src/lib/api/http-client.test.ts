@@ -1007,7 +1007,10 @@ describe('listPlatformEventHistory', () => {
 				if (url.pathname.endsWith('/platform/events')) {
 					const before = url.searchParams.get('before');
 					scans.push(before);
-					return Response.json(before === null ? { events: [event(9, 'preview')], before: 9 } : { events: [event(4, 'development')], before: null });
+					const unreadable = (storage_id: number, target: string) => ({ storage_id, event_id: `u-${storage_id}`, occurred_at: '2026-11-09T09:00:00Z', event_type: 'platform_sync_stalled', error: 'unknown variant `sync_stalled`', location_id: '0191f0aa-orders', target });
+					return Response.json(
+						before === null ? { events: [event(9, 'preview')], before: 9, unreadable: [unreadable(8, 'preview')] } : { events: [event(4, 'development')], before: null, unreadable: [unreadable(5, 'development')] }
+					);
 				}
 				return Response.json([]);
 			})
@@ -1015,10 +1018,13 @@ describe('listPlatformEventHistory', () => {
 		return { scans, client: createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} }) };
 	}
 
-	it("keeps scanning past a scan without the location's events until the server says none are older", async () => {
+	it("keeps scanning past a scan without the location's events until the server says none are older, listing the location's unreadable events too", async () => {
 		const { scans, client } = server();
 		const history = await client.listPlatformEventHistory({ locationId: '0191f0aa-orders:development' });
-		expect(history.map((r) => r.id)).toEqual(['e-4']);
+		expect(history.map((r) => [r.id, r.kind])).toEqual([
+			['u-5', 'unreadable_event'],
+			['e-4', 'location_broken']
+		]);
 		expect(scans).toEqual([null, '9']);
 	});
 });

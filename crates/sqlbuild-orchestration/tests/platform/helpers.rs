@@ -467,3 +467,20 @@ pub(crate) fn failing_sink_of(sink: &str, reason: &str) -> crate::platform::mode
         last_success_at: None,
     }
 }
+
+/// Deliver the webhook's events three times over; the last pass must find nothing left.
+pub(crate) async fn drain_webhook(store: &ControlStore, sink: &crate::webhooks::models::Webhook) {
+    let mut handled: Vec<usize> = Vec::new();
+    for _ in 0..3 {
+        handled.push(
+            crate::webhooks::_helpers::delivery::deliver_webhook(store, sink)
+                .await
+                .expect("delivery carries on"),
+        );
+    }
+    assert_eq!(
+        handled.last(),
+        Some(&0),
+        "delivery reaches the end: {handled:?}"
+    );
+}

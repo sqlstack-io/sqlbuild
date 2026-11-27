@@ -27,7 +27,7 @@ function failingMessage(place: string, location: Wire['FailingLocation']): strin
 	return `${place}: ${FAILED[location.state] ?? location.state}${error}. ${serving}`;
 }
 
-/** Live problems as active banner events: a stopped scheduler, each broken location, and late schedules, low calendars, skipped triggers, sensors checked again from scratch and calendars' dropped times per location. */
+/** Live problems as active banner events: a stopped scheduler, each broken location, and late schedules, low calendars, skipped triggers, sensors checked again from scratch, calendars' dropped times and skipped stored events per location. */
 export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number): PlatformEvent[] {
 	const events: PlatformEvent[] = [];
 	if (!problems.scheduler_leader) {
@@ -231,6 +231,27 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 					: `${calendars.length} calendars in ${place} dropped pending times, starting with ${first.name}, which won’t tick ${droppedTimes(first.times)}.`
 		});
 	}
+	const unread = new Map<string, Wire['SkippedEvent'][]>();
+	for (const event of problems.skipped_events ?? []) {
+		const key = event.location_id && event.target ? keyOf(event.location_id, event.target) : '';
+		unread.set(key, [...(unread.get(key) ?? []), event]);
+	}
+	for (const [key, items] of unread) {
+		const first = items.reduce((a, b) => (a.skipped_at <= b.skipped_at ? a : b));
+		const place = first.location_name && first.target ? placeOf(first.location_name, first.target) : null;
+		const what = items.length === 1 ? `A stored ${first.event_type} event` : `${items.length} stored events, starting with a ${first.event_type} event,`;
+		events.push({
+			id: `skipped:${key || 'server'}`,
+			kind: 'unreadable_event_skipped',
+			severity: 'warning',
+			occurredAt: first.skipped_at,
+			members: [...new Set(items.map((e) => String(e.storage_id)))].sort(),
+			active: true,
+			locationId: key || null,
+			subject: place,
+			message: `${what}${place ? ` in ${place}` : ''} can’t be read by this SQLBuild release, so webhooks and platform sensors skipped ${items.length === 1 ? 'it' : 'them'} and carried on: ${first.reason}.`
+		});
+	}
 	return events;
 }
 
@@ -249,9 +270,18 @@ export function toPlatformHealth(problems: Wire['PlatformProblems']): PlatformHe
 	};
 }
 
-/** Stored events newest first; an open problem marks the newest stored event of its kind and place as ongoing, or comes first when none was stored. */
-export function toPlatformEventRecords(open: PlatformEvent[], stored: Wire['PersonPlatformEvent'][], names: Map<string, string>): PlatformEventRecord[] {
-	const records = stored.flatMap((wire) => storedRecord(wire, names) ?? []);
+/** Stored events newest first; an open problem marks the newest stored event of its kind and place as ongoing, or comes first when none was stored. An event that can't be read is a row of its own, so it never hides the others. */
+export function toPlatformEventRecords(
+	open: PlatformEvent[],
+	stored: Wire['PersonPlatformEvent'][],
+	names: Map<string, string>,
+	unreadable: Wire['UnreadablePlatformEvent'][] = []
+): PlatformEventRecord[] {
+	const rows: { storage: number; records: () => PlatformEventRecord[] }[] = [
+		...stored.map((wire) => ({ storage: wire.storage_id, records: () => readStored(wire, names) })),
+		...unreadable.map((item) => ({ storage: item.storage_id, records: () => [unreadableRecord(item, names)] }))
+	];
+	const records = rows.sort((a, b) => b.storage - a.storage).flatMap((row) => row.records());
 	const unmatched: PlatformEventRecord[] = [];
 	for (const event of open) {
 		const latest = records.find((r) => !r.active && r.kind === event.kind && r.locationId === event.locationId);
@@ -261,8 +291,40 @@ export function toPlatformEventRecords(open: PlatformEvent[], stored: Wire['Pers
 	return [...unmatched, ...records];
 }
 
-/** Null for `run_failed`, which only the platform webhook receives; person reads never return it. */
-function storedRecord(wire: Wire['PersonPlatformEvent'], names: Map<string, string>): PlatformEventRecord | null {
+/** One stored event's record, or a row saying why it can't be shown: a kind this page doesn't know, or a shape it can't read. */
+function readStored(wire: Wire['PersonPlatformEvent'], names: Map<string, string>): PlatformEventRecord[] {
+	const kind = (wire.event as { kind?: unknown } | null)?.kind;
+	try {
+		const record = storedRecord(wire, names);
+		if (record === undefined) return [unreadableRecord({ ...wire, event_type: String(kind), error: `this page doesn’t know events of kind ${String(kind)}` }, names)];
+		return record ? [record] : [];
+	} catch (error) {
+		return [unreadableRecord({ ...wire, event_type: String(kind), error: error instanceof Error ? error.message : String(error) }, names)];
+	}
+}
+
+/** A stored event the server or this page can't read, listed with why, so the rest of the list still loads. */
+function unreadableRecord(item: Wire['UnreadablePlatformEvent'], names: Map<string, string>): PlatformEventRecord {
+	const key = item.location_id && item.target ? keyOf(item.location_id, item.target) : null;
+	const place = key && item.target ? placeOf(names.get(key) ?? 'A location', item.target) : null;
+	return {
+		id: item.event_id,
+		kind: 'unreadable_event',
+		severity: 'warning',
+		occurredAt: item.occurred_at,
+		active: false,
+		locationId: key,
+		subject: place,
+		message: `Couldn’t read this ${item.event_type} event${place ? ` of ${place}` : ''}: ${item.error}.`,
+		resolvedAt: null,
+		links: key ? [{ kind: 'location', id: key }] : [],
+		reactions: [],
+		payload: { event_type: item.event_type, error: item.error }
+	};
+}
+
+/** Null for `run_failed`, which only the platform webhook receives; person reads never return it; undefined for a kind this page doesn't know. */
+function storedRecord(wire: Wire['PersonPlatformEvent'], names: Map<string, string>): PlatformEventRecord | null | undefined {
 	const key = wire.location_id && wire.target ? keyOf(wire.location_id, wire.target) : null;
 	const place = key && wire.target ? placeOf(names.get(key) ?? 'A location', wire.target) : null;
 	const base = { id: wire.event_id, occurredAt: wire.occurred_at, active: false, locationId: key, subject: place, resolvedAt: null, reactions: [] };
@@ -289,6 +351,15 @@ function storedRecord(wire: Wire['PersonPlatformEvent'], names: Map<string, stri
 			return { ...base, kind: event.kind, severity: 'warning', message: `A trigger in ${place ?? 'a location'} was skipped: ${event.reason}.`, links: key ? [{ kind: 'trigger', id: event.trigger_id, name: 'trigger', locationId: key }] : [], payload: { snapshot_id: event.snapshot_id } };
 		case 'calendar_times_dropped':
 			return { ...base, kind: event.kind, severity: 'warning', message: `A calendar in ${place ?? 'a location'} dropped pending times ${droppedTimes(event.times)}: its previous definition couldn’t be read.`, links: key ? [{ kind: 'trigger', id: event.trigger_id, name: 'calendar', locationId: key }] : [], payload: { snapshot_id: event.snapshot_id, times: event.times.join(', ') } };
+		case 'unreadable_event_skipped':
+			return {
+				...base,
+				kind: event.kind,
+				severity: 'warning',
+				message: `A stored ${event.event_type} event${place ? ` in ${place}` : ''} couldn’t be read, so webhooks and platform sensors skipped it: ${event.reason}.`,
+				links: key ? [{ kind: 'location', id: key }] : [],
+				payload: { event_type: event.event_type, storage_id: String(event.storage_id) }
+			};
 		case 'sensor_rechecked':
 			return { ...base, kind: event.kind, severity: 'info', message: `A sensor in ${place ?? 'a location'} was checked again from scratch: its last check was recorded by an earlier SQLBuild release and couldn’t be read.`, links: key ? [{ kind: 'trigger', id: event.trigger_id, name: 'sensor', locationId: key }] : [], payload: { snapshot_id: event.snapshot_id, evaluation_id: event.evaluation_id } };
 		case 'launch_failed':
@@ -297,6 +368,8 @@ function storedRecord(wire: Wire['PersonPlatformEvent'], names: Map<string, stri
 			return { ...base, kind: event.kind, severity: 'info', message: 'A server checked in.', links: [], payload: {} };
 		case 'run_failed':
 			return null;
+		default:
+			return undefined;
 	}
 }
 

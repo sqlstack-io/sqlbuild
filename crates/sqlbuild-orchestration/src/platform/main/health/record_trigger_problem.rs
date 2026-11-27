@@ -1,4 +1,4 @@
-//! The scheduler and publication record a trigger's health problem as one event per episode.
+//! The scheduler, publication and stored-event readers record a health problem as one event per episode.
 
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
@@ -9,7 +9,7 @@ use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::ControlTransaction;
 
-/// Record `event`, a trigger's problem; the same `episode`, or payload when none, and `incident` again add nothing, so the first payload stays.
+/// Record `event`, a problem; the same `episode`, or payload when none, and `incident` again add nothing, so the first payload stays.
 pub(crate) async fn record_trigger_problem(
     transaction: ControlTransaction,
     (event, episode, incident): (PlatformEvent, Option<PlatformEvent>, Option<DateTime<Utc>>),

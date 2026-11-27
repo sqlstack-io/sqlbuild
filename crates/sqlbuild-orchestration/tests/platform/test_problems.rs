@@ -268,7 +268,8 @@ fn given_broken_locations_and_late_ticks_when_people_read_problems_then_only_lis
                     .expect("developer's first page"),
                 PersonPlatformEventPage {
                     events: Vec::new(),
-                    before: Some(all[0].storage_id)
+                    before: Some(all[0].storage_id),
+                    unreadable: Vec::new(),
                 },
                 "a page whose events are all hidden still continues the scan"
             );
@@ -291,7 +292,8 @@ fn given_broken_locations_and_late_ticks_when_people_read_problems_then_only_lis
                     vec![PlatformEventKind::SchedulerNoLeader],
                     PersonPlatformEventPage {
                         events: Vec::new(),
-                        before: None
+                        before: None,
+                        unreadable: Vec::new(),
                     }
                 ),
                 "paging through hidden events reaches older visible ones and then ends"

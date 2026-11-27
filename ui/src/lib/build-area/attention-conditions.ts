@@ -44,8 +44,8 @@ export function conditionOf(item: AttentionItem): { key: string; shape: Conditio
 	}
 }
 
-const COUNT_LABEL: Record<string, string> = { changed: 'changed', behind: 'behind', warn: 'late', error: 'past their error threshold', tick_overdue: 'late', calendar_horizon_low: 'running out of dates', trigger_skipped: 'skipped', sensor_rechecked: 'checked again from scratch', calendar_times_dropped: 'dropping pending times' };
-const NOUNS: Record<string, string> = { tick_overdue: 'schedule', calendar_horizon_low: 'calendar', trigger_skipped: 'trigger', sensor_rechecked: 'sensor', calendar_times_dropped: 'calendar' };
+const COUNT_LABEL: Record<string, string> = { changed: 'changed', behind: 'behind', warn: 'late', error: 'past their error threshold', tick_overdue: 'late', calendar_horizon_low: 'running out of dates', trigger_skipped: 'skipped', sensor_rechecked: 'checked again from scratch', calendar_times_dropped: 'dropping pending times', unreadable_event_skipped: 'skipped' };
+const NOUNS: Record<string, string> = { tick_overdue: 'schedule', calendar_horizon_low: 'calendar', trigger_skipped: 'trigger', sensor_rechecked: 'sensor', calendar_times_dropped: 'calendar', unreadable_event_skipped: 'stored event' };
 
 /** The server keeps keys to 256 characters; a longer one is cut, with a hash of the whole to keep it distinct. */
 export const MAX_KEY_CHARS = 256;
@@ -139,12 +139,13 @@ export const CLEARED_REASON = 'automatic: the condition cleared';
 
 /**
  * Whether an event's condition is one every viewer of `scopeKey` (a `<location>:<target>` key) sees in full:
- * the server-wide scheduler, which everyone sees, or this target's own problems. Others' problems are
+ * the server-wide scheduler and stored events skipped without a target, which everyone sees, or this target's own problems. Others' problems are
  * listed only to people who may view their target, so their absence here says nothing. Missing provider
  * secrets come from the target's health read, so only a `healthRead` that succeeded can show them gone.
  */
 export function visibleEventKey(key: string, scopeKey: string, healthRead = false): boolean {
 	if (key === boundedKey('event:scheduler_no_leader::')) return true;
+	if (key === boundedKey('event:unreadable_event_skipped::')) return true;
 	if (key.startsWith('sensor:')) return true;
 	const kinds = [
 		'location_broken',
@@ -154,6 +155,7 @@ export function visibleEventKey(key: string, scopeKey: string, healthRead = fals
 		'trigger_skipped',
 		'sensor_rechecked',
 		'calendar_times_dropped',
+		'unreadable_event_skipped',
 		...(healthRead ? ['location_missing_secrets'] : [])
 	];
 	return kinds.some((kind) => key.startsWith(`event:${kind}:${scopeKey}:`));

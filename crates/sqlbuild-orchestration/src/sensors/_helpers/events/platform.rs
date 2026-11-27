@@ -1,8 +1,9 @@
-//! Platform observations in storage order, filtered to the kinds a sensor watches.
+//! Platform observations in storage order, filtered to the kinds a sensor watches; one that can't be read is passed over and kept for the tick to record.
 
 use std::collections::BTreeSet;
 
-use crate::platform::models::{PlatformEventEnvelope, PlatformEventKind};
+use crate::platform::main::installation::read_stored_event::read_stored_event;
+use crate::platform::models::{PlatformEventKind, StoredPlatformEvent};
 use crate::sensors::_helpers::events::conditions::page_clause;
 use crate::sensors::constants::EVENT_PAGE_SIZE;
 use crate::sensors::models::{Direction, Scanned, SensorEvent};
@@ -16,21 +17,33 @@ pub(crate) async fn scan_platform_events(
     kinds: &BTreeSet<PlatformEventKind>,
 ) -> Result<(ControlTransaction, Scanned), ControlError> {
     let (clause, position) = page_clause(direction, "storage_id", 1);
-    let (transaction, events): (_, Vec<PlatformEventEnvelope>) = query_records(
+    let (transaction, rows): (_, Vec<StoredPlatformEvent>) = query_records(
         transaction,
         &format!(
-            "SELECT storage_id,event_id,occurred_at,payload FROM recall_events WHERE producer='platform' \
+            "SELECT storage_id,event_id,occurred_at,event_type,payload FROM recall_events WHERE producer='platform' \
              AND invocation_id LIKE 'platform/%' AND {clause} LIMIT {EVENT_PAGE_SIZE}"
         ),
         vec![position],
     )
     .await?;
     let mut scanned = Scanned {
-        full: events.len() >= EVENT_PAGE_SIZE,
+        full: rows.len() >= EVENT_PAGE_SIZE,
         ..Scanned::default()
     };
-    for event in events {
-        scanned.last = Some(event.storage_id);
+    for row in rows {
+        scanned.last = Some(row.storage_id);
+        let event = match read_stored_event(row) {
+            Ok(event) => event,
+            Err(row) => {
+                let watched = kinds
+                    .iter()
+                    .any(|kind| row.event.event_type == format!("platform_{}", kind.as_str()));
+                if watched {
+                    scanned.unreadable.push(*row);
+                }
+                continue;
+            }
+        };
         let kind = event.payload.platform.kind();
         if !kinds.contains(&kind) {
             continue;

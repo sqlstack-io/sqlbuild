@@ -151,3 +151,25 @@ pub(crate) struct LocationSinkTestCase {
     /// Each failing sink with its reason and run.
     pub(crate) expected_sinks: Vec<(String, String, Option<uuid::Uuid>)>,
 }
+
+pub(crate) struct PlatformEventReadTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The readable kinds the person sees, sorted.
+    pub(crate) expected_kinds: [crate::platform::models::PlatformEventKind; 9],
+    /// The stored type of the one event this server can't read.
+    pub(crate) expected_unreadable_type: &'static str,
+}
+
+pub(crate) struct UnreadableEventTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// Which reader goes first: 0 for webhook delivery, 1 for the platform sensor.
+    pub(crate) reader_rotation: usize,
+    /// Runs the sensor starts: one per readable event of a kind it watches.
+    pub(crate) expected_sensor_runs: usize,
+    /// Events the webhook receives: every readable one stored, and the skip.
+    pub(crate) expected_deliveries: usize,
+    /// What the problem says is wrong with the skipped event.
+    pub(crate) expected_reason: &'static str,
+}

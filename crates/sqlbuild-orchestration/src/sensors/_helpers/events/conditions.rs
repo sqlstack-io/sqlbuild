@@ -1,5 +1,6 @@
 //! Each condition reads its matching events a bounded page at a time, forward for ticks or back for a person's look.
 
+use crate::platform::main::health::record_skipped_event::record_skipped_event;
 use crate::sensors::_helpers::events::nodes::{scan_check_events, scan_node_events};
 use crate::sensors::_helpers::events::platform::scan_platform_events;
 use crate::sensors::_helpers::events::runs::scan_run_events;
@@ -11,7 +12,7 @@ use crate::sensors::models::{
 use crate::store::errors::ControlError;
 use crate::store::models::{ControlTransaction, Parameter};
 
-/// The oldest event after `cursor` the sensor has not handled.
+/// The oldest event after `cursor` the sensor has not handled; a watched one that can't be read is passed over and recorded as a problem, so the tick writes.
 pub(crate) async fn next_event(
     transaction: ControlTransaction,
     scope: EventScope<'_>,
@@ -23,13 +24,16 @@ pub(crate) async fn next_event(
     ) {
         return next_source_event(transaction, scope, (condition, cursor)).await;
     }
-    let (transaction, mut scanned) = scan(
+    let (mut transaction, mut scanned) = scan(
         transaction,
         scope,
         condition,
         (Direction::After(cursor.event_storage_id), 1),
     )
     .await?;
+    for row in std::mem::take(&mut scanned.unreadable) {
+        transaction = record_skipped_event(transaction, row).await?;
+    }
     let after = SensorCursor {
         event_storage_id: scanned.last.unwrap_or(cursor.event_storage_id),
         ..cursor.clone()
