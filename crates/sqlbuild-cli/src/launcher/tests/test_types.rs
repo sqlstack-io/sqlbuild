@@ -12,3 +12,10 @@ pub(crate) struct LaunchKeyTestCase {
     pub(crate) cwd: &'static str,
     pub(crate) expected_same: bool,
 }
+
+/// The purge delay the launcher inherits and the default it adds for the Python CLI.
+pub(crate) struct AllocatorDefaultTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) inherited: Option<&'static str>,
+    pub(crate) expected_default: Option<(&'static str, &'static str)>,
+}

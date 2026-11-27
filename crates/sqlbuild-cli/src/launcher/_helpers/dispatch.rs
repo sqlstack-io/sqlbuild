@@ -7,13 +7,15 @@ use std::time::{Instant, SystemTime};
 use crate::launcher::_helpers::env_file::load_project_env_file;
 use crate::launcher::_helpers::handoff::{beside, hand_off};
 use sqlbuild_core::process_environment::main::environment_overlay::environment_overlay;
+use sqlbuild_core::process_environment::main::environment_var_os::environment_var_os;
 
 use crate::launcher::_helpers::launch_key::{launch_key, launch_record_path};
 use crate::launcher::_helpers::messages::{
     print_version, report_handoff_failure, report_missing_python_cli,
 };
 use crate::launcher::constants::{
-    HANDOFF_FAILURE_EXIT_CODE, LAUNCH_RECORD_OPTION, PYTHON_CLI_SCRIPT, VERSION_OPTIONS,
+    ALLOCATOR_PURGE_DELAY, HANDOFF_FAILURE_EXIT_CODE, LAUNCH_RECORD_OPTION, PYTHON_CLI_SCRIPT,
+    VERSION_OPTIONS,
 };
 use crate::native_commands::main::parse_native_invocation::parse_native_invocation;
 use crate::native_commands::main::run_control_invocation::run_control_invocation;
@@ -52,7 +54,20 @@ fn overlay_changes() -> Vec<(OsString, Option<OsString>)> {
             .into_iter()
             .map(|(name, value)| (name, Some(value))),
     );
+    changes.extend(allocator_default(environment_var_os(
+        ALLOCATOR_PURGE_DELAY.0,
+    )));
     changes
+}
+
+/// The allocator purge delay to set for the Python CLI, none when the user's `inherited` one stands.
+pub(crate) fn allocator_default(
+    inherited: Option<OsString>,
+) -> Option<(OsString, Option<OsString>)> {
+    let (name, value) = ALLOCATOR_PURGE_DELAY;
+    inherited
+        .is_none()
+        .then(|| (OsString::from(name), Some(OsString::from(value))))
 }
 
 fn exit_code(code: i64) -> i32 {

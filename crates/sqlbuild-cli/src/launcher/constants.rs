@@ -23,5 +23,7 @@ pub const VOLATILE_ENVIRONMENT: [&str; 4] = ["OLDPWD", "PWD", "SHLVL", "_"];
 pub const LAUNCH_KEY_DOMAIN: &str = "sqlbuild-launch-key-1";
 /// The launch key's stamp of a file that does not exist.
 pub const MISSING_FILE_STAMP: &[u8] = b"missing";
+/// mimalloc's purge delay in milliseconds for the Python CLI, unless the user sets one.
+pub const ALLOCATOR_PURGE_DELAY: (&str, &str) = ("MIMALLOC_PURGE_DELAY", "100");
 /// Exit code when the Python CLI cannot be started.
 pub const HANDOFF_FAILURE_EXIT_CODE: i32 = 1;
