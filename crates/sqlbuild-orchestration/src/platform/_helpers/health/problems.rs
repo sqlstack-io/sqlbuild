@@ -12,9 +12,9 @@ use std::collections::BTreeSet;
 
 use crate::platform::constants::{OBSERVATION_WINDOW_SECONDS, SKIPPED_TRIGGER_EVENTS};
 use crate::platform::models::{
-    DroppedCalendarTimes, LateTarget, LowCalendar, OverdueTick, PlatformEvent,
+    DroppedCalendarTimes, LateTarget, LocationFact, LowCalendar, OverdueTick, PlatformEvent,
     PlatformEventEnvelope, ProblemScan, PublishedTrigger, RecheckedSensor, RunningSchedule,
-    SkippedTrigger, TriggerProblems,
+    ScopedProblems, SkippedTrigger, TriggerProblems,
 };
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
@@ -22,6 +22,7 @@ use crate::store::main::query::query;
 use crate::store::main::query_records::query_records;
 use crate::store::main::{begin::begin, commit::commit};
 use crate::store::models::{ControlStore, ControlTransaction, Parameter, TransactionMode};
+use crate::store::types::Row;
 
 pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, ControlError> {
     let transaction = begin(store, TransactionMode::Read).await?;
@@ -34,13 +35,45 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
     .await?;
     let (transaction, locations) = query(
         transaction,
-        "SELECT i.location_id, l.name AS location_name, i.target, MAX(i.last_seen_at) AS last_seen_at, \
-         'stops_runs' AS tier FROM sqb_location_instances i JOIN sqb_locations l ON l.location_id=i.location_id \
+        "SELECT i.location_id, l.name AS location_name, i.target, MAX(i.last_seen_at) AS last_seen_at \
+         FROM sqb_location_instances i JOIN sqb_locations l ON l.location_id=i.location_id \
          WHERE l.archived_at IS NULL GROUP BY i.location_id,l.name,i.target \
          HAVING MAX(i.last_seen_at)<$1 ORDER BY i.location_id,i.target",
         vec![Parameter::Time(now - TimeDelta::seconds(LOCATION_SILENCE_SECONDS))],
     )
     .await?;
+    let (transaction, failing) = failing_locations(transaction).await?;
+    let (transaction, scoped) = location_problems(transaction, None).await?;
+    commit(transaction).await?;
+    Ok(ProblemScan {
+        low_calendars: scoped.low_calendars,
+        skipped_triggers: scoped.triggers.skipped,
+        rechecked_sensors: scoped.triggers.rechecked,
+        dropped_calendar_times: scoped.triggers.dropped,
+        skipped_events: scoped.skipped_events,
+        now,
+        lease: leases.into_iter().next().map(decode_row).transpose()?,
+        broken: locations
+            .into_iter()
+            .map(|row| decode_row(tiered(row, LocationFact::NotCheckingIn)))
+            .collect::<Result<_, _>>()?,
+        failing: failing.locations,
+        failing_syncs: failing.syncs,
+        stalled_syncs: failing.stalled,
+        failing_sinks: scoped.sinks,
+        late_targets: scoped.late_targets,
+    })
+}
+
+/// The open problems of `scope`'s target, or every target's, besides its state and sync, such as late schedules.
+pub(crate) async fn location_problems(
+    transaction: ControlTransaction,
+    scope: Option<(Uuid, &str)>,
+) -> Result<(ControlTransaction, ScopedProblems), ControlError> {
+    let now = transaction.now;
+    let within = |location_id: Uuid, target: &str| {
+        scope.is_none_or(|(scoped, scoped_target)| scoped == location_id && scoped_target == target)
+    };
     let (transaction, late_targets) = query(
         transaction,
         "SELECT DISTINCT t.location_id, t.target FROM sqb_triggers t \
@@ -61,17 +94,16 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
         vec![],
     )
     .await?;
-    let (transaction, problems) = trigger_problems(transaction).await?;
-    let (transaction, failing) = failing_locations(transaction).await?;
+    let (transaction, triggers) = trigger_problems(transaction).await?;
     let (transaction, sinks) = sink_reports(transaction).await?;
-    let (transaction, skipped_events) = skipped_events(transaction).await?;
-    commit(transaction).await?;
+    let (transaction, skipped) = skipped_events(transaction).await?;
     let schedules: Vec<RunningSchedule> = schedules
         .into_iter()
         .map(decode_row)
         .collect::<Result<_, _>>()?;
     let low_calendars: Vec<LowCalendar> = schedules
         .into_iter()
+        .filter(|schedule| within(schedule.location_id, &schedule.target))
         .filter_map(|schedule| {
             let (refresh_at, horizon_end) = calendar_low(&schedule.definition_json.schedule, now)?;
             Some(LowCalendar {
@@ -82,33 +114,61 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
                 target: schedule.target,
                 refresh_at,
                 horizon_end,
+                tier: LocationFact::CalendarLow.problem_tier(),
             })
         })
         .collect();
-    Ok(ProblemScan {
-        low_calendars,
-        skipped_triggers: problems.skipped,
-        rechecked_sensors: problems.rechecked,
-        dropped_calendar_times: problems.dropped,
-        skipped_events,
-        now,
-        lease: leases.into_iter().next().map(decode_row).transpose()?,
-        broken: locations
-            .into_iter()
-            .map(decode_row)
-            .collect::<Result<_, _>>()?,
-        failing: failing.locations,
-        failing_syncs: failing.syncs,
-        stalled_syncs: failing.stalled,
-        failing_sinks: failing_sinks(&sinks),
+    let problems = ScopedProblems {
         late_targets: late_targets
             .into_iter()
             .map(|row| {
                 let target: LateTarget = decode_row(row)?;
                 Ok((target.location_id, target.target))
             })
-            .collect::<Result<_, ControlError>>()?,
-    })
+            .collect::<Result<BTreeSet<_>, ControlError>>()?
+            .into_iter()
+            .filter(|(location_id, target)| within(*location_id, target))
+            .collect(),
+        low_calendars,
+        triggers: TriggerProblems {
+            skipped: triggers
+                .skipped
+                .into_iter()
+                .filter(|trigger| within(trigger.location_id, &trigger.target))
+                .collect(),
+            rechecked: triggers
+                .rechecked
+                .into_iter()
+                .filter(|sensor| within(sensor.location_id, &sensor.target))
+                .collect(),
+            dropped: triggers
+                .dropped
+                .into_iter()
+                .filter(|calendar| within(calendar.location_id, &calendar.target))
+                .collect(),
+        },
+        sinks: failing_sinks(&sinks)
+            .into_iter()
+            .filter(|sink| within(sink.location_id, &sink.target))
+            .collect(),
+        skipped_events: skipped
+            .into_iter()
+            .filter(|event| {
+                scope.is_none()
+                    || event
+                        .location_id
+                        .zip(event.target.as_deref())
+                        .is_some_and(|(location_id, target)| within(location_id, target))
+            })
+            .collect(),
+    };
+    Ok((transaction, problems))
+}
+
+/// `row` with the tier of an open problem of kind `fact`, which the server decides in one place.
+fn tiered(mut row: Row, fact: LocationFact) -> Row {
+    row.insert("tier".to_owned(), serde_json::json!(fact.problem_tier()));
+    row
 }
 
 /// Each trigger's live problems, all for the snapshot it is still published in: skipped until the location publishes again or, for a sensor, a later check completes; a sensor's re-check from scratch until it or a later check completes; and dropped calendar times until the next successful tick.
@@ -156,6 +216,7 @@ async fn trigger_problems(
                 target,
                 skipped_at: at,
                 reason,
+                tier: LocationFact::TriggerSkipped.problem_tier(),
             }),
             PlatformEvent::SensorRechecked { .. } => problems.rechecked.push(RecheckedSensor {
                 trigger_id,
@@ -164,6 +225,7 @@ async fn trigger_problems(
                 location_name,
                 target,
                 rechecked_at: at,
+                tier: LocationFact::SensorRechecked.problem_tier(),
             }),
             PlatformEvent::CalendarTimesDropped { times, .. } => {
                 problems.dropped.push(DroppedCalendarTimes {
@@ -174,6 +236,7 @@ async fn trigger_problems(
                     target,
                     dropped_at: at,
                     times,
+                    tier: LocationFact::CalendarTimesDropped.problem_tier(),
                 });
             }
             _ => {}
@@ -311,7 +374,7 @@ pub(crate) async fn late_ticks(
         overdue.extend(
             ticks
                 .into_iter()
-                .map(decode_row)
+                .map(|row| decode_row(tiered(row, LocationFact::ScheduleOverdue)))
                 .collect::<Result<Vec<OverdueTick>, _>>()?,
         );
     }

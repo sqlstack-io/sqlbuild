@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::platform::constants::SYNC_STALL_SECONDS;
 use crate::platform::models::{
-    FailingSync, LocationHealth, LocationHealthObservation, ProblemTier, RunningSync, StalledSync,
+    FailingSync, LocationFact, LocationHealth, LocationHealthObservation, RunningSync, StalledSync,
     WarehouseReadFailure, WarehouseSyncFailure, WarehouseSyncProgress, WarehouseSyncState,
 };
 
@@ -67,7 +67,7 @@ pub(crate) fn stalled_sync(
         position: running.position,
         kinds: running.kinds,
         table: running.table,
-        tier: ProblemTier::NeedsAttention,
+        tier: LocationFact::SyncStalled.problem_tier(),
     })
 }
 
@@ -127,7 +127,7 @@ pub(crate) fn failing_sync(
             .iter()
             .find(|(_, failure)| failure.is_none())
             .map(|(observation, _)| observation.received_at),
-        tier: ProblemTier::NeedsAttention,
+        tier: LocationFact::SyncFailing.problem_tier(),
     })
 }
 

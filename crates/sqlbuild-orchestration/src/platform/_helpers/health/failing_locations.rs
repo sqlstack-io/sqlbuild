@@ -9,7 +9,7 @@ use crate::platform::_helpers::health::recent_health::recent_health;
 use crate::platform::constants::LOCATION_SILENCE_SECONDS;
 use crate::platform::models::{
     DiscoveryHealth, FailingLocation, FailingSync, LocationFact, LocationFailures, LocationHealth,
-    LocationHealthObservation, LocationState, ProblemTier, StalledSync,
+    LocationHealthObservation, LocationState, StalledSync,
 };
 use crate::snapshots::main::reads::read_current_record::read_current_record;
 use crate::store::errors::ControlError;
@@ -62,9 +62,7 @@ pub(crate) async fn failing_locations(
         };
         let serving;
         (transaction, serving) = read_current_record(transaction, (location_id, target)).await?;
-        let tier = LocationFact::of_state(state, serving.is_some())
-            .tier()
-            .unwrap_or(ProblemTier::NeedsAttention);
+        let tier = LocationFact::of_state(state, serving.is_some()).problem_tier();
         failing.push(FailingLocation {
             location_id,
             location_name,

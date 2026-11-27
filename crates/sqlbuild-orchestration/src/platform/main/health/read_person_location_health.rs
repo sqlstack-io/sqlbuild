@@ -11,6 +11,7 @@ use crate::platform::_helpers::health::failing_syncs::sync_state;
 use crate::platform::_helpers::health::pool_cap_warnings::{
     pool_cap_observation, pool_cap_warnings,
 };
+use crate::platform::_helpers::health::problems::location_problems;
 use crate::platform::_helpers::health::recent_health::recent_health;
 use crate::platform::constants::LOCATION_RETENTION_DAYS;
 use crate::platform::models::{
@@ -44,13 +45,15 @@ pub async fn read_person_location_health(
     let (transaction, requested) = pending_sync(transaction, (location_id, target)).await?;
     warehouse_sync.requested = requested;
     let (transaction, tested_at) = tested_at(transaction, (location_id, target)).await?;
+    let (transaction, problems) =
+        location_problems(transaction, Some((location_id, target))).await?;
     let verdict = LocationVerdict::of(
         (
             state,
             snapshot.as_ref().map(|snapshot| snapshot.published_at),
         ),
-        &warehouse_sync,
-        tested_at,
+        (&warehouse_sync, tested_at),
+        &problems.facts(),
     );
     let (transaction, jobs) = current_jobs(transaction, (location_id, target), caps).await?;
     commit(transaction).await?;

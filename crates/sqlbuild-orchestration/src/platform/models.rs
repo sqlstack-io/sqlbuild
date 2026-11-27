@@ -237,8 +237,10 @@ pub enum ProblemTier {
     NeedsAttention,
 }
 
-/// A location target's worst open fact, which its health names wherever it is shown.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+/// A location target's open fact, worst first: its health names the worst wherever it is shown.
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum LocationFact {
     NotCheckingIn,
@@ -254,6 +256,20 @@ pub enum LocationFact {
     MissingSecrets,
     ChangePlanFailed,
     DiscoveryFailed,
+    /// A running schedule's next tick is more than 30 seconds late.
+    ScheduleOverdue,
+    /// A trigger is skipped because its stored job or pinned snapshot can't be read, or a sensor's check failed.
+    TriggerSkipped,
+    /// A lifecycle event sink's newest run lost events.
+    SinkFailing,
+    /// A running calendar's dates run out within a day.
+    CalendarLow,
+    /// A republish dropped a calendar's pending times.
+    CalendarTimesDropped,
+    /// A sensor is checked again from scratch because its last check can't be read.
+    SensorRechecked,
+    /// A stored event of the location can't be read, so webhook delivery or a platform sensor skipped it.
+    EventSkipped,
     Starting,
     /// No connection check since the version it runs was published.
     NotTested,
@@ -261,15 +277,38 @@ pub enum LocationFact {
 }
 
 impl LocationFact {
-    /// Red when runs can't happen, amber otherwise; none when nothing is open.
+    /// The one place a problem's tier is decided: red when it stops the location's runs, amber otherwise; none when nothing is open.
     #[must_use]
     pub const fn tier(self) -> Option<ProblemTier> {
         match self {
             Self::NotCheckingIn | Self::CantConnect | Self::DeployFailed => {
                 Some(ProblemTier::StopsRuns)
             }
+            Self::DeployFailedOnPrevious
+            | Self::SyncFailing
+            | Self::SyncStalled
+            | Self::MissingSecrets
+            | Self::ChangePlanFailed
+            | Self::DiscoveryFailed
+            | Self::ScheduleOverdue
+            | Self::TriggerSkipped
+            | Self::SinkFailing
+            | Self::CalendarLow
+            | Self::CalendarTimesDropped
+            | Self::SensorRechecked
+            | Self::EventSkipped
+            | Self::Starting
+            | Self::NotTested => Some(ProblemTier::NeedsAttention),
             Self::Healthy => None,
-            _ => Some(ProblemTier::NeedsAttention),
+        }
+    }
+
+    /// The tier of an open problem of this kind, which every problem the server lists carries.
+    #[must_use]
+    pub const fn problem_tier(self) -> ProblemTier {
+        match self.tier() {
+            Some(tier) => tier,
+            None => ProblemTier::NeedsAttention,
         }
     }
 
@@ -298,29 +337,26 @@ pub struct LocationVerdict {
 }
 
 impl LocationVerdict {
-    /// The worst of the target's facts: what stops runs, a previous version, the sync, the state, then an untested connection.
+    /// The worst of the target's open facts: its state, sync, other open `problems` and an untested connection; healthy if none.
     #[must_use]
     pub fn of(
         (state, published_at): (LocationState, Option<DateTime<Utc>>),
-        sync: &WarehouseSyncState,
-        tested_at: Option<DateTime<Utc>>,
+        (sync, tested_at): (&WarehouseSyncState, Option<DateTime<Utc>>),
+        problems: &[LocationFact],
     ) -> Self {
-        let from_state = LocationFact::of_state(state, published_at.is_some());
         let stalled = sync.running.as_ref().is_some_and(|running| running.stalled);
-        let fact = match from_state {
-            LocationFact::NotCheckingIn
-            | LocationFact::CantConnect
-            | LocationFact::DeployFailed
-            | LocationFact::DeployFailedOnPrevious => from_state,
-            _ if sync.failing => LocationFact::SyncFailing,
-            _ if stalled => LocationFact::SyncStalled,
-            LocationFact::Healthy
-                if tested_at.is_none_or(|tested| published_at.is_some_and(|at| tested < at)) =>
-            {
-                LocationFact::NotTested
-            }
-            other => other,
-        };
+        let untested = tested_at.is_none_or(|tested| published_at.is_some_and(|at| tested < at));
+        let fact = [
+            Some(LocationFact::of_state(state, published_at.is_some())),
+            sync.failing.then_some(LocationFact::SyncFailing),
+            stalled.then_some(LocationFact::SyncStalled),
+            untested.then_some(LocationFact::NotTested),
+        ]
+        .into_iter()
+        .flatten()
+        .chain(problems.iter().copied())
+        .min()
+        .unwrap_or(LocationFact::Healthy);
         Self {
             fact,
             tier: fact.tier(),
@@ -978,6 +1014,46 @@ pub struct DroppedCalendarTimes {
     pub dropped_at: DateTime<Utc>,
     /// The times that were due by the republish but never ticked, oldest first.
     pub times: Vec<DateTime<Utc>>,
+    /// Always `needs_attention`, by `LocationFact::problem_tier`.
+    pub tier: ProblemTier,
+}
+
+/// The open problems scoped to location targets other than the target's own state and sync: one target's, or every target's.
+#[derive(Debug, Default)]
+pub(crate) struct ScopedProblems {
+    pub(crate) late_targets: std::collections::BTreeSet<(Uuid, String)>,
+    pub(crate) low_calendars: Vec<LowCalendar>,
+    pub(crate) triggers: TriggerProblems,
+    pub(crate) sinks: Vec<FailingSink>,
+    pub(crate) skipped_events: Vec<SkippedEvent>,
+}
+
+impl ScopedProblems {
+    /// The fact of each kind of problem open here, for a target's verdict.
+    #[must_use]
+    pub(crate) fn facts(&self) -> Vec<LocationFact> {
+        [
+            (!self.late_targets.is_empty(), LocationFact::ScheduleOverdue),
+            (
+                !self.triggers.skipped.is_empty(),
+                LocationFact::TriggerSkipped,
+            ),
+            (!self.sinks.is_empty(), LocationFact::SinkFailing),
+            (!self.low_calendars.is_empty(), LocationFact::CalendarLow),
+            (
+                !self.triggers.dropped.is_empty(),
+                LocationFact::CalendarTimesDropped,
+            ),
+            (
+                !self.triggers.rechecked.is_empty(),
+                LocationFact::SensorRechecked,
+            ),
+            (!self.skipped_events.is_empty(), LocationFact::EventSkipped),
+        ]
+        .into_iter()
+        .filter_map(|(open, fact)| open.then_some(fact))
+        .collect()
+    }
 }
 
 /// The live trigger problems, each list with its own withdrawal.
@@ -997,6 +1073,8 @@ pub struct RecheckedSensor {
     pub location_name: String,
     pub target: String,
     pub rechecked_at: DateTime<Utc>,
+    /// Always `needs_attention`, by `LocationFact::problem_tier`.
+    pub tier: ProblemTier,
 }
 
 /// A stored event webhook delivery or a platform sensor skipped because this server can't read it; it clears once the event can be read or is pruned.
@@ -1014,6 +1092,8 @@ pub struct SkippedEvent {
     pub skipped_at: DateTime<Utc>,
     /// Why the event couldn't be read.
     pub reason: String,
+    /// Always `needs_attention`, by `LocationFact::problem_tier`.
+    pub tier: ProblemTier,
 }
 
 /// The stored event a dismissal of its skip names, read from the audit event's scope.
@@ -1033,6 +1113,8 @@ pub struct SkippedTrigger {
     /// When it was first skipped for this snapshot.
     pub skipped_at: DateTime<Utc>,
     pub reason: String,
+    /// Always `needs_attention`, by `LocationFact::problem_tier`.
+    pub tier: ProblemTier,
 }
 
 /// A live trigger and the snapshot it was published in.
@@ -1058,6 +1140,8 @@ pub struct LowCalendar {
     pub refresh_at: DateTime<Utc>,
     /// The calendar's last date; absent when none are left.
     pub horizon_end: Option<DateTime<Utc>>,
+    /// Always `needs_attention`, by `LocationFact::problem_tier`.
+    pub tier: ProblemTier,
 }
 
 /// A running schedule of a live location, with its declaration.
@@ -1172,6 +1256,8 @@ pub struct FailingSink {
     pub run_id: Option<Uuid>,
     /// The newest run before that whose events it all delivered.
     pub last_success_at: Option<DateTime<Utc>>,
+    /// Always `needs_attention`, by `LocationFact::problem_tier`.
+    pub tier: ProblemTier,
 }
 
 /// A run's report of its sinks' deliveries, with where the run ran.
@@ -1246,6 +1332,8 @@ pub struct OverdueTick {
     pub location_name: String,
     pub target: String,
     pub scheduled_for: DateTime<Utc>,
+    /// Always `needs_attention`, by `LocationFact::problem_tier`.
+    pub tier: ProblemTier,
 }
 
 #[derive(Debug, Deserialize)]

@@ -89,6 +89,21 @@ pub(crate) fn snapshot(location_id: Uuid) -> SnapshotInput {
     }
 }
 
+/// `snapshot` with one running calendar schedule whose dates last ten days, so only its lateness can be a problem.
+pub(crate) fn one_schedule_snapshot(location_id: Uuid) -> SnapshotInput {
+    let future = Utc::now() + TimeDelta::days(10);
+    let mut input = snapshot(location_id);
+    input.documents.insert(
+        "triggers".into(),
+        json!({"daily_orders": {
+            "description": "Refresh orders", "job_key": "orders",
+            "starts_at": calendar_text(0),
+            "schedule": {"kind": "calendar", "times": [calendar_text(0), future], "refresh_at": future}
+        }}),
+    );
+    input
+}
+
 pub(crate) async fn wait_for_scans(
     store: &ControlStore,
     replicas: &BTreeSet<Uuid>,
@@ -479,6 +494,7 @@ pub(crate) fn failing_sink_of(sink: &str, reason: &str) -> crate::platform::mode
         reason: reason.into(),
         run_id: Some(uuid::Uuid::from_u128(3)),
         last_success_at: None,
+        tier: crate::platform::models::ProblemTier::NeedsAttention,
     }
 }
 
