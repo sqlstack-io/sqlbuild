@@ -46,9 +46,9 @@ _SOURCES: str = """sources:
       TIMESTAMP '2026-01-01 00:00:00' AS ordered_at, DATE '2026-01-01' AS order_date)
     columns:
       - name: order_id
-        type: BIGINT
+        type: INTEGER
       - name: customer_id
-        type: BIGINT
+        type: INTEGER
       - name: amount
         type: DOUBLE
       - name: status
