@@ -2624,6 +2624,8 @@ export interface components {
             location_name: string;
             name: string;
             target: string;
+            /** @description Always `needs_attention`, by `LocationFact::problem_tier`. */
+            tier: components["schemas"]["ProblemTier"];
             /** @description The times that were due by the republish but never ticked, oldest first. */
             times: string[];
             /** Format: uuid */
@@ -2698,6 +2700,8 @@ export interface components {
             /** @description The sink's name in the project. */
             sink: string;
             target: string;
+            /** @description Always `needs_attention`, by `LocationFact::problem_tier`. */
+            tier: components["schemas"]["ProblemTier"];
         };
         /** @description A checking-in location whose run-history sync is failing: since when, why, and when it tries again. */
         FailingSync: {
@@ -2927,10 +2931,10 @@ export interface components {
             target: string;
         };
         /**
-         * @description A location target's worst open fact, which its health names wherever it is shown.
+         * @description A location target's open fact, worst first: its health names the worst wherever it is shown.
          * @enum {string}
          */
-        LocationFact: "not_checking_in" | "cant_connect" | "deploy_failed" | "deploy_failed_on_previous" | "sync_failing" | "sync_stalled" | "missing_secrets" | "change_plan_failed" | "discovery_failed" | "starting" | "not_tested" | "healthy";
+        LocationFact: "not_checking_in" | "cant_connect" | "deploy_failed" | "deploy_failed_on_previous" | "sync_failing" | "sync_stalled" | "missing_secrets" | "change_plan_failed" | "discovery_failed" | "schedule_overdue" | "trigger_skipped" | "sink_failing" | "calendar_low" | "calendar_times_dropped" | "sensor_rechecked" | "event_skipped" | "starting" | "not_tested" | "healthy";
         /** @description Locations report bounded facts, never connection strings; a failed warehouse read carries only its redacted error text. */
         LocationHealth: {
             /** @enum {string} */
@@ -3218,6 +3222,8 @@ export interface components {
              */
             refresh_at: string;
             target: string;
+            /** @description Always `needs_attention`, by `LocationFact::problem_tier`. */
+            tier: components["schemas"]["ProblemTier"];
             /** Format: uuid */
             trigger_id: string;
         };
@@ -3625,6 +3631,8 @@ export interface components {
             /** Format: date-time */
             scheduled_for: string;
             target: string;
+            /** @description Always `needs_attention`, by `LocationFact::problem_tier`. */
+            tier: components["schemas"]["ProblemTier"];
             /** Format: uuid */
             trigger_id: string;
         };
@@ -4301,6 +4309,8 @@ export interface components {
             /** Format: date-time */
             rechecked_at: string;
             target: string;
+            /** @description Always `needs_attention`, by `LocationFact::problem_tier`. */
+            tier: components["schemas"]["ProblemTier"];
             /** Format: uuid */
             trigger_id: string;
         };
@@ -5435,6 +5445,8 @@ export interface components {
             /** Format: int64 */
             storage_id: number;
             target?: string | null;
+            /** @description Always `needs_attention`, by `LocationFact::problem_tier`. */
+            tier: components["schemas"]["ProblemTier"];
         };
         /** @description Dismisses the problem of one stored event webhooks and sensors skipped because it can't be read; an event ID applies once. */
         SkippedEventDismissalRequest: {
@@ -5459,6 +5471,8 @@ export interface components {
              */
             skipped_at: string;
             target: string;
+            /** @description Always `needs_attention`, by `LocationFact::problem_tier`. */
+            tier: components["schemas"]["ProblemTier"];
             /** Format: uuid */
             trigger_id: string;
         };

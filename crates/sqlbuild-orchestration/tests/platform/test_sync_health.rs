@@ -17,8 +17,8 @@ use crate::platform::models::{
     LocationFact, LocationHealth, LocationHealthReport, LocationVerdict, LocationWork,
     LocationWorkRequest, PersonWorkRequest, ProblemTier,
 };
-use crate::platform::tests::helpers::sync;
-use crate::platform::tests::test_types::SyncHealthTestCase;
+use crate::platform::tests::helpers::{one_schedule_snapshot, sync};
+use crate::platform::tests::test_types::{ProblemVerdictTestCase, SyncHealthTestCase};
 use crate::runs::tests::helpers::snapshot;
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
@@ -260,6 +260,134 @@ fn given_a_location_when_it_is_silent_syncing_stalled_or_disconnected_then_the_s
                     vec![test_case.expected_connection_tier]
                 ),
                 "{}: a failed connection check stops runs, ahead of the stalled sync",
+                test_case.description
+            );
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_a_location_whose_only_open_problem_is_an_overdue_schedule_when_read_then_it_needs_attention()
+ {
+    let overdue = LocationVerdict {
+        fact: LocationFact::ScheduleOverdue,
+        tier: Some(ProblemTier::NeedsAttention),
+    };
+    let calm = LocationVerdict {
+        fact: LocationFact::Healthy,
+        tier: None,
+    };
+    let test_cases = [
+        ProblemVerdictTestCase {
+            description: "SQLite overdue schedule",
+            backend: Backend::Sqlite,
+            expected_overdue: overdue,
+            expected_tick_tier: ProblemTier::NeedsAttention,
+            expected_calm: calm,
+        },
+        ProblemVerdictTestCase {
+            description: "PostgreSQL overdue schedule",
+            backend: Backend::Postgres,
+            expected_overdue: overdue,
+            expected_tick_tier: ProblemTier::NeedsAttention,
+            expected_calm: calm,
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let context = AuditContext {
+                actor: "control-store-owner".into(),
+                granting_role: "control-store-owner".into(),
+                request_id: Uuid::now_v7(),
+                ip_address: None,
+            };
+            let admin = bootstrap_user(store, &context, "orders-admin")
+                .await
+                .expect("admin");
+            let late = create_location(store, "orders", "test-owner")
+                .await
+                .expect("late location");
+            let quiet = create_location(store, "inventory", "test-owner")
+                .await
+                .expect("quiet location");
+            for (location, input) in [
+                (late, one_schedule_snapshot(late)),
+                (quiet, snapshot(quiet)),
+            ] {
+                let published = publish_snapshot(store, &input).await.expect("publish");
+                let session = Uuid::now_v7();
+                for health in [
+                    LocationHealth::Heartbeat {},
+                    LocationHealth::Connection {
+                        generation: published.generation,
+                        healthy: true,
+                        trigger: None,
+                        elapsed_millis: None,
+                    },
+                ] {
+                    report_location_health(
+                        store,
+                        location,
+                        &LocationHealthReport {
+                            event_id: Uuid::now_v7(),
+                            session_id: session,
+                            target: "development".into(),
+                            health,
+                        },
+                    )
+                    .await
+                    .expect("live, connected location");
+                }
+            }
+            let transaction = begin(store, TransactionMode::Write).await.expect("late");
+            let due = transaction.now - TimeDelta::minutes(5);
+            let (transaction, _) = query(
+                transaction,
+                "UPDATE sqb_trigger_state SET next_due_at=$1 \
+                 WHERE trigger_id IN (SELECT trigger_id FROM sqb_triggers WHERE location_id=$2)",
+                vec![Parameter::Time(due), Parameter::Id(late)],
+            )
+            .await
+            .expect("overdue schedule");
+            commit(transaction).await.expect("late schedule");
+            let caps = ServerPoolCaps::default();
+            let mut verdicts = Vec::new();
+            for location in [late, quiet] {
+                verdicts.push(
+                    read_person_location_health(
+                        store,
+                        (&context, admin),
+                        (location, "development"),
+                        (DefaultRole::None, &caps),
+                    )
+                    .await
+                    .expect("health")
+                    .verdict,
+                );
+            }
+            let problems = read_person_problems(store, admin, DefaultRole::None)
+                .await
+                .expect("problems");
+            assert_eq!(
+                (
+                    verdicts,
+                    problems
+                        .overdue_ticks
+                        .iter()
+                        .map(|tick| (tick.location_id, tick.tier))
+                        .collect::<Vec<_>>(),
+                ),
+                (
+                    vec![test_case.expected_overdue, test_case.expected_calm],
+                    vec![(late, test_case.expected_tick_tier)],
+                ),
+                "{}: only the location with an open problem needs attention, and its tick says so too",
                 test_case.description
             );
             close_test_store(fixture).await;

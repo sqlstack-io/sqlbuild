@@ -140,6 +140,8 @@ pub(crate) struct LocationVerdictTestCase {
     pub(crate) sync: crate::platform::models::WarehouseSyncState,
     /// When the last connection check was, in minutes from publication; absent when none was.
     pub(crate) tested_minutes: Option<i64>,
+    /// The target's other open problems, such as an overdue schedule.
+    pub(crate) problems: Vec<crate::platform::models::LocationFact>,
     pub(crate) expected_fact: crate::platform::models::LocationFact,
     pub(crate) expected_tier: Option<crate::platform::models::ProblemTier>,
 }
@@ -150,6 +152,16 @@ pub(crate) struct SyncHealthTestCase {
     pub(crate) expected_silent_refusal: &'static str,
     pub(crate) expected_stall_tier: crate::platform::models::ProblemTier,
     pub(crate) expected_connection_tier: crate::platform::models::ProblemTier,
+}
+
+pub(crate) struct ProblemVerdictTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The location whose only open problem is an overdue schedule.
+    pub(crate) expected_overdue: crate::platform::models::LocationVerdict,
+    pub(crate) expected_tick_tier: crate::platform::models::ProblemTier,
+    /// The location with nothing open.
+    pub(crate) expected_calm: crate::platform::models::LocationVerdict,
 }
 
 pub(crate) struct FailingSyncTestCase {
