@@ -25,7 +25,7 @@ _PROJECT_TOML: str = (
 _PROJECT_FILES: dict[str, str] = {
     "sql/sources/raw.yml": (
         "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n    managed: true\n"
-        "    columns:\n      - name: order_id\n        type: INTEGER\n"
+        "    columns:\n      - name: order_id\n        type: BIGINT\n"
     ),
     "python/nodes/loaders/raw/loader.py": (
         "from sqlbuild.loaders import loader\n\n\n"

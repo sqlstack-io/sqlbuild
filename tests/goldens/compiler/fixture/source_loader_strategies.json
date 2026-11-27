@@ -61,7 +61,7 @@
       "name": "country_code",
       "description": "",
       "meta": {},
-      "data_type": "VARCHAR",
+      "data_type": "TEXT",
       "constraints": [],
       "quote": null,
       "tags": []
@@ -70,7 +70,7 @@
       "name": "country_name",
       "description": "",
       "meta": {},
-      "data_type": "VARCHAR",
+      "data_type": "TEXT",
       "constraints": [],
       "quote": null,
       "tags": []
@@ -126,7 +126,7 @@
       "name": "event_name",
       "description": "",
       "meta": {},
-      "data_type": "VARCHAR",
+      "data_type": "TEXT",
       "constraints": [],
       "quote": null,
       "tags": []
@@ -248,7 +248,7 @@
       "name": "plan_name",
       "description": "",
       "meta": {},
-      "data_type": "VARCHAR",
+      "data_type": "TEXT",
       "constraints": [],
       "quote": null,
       "tags": []
@@ -317,7 +317,7 @@
       "name": "status_name",
       "description": "",
       "meta": {},
-      "data_type": "VARCHAR",
+      "data_type": "TEXT",
       "constraints": [],
       "quote": null,
       "tags": []
@@ -326,7 +326,7 @@
       "name": "loaded_by",
       "description": "",
       "meta": {},
-      "data_type": "VARCHAR",
+      "data_type": "TEXT",
       "constraints": [],
       "quote": null,
       "tags": []

@@ -78,11 +78,11 @@ PROJECT_FILES: dict[str, str] = {
             managed: true
             columns:
               - name: payment_id
-                type: INTEGER
+                type: BIGINT
               - name: order_id
-                type: INTEGER
+                type: BIGINT
               - name: amount_cents
-                type: INTEGER
+                type: BIGINT
           - name: raw_orders
             description: Test source raw_orders.
             expression: |
@@ -99,7 +99,7 @@ PROJECT_FILES: dict[str, str] = {
             description: Test seed customers.
             columns:
               - name: customer_id
-                type: INTEGER
+                type: BIGINT
               - name: customer_name
                 type: VARCHAR
         """

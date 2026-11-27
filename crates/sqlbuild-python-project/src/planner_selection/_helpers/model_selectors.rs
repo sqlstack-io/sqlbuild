@@ -1,8 +1,8 @@
 //! `+` marker splitting and SQLBuild-owned model selectors for dbt interop.
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult};
-use pyo3::types::{PyList, PyTuple};
 use sqlbuild_analysis::planner_selection::models::SelectableModel;
+use sqlbuild_python_base::records::main::fields::tag_texts::tag_texts;
 
 use crate::planner_selection::models::Carrier;
 use sqlbuild_python_base::boundary::main::imported::imported;
@@ -25,10 +25,7 @@ pub(crate) fn shared_input_error(carrier: &Carrier<'_>, message: &str) -> PyErr 
 
 fn model_tags(model: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
     let tags: Bound<'_, PyAny> = config_value(model.py(), &model_values(model)?, TAGS_KEY)?;
-    if !tags.is_instance_of::<PyTuple>() && !tags.is_instance_of::<PyList>() {
-        return Ok(Vec::new());
-    }
-    tags.try_iter()?.map(|tag| tag?.str()?.extract()).collect()
+    tag_texts(&tags)
 }
 
 pub(crate) fn selectable_model(model: &Bound<'_, PyAny>) -> PyResult<SelectableModel> {

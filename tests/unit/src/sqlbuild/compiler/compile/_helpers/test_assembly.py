@@ -63,7 +63,7 @@ sources:
     description: Orders
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
   - name: shop__customers
     description: Customers
   - name: payments
@@ -181,7 +181,7 @@ seeds:
     description: Test seed order_codes.
     columns:
       - name: order_id
-        type: INTEGER
+        type: BIGINT
 """.strip()
                 + "\n",
                 "sql/seeds/order_codes.csv": "order_id\n1\n",

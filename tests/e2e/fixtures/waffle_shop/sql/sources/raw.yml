@@ -6,11 +6,11 @@ sources:
       - name: id
         type: BIGINT
       - name: first_name
-        type: VARCHAR
+        type: TEXT
       - name: last_name
-        type: VARCHAR
+        type: TEXT
       - name: email
-        type: VARCHAR
+        type: TEXT
       - name: created_at
         type: TIMESTAMP
 
@@ -29,7 +29,7 @@ sources:
       - name: ordered_at
         type: TIMESTAMP
       - name: status
-        type: VARCHAR
+        type: TEXT
 
   - name: raw_payments
     description: Test source raw_payments.

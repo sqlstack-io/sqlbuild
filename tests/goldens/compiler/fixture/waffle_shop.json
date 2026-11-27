@@ -1804,7 +1804,7 @@
       "name": "first_name",
       "description": "",
       "meta": {},
-      "data_type": "VARCHAR",
+      "data_type": "TEXT",
       "constraints": [],
       "quote": null,
       "tags": []
@@ -1813,7 +1813,7 @@
       "name": "last_name",
       "description": "",
       "meta": {},
-      "data_type": "VARCHAR",
+      "data_type": "TEXT",
       "constraints": [],
       "quote": null,
       "tags": []
@@ -1822,7 +1822,7 @@
       "name": "email",
       "description": "",
       "meta": {},
-      "data_type": "VARCHAR",
+      "data_type": "TEXT",
       "constraints": [],
       "quote": null,
       "tags": []
@@ -1923,7 +1923,7 @@
       "name": "status",
       "description": "",
       "meta": {},
-      "data_type": "VARCHAR",
+      "data_type": "TEXT",
       "constraints": [],
       "quote": null,
       "tags": []

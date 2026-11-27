@@ -225,13 +225,13 @@ def test_given_concurrent_provider_backed_loaders_when_executing_then_share_prov
                     managed: true
                     columns:
                       - name: event_id
-                        type: INTEGER
+                        type: BIGINT
                   - name: raw_beta
                     description: Test source raw_beta.
                     managed: true
                     columns:
                       - name: event_id
-                        type: INTEGER
+                        type: BIGINT
                 """
             ).strip()
             + "\n",

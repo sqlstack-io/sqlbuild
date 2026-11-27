@@ -2234,6 +2234,26 @@ crate_names = [
     "sqlbuild-state",
 ]
 
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-base/src/boundary/_helpers/expected_errors.rs", "crates/sqlbuild-python-compile/src/compile_command/main/invocation/register_report.rs", "crates/sqlbuild-python-compile/src/compile_driver/main/setup/register_project.rs", "crates/sqlbuild-python-compile/src/compile_driver/main/setup/register_python_plan_entries.rs", "crates/sqlbuild-python-front/src/discovery/main/headers/register_header_values.rs", "crates/sqlbuild-python-front/src/macro_bridge/main/register_module_digests.rs", "crates/sqlbuild-python-front/src/resource_costs/main/register_resource_costs_state.rs", "crates/sqlbuild-python-load/src/bindings/main/register_loads.rs", "crates/sqlbuild-python-output/src/event_exporting/main/register_policy.rs", "crates/sqlbuild-python-planner/src/microbatches/main/register_projection.rs", "crates/sqlbuild-python-planner/src/planner_changes/main/register_detect.rs", "crates/sqlbuild-python-planner/src/planner_changes/main/register_metadata.rs", "crates/sqlbuild-python-planner/src/planner_resolution/main/cursor/register_cursor_ranges.rs", "crates/sqlbuild-python-planner/src/planner_resolution/main/references/register_locations.rs", "crates/sqlbuild-python-planner/src/planner_resolution/main/references/register_orchestration.rs", "crates/sqlbuild-python-planner/src/planner_strategy/main/audits/register_audits.rs", "crates/sqlbuild-python-project/src/semantic_shapes/main/register_shapes.rs", "crates/sqlbuild-python/src/bindings/_helpers/command_runtime/connection.rs", "crates/sqlbuild-python/src/bindings/_helpers/cost_report/degradation.rs", "crates/sqlbuild-python/src/bindings/_helpers/dbt_interop/pipeline.rs", "crates/sqlbuild-python/src/bindings/_helpers/dbt_interop/plan_output.rs"]
+reason = "Each registers its own module's Python functions; only the add-function calls are alike."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-front/src/execution_history/main/register_functions.rs", "crates/sqlbuild-python-output/src/result_output/main/results/register_documents.rs", "crates/sqlbuild-python/src/bindings/_helpers/cost_report/functions.rs", "crates/sqlbuild-python/src/bindings/_helpers/dbt_interop/cli.rs"]
+reason = "Each registers its own module's Python functions; only the add-function calls are alike."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-compile/src/rules/_helpers/checking/dsl_headers.rs", "crates/sqlbuild-python-compile/src/rules/_helpers/lint/lint_sql_bodies.rs", "crates/sqlbuild-python-compile/src/rules/_helpers/sql/fixture_schemas.rs", "crates/sqlbuild-python-planner/src/planner_resolution/_helpers/references/sources.rs", "crates/sqlbuild-python-project/src/compiled_views/_helpers/project/loads.rs", "crates/sqlbuild-python-project/src/references/_helpers/reference_facts.rs"]
+reason = "Each reads its own record's fields into its own struct; only reading named fields in a loop is alike."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-compile/src/semantic_checks/_helpers/session/metadata.rs", "crates/sqlbuild-python/src/bindings/_helpers/janitor/janitor_usage.rs"]
+reason = "One keys a project's loader functions by name to find the file that sets a cursor, the other keys janitor usages by relation identity; only the collecting loop is alike."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-load/src/bindings/_helpers/plan_binding.rs", "crates/sqlbuild-python-load/src/bindings/_helpers/run_binding.rs"]
+reason = "Each is the Python entry for its own SQLLoad operation, a plan or a run, with its own report; the connections, plan options and GIL release are shared in detached_load. Only the pyfunction signature is alike."
+
 [[dupes.contract_exemptions]]
 contract = "src/sqlbuild/adapter/contract/classes/strict_adapter.py:StrictAdapter"
 forbidden_owners = ["src/sqlbuild/adapter/contract/classes/base_adapter.py:BaseAdapter"]

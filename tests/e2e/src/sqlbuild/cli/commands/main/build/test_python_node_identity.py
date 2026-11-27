@@ -24,7 +24,7 @@ _LOADERS_MODULE: str = "python/nodes/loaders/orders.py"
 _ASSETS_MODULE: str = "python/nodes/assets/exports.py"
 _LOADERS_PATH: str = "python/nodes/loaders/orders/staged_orders/loader.py"
 _ASSETS_PATH: str = "python/nodes/assets/exports/export_orders/asset.py"
-_ORIGINAL_COLUMNS: str = 'LoaderColumnSpec(name="order_id", type="INTEGER")'
+_ORIGINAL_COLUMNS: str = 'LoaderColumnSpec(name="order_id", type="BIGINT")'
 _ORIGINAL_RETRY: str = "RetryPolicy(max_attempts=2, retry_on=RuntimeError)"
 
 
@@ -36,7 +36,7 @@ _ORIGINAL_RETRY: str = "RetryPolicy(max_attempts=2, retry_on=RuntimeError)"
             edited_path=_LOADERS_PATH,
             original_text=_ORIGINAL_COLUMNS,
             edited_text=(
-                'LoaderColumnSpec(name="order_id", type="INTEGER", '
+                'LoaderColumnSpec(name="order_id", type="BIGINT", '
                 'description="Staged order identifier")'
             ),
             expected_asset_identity_status="unchanged",
@@ -103,7 +103,7 @@ def test_given_built_python_nodes_when_editing_decorator_inputs_then_identity_tr
                     managed: true
                     columns:
                       - name: order_id
-                        type: INTEGER
+                        type: BIGINT
                 """
             ).lstrip(),
             **node_module_files(

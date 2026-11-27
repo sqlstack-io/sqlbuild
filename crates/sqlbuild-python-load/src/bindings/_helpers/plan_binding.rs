@@ -1,12 +1,10 @@
 //! `plan_sqlload_project`: SQLLoad's plan of a project from Python, with the GIL released while it plans.
 
-use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::{Bound, PyResult, pyfunction};
 use pyo3::types::PyDict;
 use serde_json::json;
-use sqlload::loader::models::PlanOptions;
 
-use crate::bindings::_helpers::run_binding::session_connections;
+use crate::bindings::_helpers::run_binding::detached_load;
 use crate::runs::main::plan_project::plan_project;
 use crate::runs::models::PlannedProject;
 
@@ -19,18 +17,13 @@ pub(crate) fn plan_sqlload_project(
     tables: (Vec<String>, Vec<String>),
     reload: bool,
 ) -> PyResult<String> {
-    let (select, require): (Vec<String>, Vec<String>) = tables;
-    let connections = session_connections(sessions)?;
-    let options = PlanOptions {
-        select,
-        reload,
-        ..PlanOptions::default()
-    };
-    let project: String = project.to_owned();
-    let planned: PlannedProject = sessions
-        .py()
-        .detach(move || plan_project(&project, connections, (options, require)))
-        .map_err(PyRuntimeError::new_err)?;
+    let planned: PlannedProject = detached_load(
+        (project, sessions),
+        (tables, reload),
+        |project, (connections, options, require)| {
+            plan_project(&project, connections, (options, require))
+        },
+    )?;
     Ok(json!({
         "lines": planned.lines,
         "ready": planned.ready,

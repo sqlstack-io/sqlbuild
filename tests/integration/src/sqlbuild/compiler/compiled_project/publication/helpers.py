@@ -2495,7 +2495,7 @@ INGRESS_LOADER_FILES: dict[str, str] = {
         "\n"
         "\n"
         "@loader(depends_on=[ready], write_strategy='replace', "
-        "columns=[{'name': 'step', 'type': 'INTEGER'}])\n"
+        "columns=[{'name': 'step', 'type': 'BIGINT'}])\n"
         "def fetch_steps(ctx):\n"
         '    """Fetch the steps."""\n'
         '    return [{"step": 1}]\n'

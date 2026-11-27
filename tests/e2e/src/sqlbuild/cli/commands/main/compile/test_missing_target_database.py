@@ -221,7 +221,7 @@ _PRESERVED_TARGET_PROJECT: str = (
                 "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
                     "    managed: true\n"
-                    "    columns:\n      - name: order_id\n        type: INTEGER\n"
+                    "    columns:\n      - name: order_id\n        type: BIGINT\n"
                 ),
                 "python/nodes/loaders/orders/loader.py": (
                     "from sqlbuild.loaders import loader\n\n\n@loader(write_strategy='replace')\n"
@@ -249,7 +249,7 @@ _PRESERVED_TARGET_PROJECT: str = (
                 "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
                     "    managed: true\n"
-                    "    columns:\n      - name: order_id\n        type: INTEGER\n"
+                    "    columns:\n      - name: order_id\n        type: BIGINT\n"
                 ),
                 "python/nodes/loaders/orders/loader.py": (
                     "from sqlbuild.loaders import loader\n\n\n@loader(write_strategy='replace')\n"
@@ -439,7 +439,7 @@ def test_given_managed_source_when_loading_then_source_lands_in_its_resolved_sch
             "sql/sources/raw.yml": (
                 "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
                 f"    managed: true\n{test_case.source_schema}"
-                "    columns:\n      - name: order_id\n        type: INTEGER\n"
+                "    columns:\n      - name: order_id\n        type: BIGINT\n"
             ),
             "python/nodes/loaders/orders/loader.py": (
                 "from sqlbuild.loaders import loader\n\n\n@loader(write_strategy='replace')\n"

@@ -61,7 +61,7 @@ _MANAGED_SOURCE: str = (
     "    managed: true\n"
     "    columns:\n"
     "      - name: event_id\n"
-    "        type: INTEGER\n"
+    "        type: BIGINT\n"
 )
 _MANAGED_SOURCE_LOADER: str = (
     "from sqlbuild.loaders import loader\n\n"

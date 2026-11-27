@@ -1,22 +1,12 @@
 //! The graph rows of compiled resource records: their keys, dependencies, tags and folders.
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
-use pyo3::types::{PyDict, PyDictMethods, PyList, PyTuple};
+use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::tag_texts::tag_texts;
 
 use crate::graph::main::nodes::native_key::native_key;
 use crate::graph::models::ResourceRow;
-
-/// The texts of a list or tuple of tags; anything else has none.
-fn graph_tags(value: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
-    if !(value.is_instance_of::<PyList>() || value.is_instance_of::<PyTuple>()) {
-        return Ok(Vec::new());
-    }
-    value
-        .try_iter()?
-        .map(|item| item?.str()?.extract())
-        .collect()
-}
 
 /// A resource's tags and model folder.
 pub(crate) type ResourceTags = (Vec<String>, Option<String>);
@@ -49,7 +39,7 @@ pub(crate) fn resource_rows(
 pub(crate) fn model_tags(model: &Bound<'_, PyAny>) -> PyResult<ResourceTags> {
     let values: Bound<'_, PyAny> = native_field(&native_field(model, "config")?, "values")?;
     let tags: Vec<String> = match values.cast::<PyDict>()?.get_item("tags")? {
-        Some(tags) => graph_tags(&tags)?,
+        Some(tags) => tag_texts(&tags)?,
         None => Vec::new(),
     };
     let folder: String = native_field(&native_field(model, "relative_path")?, "parent")?

@@ -17,7 +17,18 @@ pub(crate) fn refuse_warehouse_connection(
     check: &LoadCheck,
     load: &LoadDeclaration,
 ) -> Result<(), LoadProblem> {
-    let Some(name) = load.settings.get(CONNECTION).and_then(toml::Value::as_str) else {
+    refuse_warehouse_name(
+        check,
+        load.settings.get(CONNECTION).and_then(toml::Value::as_str),
+    )
+}
+
+/// Refuse `name` when it is one of the project's SQLBuild connections; loads and loaders read source connections.
+pub(crate) fn refuse_warehouse_name(
+    check: &LoadCheck,
+    name: Option<&str>,
+) -> Result<(), LoadProblem> {
+    let Some(name) = name else {
         return Ok(());
     };
     let Some((_, sets_kind)) = check
@@ -28,7 +39,7 @@ pub(crate) fn refuse_warehouse_connection(
         return Ok(());
     };
     let why: &str = match sets_kind {
-        true => "is a warehouse connection",
+        true => "is a target's warehouse connection",
         false => "sets no kind",
     };
     Err(at(

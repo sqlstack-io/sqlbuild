@@ -203,9 +203,9 @@ def test_given_provider_usages_when_planning_then_text_and_json_include_selected
                     managed: true
                     columns:
                       - name: order_id
-                        type: INTEGER
+                        type: BIGINT
                       - name: amount
-                        type: INTEGER
+                        type: BIGINT
                 """
             ).strip()
             + "\n",
@@ -403,7 +403,7 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
                     managed: true
                     columns:
                       - name: event_id
-                        type: INTEGER
+                        type: BIGINT
                       - name: label
                         type: VARCHAR
                 """
@@ -565,7 +565,7 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
                         managed: true
                         columns:
                           - name: event_id
-                            type: INTEGER
+                            type: BIGINT
                     """
                 ).strip()
                 + "\n",
@@ -864,13 +864,13 @@ def test_given_concurrent_provider_backed_nodes_when_running_command_then_share_
                     managed: true
                     columns:
                       - name: event_id
-                        type: INTEGER
+                        type: BIGINT
                   - name: raw_beta
                     description: Test source raw_beta.
                     managed: true
                     columns:
                       - name: event_id
-                        type: INTEGER
+                        type: BIGINT
                 """
             ).strip()
             + "\n",

@@ -23,24 +23,17 @@ pub(crate) fn run_sqlload_project(
     tables: (Vec<String>, Vec<String>),
     reload: bool,
 ) -> PyResult<String> {
-    let (select, require): (Vec<String>, Vec<String>) = tables;
-    let connections: BTreeMap<String, SessionConnection> = session_connections(sessions)?;
-    let options = PlanOptions {
-        select,
-        reload,
-        ..PlanOptions::default()
-    };
-    let project: String = project.to_owned();
-    let run: ProjectRun = sessions
-        .py()
-        .detach(move || {
+    let run: ProjectRun = detached_load(
+        (project, sessions),
+        (tables, reload),
+        |project, (connections, options, require)| {
             run_project(
                 (&project, Vec::new(), None),
                 connections,
                 (options, require),
             )
-        })
-        .map_err(PyRuntimeError::new_err)?;
+        },
+    )?;
     Ok(run_report(run))
 }
 
@@ -61,6 +54,33 @@ pub(crate) fn run_report(run: ProjectRun) -> String {
         })
         .collect();
     json!({"tables": rows, "planned": run.planned, "missing": run.missing}).to_string()
+}
+
+/// SQLLoad's connections, plan options and required tables for one plan or run from Python.
+pub(crate) type LoadRequest = (
+    BTreeMap<String, SessionConnection>,
+    PlanOptions,
+    Vec<String>,
+);
+
+/// `work` on `project` and its load request (`sessions`, `tables`, `reload`), with the GIL released.
+pub(crate) fn detached_load<T: Send>(
+    (project, sessions): (&str, &Bound<'_, PyDict>),
+    (tables, reload): ((Vec<String>, Vec<String>), bool),
+    work: impl FnOnce(String, LoadRequest) -> Result<T, String> + Send,
+) -> PyResult<T> {
+    let (select, require): (Vec<String>, Vec<String>) = tables;
+    let options = PlanOptions {
+        select,
+        reload,
+        ..PlanOptions::default()
+    };
+    let request: LoadRequest = (session_connections(sessions)?, options, require);
+    let project: String = project.to_owned();
+    sessions
+        .py()
+        .detach(move || work(project, request))
+        .map_err(PyRuntimeError::new_err)
 }
 
 /// Each of `sessions`, `{adapter, database, opener, description}` by name, as SQLLoad's session connection.

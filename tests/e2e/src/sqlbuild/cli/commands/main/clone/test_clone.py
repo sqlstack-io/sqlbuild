@@ -361,7 +361,7 @@ def test_given_invalid_origin_connection_when_exact_cloning_then_destination_ses
                         managed: true
                         columns:
                           - name: customer_id
-                            type: INTEGER
+                            type: BIGINT
                           - name: first_name
                             type: VARCHAR
                     """
@@ -445,7 +445,7 @@ def test_given_invalid_origin_connection_when_exact_cloning_then_destination_ses
                         managed: true
                         columns:
                           - name: customer_id
-                            type: INTEGER
+                            type: BIGINT
                           - name: first_name
                             type: VARCHAR
                     """
@@ -598,7 +598,7 @@ def test_given_multi_schema_functions_when_cloning_then_destination_graph_is_que
                     schema: seed_origin
                     columns:
                       - name: bonus
-                        type: INTEGER
+                        type: BIGINT
                 """
             ).strip()
             + "\n",
@@ -827,7 +827,7 @@ def test_given_destination_source_deferral_when_cloning_then_function_reads_defe
                     managed: true
                     columns:
                       - name: bonus
-                        type: INTEGER
+                        type: BIGINT
                 """
             ).strip()
             + "\n",

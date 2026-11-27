@@ -1796,7 +1796,7 @@ def _layered_write_sources(*, project_dir: Path, source_count: int) -> None:
     expression: "(SELECT {index} AS id, CAST({index} AS DOUBLE) AS amount, 'source' AS status)"
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
       - name: amount
         type: DOUBLE
       - name: status
@@ -1814,7 +1814,7 @@ def _layered_write_seeds(*, project_dir: Path, seed_count: int) -> None:
     description: Test seed seed_{index:05d}.
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
       - name: label
         type: VARCHAR"""
         for index in range(seed_count)
@@ -2969,7 +2969,7 @@ SQLSERVER_REQUIRE_SQL_ANALYSIS_PROJECT: str = (
 )
 SQLSERVER_EVENTS_SOURCE: str = (
     "sources:\n  - name: raw_events\n    description: Event feed.\n    columns:\n"
-    "      - name: id\n        type: INTEGER\n      - name: amount\n        type: INTEGER\n"
+    "      - name: id\n        type: BIGINT\n      - name: amount\n        type: BIGINT\n"
     "      - name: created_at\n        type: TIMESTAMP\n"
 )
 SQLSERVER_BRACKETED_CURSOR_MODEL: str = (
@@ -4803,9 +4803,9 @@ _REFERENCE_CALL_SOURCES_YML: str = (
     "    table: raw_orders\n"
     "    columns:\n"
     "      - name: order_id\n"
-    "        type: INTEGER\n"
+    "        type: BIGINT\n"
     "      - name: amount_cents\n"
-    "        type: INTEGER\n"
+    "        type: BIGINT\n"
 )
 _REFERENCE_CALL_RAW_ORDERS_SQL: str = (
     "CREATE TABLE main.raw_orders AS "

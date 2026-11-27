@@ -333,7 +333,7 @@ def test_given_rule_harness_test_when_compiling_then_python_test_path_is_accepte
                     "    managed: true\n"
                     "    columns:\n"
                     "      - name: order_id\n"
-                    "        type: INTEGER\n"
+                    "        type: BIGINT\n"
                     "      - name: status\n"
                     "        type: VARCHAR\n"
                 ),

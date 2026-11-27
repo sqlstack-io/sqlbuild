@@ -1,9 +1,7 @@
 //! Python's unified selector resolution across SQL resources and Python nodes.
 
 use std::collections::{BTreeSet, HashMap, HashSet};
-use std::convert::Infallible;
 
-use sqlbuild_core::graph_walk::main::breadth_first_reach::breadth_first_reach;
 use sqlbuild_core::text::main::glob_match::glob_match;
 
 use crate::assembly::project::types::ObjectKey;
@@ -11,8 +9,8 @@ use crate::definition_changes::constants::PYTHON_NODE_KINDS;
 use crate::graph::constants::{AUDIT_KIND, RUN_SELECTOR_KINDS};
 use crate::graph::errors::SelectorError;
 use crate::graph::main::build_resources::build_resources;
-use crate::graph::main::edge_keys::edge_keys;
 use crate::graph::main::parse_selector::parse_selector;
+use crate::graph::main::reachable_graph_keys::reachable_graph_keys;
 use crate::graph::main::resolve_selectors::resolve_selectors;
 use crate::graph::models::{BuildResources, EdgeDirection, ParsedSelector};
 use crate::python_selection::_helpers::nodes::{
@@ -265,26 +263,19 @@ fn single(context: &SelectionContext<'_>, raw: &str) -> Resolved {
 
 /// The SQL resources selected Python nodes declare, with their SQL upstream and loaders.
 fn sql_dependency_upstream(context: &SelectionContext<'_>, atoms: &Atoms) -> Atoms {
-    let starts: BTreeSet<&ObjectKey> = atoms
+    let starts: Vec<ObjectKey> = atoms
         .iter()
         .filter_map(|atom| match atom {
             Atom::Python(name) => context.nodes.node(name),
             Atom::Sql(_) => None,
         })
-        .flat_map(|node| node.sql_deps.iter())
+        .flat_map(|node| node.sql_deps.iter().cloned())
         .collect();
-    if starts.is_empty() {
-        return Atoms::new();
-    }
-    let mut visited: HashSet<&ObjectKey> = starts.iter().copied().collect();
-    let Ok(()) = breadth_first_reach(starts, None, &mut visited, |current| {
-        Ok::<_, Infallible>(edge_keys(
-            context.sql.graph,
-            current,
-            EdgeDirection::Upstream,
-        ))
-    });
-    let selected: Atoms = sql_atoms(visited.into_iter().cloned());
+    let selected: Atoms = sql_atoms(reachable_graph_keys(
+        &starts,
+        context.sql.graph,
+        EdgeDirection::Upstream,
+    ));
     let loaders: Atoms = terminal_loader_atoms(context, &selected);
     selected.into_iter().chain(loaders).collect()
 }
@@ -318,19 +309,11 @@ fn filled_source_downstream(context: &SelectionContext<'_>, atoms: &Atoms) -> At
         })
         .map(|source| (SOURCE_RESOURCE.to_owned(), (*source).to_owned()))
         .collect();
-    if starts.is_empty() {
-        return Atoms::new();
-    }
-    let mut visited: HashSet<&ObjectKey> = starts.iter().collect();
-    let roots: BTreeSet<&ObjectKey> = starts.iter().collect();
-    let Ok(()) = breadth_first_reach(roots, None, &mut visited, |current| {
-        Ok::<_, Infallible>(edge_keys(
-            context.sql.graph,
-            current,
-            EdgeDirection::Downstream,
-        ))
-    });
-    sql_atoms(visited.into_iter().cloned())
+    sql_atoms(reachable_graph_keys(
+        &starts,
+        context.sql.graph,
+        EdgeDirection::Downstream,
+    ))
 }
 
 /// Runnable Python nodes declaring a selected SQL resource, with their downstream nodes.

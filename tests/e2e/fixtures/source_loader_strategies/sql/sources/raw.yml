@@ -6,9 +6,9 @@ sources:
       - name: country_id
         type: BIGINT
       - name: country_code
-        type: VARCHAR
+        type: TEXT
       - name: country_name
-        type: VARCHAR
+        type: TEXT
 
   - name: raw_webhook_events
     description: Test source raw_webhook_events.
@@ -17,7 +17,7 @@ sources:
       - name: event_id
         type: BIGINT
       - name: event_name
-        type: VARCHAR
+        type: TEXT
 
   - name: raw_order_events
     description: Test source raw_order_events.
@@ -37,7 +37,7 @@ sources:
       - name: customer_id
         type: BIGINT
       - name: plan_name
-        type: VARCHAR
+        type: TEXT
       - name: updated_at
         type: TIMESTAMP
 
@@ -48,6 +48,6 @@ sources:
       - name: status_id
         type: BIGINT
       - name: status_name
-        type: VARCHAR
+        type: TEXT
       - name: loaded_by
-        type: VARCHAR
+        type: TEXT

@@ -113,9 +113,9 @@ _RUNTIME_CHECK: str = _MODEL_CHECK.replace(
 _RAW_SOURCES: str = (
     "sources:\n"
     "  - name: raw_regions\n    description: Test source raw_regions.\n    managed: true\n"
-    "    columns:\n      - name: id\n        type: INTEGER\n"
+    "    columns:\n      - name: id\n        type: BIGINT\n"
     "  - name: raw_customers\n    description: Test source raw_customers.\n    managed: true\n"
-    "    columns:\n      - name: id\n        type: INTEGER\n"
+    "    columns:\n      - name: id\n        type: BIGINT\n"
 )
 
 

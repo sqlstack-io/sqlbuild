@@ -94,7 +94,7 @@ _STEPS: frozenset[str] = frozenset({"asset:pick", "asset:pack", "asset:ship"})
                     "from python.nodes.steps import ship\n"
                     "\n"
                     "\n"
-                    "@loader(depends_on=[ship], write_strategy='replace', columns=[{'name': 'step', 'type': 'INTEGER'}])\n"
+                    "@loader(depends_on=[ship], write_strategy='replace', columns=[{'name': 'step', 'type': 'BIGINT'}])\n"
                     "def fetch_steps(ctx):\n"
                     '    """Fetch the steps."""\n'
                     '    return [{"step": 1}]\n'

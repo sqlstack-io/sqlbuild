@@ -71,9 +71,9 @@ def test_given_managed_loader_watermark_when_reloaded_then_incremental_consumes_
                 "    managed: true\n"
                 "    columns:\n"
                 "      - name: id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
                 "      - name: amount\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
             ),
             "sql/models/raw_orders_incremental.sql": dedent(
                 """

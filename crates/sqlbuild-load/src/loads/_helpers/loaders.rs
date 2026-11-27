@@ -2,6 +2,7 @@
 
 use sqlload::python_sources::models::PythonSource;
 
+use crate::loads::_helpers::settings::refuse_warehouse_name;
 use crate::loads::constants::{
     COLUMNS, CONNECTION, LOADER_OWNED_KEYS, ON_SCHEMA_CHANGE, RENAMED_STRATEGY, REPLACE_STRATEGY,
     TABLE_NAME, TABLES, WRITE_STRATEGY,
@@ -48,27 +49,7 @@ pub(crate) fn refused_connection(
     check: &LoadCheck,
     loader: &LoaderDeclaration,
 ) -> Result<(), LoadProblem> {
-    let Some(connection) = &loader.connection else {
-        return Ok(());
-    };
-    let Some((_, sets_kind)) = check
-        .warehouse_connections
-        .iter()
-        .find(|(name, _)| name == connection)
-    else {
-        return Ok(());
-    };
-    let why: &str = if *sets_kind {
-        "is a target's warehouse connection"
-    } else {
-        "sets no kind"
-    };
-    Err(LoadProblem {
-        message: format!(
-            "connection '{connection}' {why}; loads and loaders read source connections"
-        ),
-        path: vec![CONNECTION.to_owned()],
-    })
+    refuse_warehouse_name(check, loader.connection.as_deref())
 }
 
 /// The loader's options with the declared column types of the source it fills.

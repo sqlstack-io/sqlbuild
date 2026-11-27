@@ -389,9 +389,9 @@ def test_given_source_deferral_env_when_building_on_postgres_then_reads_prod_and
                 "    managed: true\n"
                 "    columns:\n"
                 "      - name: order_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
                 "      - name: status\n"
-                "        type: VARCHAR\n"
+                "        type: TEXT\n"
             ),
             "python/nodes/loaders/raw_orders/loader.py": (
                 "from sqlbuild.loaders import loader\n\n"
@@ -484,7 +484,7 @@ def test_given_partial_source_type_enforcement_when_building_on_postgres_then_ca
                 "    type_enforcement: true\n"
                 "    columns:\n"
                 "      - name: order_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
             ),
             "sql/models/stg_orders.sql": (
                 "MODEL (description 'Test model stg_orders.', materialized table);\n\n"
@@ -724,16 +724,16 @@ def test_given_chained_loader_project_when_loading_on_postgres_then_runs_loader_
                 "    managed: true\n"
                 "    columns:\n"
                 "      - name: event_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
                 "      - name: status\n"
-                "        type: VARCHAR\n"
+                "        type: TEXT\n"
             ),
             node_files={
                 **node_module_files(
                     "python/nodes/loaders/source_rows.py",
                     "from sqlbuild.loaders import loader\n\n"
                     "@loader(write_strategy='replace', columns=[\n"
-                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
+                    "    {'name': 'event_id', 'type': 'BIGINT'},\n"
                     "])\n"
                     "def fetch_events(ctx):\n"
                     "    '''Test loader fetch_events.'''\n    return [{'event_id': 1}, {'event_id': 2}]\n\n"
@@ -795,9 +795,9 @@ def test_given_chained_loader_project_when_loading_on_postgres_then_runs_loader_
             loader_py=(
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader(write_strategy='append', cursor_column='load_seq', columns=[\n"
-                "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                "    {'name': 'amount', 'type': 'INTEGER'},\n"
-                "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
+                "    {'name': 'event_id', 'type': 'BIGINT'},\n"
+                "    {'name': 'amount', 'type': 'BIGINT'},\n"
+                "    {'name': 'load_seq', 'type': 'BIGINT'},\n"
                 "])\n"
                 "def fetch_events(ctx):\n"
                 "    '''Test loader fetch_events.'''\n    if ctx.cursor_value is None:\n"
@@ -829,9 +829,9 @@ def test_given_chained_loader_project_when_loading_on_postgres_then_runs_loader_
                 "    unique_key='event_id',\n"
                 "    cursor_column='load_seq',\n"
                 "    columns=[\n"
-                "        {'name': 'event_id', 'type': 'INTEGER'},\n"
-                "        {'name': 'amount', 'type': 'INTEGER'},\n"
-                "        {'name': 'load_seq', 'type': 'INTEGER'},\n"
+                "        {'name': 'event_id', 'type': 'BIGINT'},\n"
+                "        {'name': 'amount', 'type': 'BIGINT'},\n"
+                "        {'name': 'load_seq', 'type': 'BIGINT'},\n"
                 "    ],\n"
                 ")\n"
                 "def fetch_events(ctx):\n"
@@ -862,9 +862,9 @@ def test_given_chained_loader_project_when_loading_on_postgres_then_runs_loader_
             loader_py=(
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader(write_strategy='delete_insert', cursor_column='load_seq', columns=[\n"
-                "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                "    {'name': 'amount', 'type': 'INTEGER'},\n"
-                "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
+                "    {'name': 'event_id', 'type': 'BIGINT'},\n"
+                "    {'name': 'amount', 'type': 'BIGINT'},\n"
+                "    {'name': 'load_seq', 'type': 'BIGINT'},\n"
                 "])\n"
                 "def fetch_events(ctx):\n"
                 "    '''Test loader fetch_events.'''\n    if ctx.cursor_value is None:\n"
@@ -908,9 +908,9 @@ def test_given_intermediate_strategy_project_when_loading_twice_on_postgres_then
                 "    managed: true\n"
                 "    columns:\n"
                 "      - name: event_id\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
                 "      - name: amount\n"
-                "        type: INTEGER\n"
+                "        type: BIGINT\n"
             ),
             node_files={
                 **node_module_files("python/nodes/loaders/source_rows.py", test_case.loader_py)

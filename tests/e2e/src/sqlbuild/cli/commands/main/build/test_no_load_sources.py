@@ -74,7 +74,7 @@ def test_given_loaded_source_when_building_without_loading_then_only_its_audits_
             "sql/sources/raw.yml": (
                 "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
                 "    managed: true\n    columns:\n"
-                "      - name: order_id\n        type: INTEGER\n        audits: [not_null]\n"
+                "      - name: order_id\n        type: BIGINT\n        audits: [not_null]\n"
             ),
             "python/nodes/loaders/orders/loader.py": (
                 "from sqlbuild.loaders import loader\n\n\n"
