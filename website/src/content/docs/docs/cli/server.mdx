@@ -139,6 +139,36 @@ unavailable, every page keeps its address and says it isn't available, with the 
 when and the parts, and loads by itself when the database is back. While a part is degraded, pages
 work and a banner names it.
 
+## See a location's health
+
+The Locations page and each location's page show one verdict per location target. It names the
+location's worst open problem:
+
+- **Healthy** (green): nothing is open for the location.
+- Red: runs can't happen. **Not checking in** means no instance has checked in for 90 seconds.
+  **Can't connect** means the warehouse connection check after the last load failed. **Deploy
+  failed** means the latest deploy didn't load and no earlier version is published to run instead.
+- Amber: runs still happen, but something needs a look. Examples are **Running previous version**,
+  **Sync failing**, **Sync stalled** and **Not tested**, which means no connection check since the
+  running version was published.
+
+Every open problem listed for the location counts, not only its own state. An overdue schedule, a
+calendar running out of dates, a skipped trigger, a sensor checked again from scratch, an event sink
+losing events or a stored event that can't be read each turns the verdict amber.
+
+The full error is shown once, under the location's **Problems**, behind **View error**. The verdict,
+lists and banner name only the problem. When one cause has several effects, only the cause is red:
+while the location can't connect, its sync shows **blocked: can't connect**.
+
+Every page except the Overview shows one banner line for all open problems. It names the worst
+with its location, such as `waffle-shop can't connect · 1 more problem · View`, or counts them, such
+as `3 locations have problems · View`. It is red when anything stops runs, and amber otherwise.
+
+Scripts read the same verdict. The `verdict` of
+`GET /api/control/locations/{location_id}/targets/{target}/health` has the `fact` and its `tier`,
+`stops_runs` or `needs_attention`, and every location problem in `/api/control/platform/problems`
+carries its `tier`.
+
 ## Serve over HTTPS
 
 Code locations and workers send their bearer token with every request to the `--server` URL.
