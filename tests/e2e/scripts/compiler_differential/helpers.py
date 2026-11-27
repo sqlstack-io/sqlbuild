@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from scripts.compiler_differential.constants import GENERATOR_FEATURE_BLOCKS
 from scripts.compiler_differential.main.failure_cases import failure_cases
 
 WAFFLE_SHOP_FIXTURE: Path = Path(__file__).resolve().parents[2] / "fixtures" / "waffle_shop"
@@ -50,3 +51,15 @@ def harness_arguments(
         str(work_dir),
         *extra,
     ]
+
+
+def every_block_sets() -> tuple[tuple[str, ...], ...]:
+    """Every feature block across two projects: one without the project adapter, one with it.
+
+    A project adapter drops the loader and load blocks, which write only to built-in adapters.
+    """
+
+    return (
+        tuple(block for block in GENERATOR_FEATURE_BLOCKS if block != "project_adapter"),
+        GENERATOR_FEATURE_BLOCKS,
+    )

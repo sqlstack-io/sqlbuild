@@ -26,8 +26,11 @@ from scripts.compiler_differential.models import GeneratedProject
 from tests.e2e.scripts.compiler_differential._test_types import AnalysisCaptureTestCase
 
 # dbt_ref fails compile without its manifest; macro_generated_reference turns off the explicit
-# references that Python SQL relation checks need.
-_CONFLICTING_BLOCKS: frozenset[str] = frozenset({"dbt_ref", "macro_generated_reference"})
+# references that Python SQL relation checks need; project_adapter drops the loader and load
+# blocks (they write only to built-in adapters) and analyses nothing itself.
+_CONFLICTING_BLOCKS: frozenset[str] = frozenset(
+    {"dbt_ref", "macro_generated_reference", "project_adapter"}
+)
 _OTHER_DIALECT_KINDS: frozenset[str] = frozenset(
     {"dialect_postgresql", "dialect_snowflake", "managed_write_schema"}
 )

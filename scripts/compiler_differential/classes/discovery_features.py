@@ -616,6 +616,12 @@ def feature_blocks_for_seed(*, seed: int, rng: random.Random) -> tuple[str, ...]
             )
         if selected:
             blocks.append(block)
+    return without_excluded_pairs(tuple(blocks))
+
+
+def without_excluded_pairs(blocks: tuple[str, ...]) -> tuple[str, ...]:
+    """`blocks` less every block an excluded pair drops because its partner is chosen."""
+
     excluded: set[str] = {
         dropped for dropped, chosen in GENERATOR_EXCLUDED_FEATURE_PAIRS if chosen in blocks
     }
