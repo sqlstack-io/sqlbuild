@@ -19,7 +19,8 @@
 	import RepublishNow from '$lib/components/platform/republish-now.svelte';
 	import type { LocationInstance } from '$lib/api';
 	import { formatAgo, formatStamp } from '$lib/format/time';
-	import { brokenDeployPolicyHelp, brokenDeployPolicyLabel, healthHelp, healthLabel, healthTone, shortImage, targetWords } from '$lib/platform/labels';
+	import { brokenDeployPolicyHelp, brokenDeployPolicyLabel, healthHelp, locationVerdict, shortImage, targetWords, verdictTone } from '$lib/platform/labels';
+	import { syncNowState } from '$lib/platform/sync-now';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { openRecord } from '../utils';
@@ -43,6 +44,23 @@
 	const openProblems = $derived((problems.data ?? []).filter((e) => e.active).length);
 	const processes = $derived(summariseProcesses(detail?.instances ?? []));
 	const running = $derived(processes.live[0] ?? null);
+	// "Healthy" never sits beside a failing sync, a failed or missing connection test, or no check-in: the headline names the worst.
+	const sync = createResource((client) => client.getWarehouseSync({ locationId: id }), ['warehouse_sync']);
+	const headline = $derived(
+		detail
+			? locationVerdict({
+					health: detail.health,
+					live: processes.live.length > 0,
+					test: detail.connectionTest,
+					deployedAt: detail.snapshot?.publishedAt ?? null,
+					failedDeploy: !!detail.failedDeploy,
+					fallback: detail.brokenDeployPolicy === 'fallback' && !!detail.snapshot,
+					events: app.platformEvents.filter((e) => e.locationId === detail.id),
+					sync: syncNowState(sync.data ?? null, null, app.now),
+					verdict: detail.verdict
+				})
+			: null
+	);
 
 	const instanceTone: Record<LocationInstance['state'], string> = {
 		live: 'var(--sb-success)',
@@ -70,8 +88,10 @@
 				<span class="font-display text-[17px] font-semibold">{detail.name}</span>
 				<span class="muted">· {targetWords(detail.target)}</span>
 				<span class="right">
-					<span title={healthHelp[detail.health]}><StatusLabel tone={healthTone[detail.health]} label={healthLabel[detail.health]} /></span>
-					{#if openProblems}<a class="warn" href="#problems">· {plural(openProblems, 'open problem')}</a>{/if}
+					{#if headline}
+						<span title={healthHelp[detail.health]} data-testid="location-headline"><StatusLabel tone={verdictTone[headline.tone]} label={headline.label} /></span>
+					{/if}
+					{#if openProblems}<a class="count" href="#problems">{plural(openProblems, 'problem')}</a>{/if}
 				</span>
 			</div>
 
@@ -99,11 +119,12 @@
 						<b class="err">Not running</b> · no runs can start
 					{/if}
 				</span>
-				<span class="right">
-					<ConnectionTest compact scope={{ locationId: detail.id }} connection={detail.warehouseConnection ?? 'warehouse'} last={detail.connectionTest} />
-					<WarehouseSyncNow scope={{ locationId: detail.id }} />
-					{#if app.client.supports('republish')}<RepublishNow scope={{ locationId: detail.id }} ondone={() => location.refresh()} />{/if}
-				</span>
+			</div>
+
+			<div class="line strip" data-testid="location-actions">
+				<ConnectionTest compact scope={{ locationId: detail.id }} connection={detail.warehouseConnection ?? 'warehouse'} last={detail.connectionTest} deployedAt={detail.snapshot?.publishedAt ?? null} problemsHref="#problems" ontested={() => location.refresh()} />
+				<WarehouseSyncNow scope={{ locationId: detail.id }} problemsHref="#problems" blocked={detail.connectionTest?.outcome === 'failed'} />
+				{#if app.client.supports('republish')}<RepublishNow scope={{ locationId: detail.id }} snapshot={detail.snapshot} ondone={() => location.refresh()} />{/if}
 			</div>
 
 			{#if processes.listed.length}
@@ -128,7 +149,7 @@
 							· {detail.brokenDeployPolicy === 'fallback' ? `on version ${detail.snapshot ? detail.snapshot.generation : 'before'}` : 'runs held'}
 							· <code>{firstLine(detail.failedDeploy.error)}</code>
 						</span>
-						<span class="more">details</span>
+						<span class="more">View error</span>
 					</summary>
 					<div class="alert-body">
 						<p title="A deploy takes over only once it loads cleanly">Commit <code>{detail.failedDeploy.gitRevision}</code> (image <code>{shortImage(detail.failedDeploy.imageId)}</code>) didn't load.</p>
@@ -140,7 +161,7 @@
 					<summary>
 						<TriangleAlertIcon size={14} />
 						<span class="summary-text"><b>The last load reported an error</b> · <code>{firstLine(detail.lastLoadError)}</code></span>
-						<span class="more">details</span>
+						<span class="more">View error</span>
 					</summary>
 					<div class="alert-body"><pre>{detail.lastLoadError}</pre></div>
 				</details>
@@ -153,23 +174,15 @@
 				</div>
 			{/if}
 			{#if detail.missingSecrets.length}<LocationSecrets missing={detail.missingSecrets} />{/if}
-			{#if detail.poolCapWarnings.length}
-				<!-- The server's own warning, from its pool caps: it doesn't touch the location's health or last check-in. -->
-				<div class="alert note pool-caps">
-					<TriangleAlertIcon size={14} />
-					<span class="summary-text">
-						<b title="This server's pool_caps lower a pool's limit below what these jobs ask for; each takes the whole pool, so it runs alone in it">Pool caps on this server</b>
-						{#each detail.poolCapWarnings as w (`${w.jobKey}:${w.pool}`)}
-							<span class="cap" title={w.message}>
-								· {w.kind} <a href={to(`/jobs/${w.jobKey}`)}>{w.jobKey}</a> takes {w.amount} of pool {w.pool}; capped at {w.cap}, so it runs alone in that pool
-							</span>
-						{/each}
-					</span>
-				</div>
-			{/if}
-
+			{#snippet poolCaps()}
+				<span class="pool-caps">
+					{#each detail.poolCapWarnings as w, i (`${w.jobKey}:${w.pool}`)}
+						<span title={w.message}>{i ? ' · ' : ''}{w.kind} <a href={to(`/jobs/${w.jobKey}`)}>{w.jobKey}</a> takes {w.amount} of pool {w.pool}; capped at {w.cap}, so it runs alone in that pool</span>
+					{/each}
+				</span>
+			{/snippet}
 			<details class="facts">
-				<summary>Details</summary>
+				<summary>Details{#if detail.poolCapWarnings.length}<span class="faint">&nbsp;·&nbsp;{plural(detail.poolCapWarnings.length, 'pool cap note')}</span>{/if}</summary>
 				<div class="facts-body">
 					<KeyValues
 						rows={[
@@ -177,6 +190,7 @@
 							detail.createdAt && { label: 'Created', value: formatAgo(detail.createdAt, app.now), title: formatStamp(detail.createdAt) },
 							{ label: 'Target', value: [targetWords(detail.target), detail.target.connectionSummary].filter(Boolean).join(' · ') },
 							detail.warehouseConnection && { label: 'Warehouse connection', value: detail.warehouseConnection, mono: true },
+							detail.poolCapWarnings.length && { label: 'Pool caps', help: 'This server’s pool_caps lower a pool’s limit below what these jobs ask for; each takes the whole pool, so it runs alone in it.', content: poolCaps },
 							detail.brokenDeployPolicy && {
 								label: 'If a deploy fails',
 								value: brokenDeployPolicyLabel[detail.brokenDeployPolicy === 'fallback' ? 'fallback' : 'hold'],
@@ -231,6 +245,18 @@
 		align-items: center;
 		gap: 8px;
 	}
+	/* Test connection, Sync now and Republish on a line of their own, each cause on a line of its own below; each lead's left margin spaces the groups, so the first one's is taken back. */
+	.strip {
+		flex-wrap: wrap;
+		justify-content: flex-start;
+		margin-left: -14px;
+		row-gap: 4px;
+		column-gap: 8px;
+	}
+	.note {
+		font-size: 12.5px;
+		font-weight: 500;
+	}
 	.title-line {
 		gap: 10px;
 	}
@@ -267,16 +293,12 @@
 	.processes li.off {
 		opacity: 0.7;
 	}
-	.alert {
-		border: 1px solid color-mix(in srgb, var(--sb-warning) 40%, var(--border));
-		border-radius: 2px;
-		background: color-mix(in srgb, var(--sb-warning) 8%, var(--background));
-	}
+	/* A failed deploy or load: one line like the rest of the header, its error behind View error. */
 	.alert summary {
 		display: flex;
 		align-items: center;
 		gap: 8px;
-		padding: 7px 10px;
+		padding: 2px 0;
 		cursor: pointer;
 		list-style: none;
 	}
@@ -285,7 +307,7 @@
 	}
 	.alert summary > :global(svg) {
 		flex: 0 0 auto;
-		color: var(--sb-warning);
+		color: var(--sb-error);
 	}
 	.summary-text {
 		min-width: 0;
@@ -298,18 +320,26 @@
 	}
 	.more {
 		flex: 0 0 auto;
-		margin-left: auto;
-		color: var(--muted-foreground);
-		text-decoration: underline;
+		color: var(--primary);
+		font-size: 12px;
 	}
 	.alert[open] .more {
 		visibility: hidden;
+	}
+	.count {
+		color: var(--muted-foreground);
+	}
+	.count:hover {
+		color: var(--foreground);
+	}
+	.faint {
+		color: var(--sb-text-faint);
 	}
 	.note {
 		display: flex;
 		align-items: baseline;
 		gap: 8px;
-		padding: 7px 10px;
+		padding: 2px 0;
 	}
 	.note > :global(svg) {
 		flex: 0 0 auto;
@@ -320,7 +350,7 @@
 		white-space: normal;
 	}
 	.alert-body {
-		padding: 0 10px 10px 32px;
+		padding: 4px 0 6px 22px;
 		color: var(--muted-foreground);
 	}
 	.alert-body p {

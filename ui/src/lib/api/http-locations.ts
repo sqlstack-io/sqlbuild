@@ -1,7 +1,7 @@
 import { shortName } from '$lib/build-area/labels';
 import type { components } from '$control/schema.d.ts';
 import type { Location, LocationHealth, PlatformEvent, Snapshot, WarehouseSync } from './types';
-import type { ConnectionDetails, ConnectionTest, LocationDetail, MissingProviderSecrets, PoolCapWarning, LocationInstance, LocationSummary, WarehouseConnection, WarehouseTableSync } from './types/platform';
+import type { ConnectionDetails, ConnectionTest, LocationDetail, LocationVerdictFact, MissingProviderSecrets, PoolCapWarning, LocationInstance, LocationSummary, WarehouseConnection, WarehouseTableSync } from './types/platform';
 
 type Wire = components['schemas'];
 
@@ -136,6 +136,7 @@ export function toLocationSummary(
 		brokenDeployPolicy: null,
 		failedDeploy: null,
 		connectionTest: observations ? connectionTestOf(observations) : null,
+		verdict: read ? verdictOf(read.verdict) : null,
 		activeProblems,
 		snapshot: snapshotOf(published)
 	};
@@ -186,7 +187,26 @@ export function toLocationDetail(location: Location, read: Wire['PersonLocationH
 		target: location.target,
 		snapshot: snapshotOf(published),
 		warehouseConnection: null,
-		connectionTest: connectionTestOf(observations)
+		connectionTest: connectionTestOf(observations),
+		verdict: verdictOf(read.verdict)
+	};
+}
+
+/** The server's verdict on a target: its worst open fact, and whether it stops runs. */
+export function verdictOf(verdict: Wire['LocationVerdict']): LocationVerdictFact {
+	return { fact: verdict.fact, stopsRuns: verdict.tier === 'stops_runs' };
+}
+
+/** The sync from its reports, with what the server knows beyond them: a request waiting, when the running sync started, and whether it stalled. */
+export function withServerSync(sync: WarehouseSync | null, server: Wire['WarehouseSyncState']): WarehouseSync | null {
+	const requested = server.requested ? { at: server.requested.requested_at, by: server.requested.requested_by } : null;
+	const running = server.running;
+	if (!sync) return requested ? { lastSyncedAt: null, lastError: null, requested } : null;
+	return {
+		...sync,
+		requested,
+		syncing: running ? { position: running.position, kinds: running.kinds, table: running.table, rows: running.rows, startedAt: running.started_at } : null,
+		stalled: running?.stalled ?? false
 	};
 }
 

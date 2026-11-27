@@ -74,8 +74,12 @@ export type WarehouseSync = {
 	lastError: string | null;
 	/** When the newest sync report arrived, failed or not; a new one means a requested sync has finished. */
 	lastReportedAt?: Iso | null;
-	/** The sync now running: which kind of how many, and rows so far; null when none is. */
-	syncing?: { position: number; kinds: number; table: string; rows: number } | null;
+	/** The sync now running: which kind of how many, rows so far and, when known, when it started; null when none is. */
+	syncing?: { position: number; kinds: number; table: string; rows: number; startedAt?: Iso | null } | null;
+	/** A sync someone asked for that the location hasn't reported on yet, when the server knows of one. */
+	requested?: { at: Iso; by: string | null } | null;
+	/** The server says the running sync stalled; absent where it doesn't, and the page judges by the clock. */
+	stalled?: boolean;
 	/** The newest completed sync among recent reports; null when none completed in them. */
 	completed?: { at: Iso; kinds: number; rows: number; elapsedMs: number } | null;
 	/** While the newest report is a failure: since when, why, and how it retries; null while the sync works. */
@@ -131,6 +135,7 @@ export type PlatformEventKind =
 	| 'sensor_rechecked'
 	| 'calendar_times_dropped'
 	| 'unreadable_event_skipped'
+	| 'warehouse_sync_stalled'
 	| 'scheduler_no_leader'
 	| 'location_broken'
 	| 'location_failing'
@@ -160,6 +165,10 @@ export type PlatformEvent = {
 	 * stopped scheduler's expired lease or a broken location's last check-in.
 	 */
 	occurrence?: string;
+	/** A failing location's state, such as `degraded` when its connection check failed. */
+	state?: string;
+	/** The server says the problem stops runs; absent where it doesn't, and `stopsRuns` judges by kind and severity. */
+	stopsRuns?: boolean;
 	/** A failing run-history sync: whether failed reads stopped it, so Resume restarts it, and when it tries again. */
 	sync?: { halted: boolean; unreachable: boolean; retrySeconds: number | null; retryAt: Iso | null; lastSuccessAt: Iso | null };
 };

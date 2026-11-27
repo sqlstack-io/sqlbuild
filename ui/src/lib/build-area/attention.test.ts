@@ -14,7 +14,7 @@ const unresponsive = (id: string, jobKey: string | null, heardMinutesAgo: number
 const queued = (runId: string, jobKey: string | null, waits: Extract<AttentionItem, { kind: 'queue_blocked' }>['waits']): AttentionItem => ({ kind: 'queue_blocked', runId, jobKey, queuedAt: ago(20), waits });
 
 describe('overview alerts', () => {
-	it("lists an overdue schedule under its own location's outage, else under the stopped scheduler", () => {
+	it("lists an overdue schedule under its own location's outage, else under the stopped scheduler, a location that can't run first", () => {
 		const views = attentionViews(
 			[
 				event('broken', 'location_broken', 'shop'),
@@ -25,8 +25,8 @@ describe('overview alerts', () => {
 			now
 		);
 		expect(views.map(({ view }) => [view.key, view.consequences.map((c) => c.text)])).toEqual([
-			['event:stopped', ['daily is late']],
-			['event:broken', ['hourly is late']]
+			['event:broken', ['hourly is late']],
+			['event:stopped', ['daily is late']]
 		]);
 	});
 
@@ -40,9 +40,12 @@ describe('overview alerts', () => {
 		]);
 	});
 
-	it('keeps an overdue schedule as its own alert when nothing explains it', () => {
+	it('keeps an overdue schedule as its own alert when nothing explains it, after a location that can’t run', () => {
 		const views = attentionViews([event('late', 'tick_overdue', 'shop'), event('broken', 'location_broken', 'marketing')], now);
-		expect(views.map(({ view }) => view.key)).toEqual(['event:late', 'event:broken']);
+		expect(views.map(({ view }) => [view.key, view.tone])).toEqual([
+			['event:broken', 'error'],
+			['event:late', 'warning']
+		]);
 	});
 
 	it('lists a queued run under the unresponsive run of its job or the one it waits for, and the cause takes the more urgent tone', () => {

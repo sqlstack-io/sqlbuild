@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { stopsRuns } from '$lib/platform/labels';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { appPath, to } from '$lib/paths';
 	import logoForDark from '$website/src/assets/logo-dark.png';
@@ -21,8 +22,11 @@
 		muted: '#707782',
 		warning: 'var(--sb-warning)',
 		error: 'var(--sb-error)',
-		live: 'var(--sb-running)'
+		live: 'var(--sb-running)',
+		problems: 'var(--sb-warning)'
 	};
+	/** The Locations badge's tone, by the banner's rule: red only when a problem stops runs. */
+	const problemsTone = $derived(app.platformEvents.some((e) => e.active && stopsRuns(e)) ? 'var(--sb-error)' : 'var(--sb-warning)');
 
 	const initials = $derived(
 		(app.user?.displayName ?? '?')
@@ -74,7 +78,7 @@
 								<span class="h-1.5 w-1.5 rounded-full" style:background={badgeTone.live}></span>{count}
 							</span>
 						{:else}
-							<span class="ml-auto text-[11.5px]" style:color={badgeTone[item.badge.tone]}>{count}</span>
+							<span class="ml-auto text-[11.5px]" style:color={item.badge.tone === 'problems' ? problemsTone : badgeTone[item.badge.tone]}>{count}</span>
 						{/if}
 					{/if}
 				</a>

@@ -3,44 +3,45 @@
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import OctagonAlertIcon from '@lucide/svelte/icons/octagon-alert';
 	import type { PlatformEvent } from '$lib/api';
-	import { formatAgo } from '$lib/format/time';
-	import { eventKindLabel, problemHref } from '$lib/platform/labels';
+	import { eventKindLabel, messageParts, problemHref, problemPhrase, stopsRuns } from '$lib/platform/labels';
 	import { app } from '$lib/state/app.svelte';
 	import { plural } from '$lib/format/plural';
 
 	let { only = () => true }: { only?: (event: PlatformEvent) => boolean } = $props();
 
-	const rank = (e: PlatformEvent) => (e.severity === 'critical' ? 2 : e.severity === 'warning' ? 1 : 0);
+	// Every open problem, the location's and the server's, on one line: the worst leads with its
+	// location, the rest is a count. Red when one stops runs, amber otherwise; never the error itself.
+	const rank = (e: PlatformEvent) => (stopsRuns(e) ? 3 : e.severity === 'critical' ? 2 : e.severity === 'warning' ? 1 : 0);
 	const events = $derived(
-		app.platformEvents.filter((e) => e.active && e.severity !== 'info' && only(e)).sort((a, b) => rank(b) - rank(a))
+		app.platformEvents
+			.filter((e) => e.active && e.severity !== 'info' && only(e))
+			.sort((a, b) => rank(b) - rank(a) || a.occurredAt.localeCompare(b.occurredAt))
 	);
-	const critical = $derived(events.some((e) => e.severity === 'critical'));
-	/** The banner shows the worst few, so many open problems don't push the page out of the window. */
-	const SHOWN = 3;
-	/** Location problems link to the location's page if it exists, else the Locations list; server problems only to server status. */
-	function linkOf(event: PlatformEvent): { href: string; text: string } | null {
-		if (event.locationId) return { href: app.client.supports('getLocation') ? problemHref(event) : '/locations', text: 'View location →' };
-		return app.client.supports('platformHealth') ? { href: problemHref(event), text: 'View server status →' } : null;
-	}
+	const red = $derived(events.some((e) => stopsRuns(e) || (e.locationId === null && e.severity === 'critical')));
+	const places = $derived(new Set(events.flatMap((e) => (e.locationId ? [e.locationId] : []))));
+	const lead = $derived(events[0] ?? null);
+	const nameOf = (e: PlatformEvent) => app.bootstrap?.locations.find((l) => l.id === e.locationId)?.name ?? e.subject ?? 'A location';
+	const line = $derived.by(() => {
+		if (!lead) return null;
+		const server = events.filter((e) => e.locationId === null).length;
+		if (places.size > 1) {
+			return { text: `${places.size} locations have problems${server ? ` · ${plural(server, 'server problem')}` : ''}`, href: '/locations' };
+		}
+		const what = lead.locationId ? `${nameOf(lead)}${problemPhrase(lead)}` : eventKindLabel[lead.kind];
+		const rest = events.length - 1;
+		const href = lead.locationId && !app.client.supports('getLocation') ? '/locations' : problemHref(lead);
+		return { text: `${what}${rest ? ` · ${plural(rest, 'more problem')}` : ''}`, href };
+	});
 </script>
 
-{#if events.length}
-	<div class="banner" class:critical role="status" aria-live="polite">
+{#if line}
+	<div class="banner" class:critical={red} role="status" aria-live="polite" data-testid="platform-banner">
 		<span class="icon">
-			{#if critical}<OctagonAlertIcon size={14} />{:else}<TriangleAlertIcon size={14} />{/if}
+			{#if red}<OctagonAlertIcon size={14} />{:else}<TriangleAlertIcon size={14} />{/if}
 		</span>
-		<ul>
-			{#each events.slice(0, SHOWN) as event (event.id)}
-				{@const link = linkOf(event)}
-				<li>
-					<strong>{eventKindLabel[event.kind]}</strong>
-					<span>{event.message}</span>
-					<small>{formatAgo(event.occurredAt, app.now)}</small>
-					{#if link}<a href={to(link.href)}>{link.text}</a>{/if}
-				</li>
-			{/each}
-			{#if events.length > SHOWN}<li><a href={to('/locations')}>{plural(events.length - SHOWN, 'more problem')} →</a></li>{/if}
-		</ul>
+		<strong title={lead ? messageParts(lead.message).summary : undefined}>{line.text}</strong>
+		<span class="sep">·</span>
+		<a href={to(line.href)}>View</a>
 	</div>
 {/if}
 
@@ -48,9 +49,9 @@
 	.banner {
 		--tone: var(--sb-warning);
 		display: flex;
-		align-items: flex-start;
-		gap: 10px;
-		padding: 7px 20px;
+		align-items: baseline;
+		gap: 8px;
+		padding: 5px 20px;
 		border-bottom: 1px solid color-mix(in srgb, var(--tone) 35%, var(--border));
 		background: color-mix(in srgb, var(--tone) 9%, var(--background));
 		font-size: 12.5px;
@@ -60,43 +61,22 @@
 	}
 	.icon {
 		display: grid;
+		align-self: center;
 		height: 20px;
 		place-items: center;
 		color: var(--tone);
 	}
-	ul {
-		display: flex;
+	strong {
 		min-width: 0;
-		flex: 1;
-		flex-direction: column;
-		gap: 2px;
-		margin: 0;
-		padding: 0;
-		list-style: none;
-	}
-	li {
-		display: flex;
-		min-width: 0;
-		align-items: baseline;
-		gap: 8px;
-		line-height: 20px;
-	}
-	li strong {
+		overflow: hidden;
 		font-weight: 600;
+		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
-	li span {
-		min-width: 0;
-		color: var(--muted-foreground);
-		overflow-wrap: anywhere;
-	}
-	li small {
+	.sep {
 		color: var(--sb-text-faint);
-		font-size: 11.5px;
-		white-space: nowrap;
 	}
 	a {
-		margin-left: auto;
 		color: var(--primary);
 		font-weight: 500;
 		line-height: 20px;

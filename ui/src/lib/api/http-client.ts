@@ -9,7 +9,7 @@ import { LIVE_OUTPUT_ROWS, SEARCH_PARTS, followedOutput, outputLive, pageQuery, 
 import { findNode, nodeDetailOf, toCatalogNodes, nodeJobsOf, toMicrobatchCoverage, toNodeRuns, toColumnLineage, toNodeStates, toNodeStatusDelta } from './http-catalog';
 import { auditMatches, toAuditEntry } from './http-audit';
 import { toSnapshotChanges } from './http-changes';
-import { manualConnectionTest, missingSecretsEventOf, snapshotOf, toLocationDetail, toLocationSummary, toWarehouseConnection, warehouseSyncOf } from './http-locations';
+import { manualConnectionTest, missingSecretsEventOf, snapshotOf, toLocationDetail, toLocationSummary, toWarehouseConnection, warehouseSyncOf, withServerSync } from './http-locations';
 import { toAccount, toRoleAssignments, toServerSettings } from './http-people';
 import { toIssuedKey, toServiceAccount } from './http-service-accounts';
 import { toMaintenanceHistory } from './http-maintenance';
@@ -784,7 +784,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/health', { params: { path: { location_id: locationId, target } } });
 			if (response.status === 401) onUnauthorized();
 			if (!data) throw new ApiError(errorText(error, response), response.status);
-			return warehouseSyncOf(data.observations);
+			return withServerSync(warehouseSyncOf(data.observations), data.warehouse_sync);
 		},
 		/** The location takes the request within seconds; the sync's result arrives as a `warehouse_sync` change. */
 		async requestWarehouseSync(scope: Scope): Promise<void> {

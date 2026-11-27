@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { toPlatformEventRecords, toPlatformEvents, toPlatformHealth } from './http-problems';
+import { stopsRuns } from '$lib/platform/labels';
 import { formatClock } from '$lib/format/time';
 
 const NOW = Date.parse('2026-11-08T12:00:00Z');
@@ -13,13 +14,24 @@ const tick = (name: string, location: string, scheduledFor: string) => ({
 });
 
 describe('toPlatformEvents', () => {
-	it('makes a location whose latest load failed a critical problem with its error and the snapshot it serves', () => {
+	it('makes a failed connection check a problem that stops runs, and a failed load on the previous version one that needs a look', () => {
 		const serving = { snapshot_id: 's-11', location_id: 'l1', target: 'production', generation: 11, manifest_digest: 'd', published_at: '2026-11-08T09:00:00Z' };
-		const failing = (state: 'falling_back' | 'degraded', error: string | null) => ({ location_id: 'l1', location_name: 'orders', target: 'production', state, failed_at: '2026-11-08T11:59:00Z', error, serving });
-		const [failed, degraded] = toPlatformEvents({ scheduler_leader: true, broken_locations: [], overdue_ticks: [], failing_locations: [failing('falling_back', 'job loaders_job: path selectors require an explicit root'), failing('degraded', null)] }, NOW);
-		expect([failed.kind, failed.severity, failed.active, failed.occurredAt]).toEqual(['location_failing', 'critical', true, '2026-11-08T11:59:00Z']);
+		const failing = (state: 'falling_back' | 'degraded', tier: 'stops_runs' | 'needs_attention', error: string | null) => ({ location_id: 'l1', location_name: 'orders', target: 'production', state, failed_at: '2026-11-08T11:59:00Z', error, serving, tier });
+		const [failed, degraded] = toPlatformEvents(
+			{ scheduler_leader: true, broken_locations: [], overdue_ticks: [], failing_locations: [failing('falling_back', 'needs_attention', 'job loaders_job: path selectors require an explicit root'), failing('degraded', 'stops_runs', null)] },
+			NOW
+		);
+		expect([failed.kind, failed.severity, failed.state, failed.active, failed.occurredAt, stopsRuns(failed)]).toEqual(['location_failing', 'warning', 'falling_back', true, '2026-11-08T11:59:00Z', false]);
+		expect(stopsRuns(degraded)).toBe(true);
 		expect(failed.message).toMatch(/^orders · production: latest code failed to load: job loaders_job: path selectors require an explicit root\. Serving generation 11, published /);
-		expect([degraded.severity, degraded.message.split('. ')[0]]).toEqual(['warning', 'orders · production: the warehouse connection check failed']);
+		expect([degraded.severity, degraded.state, degraded.message.split('. ')[0]]).toEqual(['critical', 'degraded', 'orders · production: the warehouse connection check failed']);
+	});
+
+	it('makes a stalled sync a problem that needs a look, saying how far it got and for how long nothing moved', () => {
+		const stalled = { location_id: 'l1', location_name: 'orders', target: 'production', progressed_at: '2026-11-08T11:48:00Z', position: 7, kinds: 14, table: 'node_results' as const, tier: 'needs_attention' as const };
+		const [event] = toPlatformEvents({ scheduler_leader: true, broken_locations: [], overdue_ticks: [], stalled_syncs: [stalled] }, NOW);
+		expect([event.kind, event.severity, stopsRuns(event), event.occurrence, event.locationId]).toEqual(['warehouse_sync_stalled', 'warning', false, '2026-11-08T11:48:00Z', 'l1:production']);
+		expect(event.message).toBe('orders · production: the run history sync stalled at 7/14 (node results): no progress for 12m. The location may have stopped; check its output, then Sync now.');
 	});
 
 	it('makes a failing run-history sync a problem since its first failure, with its reason and how it retries', () => {
@@ -33,7 +45,8 @@ describe('toPlatformEvents', () => {
 			halted,
 			retry_at: halted ? null : '2026-11-08T12:00:40Z',
 			retry_seconds: halted ? null : 60,
-			last_success_at: '2026-11-08T11:40:00Z'
+			last_success_at: '2026-11-08T11:40:00Z',
+			tier: 'needs_attention' as const
 		});
 		const events = toPlatformEvents({ scheduler_leader: true, broken_locations: [], overdue_ticks: [], failing_syncs: [sync(true, false), sync(false, true)] }, NOW);
 		const since = formatClock('2026-11-08T11:42:00Z', NOW);
@@ -67,7 +80,7 @@ describe('toPlatformEvents', () => {
 
 	it('keys broken locations by location and target', () => {
 		const [broken] = toPlatformEvents(
-			{ scheduler_leader: true, broken_locations: [{ location_id: 'l2', location_name: 'inventory', target: 'development', last_seen_at: '2026-11-08T11:55:00Z' }], overdue_ticks: [] },
+			{ scheduler_leader: true, broken_locations: [{ location_id: 'l2', location_name: 'inventory', target: 'development', last_seen_at: '2026-11-08T11:55:00Z', tier: 'stops_runs' }], overdue_ticks: [] },
 			NOW
 		);
 		expect(broken).toMatchObject({ kind: 'location_broken', locationId: 'l2:development', occurredAt: '2026-11-08T11:55:00Z', subject: 'inventory · development' });
@@ -270,7 +283,7 @@ describe('toPlatformEventRecords', () => {
 	});
 
 	it('lists an open problem nothing was stored for first', () => {
-		const open = toPlatformEvents({ scheduler_leader: true, scheduler_lease_expires_at: null, broken_locations: [{ location_id: 'l2', location_name: 'inventory', target: 'development', last_seen_at: '2026-11-08T11:00:00Z' }], overdue_ticks: [] }, NOW);
+		const open = toPlatformEvents({ scheduler_leader: true, scheduler_lease_expires_at: null, broken_locations: [{ location_id: 'l2', location_name: 'inventory', target: 'development', last_seen_at: '2026-11-08T11:00:00Z', tier: 'stops_runs' }], overdue_ticks: [] }, NOW);
 		const records = toPlatformEventRecords(open, [{ storage_id: 1, event_id: 'e1', occurred_at: '2026-11-08T09:00:00Z', location_id: 'l1', target: 'development', event: { kind: 'location_broken', location_id: 'l1', target: 'development', last_seen_at: '2026-11-08T08:59:00Z' } }], new Map());
 		expect(records.map((r) => [r.kind, r.active, r.locationId])).toEqual([
 			['location_broken', true, 'l2:development'],
