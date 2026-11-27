@@ -456,9 +456,10 @@
 
 <style>
 	.health, .metric-strip, .surface-panel { box-shadow: var(--panel-shadow); border: 1px solid var(--panel-border); border-radius: 2px; background: var(--card); }
-	.health { overflow: hidden; border-color: color-mix(in srgb, var(--tone) 30%, var(--border)); border-left: 3px solid var(--tone); }
+	/* A list, not an alarm: the panel keeps the usual border, and only the icons carry each item's tone. */
+	.health { overflow: hidden; }
 	.health-head { display: flex; min-height: 49px; align-items: center; padding: 8px 13px; }
-	.issues { border-top: 1px solid color-mix(in srgb, var(--tone) 18%, var(--border)); }
+	.issues { border-top: 1px solid var(--inner-line); }
 	/* Rows share the columns, so times, Acknowledge and links line up down the list. */
 	/* The icon track is max-content so it also holds the rows' left padding, which a subgrid adds to its edge track. */
 	.issues, .handled-rows { display: grid; grid-template-columns: max-content minmax(0, 1fr) auto auto auto; column-gap: 10px; }

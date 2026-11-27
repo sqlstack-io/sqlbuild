@@ -10,7 +10,9 @@ test('a sync that can’t reach the warehouse is named in the top bar and needs 
 	await control.install(page);
 	await page.goto('/');
 	const status = page.getByTestId('sync-status');
-	await expect(status).toHaveText(new RegExp(`^Run history can't reach the warehouse since (\\d{4}-\\d{2}-\\d{2} )?\\d{2}:\\d{2} · retrying every 60 s · ${SYNC_REASON.replace(/[()]/g, '\\$&')}$`), { timeout: 30_000 });
+	// The top bar only counts the location's problems; the reason is listed once, on its page.
+	await expect(status).toHaveText(/^\d+ problems?$/, { timeout: 30_000 });
+	await expect(status).not.toContainText(SYNC_REASON);
 	await expect(status).toHaveAttribute('href', /\/locations\//);
 	const issues = page.locator('.issues');
 	await expect(issues).toContainText("run history can't reach the warehouse since", { timeout: 30_000 });
@@ -18,14 +20,14 @@ test('a sync that can’t reach the warehouse is named in the top bar and needs 
 	control.targets.shop.failingSync = null;
 	control.notify('all');
 	await expect(issues).toHaveCount(0, { timeout: 30_000 });
-	await expect(status).not.toContainText('Run history');
+	await expect(status).not.toContainText('problem');
 });
 
 test('a sync that failed reads stopped can be resumed from the attention list', async ({ page }) => {
 	const control = new FakeControl({ shop: { failingSync: { unreachable: false, halted: true } } });
 	await control.install(page);
 	await page.goto('/');
-	await expect(page.getByTestId('sync-status')).toContainText('Run history sync stopped since', { timeout: 30_000 });
+	await expect(page.getByTestId('sync-status')).toContainText('problem', { timeout: 30_000 });
 	const resume = page.getByTestId('attention-resume');
 	await expect(resume).toBeVisible({ timeout: 30_000 });
 	await resume.getByRole('button', { name: 'Resume' }).click();

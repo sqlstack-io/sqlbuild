@@ -2,7 +2,7 @@
 
 import type { AttentionItem, ChangedBuild, QueueWait } from '$lib/api';
 import { describeWait, outcomeCounts } from '$lib/operate/labels';
-import { eventKindLabel, problemHref } from '$lib/platform/labels';
+import { eventKindLabel, messageParts, problemHref } from '$lib/platform/labels';
 import { formatAgo } from '$lib/format/time';
 import { runStatusLabel } from '$lib/status';
 import { shortName } from '$lib/build-area/labels';
@@ -132,7 +132,8 @@ export function attentionView(item: AttentionItem, now: number, changedBuild: Ch
 				key: `event:${item.event.id}`,
 				tone: item.event.severity === 'critical' ? 'error' : item.event.severity === 'warning' ? 'warning' : 'info',
 				title: `${eventKindLabel[item.event.kind]}${item.event.subject ? ` · ${item.event.subject}` : ''}`,
-				detail: item.event.message,
+				// The summary only: the error itself is listed once, in the location's Problems.
+				detail: messageParts(item.event.message).summary,
 				since: formatAgo(item.event.occurredAt, now),
 				href: problemHref(item.event),
 				action: item.event.locationId ? 'View location' : 'View server status',
@@ -154,7 +155,7 @@ export function attentionView(item: AttentionItem, now: number, changedBuild: Ch
 				key: `sensor:${item.triggerId}`,
 				tone: 'error',
 				title: `Sensor ${item.triggerName} is failing`,
-				detail: [item.failing.reason, item.failing.eventId ? `Stuck on ${item.failing.eventId}` : null, plural(item.failing.failedTicks, 'failed tick')].filter(Boolean).join(' · '),
+				detail: [item.failing.reason ? messageParts(item.failing.reason).summary : null, item.failing.eventId ? `Stuck on ${item.failing.eventId}` : null, plural(item.failing.failedTicks, 'failed tick')].filter(Boolean).join(' · '),
 				since: formatAgo(item.failing.since, now),
 				href: `/triggers/${item.triggerId}`,
 				action: 'View sensor',

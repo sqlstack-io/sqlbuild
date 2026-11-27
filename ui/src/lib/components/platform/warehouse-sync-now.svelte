@@ -8,8 +8,9 @@
 	import ActionStatus from './action-status.svelte';
 
 	/** "Warehouse sync ● synced 4m ago [Sync now]"; a run ending syncs it too. */
-	type Props = { scope: Scope };
-	let { scope }: Props = $props();
+	/** `problemsHref` is where a failing or stalled sync is explained in full, on the location's page its Problems list. */
+	type Props = { scope: Scope; problemsHref?: string | null };
+	let { scope, problemsHref = null }: Props = $props();
 
 	const sync = createResource((client) => client.getWarehouseSync(scope), ['warehouse_sync']);
 	let requesting = $state(false);
@@ -25,7 +26,8 @@
 		const shown = syncWords(status, app.now);
 		return status.kind === 'synced' ? { ...shown, title: `${shown.title}${summary}` } : shown;
 	});
-	const cause = $derived(refused && !requesting ? refused.cause : status.kind === 'failing' ? status.error : null);
+	const cause = $derived(refused && !requesting ? refused.cause : null);
+	const href = $derived(!refused && (status.kind === 'failing' || status.kind === 'stalled') ? problemsHref : null);
 	const waiting = $derived(requesting || status.kind === 'requested' || status.kind === 'running');
 	const since = $derived(
 		status.kind === 'requested'
@@ -55,6 +57,7 @@
 		lead="Warehouse sync"
 		{words}
 		{cause}
+		{href}
 		testid="sync-now"
 		action={{ label: 'Sync now', requires: 'connection.test', onclick: request, busy: waiting, busyTitle: since, title: "Read what's been built, checks and freshness from the warehouse now" }}
 	/>

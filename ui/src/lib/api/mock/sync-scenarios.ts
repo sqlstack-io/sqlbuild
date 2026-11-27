@@ -74,7 +74,8 @@ function initial(scenario: SyncScenario, now: number): State {
 		events: [
 			event('warehouse_sync_failed', halted ? 'critical' : 'warning', halted ? `Run history sync stopped after failed reads in a row: ${IP_BLOCKED}` : `Run history can't reach the warehouse: ${IP_BLOCKED}`, {
 				sync: { halted, unreachable: true, retrySeconds: halted ? null : 60, retryAt: halted ? null : iso(now + 40_000), lastSuccessAt: iso(now - 26 * 3_600_000) }
-			})
+			}),
+			event('connection_test_failed', 'warning', `The warehouse connection test failed: ${IP_BLOCKED}`, { id: 'scenario-connection-test', occurredAt: iso(now - 3 * 60_000) })
 		]
 	});
 	switch (scenario) {

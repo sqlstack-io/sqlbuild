@@ -16,6 +16,7 @@
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import ServerStatus from './server-status.svelte';
+	import ViewError from '$lib/components/platform/view-error.svelte';
 
 	const locations = createResource((client) => client.listLocations(), ['snapshot', 'platform_events', 'warehouse_sync', 'location_health']);
 	let status = $state<ServerStatus>();
@@ -93,7 +94,7 @@
 							<span title={partialTitle}><StatusLabel tone="var(--sb-text-faint)" label="Unknown" muted /></span>
 						{/if}
 						{#if l.activeProblems}
-							<div class="cell-desc"><a class="link" href={to(`/locations/${l.id}#problems`)}>{plural(l.activeProblems, 'open problem')}</a></div>
+							<div class="cell-desc"><a class="muted-link" href={to(`/locations/${l.id}#problems`)}>{plural(l.activeProblems, 'problem')}</a></div>
 						{/if}
 					</td>
 					<td>
@@ -111,19 +112,24 @@
 							<span class="muted" title={partialTitle}>—</span>
 						{:else}
 							{@const words = testing[l.id] ? { tone: 'running' as const, label: 'testing…', title: 'Runs the same check as sqb debug.' } : testWords(test, l.snapshot?.publishedAt ?? null, Math.max(app.now, test ? Date.parse(test.at) : 0))}
-							<span title={words.title}><StatusLabel tone={actionTone[words.tone]} label={words.label} muted={words.tone === 'never'} /></span>
-							{#if test && !testing[l.id]}<div class="cell-desc" title={test.message}>{testOrigin(test)}</div>{/if}
+							{@const tone = words.tone === 'ok' ? 'var(--sb-text-faint)' : actionTone[words.tone]}
+							{#if test?.outcome === 'failed' && !testing[l.id]}
+								<a href={to(`/locations/${l.id}#problems`)} title={words.title}><StatusLabel {tone} label={words.label} /></a>
+							{:else}
+								<span title={words.title}><StatusLabel {tone} label={words.label} muted={words.tone === 'never'} /></span>
+							{/if}
+							{#if test && !testing[l.id]}<div class="cell-desc">{testOrigin(test)}</div>{/if}
 						{/if}
-						{#if testFailures[l.id]}<div class="cell-desc err" title={testFailures[l.id]}>{testFailures[l.id]}</div>{:else if test?.outcome === 'failed' && !testing[l.id]}<div class="cell-desc err" title={test.message}>{test.message}</div>{/if}
+						{#if testFailures[l.id]}<div class="cell-desc"><ViewError error={testFailures[l.id]} /></div>{/if}
 						{#if mayTest(l.id)}
 							<span class="mt-1 flex" title={testing[l.id] ? 'Testing now' : undefined}>
-								<Button variant="outline" size="sm" disabled={testing[l.id]} onclick={(e: MouseEvent) => (e.stopPropagation(), testConnection(l.id))} title="Ask the location to connect to its warehouse, as sqb debug does">Test connection</Button>
+								<Button variant="ghost" size="sm" disabled={testing[l.id]} onclick={(e: MouseEvent) => (e.stopPropagation(), testConnection(l.id))} title="Ask the location to connect to its warehouse, as sqb debug does">Test connection</Button>
 							</span>
 						{/if}
 					</td>
 					<td>
 						{#if l.health === null}<span class="muted" title={partialTitle}>—</span>{:else}
-							<StatusLabel tone={l.liveInstances ? actionTone.ok : actionTone.failed} label={l.liveInstances === 1 ? 'running' : l.liveInstances === 0 ? 'not checking in' : `${l.liveInstances} running`} />
+							<StatusLabel tone={l.liveInstances ? 'var(--sb-text-faint)' : actionTone.failed} label={l.liveInstances === 1 ? 'running' : l.liveInstances === 0 ? 'not checking in' : `${l.liveInstances} running`} />
 							{#if l.lastSeenAt}<div class="cell-desc"><RelativeTime value="checked in {formatAgo(l.lastSeenAt, app.now)}" exact={formatStamp(l.lastSeenAt)} /></div>{/if}
 						{/if}
 					</td>
@@ -136,5 +142,6 @@
 	tr.static {
 		cursor: default;
 	}
-	.err { color: var(--sb-error) !important; }
+	.muted-link { color: var(--muted-foreground); }
+	.muted-link:hover { color: var(--foreground); }
 </style>

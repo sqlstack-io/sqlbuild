@@ -235,7 +235,8 @@ export function testOrigin(test: Pick<ConnectionTest, 'trigger' | 'by'>): string
 /** What a connection test's tooltip says: the last test in full, or that there is none. */
 export function testTitle(test: ConnectionTest | null, deployedAt: string | null, now: number): string {
 	if (!test) return 'The location hasn’t tested its warehouse connection yet. Test connection runs the same check as sqb debug.';
-	const when = `Tested ${testOrigin(test)} · ${formatStamp(test.at)} · ${test.durationMs} ms\n${test.message}`;
+	// A failure's message is the error, shown once where the failure is listed, not in every tooltip.
+	const when = `Tested ${testOrigin(test)} · ${formatStamp(test.at)} · ${test.durationMs} ms${test.outcome === 'ok' ? `\n${test.message}` : ''}`;
 	if (test.outcome === 'ok' && deployedAt && Date.parse(test.at) < Date.parse(deployedAt)) return `Last connected ${formatAgo(test.at, now)}, before the latest deploy.\n${when}`;
 	return when;
 }
@@ -260,7 +261,7 @@ export function syncTitle(state: SyncNowState, now: number): string {
 		case 'stalled':
 			return `At ${state.running.position}/${state.running.kinds} (${state.running.table.replaceAll('_', ' ')}) since ${formatStamp(state.progressAt)}, with no report since. The location may have stopped, so check its output, then Sync now.`;
 		case 'failing':
-			return `${state.failing ? `Failing since ${formatStamp(state.failing.since)}.\n` : ''}${state.error}\n${state.lastSyncedAt ? `Last synced ${formatStamp(state.lastSyncedAt)}.` : 'Not synced yet.'}`;
+			return `${state.failing ? `Failing since ${formatStamp(state.failing.since)}. ` : ''}${state.lastSyncedAt ? `Last synced ${formatStamp(state.lastSyncedAt)}.` : 'Not synced yet.'}`;
 		case 'synced':
 			return `Synced ${formatStamp(state.at)}. A sync also follows every run that ends.\n${what}`;
 		case 'never':
@@ -315,18 +316,30 @@ export function publishWords(result: RepublishResult | null, publishing: number 
 	if (snapshot) return { tone: 'ok', label: `version ${snapshot.generation} · ${formatAgo(snapshot.publishedAt, now)}`, title };
 	return { tone: 'never', label: 'nothing published yet', title };
 }
-/** The location's headline: its health, folded with what would contradict "Healthy", worst first. */
-export function headlineWords(
-	health: LocationHealth,
-	facts: { live: boolean; test: ActionWords; sync: SyncNowState }
-): { tone: string; label: string; note: string | null; noteTone: ActionTone | null } {
-	const base = { tone: healthTone[health], label: healthLabel[health] };
-	if (!facts.live) return { tone: actionTone.failed, label: 'Broken', note: 'not checking in', noteTone: 'failed' };
-	if (health !== 'healthy') return { ...base, note: null, noteTone: null };
-	const attention = { tone: actionTone.warning, label: 'Needs attention' };
-	if (facts.sync.kind === 'failing') return { ...attention, note: 'sync failing', noteTone: 'failed' };
-	if (facts.test.tone === 'failed') return { ...attention, note: 'can’t connect', noteTone: 'failed' };
-	if (facts.sync.kind === 'stalled') return { ...attention, note: 'sync stalled', noteTone: 'warning' };
-	if (facts.test.tone === 'warning' || facts.test.tone === 'never') return { ...base, note: 'warehouse not tested', noteTone: 'warning' };
-	return { ...base, note: null, noteTone: null };
+/** The location's one health tag: its health, or the worst fact that would contradict "Healthy". */
+export function headlineWords(health: LocationHealth, facts: { live: boolean; test: ActionWords; sync: SyncNowState }): { tone: string; label: string } {
+	if (!facts.live) return { tone: actionTone.failed, label: 'Not checking in' };
+	if (health !== 'healthy') return { tone: healthTone[health], label: healthLabel[health] };
+	if (facts.sync.kind === 'failing') return { tone: actionTone.failed, label: 'Sync failing' };
+	if (facts.test.tone === 'failed') return { tone: actionTone.failed, label: 'Can’t connect' };
+	if (facts.sync.kind === 'stalled') return { tone: actionTone.warning, label: 'Sync stalled' };
+	if (facts.test.tone === 'warning' || facts.test.tone === 'never') return { tone: actionTone.warning, label: 'Not tested' };
+	return { tone: healthTone[health], label: healthLabel[health] };
+}
+
+/**
+ * A problem message as a short summary and the error behind it, so the error is shown once, behind
+ * "View error": the text before the first `: ` that follows at least three words, e.g. "Run history
+ * can't reach the warehouse" and "390422 (08001): IP … is not allowed". Short messages stay whole.
+ */
+export function messageParts(message: string): { summary: string; error: string | null } {
+	for (let at = message.indexOf(': '); at > 0; at = message.indexOf(': ', at + 2)) {
+		const head = message.slice(0, at);
+		const words = head.split(/\s+/).filter((w) => /[a-z]/i.test(w)).length;
+		if (words >= 3) {
+			const rest = message.slice(at + 2).trim();
+			return rest ? { summary: head, error: rest } : { summary: message, error: null };
+		}
+	}
+	return { summary: message, error: null };
 }

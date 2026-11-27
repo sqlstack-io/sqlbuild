@@ -50,3 +50,18 @@ describe('syncNowState', () => {
 		expect(syncNowState({ ...recovered, requested: { at: '2026-11-27T03:54:50Z', by: 'ada' } }, null, NOW)).toEqual({ kind: 'requested', at: Date.parse('2026-11-27T03:54:50Z'), by: 'ada' });
 	});
 });
+
+describe('messageParts', () => {
+	it('keeps the error out of the summary, after the first clause of three words or more', async () => {
+		const { messageParts } = await import('./labels');
+		expect(messageParts("Run history can't reach the warehouse: 390422 (08001): IP 203.0.113.7 is not allowed")).toEqual({
+			summary: "Run history can't reach the warehouse",
+			error: '390422 (08001): IP 203.0.113.7 is not allowed'
+		});
+		expect(messageParts('orders · prod: the warehouse connection check failed: IP is not allowed.')).toEqual({
+			summary: 'orders · prod: the warehouse connection check failed',
+			error: 'IP is not allowed.'
+		});
+		expect(messageParts('stock_levels in inventory · development is late.')).toEqual({ summary: 'stock_levels in inventory · development is late.', error: null });
+	});
+});
