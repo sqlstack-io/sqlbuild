@@ -503,6 +503,7 @@ pub enum PlatformEventKind {
     SensorRechecked,
     CalendarTimesDropped,
     UnreadableEventSkipped,
+    ControlSessionCutOff,
 }
 
 impl PlatformEventKind {
@@ -521,6 +522,7 @@ impl PlatformEventKind {
             Self::SensorRechecked => "sensor_rechecked",
             Self::CalendarTimesDropped => "calendar_times_dropped",
             Self::UnreadableEventSkipped => "unreadable_event_skipped",
+            Self::ControlSessionCutOff => "control_session_cut_off",
         }
     }
 }
@@ -596,6 +598,13 @@ pub enum PlatformEvent {
         /// Why the event couldn't be read.
         reason: String,
     },
+    /// The control database cut off one of this server's sessions: a statement ran past its limit, or a transaction sat idle past its own, and was rolled back.
+    ControlSessionCutOff {
+        /// The transaction sat idle past its limit, rather than a statement running past its own.
+        idle: bool,
+        cut_at: DateTime<Utc>,
+        error: String,
+    },
 }
 
 /// What a `run_failed` event says: the run, what started it, when, what failed and why, with UI links.
@@ -643,6 +652,7 @@ impl PlatformEvent {
             Self::SensorRechecked { .. } => PlatformEventKind::SensorRechecked,
             Self::CalendarTimesDropped { .. } => PlatformEventKind::CalendarTimesDropped,
             Self::UnreadableEventSkipped { .. } => PlatformEventKind::UnreadableEventSkipped,
+            Self::ControlSessionCutOff { .. } => PlatformEventKind::ControlSessionCutOff,
         }
     }
 
@@ -661,6 +671,7 @@ impl PlatformEvent {
             Self::SensorRechecked { .. } => "platform_sensor_rechecked",
             Self::CalendarTimesDropped { .. } => "platform_calendar_times_dropped",
             Self::UnreadableEventSkipped { .. } => "platform_unreadable_event_skipped",
+            Self::ControlSessionCutOff { .. } => "platform_control_session_cut_off",
         }
     }
 }

@@ -7,7 +7,7 @@ use crate::runs::_helpers::groups::context::load_group;
 use crate::runs::constants::SUPERSEDED_CHILD;
 use crate::runs::constants::UNFINISHED_NODE_STATUSES;
 use crate::runs::models::{GroupContext, GroupRun, QueueWait, RunRequest, RunStatus};
-use crate::snapshots::main::reads::read_snapshot_nodes::read_snapshot_nodes;
+use crate::snapshots::main::reads::snapshot_nodes::snapshot_nodes;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
@@ -150,7 +150,7 @@ pub(crate) async fn skipped_nodes(
     if failures.is_empty() {
         return Ok((transaction, BTreeMap::new()));
     }
-    let (transaction, nodes) = read_snapshot_nodes(transaction, request.snapshot_id, None).await?;
+    let nodes = snapshot_nodes(&transaction.store, request.snapshot_id).await?;
     let mut skipped: BTreeMap<String, String> = BTreeMap::new();
     for selected in &request.selection {
         let mut seen: BTreeSet<&str> = BTreeSet::new();

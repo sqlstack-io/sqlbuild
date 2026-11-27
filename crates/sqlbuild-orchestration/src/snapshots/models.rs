@@ -17,6 +17,43 @@ pub struct SnapshotNode {
     pub python_source: Option<String>,
 }
 
+/// Decoded snapshots by ID, and the memory budget their decoding shares.
+#[derive(Debug)]
+pub(crate) struct SnapshotNodeCache {
+    pub(crate) slots: std::sync::Mutex<SnapshotNodeSlots>,
+    /// One permit per MiB a read may decode into; a read waits for its estimate, capped at the whole budget.
+    pub(crate) budget: tokio::sync::Semaphore,
+}
+
+/// The cached snapshots; a larger `used` is more recent.
+#[derive(Debug)]
+pub(crate) struct SnapshotNodeSlots {
+    pub(crate) clock: u64,
+    pub(crate) slots: Vec<SnapshotNodeSlot>,
+}
+
+/// One snapshot's nodes, decoded by the first reader while later ones wait.
+#[derive(Debug)]
+pub(crate) struct SnapshotNodeSlot {
+    pub(crate) snapshot_id: Uuid,
+    pub(crate) used: u64,
+    pub(crate) cell: std::sync::Arc<tokio::sync::OnceCell<crate::snapshots::types::SnapshotNodes>>,
+}
+
+impl SnapshotNodeCache {
+    pub(crate) const fn new() -> Self {
+        Self {
+            slots: std::sync::Mutex::new(SnapshotNodeSlots {
+                clock: 0,
+                slots: Vec::new(),
+            }),
+            budget: tokio::sync::Semaphore::const_new(
+                crate::snapshots::constants::SNAPSHOT_DECODE_BUDGET_MIB as usize,
+            ),
+        }
+    }
+}
+
 /// SQL inspection never returns Python source, execution artifacts or unrelated node metadata.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct NodeSql {

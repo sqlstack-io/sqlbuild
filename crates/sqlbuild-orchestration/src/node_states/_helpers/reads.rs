@@ -9,7 +9,7 @@ use uuid::Uuid;
 use crate::node_states::_helpers::status::{StatusNode, apply_statuses};
 use crate::node_states::models::{ChangedBuild, ChangedBuildNodes, NodeState, SnapshotCatalog};
 use crate::snapshots::main::reads::read_current_record::read_current_record;
-use crate::snapshots::main::reads::read_snapshot_nodes::read_snapshot_nodes;
+use crate::snapshots::main::reads::snapshot_nodes::snapshot_nodes;
 use crate::snapshots::models::SnapshotNode;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
@@ -52,8 +52,9 @@ pub(crate) async fn read_target(
         (Some(held), _) if held.snapshot_id == snapshot_id => (transaction, held),
         (_, None) => (transaction, Arc::new(SnapshotCatalog::default())),
         (_, Some(snapshot_id)) => {
-            let (transaction, nodes) = read_snapshot_nodes(transaction, snapshot_id, None).await?;
-            (transaction, Arc::new(snapshot_catalog(snapshot_id, nodes)))
+            commit(transaction).await?;
+            let catalog = shared_catalog(store, snapshot_id).await?;
+            (begin(store, TransactionMode::Read).await?, catalog)
         }
     };
     let (transaction, states) = node_states(transaction, (location_id, target), &catalog).await?;
@@ -95,12 +96,23 @@ async fn changed_build(
     ))
 }
 
-fn snapshot_catalog(snapshot_id: Uuid, nodes: BTreeMap<String, SnapshotNode>) -> SnapshotCatalog {
+/// The snapshot's catalog, built off the async workers from the shared copy of its nodes; the caller holds no transaction meanwhile, since that read runs in its own short transactions and may wait for the memory budget.
+async fn shared_catalog(
+    store: &ControlStore,
+    snapshot_id: Uuid,
+) -> Result<Arc<SnapshotCatalog>, ControlError> {
+    let nodes = snapshot_nodes(store, snapshot_id).await?;
+    Ok(Arc::new(
+        tokio::task::spawn_blocking(move || snapshot_catalog(snapshot_id, &nodes)).await?,
+    ))
+}
+
+fn snapshot_catalog(snapshot_id: Uuid, nodes: &BTreeMap<String, SnapshotNode>) -> SnapshotCatalog {
     let mut records = Vec::with_capacity(nodes.len());
     let mut inputs = Vec::with_capacity(nodes.len());
     for (key, node) in nodes {
         records.push(catalog_node(
-            (&key, &node),
+            (key, node),
             snapshot_id,
             (None, None, false),
             Default::default(),
@@ -110,9 +122,9 @@ fn snapshot_catalog(snapshot_id: Uuid, nodes: BTreeMap<String, SnapshotNode>) ->
             .filter_map(|field| Some(((*field).to_owned(), node.definition.get(field)?.clone())))
             .collect();
         inputs.push((
-            key,
+            key.clone(),
             SnapshotNode {
-                kind: node.kind,
+                kind: node.kind.clone(),
                 definition: Value::Object(definition),
                 raw_sql: None,
                 compiled_sql: None,

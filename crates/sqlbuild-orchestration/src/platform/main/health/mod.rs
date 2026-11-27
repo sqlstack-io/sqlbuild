@@ -8,4 +8,5 @@ pub(crate) mod record_trigger_problem;
 pub(crate) mod recorded_skip;
 pub mod report_location_health;
 pub mod report_remote_location_health;
+pub mod report_session_cut_offs;
 pub mod unallowed_secret_count;

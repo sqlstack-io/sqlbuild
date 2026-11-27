@@ -27,6 +27,9 @@ pub(crate) fn sentence(case: ControlCauseCase, target: &ControlTarget, own: &str
             target.connections, target.wait_seconds
         ),
         ControlCauseCase::Locked => "The control database is locked by another process".to_owned(),
+        ControlCauseCase::SessionCutOff => {
+            format!("The control database cut off a server session that ran past its limit: {own}")
+        }
         ControlCauseCase::Other => format!("Control database error: {own}"),
     }
 }

@@ -54,7 +54,7 @@ pub async fn read_person_job(
         snapshot_relations(&definitions, (job_key, &job), (caps, (location_id, target)));
     let (settings, ignore_audit_failures) = declared_settings(&job);
     let (transaction, nodes) =
-        read_snapshot_nodes(transaction, snapshot_id, Some(&job.selection)).await?;
+        read_snapshot_nodes(transaction, snapshot_id, &job.selection).await?;
     commit(transaction).await?;
     Ok(Some(JobDetailRecord {
         job_key: job_key.into(),

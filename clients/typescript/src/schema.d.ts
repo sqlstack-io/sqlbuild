@@ -2377,7 +2377,7 @@ export interface components {
          * @description Which kind of control database failure an error is; the sentence people read follows from it.
          * @enum {string}
          */
-        ControlCauseCase: "name_lookup" | "unreachable" | "login_rejected" | "no_free_connections" | "restarting" | "pool_exhausted" | "locked" | "other";
+        ControlCauseCase: "name_lookup" | "unreachable" | "login_rejected" | "no_free_connections" | "restarting" | "pool_exhausted" | "locked" | "session_cut_off" | "other";
         /** @description One job's estimated query cost on one node: in the period, and in the period before it. */
         CostFactRecord: {
             /** Format: int64 */
@@ -3988,9 +3988,17 @@ export interface components {
             /** Format: int64 */
             storage_id: number;
             target?: string | null;
+        } | {
+            /** Format: date-time */
+            cut_at: string;
+            error: string;
+            /** @description The transaction sat idle past its limit, rather than a statement running past its own. */
+            idle: boolean;
+            /** @enum {string} */
+            kind: "control_session_cut_off";
         };
         /** @enum {string} */
-        PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "location_failing" | "launch_failed" | "run_failed" | "trigger_skipped" | "sensor_rechecked" | "calendar_times_dropped" | "unreadable_event_skipped";
+        PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "location_failing" | "launch_failed" | "run_failed" | "trigger_skipped" | "sensor_rechecked" | "calendar_times_dropped" | "unreadable_event_skipped" | "control_session_cut_off";
         /** @description Problems derived from live state when read; nothing here is stored. */
         PlatformProblems: {
             broken_locations: components["schemas"]["BrokenLocation"][];

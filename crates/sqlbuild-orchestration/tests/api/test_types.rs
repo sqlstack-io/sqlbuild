@@ -743,3 +743,25 @@ pub(crate) struct LocationHealthFeedTestCase {
     /// The topic each report reaches people's pages on: the failing sync, its completion, then a check-in.
     pub(crate) expected_topics: [&'static str; 3],
 }
+
+#[derive(Debug)]
+pub(crate) struct RepublishLoadTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) nodes: usize,
+    /// The most the server's peak memory may grow per byte of the new snapshot's compressed definitions.
+    pub(crate) expected_growth_per_compressed_byte_at_most: u64,
+    pub(crate) expected_slowest_livez_ms_at_most: u64,
+    pub(crate) expected_longest_idle_in_transaction_ms_at_most: u64,
+}
+
+/// One republish under load: the snapshot's size, the server's peak memory growth, `/livez`'s slowest answer and the longest a session sat idle in a transaction.
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
+pub(crate) struct RepublishLoad {
+    pub(crate) nodes: usize,
+    pub(crate) compressed_bytes: u64,
+    pub(crate) peak_growth_bytes: u64,
+    pub(crate) slowest_livez_ms: u64,
+    pub(crate) livez_answers: u64,
+    pub(crate) longest_idle_in_transaction_ms: u64,
+    pub(crate) caught_up: bool,
+}

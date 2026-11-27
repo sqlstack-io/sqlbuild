@@ -36,6 +36,8 @@ mod plans_helpers;
 mod proxy_provisioning_helpers;
 #[path = "recall/helpers.rs"]
 mod recall_helpers;
+#[path = "republish_load/helpers.rs"]
+mod republish_load_helpers;
 #[path = "service_accounts/helpers.rs"]
 mod service_accounts_helpers;
 #[path = "state_history/helpers.rs"]
@@ -124,6 +126,8 @@ mod test_publish_encoding;
 mod test_reads;
 #[path = "test_republish.rs"]
 mod test_republish;
+#[path = "test_republish_load.rs"]
+mod test_republish_load;
 #[path = "test_resource_costs.rs"]
 mod test_resource_costs;
 #[path = "test_run_ids.rs"]

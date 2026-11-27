@@ -11,14 +11,23 @@ use crate::runs::models::{
 /// Each past run a command's selectors name, by the run ID as typed.
 pub type PastRuns = BTreeMap<String, PastRunResults>;
 
+/// Index one publication's nodes and jobs for repeated planning; pure and side-effect free, so it runs on a blocking thread.
+pub type Preparer =
+    fn(Vec<PlannerResource>, PublishedJobs) -> std::sync::Arc<dyn PreparedPublication>;
+
 /// Index a publication once with the CLI's selector graph, then parse and resolve commands against it.
 pub trait CommandPlanner: Send + Sync {
-    /// One publication's nodes and jobs, indexed for repeated planning; pure and side-effect free.
+    /// The function that indexes a publication, which the server calls off its async workers.
+    fn preparer(&self) -> Preparer;
+
+    /// One publication's nodes and jobs, indexed for repeated planning.
     fn prepare(
         &self,
         resources: Vec<PlannerResource>,
         jobs: PublishedJobs,
-    ) -> std::sync::Arc<dyn PreparedPublication>;
+    ) -> std::sync::Arc<dyn PreparedPublication> {
+        (self.preparer())(resources, jobs)
+    }
 
     /// The publications this planner has prepared, kept between requests because snapshots never change.
     fn publications(&self) -> &PublicationCache;
