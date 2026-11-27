@@ -17,6 +17,7 @@ use sqlbuild_core::progress::main::statement_summary_delta::statement_summary_de
 use sqlbuild_core::progress::models::StatementSummary;
 use sqlbuild_core::run_on::main::apply_local_refusals::apply_local_refusals;
 use sqlbuild_core::run_on::main::read_run_on_decisions::read_run_on_decisions;
+use sqlbuild_core::run_on::main::relied_on_text::relied_on_text;
 use sqlbuild_core::run_on::main::render_local_refusals::render_local_refusals;
 use sqlbuild_core::run_on::main::render_warehouse_census::render_warehouse_census;
 use sqlbuild_core::run_on::main::run_on_column::run_on_column;
@@ -220,6 +221,8 @@ struct TestCallbackRelay {
     worker: Option<Arc<WorkerBuild>>,
     /// Where each test runs, by test name; a local test that falls back becomes `warehouse`.
     run_on: Mutex<HashMap<String, String>>,
+    /// What each local test relied on from the project, by test name, for its row.
+    relied_on: HashMap<String, String>,
     /// In `auto`, a local test DuckDB can't run as the warehouse would runs there instead, unreported.
     fallback: bool,
     progress: Py<PyAny>,
@@ -332,8 +335,12 @@ impl TestCallbackRelay {
         let name: String = result.getattr("test_name")?.extract()?;
         let real: String = real_model_detail(result)?;
         let run_on = self.run_on.lock().unwrap_or_else(PoisonError::into_inner);
+        let relied: String = match (run_on.get(&name), self.relied_on.get(&name)) {
+            (Some(placed), Some(relied)) if placed == LOCAL_RUN_ON => relied.clone(),
+            _ => String::new(),
+        };
         Ok(match run_on.get(&name) {
-            Some(run_on) => format!("  {}{real}", run_on_column(run_on))
+            Some(run_on) => format!("  {}{relied}{real}", run_on_column(run_on))
                 .trim_end()
                 .to_owned(),
             None => real,
@@ -593,6 +600,8 @@ pub(crate) struct TestPlacement<'py> {
     warehouse: Vec<Bound<'py, PyAny>>,
     /// Where each test runs, by name, for its row.
     run_on: HashMap<String, String>,
+    /// What each local test relied on from the project, by name, for its row.
+    relied_on: HashMap<String, String>,
     /// In `auto`, warehouse tests without a connection become error rows instead of failing the run.
     warehouse_optional: bool,
 }
@@ -686,6 +695,7 @@ fn run_tests<'py>(
         local_names,
         mut warehouse,
         run_on,
+        relied_on,
         warehouse_optional,
     } = placement;
     let mut refused_locally: Vec<(String, LocalRefusal)> = Vec::new();
@@ -694,6 +704,7 @@ fn run_tests<'py>(
         TestCallbackRelay {
             worker,
             run_on: Mutex::new(run_on),
+            relied_on,
             fallback: warehouse_optional,
             progress: progress.unbind(),
             event_writer: event_writer.clone().unbind(),
@@ -1290,6 +1301,10 @@ fn decide(
             ),
             ("compiled_paths", paths.into_any()),
             ("run_on", text(py, mode.as_str())),
+            (
+                "discovered_inputs",
+                native_field(invocation, "discovered_inputs")?,
+            ),
         ],
     )?
     .extract()?;
@@ -1308,6 +1323,7 @@ fn place_tests<'py>(
         local_names: Vec::new(),
         warehouse: Vec::new(),
         run_on: HashMap::new(),
+        relied_on: HashMap::new(),
         warehouse_optional: mode == RunOn::Auto,
     };
     let mut placed: Vec<RunOnDecision> = Vec::with_capacity(decisions.len());
@@ -1321,7 +1337,7 @@ fn place_tests<'py>(
             .unwrap_or_else(|| RunOnDecision {
                 name: name.clone(),
                 run_on: WAREHOUSE_RUN_ON.to_owned(),
-                refusals: Vec::new(),
+                ..RunOnDecision::default()
             });
         match mode {
             RunOn::Warehouse => {
@@ -1346,6 +1362,9 @@ fn place_tests<'py>(
                     .push((entry, NEEDS_WAREHOUSE_CODE, NEEDS_WAREHOUSE_MESSAGE))
             }
             RunOn::Auto => placement.warehouse.push(entry),
+        }
+        if let Some(relied) = relied_on_text(&decision.relied_on) {
+            placement.relied_on.insert(name.clone(), relied);
         }
         placement.run_on.insert(name, decision.run_on.clone());
         placed.push(decision);

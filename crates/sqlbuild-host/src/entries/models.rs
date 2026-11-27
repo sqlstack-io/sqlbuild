@@ -282,6 +282,7 @@ pub enum ExecutorHost {
     DecideSqlTestRunOn,
     LocalTestAdapter,
     ReportUnplacedSqlTests,
+    CheckLocalTestInputs,
     DecideScenarioRunOn,
     SelectScenarioSnapshotCaptureCandidates,
     TestPipelineCallbacks,

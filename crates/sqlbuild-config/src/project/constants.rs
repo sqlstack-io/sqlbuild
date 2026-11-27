@@ -265,6 +265,10 @@ pub(crate) const DEFAULT_HEARTBEAT_GRACE_SECONDS: u64 = 1_800;
 pub(crate) const HEARTBEAT_INTERVAL_SECONDS: u64 = 60;
 pub(crate) const REVIEW_KEYS: [&str; 4] =
     ["against", "critical_tags", "downstream", "schema_prefix"];
+/// `[testing]`'s tables.
+pub(crate) const TESTING_KEYS: [&str; 1] = ["local"];
+/// `[testing.local]`'s keys.
+pub(crate) const TESTING_LOCAL_KEYS: [&str; 1] = ["allow"];
 pub(crate) const REVIEW_DOWNSTREAM_POLICIES: [&str; 3] = ["critical", "all", "none"];
 pub(crate) const CLONE_KEYS: [&str; 2] = ["allow_as_clone_origin", "allow_as_clone_destination"];
 pub(crate) const EXECUTION_LIMIT_KEYS: [&str; 5] = [

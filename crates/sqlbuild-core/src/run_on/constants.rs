@@ -8,6 +8,8 @@ pub(crate) const COLUMN_WIDTH: usize = 9;
 pub(crate) const CANNOT_RUN_LOCALLY_TITLE: &str = "Can't run locally";
 pub(crate) const ON_THE_WAREHOUSE_TITLE: &str = "On the warehouse";
 pub(crate) const RUNS_ON_LABEL: &str = "runs on";
+/// What a local item relied on from the project: SQLQuack allowances and overrides.
+pub(crate) const RELIED_ON_LABEL: &str = "relied on";
 pub(crate) const TESTS_NOTE: &str = "= tests:";
 pub(crate) const NOTE_LABEL: &str = "= note:";
 pub(crate) const EXPANDED_LABEL: &str = "= expanded from";

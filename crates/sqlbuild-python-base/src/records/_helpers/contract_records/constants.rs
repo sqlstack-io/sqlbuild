@@ -533,6 +533,7 @@ const R_PROJECT_CONFIG: RecordSpec = RecordSpec {
         ),
         FieldSpec::new("path_defaults", FieldDefault::EmptyDict),
         FieldSpec::new("vars", FieldDefault::EmptyDict),
+        FieldSpec::new("local_test_allow", FieldDefault::EmptyDict),
         FieldSpec::new("targets", FieldDefault::EmptyDict),
         FieldSpec::new("janitor", FieldDefault::NativeCall(RecordId::JanitorConfig)),
         FieldSpec::new(

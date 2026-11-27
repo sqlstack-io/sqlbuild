@@ -11,6 +11,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.scenario.helpers import (
     build_scenario_project_files,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.test._test_types import (
+    LocalTestInputsE2ETestCase,
     RunOnFallbackProgressE2ETestCase,
     RunOnLocalJsonE2ETestCase,
     RunOnPrecedenceE2ETestCase,
@@ -35,6 +36,11 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
 
 _DURATION: re.Pattern[str] = re.compile(r"  \d+\.\d+s$", re.MULTILINE)
 _PROJECTS: dict[str, dict[str, str]] = {"snowflake": SNOWFLAKE_FILES}
+_ALLOW_HASH: str = "\n[testing.local]\nallow = { hash = true }\n"
+_HASH_OVERRIDE: str = (
+    "FUNCTION (\n  arguments (x VARCHAR),\n  returns NUMBER(19,0),\n  replaces HASH,\n"
+    "  dialect duckdb\n);\nhash(x)\n"
+)
 
 
 @pytest.mark.parametrize(
@@ -173,9 +179,9 @@ def test_given_run_on_set_in_several_places_when_testing_then_flag_target_settin
                 " rows by hash.\n"
                 "  = note: wrong when: Storing, comparing or sorting by the hash value itself:"
                 " it differs, with no error.\n"
-                "  = help: allow it with hash = true under [allow] in a sqlquack.toml in the"
-                " project folder;\n"
-                "          `sqlquack explain hash` says when it is safe\n"
+                "  = help: allow it with hash = true under [testing.local] allow in"
+                " sqlbuild_project.toml; `sqlquack\n"
+                "          explain hash` says when it is safe\n"
                 "  = expanded from @py.status_hash at"
                 " sql/models/staging/stg_order_flags.sql:5:3\n"
                 "  = tests: test_stg_order_flags\n"
@@ -465,3 +471,137 @@ def test_given_scenario_run_on_flags_when_combined_then_refuses_unsupported_ones
 
 if __name__ == "__main__":
     pytest.main([__file__, "-vv"])
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    (
+        LocalTestInputsE2ETestCase(
+            description="an allowed known difference runs the test locally and says so",
+            project_toml_suffix=_ALLOW_HASH,
+            extra_files={},
+            command=("test", "--sql", "--run-on", "local", "--select", "test_stg_orders"),
+            expected_exit_code=0,
+            expected_text="PASS  local    relied on: HASH (allowed)  1 real model",
+        ),
+        LocalTestInputsE2ETestCase(
+            description="inspect lists the allowance a local test relies on",
+            project_toml_suffix=_ALLOW_HASH,
+            extra_files={},
+            command=("test", "--sql", "--inspect", "--select", "test_stg_orders"),
+            expected_exit_code=0,
+            expected_text="test_stg_orders\n  runs on: local\n  relied on: HASH (allowed)\n",
+        ),
+        LocalTestInputsE2ETestCase(
+            description="an override in tests/overrides runs the test locally and says so",
+            project_toml_suffix="",
+            extra_files={"tests/overrides/hash.sql": _HASH_OVERRIDE},
+            command=("test", "--sql", "--run-on", "local", "--select", "test_stg_orders"),
+            expected_exit_code=0,
+            expected_text="PASS  local    relied on: HASH (override)  1 real model",
+        ),
+        LocalTestInputsE2ETestCase(
+            description="warehouse runs ignore the allowance",
+            project_toml_suffix=_ALLOW_HASH,
+            extra_files={},
+            command=(
+                "test",
+                "--sql",
+                "--inspect",
+                "--run-on",
+                "warehouse",
+                "--select",
+                "test_stg_orders",
+            ),
+            expected_exit_code=0,
+            expected_text="test_stg_orders\n  runs on: warehouse\n",
+        ),
+        LocalTestInputsE2ETestCase(
+            description="an allowance naming no known difference fails compile",
+            project_toml_suffix="\n[testing.local]\nallow = { hsh = true }\n",
+            extra_files={},
+            command=("compile",),
+            expected_exit_code=1,
+            expected_text=(
+                "[testing.local] allow in sqlbuild_project.toml names no known difference "
+                "`hsh`; did you mean `hash`?"
+            ),
+        ),
+        LocalTestInputsE2ETestCase(
+            description="two overrides of one function fail compile, naming both files",
+            project_toml_suffix="",
+            extra_files={
+                "tests/overrides/hash.sql": _HASH_OVERRIDE,
+                "tests/overrides/hash_again.sql": _HASH_OVERRIDE,
+            },
+            command=("compile",),
+            expected_exit_code=1,
+            expected_text=(
+                "overrides tests/overrides/hash.sql and tests/overrides/hash_again.sql both "
+                "replace HASH"
+            ),
+        ),
+        LocalTestInputsE2ETestCase(
+            description="an override SQLQuack can't read fails compile, naming the file",
+            project_toml_suffix="",
+            extra_files={"tests/overrides/hash.sql": "FUNCTION (\n  replaces HASH\n);\nhash(x)\n"},
+            command=("compile",),
+            expected_exit_code=1,
+            expected_text="tests/overrides/hash.sql: override hash: needs `dialect duckdb`",
+        ),
+    ),
+    ids=lambda case: case.description,
+)
+def test_given_local_test_allowances_and_overrides_when_testing_then_sqlquack_uses_them(
+    tmp_path: Path, test_case: LocalTestInputsE2ETestCase
+) -> None:
+    files: dict[str, str] = {
+        **SNOWFLAKE_FILES,
+        **test_case.extra_files,
+        "sqlbuild_project.toml": SNOWFLAKE_FILES["sqlbuild_project.toml"]
+        + test_case.project_toml_suffix,
+    }
+    project: Path = prepare_inline_project(
+        tmp_path=tmp_path, project_name="local_inputs", repo_files=files
+    )
+
+    result: CompletedProcess[str] = run_sqb(
+        command=("--no-color", *test_case.command), project_dir=project
+    )
+
+    assert result.returncode == test_case.expected_exit_code, result.stdout + result.stderr
+    assert test_case.expected_text in _DURATION.sub("", result.stdout + result.stderr), (
+        result.stdout + result.stderr
+    )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    (
+        LocalTestInputsE2ETestCase(
+            description="a DuckDB project can't allow SQLQuack known differences",
+            project_toml_suffix=_ALLOW_HASH,
+            extra_files={},
+            command=("compile",),
+            expected_exit_code=1,
+            expected_text=(
+                "[testing.local] allow in sqlbuild_project.toml allows SQLQuack known "
+                "differences when local tests convert Snowflake SQL, and this is a duckdb project"
+            ),
+        ),
+    ),
+    ids=lambda case: case.description,
+)
+def test_given_a_duckdb_project_with_local_test_allowances_when_compiling_then_it_fails(
+    tmp_path: Path, test_case: LocalTestInputsE2ETestCase
+) -> None:
+    project: Path = prepare_waffle_shop(tmp_path=tmp_path)
+    config: Path = project / "sqlbuild_project.toml"
+    config.write_text(config.read_text() + test_case.project_toml_suffix)
+
+    result: CompletedProcess[str] = run_sqb(
+        command=("--no-color", *test_case.command), project_dir=project
+    )
+
+    assert result.returncode == test_case.expected_exit_code, result.stdout + result.stderr
+    assert test_case.expected_text in result.stdout + result.stderr, result.stdout + result.stderr

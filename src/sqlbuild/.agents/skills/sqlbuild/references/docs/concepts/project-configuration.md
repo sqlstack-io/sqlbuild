@@ -23,6 +23,7 @@ Online: https://sqlbuild.com/docs/concepts/project-configuration/
 - Migrations
 - Dynamic
 - Scenario
+- Testing
 - Git
 - Review
 - Pools
@@ -915,6 +916,22 @@ Local type overrides for DuckDB replay are configured per adapter dialect:
 
 See [Scenarios](scenarios.md) for details on local type overrides and capture limits.
 
+## Testing
+
+The SQLQuack known differences that local unit tests may rely on, by name:
+
+```toml
+[testing.local]
+allow = { hash = true }
+```
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `testing.local.allow` | none | Each known difference's name, `true` to allow it or `false` to refuse it. Snowflake projects only |
+
+See [Allowing known differences and overrides](testing-reference.md#allowing-known-differences-and-overrides),
+which also covers the overrides in `tests/overrides/`.
+
 ## Git
 
 The branch that `--since @base` compares against:
@@ -1071,7 +1088,9 @@ Python is supported only under `python/`, `rules/`, `orchestration/`, `sql/hooks
 
 The project's `tests/` directory holds SQL tests and scenarios, and pytest tests of project Python
 under `tests/python/nodes/`, `tests/python/providers/` and `tests/orchestration/`, which `sqb test`
-runs; see [Python tests](../cli/test.md#python-tests). Orchestrator code such as Dagster or Rivers
+runs; see [Python tests](../cli/test.md#python-tests). `tests/overrides/` holds the SQLQuack
+overrides local unit tests use; see
+[Allowing known differences and overrides](testing-reference.md#allowing-known-differences-and-overrides). Orchestrator code such as Dagster or Rivers
 definitions lives outside the SQLBuild project directory and points at it; see
 [Dagster](../integrations/dagster.md) and [Rivers](../integrations/rivers.md).
 

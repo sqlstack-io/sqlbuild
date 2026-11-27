@@ -12562,6 +12562,7 @@ class ProjectConfig(NativeRecord):
     materialization_defaults: MaterializationDefaultsConfig
     path_defaults: dict[str, dict[str, object]]
     vars: dict[str, str]
+    local_test_allow: dict[str, bool]
     targets: dict[str, TargetConfig]
     janitor: JanitorConfig
     migrations: MigrationsConfig
@@ -12591,6 +12592,7 @@ class ProjectConfig(NativeRecord):
         materialization_defaults: MaterializationDefaultsConfig = ...,
         path_defaults: dict[str, dict[str, object]] = ...,
         vars: dict[str, str] = ...,
+        local_test_allow: dict[str, bool] = ...,
         targets: dict[str, TargetConfig] = ...,
         janitor: JanitorConfig = ...,
         migrations: MigrationsConfig = ...,

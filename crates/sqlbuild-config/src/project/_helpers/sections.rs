@@ -35,6 +35,7 @@ use crate::project::constants::{
     CHANGE_COUNTS, CHANGE_REACHES, CHANGES_KEYS, CONTROL_KEYS, MAX_POOL_LIMIT,
     MIN_SYNC_INTERVAL_SECONDS, SYNC_INTERVAL_HELP, SYNC_INTERVAL_OFF,
 };
+use crate::project::constants::{TESTING_KEYS, TESTING_LOCAL_KEYS};
 use crate::project::errors::ConfigFailure;
 use crate::project::models::{
     Built, ChangesConfig, ConfigFile, ControlConfig, DynamicConfig, ReviewConfig,
@@ -1110,4 +1111,60 @@ pub(crate) fn load_local_dbt(payload: Option<&ConfigValue>, file: ConfigFile) ->
             ("vars", object_mapping(get(mapping, "vars"), file)?),
         ],
     ))
+}
+
+/// `[testing.local] allow`: each known difference's name and whether local tests may rely on it.
+pub(crate) fn load_testing(payload: Option<&ConfigValue>, file: ConfigFile) -> Loaded<Built> {
+    let testing = coerce_mapping(
+        payload,
+        Place {
+            file,
+            label: "testing",
+        },
+    )?;
+    validate_allowed_keys(
+        testing,
+        &TESTING_KEYS,
+        Place {
+            file,
+            label: "testing",
+        },
+    )?;
+    let local = coerce_mapping(
+        get(testing, "local"),
+        Place {
+            file,
+            label: "testing.local",
+        },
+    )?;
+    validate_allowed_keys(
+        local,
+        &TESTING_LOCAL_KEYS,
+        Place {
+            file,
+            label: "testing.local",
+        },
+    )?;
+    let allow = coerce_mapping(
+        get(local, "allow"),
+        Place {
+            file,
+            label: "testing.local.allow",
+        },
+    )?;
+    allow
+        .iter()
+        .map(|(name, allowed)| match allowed {
+            ConfigValue::Bool(_) => Ok((key_name(name).to_owned(), Built::Value(allowed.clone()))),
+            _ => Err(ConfigFailure::at(
+                file,
+                format!(
+                    "[testing.local] allow takes `{} = true` or `false` for a SQLQuack known \
+                     difference",
+                    key_name(name)
+                ),
+            )),
+        })
+        .collect::<Loaded<Vec<_>>>()
+        .map(Built::Dict)
 }

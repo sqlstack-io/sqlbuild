@@ -375,6 +375,11 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
         edge: HostEdge::Executor,
     },
     HostEntry {
+        name: "check_local_test_inputs",
+        kind: HostKind::Function,
+        edge: HostEdge::Executor,
+    },
+    HostEntry {
         name: "decide_scenario_run_on",
         kind: HostKind::Function,
         edge: HostEdge::Executor,

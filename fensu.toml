@@ -513,6 +513,11 @@ symbols = ["local_test_adapter"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."
 
 [[targets.python.dead_code.roots]]
+modules = ["sqlbuild.executor.local.main._check_local_test_inputs"]
+symbols = ["check_local_test_inputs"]
+reason = "Native code resolves these through the sqlbuild._native_host name table."
+
+[[targets.python.dead_code.roots]]
 modules = ["sqlbuild.executor.local.main._report_unplaced_sql_tests"]
 symbols = ["report_unplaced_sql_tests"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."

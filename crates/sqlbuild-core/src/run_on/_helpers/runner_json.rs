@@ -14,6 +14,7 @@ pub(crate) fn decision(value: &Value) -> RunOnDecision {
         name: text(value, "name").unwrap_or_default(),
         run_on: text(value, "run_on").unwrap_or_default(),
         refusals: refusals.iter().map(refusal).collect(),
+        relied_on: strings(value, "relied_on"),
     }
 }
 

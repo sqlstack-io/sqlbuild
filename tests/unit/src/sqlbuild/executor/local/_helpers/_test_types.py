@@ -104,3 +104,23 @@ class OwnFailureTextTestCase:
     description: str
     message: str
     expected_refused: bool
+
+
+@dataclass(frozen=True)
+class LocalInputsCacheTestCase:
+    """The project's allowances and override files in two runs, and what the later run converts."""
+
+    description: str
+    first: tuple[dict[str, bool], dict[str, str]]
+    later: tuple[dict[str, bool], dict[str, str]]
+    expected_later_conversions: int
+    expected_later_cached: int
+
+
+@dataclass(frozen=True)
+class ReliedOnTestCase:
+    """A conversion report's known differences and what the project's tests relied on."""
+
+    description: str
+    known_differences: tuple[dict[str, str], ...]
+    expected_relied_on: tuple[str, ...]

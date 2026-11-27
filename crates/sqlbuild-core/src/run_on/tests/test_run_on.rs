@@ -131,6 +131,14 @@ fn given_decision_when_inspecting_then_names_where_it_runs_and_why() {
             expected_line: "  runs on: local\n",
         },
         InspectionTestCase {
+            description: "a local test lists what it relied on from the project",
+            decision: RunOnDecision {
+                relied_on: vec!["HASH (allowed)".to_owned(), "TO_DATE (override)".to_owned()],
+                ..local("c")
+            },
+            expected_line: "  runs on: local\n  relied on: HASH (allowed), TO_DATE (override)\n",
+        },
+        InspectionTestCase {
             description: "a refused test names the refusal",
             decision: refused("b", "fn:HASH", 26),
             expected_line: "  runs on: warehouse  (a known difference that isn't allowed: fn:HASH)\n",
@@ -272,6 +280,7 @@ fn given_a_local_test_refused_while_running_when_applied_then_auto_moves_it_and_
             description: "auto runs the test on the warehouse, giving the guard as the reason",
             mode: RunOn::Auto,
             expected_decision: RunOnDecision {
+                relied_on: Vec::new(),
                 name: "test_orders".to_owned(),
                 run_on: "warehouse".to_owned(),
                 refusals: vec![guard.clone()],
@@ -281,6 +290,7 @@ fn given_a_local_test_refused_while_running_when_applied_then_auto_moves_it_and_
             description: "local keeps the test local and lists the guard it can't run past",
             mode: RunOn::Local,
             expected_decision: RunOnDecision {
+                relied_on: Vec::new(),
                 name: "test_orders".to_owned(),
                 run_on: "local".to_owned(),
                 refusals: vec![guard.clone()],

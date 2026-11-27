@@ -17,7 +17,7 @@ use crate::project::_helpers::sections::{
     load_changes, load_constants, load_control, load_cost, load_cursors, load_dbt, load_diff,
     load_dynamic, load_git, load_janitor, load_local_dbt, load_microbatches, load_migrations,
     load_policy_flag, load_pools, load_review, load_scenario, load_settings, load_snapshots,
-    setting_overrides,
+    load_testing, setting_overrides,
 };
 use crate::project::_helpers::sinks::load_sinks;
 use crate::project::_helpers::targets::{
@@ -258,6 +258,10 @@ fn sections(payload: &Entries) -> Loaded<Fields> {
             load_path_defaults(get(payload, "path_defaults"), PROJECT_FILE)?,
         ),
         ("vars", string_mapping(get(payload, "vars"), PROJECT_FILE)?),
+        (
+            "local_test_allow",
+            load_testing(get(payload, "testing"), PROJECT_FILE)?,
+        ),
     ])
 }
 

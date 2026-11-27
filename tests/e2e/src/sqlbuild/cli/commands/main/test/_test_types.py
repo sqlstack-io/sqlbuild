@@ -724,3 +724,15 @@ class RunOnLocalJsonE2ETestCase:
     expected_counts: tuple[int, int] | None
     expected_refusal_places: frozenset[tuple[object, ...]]
     expected_refused_tests: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class LocalTestInputsE2ETestCase:
+    """A Snowflake project's local test allowances and overrides, one command, and its output."""
+
+    description: str
+    project_toml_suffix: str
+    extra_files: dict[str, str]
+    command: tuple[str, ...]
+    expected_exit_code: int
+    expected_text: str

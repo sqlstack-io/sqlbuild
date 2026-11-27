@@ -78,6 +78,8 @@ pub struct RunOnDecision {
     pub name: String,
     pub run_on: String,
     pub refusals: Vec<LocalRefusal>,
+    /// What a local item relied on from the project, such as `HASH (allowed)`.
+    pub relied_on: Vec<String>,
 }
 
 impl RunOnDecision {

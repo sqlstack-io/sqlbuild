@@ -24,6 +24,15 @@ UTC_TIME_ZONE: str = "UTC"
 
 STATEMENT_CONSTRUCT: str = "statement"
 
+LOCAL_ALLOW_LOCATION: str = "[testing.local] allow in sqlbuild_project.toml"
+LOCAL_OVERRIDES_DIR: str = "tests/overrides"
+OVERRIDE_FILE_PATTERN: str = "*.sql"
+USER_OVERRIDE_DIFFERENCE: str = "user_override"
+FUNCTION_CONSTRUCT_PREFIX: str = "fn:"
+ALLOWED_LABEL: str = "allowed"
+OVERRIDE_LABEL: str = "override"
+LOCAL_INPUTS_CHECK_SQL: str = "SELECT 1 AS checked"
+
 CONVERSION_CACHE_DIR: str = "target/sqlquack-cache"
 CONVERSION_CACHE_INDEX: str = "used.json"
 CONVERSION_CACHE_LIFETIME_SECONDS: float = 7 * 24 * 60 * 60

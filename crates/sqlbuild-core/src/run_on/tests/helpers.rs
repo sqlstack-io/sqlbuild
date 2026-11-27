@@ -7,6 +7,7 @@ use crate::run_on::models::{LocalRefusal, RunOnDecision, RunOnLayers};
 /// A test that runs locally.
 pub(super) fn local(name: &str) -> RunOnDecision {
     RunOnDecision {
+        relied_on: Vec::new(),
         name: name.to_owned(),
         run_on: "local".to_owned(),
         refusals: Vec::new(),
@@ -16,6 +17,7 @@ pub(super) fn local(name: &str) -> RunOnDecision {
 /// A test SQLQuack refuses at `line` of `stg_orders.sql` for `construct`.
 pub(super) fn refused(name: &str, construct: &str, line: i64) -> RunOnDecision {
     RunOnDecision {
+        relied_on: Vec::new(),
         name: name.to_owned(),
         run_on: "warehouse".to_owned(),
         refusals: vec![hash_refusal(construct, line)],
@@ -46,6 +48,7 @@ fn hash_refusal(construct: &str, line: i64) -> LocalRefusal {
 /// A test SQLQuack refuses without a place in any file.
 pub(super) fn unplaced(name: &str) -> RunOnDecision {
     RunOnDecision {
+        relied_on: Vec::new(),
         name: name.to_owned(),
         run_on: "warehouse".to_owned(),
         refusals: vec![LocalRefusal {
@@ -74,6 +77,7 @@ pub(super) fn layers(
 /// A test refused in the output of `@py.status_hash`, placed at the call in the model file.
 pub(super) fn refused_in_macro_output(name: &str) -> RunOnDecision {
     RunOnDecision {
+        relied_on: Vec::new(),
         name: name.to_owned(),
         run_on: "warehouse".to_owned(),
         refusals: vec![LocalRefusal {

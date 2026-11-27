@@ -335,6 +335,7 @@ fn execute_batch<'py>(
         arguments.extend([
             ("project_dir", run.project.project_dir.clone()),
             ("replay_source", replay_source(run)?),
+            ("local_test_allow", local_test_allow(run)?),
         ]);
         ExecutorHost::RunScenarioLocalTestPipeline
     } else {
@@ -411,6 +412,7 @@ fn decide<'py>(
             ("project_name", project_name),
             ("replay_source", replay_source(run)?),
             ("run_on", text(py, mode.as_str())),
+            ("local_test_allow", local_test_allow(run)?),
         ],
     )?
     .extract()?;
@@ -589,7 +591,7 @@ pub(crate) fn run_scenario_test_command(
                 Ok(RunOnDecision {
                     name: native_field(&scenario, "name")?.extract()?,
                     run_on: "warehouse".to_owned(),
-                    refusals: Vec::new(),
+                    ..RunOnDecision::default()
                 })
             })
             .collect::<PyResult<_>>()?
@@ -680,4 +682,12 @@ pub(crate) fn run_scenario_test_command(
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(run_scenario_test_command, module)?)?;
     Ok(())
+}
+
+/// `[testing.local] allow` of the project the scenarios belong to.
+fn local_test_allow<'py>(run: &TestRun<'py>) -> PyResult<Bound<'py, PyAny>> {
+    native_field(
+        &native_field(&run.project.discovered, "project_config")?,
+        "local_test_allow",
+    )
 }

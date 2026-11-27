@@ -42,6 +42,7 @@ class RunOnDecision:
     name: str
     run_on: str
     refusals: tuple[LocalRefusal, ...] = field(default_factory=tuple)
+    relied_on: tuple[str, ...] = field(default_factory=tuple)
 
     @property
     def reason(self) -> str | None:
@@ -99,6 +100,16 @@ class ConvertedSql:
     macros: tuple[str, ...]
     refusals: tuple[Mapping[str, Any], ...]
     rendered: str
+    relied_on: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class LocalInputs:
+    """What a project adds to SQLQuack's conversion of its local test SQL: allowances, overrides."""
+
+    allow: tuple[tuple[str, bool], ...] = ()
+    overrides: str | None = None
+    digest: str = ""
 
 
 @dataclass(frozen=True)
