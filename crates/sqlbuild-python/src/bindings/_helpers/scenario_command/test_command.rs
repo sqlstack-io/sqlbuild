@@ -37,6 +37,7 @@ use sqlbuild_core::test_command::models::TestFailureFacts;
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::ScenarioRunResult;
 use sqlbuild_python_base::build_progress::main::progress::current_native_progress_projector::current_native_progress_projector;
+use sqlbuild_python_base::build_progress::main::terminal::known_terminal_columns::known_terminal_columns;
 use sqlbuild_python_base::build_progress::main::terminal::terminal_columns::terminal_columns;
 use sqlbuild_python_output::build_progress::main::local_attempt::local_attempt;
 use sqlbuild_python_output::build_progress::models::LocalAttemptStep;
@@ -267,7 +268,7 @@ fn finish(
         failed.push((entry.name.clone(), reason));
         entries.push(entry);
     }
-    let columns: usize = terminal_columns(py)?;
+    let columns: Option<usize> = known_terminal_columns(py)?;
     let mut output: String = String::new();
     if not_run > 0 {
         output.push_str(&render_cant_run_rollup(

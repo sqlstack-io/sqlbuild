@@ -1,8 +1,8 @@
 use crate::build_progress::models::ErrorText;
 use crate::nested_progress::models::{NestedChildRow, NestedItem, NestedLayout};
 
-/// Rows of 461 tests at `columns`, with the longest name 30 characters.
-pub(super) fn layout(columns: usize, verbose: bool) -> NestedLayout {
+/// Rows of 461 tests at `columns` (`None` when not a terminal), with the longest name 30 characters.
+pub(super) fn layout(columns: Option<usize>, verbose: bool) -> NestedLayout {
     NestedLayout {
         label: "test".to_owned(),
         name_width: 30,

@@ -13,8 +13,9 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
 
 _OUTCOME_FRAGMENTS: tuple[str, ...] = (
     "PASS=4  FAIL=2  TOTAL=6",
-    "unexpected sample 1: order_id=2, amount=40; missing sample 1: order_id=2, amount=41",
-    "expect  assertion all_expected_rows_built",
+    "expected rows of orders differ: 1 missing, 1 extra",
+    "amount: expected 41, actual 40",
+    "assertion all_expected_rows_built returned 1 row",
 )
 
 

@@ -127,7 +127,7 @@ fn given_failed_items_when_rendering_failures_then_wraps_fields_to_the_terminal(
     ];
 
     for test_case in test_cases {
-        let text = render_failures(&test_case.entries, test_case.columns, PLAIN);
+        let text = render_failures(&test_case.entries, Some(test_case.columns), PLAIN);
         assert_eq!(text, test_case.expected_text, "{}", test_case.description);
     }
 }

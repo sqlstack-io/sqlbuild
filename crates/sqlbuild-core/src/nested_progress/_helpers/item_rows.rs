@@ -8,6 +8,7 @@ use crate::nested_progress::constants::{
     MIN_ROW_NAME_WIDTH, RUN_ON_WIDTH, SECONDS_WIDTH, STATUS_WIDTH,
 };
 use crate::nested_progress::models::{NestedChildRow, NestedItem, NestedLayout};
+use crate::run_output::constants::UNWRAPPED_COLUMNS;
 use crate::run_output::main::cut_middle::cut_middle;
 
 /// Where a row's columns fall: the width before the label, and the name column's width.
@@ -22,15 +23,13 @@ pub(crate) fn row_geometry(item: &NestedItem, layout: &NestedLayout) -> (String,
     let digits: usize = layout.total.max(1).to_string().len();
     let counter: String = format!("{:>digits$}/{}", item.position, layout.total.max(1));
     let prefix_width: usize = 2 + counter.chars().count() + 2;
-    let reserve: usize = DETAIL_RESERVE * usize::from(layout.columns >= DETAIL_MIN_COLUMNS);
-    let right: usize = STATUS_WIDTH + 1 + RUN_ON_WIDTH + SECONDS_WIDTH + reserve;
-    let name_width: usize = (layout.name_width + 2)
-        .min(
-            layout
-                .columns
-                .saturating_sub(prefix_width + LABEL_WIDTH + right),
-        )
-        .max(MIN_ROW_NAME_WIDTH);
+    let full: usize = layout.name_width + 2;
+    let name_width: usize = layout.columns.map_or(full, |columns| {
+        let reserve: usize = DETAIL_RESERVE * usize::from(columns >= DETAIL_MIN_COLUMNS);
+        let right: usize = STATUS_WIDTH + 1 + RUN_ON_WIDTH + SECONDS_WIDTH + reserve;
+        full.min(columns.saturating_sub(prefix_width + LABEL_WIDTH + right))
+            .max(MIN_ROW_NAME_WIDTH)
+    });
     (
         counter,
         RowGeometry {
@@ -53,11 +52,14 @@ pub(crate) fn item_row(
         .filter(|rest| !group.is_empty() && !rest.is_empty())
         .unwrap_or(&item.item_name);
     let width: usize = geometry.name_width;
-    let name: String = format!("{:<width$}", cut_middle(shown, width.saturating_sub(2)));
+    let name: String = format!("{:<width$}", fitted(shown, width, layout));
     let seconds: String = item
         .seconds
         .map_or_else(String::new, |seconds| format!("  {seconds:>6.2}s"));
-    let detail: String = if layout.columns >= DETAIL_MIN_COLUMNS && !item.detail.is_empty() {
+    let room: bool = layout
+        .columns
+        .is_none_or(|columns| columns >= DETAIL_MIN_COLUMNS);
+    let detail: String = if room && !item.detail.is_empty() {
         style.muted(&format!("  {}", item.detail))
     } else {
         String::new()
@@ -72,6 +74,14 @@ pub(crate) fn item_row(
     format!("{}\n", row.trim_end())
 }
 
+/// `name` cut in the middle to its column in a terminal; in full when the width is unknown.
+fn fitted(name: &str, width: usize, layout: &NestedLayout) -> String {
+    match layout.columns {
+        Some(_) => cut_middle(name, width.saturating_sub(2)),
+        None => name.to_owned(),
+    }
+}
+
 fn padded_status(status: &str, style: CliStyle) -> String {
     format!(
         "{}{}",
@@ -81,7 +91,11 @@ fn padded_status(status: &str, style: CliStyle) -> String {
 }
 
 /// One line per child row, each a tree branch, the last closing the tree unless an error follows.
-pub(crate) fn child_lines(item: &NestedItem, geometry: RowGeometry, style: CliStyle) -> String {
+pub(crate) fn child_lines(
+    item: &NestedItem,
+    (geometry, layout): (RowGeometry, &NestedLayout),
+    style: CliStyle,
+) -> String {
     let indent: String = " ".repeat(geometry.prefix_width + CHILD_GLYPH_INDENT);
     let width: usize = (geometry.name_width + LABEL_WIDTH)
         .saturating_sub(CHILD_GLYPH_INDENT + CHILD_NAME_OFFSET)
@@ -92,21 +106,22 @@ pub(crate) fn child_lines(item: &NestedItem, geometry: RowGeometry, style: CliSt
         .enumerate()
         .map(|(index, child)| {
             let last: bool = index + 1 == count && item.error.message.is_none();
-            child_line(child, (&indent, width, last), style)
+            child_line(child, (&indent, last), (width, layout), style)
         })
         .collect()
 }
 
 fn child_line(
     child: &NestedChildRow,
-    (indent, width, last): (&str, usize, bool),
+    (indent, last): (&str, bool),
+    (width, layout): (usize, &NestedLayout),
     style: CliStyle,
 ) -> String {
     let line: String = format!(
         "{indent}{} {}{:<width$}{} {}",
         format_tree_connector(style, last),
         style.muted(&format!("{:<LABEL_WIDTH$}", child.label)),
-        cut_middle(&child.name, width.saturating_sub(2)),
+        fitted(&child.name, width, layout),
         padded_status(&child.status_text, style),
         style.muted(&child.detail)
     );
@@ -131,7 +146,11 @@ pub(crate) fn error_lines(
             message,
             item.error.help.as_deref(),
         ),
-        layout.columns.saturating_sub(content_indent).max(1),
+        layout
+            .columns
+            .unwrap_or(UNWRAPPED_COLUMNS)
+            .saturating_sub(content_indent)
+            .max(1),
         style,
     );
     lines

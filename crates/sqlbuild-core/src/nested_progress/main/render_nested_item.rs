@@ -22,7 +22,7 @@ pub fn render_nested_item(
     }
     format!(
         "{row}{}{}",
-        child_lines(item, geometry, style),
+        child_lines(item, (geometry, layout), style),
         error_lines(item, geometry, layout, style)
     )
 }

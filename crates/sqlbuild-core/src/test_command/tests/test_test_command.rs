@@ -264,7 +264,7 @@ fn given_failed_test_when_building_entry_then_renders_detail_and_short_reason() 
 
     for test_case in test_cases {
         let (entry, reason) = test_failure_entry(&test_case.facts);
-        let text = render_failures(&[entry], 80, PLAIN);
+        let text = render_failures(&[entry], Some(80), PLAIN);
         assert_eq!(text, test_case.expected_text, "{}", test_case.description);
         assert_eq!(
             reason, test_case.expected_reason,

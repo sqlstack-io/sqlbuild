@@ -186,7 +186,7 @@ fn given_refusals_when_rendering_report_then_groups_by_cause_and_lists_origins()
             &test_case.decisions,
             (test_case.errors, test_case.verbose),
             NOUNS,
-            (test_case.columns, PLAIN),
+            (Some(test_case.columns), PLAIN),
         );
         assert_eq!(text, test_case.expected_text, "{}", test_case.description);
     }
@@ -313,7 +313,7 @@ fn given_refusal_in_macro_when_rendering_then_frames_the_macro_source_or_the_cal
             &test_case.decisions,
             (test_case.errors, test_case.verbose),
             NOUNS,
-            (test_case.columns, PLAIN),
+            (Some(test_case.columns), PLAIN),
         );
         assert_eq!(text, test_case.expected_text, "{}", test_case.description);
     }

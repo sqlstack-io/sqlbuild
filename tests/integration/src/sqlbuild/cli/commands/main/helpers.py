@@ -1351,13 +1351,13 @@ def write_endless_scenario_project(project_dir: Path) -> Path:
 def signalled_scenario_run(
     *, project_dir: Path, sent_signal: signal.Signals
 ) -> tuple[int, str, float]:
-    """Exit code and output of `sqb scenario test` sent `sent_signal` while its model runs, and
-    the seconds it took to stop."""
+    """Exit code, output and seconds to stop of `sqb --debug scenario test` signalled mid-run."""
 
     process: subprocess.Popen[str] = subprocess.Popen(
         [
             str(Path(sys.executable).with_name("sqb")),
             "--no-color",
+            "--debug",
             "--project-dir",
             str(project_dir),
             "scenario",
@@ -1371,13 +1371,15 @@ def signalled_scenario_run(
         env={**os.environ, "PYTHONUNBUFFERED": "1"},
         preexec_fn=_default_interrupt_handling,
     )
-    assert process.stdout is not None
-    started: str = "".join(takewhile(lambda line: "order_totals START" not in line, process.stdout))
+    assert process.stderr is not None
+    started: str = "".join(
+        takewhile(lambda line: "model=order_totals  phase=create" not in line, process.stderr)
+    )
     time.sleep(1.0)
     process.send_signal(sent_signal)
     sent: float = time.monotonic()
     stdout, stderr = process.communicate(timeout=120)
-    return process.returncode, started + stdout + stderr, time.monotonic() - sent
+    return process.returncode, stdout + started + stderr, time.monotonic() - sent
 
 
 def write_prompting_project(project_dir: Path, *, connect: str, files: dict[str, str]) -> Path:

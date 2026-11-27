@@ -1,6 +1,8 @@
 //! Labels, widths and limits of test and scenario run output.
 
 pub(crate) const MIDDLE_ELLIPSIS: &str = "...";
+/// The width text is laid out to when output has no terminal width: wide enough that nothing wraps.
+pub(crate) const UNWRAPPED_COLUMNS: usize = 100_000;
 pub(crate) const PASS_LABEL: &str = "PASS";
 pub(crate) const FAIL_LABEL: &str = "FAIL";
 pub(crate) const TIMEOUT_LABEL: &str = "TIMEOUT";

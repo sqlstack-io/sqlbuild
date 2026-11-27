@@ -23,7 +23,10 @@ pub(crate) struct BlockStyle<'a> {
     pub(crate) errors: bool,
     pub(crate) nouns: (&'a str, &'a str),
     pub(crate) verbose: bool,
+    /// The width the head line's counts and the `used by` list are laid out to.
     pub(crate) columns: usize,
+    /// The width notes wrap at: the terminal's, or never without one.
+    pub(crate) wrap: usize,
     pub(crate) style: CliStyle,
 }
 
@@ -305,7 +308,7 @@ fn construct_rows(group: &RefusalGroup, block: &BlockStyle<'_>) -> Vec<String> {
 fn note_lines(refusal: &LocalRefusal, block: &BlockStyle<'_>) -> Vec<String> {
     let prefix: String = format!("   {NOTE_LABEL} ");
     let width: usize = block
-        .columns
+        .wrap
         .saturating_sub(prefix.chars().count())
         .max(MIN_WIDTH);
     let mut lines: Vec<String> = Vec::new();

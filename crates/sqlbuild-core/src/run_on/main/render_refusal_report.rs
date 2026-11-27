@@ -3,8 +3,10 @@
 use crate::cli_text::models::CliStyle;
 use crate::run_on::_helpers::refusal_groups::group_refusals;
 use crate::run_on::_helpers::refusal_text::{BlockStyle, group_lines};
+use crate::run_on::constants::REPORT_FALLBACK_COLUMNS;
 use crate::run_on::constants::{CANNOT_RUN_LOCALLY_TITLE, ON_THE_WAREHOUSE_TITLE, VERBOSE_HINT};
 use crate::run_on::models::RunOnDecision;
+use crate::run_output::constants::UNWRAPPED_COLUMNS;
 
 /// `Can't run locally (N tests):` with errors, or `On the warehouse (N tests):` with notes; empty with none.
 #[must_use]
@@ -12,8 +14,10 @@ pub fn render_refusal_report(
     decisions: &[RunOnDecision],
     (errors, verbose): (bool, bool),
     (singular, plural): (&str, &str),
-    (columns, style): (usize, CliStyle),
+    (columns, style): (Option<usize>, CliStyle),
 ) -> String {
+    let wrap: usize = columns.unwrap_or(UNWRAPPED_COLUMNS);
+    let columns: usize = columns.unwrap_or(REPORT_FALLBACK_COLUMNS);
     let refused: Vec<&RunOnDecision> = decisions
         .iter()
         .filter(|decision| !decision.refusals.is_empty())
@@ -38,6 +42,7 @@ pub fn render_refusal_report(
         nouns: (singular, plural),
         verbose,
         columns,
+        wrap,
         style,
     };
     let mut lines: Vec<String> = vec![String::new(), title];

@@ -84,14 +84,14 @@ def test_given_sql_tests_when_running_then_statement_summary_counts_each_stateme
     )
 
     assert text_run.returncode == test_case.expected_exit_code, text_run.stdout + text_run.stderr
-    assert test_case.expected_line in text_run.stdout.splitlines(), text_run.stdout
+    assert test_case.expected_line in map(str.strip, text_run.stdout.splitlines()), text_run.stdout
     assert json_run.returncode == test_case.expected_exit_code, json_run.stderr
     assert json.loads(json_run.stdout)["statements"] == {
         "total": sum(test_case.expected_by_kind.values()),
         "by_kind": dict(test_case.expected_by_kind),
         "compile_time": None,
     }
-    assert test_case.expected_line in json_run.stderr.splitlines(), json_run.stderr
+    assert test_case.expected_line in map(str.strip, json_run.stderr.splitlines()), json_run.stderr
 
 
 @pytest.mark.parametrize(
@@ -130,7 +130,7 @@ def test_given_scenarios_when_running_with_json_then_statement_summary_matches_p
     )
     assert (
         f"Statements: {statements['total']} on the warehouse ({kinds}); compile time not "
-        "reported by duckdb" in result.stderr.splitlines()
+        "reported by duckdb" in map(str.strip, result.stderr.splitlines())
     ), result.stderr
 
 

@@ -241,7 +241,7 @@ def test_given_origin_environment_when_cloning_then_items_and_relations_match_se
             columns=120,
             expected_screen_fragments=(
                 "✓ Warehouse connected  duckdb",
-                "Prepared clone plan.",
+                "✓ Clone plan prepared",
                 "sqb clone  origin=prod destination=dev  (2 resources)",
                 "fct_orders",
                 "orders_backlog",
@@ -278,7 +278,7 @@ def test_given_terminal_when_cloning_then_preparation_spinner_stops_before_items
     assert result.returncode == 0, rendered
     assert not any(glyph in rendered for glyph in SPINNER_GLYPHS), rendered
     assert_fragments_in_order(rendered, test_case.expected_screen_fragments)
-    after_preparation: str = result.stdout.split("Prepared clone plan.", maxsplit=1)[1]
+    after_preparation: str = result.stdout.split("Clone plan prepared", maxsplit=1)[1]
     assert not any(glyph in after_preparation for glyph in SPINNER_GLYPHS), after_preparation
 
 

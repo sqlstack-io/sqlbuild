@@ -34,7 +34,8 @@ pub struct NestedLayout {
     pub label: String,
     /// The longest name a row shows, without its group prefix.
     pub name_width: usize,
-    pub columns: usize,
+    /// The terminal's width; `None` when output isn't a terminal or its width is unknown, so nothing is cut.
+    pub columns: Option<usize>,
     pub total: usize,
     /// Whether passing items show their child rows too.
     pub verbose: bool,

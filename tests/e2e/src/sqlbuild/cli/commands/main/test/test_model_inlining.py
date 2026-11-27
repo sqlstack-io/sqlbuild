@@ -54,8 +54,8 @@ _PASSING_ORDER_LINES_SQL: str = "SELECT 1 AS order_id, 20 AS line_total"
             expected_exit_code=1,
             expected_output_fragments=(
                 "PASS=0  FAIL=1",
-                "unexpected sample 1: order_id=1, line_total=20",
-                "missing sample 1: order_id=1, line_total=99",
+                "expected rows of order_lines differ: 1 missing, 1 extra",
+                "line_total: expected 99, actual 20",
             ),
         ),
     ),

@@ -7,6 +7,8 @@ pub(crate) const WAREHOUSE: &str = "warehouse";
 pub(crate) const CANNOT_RUN_LOCALLY_TITLE: &str = "Can't run locally";
 pub(crate) const ON_THE_WAREHOUSE_TITLE: &str = "On the warehouse";
 pub(crate) const RUNS_ON_LABEL: &str = "runs on";
+/// The width the refusal report lays its counts out to when output has no terminal width.
+pub(crate) const REPORT_FALLBACK_COLUMNS: usize = 120;
 /// What a local item relied on from the project: SQLQuack allowances and overrides.
 pub(crate) const RELIED_ON_LABEL: &str = "relied on";
 pub(crate) const NOTE_LABEL: &str = "= note:";

@@ -26,7 +26,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
         HelperReferenceE2ETestCase(
             description="helper and assertion read the model",
             tests=("helper_and_assertion_read_model",),
-            command=("--no-color", "test"),
+            command=("--no-color", "test", "--verbose"),
             sql_analysis=True,
             expected_output_fragments=("PASS=1  FAIL=0  TOTAL=1", "assertion doubles_amount"),
             expected_compiled_fragments=("\n__helper__doubled AS (",),
@@ -44,7 +44,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
         HelperReferenceE2ETestCase(
             description="helper reads a helper and a mock",
             tests=("helper_reads_helper_and_mock",),
-            command=("--no-color", "test"),
+            command=("--no-color", "test", "--verbose"),
             sql_analysis=True,
             expected_output_fragments=(
                 "PASS=1  FAIL=0  TOTAL=1",
@@ -56,7 +56,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
         HelperReferenceE2ETestCase(
             description="inlined helpers read by expected rows and assertions",
             tests=("helper_reads_helper_and_mock",),
-            command=("--no-color", "test"),
+            command=("--no-color", "test", "--verbose"),
             sql_analysis=False,
             expected_output_fragments=(
                 "PASS=1  FAIL=0  TOTAL=1",
@@ -70,7 +70,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
         HelperReferenceE2ETestCase(
             description="helper and assertion read a mocked model",
             tests=("mocked_model_read_by_helper_and_assertion",),
-            command=("--no-color", "test"),
+            command=("--no-color", "test", "--verbose"),
             sql_analysis=True,
             expected_output_fragments=("PASS=1  FAIL=0  TOTAL=1", "assertion doubles_amount"),
             expected_compiled_fragments=("\n__helper__doubled AS (",),
@@ -97,7 +97,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
         HelperReferenceE2ETestCase(
             description="expected rows and assertion read a mock",
             tests=("mocked_model_read_by_expected_and_assertion",),
-            command=("--no-color", "test"),
+            command=("--no-color", "test", "--verbose"),
             sql_analysis=True,
             expected_output_fragments=(
                 "PASS=1  FAIL=0  TOTAL=1",
@@ -115,7 +115,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
         HelperReferenceE2ETestCase(
             description="expected rows and assertion read a mock without sql analysis",
             tests=("mocked_model_read_by_expected_and_assertion",),
-            command=("--no-color", "test"),
+            command=("--no-color", "test", "--verbose"),
             sql_analysis=False,
             expected_output_fragments=(
                 "PASS=1  FAIL=0  TOTAL=1",

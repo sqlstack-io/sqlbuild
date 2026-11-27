@@ -48,6 +48,7 @@ use sqlbuild_host::models::{
 };
 use sqlbuild_host::types::ResultEnum;
 use sqlbuild_orchestration::runs::models::NodeOutcome;
+use sqlbuild_python_base::build_progress::main::terminal::known_terminal_columns::known_terminal_columns;
 use sqlbuild_python_base::build_progress::main::terminal::terminal_columns::terminal_columns;
 use sqlbuild_python_base::build_progress::models::NativeProgressProjector;
 
@@ -1071,7 +1072,7 @@ fn complete(
     let style: CliStyle = CliStyle {
         use_color: invocation.getattr("use_color")?.is_truthy()?,
     };
-    let columns: usize = terminal_columns(py)?;
+    let columns: Option<usize> = known_terminal_columns(py)?;
     let mut text: String = String::new();
     let causes: Vec<HeaderCause> = refusal_causes(&report.decisions);
     if !not_run.is_empty() && report.mode == RunOn::Local {
@@ -1151,7 +1152,7 @@ fn complete(
 }
 
 /// `local`: every refusal as an error; `auto` with `--verbose`: the same blocks as notes; else nothing.
-fn refusal_report(report: &RunOnReport, (columns, style): (usize, CliStyle)) -> String {
+fn refusal_report(report: &RunOnReport, (columns, style): (Option<usize>, CliStyle)) -> String {
     match report.mode {
         RunOn::Warehouse => String::new(),
         RunOn::Local => render_refusal_report(
@@ -1376,7 +1377,7 @@ fn run_sql_tests<'py>(
                     &decisions,
                     (mode == RunOn::Local, true),
                     TEST_NOUNS,
-                    (terminal_columns(py)?, style),
+                    (Some(terminal_columns(py)?), style),
                 ),
             )?;
         }

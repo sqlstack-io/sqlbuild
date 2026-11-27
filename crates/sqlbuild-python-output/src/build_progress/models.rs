@@ -92,6 +92,7 @@ use sqlbuild_python_base::build_progress::main::terminal::claim::claim;
 use sqlbuild_python_base::build_progress::main::terminal::consume_terminal::consume_terminal;
 use sqlbuild_python_base::build_progress::main::terminal::flush::flush;
 use sqlbuild_python_base::build_progress::main::terminal::join_spinner::join_spinner;
+use sqlbuild_python_base::build_progress::main::terminal::known_terminal_columns::known_terminal_columns;
 use sqlbuild_python_base::build_progress::main::terminal::projector::projector;
 use sqlbuild_python_base::build_progress::main::terminal::release::release;
 use sqlbuild_python_base::build_progress::main::terminal::shared_lines::shared_lines;
@@ -1013,7 +1014,11 @@ impl NestedCommandProgressCallbacks {
         Ok(NestedLayout {
             label: self.label.clone(),
             name_width: self.name_width,
-            columns: terminal_columns(py)?,
+            columns: if self.is_tty {
+                known_terminal_columns(py)?
+            } else {
+                None
+            },
             total: self.total,
             verbose: self.verbose,
         })
