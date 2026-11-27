@@ -28,6 +28,11 @@ pub async fn read_person_problems(
                 .iter()
                 .map(|location| (location.location_id, location.target.clone())),
         )
+        .chain(
+            scan.stalled_syncs
+                .iter()
+                .map(|sync| (sync.location_id, sync.target.clone())),
+        )
         .chain(scan.late_targets.iter().cloned())
         .chain(
             scan.low_calendars
@@ -86,6 +91,11 @@ pub async fn read_person_problems(
             .collect(),
         failing_syncs: scan
             .failing_syncs
+            .into_iter()
+            .filter(|sync| listed.contains(&(sync.location_id, sync.target.clone())))
+            .collect(),
+        stalled_syncs: scan
+            .stalled_syncs
             .into_iter()
             .filter(|sync| listed.contains(&(sync.location_id, sync.target.clone())))
             .collect(),

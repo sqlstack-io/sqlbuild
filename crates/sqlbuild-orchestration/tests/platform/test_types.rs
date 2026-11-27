@@ -122,6 +122,36 @@ pub(crate) struct FailingLocationTestCase {
     pub(crate) expected_error: &'static str,
 }
 
+pub(crate) struct SyncStateTestCase {
+    pub(crate) description: &'static str,
+    /// Newest first, as `recent_health` returns them.
+    pub(crate) observations: Vec<crate::platform::models::LocationHealthObservation>,
+    pub(crate) now_minutes: i64,
+    /// When the running sync started and whether it stalled; absent when none runs.
+    pub(crate) expected_running: Option<(DateTime<Utc>, bool)>,
+    pub(crate) expected_failing: bool,
+    pub(crate) expected_stalled_problem: bool,
+}
+
+pub(crate) struct LocationVerdictTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) state: crate::platform::models::LocationState,
+    pub(crate) published: bool,
+    pub(crate) sync: crate::platform::models::WarehouseSyncState,
+    /// When the last connection check was, in minutes from publication; absent when none was.
+    pub(crate) tested_minutes: Option<i64>,
+    pub(crate) expected_fact: crate::platform::models::LocationFact,
+    pub(crate) expected_tier: Option<crate::platform::models::ProblemTier>,
+}
+
+pub(crate) struct SyncHealthTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_silent_refusal: &'static str,
+    pub(crate) expected_stall_tier: crate::platform::models::ProblemTier,
+    pub(crate) expected_connection_tier: crate::platform::models::ProblemTier,
+}
+
 pub(crate) struct FailingSyncTestCase {
     pub(crate) description: &'static str,
     /// Newest first, as `recent_health` returns them.
