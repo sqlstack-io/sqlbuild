@@ -2,7 +2,7 @@
 
 use crate::analysis_route::constants::{SNOWFLAKE_DEFAULT_PRECISION, SNOWFLAKE_DIALECT};
 use crate::analysis_route::main::analysis_route::analysis_route;
-use crate::analysis_route::models::AnalysisRoute;
+use crate::analysis_route::models::{AnalysisRoute, TypeMatch};
 use crate::type_system::main::same_type::same_type;
 use crate::type_system::models::{NormalizedType, PythonInteger, TypeFamily};
 
@@ -15,6 +15,16 @@ pub fn same_column_type(dialect: Option<&str>, declared: &str, listed: &str) -> 
     let AnalysisRoute::Native(native) = analysis_route(dialect) else {
         return false;
     };
+    // A dialect that compares types its own way (ClickHouse: base types, wrappers apart) decides first.
+    if matches!(
+        native.type_match(declared, Some(listed), false),
+        TypeMatch::Compared {
+            same_type: true,
+            ..
+        }
+    ) {
+        return true;
+    }
     let (Some(declared), Some(listed)) = (
         native.normalize_type(declared),
         native.normalize_type(listed),
