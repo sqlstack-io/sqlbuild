@@ -158,6 +158,7 @@ pub(super) fn refused_in_macro_source(name: &str) -> RunOnDecision {
             }),
             ..refused_in_macro_output(name).refusals[0].clone()
         }],
+        relied_on: Vec::new(),
     }
 }
 
