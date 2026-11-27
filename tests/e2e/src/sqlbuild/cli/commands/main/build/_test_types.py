@@ -1794,8 +1794,7 @@ class CursorWindowFloorTestCase:
     expected_rows: dict[str, tuple[str, ...]]
 
 
-@dataclass(frozen=True)
-class BlockedAssetBuild:
+class BlockedAssetBuild(NamedTuple):
     """A build whose asset waited for the test: whether a line showed first, its output and exit."""
 
     shown_before_release: bool

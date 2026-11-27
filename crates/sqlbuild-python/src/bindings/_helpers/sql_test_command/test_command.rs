@@ -292,6 +292,7 @@ impl TestCallbackRelay {
             Some(CANNOT_RUN_LOCALLY_CODE | NEEDS_WAREHOUSE_CODE)
         );
         let children: Bound<'_, PyTuple> = expectation_rows(result)?;
+        let placement: (String, String) = self.placement(result)?;
         let error = |name: &str| -> PyResult<Bound<'_, PyAny>> {
             if error_code.as_deref() == Some(EXPECTATIONS_FAILED_CODE) && children.len()? > 0 {
                 return Ok(py.None().into_bound(py));
@@ -305,8 +306,8 @@ impl TestCallbackRelay {
                 ("item_name", text(py, &test_label(result, "test_name")?)),
                 ("status_text", text(py, status)),
                 ("child_rows", children.clone().into_any()),
-                ("run_on", text(py, &self.run_on(result)?)),
-                ("detail", text(py, &self.detail(result)?)),
+                ("run_on", text(py, &placement.0)),
+                ("detail", text(py, &placement.1)),
                 ("not_run", PyBool::new(py, not_run).to_owned().into_any()),
                 ("error_code", error("error_code")?),
                 ("error_help", error("error_help")?),
@@ -354,29 +355,25 @@ impl TestCallbackRelay {
 }
 
 impl TestCallbackRelay {
-    /// What a local test relied on from the project, then `N real models`.
-    fn detail(&self, result: &Bound<'_, PyAny>) -> PyResult<String> {
+    /// Where the test ran (`local`, `warehouse` or undecided), then what it relied on and `N real models`.
+    fn placement(&self, result: &Bound<'_, PyAny>) -> PyResult<(String, String)> {
         let name: String = result.getattr("test_name")?.extract()?;
         let real: String = real_model_detail(result)?;
         let run_on = self.run_on.lock().unwrap_or_else(PoisonError::into_inner);
-        let relied: Option<&String> = match run_on.get(&name) {
+        let placed: Option<&String> = run_on.get(&name);
+        let relied: Option<&String> = match placed {
             Some(placed) if placed == LOCAL_RUN_ON => self.relied_on.get(&name),
             _ => None,
         };
-        Ok(match relied {
+        let detail: String = match relied {
             Some(relied) if real.is_empty() => relied.clone(),
             Some(relied) => format!("{relied}  {real}"),
             None => real,
-        })
-    }
-
-    /// Where the test ran: `local` or `warehouse`; empty when the run did not decide.
-    fn run_on(&self, result: &Bound<'_, PyAny>) -> PyResult<String> {
-        let name: String = result.getattr("test_name")?.extract()?;
-        let run_on = self.run_on.lock().unwrap_or_else(PoisonError::into_inner);
-        Ok(run_on.get(&name).map_or_else(String::new, |run_on| {
+        };
+        let shown: String = placed.map_or_else(String::new, |run_on| {
             run_on.split("  ").next().unwrap_or_default().to_owned()
-        }))
+        });
+        Ok((shown, detail))
     }
 
     fn connection_call(

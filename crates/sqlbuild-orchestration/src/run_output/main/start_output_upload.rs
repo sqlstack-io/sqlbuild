@@ -2,7 +2,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use crate::run_output::_helpers::upload::{attached, send_batches};
+use crate::run_output::_helpers::worker::upload::{attached, send_batches};
 use crate::run_output::models::{RunOutputUploader, UploadShared};
 use crate::worker::errors::WorkerError;
 use crate::worker::models::WorkerClient;

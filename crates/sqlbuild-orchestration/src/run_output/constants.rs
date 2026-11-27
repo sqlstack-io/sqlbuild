@@ -59,6 +59,8 @@ pub(crate) const TAIL_PART: &str = "tail";
 
 /// The longest `ctx.log` message a worker reports; longer ones end in an ellipsis.
 pub const NODE_LOG_MESSAGE_BYTES: usize = 4096;
+/// What ends a `ctx.log` message cut to its limit.
+pub const NODE_LOG_ELLIPSIS: char = '\u{2026}';
 
 /// The most `ctx.log` lines a worker reports per node.
 pub const NODE_LOGS_PER_NODE: usize = 200;

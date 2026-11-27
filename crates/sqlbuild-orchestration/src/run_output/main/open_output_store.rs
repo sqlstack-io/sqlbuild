@@ -8,7 +8,7 @@ use object_store::aws::AmazonS3Builder;
 use object_store::local::LocalFileSystem;
 use object_store::path::Path;
 
-use crate::run_output::_helpers::folders::{default_folder, user_folders};
+use crate::run_output::_helpers::store::folders::{default_folder, user_folders};
 use crate::run_output::constants::{FILE_SCHEME, S3_SCHEME};
 use crate::run_output::models::{OutputSettings, OutputStore};
 use crate::store::errors::ControlError;

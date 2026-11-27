@@ -2684,3 +2684,50 @@ def runtime_sink_totals(
     stdin.close()
     child.wait(timeout=60)
     return totals
+
+
+def live_log_execution(description: str, steps: str) -> WorkerExecutionTestCase:
+    """A scheduled `steps_job` running the asset `steps` defines, for live-log tests."""
+
+    return WorkerExecutionTestCase(
+        description=description,
+        model_sql="SELECT 1 AS amount",
+        warehouse_query="",
+        expected_status="",
+        expected_rows=[],
+        files=node_module_files("python/nodes/steps.py", steps),
+        default_job_files={
+            "orchestration/jobs/steps_job.toml": (
+                'name = "steps_job"\n'
+                'description = "Run the steps."\n'
+                'select = "stream_steps"\n'
+                'schedule = { cron = "0 0 * * *", timezone = "UTC", '
+                'starts_at = "2000-01-01T00:00:00Z" }\n'
+            )
+        },
+    )
+
+
+def stored_node_logs(control_store: Path, run_id: str, node_key: str) -> list[tuple[str, str]]:
+    """The `ctx.log` lines stored for `node_key` in run `run_id`, as level and message."""
+
+    with sqlite3.connect(control_store) as control:
+        return control.execute(
+            "SELECT level, message FROM sqb_run_node_logs WHERE run_id=? AND node_key=? "
+            "ORDER BY logged_at, event_id",
+            (run_id, node_key),
+        ).fetchall()
+
+
+def marked_output(control_store: Path, run_id: str, node_key: str) -> list[str]:
+    """The output lines the server marked for `node_key` in run `run_id`, in order."""
+
+    with sqlite3.connect(control_store) as control:
+        return [
+            text
+            for (text,) in control.execute(
+                "SELECT text FROM sqb_run_output_marks WHERE run_id=? AND node_key=? "
+                "ORDER BY node_line",
+                (run_id, node_key),
+            ).fetchall()
+        ]

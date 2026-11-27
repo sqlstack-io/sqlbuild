@@ -1,6 +1,5 @@
 """A running asset's `ctx.log` lines and printed output reach the server while it runs, not when it ends."""
 
-import sqlite3
 import time
 from pathlib import Path
 from typing import Any
@@ -10,13 +9,14 @@ import pytest
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     LiveLogTestCase,
     LogOverflowTestCase,
-    WorkerExecutionTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
+    live_log_execution,
+    marked_output,
     scheduled_worker,
+    stored_node_logs,
     wait_for_run,
 )
-from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 _NODE: str = "asset:stream_steps"
 _BLOCKED_ASSET: str = '''\
@@ -51,47 +51,6 @@ def stream_steps(ctx: AssetContext):
 '''
 
 
-def _execution(description: str, steps: str) -> WorkerExecutionTestCase:
-    return WorkerExecutionTestCase(
-        description=description,
-        model_sql="SELECT 1 AS amount",
-        warehouse_query="",
-        expected_status="",
-        expected_rows=[],
-        files=node_module_files("python/nodes/steps.py", steps),
-        default_job_files={
-            "orchestration/jobs/steps_job.toml": (
-                'name = "steps_job"\n'
-                'description = "Run the steps."\n'
-                'select = "stream_steps"\n'
-                'schedule = { cron = "0 0 * * *", timezone = "UTC", '
-                'starts_at = "2000-01-01T00:00:00Z" }\n'
-            )
-        },
-    )
-
-
-def _node_logs(control_store: Path, run_id: str) -> list[tuple[str, str]]:
-    with sqlite3.connect(control_store) as control:
-        return control.execute(
-            "SELECT level, message FROM sqb_run_node_logs WHERE run_id=? AND node_key=? "
-            "ORDER BY logged_at, event_id",
-            (run_id, _NODE),
-        ).fetchall()
-
-
-def _marked_output(control_store: Path, run_id: str) -> list[str]:
-    with sqlite3.connect(control_store) as control:
-        return [
-            text
-            for (text,) in control.execute(
-                "SELECT text FROM sqb_run_output_marks WHERE run_id=? AND node_key=? "
-                "ORDER BY node_line",
-                (run_id, _NODE),
-            ).fetchall()
-        ]
-
-
 @pytest.mark.parametrize(
     "test_case",
     [
@@ -118,7 +77,7 @@ def test_given_a_running_asset_when_it_logs_or_prints_then_the_server_has_the_li
     release: Path = tmp_path / "release"
     steps: str = _BLOCKED_ASSET.format(release=str(release), first_step=test_case.first_step)
     with scheduled_worker(
-        tmp_path, monkeypatch, _execution(test_case.description, steps)
+        tmp_path, monkeypatch, live_log_execution(test_case.description, steps)
     ) as worker:
         running: dict[str, Any] = wait_for_run(
             worker.api,
@@ -138,14 +97,16 @@ def test_given_a_running_asset_when_it_logs_or_prints_then_the_server_has_the_li
             assert time.monotonic() < deadline, (live, worker.log.read_text()[-4000:])
             time.sleep(0.1)
             live = (
-                _node_logs(worker.control_store, running["run_id"]),
-                _marked_output(worker.control_store, running["run_id"]),
+                stored_node_logs(worker.control_store, running["run_id"], _NODE),
+                marked_output(worker.control_store, running["run_id"], _NODE),
             )
         release.touch()
         finished: dict[str, Any] = wait_for_run(
             worker.api, worker.process, worker.log, job_key="steps_job"
         )
-        logs: list[tuple[str, str]] = _node_logs(worker.control_store, finished["run_id"])
+        logs: list[tuple[str, str]] = stored_node_logs(
+            worker.control_store, finished["run_id"], _NODE
+        )
 
     assert finished["status"] == "success", worker.log.read_text()[-4000:]
     assert logs == test_case.expected_logs
@@ -178,15 +139,15 @@ def test_given_an_asset_logging_past_the_cap_when_a_worker_runs_it_then_the_rest
 ) -> None:
     steps: str = _CHATTY_ASSET.format(lines=test_case.lines)
     with scheduled_worker(
-        tmp_path, monkeypatch, _execution(test_case.description, steps)
+        tmp_path, monkeypatch, live_log_execution(test_case.description, steps)
     ) as worker:
         run: dict[str, Any] = wait_for_run(
             worker.api, worker.process, worker.log, job_key="steps_job"
         )
-        logs: list[tuple[str, str]] = _node_logs(worker.control_store, run["run_id"])
+        logs: list[tuple[str, str]] = stored_node_logs(worker.control_store, run["run_id"], _NODE)
 
     assert run["status"] == "success", worker.log.read_text()[-4000:]
-    assert [message for level, message in logs if level == "info"] == [
+    assert [message for _, message in filter(lambda row: row[0] == "info", logs)] == [
         f"line {line}" for line in range(test_case.expected_kept)
     ]
     assert logs[-1] == test_case.expected_last_log

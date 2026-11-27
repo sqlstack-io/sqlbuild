@@ -4,7 +4,7 @@ use object_store::ObjectStoreExt;
 use object_store::path::Path;
 use uuid::Uuid;
 
-use crate::run_output::_helpers::chunks::decompress;
+use crate::run_output::_helpers::store::chunks::decompress;
 use crate::run_output::models::OutputStore;
 use crate::store::errors::ControlError;
 

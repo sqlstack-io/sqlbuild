@@ -1853,11 +1853,9 @@ def build_until_line(project_dir: Path, release: Path, line: str) -> BlockedAsse
     watchdog.start()
     assert build.stdout is not None
     before: list[str] = []
-    for printed in build.stdout:
-        before.append(printed)
-        if line in printed:
-            break
-    shown_before_release: bool = line in before[-1] if before else False
+    shown_before_release: bool = any(
+        before.append(printed) or line in printed for printed in build.stdout
+    )
     release.touch()
     after: str = build.stdout.read()
     returncode: int = build.wait(timeout=60)

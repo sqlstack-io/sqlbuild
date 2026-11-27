@@ -4,8 +4,8 @@ use futures_util::Stream;
 use serde_json::json;
 
 use crate::credentials::models::Action;
-use crate::run_output::_helpers::pages::text_after;
-use crate::run_output::_helpers::views::view_line_count;
+use crate::run_output::_helpers::reads::pages::text_after;
+use crate::run_output::_helpers::reads::views::view_line_count;
 use crate::run_output::models::{OutputDownloadQuery, OutputStore, OutputView};
 use crate::run_output::types::PersonRunRead;
 use crate::store::errors::ControlError;

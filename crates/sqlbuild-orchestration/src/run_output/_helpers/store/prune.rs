@@ -5,7 +5,7 @@ use futures_util::StreamExt;
 use object_store::ObjectStoreExt;
 use uuid::Uuid;
 
-use crate::run_output::_helpers::objects::run_prefix;
+use crate::run_output::_helpers::store::objects::run_prefix;
 use crate::run_output::constants::PRUNE_RUNS;
 use crate::run_output::models::{ExpiredRun, OutputStore};
 use crate::store::errors::ControlError;

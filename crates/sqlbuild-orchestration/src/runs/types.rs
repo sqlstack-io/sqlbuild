@@ -69,3 +69,9 @@ pub type RunHandoff = (
 
 /// A permission a launch needs, and the pinned job whose settings it is needed for, if any.
 pub(crate) type ExecutionScope = (PermissionScope, Option<String>);
+
+/// Publications prepared once per snapshot, least recently used first out within each location and target.
+pub(crate) type SnapshotSlots = crate::snapshots::models::SnapshotCells<
+    (uuid::Uuid, String),
+    std::sync::Arc<crate::runs::models::CachedPublication>,
+>;

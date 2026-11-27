@@ -1,9 +1,9 @@
 //! Pages of a view's lines with similar lines folded, searches from a line in either direction, and a view's whole text.
 
-use crate::run_output::_helpers::chunks::similar_key;
-use crate::run_output::_helpers::lines::segment_text;
-use crate::run_output::_helpers::objects::read_chunk;
-use crate::run_output::_helpers::views::view_segments;
+use crate::run_output::_helpers::reads::lines::segment_text;
+use crate::run_output::_helpers::reads::views::view_segments;
+use crate::run_output::_helpers::store::chunks::similar_key;
+use crate::run_output::_helpers::store::objects::read_chunk;
 use crate::run_output::constants::{
     AROUND_OPEN_LINES, COLLAPSE_SCAN_LINES, MIN_SIMILAR_LINES, SEARCH_CHUNKS, SEGMENT_BATCH,
 };

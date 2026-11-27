@@ -2,9 +2,9 @@
 
 use std::sync::Arc;
 
-use crate::run_output::_helpers::chunks::{level_of, lines};
-use crate::run_output::_helpers::objects::read_chunk;
-use crate::run_output::_helpers::views::{view_gap, view_segments};
+use crate::run_output::_helpers::reads::views::{view_gap, view_segments};
+use crate::run_output::_helpers::store::chunks::{level_of, lines};
+use crate::run_output::_helpers::store::objects::read_chunk;
 use crate::run_output::constants::SEGMENT_BATCH;
 use crate::run_output::models::{
     OutputLine, OutputStore, OutputView, SearchDirection, StoredSegment, ViewReader,

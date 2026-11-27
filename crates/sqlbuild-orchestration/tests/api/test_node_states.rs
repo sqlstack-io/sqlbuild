@@ -8,9 +8,7 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::api::models::{ApiAuthentication, HumanLogin};
-use crate::api::tests::changes_helpers::{
-    next_notice, next_notice_on, opened, request_person_feed,
-};
+use crate::api::tests::changes_helpers::{next_notice, next_topic, opened, request_person_feed};
 use crate::api::tests::helpers::{start_api_with_authentication, stop_api};
 use crate::api::tests::node_states_helpers::{builds, notices, orders_snapshot, reader};
 use crate::api::tests::test_types::{
@@ -398,9 +396,7 @@ fn given_changed_build_reports_when_people_read_node_states_then_only_the_curren
             )
             .await
             .expect("failing changed build");
-            next_notice_on(&mut feed, "node_status")
-                .await
-                .expect("node status");
+            next_notice(&mut feed).await.expect("node status");
             assert_eq!(
                 changed_build().await,
                 json!({"generation": 2, "changed": [], "downstream": [], "failing": "Model orders cannot plan a full rebuild"}),
@@ -446,6 +442,12 @@ fn given_changed_build_reports_when_people_read_node_states_then_only_the_curren
                 "{}: a failed plan of what changed is the location's health, not only a log line",
                 test_case.description
             );
+            assert_eq!(
+                next_topic(&mut feed).await,
+                Some(format!("location_health:{location}")),
+                "{}: a location's health report reaches the people following its target",
+                test_case.description
+            );
             let partial = ChangedBuildReport {
                 session_id,
                 generation: 2,
@@ -458,9 +460,7 @@ fn given_changed_build_reports_when_people_read_node_states_then_only_the_curren
             report_changed_build(store, (location, "development"), &partial)
                 .await
                 .expect("partial changed build");
-            next_notice_on(&mut feed, "node_status")
-                .await
-                .expect("node status");
+            next_notice(&mut feed).await.expect("node status");
             assert_eq!(
                 changed_build().await,
                 json!({"generation": 2, "changed": ["model:totals"], "downstream": [], "failing": "Can't plan 1 model: orders: model 'orders' sets full_refresh false"}),

@@ -125,8 +125,10 @@ def _execute_ready_node(
             phase="execute",
         ),
     ):
-        if runtime.on_log is not None:
-            statement_recorder.on_log = functools.partial(runtime.on_log, node.name)
+        recorder: StatementRecorder = StatementRecorder(
+            events=statement_recorder.events,
+            on_log=None if runtime.on_log is None else functools.partial(runtime.on_log, node.name),
+        )
         with ResourceAttemptLifecycle(
             resource_id=f"{node_kind.value}:{node.name}",
             resource_kind=node_kind.value,
@@ -138,14 +140,14 @@ def _execute_ready_node(
                 node_kind=node_kind,
                 upstream_results=upstream_results,
                 runtime=runtime,
-                statement_recorder=statement_recorder,
+                statement_recorder=recorder,
                 logger=logger,
                 run_state=run_state,
                 result_store=result_store,
                 sleep=sleep,
                 monotonic=monotonic,
             )
-            logged: tuple[LifeCycleEvent, ...] = _logged_events(statement_recorder)
+            logged: tuple[LifeCycleEvent, ...] = _logged_events(recorder)
             result: PythonNodeExecutionResult = replace(
                 outcome,
                 lifecycle_events=logged,

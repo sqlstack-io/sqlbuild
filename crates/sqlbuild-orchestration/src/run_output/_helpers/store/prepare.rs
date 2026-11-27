@@ -2,7 +2,7 @@
 
 use uuid::Uuid;
 
-use crate::run_output::_helpers::chunks::{compress, line_count, marked_lines};
+use crate::run_output::_helpers::store::chunks::{compress, line_count, marked_lines};
 use crate::run_output::constants::{
     MARKED_LINES, MAX_BATCH_SEGMENTS, MAX_BATCH_TEXT_BYTES, RUN_OUTPUT_NODE,
 };

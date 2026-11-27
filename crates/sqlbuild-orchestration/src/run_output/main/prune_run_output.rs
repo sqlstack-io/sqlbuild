@@ -1,6 +1,8 @@
 //! Finished runs past `run_output_days` lose their output; the run and its node logs stay.
 
-use crate::run_output::_helpers::prune::{expired_runs, prune_run, report_retention_failure};
+use crate::run_output::_helpers::store::prune::{
+    expired_runs, prune_run, report_retention_failure,
+};
 use crate::run_output::models::{ExpiredRun, OutputStore};
 use crate::store::models::ControlStore;
 

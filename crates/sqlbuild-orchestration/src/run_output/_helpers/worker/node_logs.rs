@@ -7,7 +7,8 @@ use crate::run_output::constants::{
     NODE_LOG_FLUSH_INTERVAL, NODE_LOG_FLUSH_LINES, NODE_LOG_FLUSH_WAIT, NODE_LOGS_PER_NODE,
 };
 use crate::run_output::main::node_log_change::node_log_change;
-use crate::run_output::models::{NodeLogReport, NodeLogSender, NodeLogShared, NodeLogState};
+use crate::run_output::models::{NodeLogSender, NodeLogShared, NodeLogState};
+use crate::run_output::types::NodeLogReport;
 use crate::runs::models::{NodeLogLevel, RunChange};
 
 impl NodeLogShared {
@@ -37,7 +38,7 @@ impl NodeLogState {
 impl NodeLogSender {
     /// A sender that reports each line with `report`; its thread starts with the first line.
     #[must_use]
-    pub fn new(report: Box<NodeLogReport>) -> Self {
+    pub fn new(report: Box<dyn NodeLogReport>) -> Self {
         Self {
             shared: Arc::new(NodeLogShared {
                 state: Mutex::default(),
@@ -137,7 +138,7 @@ impl NodeLogSender {
     }
 }
 
-/// Send each due batch in order until the sender closes and nothing is left.
+/// Send each due batch in order until the sender closes; an unacknowledged line goes with its node's result.
 fn send_node_logs(shared: &NodeLogShared) {
     loop {
         let batch: Vec<(String, String, RunChange)> = {
@@ -164,11 +165,13 @@ fn send_node_logs(shared: &NodeLogShared) {
                     .0;
             }
         };
-        let acknowledged: Vec<String> = batch
-            .into_iter()
-            .filter(|(_, key, change)| (shared.report)(key, change))
-            .map(|(_, key, _)| key)
-            .collect();
+        let mut acknowledged: Vec<String> = Vec::new();
+        for (_, key, change) in batch {
+            match shared.report.report(&key, &change) {
+                Ok(()) => acknowledged.push(key),
+                Err(_unacknowledged) => {}
+            }
+        }
         let mut state = shared.locked();
         state.sent.extend(acknowledged);
         state.sending.clear();

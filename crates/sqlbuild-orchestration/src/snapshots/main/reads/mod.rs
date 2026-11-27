@@ -10,4 +10,5 @@ pub mod read_person_node_sql;
 pub(crate) mod read_snapshot_documents;
 pub(crate) mod read_snapshot_keys;
 pub(crate) mod read_snapshot_nodes;
+pub mod snapshot_cell;
 pub(crate) mod snapshot_nodes;

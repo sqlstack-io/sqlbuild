@@ -1,7 +1,7 @@
 //! Whole-snapshot reads: decoded once per snapshot, in pages read by short transactions, within a shared memory budget.
 
 use std::collections::BTreeMap;
-use std::sync::{Arc, PoisonError};
+use std::sync::Arc;
 
 use tokio::sync::OnceCell;
 use uuid::Uuid;
@@ -11,7 +11,8 @@ use crate::snapshots::constants::{
     DECODED_BODY_EXPANSION, SNAPSHOT_DECODE_BUDGET_MIB, SNAPSHOT_NODE_CACHE_ENTRIES,
     SNAPSHOT_NODE_PAGE,
 };
-use crate::snapshots::models::{SnapshotNode, SnapshotNodeCache, SnapshotNodeSlot};
+use crate::snapshots::main::reads::snapshot_cell::snapshot_cell;
+use crate::snapshots::models::{SnapshotNode, SnapshotNodeCache};
 use crate::snapshots::types::SnapshotNodes;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
@@ -24,36 +25,7 @@ const MIB: u64 = 1024 * 1024;
 
 /// The snapshot's cell, marked most recently used; adding one drops the least recently used beyond the limit.
 pub(crate) fn slot(cache: &SnapshotNodeCache, snapshot_id: Uuid) -> Arc<OnceCell<SnapshotNodes>> {
-    let mut state = cache.slots.lock().unwrap_or_else(PoisonError::into_inner);
-    state.clock += 1;
-    let now = state.clock;
-    if let Some(slot) = state
-        .slots
-        .iter_mut()
-        .find(|slot| slot.snapshot_id == snapshot_id)
-    {
-        slot.used = now;
-        return Arc::clone(&slot.cell);
-    }
-    let cell = Arc::new(OnceCell::new());
-    state.slots.push(SnapshotNodeSlot {
-        snapshot_id,
-        used: now,
-        cell: Arc::clone(&cell),
-    });
-    while state.slots.len() > SNAPSHOT_NODE_CACHE_ENTRIES {
-        let Some(oldest) = state
-            .slots
-            .iter()
-            .enumerate()
-            .min_by_key(|(_, slot)| slot.used)
-            .map(|(index, _)| index)
-        else {
-            break;
-        };
-        state.slots.remove(oldest);
-    }
-    cell
+    snapshot_cell(&cache.slots, ((), snapshot_id), SNAPSHOT_NODE_CACHE_ENTRIES)
 }
 
 /// Every node of the snapshot, decoded within `cache`'s budget: it waits until its estimate fits.

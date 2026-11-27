@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 use std::future::Future;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
 
 use serde_json::Value;
 use tokio::sync::OnceCell;
@@ -12,12 +12,12 @@ use crate::authorization::main::decisions::authorize_person::authorize_person;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::declarations::main::frozen_definitions::frozen_definitions;
 use crate::runs::constants::PUBLICATIONS_PER_TARGET;
-use crate::runs::models::{
-    CachedPublication, PlannerResource, PublishedJobs, SnapshotSlot, SnapshotSlots,
-};
+use crate::runs::models::{CachedPublication, PlannerResource, PublishedJobs};
 use crate::runs::types::CommandPlanner;
+use crate::runs::types::SnapshotSlots;
 use crate::snapshots::main::reads::read_current_record::read_current_record;
 use crate::snapshots::main::reads::read_snapshot_keys::read_snapshot_keys;
+use crate::snapshots::main::reads::snapshot_cell::snapshot_cell;
 use crate::snapshots::main::reads::snapshot_nodes::snapshot_nodes;
 use crate::snapshots::main::write_sets::writer_nodes::writer_nodes;
 use crate::snapshots::models::{SnapshotNode, SnapshotRecord};
@@ -138,42 +138,7 @@ fn slot(
     slots: &Mutex<SnapshotSlots>,
     (scope, snapshot_id): ((Uuid, String), Uuid),
 ) -> Arc<OnceCell<Arc<CachedPublication>>> {
-    let mut state = slots.lock().unwrap_or_else(PoisonError::into_inner);
-    state.clock += 1;
-    let now = state.clock;
-    if let Some(slot) = state
-        .slots
-        .iter_mut()
-        .find(|slot| slot.snapshot_id == snapshot_id)
-    {
-        slot.used = now;
-        return Arc::clone(&slot.cell);
-    }
-    let cell = Arc::new(OnceCell::new());
-    state.slots.push(SnapshotSlot {
-        scope: scope.clone(),
-        snapshot_id,
-        used: now,
-        cell: Arc::clone(&cell),
-    });
-    loop {
-        let in_scope = state
-            .slots
-            .iter()
-            .enumerate()
-            .filter(|(_, slot)| slot.scope == scope);
-        if in_scope.clone().count() <= PUBLICATIONS_PER_TARGET {
-            break;
-        }
-        let Some(oldest) = in_scope
-            .min_by_key(|(_, slot)| slot.used)
-            .map(|(index, _)| index)
-        else {
-            break;
-        };
-        state.slots.remove(oldest);
-    }
-    cell
+    snapshot_cell(slots, (scope, snapshot_id), PUBLICATIONS_PER_TARGET)
 }
 
 /// Read what planning needs from one snapshot and index it with the planner.

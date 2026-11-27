@@ -20,33 +20,41 @@ pub struct SnapshotNode {
 /// Decoded snapshots by ID, and the memory budget their decoding shares.
 #[derive(Debug)]
 pub(crate) struct SnapshotNodeCache {
-    pub(crate) slots: std::sync::Mutex<SnapshotNodeSlots>,
+    pub(crate) slots: std::sync::Mutex<SnapshotCells<(), crate::snapshots::types::SnapshotNodes>>,
     /// One permit per MiB a read may decode into; a read waits for its estimate, capped at the whole budget.
     pub(crate) budget: tokio::sync::Semaphore,
 }
 
-/// The cached snapshots; a larger `used` is more recent.
+/// Values cached once per snapshot, each in a scope such as a location target; a larger `used` is more recent.
 #[derive(Debug)]
-pub(crate) struct SnapshotNodeSlots {
+pub(crate) struct SnapshotCells<S, T> {
+    /// Counts lookups, so a larger `used` is more recent.
     pub(crate) clock: u64,
-    pub(crate) slots: Vec<SnapshotNodeSlot>,
+    pub(crate) slots: Vec<SnapshotCell<S, T>>,
 }
 
-/// One snapshot's nodes, decoded by the first reader while later ones wait.
+/// One snapshot's value, made by the first reader that needs it while later ones wait.
 #[derive(Debug)]
-pub(crate) struct SnapshotNodeSlot {
+pub(crate) struct SnapshotCell<S, T> {
+    pub(crate) scope: S,
     pub(crate) snapshot_id: Uuid,
     pub(crate) used: u64,
-    pub(crate) cell: std::sync::Arc<tokio::sync::OnceCell<crate::snapshots::types::SnapshotNodes>>,
+    pub(crate) cell: std::sync::Arc<tokio::sync::OnceCell<T>>,
+}
+
+impl<S, T> SnapshotCells<S, T> {
+    pub(crate) const fn new() -> Self {
+        Self {
+            clock: 0,
+            slots: Vec::new(),
+        }
+    }
 }
 
 impl SnapshotNodeCache {
     pub(crate) const fn new() -> Self {
         Self {
-            slots: std::sync::Mutex::new(SnapshotNodeSlots {
-                clock: 0,
-                slots: Vec::new(),
-            }),
+            slots: std::sync::Mutex::new(SnapshotCells::new()),
             budget: tokio::sync::Semaphore::const_new(
                 crate::snapshots::constants::SNAPSHOT_DECODE_BUDGET_MIB as usize,
             ),

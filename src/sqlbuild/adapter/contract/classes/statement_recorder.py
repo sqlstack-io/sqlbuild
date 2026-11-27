@@ -12,9 +12,13 @@ from sqlbuild.adapter.contract.types import LifeCycleEventKind, LogLevel
 class StatementRecorder:
     """Mutable recorder for runtime lifecycle events."""
 
-    def __init__(self, events: list[LifeCycleEvent] | None = None) -> None:
-        self.events = events or []
-        self.on_log: Callable[[LogLevel, str], None] | None = None
+    def __init__(
+        self,
+        events: list[LifeCycleEvent] | None = None,
+        on_log: Callable[[LogLevel, str], None] | None = None,
+    ) -> None:
+        self.events = events if events is not None else []
+        self.on_log: Callable[[LogLevel, str], None] | None = on_log
         self._log_lock: threading.Lock = threading.Lock()
 
     def record(self, statement: str) -> None:

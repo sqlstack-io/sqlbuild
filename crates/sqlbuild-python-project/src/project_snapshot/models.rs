@@ -45,6 +45,7 @@ use sqlbuild_orchestration::run_output::constants::UPLOAD_CLOSE_BUDGET;
 use sqlbuild_orchestration::run_output::main::finish_output_upload::finish_output_upload;
 use sqlbuild_orchestration::run_output::main::start_output_upload::start_output_upload;
 use sqlbuild_orchestration::run_output::models::NodeLogSender;
+use sqlbuild_orchestration::run_output::types::NodeLogReport;
 use sqlbuild_orchestration::runs::models::NodeLogLevel;
 use sqlbuild_orchestration::runs::models::NodeOutcome;
 use sqlbuild_orchestration::runs::models::RunChange;
@@ -235,9 +236,7 @@ impl WorkerBuild {
     ) -> PyResult<Arc<Self>> {
         let reporter: Py<NativeOrchestrationWorker> = worker.clone().unbind();
         let state = Arc::new(Self {
-            logs: NodeLogSender::new(Box::new(move |key: &str, change: &RunChange| {
-                reporter.get().send_change(key, change.clone()).is_ok()
-            })),
+            logs: NodeLogSender::new(Box::new(WorkerLogReport { worker: reporter })),
             execution: worker.get().execution(worker.py())?,
             worker: worker.clone().unbind(),
             completed: Mutex::default(),
@@ -1147,6 +1146,21 @@ impl WorkerBuild {
             },
         )?;
         Ok(outcome)
+    }
+}
+
+/// Sends a build's `ctx.log` lines through its orchestration worker, from the log sender's thread.
+#[derive(Debug)]
+struct WorkerLogReport {
+    worker: Py<NativeOrchestrationWorker>,
+}
+
+impl NodeLogReport for WorkerLogReport {
+    fn report(&self, key: &str, change: &RunChange) -> Result<(), String> {
+        self.worker
+            .get()
+            .send_change(key, change.clone())
+            .map_err(|error| error.to_string())
     }
 }
 

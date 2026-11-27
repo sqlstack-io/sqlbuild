@@ -1,12 +1,16 @@
 //! A worker sends `ctx.log` lines from a background thread: a node never waits, lines past the cap are counted, and only acknowledged lines count as sent.
 
+use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::run_output::constants::NODE_LOGS_PER_NODE;
 use crate::run_output::main::node_log_overflow::node_log_overflow;
 use crate::run_output::models::NodeLogSender;
-use crate::run_output::tests::test_types::NodeLogSendTestCase;
+use crate::run_output::tests::helpers::{close_sender, flush_node};
+use crate::run_output::tests::test_types::{
+    NodeLogSendTestCase, RecordingReport, SlowNodeLogTestCase,
+};
 use crate::runs::models::{NodeLogLevel, RunChange};
 
 const NODE: &str = "asset:fulfil[pack]";
@@ -19,7 +23,7 @@ fn given_a_node_logging_when_its_lines_are_sent_then_the_server_gets_the_kept_on
             description: "a few lines reach the server before the node finishes",
             lines: 3,
             acknowledged: true,
-            flushed: true,
+            finish: flush_node,
             expected_reported: 3,
             expected_last_sent: true,
             expected_overflow: None,
@@ -28,7 +32,7 @@ fn given_a_node_logging_when_its_lines_are_sent_then_the_server_gets_the_kept_on
             description: "lines past the cap are counted, not sent, and a warning says how many",
             lines: NODE_LOGS_PER_NODE + 5,
             acknowledged: true,
-            flushed: true,
+            finish: flush_node,
             expected_reported: NODE_LOGS_PER_NODE,
             expected_last_sent: true,
             expected_overflow: Some(
@@ -39,7 +43,7 @@ fn given_a_node_logging_when_its_lines_are_sent_then_the_server_gets_the_kept_on
             description: "a line the server refused is left for the finishing node to report",
             lines: 2,
             acknowledged: false,
-            flushed: true,
+            finish: flush_node,
             expected_reported: 2,
             expected_last_sent: false,
             expected_overflow: None,
@@ -48,7 +52,7 @@ fn given_a_node_logging_when_its_lines_are_sent_then_the_server_gets_the_kept_on
             description: "closing the sender at the end of the run sends what is waiting",
             lines: 4,
             acknowledged: true,
-            flushed: false,
+            finish: close_sender,
             expected_reported: 4,
             expected_last_sent: true,
             expected_overflow: None,
@@ -56,12 +60,11 @@ fn given_a_node_logging_when_its_lines_are_sent_then_the_server_gets_the_kept_on
     ];
     for test_case in test_cases {
         let reported: Arc<Mutex<Vec<(String, RunChange)>>> = Arc::default();
-        let seen: Arc<Mutex<Vec<(String, RunChange)>>> = Arc::clone(&reported);
-        let acknowledged: bool = test_case.acknowledged;
-        let sender = NodeLogSender::new(Box::new(move |key: &str, change: &RunChange| {
-            std::thread::sleep(Duration::from_millis(1));
-            seen.lock().unwrap().push((key.to_owned(), change.clone()));
-            acknowledged
+        let (arrivals, _arrived): (Sender<String>, Receiver<String>) = channel();
+        let sender = NodeLogSender::new(Box::new(RecordingReport {
+            reported: Arc::clone(&reported),
+            acknowledged: test_case.acknowledged,
+            arrivals: Mutex::new(arrivals),
         }));
         let started: Instant = Instant::now();
         for index in 0..test_case.lines {
@@ -72,12 +75,8 @@ fn given_a_node_logging_when_its_lines_are_sent_then_the_server_gets_the_kept_on
             "{}: logging waited on the server",
             test_case.description
         );
-        if test_case.flushed {
-            sender.flush(NODE);
-        } else {
-            sender.close();
-        }
-        let reported = reported.lock().unwrap().clone();
+        (test_case.finish)(&sender, NODE);
+        let reported = reported.lock().expect("reported lines").clone();
         let last: usize = test_case.expected_reported - 1;
         assert_eq!(
             reported.len(),
@@ -131,21 +130,32 @@ fn given_a_node_logging_when_its_lines_are_sent_then_the_server_gets_the_kept_on
 
 #[test]
 fn given_lines_arriving_slowly_when_no_node_finishes_then_they_are_sent_within_about_a_second() {
-    let reported: Arc<Mutex<Vec<String>>> = Arc::default();
-    let seen: Arc<Mutex<Vec<String>>> = Arc::clone(&reported);
-    let sender = NodeLogSender::new(Box::new(move |key: &str, _: &RunChange| {
-        seen.lock().unwrap().push(key.to_owned());
-        true
-    }));
-    sender.push(NODE, (NodeLogLevel::Info, "step 1"));
-    let deadline: Instant = Instant::now() + Duration::from_secs(5);
-    while reported.lock().unwrap().is_empty() && Instant::now() < deadline {
-        std::thread::sleep(Duration::from_millis(20));
-    }
+    let test_cases = [SlowNodeLogTestCase {
+        description: "one line is sent on the sender's timer, with no node finishing",
+        message: "step 1",
+        wait: Duration::from_secs(5),
+        expected_key: "node-log/asset:fulfil[pack]/0",
+    }];
+    for test_case in test_cases {
+        let (arrivals, arrived): (Sender<String>, Receiver<String>) = channel();
+        let sender = NodeLogSender::new(Box::new(RecordingReport {
+            reported: Arc::default(),
+            acknowledged: true,
+            arrivals: Mutex::new(arrivals),
+        }));
+        sender.push(NODE, (NodeLogLevel::Info, test_case.message));
 
-    assert_eq!(
-        *reported.lock().unwrap(),
-        vec![format!("node-log/{NODE}/0")]
-    );
-    assert!(sender.was_sent(&format!("node-log/{NODE}/0")));
+        assert_eq!(
+            arrived.recv_timeout(test_case.wait),
+            Ok(test_case.expected_key.to_owned()),
+            "{}",
+            test_case.description
+        );
+        sender.close();
+        assert!(
+            sender.was_sent(test_case.expected_key),
+            "{}",
+            test_case.description
+        );
+    }
 }

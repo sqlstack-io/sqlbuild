@@ -172,9 +172,28 @@ pub(crate) struct NodeLogSendTestCase {
     pub(crate) lines: usize,
     /// Whether the server acknowledges each report.
     pub(crate) acknowledged: bool,
-    /// Whether the node finishes (flushes) rather than the run closing the sender.
-    pub(crate) flushed: bool,
+    /// How the lines finish: the node flushing its own, or the run closing the sender.
+    pub(crate) finish: fn(&crate::run_output::models::NodeLogSender, &str),
     pub(crate) expected_reported: usize,
     pub(crate) expected_last_sent: bool,
     pub(crate) expected_overflow: Option<&'static str>,
+}
+
+/// One node's line arriving slowly, while no node finishes, and the line the server then gets.
+pub(crate) struct SlowNodeLogTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) message: &'static str,
+    /// The longest the line may take to reach the server.
+    pub(crate) wait: std::time::Duration,
+    pub(crate) expected_key: &'static str,
+}
+
+/// A fake server for a worker's log sender: it records each line and acknowledges it or not.
+#[derive(Debug)]
+pub(crate) struct RecordingReport {
+    pub(crate) reported:
+        std::sync::Arc<std::sync::Mutex<Vec<(String, crate::runs::models::RunChange)>>>,
+    pub(crate) acknowledged: bool,
+    /// Each reported key, as it arrives.
+    pub(crate) arrivals: std::sync::Mutex<std::sync::mpsc::Sender<String>>,
 }
