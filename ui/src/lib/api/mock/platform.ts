@@ -286,9 +286,11 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 	});
 	const loadError =
 		"ImportError: cannot import name 'campaign_touches' from 'models.attribution' (orchestration/jobs.py, line 12)";
-	type LocationExtras = Pick<LocationDetail, 'createdAt' | 'brokenDeployPolicy' | 'failedDeploy' | 'lastLoadError' | 'instances' | 'imageId' | 'warehouseConnection' | 'connectionTest' | 'poolCapWarnings' | 'missingSecrets'>;
+	type LocationExtras = Pick<LocationDetail, 'createdAt' | 'brokenDeployPolicy' | 'failedDeploy' | 'lastLoadError' | 'instances' | 'imageId' | 'warehouseConnection' | 'connectionTest' | 'poolCapWarnings' | 'missingSecrets' | 'verdict'>;
 	const locationExtras: Record<string, LocationExtras> = {
 		[LOCATION_SHOP]: {
+			// What the server's verdict says of this location's mock state.
+			verdict: { fact: 'not_tested', stopsRuns: false },
 			createdAt: ago(days(210)),
 			brokenDeployPolicy: 'fallback',
 			failedDeploy: null,
@@ -306,6 +308,8 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 		},
 		// A deploy in progress: the new process is loading while the old one keeps running.
 		[LOCATION_SHOP_STAGING]: {
+			// What the server's verdict says of this location's mock state.
+			verdict: { fact: 'cant_connect', stopsRuns: true },
 			createdAt: ago(days(180)),
 			brokenDeployPolicy: 'fallback',
 			failedDeploy: null,
@@ -321,6 +325,8 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 			]
 		},
 		[LOCATION_SHOP_DEV]: {
+			// What the server's verdict says of this location's mock state.
+			verdict: { fact: 'healthy', stopsRuns: false },
 			createdAt: ago(days(14)),
 			brokenDeployPolicy: 'queue',
 			failedDeploy: null,
@@ -342,6 +348,8 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 			instances: [{ id: 'location-waffle-shop-dev-local', imageId: 'local', gitRevision: 'b81c09e', startedAt: ago(30), lastSeenAt: ago(0.3), state: 'live' }]
 		},
 		[LOCATION_MARKETING]: {
+			// What the server's verdict says of this location's mock state.
+			verdict: { fact: 'not_checking_in', stopsRuns: true },
 			createdAt: ago(days(120)),
 			brokenDeployPolicy: 'fallback',
 			failedDeploy: { gitRevision: '9c4b2d1', imageId: 'sha256:9c4b2d18e07f', attemptedAt: ago(48), error: loadError },
@@ -608,10 +616,10 @@ function historicalEvents(now: number): PlatformEventRecord[] {
 	const ago = (minutes: number) => new Date(now - minutes * MIN).toISOString();
 	const shop = { locationId: LOCATION_SHOP };
 	return [
-		{ id: 'pe-h3', kind: 'launch_failed', severity: 'critical', occurredAt: ago(1500), active: false, locationId: LOCATION_SHOP, subject: 'activity_microbatch', message: 'A run of activity_microbatch stopped reporting in and was marked failed.', resolvedAt: ago(1490), links: [{ kind: 'job', key: 'activity_microbatch', ...shop }, { kind: 'run', id: 'run-e3f8', ...shop }], reactions: [reaction('consumed', 52, 1, ago(1499))], payload: { job: 'activity_microbatch', attempts: '1', error: 'worker lost' } },
-		{ id: 'pe-h2', kind: 'scheduler_no_leader', severity: 'critical', occurredAt: ago(2 * 1440 + 30), active: false, locationId: null, subject: null, message: 'No server ran the scheduler for 41s while a server restarted.', resolvedAt: ago(2 * 1440 + 29), links: [], reactions: [reaction('consumed', 41, 1, ago(2 * 1440 + 29))], payload: { last_holder: 'sqb-server-2', lease_expired_at: ago(2 * 1440 + 30) } },
-		{ id: 'pe-h4', kind: 'connection_test_failed', severity: 'warning', occurredAt: ago(2 * 1440 + 400), active: false, locationId: LOCATION_MARKETING, subject: 'prod', message: 'The warehouse connection test after publishing failed: password authentication failed for user sqb_builder.', resolvedAt: ago(2 * 1440 + 380), links: [{ kind: 'location', id: LOCATION_MARKETING }], reactions: [], payload: { connection: 'prod', trigger: 'publish', error: 'password authentication failed' } },
-		{ id: 'pe-h1', kind: 'tick_overdue', severity: 'warning', occurredAt: ago(3 * 1440), active: false, locationId: LOCATION_SHOP, subject: 'core_build', message: 'The core_build schedule started 4 minutes late.', resolvedAt: ago(3 * 1440 - 4), links: [{ kind: 'trigger', id: triggerId('core_build'), name: 'core_build', ...shop }], reactions: [reaction('consumed', 33, 1, ago(3 * 1440 - 1))], payload: { trigger: 'core_build', scheduled_for: ago(3 * 1440), overdue_by: '4m' } }
+		{ id: 'pe-h3', stopsRuns: false, kind: 'launch_failed', severity: 'critical', occurredAt: ago(1500), active: false, locationId: LOCATION_SHOP, subject: 'activity_microbatch', message: 'A run of activity_microbatch stopped reporting in and was marked failed.', resolvedAt: ago(1490), links: [{ kind: 'job', key: 'activity_microbatch', ...shop }, { kind: 'run', id: 'run-e3f8', ...shop }], reactions: [reaction('consumed', 52, 1, ago(1499))], payload: { job: 'activity_microbatch', attempts: '1', error: 'worker lost' } },
+		{ id: 'pe-h2', stopsRuns: false, kind: 'scheduler_no_leader', severity: 'critical', occurredAt: ago(2 * 1440 + 30), active: false, locationId: null, subject: null, message: 'No server ran the scheduler for 41s while a server restarted.', resolvedAt: ago(2 * 1440 + 29), links: [], reactions: [reaction('consumed', 41, 1, ago(2 * 1440 + 29))], payload: { last_holder: 'sqb-server-2', lease_expired_at: ago(2 * 1440 + 30) } },
+		{ id: 'pe-h4', stopsRuns: false, kind: 'connection_test_failed', severity: 'warning', occurredAt: ago(2 * 1440 + 400), active: false, locationId: LOCATION_MARKETING, subject: 'prod', message: 'The warehouse connection test after publishing failed: password authentication failed for user sqb_builder.', resolvedAt: ago(2 * 1440 + 380), links: [{ kind: 'location', id: LOCATION_MARKETING }], reactions: [], payload: { connection: 'prod', trigger: 'publish', error: 'password authentication failed' } },
+		{ id: 'pe-h1', stopsRuns: false, kind: 'tick_overdue', severity: 'warning', occurredAt: ago(3 * 1440), active: false, locationId: LOCATION_SHOP, subject: 'core_build', message: 'The core_build schedule started 4 minutes late.', resolvedAt: ago(3 * 1440 - 4), links: [{ kind: 'trigger', id: triggerId('core_build'), name: 'core_build', ...shop }], reactions: [reaction('consumed', 33, 1, ago(3 * 1440 - 1))], payload: { trigger: 'core_build', scheduled_for: ago(3 * 1440), overdue_by: '4m' } }
 	];
 }
 
@@ -732,7 +740,8 @@ export class MockPlatformApi implements PlatformApi {
 				lastSeenAt: d.instances.map((i) => i.lastSeenAt).sort().at(-1) ?? null,
 				target: d.target,
 				snapshot: d.snapshot,
-				connectionTest: d.connectionTest
+				connectionTest: d.connectionTest,
+				verdict: d.verdict
 			}))
 		);
 	}

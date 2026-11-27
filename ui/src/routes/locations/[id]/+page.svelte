@@ -46,21 +46,7 @@
 	const running = $derived(processes.live[0] ?? null);
 	// "Healthy" never sits beside a failing sync, a failed or missing connection test, or no check-in: the headline names the worst.
 	const sync = createResource((client) => client.getWarehouseSync({ locationId: id }), ['warehouse_sync']);
-	const headline = $derived(
-		detail
-			? locationVerdict({
-					health: detail.health,
-					live: processes.live.length > 0,
-					test: detail.connectionTest,
-					deployedAt: detail.snapshot?.publishedAt ?? null,
-					failedDeploy: !!detail.failedDeploy,
-					fallback: detail.brokenDeployPolicy === 'fallback' && !!detail.snapshot,
-					events: app.platformEvents.filter((e) => e.locationId === detail.id),
-					sync: syncNowState(sync.data ?? null, null, app.now),
-					verdict: detail.verdict
-				})
-			: null
-	);
+	const headline = $derived(detail ? locationVerdict(detail.verdict) : null);
 
 	const instanceTone: Record<LocationInstance['state'], string> = {
 		live: 'var(--sb-success)',

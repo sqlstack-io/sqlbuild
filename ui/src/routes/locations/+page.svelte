@@ -50,17 +50,7 @@
 		}
 	}
 	/** The row's health, by the rule every page uses: its worst open fact. */
-	const verdictOf = (l: (typeof all)[number]) =>
-		locationVerdict({
-			health: l.health,
-			live: l.liveInstances > 0,
-			test: tested[l.id] ?? l.connectionTest,
-			deployedAt: l.snapshot?.publishedAt ?? null,
-			failedDeploy: !!l.failedDeploy,
-			fallback: l.brokenDeployPolicy === 'fallback' && !!l.snapshot,
-			events: app.platformEvents.filter((e) => e.locationId === l.id),
-			verdict: l.verdict
-		});
+	const verdictOf = (l: (typeof all)[number]) => locationVerdict(l.verdict);
 	const tableColumns = $derived<TableColumn[]>([
 		{ id: 'location', label: 'Location', minWidth: 220 },
 		{ id: 'health', label: 'Health', width: '170px' },

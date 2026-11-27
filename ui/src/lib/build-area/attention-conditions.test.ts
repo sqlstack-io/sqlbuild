@@ -10,6 +10,7 @@ const event = (extra: Partial<PlatformEvent> = {}): PlatformEvent => ({
 	id: 'ev-1',
 	kind: 'tick_overdue',
 	severity: 'warning',
+	stopsRuns: false,
 	occurredAt: iso(-1),
 	active: true,
 	locationId: 'loc-1',
@@ -172,7 +173,7 @@ describe('acknowledgements of conditions that cleared', () => {
 		const secrets = ack('event:location_missing_secrets:loc-1:dev:');
 		const healthy = (acks: AttentionAcknowledgement[], events: PlatformEvent[] = []) =>
 			overviewOf({ runs: [], checks: [], nodes: [built([])], changes: [], events, triggers: [], acknowledgements: new Map(), conditions: { snoozeSeconds: 86_400, acknowledgements: acks }, now, scopeKey: 'loc-1:dev', healthRead: true });
-		const stillMissing: PlatformEvent = { id: 'secrets:loc-1:dev', kind: 'location_missing_secrets', severity: 'warning', occurredAt: iso(-1), active: true, locationId: 'loc-1:dev', subject: null, message: 'orders_api is missing ORDERS_API_KEY', members: ['ORDERS_API_KEY'] };
+		const stillMissing: PlatformEvent = { id: 'secrets:loc-1:dev', kind: 'location_missing_secrets', severity: 'warning', stopsRuns: false, occurredAt: iso(-1), active: true, locationId: 'loc-1:dev', subject: null, message: 'orders_api is missing ORDERS_API_KEY', members: ['ORDERS_API_KEY'] };
 		expect(read([built([])], [secrets]).clearedAcknowledgements).toEqual([]);
 		expect(healthy([secrets]).clearedAcknowledgements).toEqual([secrets]);
 		expect(healthy([secrets], [stillMissing]).clearedAcknowledgements).toEqual([]);

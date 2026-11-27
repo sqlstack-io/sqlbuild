@@ -4,7 +4,7 @@
 import { ApiError, type ApiClient } from '../client';
 import { LocalChangeBus } from '../signals';
 import type { ConnectionTest, LocationDetail, LocationSummary, NavCounts, Overview, PlatformEvent, RepublishResult, Scope, WarehouseSync } from '../types';
-import type { PlatformEventRecord, WarehouseConnection } from '../types/platform';
+import type { LocationVerdictFact, PlatformEventRecord, WarehouseConnection } from '../types/platform';
 import { LOCATION_SHOP } from './fixtures';
 
 export const SYNC_SCENARIOS = ['healthy', 'synced-untested', 'requested', 'running', 'stalled', 'stopped', 'deploy-failed-fallback', 'failing', 'not-checking-in', 'deploy-failed', 'several', 'reconnecting', 'offline'] as const;
@@ -31,7 +31,10 @@ const IP_BLOCKED = '390422 (08001): IP 203.0.113.7 is not allowed to access Snow
 const NOT_CHECKING_IN = (what: string) => `The location isn't checking in (last 6m ago), so it can't ${what}. Start it, then try again.`;
 const KINDS = ['catalog', 'node_results', 'audit_results', 'freshness', 'fingerprints', 'migrations', 'run_results', 'observations', 'statistics', 'consumption', 'resource_costs', 'microbatches', 'janitor_events', 'old_name_views'];
 
-type State = { sync: WarehouseSync; test: ConnectionTest | null; live: boolean; events: PlatformEvent[]; deploy?: { fallback: boolean } };
+/** `verdict` is what the server would say of the scenario's location. */
+type State = { sync: WarehouseSync; test: ConnectionTest | null; live: boolean; events: PlatformEvent[]; verdict: LocationVerdictFact; deploy?: { fallback: boolean } };
+
+const verdict = (fact: LocationVerdictFact['fact'], stopsRuns = false): LocationVerdictFact => ({ fact, stopsRuns });
 const PERMISSION = 'SQL access control error: insufficient privileges to operate on schema ARCHIVE';
 const LOAD_ERROR = "ImportError: cannot import name 'daily_revenue' from 'models.finance' (orchestration/jobs.py, line 8)";
 
@@ -45,7 +48,8 @@ function initial(scenario: SyncScenario, now: number): State {
 		syncing: null,
 		completed: { at: iso(now - minutes * 60_000), kinds: 14, rows: 2446, elapsedMs: 23_200 },
 		failing: null,
-		requested: null
+		requested: null,
+		stalled: false
 	});
 	const tested = (minutes: number, outcome: ConnectionTest['outcome'] = 'ok'): ConnectionTest => ({
 		outcome,
@@ -59,6 +63,7 @@ function initial(scenario: SyncScenario, now: number): State {
 		id: `scenario-${kind}`,
 		kind,
 		severity,
+		stopsRuns: false,
 		occurredAt: iso(now - 12 * 60_000),
 		active: true,
 		locationId: LOCATION_SHOP,
@@ -70,11 +75,13 @@ function initial(scenario: SyncScenario, now: number): State {
 		sync: synced(3),
 		test: tested(1),
 		live: true,
+		verdict: fallback ? verdict('deploy_failed_on_previous') : verdict('deploy_failed', true),
 		deploy: { fallback },
 		events: [
 			event('location_failing', fallback ? 'warning' : 'critical', `waffle-shop · prod: latest code failed to load: ${LOAD_ERROR}. ${fallback ? 'Serving generation 43.' : 'Runs are held until a deploy loads.'}`, {
 				id: 'scenario-deploy',
 				state: fallback ? 'falling_back' : 'held',
+				stopsRuns: !fallback,
 				occurredAt: iso(now - 5 * 60_000)
 			})
 		]
@@ -89,25 +96,27 @@ function initial(scenario: SyncScenario, now: number): State {
 		},
 		test: tested(3, 'failed'),
 		live: true,
+		verdict: verdict('cant_connect', true),
 		events: [
 			event('warehouse_sync_failed', halted ? 'critical' : 'warning', halted ? `Run history sync stopped after failed reads in a row: ${IP_BLOCKED}` : `Run history can't reach the warehouse: ${IP_BLOCKED}`, {
 				sync: { halted, unreachable: true, retrySeconds: halted ? null : 60, retryAt: halted ? null : iso(now + 40_000), lastSuccessAt: iso(now - 26 * 3_600_000) }
 			}),
-			event('connection_test_failed', 'critical', `The warehouse connection test failed: ${IP_BLOCKED}`, { id: 'scenario-connection-test', occurredAt: iso(now - 3 * 60_000) })
+			event('connection_test_failed', 'critical', `The warehouse connection test failed: ${IP_BLOCKED}`, { id: 'scenario-connection-test', stopsRuns: true, occurredAt: iso(now - 3 * 60_000) })
 		]
 	});
 	switch (scenario) {
 		case 'synced-untested':
-			return { sync: synced(2), test: null, live: true, events: [] };
+			return { sync: synced(2), test: null, live: true, verdict: verdict('not_tested'), events: [] };
 		case 'requested':
-			return { sync: { ...synced(40), requested: { at: iso(now - 4_000), by: 'ada' } }, test: tested(1), live: true, events: [] };
+			return { sync: { ...synced(40), requested: { at: iso(now - 4_000), by: 'ada' } }, test: tested(1), live: true, verdict: verdict('healthy'), events: [] };
 		case 'running':
-			return { sync: { ...synced(40), lastReportedAt: iso(now - 3_000), syncing: { position: 7, kinds: 14, table: 'run_results', rows: 1240, startedAt: iso(now - 2 * 60_000) } }, test: tested(1), live: true, events: [] };
+			return { sync: { ...synced(40), lastReportedAt: iso(now - 3_000), syncing: { position: 7, kinds: 14, table: 'run_results', rows: 1240, startedAt: iso(now - 2 * 60_000) } }, test: tested(1), live: true, verdict: verdict('healthy'), events: [] };
 		case 'stalled':
 			return {
-				sync: { ...synced(55), lastReportedAt: iso(now - 12 * 60_000), syncing: { position: 7, kinds: 14, table: 'run_results', rows: 1240, startedAt: iso(now - 14 * 60_000) } },
+				sync: { ...synced(55), lastReportedAt: iso(now - 12 * 60_000), syncing: { position: 7, kinds: 14, table: 'run_results', rows: 1240, startedAt: iso(now - 14 * 60_000) }, stalled: true },
 				test: tested(1),
 				live: true,
+				verdict: verdict('sync_stalled'),
 				events: [event('warehouse_sync_stalled', 'warning', 'The run history sync stalled at 7/14 (run results): no progress for 12m. The location may have stopped; check its output, then Sync now.')]
 			};
 		case 'failing':
@@ -120,22 +129,23 @@ function initial(scenario: SyncScenario, now: number): State {
 				...stopped,
 				sync: { ...stopped.sync, lastError: reason, failing: stopped.sync.failing && { ...stopped.sync.failing, reason: PERMISSION, unreachable: false } },
 				test: tested(2),
+				verdict: verdict('sync_failing'),
 				events: stopped.events
 					.filter((e) => e.kind !== 'connection_test_failed')
 					.map((e) => ({ ...e, severity: 'warning' as const, message: `Run history sync stopped after failed reads in a row: ${PERMISSION}`, sync: e.sync && { ...e.sync, unreachable: false } }))
 			};
 		}
 		case 'healthy':
-			return { sync: synced(2), test: tested(1), live: true, events: [] };
+			return { sync: synced(2), test: tested(1), live: true, verdict: verdict('healthy'), events: [] };
 		case 'deploy-failed-fallback':
 			return deployFailed(true);
 		case 'deploy-failed':
 			return deployFailed(false);
 		case 'not-checking-in':
-			return { sync: synced(9), test: tested(2), live: false, events: [event('location_broken', 'critical', 'shop · prod stopped checking in, so its scheduled runs aren’t starting.', { occurredAt: iso(now - 6 * 60_000) })] };
+			return { sync: synced(9), test: tested(2), live: false, verdict: verdict('not_checking_in', true), events: [event('location_broken', 'critical', 'shop · prod stopped checking in, so its scheduled runs aren’t starting.', { stopsRuns: true, occurredAt: iso(now - 6 * 60_000) })] };
 		case 'reconnecting':
 		case 'offline':
-			return { sync: synced(4), test: tested(1), live: true, events: [] };
+			return { sync: synced(4), test: tested(1), live: true, verdict: verdict('healthy'), events: [] };
 	}
 }
 
@@ -170,13 +180,14 @@ export function syncScenario(client: ApiClient, scenario: SyncScenario): ApiClie
 		}
 		const startedAt = iso(Date.now());
 		for (let position = 1; position <= 14; position++) {
-			Object.assign(sync, { lastReportedAt: iso(Date.now()), syncing: { position, kinds: 14, table: KINDS[position - 1], rows: position * 175, startedAt } });
+			Object.assign(sync, { lastReportedAt: iso(Date.now()), stalled: false, syncing: { position, kinds: 14, table: KINDS[position - 1], rows: position * 175, startedAt } });
 			announce();
 			await delay(700);
 		}
 		const now = Date.now();
 		Object.assign(sync, { syncing: null, lastSyncedAt: iso(now), lastReportedAt: iso(now), lastError: null, completed: { at: iso(now), kinds: 14, rows: 2446, elapsedMs: now - Date.parse(startedAt) } });
 		state.events = state.events.filter((e) => e.kind !== 'warehouse_sync_stalled');
+		if (state.verdict.fact === 'sync_stalled' || state.verdict.fact === 'sync_failing') state.verdict = verdict('healthy');
 		bus?.emit('platform_events');
 		announce();
 	}
@@ -192,7 +203,8 @@ export function syncScenario(client: ApiClient, scenario: SyncScenario): ApiClie
 		liveInstances: Math.max(1, l.liveInstances),
 		lastSeenAt: l.liveInstances ? l.lastSeenAt : iso(Date.now() - 20_000),
 		connectionTest: l.connectionTest?.outcome === 'failed' ? { ...l.connectionTest, outcome: 'ok', message: 'Connected' } : l.connectionTest,
-		activeProblems: 0
+		activeProblems: 0,
+		verdict: l.verdict?.stopsRuns ? verdict('healthy') : l.verdict
 	});
 	/** The failed deploy the scenario names, and whether a previous version runs instead. */
 	const deployOf = (base: Pick<LocationDetail, 'failedDeploy' | 'brokenDeployPolicy'>) =>
@@ -225,6 +237,8 @@ export function syncScenario(client: ApiClient, scenario: SyncScenario): ApiClie
 			await delay(1100);
 			const failed = state.sync.failing !== null && state.sync.failing !== undefined;
 			state.test = { outcome: failed ? 'failed' : 'ok', at: iso(Date.now()), durationMs: Date.now() - started, trigger: 'manual', by: { kind: 'user', name: 'ada', displayName: 'Ada' }, message: failed ? IP_BLOCKED : 'Connected as TRANSFORMER to WAFFLE_SHOP; warehouse TRANSFORMING_WH available' };
+			if (failed) state.verdict = verdict('cant_connect', true);
+			else if (state.verdict.fact === 'not_tested' || state.verdict.fact === 'cant_connect') state.verdict = verdict('healthy');
 			announce();
 			return structuredClone(state.test);
 		},
@@ -241,13 +255,13 @@ export function syncScenario(client: ApiClient, scenario: SyncScenario): ApiClie
 			const detail = await client.getLocation(id);
 			if (!detail || !shop(id)) return detail;
 			const instances = state.live ? detail.instances : detail.instances.map((i) => ({ ...i, state: 'stale' as const, lastSeenAt: lastSeen() }));
-			return { ...detail, health: state.live ? (state.deploy?.fallback ? 'falling_back' : detail.health) : 'broken', instances, connectionTest: state.test, ...deployOf(detail) };
+			return { ...detail, health: state.live ? (state.deploy?.fallback ? 'falling_back' : detail.health) : 'broken', instances, connectionTest: state.test, verdict: state.verdict, ...deployOf(detail) };
 		},
 		async listLocations(): Promise<LocationSummary[]> {
 			const locations = await client.listLocations();
 			return locations.map((l) =>
 				shop(l.id)
-					? { ...l, connectionTest: state.test, activeProblems: state.events.length, ...deployOf(l), ...(state.live ? {} : { health: 'broken' as const, liveInstances: 0, lastSeenAt: lastSeen() }) }
+					? { ...l, connectionTest: state.test, verdict: state.verdict, activeProblems: state.events.length, ...deployOf(l), ...(state.live ? {} : { health: 'broken' as const, liveInstances: 0, lastSeenAt: lastSeen() }) }
 					: calmOther(l)
 			);
 		},

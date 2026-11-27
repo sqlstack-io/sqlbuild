@@ -78,8 +78,8 @@ export type WarehouseSync = {
 	syncing?: { position: number; kinds: number; table: string; rows: number; startedAt?: Iso | null } | null;
 	/** A sync someone asked for that the location hasn't reported on yet, when the server knows of one. */
 	requested?: { at: Iso; by: string | null } | null;
-	/** The server says the running sync stalled; absent where it doesn't, and the page judges by the clock. */
-	stalled?: boolean;
+	/** The server says the running sync stalled: no progress for ten minutes. */
+	stalled: boolean;
 	/** The newest completed sync among recent reports; null when none completed in them. */
 	completed?: { at: Iso; kinds: number; rows: number; elapsedMs: number } | null;
 	/** While the newest report is a failure: since when, why, and how it retries; null while the sync works. */
@@ -168,8 +168,8 @@ export type PlatformEvent = {
 	occurrence?: string;
 	/** A failing location's state, such as `degraded` when its connection check failed. */
 	state?: string;
-	/** The server says the problem stops runs; absent where it doesn't, and `stopsRuns` judges by kind and severity. */
-	stopsRuns?: boolean;
+	/** The server says the problem stops runs. */
+	stopsRuns: boolean;
 	/** A failing run-history sync: whether failed reads stopped it, so Resume restarts it, and when it tries again. */
 	sync?: { halted: boolean; unreachable: boolean; retrySeconds: number | null; retryAt: Iso | null; lastSuccessAt: Iso | null };
 };

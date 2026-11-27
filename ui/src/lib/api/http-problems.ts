@@ -35,6 +35,7 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 			id: 'scheduler',
 			kind: 'scheduler_no_leader',
 			severity: 'critical',
+			stopsRuns: false,
 			occurredAt: problems.scheduler_lease_expires_at ?? new Date(now).toISOString(),
 			// The lease that ran out tells one leaderless outage from the next.
 			occurrence: problems.scheduler_lease_expires_at ?? undefined,
@@ -83,6 +84,7 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 			id: `sync:${keyOf(sync.location_id, sync.target)}`,
 			kind: 'warehouse_sync_failed',
 			severity: 'warning',
+			stopsRuns: false,
 			occurredAt: sync.since,
 			// The first failure in a row tells one failing streak from the next.
 			occurrence: sync.since,
@@ -116,6 +118,7 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 			id: `sink:${keyOf(sink.location_id, sink.target)}:${sink.sink}`,
 			kind: 'event_sink_failed',
 			severity: 'warning',
+			stopsRuns: false,
 			occurredAt: sink.since,
 			// The first lossy run in a row tells one failing streak from the next.
 			occurrence: sink.since,
@@ -130,6 +133,7 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 			id: `forwarding:${forwarding.name}`,
 			kind: 'event_forwarding_failed',
 			severity: 'warning',
+			stopsRuns: false,
 			occurredAt: forwarding.since,
 			occurrence: forwarding.since,
 			active: true,
@@ -150,6 +154,7 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 			id: `late:${key}`,
 			kind: 'tick_overdue',
 			severity: 'warning',
+			stopsRuns: false,
 			occurredAt: oldest.scheduled_for,
 			members: [...new Set(ticks.map((t) => t.trigger_id))].sort(),
 			active: true,
@@ -172,6 +177,7 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 			id: `calendar:${key}`,
 			kind: 'calendar_horizon_low',
 			severity: 'warning',
+			stopsRuns: false,
 			occurredAt: ends(soonest),
 			members: [...new Set(calendars.map((c) => c.trigger_id))].sort(),
 			active: true,
@@ -195,6 +201,7 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 			id: `skipped:${key}`,
 			kind: 'trigger_skipped',
 			severity: 'warning',
+			stopsRuns: false,
 			occurredAt: first.skipped_at,
 			members: [...new Set(triggers.map((t) => t.trigger_id))].sort(),
 			active: true,
@@ -218,6 +225,7 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 			id: `rechecked:${key}`,
 			kind: 'sensor_rechecked',
 			severity: 'info',
+			stopsRuns: false,
 			occurredAt: first.rechecked_at,
 			members: [...new Set(sensors.map((s) => s.trigger_id))].sort(),
 			active: true,
@@ -241,6 +249,7 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 			id: `dropped:${key}`,
 			kind: 'calendar_times_dropped',
 			severity: 'warning',
+			stopsRuns: false,
 			occurredAt: first.dropped_at,
 			members: [...new Set(calendars.map((c) => c.trigger_id))].sort(),
 			active: true,
@@ -265,6 +274,7 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 			id: `skipped:${key || 'server'}`,
 			kind: 'unreadable_event_skipped',
 			severity: 'warning',
+			stopsRuns: false,
 			occurredAt: first.skipped_at,
 			members: [...new Set(items.map((e) => String(e.storage_id)))].sort(),
 			active: true,
@@ -306,7 +316,8 @@ export function toPlatformEventRecords(
 	const unmatched: PlatformEventRecord[] = [];
 	for (const event of open) {
 		const latest = records.find((r) => !r.active && r.kind === event.kind && r.locationId === event.locationId);
-		if (latest) latest.active = true;
+		// The open problem is the server's word on it now: how serious, and whether it stops runs.
+		if (latest) Object.assign(latest, { active: true, severity: event.severity, stopsRuns: event.stopsRuns });
 		else unmatched.push({ ...event, resolvedAt: null, links: [], reactions: [], payload: {} });
 	}
 	return [...unmatched, ...records];
@@ -332,6 +343,7 @@ function unreadableRecord(item: Wire['UnreadablePlatformEvent'], names: Map<stri
 		id: item.event_id,
 		kind: 'unreadable_event',
 		severity: 'warning',
+		stopsRuns: false,
 		occurredAt: item.occurred_at,
 		active: false,
 		locationId: key,
@@ -348,7 +360,7 @@ function unreadableRecord(item: Wire['UnreadablePlatformEvent'], names: Map<stri
 function storedRecord(wire: Wire['PersonPlatformEvent'], names: Map<string, string>): PlatformEventRecord | null | undefined {
 	const key = wire.location_id && wire.target ? keyOf(wire.location_id, wire.target) : null;
 	const place = key && wire.target ? placeOf(names.get(key) ?? 'A location', wire.target) : null;
-	const base = { id: wire.event_id, occurredAt: wire.occurred_at, active: false, locationId: key, subject: place, resolvedAt: null, reactions: [] };
+	const base = { id: wire.event_id, occurredAt: wire.occurred_at, active: false, stopsRuns: false, locationId: key, subject: place, resolvedAt: null, reactions: [] };
 	const event = wire.event;
 	switch (event.kind) {
 		case 'scheduler_no_leader':
@@ -377,6 +389,7 @@ function storedRecord(wire: Wire['PersonPlatformEvent'], names: Map<string, stri
 				...base,
 				kind: event.kind,
 				severity: 'warning',
+				stopsRuns: false,
 				message: `A stored ${event.event_type} event${place ? ` in ${place}` : ''} couldn’t be read, so webhooks and platform sensors skipped it: ${event.reason}.`,
 				links: key ? [{ kind: 'location', id: key }] : [],
 				payload: { event_type: event.event_type, storage_id: String(event.storage_id) }
