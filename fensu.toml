@@ -2258,6 +2258,10 @@ reason = "One keys a project's loader functions by name to find the file that se
 paths = ["crates/sqlbuild-python-load/src/bindings/_helpers/plan_binding.rs", "crates/sqlbuild-python-load/src/bindings/_helpers/run_binding.rs"]
 reason = "Each is the Python entry for its own SQLLoad operation, a plan or a run, with its own report; the connections, plan options and GIL release are shared in detached_load. Only the pyfunction signature is alike."
 
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-output/src/result_output/_helpers/results/assets.rs", "crates/sqlbuild-python-output/src/result_output/_helpers/results/checks.rs"]
+reason = "Each lists the fields of its own JSON document, a Python node asset or a Python check, in that document's key order; the terminal-row loop they share is terminal_rows. Only a few common field names are alike."
+
 [[dupes.contract_exemptions]]
 contract = "src/sqlbuild/adapter/contract/classes/strict_adapter.py:StrictAdapter"
 forbidden_owners = ["src/sqlbuild/adapter/contract/classes/base_adapter.py:BaseAdapter"]

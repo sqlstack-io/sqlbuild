@@ -10,6 +10,7 @@ use sqlbuild_host::models::{
 use sqlbuild_host::types::ResultEnum;
 
 use crate::result_output::_helpers::results::assets::or_none;
+use crate::result_output::_helpers::results::assets::terminal_rows;
 use crate::result_output::_helpers::results::assets::without_none;
 use crate::result_output::_helpers::results::projection::Projection;
 use crate::result_output::_helpers::results::projection::ResultIdentity;
@@ -387,33 +388,25 @@ pub(crate) fn python_checks<'py>(
     projection: &Projection<'py>,
     results: &[Bound<'py, PyAny>],
 ) -> PyResult<Vec<Bound<'py, PyDict>>> {
-    let mut checks: Vec<Bound<'py, PyDict>> = Vec::new();
-    for result in results {
-        if !projection.terminal_recorded(result)? {
-            continue;
-        }
+    terminal_rows(projection, results, |result| {
         let py: Python<'py> = result.py();
         let name: String = text(&native_field(result, "node_name")?)?;
-        checks.push(without_none(
-            py,
-            vec![
-                ("kind", any(py, "python_check")?),
-                ("name", native_field(result, "node_name")?),
-                ("check_id", any(py, format!("python_check:{name}"))?),
-                ("passed", native_field(result, "passed")?),
-                ("status", any(py, python_check_status(result)?)?),
-                ("severity", value(result, "severity")?),
-                ("message", native_field(result, "message")?),
-                ("error_message", native_field(result, "error_message")?),
-                ("metadata", native_field(result, "metadata")?),
-                (
-                    "warnings",
-                    or_none(native_field(result, "warning_messages")?)?,
-                ),
-            ],
-        )?);
-    }
-    Ok(checks)
+        Ok(vec![
+            ("kind", any(py, "python_check")?),
+            ("name", native_field(result, "node_name")?),
+            ("check_id", any(py, format!("python_check:{name}"))?),
+            ("passed", native_field(result, "passed")?),
+            ("status", any(py, python_check_status(result)?)?),
+            ("severity", value(result, "severity")?),
+            ("message", native_field(result, "message")?),
+            ("error_message", native_field(result, "error_message")?),
+            ("metadata", native_field(result, "metadata")?),
+            (
+                "warnings",
+                or_none(native_field(result, "warning_messages")?)?,
+            ),
+        ])
+    })
 }
 
 fn with_errors<'py>(
