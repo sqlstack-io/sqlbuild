@@ -1,5 +1,6 @@
 //! Check the control database every few seconds, and read which locations there are, so health is current without a request.
 
+use crate::platform::main::health::report_session_cut_offs::report_session_cut_offs;
 use chrono::Utc;
 use tokio::sync::watch;
 
@@ -21,9 +22,20 @@ pub async fn probe_control_database(
     health.attach_store(&store);
     let mut failing = false;
     while !*stopped.borrow() {
+        let cut_off = match report_session_cut_offs(&store, &health).await {
+            Ok(cut_off) => cut_off,
+            Err(error) => {
+                if let Some(cause) = control_cause(&error, (&Default::default(), false)) {
+                    log_cause(None, &health.locate(cause));
+                }
+                true
+            }
+        };
         match active_locations(&store).await {
             Ok(locations) => {
-                health.control_succeeded(Utc::now());
+                if !cut_off {
+                    health.control_succeeded(Utc::now());
+                }
                 health.locations_seen(locations);
                 failing = false;
             }

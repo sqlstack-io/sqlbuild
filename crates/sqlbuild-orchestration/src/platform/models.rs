@@ -502,6 +502,7 @@ pub enum PlatformEventKind {
     TriggerSkipped,
     SensorRechecked,
     CalendarTimesDropped,
+    ControlSessionCutOff,
 }
 
 impl PlatformEventKind {
@@ -519,6 +520,7 @@ impl PlatformEventKind {
             Self::TriggerSkipped => "trigger_skipped",
             Self::SensorRechecked => "sensor_rechecked",
             Self::CalendarTimesDropped => "calendar_times_dropped",
+            Self::ControlSessionCutOff => "control_session_cut_off",
         }
     }
 }
@@ -582,6 +584,13 @@ pub enum PlatformEvent {
         snapshot_id: Uuid,
         times: Vec<DateTime<Utc>>,
     },
+    /// The control database cut off one of this server's sessions: a statement ran past its limit, or a transaction sat idle past its own, and was rolled back.
+    ControlSessionCutOff {
+        /// The transaction sat idle past its limit, rather than a statement running past its own.
+        idle: bool,
+        cut_at: DateTime<Utc>,
+        error: String,
+    },
 }
 
 /// What a `run_failed` event says: the run, what started it, when, what failed and why, with UI links.
@@ -628,6 +637,7 @@ impl PlatformEvent {
             Self::TriggerSkipped { .. } => PlatformEventKind::TriggerSkipped,
             Self::SensorRechecked { .. } => PlatformEventKind::SensorRechecked,
             Self::CalendarTimesDropped { .. } => PlatformEventKind::CalendarTimesDropped,
+            Self::ControlSessionCutOff { .. } => PlatformEventKind::ControlSessionCutOff,
         }
     }
 
@@ -645,6 +655,7 @@ impl PlatformEvent {
             Self::TriggerSkipped { .. } => "platform_trigger_skipped",
             Self::SensorRechecked { .. } => "platform_sensor_rechecked",
             Self::CalendarTimesDropped { .. } => "platform_calendar_times_dropped",
+            Self::ControlSessionCutOff { .. } => "platform_control_session_cut_off",
         }
     }
 }

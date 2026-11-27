@@ -6,4 +6,5 @@ pub mod read_person_location_health;
 pub(crate) mod record_trigger_problem;
 pub mod report_location_health;
 pub mod report_remote_location_health;
+pub mod report_session_cut_offs;
 pub mod unallowed_secret_count;

@@ -17,8 +17,8 @@ use crate::runs::models::{
 };
 use crate::runs::types::CommandPlanner;
 use crate::snapshots::main::reads::read_current_record::read_current_record;
-use crate::snapshots::main::reads::read_kind_nodes::read_kind_nodes;
 use crate::snapshots::main::reads::read_snapshot_keys::read_snapshot_keys;
+use crate::snapshots::main::reads::snapshot_nodes::snapshot_nodes;
 use crate::snapshots::main::write_sets::writer_nodes::writer_nodes;
 use crate::snapshots::models::{SnapshotNode, SnapshotRecord};
 use crate::store::errors::ControlError;
@@ -183,7 +183,7 @@ async fn read_publication(
     snapshot_id: Uuid,
 ) -> Result<(ControlTransaction, CachedPublication), ControlError> {
     let (transaction, node_keys) = read_snapshot_keys(transaction, snapshot_id).await?;
-    let (transaction, nodes) = read_kind_nodes(transaction, snapshot_id, &PLANNED_KINDS).await?;
+    let nodes = snapshot_nodes(&transaction.store, snapshot_id).await?;
     let (transaction, definitions) = frozen_definitions(transaction, snapshot_id).await?;
     let definitions = definitions?;
     let jobs = PublishedJobs {
@@ -209,11 +209,22 @@ async fn read_publication(
             .map(|(name, job)| (name, job.settings))
             .collect(),
     };
+    let preparer = planner.preparer();
+    let (prepared, writers) = tokio::task::spawn_blocking(move || {
+        let planned = nodes
+            .iter()
+            .filter(|(_, node)| PLANNED_KINDS.contains(&node.kind.as_str()));
+        (
+            preparer(planner_resources(&nodes), jobs),
+            writer_nodes(planned),
+        )
+    })
+    .await?;
     Ok((
         transaction,
         CachedPublication {
-            prepared: planner.prepare(planner_resources(&nodes), jobs),
-            writers: writer_nodes(&nodes),
+            prepared,
+            writers,
             node_keys,
         },
     ))

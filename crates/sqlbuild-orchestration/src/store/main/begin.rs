@@ -7,6 +7,7 @@ use rusqlite::OpenFlags;
 use rusqlite::config::DbConfig;
 
 use crate::store::_helpers::changes::sqlite_changes;
+use crate::store::_helpers::long_transaction::long_transaction;
 use crate::store::_helpers::writer_gate::writer_turn;
 use crate::store::errors::ControlError;
 use crate::store::main::refresh_clock::refresh_clock;
@@ -19,7 +20,7 @@ pub(crate) async fn begin(
     let mut writer = None;
     let (connection, notifications) = match store {
         ControlStore::Sqlite(path) => {
-            if mode == TransactionMode::Write {
+            if matches!(mode, TransactionMode::Write | TransactionMode::Publish) {
                 writer = Some(writer_turn(path).await?);
             }
             let path = path.clone();
@@ -33,7 +34,7 @@ pub(crate) async fn begin(
                 connection.busy_timeout(Duration::from_secs(30))?;
                 connection.set_db_config(DbConfig::SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE, true)?;
                 connection.execute_batch(match mode {
-                    TransactionMode::Write => {
+                    TransactionMode::Write | TransactionMode::Publish => {
                         "PRAGMA synchronous=FULL; PRAGMA foreign_keys=ON; BEGIN IMMEDIATE"
                     }
                     TransactionMode::Migrate => {
@@ -68,10 +69,17 @@ pub(crate) async fn begin(
     };
     let transaction = ControlTransaction {
         connection: Some(connection),
+        store: store.clone(),
         now: Utc::now(),
         changes: Default::default(),
         notifications,
         _writer: writer,
+    };
+    let transaction = match mode {
+        TransactionMode::Migrate | TransactionMode::Publish => {
+            long_transaction(transaction).await?
+        }
+        TransactionMode::Read | TransactionMode::Write => transaction,
     };
     refresh_clock(transaction).await
 }

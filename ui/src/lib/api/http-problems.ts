@@ -295,6 +295,17 @@ function storedRecord(wire: Wire['PersonPlatformEvent'], names: Map<string, stri
 			return { ...base, kind: event.kind, severity: 'critical', message: `A run in ${place ?? 'a location'} couldn't start (${event.code}).`, links: key ? [{ kind: 'run', id: event.run_id, locationId: key }] : [], payload: { code: event.code } };
 		case 'heartbeat':
 			return { ...base, kind: event.kind, severity: 'info', message: 'A server checked in.', links: [], payload: {} };
+		case 'control_session_cut_off':
+			return {
+				...base,
+				kind: event.kind,
+				severity: 'critical',
+				message: event.idle
+					? `The control database ended a server session left idle in a transaction past its limit: ${event.error}`
+					: `The control database cancelled a server statement that ran past its limit: ${event.error}`,
+				links: [],
+				payload: { cut_at: event.cut_at }
+			};
 		case 'run_failed':
 			return null;
 	}

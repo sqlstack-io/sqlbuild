@@ -22,6 +22,7 @@ class PlatformEventKind(StrEnum):
     TRIGGER_SKIPPED = "trigger_skipped"
     SENSOR_RECHECKED = "sensor_rechecked"
     CALENDAR_TIMES_DROPPED = "calendar_times_dropped"
+    CONTROL_SESSION_CUT_OFF = "control_session_cut_off"
 
 
 class RunEventKind(StrEnum):

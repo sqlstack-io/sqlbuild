@@ -41,7 +41,7 @@ pub(crate) async fn project_queued_run(
             Parameter::Boolean(rewrites_history(request, std::slice::from_ref(request)))]).await?;
     let definitions;
     (transaction, definitions) =
-        read_snapshot_nodes(transaction, request.snapshot_id, Some(&request.selection)).await?;
+        read_snapshot_nodes(transaction, request.snapshot_id, &request.selection).await?;
     for node in &request.selection {
         let materialization: Option<String> = definitions
             .get(node)

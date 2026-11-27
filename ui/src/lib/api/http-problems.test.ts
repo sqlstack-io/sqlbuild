@@ -210,4 +210,20 @@ describe('toPlatformEventRecords', () => {
 			['location_broken', false, 'l1:development']
 		]);
 	});
+
+	it('reads a cut-off control database session as a critical server-wide event, idle or past its statement limit', () => {
+		const open = toPlatformEvents({ scheduler_leader: true, scheduler_lease_expires_at: null, broken_locations: [], overdue_ticks: [] }, NOW);
+		const records = toPlatformEventRecords(
+			open,
+			[
+				{ storage_id: 3, event_id: 'e3', occurred_at: '2026-11-08T11:00:00Z', event: { kind: 'control_session_cut_off', idle: true, cut_at: '2026-11-08T10:59:58Z', error: 'terminating connection due to idle-in-transaction timeout' } },
+				{ storage_id: 2, event_id: 'e2', occurred_at: '2026-11-08T10:00:00Z', event: { kind: 'control_session_cut_off', idle: false, cut_at: '2026-11-08T09:59:58Z', error: 'canceling statement due to statement timeout' } }
+			],
+			new Map()
+		);
+		expect(records.map((r) => [r.kind, r.severity, r.locationId, r.message, r.payload])).toEqual([
+			['control_session_cut_off', 'critical', null, 'The control database ended a server session left idle in a transaction past its limit: terminating connection due to idle-in-transaction timeout', { cut_at: '2026-11-08T10:59:58Z' }],
+			['control_session_cut_off', 'critical', null, 'The control database cancelled a server statement that ran past its limit: canceling statement due to statement timeout', { cut_at: '2026-11-08T09:59:58Z' }]
+		]);
+	});
 });

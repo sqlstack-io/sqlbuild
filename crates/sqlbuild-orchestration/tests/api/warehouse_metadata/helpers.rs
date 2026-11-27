@@ -601,9 +601,15 @@ pub(crate) async fn sync_due_scope(
 }
 
 async fn mirrored_fingerprints(store: &ControlStore) -> Vec<Value> {
-    let (transaction, rows) = query(begin(store, TransactionMode::Read).await.expect("read"),
-        "SELECT f.event_id,f.source_event_id,f.definition_text_hash,f.record_json,t.body FROM sqb_warehouse_fingerprints f \
-         JOIN sqb_source_texts t ON t.text_hash=f.definition_text_hash ORDER BY f.event_id", vec![]).await.expect("mirrored definitions");
+    let transaction = begin(store, TransactionMode::Read).await.expect("read");
+    let select = format!(
+        "SELECT f.event_id,f.source_event_id,f.definition_text_hash,f.record_json,{} AS body FROM sqb_warehouse_fingerprints f \
+         JOIN sqb_source_texts t ON t.text_hash=f.definition_text_hash ORDER BY f.event_id",
+        transaction.hex_column("t.body"),
+    );
+    let (transaction, rows) = query(transaction, &select, vec![])
+        .await
+        .expect("mirrored definitions");
     commit(transaction).await.expect("close read");
     rows.into_iter()
         .map(|row| serde_json::to_value(row).expect("row"))

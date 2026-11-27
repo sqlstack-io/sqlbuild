@@ -27,6 +27,8 @@ pub enum ControlCauseCase {
     PoolExhausted,
     /// Another process holds the SQLite database's lock.
     Locked,
+    /// The database cut off a server session: a statement ran past its limit, or a transaction sat idle past its own.
+    SessionCutOff,
     /// Any other control database error, read by its own message.
     Other,
 }
@@ -436,5 +438,28 @@ impl ServerHealth {
                 )
             })
             .collect();
+    }
+}
+
+/// A server session PostgreSQL cut off: a statement that ran past its limit, or a transaction left idle past its own.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct SessionCutOff {
+    pub(crate) at: DateTime<Utc>,
+    /// The transaction sat idle past its limit, rather than a statement running past its own.
+    pub(crate) idle: bool,
+    pub(crate) error: String,
+}
+
+/// The cut-off sessions not yet reported, oldest first, each with the database it belongs to.
+#[derive(Debug)]
+pub(crate) struct SessionCutOffs {
+    pub(crate) pending: Mutex<Vec<(String, SessionCutOff)>>,
+}
+
+impl SessionCutOffs {
+    pub(crate) const fn new() -> Self {
+        Self {
+            pending: Mutex::new(Vec::new()),
+        }
     }
 }
