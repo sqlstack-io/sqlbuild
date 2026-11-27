@@ -99,7 +99,7 @@ PROJECT_FILES: dict[str, str] = {
             description: Test seed customers.
             columns:
               - name: customer_id
-                type: BIGINT
+                type: INTEGER
               - name: customer_name
                 type: VARCHAR
         """

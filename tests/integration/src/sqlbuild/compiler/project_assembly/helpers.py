@@ -89,9 +89,9 @@ def generated_assembly_files(*, rng: random.Random, model_count: int) -> dict[st
         "sql/seeds/lookups.yml": (
             "seeds:\n"
             f"  - name: countries\n    description: Countries.\n{rng.choice(_SEED_NAMESPACES)}"
-            "    columns:\n      - name: n\n        type: BIGINT\n"
+            "    columns:\n      - name: n\n        type: INTEGER\n"
             f"  - name: regions\n    description: Regions.\n{rng.choice(_SEED_NAMESPACES)}"
-            "    columns:\n      - name: n\n        type: BIGINT\n"
+            "    columns:\n      - name: n\n        type: INTEGER\n"
         ),
         "sql/seeds/countries.csv": "n\n1\n",
         "sql/seeds/regions.csv": "n\n2\n",
@@ -102,7 +102,7 @@ def generated_assembly_files(*, rng: random.Random, model_count: int) -> dict[st
             "    columns:\n      - name: n\n        type: BIGINT\n"
             "  - name: landing_orders\n    description: Landing orders.\n"
             f"{rng.choice(_SOURCE_NAMESPACES)}"
-            "    columns:\n      - name: n\n        type: BIGINT\n"
+            "    columns:\n      - name: n\n        type: INTEGER\n"
         ),
         "python/nodes/loaders/raw/loader.py": (
             "from sqlbuild.loaders import loader\n\n\n"
@@ -132,7 +132,7 @@ def seed_yml(schema: str) -> str:
 
     return (
         "seeds:\n  - name: countries\n    description: Countries.\n"
-        f'    schema: "{schema}"\n    columns:\n      - name: n\n        type: BIGINT\n'
+        f'    schema: "{schema}"\n    columns:\n      - name: n\n        type: INTEGER\n'
     )
 
 
@@ -295,7 +295,7 @@ _EDGE_VARS: dict[str, object] = {
 def _edge_seeds(*namespaces: str) -> str:
     return "seeds:\n" + "".join(
         f"  - name: s{index}\n    description: Seed {index}.\n{namespace}"
-        "    columns:\n      - name: n\n        type: BIGINT\n"
+        "    columns:\n      - name: n\n        type: INTEGER\n"
         for index, namespace in enumerate(namespaces)
     )
 

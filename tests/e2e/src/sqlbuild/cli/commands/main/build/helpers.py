@@ -1533,7 +1533,7 @@ _TWO_GATE_LOADER: str = (
     "from sqlbuild.loaders import loader\n\n"
     "from python.nodes.tasks.ranking import rank_orders\n"
     "from python.nodes.tasks.scoring.asset import score_orders\n\n\n"
-    "@loader(depends_on=[score_orders, rank_orders])\n"
+    "@loader(write_strategy='replace', depends_on=[score_orders, rank_orders])\n"
     "def partner_scores(ctx):\n"
     '    """Load the scores the partner returned."""\n'
     "    result = ctx.result_of(node_function=score_orders)\n"

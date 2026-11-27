@@ -4302,7 +4302,7 @@ def staging_type_change(root: Path) -> None:
     """Change one staging output column type, which propagates downstream."""
 
     replace_project_text(
-        root, STG_ORDERS_MODEL, "  quantity,\n", "  CAST(quantity AS BIGINT) AS quantity,\n"
+        root, STG_ORDERS_MODEL, "  quantity,\n", "  CAST(quantity AS INTEGER) AS quantity,\n"
     )
 
 

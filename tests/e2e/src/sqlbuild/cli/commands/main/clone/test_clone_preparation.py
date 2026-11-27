@@ -163,9 +163,10 @@ _ALL_DEV_ASSETS: tuple[tuple[str, str, str, str | None, str], ...] = (
                     (
                         (
                             "CREATE VIEW review.stg_payments AS SELECT * FROM "
-                            "(SELECT CAST(payment_id AS INTEGER) AS payment_id, "
-                            "CAST(order_id AS INTEGER) AS order_id, "
-                            "CAST(amount_cents AS INTEGER) AS amount_cents "
+                            "(SELECT * EXCLUDE (payment_id, order_id, amount_cents), "
+                            "CAST(payment_id AS BIGINT) AS payment_id, "
+                            "CAST(order_id AS BIGINT) AS order_id, "
+                            "CAST(amount_cents AS BIGINT) AS amount_cents "
                             "FROM raw_prod.raw_payments);",
                         ),
                     ),
