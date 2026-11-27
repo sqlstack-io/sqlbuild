@@ -82,6 +82,15 @@ describe('locationVerdict', () => {
 		expect(locationVerdict({ fact: 'healthy', stopsRuns: false })).toEqual({ tone: 'ok', label: 'Healthy' });
 	});
 
+	it('names the worst of the location’s other open problems as its Problems list does', async () => {
+		const { locationVerdict } = await import('./labels');
+		expect(locationVerdict({ fact: 'schedule_overdue', stopsRuns: false })).toEqual({ tone: 'warning', label: 'Schedule overdue' });
+		expect(locationVerdict({ fact: 'calendar_low', stopsRuns: false })).toEqual({ tone: 'warning', label: 'Calendar running out of dates' });
+		expect(locationVerdict({ fact: 'sink_failing', stopsRuns: false })).toEqual({ tone: 'warning', label: 'Event sink losing events' });
+		expect(locationVerdict({ fact: 'sensor_rechecked', stopsRuns: false })).toEqual({ tone: 'warning', label: 'Sensor checked again from scratch' });
+		expect(locationVerdict({ fact: 'event_skipped', stopsRuns: false })).toEqual({ tone: 'warning', label: 'Stored event skipped' });
+	});
+
 	it('says nothing it cannot know when the person may not read the health', async () => {
 		const { locationVerdict } = await import('./labels');
 		expect(locationVerdict(null)).toEqual({ tone: 'unknown', label: 'Unknown' });

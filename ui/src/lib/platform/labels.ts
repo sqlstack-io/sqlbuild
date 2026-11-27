@@ -346,6 +346,13 @@ const verdictLabel: Record<LocationVerdictFact['fact'], string> = {
 	missing_secrets: healthLabel.missing_secrets,
 	change_plan_failed: healthLabel.change_plan_failed,
 	discovery_failed: healthLabel.discovery_failed,
+	schedule_overdue: eventKindLabel.tick_overdue,
+	trigger_skipped: eventKindLabel.trigger_skipped,
+	sink_failing: eventKindLabel.event_sink_failed,
+	calendar_low: eventKindLabel.calendar_horizon_low,
+	calendar_times_dropped: eventKindLabel.calendar_times_dropped,
+	sensor_rechecked: eventKindLabel.sensor_rechecked,
+	event_skipped: eventKindLabel.unreadable_event_skipped,
 	starting: healthLabel.starting,
 	not_tested: 'Not tested',
 	healthy: 'Healthy'

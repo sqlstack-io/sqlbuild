@@ -290,7 +290,7 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 	const locationExtras: Record<string, LocationExtras> = {
 		[LOCATION_SHOP]: {
 			// What the server's verdict says of this location's mock state.
-			verdict: { fact: 'not_tested', stopsRuns: false },
+			verdict: { fact: 'schedule_overdue', stopsRuns: false },
 			createdAt: ago(days(210)),
 			brokenDeployPolicy: 'fallback',
 			failedDeploy: null,

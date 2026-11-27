@@ -179,9 +179,9 @@ export type LocationDetail = {
 	verdict: LocationVerdictFact | null;
 };
 
-/** A target's worst open fact as the server names it, and whether it stops runs. */
+/** A target's worst open fact as the server names it, any of its open problems included, and whether it stops runs. */
 export type LocationVerdictFact = {
-	fact: 'not_checking_in' | 'cant_connect' | 'deploy_failed' | 'deploy_failed_on_previous' | 'sync_failing' | 'sync_stalled' | 'missing_secrets' | 'change_plan_failed' | 'discovery_failed' | 'starting' | 'not_tested' | 'healthy';
+	fact: 'not_checking_in' | 'cant_connect' | 'deploy_failed' | 'deploy_failed_on_previous' | 'sync_failing' | 'sync_stalled' | 'missing_secrets' | 'change_plan_failed' | 'discovery_failed' | 'schedule_overdue' | 'trigger_skipped' | 'sink_failing' | 'calendar_low' | 'calendar_times_dropped' | 'sensor_rechecked' | 'event_skipped' | 'starting' | 'not_tested' | 'healthy';
 	stopsRuns: boolean;
 };
 
