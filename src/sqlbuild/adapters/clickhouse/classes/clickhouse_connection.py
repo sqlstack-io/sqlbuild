@@ -82,6 +82,11 @@ class _ClickHouseConnection:
             fmt="CSV",
         )
 
+    def insert_parquet(self, *, table: str, payload: bytes) -> None:
+        """Bulk insert one Parquet file; ClickHouse reads each column into its declared type."""
+
+        self.client.raw_insert(table=table, insert_block=payload, fmt="Parquet")
+
     def cancel_active_statements(self) -> bool:
         """Kill this connection's running queries from a separate client."""
 

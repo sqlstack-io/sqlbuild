@@ -2,7 +2,9 @@
 
 use sqlload::python_sources::models::PythonSource;
 
-use crate::loads::_helpers::settings::refuse_warehouse_name;
+use sqlload::column_types::models::Warehouse;
+
+use crate::loads::_helpers::settings::{column_types, refuse_warehouse_name};
 use crate::loads::constants::{
     COLUMNS, CONNECTION, LOADER_OWNED_KEYS, ON_SCHEMA_CHANGE, RENAMED_STRATEGY, REPLACE_STRATEGY,
     TABLE_NAME, TABLES, WRITE_STRATEGY,
@@ -52,15 +54,14 @@ pub(crate) fn refused_connection(
     refuse_warehouse_name(check, loader.connection.as_deref())
 }
 
-/// The loader's options with the declared column types of the source it fills.
-pub(crate) fn table_settings(loader: &LoaderDeclaration) -> toml::Table {
+/// The loader's options with the declared column types of the source it fills, as SQLLoad reads them in `warehouse`.
+pub(crate) fn table_settings(loader: &LoaderDeclaration, warehouse: Warehouse) -> toml::Table {
     let mut table: toml::Table = loader.settings.clone();
     if !loader.columns.is_empty() {
-        let mut columns = toml::Table::new();
-        for (column, kind) in &loader.columns {
-            columns.insert(column.clone(), toml::Value::String(kind.clone()));
-        }
-        table.insert(COLUMNS.to_owned(), toml::Value::Table(columns));
+        table.insert(
+            COLUMNS.to_owned(),
+            toml::Value::Table(column_types(&loader.columns, warehouse)),
+        );
     }
     if let Some(policy) = &loader.on_schema_change {
         table.insert(

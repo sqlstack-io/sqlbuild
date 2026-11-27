@@ -1,7 +1,13 @@
 //! A load's settings before SQLLoad reads them: the connection it reads, and its sources' column types on its tables.
 
+use sqlload::column_types::models::Warehouse;
+
 use crate::loads::_helpers::naming::literal_tables;
-use crate::loads::constants::{COLUMNS, CONNECTION, INCLUDE, ON_SCHEMA_CHANGE, TABLES};
+use crate::loads::constants::{
+    COLUMNS, CONNECTION, FILES_KIND, INCLUDE, KIND, ON_SCHEMA_CHANGE, TABLE_NAME, TABLES,
+    TEMPLATE_OPEN,
+};
+use crate::loads::main::sqlload_column_type::sqlload_column_type;
 use crate::loads::models::{FilledSource, LoadCheck, LoadDeclaration, LoadProblem};
 
 /// A problem at `path` in the `load:` mapping.
@@ -49,7 +55,10 @@ pub(crate) fn refuse_warehouse_name(
 }
 
 /// `load`'s settings with each listed source's column types on the table it fills, where compile knows that table.
-pub(crate) fn with_source_columns(load: &LoadDeclaration) -> Result<toml::Table, LoadProblem> {
+pub(crate) fn with_source_columns(
+    load: &LoadDeclaration,
+    warehouse: Warehouse,
+) -> Result<toml::Table, LoadProblem> {
     let mut settings: toml::Table = load.settings.clone();
     let mut tables: toml::Table = match settings.remove(TABLES) {
         None => toml::Table::new(),
@@ -74,7 +83,15 @@ pub(crate) fn with_source_columns(load: &LoadDeclaration) -> Result<toml::Table,
     }
     if let Some(known) = literal_tables(&load.name, &load.settings) {
         for source in &load.sources {
-            tables = with_columns(tables, (&load.name, &known), source)?;
+            tables = with_columns(tables, (&load.name, &known), (source, warehouse))?;
+        }
+    } else if let Some(known) = one_named_table(load) {
+        let filling = load
+            .sources
+            .iter()
+            .filter(|source| known.iter().any(|(_, table)| *table == source.name));
+        for source in filling {
+            tables = with_columns(tables, (&load.name, &known), (source, warehouse))?;
         }
     }
     if !tables.is_empty() {
@@ -87,7 +104,7 @@ pub(crate) fn with_source_columns(load: &LoadDeclaration) -> Result<toml::Table,
 fn with_columns(
     mut tables: toml::Table,
     (load, known): (&str, &[(String, String)]),
-    source: &FilledSource,
+    (source, warehouse): (&FilledSource, Warehouse),
 ) -> Result<toml::Table, LoadProblem> {
     let Some((key, _)) = known
         .iter()
@@ -129,14 +146,35 @@ fn with_columns(
         );
     }
     if !source.columns.is_empty() {
-        let mut columns = toml::Table::new();
-        for (column, kind) in &source.columns {
-            columns.insert(column.clone(), toml::Value::String(kind.clone()));
-        }
-        table.insert(COLUMNS.to_owned(), toml::Value::Table(columns));
+        table.insert(
+            COLUMNS.to_owned(),
+            toml::Value::Table(column_types(&source.columns, warehouse)),
+        );
     }
     if table.is_empty() {
         tables.remove(key);
     }
     Ok(tables)
+}
+
+/// The one table of a files load naming it with a literal `table_name`, keyed by the source as SQLLoad keys it, which is the load; a source it doesn't fill is S304's to report.
+fn one_named_table(load: &LoadDeclaration) -> Option<Vec<(String, String)>> {
+    if load.settings.get(KIND)?.as_str()? != FILES_KIND {
+        return None;
+    }
+    let name: &str = load.settings.get(TABLE_NAME)?.as_str()?;
+    (!name.contains(TEMPLATE_OPEN)).then(|| vec![(load.name.clone(), name.to_owned())])
+}
+
+/// Each column's declared type as SQLLoad reads it in `warehouse`.
+pub(crate) fn column_types(columns: &[(String, String)], warehouse: Warehouse) -> toml::Table {
+    columns
+        .iter()
+        .map(|(column, kind)| {
+            (
+                column.clone(),
+                toml::Value::String(sqlload_column_type(kind, warehouse)),
+            )
+        })
+        .collect()
 }

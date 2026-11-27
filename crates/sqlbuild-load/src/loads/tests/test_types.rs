@@ -47,3 +47,10 @@ pub(super) struct DeclaredTypeTestCase {
     /// The type SQLLoad creates when it differs from the declared one, compared by name.
     pub(super) expected_created: Option<&'static str>,
 }
+
+pub(super) struct SqlloadColumnTypeTestCase {
+    pub(super) description: &'static str,
+    pub(super) warehouse: sqlload::column_types::models::Warehouse,
+    pub(super) declared: &'static str,
+    pub(super) expected: &'static str,
+}

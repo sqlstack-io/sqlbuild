@@ -20,6 +20,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     query_duckdb,
     run_sqb,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 
 def assert_source_only_ingress_dependency_case(
@@ -440,3 +441,30 @@ def build_loader_waffle_shop_project_files(*, project_toml: str | None = None) -
             "GROUP BY customer_id, COALESCE(plan_name, 'unknown')\n"
         ),
     }
+
+
+def build_native_column_project_files(
+    *, columns: tuple[tuple[str, str], ...], rows: str
+) -> dict[str, str]:
+    """A loader filling `raw_events`, whose sources file declares `columns` as `(name, type)`."""
+
+    declared: str = "".join(
+        f"      - name: {name}\n        type: {column_type}\n" for name, column_type in columns
+    )
+    return build_schema_behavior_project_files(
+        source_yaml=(
+            "sources:\n"
+            "  - name: raw_events\n"
+            "    description: Events with warehouse-native column types.\n"
+            "    managed: true\n"
+            "    columns:\n" + declared
+        ),
+        node_files=node_module_files(
+            "python/nodes/loaders/raw_events.py",
+            "from sqlbuild.loaders import loader\n\n"
+            "@loader(write_strategy='replace')\n"
+            "def raw_events(ctx):\n"
+            "    '''Test loader raw_events.'''\n"
+            f"    return {rows}\n",
+        ),
+    )

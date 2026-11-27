@@ -9,6 +9,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.clickhouse._test_types import (
     ClickHouseWaffleShopE2ETestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.clickhouse.helpers import (
+    SQLLOAD_CALLER_SESSION_PUBLISH,
     cleanup_clickhouse_schema,
     create_clickhouse_schema,
     fetch_clickhouse_rows,
@@ -17,6 +18,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.clickhouse.helpers import (
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import run_sqb
 
 
+@pytest.mark.xfail(strict=True, reason=SQLLOAD_CALLER_SESSION_PUBLISH)
 @pytest.mark.parametrize(
     "test_case",
     [

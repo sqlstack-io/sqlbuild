@@ -29,6 +29,12 @@ from tests.integration.src.sqlbuild.cli.recall.helpers import (
 )
 
 CLICKHOUSE_IMAGE: str = "clickhouse/clickhouse-server:26.1"
+# Remove the strict xfail markers that cite this once SQLLoad carries out its ClickHouse publish
+# steps on a caller's session; until then every ClickHouse load through SQLBuild fails to publish.
+SQLLOAD_CALLER_SESSION_PUBLISH: str = (
+    "SQLLoad 0.87 sends its ClickHouse publish steps ('-- sqlload publish ...') to a caller's "
+    "session as SQL instead of carrying them out"
+)
 _RECALL_SCHEMA_CONSTANTS: Path = REPO_ROOT / "crates/sqlbuild-recall/src/schema/constants.rs"
 _RECALL_SCHEMA_VERSION_PATTERN: re.Pattern[str] = re.compile(
     r"pub const RECALL_SCHEMA_VERSION: i64 = (\d+);"

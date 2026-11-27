@@ -11,7 +11,7 @@ use crate::loads::models::{LoadCheck, LoadDeclaration, LoadProblem};
 /// `load`'s settings with its sources' column types, as SQLLoad reads them, or why it can't be used.
 pub fn check_load(check: &LoadCheck, load: &LoadDeclaration) -> Result<toml::Table, LoadProblem> {
     refuse_warehouse_connection(check, load)?;
-    let settings: toml::Table = with_source_columns(load)?;
+    let settings: toml::Table = with_source_columns(load, check.warehouse)?;
     let (text, sessions) = check_project(check, Some((&load.name, settings.clone())))
         .map_err(|message| at(&[], message))?;
     match parse_python_project(&text, &|_| None, (&[], sessions)) {

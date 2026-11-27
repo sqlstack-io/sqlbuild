@@ -49,10 +49,10 @@ pub fn reject_invalid_loaders(
         };
         let declared = declared_type_problem(checking, (&owner, columns), |mismatch| {
             match declaration.fills_source {
-                true => format!("`type: {}` in its sources file", mismatch.created),
+                true => format!("`type: {}` in its sources file", mismatch.declare),
                 false => format!(
                     "{{'name': '{}', 'type': '{}'}} in columns=",
-                    mismatch.column, mismatch.created
+                    mismatch.column, mismatch.declare
                 ),
             }
         });

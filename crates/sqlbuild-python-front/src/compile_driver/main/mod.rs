@@ -1,6 +1,7 @@
 pub mod discovered_loads;
 pub mod planned_load_projects;
 pub mod planned_loader_projects;
+pub mod project_load_warehouse;
 pub mod reject_invalid_connection_configuration;
 pub mod reject_invalid_loaders;
 pub mod reject_invalid_loads;

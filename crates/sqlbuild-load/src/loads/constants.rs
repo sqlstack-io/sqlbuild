@@ -50,3 +50,11 @@ pub(crate) const WRITE_STRATEGY: &str = "write_strategy";
 /// SQLBuild's old name for writing the whole table each run, and SQLLoad's.
 pub(crate) const RENAMED_STRATEGY: &str = "table";
 pub(crate) const REPLACE_STRATEGY: &str = "replace";
+/// How SQLLoad pins a warehouse type it passes through verbatim: `native("...")`.
+pub(crate) const NATIVE_OPEN: &str = "native(\"";
+pub(crate) const NATIVE_CLOSE: &str = "\")";
+/// How a `table_name` template marks a placeholder, such as `{table}`.
+pub(crate) const TEMPLATE_OPEN: char = '{';
+/// The key naming a load's source kind, and the kind of a one-table files source, whose table SQLLoad keys by the source.
+pub(crate) const KIND: &str = "kind";
+pub(crate) const FILES_KIND: &str = "files";

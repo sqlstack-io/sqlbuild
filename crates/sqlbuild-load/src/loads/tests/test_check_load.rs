@@ -48,6 +48,24 @@ fn given_load_settings_when_checking_them_then_sqlload_reads_them_with_the_liste
             )),
         },
         CheckLoadTestCase {
+            description: "a one-table files load hands its source's column types to its table",
+            settings: "kind = \"files\"\nconnection = \"landing\"\npath = \"orders/\"\nformat = \"csv\"\n\
+                       table_name = \"shop__orders\"\n",
+            sources: &[("shop__orders", &[("id", "BIGINT"), ("big", "UBIGINT")])],
+            on_schema_change: None,
+            expected_result: Ok(
+                "{ shop = { columns = { big = 'native(\"UBIGINT\")', id = \"BIGINT\" } } }",
+            ),
+        },
+        CheckLoadTestCase {
+            description: "a one-table files load leaves a source it doesn't fill to the plan",
+            settings: "kind = \"files\"\nconnection = \"landing\"\npath = \"orders/\"\nformat = \"csv\"\n\
+                       table_name = \"shop__orders\"\n",
+            sources: &[("shop__refunds", &[("id", "BIGINT")])],
+            on_schema_change: None,
+            expected_result: Ok(""),
+        },
+        CheckLoadTestCase {
             description: "a load can't read a warehouse connection",
             settings: "kind = \"postgres\"\nconnection = \"warehouse\"\ninclude = [\"public.orders\"]\n",
             sources: &[],

@@ -129,3 +129,14 @@ class HttpLoaderE2ETestCase:
     loader_body: str
     expected_rows: tuple[tuple[object, ...], ...]
     expected_return_code: int = 0
+
+
+@dataclass(frozen=True)
+class NativeColumnTypesE2ETestCase:
+    """Columns declared as DuckDB types, a loader's rows, and the columns and rows it creates."""
+
+    description: str
+    columns: tuple[tuple[str, str], ...]
+    rows: str
+    expected_types: tuple[tuple[str, str], ...]
+    expected_rows: tuple[tuple[object, ...], ...]

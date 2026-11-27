@@ -10,6 +10,8 @@ mod helpers;
 mod load_message;
 #[path = "tests/test_loader_source.rs"]
 mod loader_source;
+#[path = "tests/test_sqlload_column_type.rs"]
+mod sqlload_column_type;
 #[path = "tests/test_types.rs"]
 mod test_types;
 #[path = "tests/test_yaml_line.rs"]

@@ -17,7 +17,7 @@ pub fn check_loader(
 ) -> Result<toml::Table, LoadProblem> {
     refused_option(loader)?;
     refused_connection(check, loader)?;
-    let table: toml::Table = table_settings(loader);
+    let table: toml::Table = table_settings(loader, check.warehouse);
     let source: PythonSource = python_source(loader, &table)?;
     let (text, sessions) = check_project(check, None).map_err(|message| LoadProblem {
         message,

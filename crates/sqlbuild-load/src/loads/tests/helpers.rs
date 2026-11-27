@@ -9,7 +9,8 @@ pub(super) fn project_check() -> LoadCheck {
     LoadCheck {
         connections: toml::from_str(
             "[shop_db]\nkind = \"postgres\"\nhost = \"db\"\nuser = \"reader\"\ndatabase = \"shop\"\n\
-             password = \"${ENV:SHOP_PASSWORD}\"\n",
+             password = \"${ENV:SHOP_PASSWORD}\"\n\
+             [landing]\nkind = \"filesystem\"\nroot = \"/landing\"\n",
         )
         .expect("connections"),
         warehouse_connections: vec![("warehouse".to_owned(), false)],

@@ -40,7 +40,7 @@ pub fn reject_invalid_loads(
                 declared_type_problem(
                     checking,
                     (&format!("source '{}'", source.name), &source.columns),
-                    |mismatch| format!("`type: {}`", mismatch.created),
+                    |mismatch| format!("`type: {}`", mismatch.declare),
                 )
             }) {
                 return Err(fail(format!("{shown}: {message}")));

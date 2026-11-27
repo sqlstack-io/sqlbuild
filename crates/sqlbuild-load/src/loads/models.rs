@@ -27,6 +27,8 @@ pub struct TypeMismatch {
     pub declared: String,
     /// The type SQLLoad creates for `declared`, as the warehouse spells it.
     pub created: String,
+    /// What to declare instead: `created` when declaring it creates it exactly, else `created` pinned as `native("...")`.
+    pub declare: String,
 }
 
 /// What a project's loads are checked against: its source connections and the warehouse kind its targets hold.

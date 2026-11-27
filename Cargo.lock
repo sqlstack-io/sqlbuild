@@ -6560,6 +6560,7 @@ version = "0.0.0"
 dependencies = [
  "blake3",
  "serde_json",
+ "sqlbuild-analysis",
  "sqlbuild-config",
  "sqlload",
  "toml",
@@ -6740,6 +6741,7 @@ dependencies = [
  "sqlbuild-scopes",
  "sqlbuild-sqltext",
  "sqlclean",
+ "sqlload",
 ]
 
 [[package]]
@@ -6769,6 +6771,7 @@ dependencies = [
  "sqlbuild-scopes",
  "sqlbuild-sqltext",
  "sqlbuild-state",
+ "sqlload",
  "stacker",
  "tokio",
  "toml",

@@ -93,6 +93,7 @@ def _load_bigquery(*, connection: Any, table: tuple[str | None, str, str], file:
 
 
 def _load_clickhouse(*, connection: Any, table: tuple[str | None, str, str], file: Path) -> None:
-    client: Any = _raw(connection=connection)
     _, schema, name = table
-    client.raw_insert(f"`{schema}`.`{name}`", insert_block=file.read_bytes(), fmt="Parquet")
+    _raw(connection=connection).insert_parquet(
+        table=f"`{schema}`.`{name}`", payload=file.read_bytes()
+    )

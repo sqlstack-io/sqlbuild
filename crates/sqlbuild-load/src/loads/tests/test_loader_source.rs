@@ -1,3 +1,5 @@
+use sqlload::column_types::models::Warehouse;
+
 use crate::loads::main::loader_source::loader_source;
 use crate::loads::models::LoaderDeclaration;
 use crate::loads::tests::test_types::LoaderSourceTestCase;
@@ -30,7 +32,7 @@ fn given_a_loader_when_declaring_its_python_source_then_it_carries_its_table_opt
             fills_source: true,
         };
 
-        let source = loader_source(&loader).map(|source| source.to_string());
+        let source = loader_source(&loader, Warehouse::DuckDb).map(|source| source.to_string());
 
         assert_eq!(
             source,
