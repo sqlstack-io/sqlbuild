@@ -200,7 +200,7 @@ connections move into `[connections.<name>]` unchanged, `${ENV:NAME}` references
 target's `loader_schema` takes the place of the SQLLoad target's.
 
 Loads write to DuckDB, MotherDuck, Postgres, Snowflake, BigQuery and ClickHouse warehouses. A
-project on SQLite or SQL Server can't declare one, and a Databricks load fails when it runs: SQLLoad
+project on SQLite, SQL Server or a custom adapter can't declare one, and a Databricks load fails when it runs: SQLLoad
 stages its files in a volume, which SQLBuild's Databricks connection doesn't name yet.
 
 ## Source freshness

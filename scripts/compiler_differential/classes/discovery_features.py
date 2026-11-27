@@ -12,6 +12,7 @@ from scripts.compiler_differential.constants import (
     GENERATOR_DBT_MANIFEST,
     GENERATOR_DBT_MODEL,
     GENERATOR_DBT_REF_ERROR_CODE,
+    GENERATOR_EXCLUDED_FEATURE_PAIRS,
     GENERATOR_FEATURE_BLOCKS,
     GENERATOR_FEATURE_FOLDER,
     GENERATOR_FEATURE_STRIDE,
@@ -580,7 +581,7 @@ class DiscoveryFeatureWriter:
 
 
 def feature_blocks_for_seed(*, seed: int, rng: random.Random) -> tuple[str, ...]:
-    """Return stride-forced blocks plus a random share of the rest; rare blocks are residue-only."""
+    """Stride-forced blocks and a random share of the rest; rare ones by residue, pairs excluded."""
 
     blocks: list[str] = []
     for index, block in enumerate(GENERATOR_FEATURE_BLOCKS):
@@ -594,4 +595,7 @@ def feature_blocks_for_seed(*, seed: int, rng: random.Random) -> tuple[str, ...]
             )
         if selected:
             blocks.append(block)
-    return tuple(blocks)
+    excluded: set[str] = {
+        dropped for dropped, chosen in GENERATOR_EXCLUDED_FEATURE_PAIRS if chosen in blocks
+    }
+    return tuple(block for block in blocks if block not in excluded)

@@ -272,6 +272,9 @@ GENERATOR_FEATURE_STRIDE: int = 4
 GENERATOR_OPTIONAL_FEATURE_SHARE: float = 0.2
 GENERATOR_RARE_FEATURE_PERIOD: int = 12
 GENERATOR_RARE_FEATURE_BLOCKS: dict[str, int] = {"dbt_ref": 1}
+GENERATOR_EXCLUDED_FEATURE_PAIRS: tuple[tuple[str, str], ...] = (
+    ("managed_source_loader", "project_adapter"),
+)
 GENERATOR_DBT_REF_ERROR_CODE: str = "C214"
 GENERATOR_FEATURE_FOLDER: str = "sql/models/features"
 GENERATOR_RENDER_FOLDER: str = "sql/models/rendering"

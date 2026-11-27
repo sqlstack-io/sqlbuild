@@ -599,5 +599,6 @@ options) is set on `@loader`, not in the sources file.
 ## Limitations
 
 - Loaders write to DuckDB, MotherDuck, Postgres, Snowflake, BigQuery and ClickHouse warehouses. A
-  project on SQLite or SQL Server can't declare one, and a Databricks loader fails when it runs, as
-  a [Databricks load](../sources.md#loads) does.
+  project on SQLite, SQL Server or a [custom adapter](../adapters/custom.md) can't declare
+  one, and a Databricks loader fails when it runs, as a [Databricks load](../sources.md#loads)
+  does.
