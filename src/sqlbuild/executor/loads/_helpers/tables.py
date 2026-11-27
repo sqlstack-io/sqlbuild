@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from sqlbuild._native import LoadPlanEntry, SourceEntry
+from sqlbuild.executor.loads.constants import PLAN_ERRORS_HEADING
 
 
 def missing_message(*, load: str, missing: list[str], planned: list[str]) -> str:
@@ -12,6 +13,13 @@ def missing_message(*, load: str, missing: list[str], planned: list[str]) -> str
     sources: str = ", ".join(f"'{source}'" for source in missing)
     loaded: str = ", ".join(planned) or "no tables"
     return f"load '{load}' loads no table into {sources}; its tables load into {loaded}"
+
+
+def missing_help(*, lines: list[str]) -> str:
+    """SQLLoad's own account of the tables it couldn't plan, else how to include a table."""
+    if any(line.startswith(PLAN_ERRORS_HEADING) for line in lines):
+        return "SQLLoad's plan:\n" + "\n".join(lines)
+    return "read a table the load includes, or include the table in the load"
 
 
 def required_tables(*, entry: LoadPlanEntry, source_map: Mapping[str, SourceEntry]) -> list[str]:

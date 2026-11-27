@@ -3184,6 +3184,47 @@
    }
   },
   "sources": {
+   "source.generated_6.landing__orders": {
+    "database": null,
+    "schema": "main",
+    "name": "landing__orders",
+    "resource_type": "source",
+    "package_name": "generated_6",
+    "path": "sql/sources/landing.yml",
+    "original_file_path": "sql/sources/landing.yml",
+    "unique_id": "source.generated_6.landing__orders",
+    "fqn": [
+     "generated_6",
+     "landing__orders"
+    ],
+    "source_name": "landing__orders",
+    "source_description": "",
+    "loader": "",
+    "identifier": "landing__orders",
+    "quoting": {},
+    "loaded_at_field": null,
+    "freshness": null,
+    "external": null,
+    "description": "Orders landed as files.",
+    "columns": {
+     "id": {
+      "name": "id",
+      "description": "",
+      "meta": {},
+      "data_type": "BIGINT",
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     }
+    },
+    "meta": {},
+    "source_meta": {},
+    "tags": [],
+    "config": {},
+    "patch_path": null,
+    "unrendered_config": {},
+    "relation_name": null
+   },
    "source.generated_6.raw_events_0": {
     "database": null,
     "schema": "",
@@ -3553,12 +3594,16 @@
    "model.generated_6.stg_sales_0": [
     "source.generated_6.raw_events_0"
    ],
+   "source.generated_6.landing__orders": [
+    "model.generated_6.landing"
+   ],
    "source.generated_6.raw_events_0": [],
    "model.generated_6.is_placed": [],
    "model.generated_6.table_fn__events_above": [
     "model.generated_6.stg_sales_0"
    ],
-   "model.generated_6.is_large": []
+   "model.generated_6.is_large": [],
+   "model.generated_6.landing": []
   },
   "group_map": {},
   "docs": {},

@@ -10,6 +10,7 @@ from sqlbuild._native import LoadPlanEntry, PlannerInputError, PlanOutput, plan_
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.executor.load_sessions.constants import DUCKDB_BACKED_ADAPTERS
 from sqlbuild.executor.loads._helpers.tables import (
+    missing_help,
     missing_message,
     required_tables,
     selected_tables,
@@ -78,6 +79,6 @@ def _planned_entry(
         raise PlannerInputError(
             missing_message(load=entry.name, missing=planned["missing"], planned=planned["tables"]),
             code=MISSING_LOAD_TABLE_CODE,
-            help="read a table the load includes, or include the table in the load",
+            help=missing_help(lines=planned["lines"]),
         )
     return dataclasses.replace(entry, plan_lines=tuple(planned["lines"]))

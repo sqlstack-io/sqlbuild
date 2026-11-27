@@ -90,6 +90,7 @@ class DiscoveryFeatureWriter:
             ),
             "python_hook": self._python_hook,
             "managed_source_loader": self._managed_source_loader,
+            "source_file_load": self._source_file_load,
             "asset_and_check": self._asset_and_check,
             "discovered_set": self._discovered_set,
             "audit_factory": self._audit_factory,
@@ -331,6 +332,26 @@ class DiscoveryFeatureWriter:
             description=f"Custom copy of {base.name}",
             header="  materialized copy_table,\n",
             body=f'SELECT id, status\nFROM __ref("{base.name}")\n',
+        )
+
+    def _source_file_load(self) -> None:
+        self._features.add("source_file_load")
+        self.config_lines.extend(
+            [
+                'extra_paths = ["landing"]',
+                "",
+                "[connections.landing]",
+                'kind = "filesystem"',
+                'root = "landing"',
+            ]
+        )
+        self._files["landing/orders/day1.csv"] = "id\n1\n2\n"
+        self._files["sql/sources/landing.yml"] = (
+            "load:\n  name: landing\n  kind: files\n  connection: landing\n"
+            "  path: orders/\n  format: csv\n  write_strategy: replace\n"
+            "  table_name: landing__orders\n"
+            "sources:\n  - name: landing__orders\n    description: Orders landed as files.\n"
+            "    columns:\n      - name: id\n        type: BIGINT\n"
         )
 
     def _project_adapter(self) -> None:

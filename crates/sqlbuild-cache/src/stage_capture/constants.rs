@@ -239,6 +239,7 @@ pub const PROJECTED_ATTRIBUTES: [(&str, &[&str]); 15] = [
             "scenario",
             "models",
             "sources",
+            "loads",
             "seeds",
             "functions",
             "audits",
