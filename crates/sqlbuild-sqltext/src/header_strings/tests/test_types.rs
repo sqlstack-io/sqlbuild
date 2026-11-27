@@ -45,3 +45,9 @@ pub(crate) struct DescriptionEndTestCase {
     pub(crate) start: usize,
     pub(crate) expected_end: Option<usize>,
 }
+
+pub(crate) struct DescriptionKeysTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) order: fn(Vec<usize>) -> Vec<usize>,
+    pub(crate) expected_follows: fn(&[char], usize) -> bool,
+}

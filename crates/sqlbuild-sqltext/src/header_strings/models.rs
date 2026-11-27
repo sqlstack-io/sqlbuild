@@ -33,3 +33,15 @@ pub struct QuoteFailure {
     pub message: String,
     pub help: String,
 }
+
+/// The `description` keys of one header text, read forward once however many strings ask.
+#[derive(Clone, Debug)]
+pub struct DescriptionKeys<'a, T> {
+    pub(crate) text: &'a [T],
+    /// The offset up to which `open_parens` describes `text`.
+    pub(crate) read_to: usize,
+    /// Whether each parenthesis still open before `read_to` opens a `meta (...)` value.
+    pub(crate) open_parens: Vec<bool>,
+    /// How many of `open_parens` open a `meta (...)` value.
+    pub(crate) open_meta: usize,
+}

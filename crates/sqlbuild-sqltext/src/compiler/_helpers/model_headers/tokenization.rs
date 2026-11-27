@@ -14,12 +14,12 @@ use crate::header_strings::constants::{
 };
 use crate::header_strings::errors::TripleQuoteError;
 use crate::header_strings::main::closes_inside_text::closes_inside_text;
-use crate::header_strings::main::follows_description_key::follows_description_key;
 use crate::header_strings::main::opens_triple_quote::opens_triple_quote;
 use crate::header_strings::main::prose_end::prose_end;
 use crate::header_strings::main::prose_error_message::prose_error_message;
 use crate::header_strings::main::prose_string::prose_string;
 use crate::header_strings::main::triple_quoted_end::triple_quoted_end;
+use crate::header_strings::models::DescriptionKeys;
 use sqlbuild_core::constants::{CLOSE_PAREN, OPEN_PAREN};
 
 pub(crate) const MAX_TOKENIZER_WORKERS: usize = 4;
@@ -577,6 +577,7 @@ fn parse_word(value: String) -> AuthoredValue {
 fn tokenize(characters: &[char]) -> Result<Vec<HeaderToken>, String> {
     let mut scan: TokenScan<'_> = TokenScan {
         characters,
+        description_keys: DescriptionKeys::new(characters),
         prose_error: None,
     };
     scan.tokens()
@@ -586,6 +587,7 @@ fn tokenize(characters: &[char]) -> Result<Vec<HeaderToken>, String> {
 /// One tokenization of a header, remembering the first description that is misquoted as prose.
 struct TokenScan<'a> {
     characters: &'a [char],
+    description_keys: DescriptionKeys<'a, char>,
     prose_error: Option<String>,
 }
 
@@ -680,7 +682,7 @@ impl TokenScan<'_> {
     fn quoted_token(&mut self, start: usize) -> Result<(String, usize), String> {
         let characters: &[char] = self.characters;
         let read: Result<(String, usize), String> = read_quoted_string(characters, start);
-        if !follows_description_key(characters, start) {
+        if !self.description_keys.follows(start) {
             return read;
         }
         let end: usize = match prose_end(characters, start) {
