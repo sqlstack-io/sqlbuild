@@ -36,12 +36,12 @@
 				<tr class:has-detail={!!t.failure}>
 					<td><code>{t.table}</code></td>
 					<td title={formatStamp(t.at)}>
-						{#if t.waiting}<StatusLabel tone="var(--sb-warning)" label="Waiting" />{:else if t.failure}<StatusLabel tone="var(--sb-error)" label="Failed {formatAgo(t.at, app.now)}" />{:else}<StatusLabel tone="var(--sb-success)" label="Synced {formatAgo(t.at, app.now)}" />{/if}
+						{#if t.waiting}<StatusLabel tone="var(--sb-warning)" label="waiting for the warehouse" />{:else if t.failure}<StatusLabel tone="var(--sb-error)" label="failed {formatAgo(t.at, app.now)}" />{:else}<StatusLabel tone="var(--sb-success)" label="synced {formatAgo(t.at, app.now)}" />{/if}
 					</td>
 					<td class:faint={t.mirroredTotal === null}>{formatNumber(t.mirroredTotal)}</td>
 					<td>{formatNumber(t.recordsSent)}</td>
 					<td>{formatMs(t.elapsedMs)}</td>
-					<td class="faint" title={t.lastSyncedAt ? formatStamp(t.lastSyncedAt) : undefined}>{t.lastSyncedAt ? formatAgo(t.lastSyncedAt, app.now) : 'Never'}</td>
+					<td class="faint" title={t.lastSyncedAt ? formatStamp(t.lastSyncedAt) : undefined}>{t.lastSyncedAt ? formatAgo(t.lastSyncedAt, app.now) : 'never'}</td>
 				</tr>
 				{#if t.failure}
 					<tr class="detail">

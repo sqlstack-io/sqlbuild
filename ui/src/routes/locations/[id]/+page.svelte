@@ -19,7 +19,8 @@
 	import RepublishNow from '$lib/components/platform/republish-now.svelte';
 	import type { LocationInstance } from '$lib/api';
 	import { formatAgo, formatStamp } from '$lib/format/time';
-	import { brokenDeployPolicyHelp, brokenDeployPolicyLabel, healthHelp, healthLabel, healthTone, shortImage, targetWords } from '$lib/platform/labels';
+	import { actionTone, brokenDeployPolicyHelp, brokenDeployPolicyLabel, headlineWords, healthHelp, shortImage, targetWords, testWords } from '$lib/platform/labels';
+	import { syncNowState } from '$lib/platform/sync-now';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { openRecord } from '../utils';
@@ -43,6 +44,17 @@
 	const openProblems = $derived((problems.data ?? []).filter((e) => e.active).length);
 	const processes = $derived(summariseProcesses(detail?.instances ?? []));
 	const running = $derived(processes.live[0] ?? null);
+	// "Healthy" never sits beside a failing sync, a failed or missing connection test, or no check-in: the headline names the worst.
+	const sync = createResource((client) => client.getWarehouseSync({ locationId: id }), ['warehouse_sync']);
+	const headline = $derived(
+		detail
+			? headlineWords(detail.health, {
+					live: processes.live.length > 0,
+					test: testWords(detail.connectionTest, detail.snapshot?.publishedAt ?? null, app.now),
+					sync: syncNowState(sync.data ?? null, null, app.now)
+				})
+			: null
+	);
 
 	const instanceTone: Record<LocationInstance['state'], string> = {
 		live: 'var(--sb-success)',
@@ -70,7 +82,10 @@
 				<span class="font-display text-[17px] font-semibold">{detail.name}</span>
 				<span class="muted">· {targetWords(detail.target)}</span>
 				<span class="right">
-					<span title={healthHelp[detail.health]}><StatusLabel tone={healthTone[detail.health]} label={healthLabel[detail.health]} /></span>
+					{#if headline}
+						<span title={healthHelp[detail.health]} data-testid="location-headline"><StatusLabel tone={headline.tone} label={headline.label} /></span>
+						{#if headline.note && headline.noteTone}<span class="note" style:color={actionTone[headline.noteTone]}>· {headline.note}</span>{/if}
+					{/if}
 					{#if openProblems}<a class="warn" href="#problems">· {plural(openProblems, 'open problem')}</a>{/if}
 				</span>
 			</div>
@@ -99,11 +114,12 @@
 						<b class="err">Not running</b> · no runs can start
 					{/if}
 				</span>
-				<span class="right">
-					<ConnectionTest compact scope={{ locationId: detail.id }} connection={detail.warehouseConnection ?? 'warehouse'} last={detail.connectionTest} />
-					<WarehouseSyncNow scope={{ locationId: detail.id }} />
-					{#if app.client.supports('republish')}<RepublishNow scope={{ locationId: detail.id }} ondone={() => location.refresh()} />{/if}
-				</span>
+			</div>
+
+			<div class="line strip" data-testid="location-actions">
+				<ConnectionTest compact scope={{ locationId: detail.id }} connection={detail.warehouseConnection ?? 'warehouse'} last={detail.connectionTest} deployedAt={detail.snapshot?.publishedAt ?? null} ontested={() => location.refresh()} />
+				<WarehouseSyncNow scope={{ locationId: detail.id }} />
+				{#if app.client.supports('republish')}<RepublishNow scope={{ locationId: detail.id }} snapshot={detail.snapshot} ondone={() => location.refresh()} />{/if}
 			</div>
 
 			{#if processes.listed.length}
@@ -230,6 +246,18 @@
 		min-width: 0;
 		align-items: center;
 		gap: 8px;
+	}
+	/* Test connection, Sync now and Republish on a line of their own, each cause on a line of its own below; each lead's left margin spaces the groups, so the first one's is taken back. */
+	.strip {
+		flex-wrap: wrap;
+		justify-content: flex-start;
+		margin-left: -14px;
+		row-gap: 4px;
+		column-gap: 8px;
+	}
+	.note {
+		font-size: 12.5px;
+		font-weight: 500;
 	}
 	.title-line {
 		gap: 10px;

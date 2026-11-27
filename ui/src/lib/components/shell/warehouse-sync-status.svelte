@@ -12,8 +12,8 @@
 	const text = $derived.by(() => {
 		if (!sync) return '';
 		if (failing) return syncLine(failing, formatClock(failing.since, app.now));
-		if (sync.lastError) return `Sync failing · ${formatAgo(sync.lastSyncedAt, app.now)}`;
-		return sync.lastSyncedAt ? `Synced ${formatAgo(sync.lastSyncedAt, app.now)}` : 'Not synced yet';
+		if (sync.lastError) return `history sync failing · last synced ${formatAgo(sync.lastSyncedAt, app.now)}`;
+		return sync.lastSyncedAt ? `history synced ${formatAgo(sync.lastSyncedAt, app.now)}` : 'history not synced yet';
 	});
 
 	const title = $derived.by(() => {
@@ -32,7 +32,7 @@
 {#if failing && app.location}
 	<a class="sync failed" href={to(`/locations/${app.location.id}`)} {title} data-testid="sync-status">{text}</a>
 {:else}
-	<span class="sync" class:failed={!!sync?.lastError} class:waiting={!sync} {title} data-testid="sync-status">{sync ? text : 'Synced just now'}</span>
+	<span class="sync" class:failed={!!sync?.lastError} class:waiting={!sync} {title} data-testid="sync-status">{sync ? text : 'history synced just now'}</span>
 {/if}
 
 <style>
@@ -42,11 +42,10 @@
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
 		display: inline-block;
-		min-width: 14.6em;
-		max-width: 46ch;
+		min-width: 0;
+		max-width: 52ch;
 		overflow: hidden;
 		text-overflow: ellipsis;
-		text-align: right;
 		vertical-align: middle;
 	}
 	.sync.waiting {

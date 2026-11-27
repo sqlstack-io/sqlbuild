@@ -28,7 +28,8 @@ test('a sync that failed reads stopped can be resumed from the attention list', 
 	await expect(page.getByTestId('sync-status')).toContainText('Run history sync stopped since', { timeout: 30_000 });
 	const resume = page.getByTestId('attention-resume');
 	await expect(resume).toBeVisible({ timeout: 30_000 });
-	await resume.click();
+	await resume.getByRole('button', { name: 'Resume' }).click();
+	await expect(resume).toContainText('requested · waiting for the location');
 	await expect.poll(() => control.writes.filter((w) => w.path === '/warehouse-syncs').length).toBe(1);
 });
 
@@ -36,13 +37,13 @@ test('a sync report that arrives after the location page loaded updates it witho
 	const control = new FakeControl({ shop: { sync: 'failed' } });
 	await control.install(page);
 	await page.goto(`/locations/${LOCATIONS.shop}:dev`);
-	const line = page.locator('.sync-now');
+	const line = page.getByTestId('sync-now');
 	await expect(line).toContainText('failing', { timeout: 30_000 });
 	await page.evaluate(() => Object.assign(window, { stillLoaded: true }));
 	const syncNow = line.getByRole('button', { name: 'Sync now' });
 	await syncNow.click();
 	await expect.poll(() => control.writes.filter((w) => w.path === '/warehouse-syncs').length).toBe(1);
-	await expect(line).toContainText('syncing…');
+	await expect(line).toContainText('requested · waiting for the location');
 	await expect(syncNow).toBeDisabled();
 	// The location's successful report reaches the page as the server's change feed announces it.
 	control.targets.shop.sync = 'settled';

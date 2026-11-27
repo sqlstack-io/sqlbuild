@@ -12,7 +12,8 @@
 	import { SERVER_DOCS } from '$lib/boot-failure';
 	import { app } from '$lib/state/app.svelte';
 	import { appPath } from '$lib/paths';
-	import { DEMO } from '$lib/api';
+	import { DEMO, isMock, mockScenario, type SyncScenario } from '$lib/api';
+	import ScenarioPicker from '$lib/components/shell/scenario-picker.svelte';
 	import favicon from '$website/public/favicon.png';
 
 	let { children } = $props();
@@ -24,14 +25,20 @@
 	/** Nothing that reads the control database works: every page but Status says why and waits. */
 	const blocked = $derived(health.outage !== null || app.bootWaiting);
 
+	/** The mock's scenario picker: read from the address the app loaded with, as the mock client is. */
+	let picker = $state<{ current: SyncScenario | null } | null>(null);
 	onMount(() => {
 		if (!signingIn) void app.start();
+		const search = new URLSearchParams(window.location.search);
+		if (isMock(search)) picker = { current: mockScenario(search) };
 	});
 </script>
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
 </svelte:head>
+
+{#if picker && !signingIn}<ScenarioPicker current={picker.current} />{/if}
 
 {#if signingIn}
 	{@render children()}
