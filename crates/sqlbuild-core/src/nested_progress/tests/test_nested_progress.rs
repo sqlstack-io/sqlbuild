@@ -58,6 +58,13 @@ fn given_completed_item_when_rendering_then_draws_one_row_and_children_only_on_f
             expected_text: "    7/461  test      fct_orders__totals_match_line_items_after_refunds_and_partial_shipments_are_applied  PASS   local        0.42s  1 real model\n",
         },
         NestedItemTestCase {
+            description: "without a terminal width a name wider than its column keeps two spaces before the status",
+            item: item(LONG_NAME, "PASS"),
+            group: "",
+            layout: layout(None, false),
+            expected_text: "    7/461  test      fct_orders__totals_match_line_items_after_refunds_and_partial_shipments_are_applied  PASS   local        0.42s  1 real model\n",
+        },
+        NestedItemTestCase {
             description: "a wide terminal cuts nothing it has room for",
             item: item(LONG_NAME, "PASS"),
             group: "",

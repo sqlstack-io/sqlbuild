@@ -220,7 +220,7 @@ def test_given_terminal_scheduler_state_when_reporting_then_output_explains_abor
             expected_output=(
                 "  1/1  test      test_daily_revenue_chain  PASS\n"
                 "         ├── expected  fact_orders         PASS\n"
-                "         └── assertion line_to...negative  PASS\n"
+                "         └── assertion line_totals_are_non_negative  PASS\n"
             ),
         ),
         NestedProgressChildRowsTestCase(
@@ -234,7 +234,7 @@ def test_given_terminal_scheduler_state_when_reporting_then_output_explains_abor
             expected_output=(
                 "  1/1  test      test_daily_revenue_chain  FAIL\n"
                 "         ├── expected  fact_orders         FAIL\n"
-                "         ├── assertion line_to...negative  FAIL\n"
+                "         ├── assertion line_totals_are_non_negative  FAIL\n"
                 "         └── error     [T002] execution error while running stg_orders\n"
             ),
         ),

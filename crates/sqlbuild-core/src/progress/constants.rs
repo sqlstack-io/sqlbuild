@@ -99,6 +99,8 @@ pub(crate) const PLANNING_COMPLETION_PREFIXES: [&str; 19] = [
 ];
 /// Completion verbs whose phase line takes a participle other than the verb itself.
 pub(crate) const IRREGULAR_PARTICIPLES: [(&str, &str); 1] = [("Wrote", "written")];
+/// Marks of a completion subject with clauses of its own, which no phase line reorders.
+pub(crate) const UNMOVABLE_SUBJECT_MARKS: [char; 3] = ['(', ';', ','];
 /// Names a phase line keeps lowercase when they lead it.
 pub(crate) const LOWERCASE_NAMES: [&str; 1] = ["dbt"];
 /// Messages that end a planning phase with a failure.

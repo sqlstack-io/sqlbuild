@@ -2,7 +2,7 @@
 
 use crate::cli_text::main::format_phase_line::format_phase_line;
 use crate::cli_text::models::CliStyle;
-use crate::progress::constants::{IRREGULAR_PARTICIPLES, LOWERCASE_NAMES};
+use crate::progress::constants::{IRREGULAR_PARTICIPLES, LOWERCASE_NAMES, UNMOVABLE_SUBJECT_MARKS};
 use crate::progress::main::is_planning_completion_message::is_planning_completion_message;
 
 /// `✓ <What> <verb>  <detail>  (<time>)` for a `<Verb> <what>[: <detail>]. (<time>)` completion message; `None` for any other text.
@@ -20,6 +20,10 @@ pub fn completion_phase_line(message: &str, style: CliStyle) -> Option<String> {
     let what: &str = what.trim().trim_end_matches('.');
     // `Checked relation usage: 2 of 4 in use.` keeps what it checked as the label and the rest as detail.
     let (what, detail) = what.split_once(": ").unwrap_or((what, ""));
+    // A subject with its own clauses can't move ahead of its verb intact, so it stays as written.
+    if what.contains(UNMOVABLE_SUBJECT_MARKS) {
+        return None;
+    }
     let summary: String = [detail, time.as_str()]
         .into_iter()
         .filter(|part| !part.is_empty())

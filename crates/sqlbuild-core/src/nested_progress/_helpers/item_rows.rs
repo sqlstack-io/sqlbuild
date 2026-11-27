@@ -74,10 +74,11 @@ pub(crate) fn item_row(
     format!("{}\n", row.trim_end())
 }
 
-/// `name` cut in the middle to its column in a terminal; in full when the width is unknown.
+/// `name` cut in the middle to its column in a terminal; in full when the width is unknown, still two spaces clear of what follows.
 fn fitted(name: &str, width: usize, layout: &NestedLayout) -> String {
     match layout.columns {
         Some(_) => cut_middle(name, width.saturating_sub(2)),
+        None if name.chars().count() + 2 > width => format!("{name}  "),
         None => name.to_owned(),
     }
 }

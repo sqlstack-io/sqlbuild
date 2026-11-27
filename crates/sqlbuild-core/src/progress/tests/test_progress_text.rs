@@ -102,6 +102,24 @@ fn given_completion_message_when_formatting_then_its_phase_line_names_what_was_d
             expected_line: "\u{2713} Relation usage checked  2 of 4 in use  (0.00s)",
         },
         ProgressLineTestCase {
+            description: "a subject with its own clauses stays as written",
+            line: completion_phase_line(
+                "Evaluated rules. (0.25s; built-in 0.10s, custom 0.00s); skipped type-proof rules (SQBRCONTRACT105) because SQL analysis is disabled",
+                PLAIN,
+            )
+            .unwrap_or_default(),
+            expected_line: "",
+        },
+        ProgressLineTestCase {
+            description: "a detail may hold clauses of its own",
+            line: completion_phase_line(
+                "Compiled project: 1 existing rule failure; the change may not add or worsen any. (0.51s)",
+                PLAIN,
+            )
+            .unwrap_or_default(),
+            expected_line: "\u{2713} Project compiled  1 existing rule failure; the change may not add or worsen any  (0.51s)",
+        },
+        ProgressLineTestCase {
             description: "a leading name keeps its case",
             line: completion_phase_line("Inspected dbt project and profile. (0.00s)", PLAIN)
                 .unwrap_or_default(),
