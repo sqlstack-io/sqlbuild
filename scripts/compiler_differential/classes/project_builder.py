@@ -701,10 +701,8 @@ def _relation(reference: str) -> str:
 def merged_extra_paths(lines: list[str]) -> list[str]:
     """One `extra_paths` line holding every path the `extra_paths = [...]` lines list."""
 
-    paths: list[str] = [
-        path.strip()
-        for line in lines
-        for path in line.split("=", 1)[1].strip().strip("[]").split(",")
-        if path.strip()
-    ]
+    paths: list[str] = []
+    for line in lines:
+        listed: str = line.split("=", 1)[1].strip().strip("[]")
+        paths.extend(path.strip() for path in listed.split(",") if path.strip())
     return [f"extra_paths = [{', '.join(paths)}]"] if paths else []

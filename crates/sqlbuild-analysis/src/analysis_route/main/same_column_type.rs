@@ -6,7 +6,7 @@ use crate::analysis_route::models::{AnalysisRoute, TypeMatch};
 use crate::type_system::main::same_type::same_type;
 use crate::type_system::models::{NormalizedType, PythonInteger, TypeFamily};
 
-/// Whether `declared` and `listed` are one stored type in `dialect`, its defaults and synonyms met.
+/// Whether `declared` and `listed` are one stored type in `dialect`, its defaults and synonyms met; a dialect's own type match decides first (ClickHouse: a declared BIGINT is a listed `Nullable(Int64)`).
 #[must_use]
 pub fn same_column_type(dialect: Option<&str>, declared: &str, listed: &str) -> bool {
     if declared.trim().eq_ignore_ascii_case(listed.trim()) {
@@ -15,7 +15,6 @@ pub fn same_column_type(dialect: Option<&str>, declared: &str, listed: &str) -> 
     let AnalysisRoute::Native(native) = analysis_route(dialect) else {
         return false;
     };
-    // A dialect that compares types its own way (ClickHouse: base types, wrappers apart) decides first.
     if matches!(
         native.type_match(declared, Some(listed), false),
         TypeMatch::Compared {

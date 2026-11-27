@@ -273,7 +273,6 @@ GENERATOR_FEATURE_STRIDE: int = 4
 GENERATOR_OPTIONAL_FEATURE_SHARE: float = 0.2
 GENERATOR_RARE_FEATURE_PERIOD: int = 12
 GENERATOR_RARE_FEATURE_BLOCKS: dict[str, int] = {"dbt_ref": 1, "source_file_load": 6}
-# Loaders and loads write only to built-in adapters, so a project adapter drops them.
 GENERATOR_EXCLUDED_FEATURE_PAIRS: tuple[tuple[str, str], ...] = (
     ("managed_source_loader", "project_adapter"),
     ("source_file_load", "project_adapter"),

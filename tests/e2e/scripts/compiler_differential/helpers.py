@@ -59,7 +59,8 @@ def every_block_sets() -> tuple[tuple[str, ...], ...]:
     A project adapter drops the loader and load blocks, which write only to built-in adapters.
     """
 
+    adapter: int = GENERATOR_FEATURE_BLOCKS.index("project_adapter")
     return (
-        tuple(block for block in GENERATOR_FEATURE_BLOCKS if block != "project_adapter"),
+        GENERATOR_FEATURE_BLOCKS[:adapter] + GENERATOR_FEATURE_BLOCKS[adapter + 1 :],
         GENERATOR_FEATURE_BLOCKS,
     )
