@@ -110,7 +110,7 @@ def test_given_local_project_when_running_dag_json_then_outputs_static_graph_wit
             expected_task_group="python",
             expected_task_meta={"owner": "data"},
             expected_loader_id="loader:warehouse_export",
-            expected_loader_columns=[{"name": "order_id", "type": "integer"}],
+            expected_loader_columns=[{"name": "order_id", "type": "BIGINT"}],
             expected_asset_id="asset:orders_export",
             expected_asset_key=["asset", "orders_export"],
             expected_asset_description="Orders export artifact",

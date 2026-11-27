@@ -901,9 +901,9 @@ def build_long_model_name_project_files(
             "    table: raw_orders\n"
             "    columns:\n"
             "      - name: id\n"
-            "        type: BIGINT\n"
+            "        type: INTEGER\n"
             "      - name: amount\n"
-            "        type: BIGINT\n"
+            "        type: INTEGER\n"
         ),
         f"sql/models/{model_name}.sql": (
             "MODEL (\n"
