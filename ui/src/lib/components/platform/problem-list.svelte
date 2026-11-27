@@ -4,7 +4,8 @@
 	import { to } from '$lib/paths';
 	import type { PlatformEventLink, PlatformEventReaction, PlatformEventRecord } from '$lib/api';
 	import { formatAgo, formatDuration, formatStamp } from '$lib/format/time';
-	import { eventKindLabel, eventLinkHref, eventLinkLabel, reactionHref, reactionLabel, reactionTone, severityTone } from '$lib/platform/labels';
+	import ViewError from './view-error.svelte';
+	import { eventKindLabel, eventLinkHref, messageParts, eventLinkLabel, reactionHref, reactionLabel, reactionTone, severityTone } from '$lib/platform/labels';
 	import { app } from '$lib/state/app.svelte';
 	import type { Resource } from '$lib/state/resource.svelte';
 
@@ -57,13 +58,15 @@
 
 <DataTable class="problems static" embedded columns={tableColumns} rows={events} key={(e) => e.id} {resource} {empty}>
 	{#snippet row(e)}
+			{@const parts = messageParts(e.message)}
 			<tr>
 				<td>
 					<div class="cell-name">
 						<span class="dot" style:background={e.active ? severityTone[e.severity] : 'var(--sb-text-faint)'} title={e.severity}></span>
 						<div class="min-w-0">
-							<strong>{eventKindLabel[e.kind]}</strong>{#if e.active}<span class="open">ongoing</span>{/if}
-							<div class="cell-desc wrap">{e.message}</div>
+							<strong>{eventKindLabel[e.kind]}</strong>{#if e.active}<span class="open">· ongoing</span>{/if}
+							<div class="cell-desc wrap">{parts.summary}</div>
+							{#if parts.error}<ViewError error={parts.error} />{/if}
 							{#if Object.keys(e.payload).length}
 								<details>
 									<summary>Details</summary>
@@ -125,12 +128,9 @@
 		white-space: normal !important;
 	}
 	.open {
-		margin-left: 8px;
-		padding: 0 6px;
-		border-radius: 999px;
-		background: color-mix(in srgb, var(--sb-warning) 15%, transparent);
-		color: var(--sb-warning);
-		font-size: 11px;
+		margin-left: 6px;
+		color: var(--muted-foreground);
+		font-size: 12px;
 	}
 	.nowrap {
 		white-space: nowrap;

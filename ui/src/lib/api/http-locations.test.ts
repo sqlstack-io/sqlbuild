@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkInsOf, connectionDetailsOf, connectionTestOf, firstSyncPending, instancesOf, missingSecretsEventOf, missingSecretsOf, poolCapWarningsOf, toLocationDetail, toWarehouseConnection, warehouseSyncOf } from './http-locations';
+import { checkInsOf, connectionDetailsOf, connectionTestOf, firstSyncPending, instancesOf, missingSecretsEventOf, missingSecretsOf, poolCapWarningsOf, toLocationDetail, toWarehouseConnection, warehouseSyncOf, withServerSync } from './http-locations';
 
 const now = Date.parse('2026-11-08T12:00:00Z');
 const at = (secondsAgo: number) => new Date(now - secondsAgo * 1000).toISOString();
@@ -87,20 +87,21 @@ describe('location processes', () => {
 
 describe('toLocationDetail', () => {
 	const location = { id: 'loc:prod', name: 'orders', health: null, lastSeenAt: null, target: { name: 'prod', adapter: null, connectionSummary: null }, warehouseSync: { lastSyncedAt: null, lastError: null } };
+	const server = (fact: 'deploy_failed_on_previous' | 'healthy', tier: 'needs_attention' | null) => ({ verdict: { fact, tier }, warehouse_sync: { failing: false } });
 
 	it("shows the server's state, without inventing a failed deploy or error text", () => {
-		const detail = toLocationDetail(location, { state: 'falling_back', observations: [seen(5, { kind: 'heartbeat' }), seen(20, { kind: 'compile_failed', generation: 3 }), seen(40, { kind: 'connection', generation: 2, healthy: true })] }, null, now);
-		expect([detail.health, detail.failedDeploy, detail.lastLoadError, detail.snapshot]).toEqual(['falling_back', null, null, null]);
+		const detail = toLocationDetail(location, { ...server('deploy_failed_on_previous', 'needs_attention'), state: 'falling_back', observations: [seen(5, { kind: 'heartbeat' }), seen(20, { kind: 'compile_failed', generation: 3 }), seen(40, { kind: 'connection', generation: 2, healthy: true })] }, null, now);
+		expect([detail.health, detail.failedDeploy, detail.lastLoadError, detail.snapshot, detail.verdict]).toEqual(['falling_back', null, null, null, { fact: 'deploy_failed_on_previous', stopsRuns: false }]);
 	});
 
 	it('lists the rule findings that failed the load, as sqb compile prints them', () => {
 		const rules = { finding_count: 3, findings: [{ code: 'SQBRMODEL102', message: 'SELECT * is allowed only inside dependency import CTEs', path: 'models/orders.sql', line: 2 }] };
-		const detail = toLocationDetail(location, { state: 'falling_back', observations: [seen(20, { kind: 'compile_failed', generation: 3, rules })] }, null, now);
+		const detail = toLocationDetail(location, { ...server('deploy_failed_on_previous', 'needs_attention'), state: 'falling_back', observations: [seen(20, { kind: 'compile_failed', generation: 3, rules })] }, null, now);
 		expect(detail.lastLoadError).toBe('Compile failed: 3 rule findings\nmodels/orders.sql:2 [SQBRMODEL102] SELECT * is allowed only inside dependency import CTEs\n… and 2 more');
 	});
 
 	it('shows no load error once the server reads the location healthy again', () => {
-		const detail = toLocationDetail(location, { state: 'healthy', observations: [seen(5, { kind: 'connection', generation: 4, healthy: true }), seen(20, { kind: 'compile_failed', generation: 3, error: 'job x: unknown' })] }, null, now);
+		const detail = toLocationDetail(location, { ...server('healthy', null), state: 'healthy', observations: [seen(5, { kind: 'connection', generation: 4, healthy: true }), seen(20, { kind: 'compile_failed', generation: 3, error: 'job x: unknown' })] }, null, now);
 		expect([detail.health, detail.lastLoadError, detail.connectionTest?.outcome]).toEqual(['healthy', null, 'ok']);
 	});
 });
@@ -266,5 +267,21 @@ describe('warehouseSyncOf', () => {
 
 	it('clears the error once the failing table syncs again', () => {
 		expect(warehouseSyncOf([sync('2026-11-08T12:05:00Z', 'catalog', null), sync('2026-11-08T12:03:00Z', 'catalog', 'read')])?.lastError).toBeNull();
+	});
+});
+
+describe('withServerSync', () => {
+	const reported = { lastSyncedAt: '2026-11-08T11:00:00Z', lastError: null, lastReportedAt: '2026-11-08T11:40:00Z', syncing: { position: 3, kinds: 14, table: 'catalog', rows: 10 } };
+
+	it('adds who asked for a sync the location has not started, even before its first report', () => {
+		const requested = { requested_at: '2026-11-08T11:59:00Z', requested_by: 'ada' };
+		expect(withServerSync(null, { failing: false, requested })).toEqual({ lastSyncedAt: null, lastError: null, requested: { at: '2026-11-08T11:59:00Z', by: 'ada' } });
+		expect(withServerSync(null, { failing: false })).toBeNull();
+	});
+
+	it("takes the running sync's start and stall from the server", () => {
+		const running = { started_at: '2026-11-08T11:30:00Z', progressed_at: '2026-11-08T11:40:00Z', position: 3, kinds: 14, rows: 10, table: 'catalog' as const, stalled: true };
+		expect(withServerSync(reported, { failing: false, running })).toEqual({ ...reported, requested: null, syncing: { ...reported.syncing, startedAt: '2026-11-08T11:30:00Z' }, stalled: true });
+		expect(withServerSync(reported, { failing: false })).toEqual({ ...reported, requested: null, syncing: null, stalled: false });
 	});
 });

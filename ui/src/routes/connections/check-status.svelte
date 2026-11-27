@@ -5,7 +5,7 @@
 	import { app } from '$lib/state/app.svelte';
 	import { checkOrigin, checkTitle, checkWords } from './utils/connections';
 
-	// The last connection check: "● Passed 3h ago" over "after deploy · 820 ms", details on hover.
+	// The last connection check: "● connected 3h ago" over "on deploy · 820 ms", details on hover, in the words every page uses.
 	let { test }: { test: ConnectionTest | null } = $props();
 </script>
 
@@ -15,7 +15,7 @@
 		<span class="origin">{checkOrigin(test)}</span>
 	</span>
 {:else}
-	<StatusLabel tone="var(--sb-text-faint)" label="Not checked yet" muted />
+	<StatusLabel tone="var(--sb-text-faint)" label="not tested yet" muted />
 {/if}
 
 <style>

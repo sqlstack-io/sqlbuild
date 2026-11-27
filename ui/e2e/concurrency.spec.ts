@@ -72,8 +72,10 @@ test('a group in no pool says so', async ({ page }) => {
 
 test("the location shows the server's pool-cap warning", async ({ page }) => {
 	await page.goto('/locations/0d9c6a52-3f1e-4b7a-9c43-5b8e2f61a7d4?mock');
+	// An informational note of the server's: one muted count beside Details, the caps inside it.
+	await expect(page.locator('details.facts summary')).toContainText('1 pool cap note', { timeout: 20_000 });
+	await page.locator('details.facts summary').click();
 	const caps = page.locator('.pool-caps');
-	await expect(caps).toContainText('Pool caps on this server', { timeout: 20_000 });
 	await expect(caps).toContainText('group close_of_business takes 3 of pool warehouse_heavy; capped at 1, so it runs alone in that pool');
 	await expect(caps.getByRole('link', { name: 'close_of_business' })).toHaveAttribute('href', /\/jobs\/close_of_business/);
 	if (shots) await page.screenshot({ path: `${shots}/concurrency-panel-location.png` });

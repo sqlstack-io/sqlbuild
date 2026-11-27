@@ -24,9 +24,9 @@ const recovered: WarehouseSync = {
 
 describe('syncNowState', () => {
 	it('goes from failing to waiting on Sync now, and to synced once the successful report arrives', () => {
-		expect(syncNowState(failing, null, NOW)).toEqual({ kind: 'failing', error: failing.lastError, lastSyncedAt: '2026-11-26T03:00:00Z' });
+		expect(syncNowState(failing, null, NOW)).toEqual({ kind: 'failing', error: failing.lastError, lastSyncedAt: '2026-11-26T03:00:00Z', failing: failing.failing });
 		const requested = { at: NOW, seen: syncReportKey(failing) };
-		expect(syncNowState(failing, requested, NOW + 30_000)).toEqual({ kind: 'requested' });
+		expect(syncNowState(failing, requested, NOW + 30_000)).toEqual({ kind: 'requested', at: NOW, by: null });
 		expect(syncNowState(recovered, requested, NOW + 31_000)).toEqual({ kind: 'synced', at: '2026-11-27T03:54:44Z' });
 	});
 
@@ -38,5 +38,64 @@ describe('syncNowState', () => {
 	it('ends the wait on a newer failed report too', () => {
 		const requested = { at: NOW, seen: syncReportKey(failing) };
 		expect(syncNowState({ ...failing, lastReportedAt: '2026-11-27T03:56:00Z' }, requested, NOW + 60_000).kind).toBe('failing');
+	});
+
+	it("takes the server's word on a stall over the page clock", () => {
+		const running: WarehouseSync = { ...recovered, lastReportedAt: '2026-11-27T03:54:00Z', syncing: { position: 7, kinds: 14, table: 'run_results', rows: 1240 } };
+		expect(syncNowState({ ...running, stalled: true }, null, NOW).kind).toBe('stalled');
+		expect(syncNowState({ ...running, stalled: false }, null, NOW + 60 * 60_000).kind).toBe('running');
+	});
+
+	it('shows a running sync with its progress, and as stalled once no progress arrives for ten minutes', () => {
+		const running: WarehouseSync = { ...recovered, lastReportedAt: '2026-11-27T03:54:00Z', syncing: { position: 7, kinds: 14, table: 'run_results', rows: 1240 } };
+		expect(syncNowState(running, null, NOW).kind).toBe('running');
+		expect(syncNowState(running, null, Date.parse('2026-11-27T04:04:00Z'))).toMatchObject({ kind: 'stalled', progressAt: '2026-11-27T03:54:00Z' });
+	});
+
+	it('waits on a request the server reports, even one made on another page', () => {
+		expect(syncNowState({ ...recovered, requested: { at: '2026-11-27T03:54:50Z', by: 'ada' } }, null, NOW)).toEqual({ kind: 'requested', at: Date.parse('2026-11-27T03:54:50Z'), by: 'ada' });
+	});
+});
+
+describe('messageParts', () => {
+	it('keeps the error out of the summary, after the first clause of three words or more', async () => {
+		const { messageParts } = await import('./labels');
+		expect(messageParts("Run history can't reach the warehouse: 390422 (08001): IP 203.0.113.7 is not allowed")).toEqual({
+			summary: "Run history can't reach the warehouse",
+			error: '390422 (08001): IP 203.0.113.7 is not allowed'
+		});
+		expect(messageParts('orders · prod: the warehouse connection check failed: IP is not allowed.')).toEqual({
+			summary: 'orders · prod: the warehouse connection check failed',
+			error: 'IP is not allowed.'
+		});
+		expect(messageParts('stock_levels in inventory · development is late.')).toEqual({ summary: 'stock_levels in inventory · development is late.', error: null });
+	});
+});
+
+describe('locationVerdict', () => {
+	it('names the worst open fact: red when runs stop, amber when it needs a look, Healthy only when nothing is open', async () => {
+		const { locationVerdict } = await import('./labels');
+		const ok = { outcome: 'ok' as const, at: '2026-11-27T03:00:00Z', durationMs: 800, trigger: 'manual' as const, by: null, message: 'Connected' };
+		const base = { health: 'healthy' as const, live: true, test: ok, deployedAt: '2026-11-27T02:00:00Z', failedDeploy: false, fallback: false, events: [] };
+		const event = (kind: 'warehouse_sync_failed' | 'tick_overdue' | 'location_broken', severity: 'warning' | 'critical' = 'warning') => ({ kind, severity, locationId: 'l1', active: true });
+		expect(locationVerdict(base)).toEqual({ tone: 'ok', label: 'Healthy' });
+		expect(locationVerdict({ ...base, events: [event('tick_overdue')] })).toEqual({ tone: 'warning', label: 'Schedule overdue' });
+		expect(locationVerdict({ ...base, events: [event('tick_overdue'), event('warehouse_sync_failed')] })).toEqual({ tone: 'warning', label: 'Sync failing' });
+		expect(locationVerdict({ ...base, test: { ...ok, outcome: 'failed' }, events: [event('warehouse_sync_failed')] })).toEqual({ tone: 'failed', label: 'Can’t connect' });
+		expect(locationVerdict({ ...base, live: false })).toEqual({ tone: 'failed', label: 'Not checking in' });
+		expect(locationVerdict({ ...base, failedDeploy: true, fallback: true })).toEqual({ tone: 'warning', label: 'Deploy failed · running previous' });
+		expect(locationVerdict({ ...base, failedDeploy: true, fallback: false })).toEqual({ tone: 'failed', label: 'Deploy failed' });
+		expect(locationVerdict({ ...base, test: null })).toEqual({ tone: 'warning', label: 'Not tested' });
+	});
+
+	it("follows the server's verdict where it gives one, so the page and the server keep one rule", async () => {
+		const { locationVerdict } = await import('./labels');
+		const ok = { outcome: 'ok' as const, at: '2026-11-27T03:00:00Z', durationMs: 800, trigger: 'manual' as const, by: null, message: 'Connected' };
+		const base = { health: 'healthy' as const, live: true, test: ok, deployedAt: '2026-11-27T02:00:00Z', failedDeploy: false, fallback: false, events: [] };
+		const overdue = { kind: 'tick_overdue' as const, severity: 'warning' as const, locationId: 'l1', active: true };
+		expect(locationVerdict({ ...base, verdict: { fact: 'cant_connect', stopsRuns: true } })).toEqual({ tone: 'failed', label: 'Can’t connect' });
+		expect(locationVerdict({ ...base, verdict: { fact: 'sync_stalled', stopsRuns: false } })).toEqual({ tone: 'warning', label: 'Sync stalled' });
+		expect(locationVerdict({ ...base, test: null, verdict: { fact: 'healthy', stopsRuns: false } })).toEqual({ tone: 'ok', label: 'Healthy' });
+		expect(locationVerdict({ ...base, events: [overdue], verdict: { fact: 'healthy', stopsRuns: false } })).toEqual({ tone: 'warning', label: 'Schedule overdue' });
 	});
 });

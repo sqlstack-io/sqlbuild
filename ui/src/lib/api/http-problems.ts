@@ -49,6 +49,7 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 			id: `broken:${keyOf(location.location_id, location.target)}`,
 			kind: 'location_broken',
 			severity: 'critical',
+			stopsRuns: location.tier === 'stops_runs',
 			occurredAt: location.last_seen_at,
 			// Its last check-in tells one outage from the next.
 			occurrence: location.last_seen_at,
@@ -63,7 +64,10 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 		events.push({
 			id: `failing:${keyOf(location.location_id, location.target)}`,
 			kind: 'location_failing',
-			severity: location.state === 'degraded' ? 'warning' : 'critical',
+			// The server says whether it stops runs: a failed connection check does; a previous version, a failed plan or discover function doesn't.
+			severity: location.tier === 'stops_runs' ? 'critical' : 'warning',
+			stopsRuns: location.tier === 'stops_runs',
+			state: location.state,
 			occurredAt: location.failed_at,
 			// The failure's report time tells one failure from the next.
 			occurrence: location.failed_at,
@@ -87,6 +91,23 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 			subject: place,
 			message: syncMessage(place, sync, now),
 			sync: { halted: sync.halted, unreachable: sync.unreachable, retrySeconds: sync.retry_seconds ?? null, retryAt: sync.retry_at ?? null, lastSuccessAt: sync.last_success_at ?? null }
+		});
+	}
+	for (const sync of problems.stalled_syncs ?? []) {
+		const place = placeOf(sync.location_name, sync.target);
+		const minutes = Math.max(1, Math.round((now - Date.parse(sync.progressed_at)) / 60_000));
+		events.push({
+			id: `stalled:${keyOf(sync.location_id, sync.target)}`,
+			kind: 'warehouse_sync_stalled',
+			severity: 'warning',
+			stopsRuns: sync.tier === 'stops_runs',
+			occurredAt: sync.progressed_at,
+			// Its last progress tells one stall from the next.
+			occurrence: sync.progressed_at,
+			active: true,
+			locationId: keyOf(sync.location_id, sync.target),
+			subject: place,
+			message: `${place}: the run history sync stalled at ${sync.position}/${sync.kinds} (${sync.table.replaceAll('_', ' ')}): no progress for ${minutes}m. The location may have stopped; check its output, then Sync now.`
 		});
 	}
 	for (const sink of problems.failing_sinks ?? []) {
