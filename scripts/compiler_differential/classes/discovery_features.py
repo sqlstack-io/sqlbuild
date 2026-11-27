@@ -200,7 +200,7 @@ class DiscoveryFeatureWriter:
             "    description: Products loaded by a project loader.\n"
             "    managed: true\n"
             "    columns:\n"
-            "      - name: id\n        type: INTEGER\n"
+            "      - name: id\n        type: BIGINT\n"
             "      - name: label\n        type: VARCHAR\n"
         )
         self._files["python/nodes/loaders/products/loader.py"] = (

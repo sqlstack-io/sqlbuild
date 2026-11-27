@@ -436,7 +436,7 @@ def _target_cases() -> tuple[FailureCase, ...]:
                 "sql/sources/loaded.yml": (
                     "sources:\n  - name: loaded_orders\n    description: Loaded orders.\n"
                     "    managed: true\n"
-                    "    columns:\n      - name: order_id\n        type: INTEGER\n"
+                    "    columns:\n      - name: order_id\n        type: BIGINT\n"
                 ),
             },
         ),

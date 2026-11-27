@@ -37,8 +37,8 @@ _SCALED_AMOUNT: str = (
 _LOADED_SOURCE: str = (
     "  - name: raw_events\n    description: Loaded events.\n    managed: true\n"
     "    contract: enforced\n"
-    "    columns:\n      - name: event_id\n        type: INTEGER\n"
-    "      - name: load_seq\n        type: INTEGER\n"
+    "    columns:\n      - name: event_id\n        type: BIGINT\n"
+    "      - name: load_seq\n        type: BIGINT\n"
 )
 _LOADER: str = (
     "from sqlbuild.loaders import loader\n\n\n"
@@ -184,7 +184,7 @@ def _metadata_cases() -> tuple[FailureCase, ...]:
             name="semantic-source-cursor-unknown-column",
             expected_code="B300",
             expected_message="cursor_column references unknown column 'loaded_at'",
-            expected_location=(21, 20),
+            expected_location=(4, 49),
             files={
                 FAILURE_SOURCES_PATH: FAILURE_BASE_SOURCES + _LOADED_SOURCE,
                 "python/nodes/loaders/raw_events/loader.py": _LOADER,

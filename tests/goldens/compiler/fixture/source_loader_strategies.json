@@ -52,7 +52,7 @@
       "name": "country_id",
       "description": "",
       "meta": {},
-      "data_type": "INTEGER",
+      "data_type": "BIGINT",
       "constraints": [],
       "quote": null,
       "tags": []
@@ -117,7 +117,7 @@
       "name": "event_id",
       "description": "",
       "meta": {},
-      "data_type": "INTEGER",
+      "data_type": "BIGINT",
       "constraints": [],
       "quote": null,
       "tags": []
@@ -173,7 +173,7 @@
       "name": "event_id",
       "description": "",
       "meta": {},
-      "data_type": "INTEGER",
+      "data_type": "BIGINT",
       "constraints": [],
       "quote": null,
       "tags": []
@@ -191,7 +191,7 @@
       "name": "amount_cents",
       "description": "",
       "meta": {},
-      "data_type": "INTEGER",
+      "data_type": "BIGINT",
       "constraints": [],
       "quote": null,
       "tags": []
@@ -239,7 +239,7 @@
       "name": "customer_id",
       "description": "",
       "meta": {},
-      "data_type": "INTEGER",
+      "data_type": "BIGINT",
       "constraints": [],
       "quote": null,
       "tags": []
@@ -308,7 +308,7 @@
       "name": "status_id",
       "description": "",
       "meta": {},
-      "data_type": "INTEGER",
+      "data_type": "BIGINT",
       "constraints": [],
       "quote": null,
       "tags": []
