@@ -44,6 +44,9 @@ fn given_a_pooled_session_when_a_transaction_begins_then_postgres_holds_it_to_th
 fn given_a_session_past_its_limit_when_postgres_cuts_it_off_then_health_and_a_platform_event_report_it()
  {
     let test_cases = [
+        // PostgreSQL sends an idle cut-off's FATAL and closes; the next query draws a reset, and
+        // Windows drops received data on a reset, so its client sees only the reset.
+        #[cfg(not(windows))]
         CutOffTestCase {
             description: "a transaction left idle past its limit",
             session: (
