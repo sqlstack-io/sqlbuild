@@ -19,7 +19,7 @@
 	import RepublishNow from '$lib/components/platform/republish-now.svelte';
 	import type { LocationInstance } from '$lib/api';
 	import { formatAgo, formatStamp } from '$lib/format/time';
-	import { brokenDeployPolicyHelp, brokenDeployPolicyLabel, headlineWords, healthHelp, shortImage, targetWords, testWords } from '$lib/platform/labels';
+	import { brokenDeployPolicyHelp, brokenDeployPolicyLabel, healthHelp, locationVerdict, shortImage, targetWords, verdictTone } from '$lib/platform/labels';
 	import { syncNowState } from '$lib/platform/sync-now';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
@@ -48,9 +48,14 @@
 	const sync = createResource((client) => client.getWarehouseSync({ locationId: id }), ['warehouse_sync']);
 	const headline = $derived(
 		detail
-			? headlineWords(detail.health, {
+			? locationVerdict({
+					health: detail.health,
 					live: processes.live.length > 0,
-					test: testWords(detail.connectionTest, detail.snapshot?.publishedAt ?? null, app.now),
+					test: detail.connectionTest,
+					deployedAt: detail.snapshot?.publishedAt ?? null,
+					failedDeploy: !!detail.failedDeploy,
+					fallback: detail.brokenDeployPolicy === 'fallback' && !!detail.snapshot,
+					events: app.platformEvents.filter((e) => e.locationId === detail.id),
 					sync: syncNowState(sync.data ?? null, null, app.now)
 				})
 			: null
@@ -83,7 +88,7 @@
 				<span class="muted">· {targetWords(detail.target)}</span>
 				<span class="right">
 					{#if headline}
-						<span title={healthHelp[detail.health]} data-testid="location-headline"><StatusLabel tone={headline.tone} label={headline.label} /></span>
+						<span title={healthHelp[detail.health]} data-testid="location-headline"><StatusLabel tone={verdictTone[headline.tone]} label={headline.label} /></span>
 					{/if}
 					{#if openProblems}<a class="count" href="#problems">{plural(openProblems, 'problem')}</a>{/if}
 				</span>
@@ -117,7 +122,7 @@
 
 			<div class="line strip" data-testid="location-actions">
 				<ConnectionTest compact scope={{ locationId: detail.id }} connection={detail.warehouseConnection ?? 'warehouse'} last={detail.connectionTest} deployedAt={detail.snapshot?.publishedAt ?? null} problemsHref="#problems" ontested={() => location.refresh()} />
-				<WarehouseSyncNow scope={{ locationId: detail.id }} problemsHref="#problems" />
+				<WarehouseSyncNow scope={{ locationId: detail.id }} problemsHref="#problems" blocked={detail.connectionTest?.outcome === 'failed'} />
 				{#if app.client.supports('republish')}<RepublishNow scope={{ locationId: detail.id }} snapshot={detail.snapshot} ondone={() => location.refresh()} />{/if}
 			</div>
 

@@ -2,7 +2,7 @@
 
 import type { AttentionItem, ChangedBuild, QueueWait } from '$lib/api';
 import { describeWait, outcomeCounts } from '$lib/operate/labels';
-import { eventKindLabel, messageParts, problemHref } from '$lib/platform/labels';
+import { eventKindLabel, messageParts, problemHref, stopsRuns } from '$lib/platform/labels';
 import { formatAgo } from '$lib/format/time';
 import { runStatusLabel } from '$lib/status';
 import { shortName } from '$lib/build-area/labels';
@@ -130,7 +130,7 @@ export function attentionView(item: AttentionItem, now: number, changedBuild: Ch
 		case 'platform_event':
 			return {
 				key: `event:${item.event.id}`,
-				tone: item.event.severity === 'critical' ? 'error' : item.event.severity === 'warning' ? 'warning' : 'info',
+				tone: stopsRuns(item.event) || item.event.severity === 'critical' ? 'error' : item.event.severity === 'warning' ? 'warning' : 'info',
 				title: `${eventKindLabel[item.event.kind]}${item.event.subject ? ` · ${item.event.subject}` : ''}`,
 				// The summary only: the error itself is listed once, in the location's Problems.
 				detail: messageParts(item.event.message).summary,
@@ -203,7 +203,7 @@ function causeOf(item: AttentionItem, items: AttentionItem[]): string | null {
 
 function consequenceOf(item: AttentionItem, view: AttentionView): Consequence {
 	if (item.kind === 'queue_blocked') return { text: `${view.title}, queued ${view.since}. ${view.detail}`, href: view.href };
-	if (item.kind === 'platform_event') return { text: item.event.message, href: view.href };
+	if (item.kind === 'platform_event') return { text: messageParts(item.event.message).summary, href: view.href };
 	return { text: `${view.title}: ${view.detail}`, href: view.href };
 }
 
@@ -219,7 +219,9 @@ export function attentionViews(items: AttentionItem[], now: number, changedBuild
 		if (attentionRank(view.tone) < attentionRank(cause.view.tone)) cause.view.tone = view.tone;
 		return false;
 	});
-	return shown.sort((a, b) => attentionRank(a.view.tone) - attentionRank(b.view.tone));
+	// A location that can't run comes before every other error.
+	const stops = (v: { item: AttentionItem }) => (v.item.kind === 'platform_event' && stopsRuns(v.item.event) ? 0 : 1);
+	return shown.sort((a, b) => stops(a) - stops(b) || attentionRank(a.view.tone) - attentionRank(b.view.tone));
 }
 
 /** Error first, then warnings, stale and info. */

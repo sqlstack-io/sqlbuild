@@ -9,8 +9,9 @@
 
 	/** "Warehouse sync ● synced 4m ago [Sync now]"; a run ending syncs it too. */
 	/** `problemsHref` is where a failing or stalled sync is explained in full, on the location's page its Problems list. */
-	type Props = { scope: Scope; problemsHref?: string | null };
-	let { scope, problemsHref = null }: Props = $props();
+	/** `blocked`: the connection check failed, so a failing sync waits on it and the connection alone carries the red. */
+	type Props = { scope: Scope; problemsHref?: string | null; blocked?: boolean };
+	let { scope, problemsHref = null, blocked = false }: Props = $props();
 
 	const sync = createResource((client) => client.getWarehouseSync(scope), ['warehouse_sync']);
 	let requesting = $state(false);
@@ -23,11 +24,13 @@
 	const summary = $derived(last?.completed ? `\nLast full sync: ${last.completed.kinds} kinds, ${last.completed.rows.toLocaleString('en-US')} rows in ${(last.completed.elapsedMs / 1000).toFixed(1)} s.` : '');
 	const words = $derived.by((): ActionWords => {
 		if (refused && !requesting) return { tone: 'failed', label: `couldn’t request · ${formatAgo(new Date(refused.at).toISOString(), Math.max(app.now, refused.at))}`, title: refused.cause };
+		// copy-allow: the product owner's wording for a sync waiting on a failed connection check
+		if (blocked && status.kind === 'failing') return { tone: 'never', label: 'blocked: can’t connect', title: 'The sync can’t run until the connection check passes.' };
 		const shown = syncWords(status, app.now);
 		return status.kind === 'synced' ? { ...shown, title: `${shown.title}${summary}` } : shown;
 	});
 	const cause = $derived(refused && !requesting ? refused.cause : null);
-	const href = $derived(!refused && (status.kind === 'failing' || status.kind === 'stalled') ? problemsHref : null);
+	const href = $derived(!refused && !blocked && (status.kind === 'failing' || status.kind === 'stalled') ? problemsHref : null);
 	const waiting = $derived(requesting || status.kind === 'requested' || status.kind === 'running');
 	const since = $derived(
 		status.kind === 'requested'

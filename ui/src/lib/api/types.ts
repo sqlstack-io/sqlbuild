@@ -161,6 +161,8 @@ export type PlatformEvent = {
 	 * stopped scheduler's expired lease or a broken location's last check-in.
 	 */
 	occurrence?: string;
+	/** A failing location's state, such as `degraded` when its connection check failed. */
+	state?: string;
 	/** A failing run-history sync: whether failed reads stopped it, so Resume restarts it, and when it tries again. */
 	sync?: { halted: boolean; unreachable: boolean; retrySeconds: number | null; retryAt: Iso | null; lastSuccessAt: Iso | null };
 };

@@ -4,22 +4,26 @@
 
 import { ApiError, type ApiClient } from '../client';
 import { LocalChangeBus } from '../signals';
-import type { ConnectionTest, LocationDetail, LocationSummary, Overview, PlatformEvent, RepublishResult, Scope, WarehouseSync } from '../types';
+import type { ConnectionTest, LocationDetail, LocationSummary, NavCounts, Overview, PlatformEvent, RepublishResult, Scope, WarehouseSync } from '../types';
 import type { PlatformEventRecord, WarehouseConnection } from '../types/platform';
 import { LOCATION_SHOP } from './fixtures';
 
-export const SYNC_SCENARIOS = ['synced-untested', 'requested', 'running', 'stalled', 'failing', 'stopped', 'not-checking-in', 'reconnecting', 'offline'] as const;
+export const SYNC_SCENARIOS = ['healthy', 'synced-untested', 'requested', 'running', 'stalled', 'stopped', 'deploy-failed-fallback', 'failing', 'not-checking-in', 'deploy-failed', 'several', 'reconnecting', 'offline'] as const;
 export type SyncScenario = (typeof SYNC_SCENARIOS)[number];
 
 /** What each scenario shows, for the picker. */
 export const SCENARIO_NOTES: Record<SyncScenario, string> = {
-	'synced-untested': 'Synced 2m ago; the warehouse connection was never tested',
+	healthy: 'Green: tested, synced, nothing open',
+	'synced-untested': 'Amber: synced 2m ago, but the warehouse connection was never tested',
 	requested: 'Sync now was clicked; the location hasn’t taken it yet',
 	running: 'A sync is running, with progress and how long it has run',
-	stalled: 'A sync stopped reporting progress 12m ago: a warning and a problem',
-	failing: 'The warehouse refuses the location’s IP: sync and test fail, with the cause',
-	stopped: 'Failed reads stopped the sync; Resume it from the Overview or Sync now',
-	'not-checking-in': 'The location stopped checking in: every action fails at once, saying why',
+	stalled: 'Amber: a sync stopped reporting progress 12m ago',
+	stopped: 'Amber: failed reads (a permission) stopped the sync; Resume it from the Overview',
+	'deploy-failed-fallback': 'Amber: the latest deploy failed to load; the previous version still runs',
+	failing: 'Red: the warehouse refuses the location’s IP, so it can’t connect and the sync is blocked',
+	'not-checking-in': 'Red: the location stopped checking in; every action fails at once, saying why',
+	'deploy-failed': 'Red: the latest deploy failed and runs are held, with no version to fall back on',
+	several: 'Red: waffle-shop can’t connect, and other locations have problems of their own',
 	reconnecting: 'Live updates dropped and are retrying: Reconnect in the top bar',
 	offline: 'Live updates gave up: Reload in the top bar'
 };
@@ -28,7 +32,9 @@ const IP_BLOCKED = '390422 (08001): IP 203.0.113.7 is not allowed to access Snow
 const NOT_CHECKING_IN = (what: string) => `The location isn't checking in (last 6m ago), so it can't ${what}. Start it, then try again.`;
 const KINDS = ['catalog', 'node_results', 'audit_results', 'freshness', 'fingerprints', 'migrations', 'run_results', 'observations', 'statistics', 'consumption', 'resource_costs', 'microbatches', 'janitor_events', 'old_name_views'];
 
-type State = { sync: WarehouseSync; test: ConnectionTest | null; live: boolean; events: PlatformEvent[] };
+type State = { sync: WarehouseSync; test: ConnectionTest | null; live: boolean; events: PlatformEvent[]; deploy?: { fallback: boolean } };
+const PERMISSION = 'SQL access control error: insufficient privileges to operate on schema ARCHIVE';
+const LOAD_ERROR = "ImportError: cannot import name 'daily_revenue' from 'models.finance' (orchestration/jobs.py, line 8)";
 
 const iso = (ms: number) => new Date(ms).toISOString();
 
@@ -61,6 +67,19 @@ function initial(scenario: SyncScenario, now: number): State {
 		message,
 		...extra
 	});
+	const deployFailed = (fallback: boolean): State => ({
+		sync: synced(3),
+		test: tested(1),
+		live: true,
+		deploy: { fallback },
+		events: [
+			event('location_failing', fallback ? 'warning' : 'critical', `waffle-shop · prod: latest code failed to load: ${LOAD_ERROR}. ${fallback ? 'Serving generation 43.' : 'Runs are held until a deploy loads.'}`, {
+				id: 'scenario-deploy',
+				state: fallback ? 'falling_back' : 'held',
+				occurredAt: iso(now - 5 * 60_000)
+			})
+		]
+	});
 	const failing = (halted: boolean): State => ({
 		sync: {
 			...synced(26 * 60),
@@ -75,7 +94,7 @@ function initial(scenario: SyncScenario, now: number): State {
 			event('warehouse_sync_failed', halted ? 'critical' : 'warning', halted ? `Run history sync stopped after failed reads in a row: ${IP_BLOCKED}` : `Run history can't reach the warehouse: ${IP_BLOCKED}`, {
 				sync: { halted, unreachable: true, retrySeconds: halted ? null : 60, retryAt: halted ? null : iso(now + 40_000), lastSuccessAt: iso(now - 26 * 3_600_000) }
 			}),
-			event('connection_test_failed', 'warning', `The warehouse connection test failed: ${IP_BLOCKED}`, { id: 'scenario-connection-test', occurredAt: iso(now - 3 * 60_000) })
+			event('connection_test_failed', 'critical', `The warehouse connection test failed: ${IP_BLOCKED}`, { id: 'scenario-connection-test', occurredAt: iso(now - 3 * 60_000) })
 		]
 	});
 	switch (scenario) {
@@ -93,9 +112,26 @@ function initial(scenario: SyncScenario, now: number): State {
 				events: [event('warehouse_sync_stalled', 'warning', 'The run history sync stalled at 7/14 (run results): no progress for 12m. The location may have stopped; check its output, then Sync now.')]
 			};
 		case 'failing':
+		case 'several':
 			return failing(false);
-		case 'stopped':
-			return failing(true);
+		case 'stopped': {
+			const stopped = failing(true);
+			const reason = `audit_results: failed while reading: ${PERMISSION}`;
+			return {
+				...stopped,
+				sync: { ...stopped.sync, lastError: reason, failing: stopped.sync.failing && { ...stopped.sync.failing, reason: PERMISSION, unreachable: false } },
+				test: tested(2),
+				events: stopped.events
+					.filter((e) => e.kind !== 'connection_test_failed')
+					.map((e) => ({ ...e, severity: 'warning' as const, message: `Run history sync stopped after failed reads in a row: ${PERMISSION}`, sync: e.sync && { ...e.sync, unreachable: false } }))
+			};
+		}
+		case 'healthy':
+			return { sync: synced(2), test: tested(1), live: true, events: [] };
+		case 'deploy-failed-fallback':
+			return deployFailed(true);
+		case 'deploy-failed':
+			return deployFailed(false);
 		case 'not-checking-in':
 			return { sync: synced(9), test: tested(2), live: false, events: [event('location_broken', 'critical', 'shop · prod stopped checking in, so its scheduled runs aren’t starting.', { occurredAt: iso(now - 6 * 60_000) })] };
 		case 'reconnecting':
@@ -146,7 +182,24 @@ export function syncScenario(client: ApiClient, scenario: SyncScenario): ApiClie
 		announce();
 	}
 
-	const withEvents = <T extends PlatformEvent>(events: T[], record: (e: PlatformEvent) => T): T[] => [...state.events.map(record), ...events];
+	// The scenario alone decides the problems, so each tier reads on its own; `several` keeps the other locations' too.
+	const others = scenario === 'several';
+	const keep = (e: PlatformEvent) => e.locationId !== LOCATION_SHOP && (others || e.locationId === null);
+	const withEvents = <T extends PlatformEvent>(events: T[], record: (e: PlatformEvent) => T): T[] => [...state.events.map(record), ...events.filter((e) => !e.active || keep(e))];
+	/** Another location as live and connected, its own problems aside. */
+	const calmOther = (l: LocationSummary): LocationSummary => (others ? l : {
+		...l,
+		health: l.health === 'broken' || l.health === 'degraded' ? 'healthy' : l.health,
+		liveInstances: Math.max(1, l.liveInstances),
+		lastSeenAt: l.liveInstances ? l.lastSeenAt : iso(Date.now() - 20_000),
+		connectionTest: l.connectionTest?.outcome === 'failed' ? { ...l.connectionTest, outcome: 'ok', message: 'Connected' } : l.connectionTest,
+		activeProblems: 0
+	});
+	/** The failed deploy the scenario names, and whether a previous version runs instead. */
+	const deployOf = (base: Pick<LocationDetail, 'failedDeploy' | 'brokenDeployPolicy'>) =>
+		state.deploy
+			? { failedDeploy: { gitRevision: '9e1d7c2', imageId: 'sha256:77c0a1d2e4f9', attemptedAt: iso(Date.now() - 5 * 60_000), error: LOAD_ERROR }, brokenDeployPolicy: state.deploy.fallback ? ('fallback' as const) : ('queue' as const) }
+			: { failedDeploy: null, brokenDeployPolicy: base.brokenDeployPolicy };
 	const overrides: Partial<Record<keyof ApiClient, unknown>> = {
 		async getWarehouseSync(scope: Scope): Promise<WarehouseSync | null> {
 			if (!shop(scope)) return client.getWarehouseSync(scope);
@@ -189,14 +242,14 @@ export function syncScenario(client: ApiClient, scenario: SyncScenario): ApiClie
 			const detail = await client.getLocation(id);
 			if (!detail || !shop(id)) return detail;
 			const instances = state.live ? detail.instances : detail.instances.map((i) => ({ ...i, state: 'stale' as const, lastSeenAt: lastSeen() }));
-			return { ...detail, health: state.live ? detail.health : 'broken', instances, connectionTest: state.test };
+			return { ...detail, health: state.live ? (state.deploy?.fallback ? 'falling_back' : detail.health) : 'broken', instances, connectionTest: state.test, ...deployOf(detail) };
 		},
 		async listLocations(): Promise<LocationSummary[]> {
 			const locations = await client.listLocations();
 			return locations.map((l) =>
 				shop(l.id)
-					? { ...l, connectionTest: state.test, activeProblems: l.activeProblems + state.events.length, ...(state.live ? {} : { health: 'broken' as const, liveInstances: 0, lastSeenAt: lastSeen() }) }
-					: l
+					? { ...l, connectionTest: state.test, activeProblems: state.events.length, ...deployOf(l), ...(state.live ? {} : { health: 'broken' as const, liveInstances: 0, lastSeenAt: lastSeen() }) }
+					: calmOther(l)
 			);
 		},
 		async listWarehouseConnections(): Promise<WarehouseConnection[]> {
@@ -208,9 +261,17 @@ export function syncScenario(client: ApiClient, scenario: SyncScenario): ApiClie
 							...c,
 							lastTest: state.test,
 							halted: !!failing?.halted,
-							tables: failing ? c.tables.map((t) => ({ ...t, at: state.sync.lastReportedAt ?? t.at, recordsSent: 0, failure: 'Failed while reading the warehouse', error: IP_BLOCKED, lastSyncedAt: state.sync.lastSyncedAt })) : c.tables
+							tables: failing
+								? c.tables.map((t) =>
+										failing.unreachable || t.table === 'audit_results'
+											? { ...t, at: state.sync.lastReportedAt ?? t.at, recordsSent: 0, failure: 'Failed while reading the warehouse', error: failing.reason, lastSyncedAt: state.sync.lastSyncedAt }
+											: t
+									)
+								: c.tables
 						}
-					: c
+					: others
+						? c
+						: { ...c, lastTest: c.lastTest?.outcome === 'failed' ? { ...c.lastTest, outcome: 'ok' as const, message: 'Connected' } : c.lastTest, tables: c.tables.map((t) => ({ ...t, failure: null, error: null })) }
 			);
 		},
 		async listPlatformEvents(query: { activeOnly: boolean }): Promise<PlatformEvent[]> {
@@ -222,10 +283,16 @@ export function syncScenario(client: ApiClient, scenario: SyncScenario): ApiClie
 			if (query.locationId !== undefined && query.locationId !== LOCATION_SHOP) return events;
 			return withEvents(events, (e) => ({ ...e, resolvedAt: null, links: [{ kind: 'location', id: LOCATION_SHOP }], reactions: [], payload: {} }) as PlatformEventRecord);
 		},
+		async navCounts(...args: Parameters<ApiClient['navCounts']>): Promise<NavCounts> {
+			const counts = await client.navCounts(...args);
+			const open = withEvents(await client.listPlatformEvents({ activeOnly: true }), (e) => e).filter((e) => e.active && e.severity !== 'info');
+			return { ...counts, activePlatformEvents: open.length };
+		},
 		async overview(...args: Parameters<ApiClient['overview']>): Promise<Overview | null> {
 			const overview = await client.overview(...args);
 			if (!overview || !shop(args[0])) return overview;
-			return { ...overview, attention: [...state.events.map((event) => ({ kind: 'platform_event' as const, event })), ...overview.attention] };
+			const attention = overview.attention.filter((item) => item.kind !== 'platform_event' || keep(item.event));
+			return { ...overview, attention: [...state.events.map((event) => ({ kind: 'platform_event' as const, event })), ...attention] };
 		}
 	};
 	if (bus && scenario === 'reconnecting') {

@@ -12,7 +12,8 @@
 
 	// A target's per-table sync list. Problem tables always show, each with its failure under it; the
 	// tables that synced cleanly fold into one line, e.g. "13 more tables synced 4m ago".
-	let { tables }: { tables: readonly Table[] } = $props();
+	/** `blocked`: the connection check failed, so the failed tables wait on it and carry no red of their own. */
+	let { tables, blocked = false }: { tables: readonly Table[]; blocked?: boolean } = $props();
 
 	let open = $state(false);
 	const problems = $derived(bySeverity(tables.filter(isProblem)));
@@ -47,7 +48,8 @@
 				<tr class:has-detail={!!t.failure}>
 					<td><code>{t.table}</code>{#if (sameAs.get(t.table)?.length ?? 1) > 1}<span class="faint" title={sameAs.get(t.table)?.map((g) => g.table).join(', ')}>&nbsp;and {(sameAs.get(t.table)?.length ?? 1) - 1} more</span>{/if}</td>
 					<td title={formatStamp(t.at)}>
-						{#if t.waiting}<StatusLabel tone="var(--sb-warning)" label="waiting for the warehouse" />{:else if t.failure}<StatusLabel tone="var(--sb-error)" label="failed {formatAgo(t.at, app.now)}" />{:else}<StatusLabel tone="var(--sb-success)" label="synced {formatAgo(t.at, app.now)}" />{/if}
+						<!-- copy-allow: the product owner's wording for a table waiting on a failed connection check -->
+						{#if t.waiting}<StatusLabel tone="var(--sb-warning)" label="waiting for the warehouse" />{:else if t.failure && blocked}<StatusLabel tone="var(--sb-text-faint)" label="blocked: can’t connect" muted />{:else if t.failure}<StatusLabel tone="var(--sb-error)" label="failed {formatAgo(t.at, app.now)}" />{:else}<StatusLabel tone="var(--sb-success)" label="synced {formatAgo(t.at, app.now)}" />{/if}
 					</td>
 					<td class:faint={t.mirroredTotal === null}>{formatNumber(t.mirroredTotal)}</td>
 					<td>{formatNumber(t.recordsSent)}</td>

@@ -12,7 +12,7 @@
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import { hasCapability, type ConnectionTest } from '$lib/api';
 	import { formatAgo, formatStamp } from '$lib/format/time';
-	import { actionTone, errorMessage, healthTone, healthWords, targetWords, testOrigin, testWords, brokenDeployPolicyHelp, brokenDeployPolicyLabel } from '$lib/platform/labels';
+	import { actionTone, errorMessage, locationVerdict, targetWords, testOrigin, testWords, verdictTone, brokenDeployPolicyHelp, brokenDeployPolicyLabel } from '$lib/platform/labels';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import ServerStatus from './server-status.svelte';
@@ -24,7 +24,7 @@
 	let query = $state('');
 	const all = $derived(locations.data ?? []);
 	const filtered = $derived(all.filter((l) => !query.trim() || l.name.toLowerCase().includes(query.trim().toLowerCase())));
-	const unhealthy = $derived(all.filter((l) => (l.health && l.health !== 'healthy') || l.activeProblems > 0).length);
+	const unhealthy = $derived(all.filter((l) => l.health !== null && verdictOf(l).tone !== 'ok').length);
 	const opensDetail = $derived(app.client.supports('getLocation'));
 	const showsServer = $derived(app.client.supports('platformHealth'));
 	const knowsPolicy = $derived(all.some((l) => l.brokenDeployPolicy));
@@ -49,6 +49,17 @@
 			testing[id] = false;
 		}
 	}
+	/** The row's health, by the rule every page uses: its worst open fact. */
+	const verdictOf = (l: (typeof all)[number]) =>
+		locationVerdict({
+			health: l.health,
+			live: l.liveInstances > 0,
+			test: tested[l.id] ?? l.connectionTest,
+			deployedAt: l.snapshot?.publishedAt ?? null,
+			failedDeploy: !!l.failedDeploy,
+			fallback: l.brokenDeployPolicy === 'fallback' && !!l.snapshot,
+			events: app.platformEvents.filter((e) => e.locationId === l.id)
+		});
 	const tableColumns = $derived<TableColumn[]>([
 		{ id: 'location', label: 'Location', minWidth: 220 },
 		{ id: 'health', label: 'Health', width: '170px' },
@@ -89,7 +100,8 @@
 					</td>
 					<td>
 						{#if l.health}
-							<StatusLabel tone={l.failedDeploy || l.activeProblems ? healthTone[l.health === 'healthy' ? 'degraded' : l.health] : healthTone[l.health]} label={healthWords(l)} />
+							{@const verdict = verdictOf(l)}
+							<span data-testid="location-verdict"><StatusLabel tone={verdictTone[verdict.tone]} label={verdict.label} /></span>
 						{:else}
 							<span title={partialTitle}><StatusLabel tone="var(--sb-text-faint)" label="Unknown" muted /></span>
 						{/if}

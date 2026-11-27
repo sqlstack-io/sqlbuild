@@ -63,7 +63,9 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 		events.push({
 			id: `failing:${keyOf(location.location_id, location.target)}`,
 			kind: 'location_failing',
-			severity: location.state === 'degraded' ? 'warning' : 'critical',
+			// A failed connection check stops runs; on its previous version, or with a failed plan or discover function, the location still runs them.
+			severity: ['falling_back', 'change_plan_failed', 'discovery_failed'].includes(location.state) ? 'warning' : 'critical',
+			state: location.state,
 			occurredAt: location.failed_at,
 			// The failure's report time tells one failure from the next.
 			occurrence: location.failed_at,

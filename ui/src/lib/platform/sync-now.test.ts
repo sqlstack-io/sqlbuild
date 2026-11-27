@@ -65,3 +65,20 @@ describe('messageParts', () => {
 		expect(messageParts('stock_levels in inventory · development is late.')).toEqual({ summary: 'stock_levels in inventory · development is late.', error: null });
 	});
 });
+
+describe('locationVerdict', () => {
+	it('names the worst open fact: red when runs stop, amber when it needs a look, Healthy only when nothing is open', async () => {
+		const { locationVerdict } = await import('./labels');
+		const ok = { outcome: 'ok' as const, at: '2026-11-27T03:00:00Z', durationMs: 800, trigger: 'manual' as const, by: null, message: 'Connected' };
+		const base = { health: 'healthy' as const, live: true, test: ok, deployedAt: '2026-11-27T02:00:00Z', failedDeploy: false, fallback: false, events: [] };
+		const event = (kind: 'warehouse_sync_failed' | 'tick_overdue' | 'location_broken', severity: 'warning' | 'critical' = 'warning') => ({ kind, severity, locationId: 'l1', active: true });
+		expect(locationVerdict(base)).toEqual({ tone: 'ok', label: 'Healthy' });
+		expect(locationVerdict({ ...base, events: [event('tick_overdue')] })).toEqual({ tone: 'warning', label: 'Schedule overdue' });
+		expect(locationVerdict({ ...base, events: [event('tick_overdue'), event('warehouse_sync_failed')] })).toEqual({ tone: 'warning', label: 'Sync failing' });
+		expect(locationVerdict({ ...base, test: { ...ok, outcome: 'failed' }, events: [event('warehouse_sync_failed')] })).toEqual({ tone: 'failed', label: 'Can’t connect' });
+		expect(locationVerdict({ ...base, live: false })).toEqual({ tone: 'failed', label: 'Not checking in' });
+		expect(locationVerdict({ ...base, failedDeploy: true, fallback: true })).toEqual({ tone: 'warning', label: 'Deploy failed · running previous' });
+		expect(locationVerdict({ ...base, failedDeploy: true, fallback: false })).toEqual({ tone: 'failed', label: 'Deploy failed' });
+		expect(locationVerdict({ ...base, test: null })).toEqual({ tone: 'warning', label: 'Not tested' });
+	});
+});

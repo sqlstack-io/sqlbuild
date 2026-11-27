@@ -3,38 +3,45 @@
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import OctagonAlertIcon from '@lucide/svelte/icons/octagon-alert';
 	import type { PlatformEvent } from '$lib/api';
-	import { formatAgo } from '$lib/format/time';
-	import { eventKindLabel, messageParts, problemHref } from '$lib/platform/labels';
+	import { eventKindLabel, messageParts, problemHref, problemPhrase, stopsRuns } from '$lib/platform/labels';
 	import { app } from '$lib/state/app.svelte';
 	import { plural } from '$lib/format/plural';
 
 	let { only = () => true }: { only?: (event: PlatformEvent) => boolean } = $props();
 
-	const rank = (e: PlatformEvent) => (e.severity === 'critical' ? 2 : e.severity === 'warning' ? 1 : 0);
-	// Only what concerns the whole server, such as a stopped scheduler: a location's problems are counted
-	// beside its name in the top bar and listed in full on its page and the Overview.
+	// Every open problem, the location's and the server's, on one line: the worst leads with its
+	// location, the rest is a count. Red when one stops runs, amber otherwise; never the error itself.
+	const rank = (e: PlatformEvent) => (stopsRuns(e) ? 3 : e.severity === 'critical' ? 2 : e.severity === 'warning' ? 1 : 0);
 	const events = $derived(
-		app.platformEvents.filter((e) => e.active && e.severity !== 'info' && e.locationId === null && only(e)).sort((a, b) => rank(b) - rank(a))
+		app.platformEvents
+			.filter((e) => e.active && e.severity !== 'info' && only(e))
+			.sort((a, b) => rank(b) - rank(a) || a.occurredAt.localeCompare(b.occurredAt))
 	);
-	const critical = $derived(events.some((e) => e.severity === 'critical'));
-	const first = $derived(events[0] ?? null);
-	const href = $derived(app.client.supports('platformHealth') ? problemHref({ locationId: null }) : '/locations');
+	const red = $derived(events.some((e) => stopsRuns(e) || (e.locationId === null && e.severity === 'critical')));
+	const places = $derived(new Set(events.flatMap((e) => (e.locationId ? [e.locationId] : []))));
+	const lead = $derived(events[0] ?? null);
+	const nameOf = (e: PlatformEvent) => app.bootstrap?.locations.find((l) => l.id === e.locationId)?.name ?? e.subject ?? 'A location';
+	const line = $derived.by(() => {
+		if (!lead) return null;
+		const server = events.filter((e) => e.locationId === null).length;
+		if (places.size > 1) {
+			return { text: `${places.size} locations have problems${server ? ` · ${plural(server, 'server problem')}` : ''}`, href: '/locations' };
+		}
+		const what = lead.locationId ? `${nameOf(lead)}${problemPhrase(lead)}` : eventKindLabel[lead.kind];
+		const rest = events.length - 1;
+		const href = lead.locationId && !app.client.supports('getLocation') ? '/locations' : problemHref(lead);
+		return { text: `${what}${rest ? ` · ${plural(rest, 'more problem')}` : ''}`, href };
+	});
 </script>
 
-{#if first}
-	<div class="banner" class:critical role="status" aria-live="polite" data-testid="platform-banner">
+{#if line}
+	<div class="banner" class:critical={red} role="status" aria-live="polite" data-testid="platform-banner">
 		<span class="icon">
-			{#if critical}<OctagonAlertIcon size={14} />{:else}<TriangleAlertIcon size={14} />{/if}
+			{#if red}<OctagonAlertIcon size={14} />{:else}<TriangleAlertIcon size={14} />{/if}
 		</span>
-		{#if events.length === 1}
-			<strong>{eventKindLabel[first.kind]}</strong>
-			<span>{messageParts(first.message).summary}</span>
-			<small>{formatAgo(first.occurredAt, app.now)}</small>
-		{:else}
-			<strong>{plural(events.length, 'server problem')}</strong>
-			<span>{events.map((e) => eventKindLabel[e.kind]).join(', ')}</span>
-		{/if}
-		<a href={to(href)}>View server status →</a>
+		<strong title={lead ? messageParts(lead.message).summary : undefined}>{line.text}</strong>
+		<span class="sep">·</span>
+		<a href={to(line.href)}>View</a>
 	</div>
 {/if}
 
@@ -60,23 +67,16 @@
 		color: var(--tone);
 	}
 	strong {
-		font-weight: 600;
-		white-space: nowrap;
-	}
-	span {
 		min-width: 0;
 		overflow: hidden;
-		color: var(--muted-foreground);
+		font-weight: 600;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
-	small {
+	.sep {
 		color: var(--sb-text-faint);
-		font-size: 11.5px;
-		white-space: nowrap;
 	}
 	a {
-		margin-left: auto;
 		color: var(--primary);
 		font-weight: 500;
 		line-height: 20px;
