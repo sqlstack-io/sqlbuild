@@ -932,6 +932,13 @@ Details:
   location is not one you can view, it prints `Warehouse sync skipped:` and the reason.
 - Requests that arrive while a sync is running, from builds, **Sync now**, ended runs or the
   interval, add one more sync after it, not one each.
+- A location that isn't checking in can't take a request, so the server refuses **Sync now**,
+  `sqb control sync`, a connection test and a republish at once with HTTP 409 and the reason, such
+  as `The location isn't checking in (last check-in 6m ago), so it can't sync. Start it, then try
+  again.` Nothing is queued.
+- While a request waits, the location's page shows who asked and when. A running sync that reports
+  no progress for 10 minutes is listed under Problems as **Sync stalled**, which needs a look but
+  doesn't stop runs, until it moves again, completes or fails.
 - The interval restarts after every completed sync, so a location that syncs often for other
   reasons never syncs extra.
 - A sync reads the warehouse and writes only to the dynamic pause table: on Snowflake, after it

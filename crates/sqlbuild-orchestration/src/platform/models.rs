@@ -217,8 +217,153 @@ pub struct LocationHealthObservation {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PersonLocationHealth {
     pub state: LocationState,
+    /// The target's health as every page shows it: its worst open fact, and whether it stops runs.
+    pub verdict: LocationVerdict,
+    /// The run-history sync now: a request waiting for the location, the sync running, and whether it stalled.
+    pub warehouse_sync: WarehouseSyncState,
     /// Newest first, with this server's pool-cap warning on the current snapshot.
     pub observations: Vec<LocationHealthObservation>,
+}
+
+/// How serious a location's open problem is: whether its runs can happen at all.
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum ProblemTier {
+    /// Runs can't happen: the location isn't checking in, can't connect, or has no version to run.
+    StopsRuns,
+    /// It works, but needs a look.
+    NeedsAttention,
+}
+
+/// A location target's worst open fact, which its health names wherever it is shown.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum LocationFact {
+    NotCheckingIn,
+    /// The warehouse connection check after its last load failed.
+    CantConnect,
+    /// The latest deploy failed to load and no earlier version is published to run instead.
+    DeployFailed,
+    /// The latest deploy failed to load, so runs use the version before it.
+    DeployFailedOnPrevious,
+    SyncFailing,
+    /// A running sync reported no progress for `SYNC_STALL_SECONDS`.
+    SyncStalled,
+    MissingSecrets,
+    ChangePlanFailed,
+    DiscoveryFailed,
+    Starting,
+    /// No connection check since the version it runs was published.
+    NotTested,
+    Healthy,
+}
+
+impl LocationFact {
+    /// Red when runs can't happen, amber otherwise; none when nothing is open.
+    #[must_use]
+    pub const fn tier(self) -> Option<ProblemTier> {
+        match self {
+            Self::NotCheckingIn | Self::CantConnect | Self::DeployFailed => {
+                Some(ProblemTier::StopsRuns)
+            }
+            Self::Healthy => None,
+            _ => Some(ProblemTier::NeedsAttention),
+        }
+    }
+
+    /// The fact a target's state is; `published` tells a failed deploy that still runs a version from one with none to run.
+    #[must_use]
+    pub const fn of_state(state: LocationState, published: bool) -> Self {
+        match state {
+            LocationState::Broken => Self::NotCheckingIn,
+            LocationState::Degraded => Self::CantConnect,
+            LocationState::FallingBack if published => Self::DeployFailedOnPrevious,
+            LocationState::FallingBack => Self::DeployFailed,
+            LocationState::MissingSecrets => Self::MissingSecrets,
+            LocationState::ChangePlanFailed => Self::ChangePlanFailed,
+            LocationState::DiscoveryFailed => Self::DiscoveryFailed,
+            LocationState::Starting => Self::Starting,
+            LocationState::Healthy => Self::Healthy,
+        }
+    }
+}
+
+/// A target's health verdict: its worst open fact and its tier, none when nothing is open.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct LocationVerdict {
+    pub fact: LocationFact,
+    pub tier: Option<ProblemTier>,
+}
+
+impl LocationVerdict {
+    /// The worst of the target's facts: what stops runs, a previous version, the sync, the state, then an untested connection.
+    #[must_use]
+    pub fn of(
+        (state, published_at): (LocationState, Option<DateTime<Utc>>),
+        sync: &WarehouseSyncState,
+        tested_at: Option<DateTime<Utc>>,
+    ) -> Self {
+        let from_state = LocationFact::of_state(state, published_at.is_some());
+        let stalled = sync.running.as_ref().is_some_and(|running| running.stalled);
+        let fact = match from_state {
+            LocationFact::NotCheckingIn
+            | LocationFact::CantConnect
+            | LocationFact::DeployFailed
+            | LocationFact::DeployFailedOnPrevious => from_state,
+            _ if sync.failing => LocationFact::SyncFailing,
+            _ if stalled => LocationFact::SyncStalled,
+            LocationFact::Healthy
+                if tested_at.is_none_or(|tested| published_at.is_some_and(|at| tested < at)) =>
+            {
+                LocationFact::NotTested
+            }
+            other => other,
+        };
+        Self {
+            fact,
+            tier: fact.tier(),
+        }
+    }
+}
+
+/// A target's run-history sync now, as people read it.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct WarehouseSyncState {
+    /// A sync someone asked for that the location hasn't started, while the request lasts.
+    pub requested: Option<SyncRequest>,
+    /// The sync running now, from its newest report; absent when none is.
+    pub running: Option<RunningSync>,
+    /// The newest report is a failure.
+    pub failing: bool,
+}
+
+/// When a target last reported a connection check, as the health read finds it.
+#[derive(Debug, Deserialize)]
+pub(crate) struct TestedAt {
+    pub(crate) tested_at: Option<DateTime<Utc>>,
+}
+
+/// Who asked for a sync, and when.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct SyncRequest {
+    pub requested_at: DateTime<Utc>,
+    pub requested_by: String,
+}
+
+/// The sync running now: when it started, when it last moved forward, and how far it has got.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RunningSync {
+    pub started_at: DateTime<Utc>,
+    /// The newest report, each of which moves the sync forward by a page.
+    pub progressed_at: DateTime<Utc>,
+    pub position: u64,
+    pub kinds: u64,
+    pub rows: u64,
+    pub table: WarehouseHistoryKind,
+    /// No progress for `SYNC_STALL_SECONDS`: a problem until it moves again, completes or fails.
+    pub stalled: bool,
 }
 
 /// One target's state from its newest health observations, as the web UI shows it.
@@ -691,6 +836,12 @@ pub(crate) struct WatchdogTrigger {
     pub(crate) next_due_at: Option<DateTime<Utc>>,
 }
 
+/// A target's newest check-in across its instances; absent before its first.
+#[derive(Debug, Deserialize)]
+pub(crate) struct LastCheckIn {
+    pub(crate) last_seen_at: Option<DateTime<Utc>>,
+}
+
 #[derive(Debug, Deserialize)]
 pub(crate) struct WatchdogLocation {
     pub(crate) location_id: Uuid,
@@ -800,6 +951,9 @@ pub struct PlatformProblems {
     /// Checking-in locations whose run-history sync is failing, until a sync report succeeds.
     #[serde(default)]
     pub failing_syncs: Vec<FailingSync>,
+    /// Checking-in locations whose run-history sync reported no progress for ten minutes, until it moves, completes or fails.
+    #[serde(default)]
+    pub stalled_syncs: Vec<StalledSync>,
     /// Lifecycle event sinks whose newest run lost events, until a run delivers all of its events.
     #[serde(default)]
     pub failing_sinks: Vec<FailingSink>,
@@ -935,6 +1089,8 @@ pub struct BrokenLocation {
     pub location_name: String,
     pub target: String,
     pub last_seen_at: DateTime<Utc>,
+    /// Always `stops_runs`, by `LocationFact::tier`.
+    pub tier: ProblemTier,
 }
 
 /// A checking-in location whose latest load, plan of what changed, discovery or connection check failed, and what it serves instead.
@@ -951,6 +1107,8 @@ pub struct FailingLocation {
     pub error: Option<String>,
     /// The snapshot the target serves; absent before its first publication.
     pub serving: Option<SnapshotRecord>,
+    /// Whether the failure stops runs, by `LocationFact::tier` of `state`.
+    pub tier: ProblemTier,
 }
 
 /// Every checking-in location's failing load, plan, discovery or connection check, and failing run-history sync.
@@ -958,6 +1116,22 @@ pub struct FailingLocation {
 pub(crate) struct LocationFailures {
     pub(crate) locations: Vec<FailingLocation>,
     pub(crate) syncs: Vec<FailingSync>,
+    pub(crate) stalled: Vec<StalledSync>,
+}
+
+/// A checking-in location whose run-history sync reported no progress for `SYNC_STALL_SECONDS`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct StalledSync {
+    pub location_id: Uuid,
+    pub location_name: String,
+    pub target: String,
+    /// The last progress report.
+    pub progressed_at: DateTime<Utc>,
+    pub position: u64,
+    pub kinds: u64,
+    pub table: WarehouseHistoryKind,
+    /// Always `needs_attention`, by `LocationFact::tier`.
+    pub tier: ProblemTier,
 }
 
 /// A checking-in location whose run-history sync is failing: since when, why, and when it tries again.
@@ -979,6 +1153,8 @@ pub struct FailingSync {
     pub retry_seconds: Option<u64>,
     /// The newest report of a sync that worked.
     pub last_success_at: Option<DateTime<Utc>>,
+    /// Always `needs_attention`, by `LocationFact::tier`.
+    pub tier: ProblemTier,
 }
 
 /// An event webhook this server can't deliver to: since when, and why; its events stay queued.
@@ -1102,6 +1278,7 @@ pub(crate) struct ProblemScan {
     pub(crate) broken: Vec<BrokenLocation>,
     pub(crate) failing: Vec<FailingLocation>,
     pub(crate) failing_syncs: Vec<FailingSync>,
+    pub(crate) stalled_syncs: Vec<StalledSync>,
     pub(crate) failing_sinks: Vec<FailingSink>,
     pub(crate) late_targets: std::collections::BTreeSet<(Uuid, String)>,
     pub(crate) low_calendars: Vec<LowCalendar>,

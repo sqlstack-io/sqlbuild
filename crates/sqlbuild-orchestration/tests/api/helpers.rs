@@ -239,3 +239,19 @@ pub(crate) fn sync_report(
         },
     }
 }
+
+/// `target` of `location_id` checks in now, as a running location does, so work may be asked of it.
+pub(crate) async fn check_in(store: &ControlStore, location_id: Uuid, target: &str) {
+    crate::platform::main::health::report_location_health::report_location_health(
+        store,
+        location_id,
+        &crate::platform::models::LocationHealthReport {
+            event_id: Uuid::now_v7(),
+            session_id: Uuid::now_v7(),
+            target: target.to_owned(),
+            health: crate::platform::models::LocationHealth::Heartbeat {},
+        },
+    )
+    .await
+    .expect("check in");
+}

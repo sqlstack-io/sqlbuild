@@ -22,6 +22,9 @@ pub enum ControlError {
     },
     #[error("control-store schema is unsupported: {0}")]
     Schema(String),
+    /// The location isn't checking in, so work asked of it would wait for nothing; the message says since when.
+    #[error("{0}")]
+    NotCheckingIn(String),
     #[error("snapshot generation is not newer than the current generation")]
     StaleGeneration,
     #[error("scheduler lease expired or was fenced by another holder")]

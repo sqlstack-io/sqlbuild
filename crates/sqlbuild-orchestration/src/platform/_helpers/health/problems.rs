@@ -34,8 +34,8 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
     .await?;
     let (transaction, locations) = query(
         transaction,
-        "SELECT i.location_id, l.name AS location_name, i.target, MAX(i.last_seen_at) AS last_seen_at \
-         FROM sqb_location_instances i JOIN sqb_locations l ON l.location_id=i.location_id \
+        "SELECT i.location_id, l.name AS location_name, i.target, MAX(i.last_seen_at) AS last_seen_at, \
+         'stops_runs' AS tier FROM sqb_location_instances i JOIN sqb_locations l ON l.location_id=i.location_id \
          WHERE l.archived_at IS NULL GROUP BY i.location_id,l.name,i.target \
          HAVING MAX(i.last_seen_at)<$1 ORDER BY i.location_id,i.target",
         vec![Parameter::Time(now - TimeDelta::seconds(LOCATION_SILENCE_SECONDS))],
@@ -99,6 +99,7 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
             .collect::<Result<_, _>>()?,
         failing: failing.locations,
         failing_syncs: failing.syncs,
+        stalled_syncs: failing.stalled,
         failing_sinks: failing_sinks(&sinks),
         late_targets: late_targets
             .into_iter()
