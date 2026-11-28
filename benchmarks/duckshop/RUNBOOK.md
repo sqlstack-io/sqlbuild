@@ -197,26 +197,29 @@ every token being distinct.
 `int_edge_delivery_status` merges a shipment delivery change log incrementally, and the
 `edge_delivery_status_matches_rebuild` audit fails if it differs from a rebuild from the whole log.
 `int_edge_delivery_status_replaced` copies it with a keyed cursor `delete_insert`, and its `unique`
-audit fails if a shipment's earlier row survives. To exercise both across loads, start without the
+audit fails if a shipment's earlier row survives. To exercise them across loads, start without the
 tables, load the first load only, build, then load everything and build again:
 
 ```bash
 sqb query --target edge "DROP TABLE IF EXISTS <database>.<schema>.int_edge_delivery_status"
 sqb query --target edge "DROP TABLE IF EXISTS <database>.<schema>.int_edge_delivery_status_replaced"
+sqb query --target edge "DROP TABLE IF EXISTS <database>.<schema>.snap_edge_delivery_status_dates"
 sqb load --target edge --select edge__delivery_updates --vars '{"edge_delivery_batch": "1"}'
 sqb build --target edge --no-load \
   --select int_edge_delivery_update_versions int_edge_delivery_status int_edge_delivery_status_rebuilt \
-  int_edge_delivery_status_replaced
+  int_edge_delivery_status_replaced snap_edge_delivery_status_dates
 sqb load --target edge --select edge__delivery_updates
 sqb build --target edge --no-load \
   --select int_edge_delivery_update_versions int_edge_delivery_status int_edge_delivery_status_rebuilt \
-  int_edge_delivery_status_replaced
+  int_edge_delivery_status_replaced snap_edge_delivery_status_dates
 ```
 
 The second build plans `int_edge_delivery_status` as a `merge` over the second load, which carries
 a late older version, a redelivered version, a delete and a new shipment, and the audit passes.
 It plans `int_edge_delivery_status_replaced` as a `delete_insert` that replaces each recomputed
 shipment by key, and its audits pass.
+`snap_edge_delivery_status_dates` closes each changed shipment's first version on the second
+load's day; its validity columns stay `DATE`, the type of its `updated_at`.
 Load with `sqb load` and build with `--no-load`, so that each build reads exactly the load you
 chose.
 

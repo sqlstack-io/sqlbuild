@@ -16,6 +16,8 @@ SQLBuild adds two generated columns to the target table:
 
 A point-in-time query uses the interval `valid_from <= point_in_time < valid_to`.
 
+A current-state timestamp snapshot gives both columns the type of its `updated_at` column, such as `DATE` or `TIMESTAMP WITH TIME ZONE`. A check snapshot stamps both with the run time as a plain timestamp.
+
 ## Change detection strategies
 
 ### Timestamp strategy
@@ -171,7 +173,7 @@ When enabled, active target rows whose keys are missing from the source are clos
 
 Hard deletes are not allowed with `historical_input changes` because change-record batches are not complete source snapshots - a missing key just means no change, not deletion.
 
-Reappearing keys create a new active version.
+A key that reappears gets a new active version. With the timestamp strategy on current-state input, the version starts at its `updated_at` when that is later than the time its previous version was closed, and at the execution time otherwise, so a key's versions never overlap.
 
 ## Configuration reference
 

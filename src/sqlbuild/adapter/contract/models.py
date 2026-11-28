@@ -303,6 +303,8 @@ class SnapshotSqlDialect:
     latest_version: SnapshotLatestVersionStyle
     historical_close: HistoricalSnapshotCloseStyle
     historical_insert: HistoricalSnapshotInsertStyle
+    # Whether CREATE TABLE AS keeps a column-typed NULL's type; SQLite drops it.
+    null_keeps_column_type: bool = True
 
 
 @dataclass(frozen=True)

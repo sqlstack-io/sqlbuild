@@ -52,7 +52,7 @@ _PORTABLE_APPLY_EXCLUSIONS: tuple[str, ...] = ("QUALIFY", "UNION DISTINCT", "NOT
             expected_create_initial_fragments=(
                 "CREATE OR REPLACE TABLE target_table AS SELECT *",
                 "updated_at AS valid_from",
-                "CAST(NULL AS TIMESTAMP) AS valid_to",
+                "CASE WHEN 1 = 0 THEN updated_at END AS valid_to",
             ),
             expected_timestamp_hard_delete_fragments=(
                 "UPDATE target_table AS __target SET effective_to = __source.updated_at",
@@ -90,7 +90,7 @@ _PORTABLE_APPLY_EXCLUSIONS: tuple[str, ...] = ("QUALIFY", "UNION DISTINCT", "NOT
             expected_create_initial_fragments=(
                 "CREATE OR REPLACE TABLE `target_table` AS SELECT *",
                 "updated_at AS valid_from",
-                "CAST(NULL AS TIMESTAMP) AS valid_to",
+                "CASE WHEN 1 = 0 THEN updated_at END AS valid_to",
             ),
             expected_timestamp_hard_delete_fragments=(
                 "UPDATE target_table AS __target SET effective_to = __source.updated_at",
@@ -128,7 +128,7 @@ _PORTABLE_APPLY_EXCLUSIONS: tuple[str, ...] = ("QUALIFY", "UNION DISTINCT", "NOT
             expected_create_initial_fragments=(
                 "CREATE OR REPLACE TRANSIENT TABLE target_table AS SELECT *",
                 "updated_at AS valid_from",
-                "CAST(NULL AS TIMESTAMP) AS valid_to",
+                "CASE WHEN 1 = 0 THEN updated_at END AS valid_to",
             ),
             expected_timestamp_hard_delete_fragments=(
                 "UPDATE target_table AS __target SET effective_to = __source.updated_at",
@@ -166,7 +166,7 @@ _PORTABLE_APPLY_EXCLUSIONS: tuple[str, ...] = ("QUALIFY", "UNION DISTINCT", "NOT
             expected_create_initial_fragments=(
                 "CREATE OR REPLACE TABLE target_table AS SELECT *",
                 "updated_at AS valid_from",
-                "CAST(NULL AS TIMESTAMP) AS valid_to",
+                "CASE WHEN 1 = 0 THEN updated_at END AS valid_to",
             ),
             expected_timestamp_hard_delete_fragments=(
                 "MERGE INTO target_table AS __target USING source_table AS __source",
@@ -204,7 +204,7 @@ _PORTABLE_APPLY_EXCLUSIONS: tuple[str, ...] = ("QUALIFY", "UNION DISTINCT", "NOT
             expected_create_initial_fragments=(
                 "SELECT * INTO target_table FROM (SELECT *",
                 "updated_at AS valid_from",
-                "CAST(NULL AS DATETIME2) AS valid_to",
+                "CASE WHEN 1 = 0 THEN updated_at END AS valid_to",
             ),
             expected_timestamp_hard_delete_fragments=(
                 "UPDATE __target SET effective_to = __source.updated_at",

@@ -1807,3 +1807,13 @@ class LiveLogBuildTestCase:
     description: str
     expected_live_line: str
     expected_later_line: str
+
+
+@dataclass(frozen=True)
+class SnapshotValidityTypeTestCase:
+    """A snapshot's strategy and updated_at type, and the types its validity columns must take."""
+
+    description: str
+    strategy_config: str
+    updated_at_type: str
+    expected_validity_types: tuple[str, str]

@@ -58,18 +58,32 @@ class SnapshotSql:
     ) -> str:
         """Render the initial-build query for a current-state snapshot."""
 
+        typed_by_updated_at: bool = (
+            snapshot_strategy == SnapshotStrategy.TIMESTAMP and updated_at_column is not None
+        )
         valid_from_expr: str = self.initial_valid_from_expr(
             snapshot_strategy=snapshot_strategy,
             updated_at_column=updated_at_column,
             observed_at_column=observed_at_column,
             initial_valid_from=initial_valid_from,
             source_alias=None,
-            current_timestamp=current_timestamp,
+            current_timestamp=current_timestamp
+            if typed_by_updated_at
+            else self.run_timestamp(current_timestamp),
         )
+        valid_to_expr: str = f"CAST(NULL AS {self.dialect.timestamp_type})"
+        if typed_by_updated_at and self.dialect.null_keeps_column_type:
+            # A timestamp snapshot's validity columns take updated_at's type, such as DATE.
+            valid_to_expr = f"CASE WHEN 1 = 0 THEN {updated_at_column} END"
         return (
             f"SELECT *, {valid_from_expr} AS {valid_from_column}, "
-            f"CAST(NULL AS {self.dialect.timestamp_type}) AS {valid_to_column} FROM {origin}"
+            f"{valid_to_expr} AS {valid_to_column} FROM {origin}"
         )
+
+    def run_timestamp(self, current_timestamp: str) -> str:
+        """The run's time as the dialect's plain timestamp type, as a check snapshot stamps it."""
+
+        return f"CAST({current_timestamp} AS {self.dialect.timestamp_type})"
 
     def timestamp_changes_sql(
         self,
@@ -108,8 +122,12 @@ class SnapshotSql:
             history_condition: str = self.key_condition(
                 left_alias="__history", right_alias="__source", unique_key=target.unique_key
             )
+            # A returning key opens at updated_at only after its close, so versions never overlap.
             version_valid_from_expr = (
                 f"CASE WHEN __active.{first_key} IS NULL AND __history.__closed_at IS NOT NULL "
+                f"AND __source.{updated_at_column} > __history.__closed_at "
+                f"THEN __source.{updated_at_column} "
+                f"WHEN __active.{first_key} IS NULL AND __history.__closed_at IS NOT NULL "
                 f"THEN {current_timestamp} "
                 f"WHEN __active.{first_key} IS NULL THEN {initial_valid_from_expr} "
                 f"ELSE __source.{updated_at_column} END"
@@ -157,6 +175,7 @@ class SnapshotSql:
     ) -> tuple[str, ...]:
         """Render the incremental statements for a current-state check snapshot."""
 
+        current_timestamp = self.run_timestamp(current_timestamp)
         initial_valid_from_expr: str = self.initial_valid_from_expr(
             snapshot_strategy="check",
             updated_at_column=updated_at_column,

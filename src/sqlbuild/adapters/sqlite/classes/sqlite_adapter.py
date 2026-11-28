@@ -193,6 +193,7 @@ class SqliteAdapter(
         latest_version=SnapshotLatestVersionStyle.DERIVED_TABLE,
         historical_close=HistoricalSnapshotCloseStyle.CORRELATED,
         historical_insert=HistoricalSnapshotInsertStyle.WITH_INSERT,
+        null_keeps_column_type=False,
     )
 
     def __init__(self) -> None:
