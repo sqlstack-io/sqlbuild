@@ -87,7 +87,8 @@
 				// A row spanning columns, such as an opened statement's SQL, styles itself.
 				if (tr.classList.contains('load-row') || tr.classList.contains('spacer') || [...tr.cells].some((td) => td.colSpan > 1)) continue;
 				[...tr.cells].forEach((td, i) => {
-					for (const c of cellClasses(columns[i])) td.classList.add(c);
+					// Adding a class a cell already has still writes the attribute, so skip it.
+					for (const c of cellClasses(columns[i])) if (!td.classList.contains(c)) td.classList.add(c);
 				});
 			}
 		};

@@ -365,15 +365,16 @@ const BUDGETS: Record<string, Budget> = {
 	'Lineage overview wheel zoom': { layouts: 3, styles: 54, mutations: 59, nodes: 3400, drawn: 16, reads: 0 },
 	// 40 transform writes, 2 card classes and the settle. Measured layouts 0, styles 43–46, mutations 44.
 	'Lineage overview drag-pan': { layouts: 2, styles: 51, mutations: 46, nodes: 3400, drawn: 16, reads: 0 },
-	// One listChecks read (filter counts come from it), 20 rows drawn: 72 row insertions and 200 cell
-	// class writes, the rest the navigation. Measured layouts 2–4, styles 15–22, mutations 350 at 1× and
-	// 377 at 6×, 3,327–3,545 nodes (as garbage collection finds them).
-	'Checks second visit': { layouts: 7, styles: 31, mutations: 410, nodes: 3800, drawn: 24, reads: 1 },
+	// One listChecks read (filter counts come from it), 20 rows drawn: 72 row insertions and each new
+	// cell's classes written once, the rest the navigation. Measured layouts 2–4, styles 12–22, mutations
+	// 238–256, 3,327–3,740 nodes (as garbage collection finds them).
+	'Checks second visit': { layouts: 7, styles: 31, mutations: 276, nodes: 3800, drawn: 24, reads: 1 },
 	// 40 wheel steps of 400 px: the window keeps 29 rows (the view and 8 either side); each step swaps
-	// rows in and out (1,822 insertions and removals), rewrites the recycled cells' classes (11,500) and
-	// the two spacers' heights (78), with one layout per step. Measured layouts 40–41, styles 81,
-	// mutations 13,400–13,414, 4,083–4,301 nodes.
-	'Checks list scroll': { layouts: 44, styles: 83, mutations: 13430, nodes: 4600, drawn: 32, reads: 0 },
+	// rows in and out (1,822 insertions and removals), gives only the new rows' cells their classes and
+	// sets the two spacers' heights (78), with one layout per step. Rewriting every drawn cell's classes
+	// on each step costs about 8,700 more. Measured layouts 40–41, styles 81, mutations 4,672–4,683,
+	// 4,083–4,491 nodes.
+	'Checks list scroll': { layouts: 44, styles: 83, mutations: 4685, nodes: 4600, drawn: 32, reads: 0 },
 	// Each section switch replaces the 50 rows it shows (100 row insertions and removals) and reads its
 	// first page once; Changed came with the page, so it reads nothing. Measured the same in every run:
 	// layouts 2/2/1, styles 5/6/5, mutations 115/115/111.
@@ -385,21 +386,19 @@ const BUDGETS: Record<string, Budget> = {
 	// The 10,000-node project (`?huge`), measured the same way: DOM changes, nodes, rows and reads the
 	// same in every run but one (141 against 140 DOM changes going back to the Overview at 6×). The folder
 	// tree windows its rows like any long list; drawing every folder or node instead adds thousands of rows.
-	// Opening the folder view reads the selection vocabulary once and draws 40 rows: 320 cell class writes,
-	// 40 rows' label and wrap classes, the rest the tab switch. Measured layouts 3, styles 12–17.
-	'10K open the folder view': { layouts: 5, styles: 24, mutations: 456, nodes: 7300, drawn: 44, reads: 1 },
+	// Opening the folder view reads the selection vocabulary once and draws 40 rows: their cells' classes,
+	// 40 rows' label and wrap classes, the rest the tab switch. Measured layouts 3, styles 12–19, mutations 274.
+	'10K open the folder view': { layouts: 5, styles: 24, mutations: 276, nodes: 7300, drawn: 44, reads: 1 },
 	// Expand all swaps the window's rows for the expanded tree's (316 row insertions and removals) and
-	// rewrites their cells' classes. Measured layouts 1, styles 11–16, mutations 590 since the selection
-	// bar became one row and the tree's window one row taller.
-	'10K expand all': { layouts: 3, styles: 23, mutations: 592, nodes: 5700, drawn: 28, reads: 0 },
-	// Opening one folder inserts its 20 subfolder rows and rewrites the window's cell classes (440).
-	// Measured layouts 1–2, styles 9–15.
-	'10K open one folder': { layouts: 5, styles: 23, mutations: 469, nodes: 7500, drawn: 48, reads: 0 },
+	// gives the new rows' cells their classes. Measured layouts 1, styles 10–16, mutations 583.
+	'10K expand all': { layouts: 3, styles: 23, mutations: 585, nodes: 5700, drawn: 28, reads: 0 },
+	// Opening one folder inserts its 20 subfolder rows and gives their cells their classes; the rows already
+	// drawn keep theirs. Measured layouts 1–2, styles 9–15, mutations 51.
+	'10K open one folder': { layouts: 5, styles: 23, mutations: 53, nodes: 7500, drawn: 48, reads: 0 },
 	// 20 wheel steps of 400 px over the expanded tree: like the Checks list, each step swaps rows in and out
-	// of the window (2,142) and rewrites the recycled cells' classes (6,579), one layout per step.
-	// Measured layouts 20, styles 45–53, mutations 9,000 (8,800 before the selection bar became one row
-	// and the window one row taller).
-	'10K opened tree scroll': { layouts: 22, styles: 63, mutations: 9002, nodes: 5700, drawn: 28, reads: 0 },
+	// of the window (2,142) and gives only the new rows' cells their classes, one layout per step.
+	// Measured layouts 20, styles 45–54, mutations 4,284.
+	'10K opened tree scroll': { layouts: 22, styles: 63, mutations: 4286, nodes: 5700, drawn: 28, reads: 0 },
 	// Reads the Overview, its timeline and the cost summary once each, and draws the attention card's 9
 	// items and the timeline. Measured layouts 3–4, styles 22–31, mutations 140–141.
 	'10K back to the Overview': { layouts: 7, styles: 42, mutations: 143, nodes: 4600, drawn: 12, reads: 3 },
