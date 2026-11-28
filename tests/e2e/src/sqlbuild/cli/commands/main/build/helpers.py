@@ -8,6 +8,7 @@ import subprocess
 import threading
 import time
 from contextlib import closing
+from datetime import date, timedelta
 from itertools import takewhile
 from pathlib import Path
 from textwrap import dedent
@@ -1866,3 +1867,22 @@ def build_until_line(project_dir: Path, release: Path, line: str) -> BlockedAsse
         output="".join(before) + after,
         returncode=returncode,
     )
+
+
+def rolling_window_seed(today: date, value: int) -> str:
+    """One event a day from a week ago through tomorrow, each holding `value`."""
+
+    days: str = "".join(
+        f"{today - timedelta(days=offset)},{value}\n" for offset in range(7, -2, -1)
+    )
+    return "event_date,value\n" + days
+
+
+def rolling_window_rows(project_dir: Path, today: date) -> dict[int, int]:
+    """The rolling-window model's value per event day, keyed by days before today."""
+
+    rows: list[tuple[Any, ...]] = query_duckdb(
+        db_path=project_dir / "events.duckdb",
+        sql="SELECT event_date, value FROM main.daily_events ORDER BY event_date",
+    )
+    return {(today - row[0]).days: row[1] for row in rows}

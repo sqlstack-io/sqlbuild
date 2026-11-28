@@ -415,22 +415,22 @@ note = "Renders the selected dbt profile output with Jinja, env_var and var as d
 [[stays]]
 path = "integrations/dbt/main/render_jinja.py"
 rule = 4
-note = "Jinja glue for sqlbuild.dbt.jinja: renders a translated dbt macro's template with jinja2 against the values and user macros the calling macro passes in, plus dbt's return. The template calls user Python macros, so rendering stays in Python; which macros it may call is read natively from the keywords (macro_modules function_calls.rs)."
+note = "Jinja glue for sqlbuild.macros.jinja: renders a translated dbt macro's template with jinja2 against the values and user macros the calling macro passes in, plus dbt's return. The template calls user Python macros, so rendering stays in Python; which macros it may call is read natively from the keywords (macro_modules function_calls.rs)."
 
 [[stays]]
 path = "integrations/dbt/classes/dbt_name_undefined.py"
 rule = 4
-note = "A jinja2.Undefined subclass for sqlbuild.dbt.jinja: a name not passed in fails the render, while a missing attribute or item renders empty as in dbt."
+note = "A jinja2.Undefined subclass for sqlbuild.macros.jinja: a name not passed in fails the render, while a missing attribute or item renders empty as in dbt."
 
 [[stays]]
 path = "integrations/dbt/main/mark_override.py"
 rule = 3
-note = "Public decorator re-exported by sqlbuild.dbt and run when user macro modules are imported: attaches a DbtMacroOverride to the function and returns it unchanged."
+note = "Public decorator re-exported by sqlbuild.macros and run when user macro modules are imported: attaches a DbtMacroOverride to the function and returns it unchanged."
 
 [[stays]]
 path = "integrations/dbt/models.py"
 rule = 3
-note = "Rule 3 shape: DbtMacroOverride, the record sqlbuild.dbt.override attaches to a macro."
+note = "Rule 3 shape: DbtMacroOverride, the record sqlbuild.macros.override attaches to a macro."
 
 [[stays]]
 path = "cli/commands/main/entrypoint/_dispatch_with_compute_logs.py"
@@ -633,9 +633,9 @@ rule = 3
 note = "Public facade: re-exports plus one-line delegating wrappers (factory, get_factory_definition)."
 
 [[stays]]
-path = "dbt.py"
+path = "macros.py"
 rule = 3
-note = "Public facade: re-exports jinja and override for Python macros translated from dbt; needs the dbt extra."
+note = "Public facade: re-exports jinja and override for Python macros, such as those translated from dbt; jinja needs the dbt extra."
 
 [[stays]]
 path = "functions.py"

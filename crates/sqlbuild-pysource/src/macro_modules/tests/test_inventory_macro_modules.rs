@@ -188,7 +188,7 @@ fn given_macro_modules_when_inventoried_then_python_analysis_agrees() {
                 SHARED,
                 (
                     "sql/macros/a.py",
-                    "from sqlbuild.dbt import jinja as _jinja\nfrom sql.macros.b import b\n\n\n\
+                    "from sqlbuild.macros import jinja as _jinja\nfrom sql.macros.b import b\n\n\n\
                      def cents(column):\n    return column\n\n\ndef total(column):\n    return \
                      _jinja('{{ b() }} {{ cents(column) }}', column=column, cents=cents, b=b)\n",
                 ),
@@ -209,7 +209,7 @@ fn given_macro_modules_when_inventoried_then_python_analysis_agrees() {
             description: "a macro passed positionally to the jinja helper is still dynamic",
             sources: &[(
                 "sql/macros/a.py",
-                "from sqlbuild.dbt import jinja\n\n\ndef cents():\n    return 1\n\n\n\
+                "from sqlbuild.macros import jinja\n\n\ndef cents():\n    return 1\n\n\n\
                  def total():\n    return jinja('{{ cents() }}', cents)\n",
             )],
             expected_exports: &[],
@@ -239,7 +239,7 @@ fn given_macro_modules_when_inventoried_then_python_analysis_agrees() {
             description: "a jinja binding reassigned at module level does not pass macros",
             sources: &[(
                 "sql/macros/a.py",
-                "from sqlbuild.dbt import jinja as _jinja\n_jinja = print\n\n\ndef cents():\n    return 1\n\n\ndef total():\n    return _jinja('{{ cents() }}', cents=cents)\n",
+                "from sqlbuild.macros import jinja as _jinja\n_jinja = print\n\n\ndef cents():\n    return 1\n\n\ndef total():\n    return _jinja('{{ cents() }}', cents=cents)\n",
             )],
             expected_exports: &[],
             expected_faults: &[(
@@ -253,7 +253,7 @@ fn given_macro_modules_when_inventoried_then_python_analysis_agrees() {
             description: "a jinja binding imported again from another module does not pass macros",
             sources: &[(
                 "sql/macros/a.py",
-                "from sqlbuild.dbt import jinja as _jinja\nfrom templates import render as _jinja\n\n\ndef cents():\n    return 1\n\n\ndef total():\n    return _jinja('{{ cents() }}', cents=cents)\n",
+                "from sqlbuild.macros import jinja as _jinja\nfrom templates import render as _jinja\n\n\ndef cents():\n    return 1\n\n\ndef total():\n    return _jinja('{{ cents() }}', cents=cents)\n",
             )],
             expected_exports: &[],
             expected_faults: &[(
@@ -267,7 +267,7 @@ fn given_macro_modules_when_inventoried_then_python_analysis_agrees() {
             description: "a jinja binding declared global in a function does not pass macros",
             sources: &[(
                 "sql/macros/a.py",
-                "from sqlbuild.dbt import jinja as _jinja\n\n\ndef _setup():\n    global _jinja\n    _jinja = print\n\n\ndef cents():\n    return 1\n\n\ndef total():\n    return _jinja('{{ cents() }}', cents=cents)\n",
+                "from sqlbuild.macros import jinja as _jinja\n\n\ndef _setup():\n    global _jinja\n    _jinja = print\n\n\ndef cents():\n    return 1\n\n\ndef total():\n    return _jinja('{{ cents() }}', cents=cents)\n",
             )],
             expected_exports: &[],
             expected_faults: &[(
@@ -281,7 +281,7 @@ fn given_macro_modules_when_inventoried_then_python_analysis_agrees() {
             description: "a star import after the jinja binding does not pass macros",
             sources: &[(
                 "sql/macros/a.py",
-                "from sqlbuild.dbt import jinja as _jinja\nfrom templates import *\n\n\ndef cents():\n    return 1\n\n\ndef total():\n    return _jinja('{{ cents() }}', cents=cents)\n",
+                "from sqlbuild.macros import jinja as _jinja\nfrom templates import *\n\n\ndef cents():\n    return 1\n\n\ndef total():\n    return _jinja('{{ cents() }}', cents=cents)\n",
             )],
             expected_exports: &[],
             expected_faults: &[(
@@ -295,7 +295,7 @@ fn given_macro_modules_when_inventoried_then_python_analysis_agrees() {
             description: "a jinja binding shadowed in the function does not pass macros",
             sources: &[(
                 "sql/macros/a.py",
-                "from sqlbuild.dbt import jinja\n\n\ndef cents():\n    return 1\n\n\n\
+                "from sqlbuild.macros import jinja\n\n\ndef cents():\n    return 1\n\n\n\
                  def total(jinja):\n    return jinja('{{ cents() }}', cents=cents)\n",
             )],
             expected_exports: &[],

@@ -200,6 +200,7 @@ E2E_DUCKDB_BUILD_INCREMENTAL_PATHS := \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_mixed_timestamp_grain_replay.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_model_backed_cursor_build.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_replay_on_change_full_build.py \
+	tests/e2e/src/sqlbuild/cli/commands/main/build/test_rolling_window_build.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_seed_watermark_build.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_snapshot_build.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_snapshot_validity_columns.py
