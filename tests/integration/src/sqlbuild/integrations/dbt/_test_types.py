@@ -45,3 +45,11 @@ class RealDbtInteropPlanTestCase:
     expected_dbt_skip_reason: DbtInteropSkipReason | None
     expected_sqlbuild_skip_reason: DbtInteropSkipReason | None
     expected_path_translations: tuple[tuple[str, str], ...] = ()
+
+
+@dataclass(frozen=True)
+class DbtMacroBuildTestCase:
+    description: str
+    macro_source: str
+    model_sql: str
+    expected_rows: tuple[tuple[object, ...], ...]
