@@ -17,9 +17,12 @@ pub(crate) async fn snapshot_nodes(
     let cell = slot(&SNAPSHOT_NODES, snapshot_id);
     let nodes = cell
         .get_or_try_init(|| async {
-            Ok::<_, ControlError>(Arc::new(
-                read_budgeted(&SNAPSHOT_NODES, store, snapshot_id).await?,
-            ))
+            let read = read_budgeted(&SNAPSHOT_NODES, store, snapshot_id);
+            // Whichever reader fills the shared cell pays for it, so a task's statement count leaves the fill out.
+            #[cfg(test)]
+            let read = crate::store::_helpers::statement_count::STATEMENTS
+                .scope(std::cell::Cell::new(0), read);
+            Ok::<_, ControlError>(Arc::new(read.await?))
         })
         .await?;
     Ok(Arc::clone(nodes))
