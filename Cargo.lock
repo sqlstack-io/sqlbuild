@@ -6395,7 +6395,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-cli"
-version = "0.263.0"
+version = "0.263.1"
 dependencies = [
  "axum",
  "blake3",
@@ -6580,7 +6580,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-python"
-version = "0.263.0"
+version = "0.263.1"
 dependencies = [
  "chrono",
  "fensu-policy",

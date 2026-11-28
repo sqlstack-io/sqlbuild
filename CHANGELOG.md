@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.263.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.263.0...v0.263.1) (2026-11-28)
+
+
+### Performance Improvements
+
+* cut cold compile allocator, scanner and header work ([#1636](https://github.com/sqlstack-io/sqlbuild/issues/1636)) ([4fcc225](https://github.com/sqlstack-io/sqlbuild/commit/4fcc225f9b6bb8e122cb6970de03e21cf55dbf2c))
+
 ## [0.263.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.262.0...v0.263.0) (2026-11-28)
 
 
