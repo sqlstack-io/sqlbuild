@@ -69,7 +69,8 @@ const ORDERS_API: MissingProviderSecrets = {
 /** The location's health with the orders API's key missing. */
 function withMissingKey(detail: LocationDetail | null): LocationDetail | null {
 	if (!detail) return detail;
-	return { ...detail, health: detail.health === 'healthy' || detail.health === 'degraded' ? 'missing_secrets' : detail.health, missingSecrets: [ORDERS_API, ...detail.missingSecrets] };
+	const missing = detail.health === 'healthy' || detail.health === 'degraded';
+	return { ...detail, health: missing ? 'missing_secrets' : detail.health, verdict: missing ? { fact: 'missing_secrets', stopsRuns: false } : detail.verdict, missingSecrets: [ORDERS_API, ...detail.missingSecrets] };
 }
 
 /** The Overview with the location's missing key among what needs attention. */
@@ -79,6 +80,7 @@ function withMissingKeyItem(overview: Overview | null, scope: Scope): Overview |
 		id: `secrets:${scope.locationId}`,
 		kind: 'location_missing_secrets' as const,
 		severity: 'warning' as const,
+		stopsRuns: false,
 		occurredAt: new Date(Date.now() - 12 * 60_000).toISOString(),
 		members: ['ORDERS_API_KEY'],
 		active: true,
