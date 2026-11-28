@@ -6,11 +6,19 @@ use std::collections::{HashMap, HashSet};
 use crate::cpython_tree::main::child_nodes::child_nodes;
 use crate::cpython_tree::main::walk_breadth_first::walk_breadth_first;
 use crate::cpython_tree::models::CpythonNode;
-use crate::macro_modules::constants::{JINJA_FUNCTION, JINJA_MODULE, MODULE_SEPARATOR};
+use crate::macro_modules::constants::{
+    JINJA_FUNCTION, JINJA_MODULE, MODULE_SEPARATOR, STAR_IMPORT_NAME,
+};
 
 /// The names `from sqlbuild.dbt import jinja` binds that no other module-level binding or
-/// `global` declaration rebinds.
+/// `global` declaration rebinds; none when a module-level star import may rebind any name.
 pub(crate) fn jinja_bindings(module: &ModModule) -> HashSet<String> {
+    if module.body.iter().any(|statement| {
+        matches!(statement, Stmt::ImportFrom(import)
+            if import.names.iter().any(|alias| alias.name.as_str() == STAR_IMPORT_NAME))
+    }) {
+        return HashSet::new();
+    }
     let counts: HashMap<String, usize> = module_binding_counts(module);
     let declared_global: HashSet<String> = global_names(module);
     module
