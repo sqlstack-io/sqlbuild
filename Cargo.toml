@@ -325,7 +325,9 @@ debug = false
 strip = "symbols"
 
 # Released wheels: Cargo's default 16 codegen units per crate. One unit made the binaries about an
-# eighth of the size but doubled build time, and macOS wheel builds took 60-90 minutes.
+# eighth smaller but doubled build time, and macOS wheel builds took 60-90 minutes. Only the Windows
+# wheel, the largest and closest to PyPI's file size limit, builds with one unit: Build
+# Distributions sets CARGO_PROFILE_DIST_CODEGEN_UNITS there.
 [profile.dist]
 inherits = "release"
 

@@ -188,6 +188,12 @@ jobs:
         run: |
           npm ci
           npm run build
+      # The Windows extension wheel is the largest, close to PyPI's file size limit, so its dist
+      # build compiles each crate as one codegen unit; see the dist profile in Cargo.toml.
+      - name: Compile the Windows dist build with one codegen unit
+        if: inputs.prebuilt-run-id == '' && runner.os == 'Windows' && inputs.cargo-profile == 'dist'
+        shell: bash
+        run: echo "CARGO_PROFILE_DIST_CODEGEN_UNITS=1" >> "${GITHUB_ENV}"
       # A Linux dist build can need more memory than the hosted runner has; see the action.
       - name: Add swap and limit cargo jobs for the Linux dist build
         if: inputs.prebuilt-run-id == '' && runner.os == 'Linux' && inputs.cargo-profile == 'dist'
