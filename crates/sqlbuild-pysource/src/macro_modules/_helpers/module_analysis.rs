@@ -16,6 +16,7 @@ use crate::macro_modules::_helpers::declarations::module_exports;
 use crate::macro_modules::_helpers::function_calls::{
     CallNames, NodeId, function_calls, runtime_nodes, unique, validate_use_locations,
 };
+use crate::macro_modules::_helpers::jinja_bindings::jinja_bindings;
 use crate::macro_modules::_helpers::module_names::{
     import_visible, imported_module_names, is_project_macro_import, resolve_import_from,
 };
@@ -117,9 +118,11 @@ pub(crate) fn analyze_module(
         .iter()
         .map(|name| (*name).to_owned())
         .collect();
+    let jinja: HashSet<String> = jinja_bindings(parsed.module);
     let names: CallNames<'_> = CallNames {
         imported: &imported,
         functions: &function_names,
+        jinja: &jinja,
         display,
     };
     let mut direct_dependencies: HashMap<String, Vec<String>> = HashMap::new();

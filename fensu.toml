@@ -1258,11 +1258,6 @@ reason = "Native bindings own configuration resolution; this package only declar
 
 [[targets.python.rule_exceptions]]
 rule = "FFR309"
-path = "src/sqlbuild/integrations/dbt/__init__.py"
-reason = "Native bindings own the dbt interop commands, the dbt runner, its JSON event stream and project initialisation; this package keeps the dbt models, types and errors and the PyYAML and Jinja profile glue they call."
-
-[[targets.python.rule_exceptions]]
-rule = "FFR309"
 path = "src/sqlbuild/compiler/pipeline/__init__.py"
 reason = "Native bindings own the compile-and-plan pipeline; this package declares the pipeline models and keeps the custom materialization loader that imports project code."
 
@@ -1579,6 +1574,12 @@ rule = "FFS120"
 path = "src/sqlbuild/runtime/user_code/classes/user_code_finder.py"
 symbols = ["UserCodeFinder.find_spec"]
 reason = "importlib calls meta-path finders positionally as find_spec(fullname, path, target)."
+
+[[targets.python.rule_exceptions]]
+rule = "FFS120"
+path = "src/sqlbuild/integrations/dbt/main/render_jinja.py"
+symbols = ["jinja"]
+reason = "jinja takes its template positional-only so that any name, `template` included, can be passed to the template as a keyword."
 
 [[targets.python.rule_exceptions]]
 rule = "FFS120"

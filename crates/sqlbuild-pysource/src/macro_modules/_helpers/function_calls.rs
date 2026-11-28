@@ -15,6 +15,8 @@ pub(crate) struct CallNames<'a> {
     /// Local binding to imported macro name.
     pub(crate) imported: &'a HashMap<String, String>,
     pub(crate) functions: &'a HashSet<String>,
+    /// Local bindings of `sqlbuild.dbt.jinja`, whose keyword arguments may pass macros.
+    pub(crate) jinja: &'a HashSet<String>,
     pub(crate) display: &'a str,
 }
 
@@ -75,6 +77,29 @@ fn direct_call_name<'a>(node: &CpythonNode<'a>) -> Option<&'a Expr> {
     }
 }
 
+/// Bare names passed by keyword to an unshadowed `jinja` binding; they count as calls.
+fn jinja_passed_names(
+    nodes: &[CpythonNode<'_>],
+    jinja: &HashSet<String>,
+    bound: &HashSet<String>,
+) -> HashSet<NodeId> {
+    nodes
+        .iter()
+        .filter_map(|node| match node {
+            CpythonNode::Expr(Expr::Call(call)) => Some(call),
+            _ => None,
+        })
+        .filter(|call| {
+            call.func.as_name_expr().is_some_and(|name| {
+                jinja.contains(name.id.as_str()) && !bound.contains(name.id.as_str())
+            })
+        })
+        .flat_map(|call| &call.arguments.keywords)
+        .filter(|keyword| keyword.arg.is_some() && keyword.value.is_name_expr())
+        .map(|keyword| std::ptr::from_ref(&keyword.value))
+        .collect()
+}
+
 /// The calls of one function, or the message of the first misuse Python reports.
 pub(crate) fn function_calls(
     function: &StmtFunctionDef,
@@ -98,11 +123,13 @@ pub(crate) fn function_calls(
         .filter_map(direct_call_name)
         .map(std::ptr::from_ref)
         .collect();
+    let passed: HashSet<NodeId> = jinja_passed_names(nodes, names.jinja, &bound);
     let mut dependencies: Vec<String> = Vec::new();
     let mut helpers: Vec<String> = Vec::new();
     for node in nodes {
         if let CpythonNode::Expr(expression @ Expr::Name(name)) = node {
-            let direct: bool = direct_calls.contains(&std::ptr::from_ref(*expression));
+            let id: NodeId = std::ptr::from_ref(*expression);
+            let direct: bool = direct_calls.contains(&id) || passed.contains(&id);
             if !direct && names.imported.contains_key(name.id.as_str()) {
                 return Err(format!(
                     "Macro module '{display}' uses imported macro '{}' dynamically; call imported \
@@ -118,7 +145,15 @@ pub(crate) fn function_calls(
                 ));
             }
         }
-        let Some(Expr::Name(called)) = direct_call_name(node) else {
+        let called: Option<&Expr> = match node {
+            CpythonNode::Expr(expression @ Expr::Name(_))
+                if passed.contains(&std::ptr::from_ref(*expression)) =>
+            {
+                Some(*expression)
+            }
+            _ => direct_call_name(node),
+        };
+        let Some(Expr::Name(called)) = called else {
             continue;
         };
         let called: &str = called.id.as_str();

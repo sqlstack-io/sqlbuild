@@ -105,6 +105,45 @@ second expansion of generated output: both calls are visible in the SQL source.
 Inner macros may return any Python value accepted by the outer macro. A macro used directly in SQL
 must return a string.
 
+## Write a macro as a Jinja template
+
+A macro converted from dbt can keep its Jinja body. Install the dbt extra with
+`pip install "sqlbuild[dbt]"`, then return `jinja(template, ...)` from `sqlbuild.dbt`, passing the
+template's values and every macro it calls by keyword:
+
+```python
+# sql/models/marts/_sqlbuild/_macros/python/labels.py
+from sqlbuild.dbt import jinja as _jinja, override as _override
+from sql.macros.python.strings import concat
+
+
+@_override(replaces="dbt.macro shop.customer_label")
+def customer_label(name_column: str, tier_column: str) -> str:
+    return _jinja(
+        """{{ concat([name_column, "' ('", tier_column, "')'"]) }}""",
+        name_column=name_column,
+        tier_column=tier_column,
+        concat=concat,
+    )
+```
+
+SQLBuild records each macro passed by keyword, here `concat`, as a call: it is a dependency of
+`customer_label`, and its import follows the same scope rules as a direct call.
+
+`override` records the dbt macro a function replaces, with optional `reason`, `differs` and
+`unchecked` text. It returns the function unchanged.
+
+Details:
+
+- The template sees only the values passed in and dbt's `return(value)`, which ends the render
+  with that value.
+- A name not passed in fails the render. A missing attribute or item, such as `d.missing`,
+  renders empty, as in dbt.
+- Only a bare macro name passed as a keyword value counts as a call. Passing a macro
+  positionally, or to any other function, fails with `P001`.
+- Without the dbt extra, calling `jinja` fails with an `ImportError` that names `sqlbuild[dbt]`;
+  `override` needs no extra.
+
 ## Macro context
 
 When the first parameter is named `ctx`, SQLBuild passes a `MacroContext` with adapter, target, and

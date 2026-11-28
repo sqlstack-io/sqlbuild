@@ -182,6 +182,130 @@ fn given_macro_modules_when_inventoried_then_python_analysis_agrees() {
                 (2, "sql.macros.c", &[]),
             ]),
         },
+        InventoryMacroModulesTestCase {
+            description: "macros passed by keyword to the jinja helper are dependencies",
+            sources: &[
+                SHARED,
+                (
+                    "sql/macros/a.py",
+                    "from sqlbuild.dbt import jinja as _jinja\nfrom sql.macros.b import b\n\n\n\
+                     def cents(column):\n    return column\n\n\ndef total(column):\n    return \
+                     _jinja('{{ b() }} {{ cents(column) }}', column=column, cents=cents, b=b)\n",
+                ),
+            ],
+            expected_exports: &[
+                ("b", 0, &[], 1, &[]),
+                ("c", 0, &[], 5, &[]),
+                ("cents", 1, &["column"], 5, &[]),
+                ("total", 1, &["column"], 9, &["b", "cents"]),
+            ],
+            expected_faults: &[],
+            expected_modules: Some(&[
+                (0, "sql.macros.b", &[]),
+                (1, "sql.macros.a", &["sql.macros.b"]),
+            ]),
+        },
+        InventoryMacroModulesTestCase {
+            description: "a macro passed positionally to the jinja helper is still dynamic",
+            sources: &[(
+                "sql/macros/a.py",
+                "from sqlbuild.dbt import jinja\n\n\ndef cents():\n    return 1\n\n\n\
+                 def total():\n    return jinja('{{ cents() }}', cents)\n",
+            )],
+            expected_exports: &[],
+            expected_faults: &[(
+                0,
+                "Macro module 'sql/macros/a.py' uses local helper 'cents' dynamically; call local \
+                 macros and helpers directly",
+            )],
+            expected_modules: None,
+        },
+        InventoryMacroModulesTestCase {
+            description: "a jinja helper from another module does not pass macros",
+            sources: &[(
+                "sql/macros/a.py",
+                "from templates import jinja\n\n\ndef cents():\n    return 1\n\n\n\
+                 def total():\n    return jinja('{{ cents() }}', cents=cents)\n",
+            )],
+            expected_exports: &[],
+            expected_faults: &[(
+                0,
+                "Macro module 'sql/macros/a.py' uses local helper 'cents' dynamically; call local \
+                 macros and helpers directly",
+            )],
+            expected_modules: None,
+        },
+        InventoryMacroModulesTestCase {
+            description: "a jinja binding reassigned at module level does not pass macros",
+            sources: &[(
+                "sql/macros/a.py",
+                "from sqlbuild.dbt import jinja as _jinja\n_jinja = print\n\n\ndef cents():\n    return 1\n\n\ndef total():\n    return _jinja('{{ cents() }}', cents=cents)\n",
+            )],
+            expected_exports: &[],
+            expected_faults: &[(
+                0,
+                "Macro module 'sql/macros/a.py' uses local helper 'cents' dynamically; call local \
+                 macros and helpers directly",
+            )],
+            expected_modules: None,
+        },
+        InventoryMacroModulesTestCase {
+            description: "a jinja binding imported again from another module does not pass macros",
+            sources: &[(
+                "sql/macros/a.py",
+                "from sqlbuild.dbt import jinja as _jinja\nfrom templates import render as _jinja\n\n\ndef cents():\n    return 1\n\n\ndef total():\n    return _jinja('{{ cents() }}', cents=cents)\n",
+            )],
+            expected_exports: &[],
+            expected_faults: &[(
+                0,
+                "Macro module 'sql/macros/a.py' uses local helper 'cents' dynamically; call local \
+                 macros and helpers directly",
+            )],
+            expected_modules: None,
+        },
+        InventoryMacroModulesTestCase {
+            description: "a jinja binding declared global in a function does not pass macros",
+            sources: &[(
+                "sql/macros/a.py",
+                "from sqlbuild.dbt import jinja as _jinja\n\n\ndef _setup():\n    global _jinja\n    _jinja = print\n\n\ndef cents():\n    return 1\n\n\ndef total():\n    return _jinja('{{ cents() }}', cents=cents)\n",
+            )],
+            expected_exports: &[],
+            expected_faults: &[(
+                0,
+                "Macro module 'sql/macros/a.py' uses local helper 'cents' dynamically; call local \
+                 macros and helpers directly",
+            )],
+            expected_modules: None,
+        },
+        InventoryMacroModulesTestCase {
+            description: "a star import after the jinja binding does not pass macros",
+            sources: &[(
+                "sql/macros/a.py",
+                "from sqlbuild.dbt import jinja as _jinja\nfrom templates import *\n\n\ndef cents():\n    return 1\n\n\ndef total():\n    return _jinja('{{ cents() }}', cents=cents)\n",
+            )],
+            expected_exports: &[],
+            expected_faults: &[(
+                0,
+                "Macro module 'sql/macros/a.py' uses local helper 'cents' dynamically; call local \
+                 macros and helpers directly",
+            )],
+            expected_modules: None,
+        },
+        InventoryMacroModulesTestCase {
+            description: "a jinja binding shadowed in the function does not pass macros",
+            sources: &[(
+                "sql/macros/a.py",
+                "from sqlbuild.dbt import jinja\n\n\ndef cents():\n    return 1\n\n\n\
+                 def total(jinja):\n    return jinja('{{ cents() }}', cents=cents)\n",
+            )],
+            expected_exports: &[],
+            expected_faults: &[(
+                0,
+                "Macro module 'sql/macros/a.py' uses local helper 'cents' dynamically; call local \
+                 macros and helpers directly",
+            )],
+            expected_modules: None,
+        },
     ];
     for test_case in test_cases {
         assert_eq!(
