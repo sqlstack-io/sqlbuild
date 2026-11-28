@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.264.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.263.1...v0.264.0) (2026-11-28)
+
+
+### Features
+
+* add sqlbuild.dbt for Python macros converted from dbt ([#1642](https://github.com/sqlstack-io/sqlbuild/issues/1642)) ([7153c0e](https://github.com/sqlstack-io/sqlbuild/commit/7153c0eca649c0255b6d6e1a05da32d2c35d9d37))
+* decide location health on the server and show it calmly ([#1640](https://github.com/sqlstack-io/sqlbuild/issues/1640)) ([084e95f](https://github.com/sqlstack-io/sqlbuild/commit/084e95f6a0116c5e2665e9ff8b46b25f201fd3bc))
+
 ## [0.263.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.263.0...v0.263.1) (2026-11-28)
 
 
