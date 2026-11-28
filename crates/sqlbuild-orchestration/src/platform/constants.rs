@@ -89,3 +89,6 @@ pub const SINK_DELIVERIES_REQUEST: &str = "sink_deliveries";
 
 /// The kind a location's sink delivery health report is stored under.
 pub(crate) const LOCATION_SINK_KIND: &str = "sink_deliveries";
+
+/// A running run-history sync with no progress report for this long has stalled.
+pub const SYNC_STALL_SECONDS: i64 = 600;

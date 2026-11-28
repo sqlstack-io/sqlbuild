@@ -18,7 +18,8 @@ import WrenchIcon from '@lucide/svelte/icons/wrench';
 import type { Component } from 'svelte';
 import { ADMIN_CAPABILITIES, hasAnyCapability, type ApiClient, type Capability, type NavCounts } from '$lib/api';
 
-export type NavBadge = { value: (counts: NavCounts) => number; tone: 'muted' | 'warning' | 'error' | 'live' };
+/** `problems` is red while an open problem stops a location's runs, amber otherwise, as the banner is. */
+export type NavBadge = { value: (counts: NavCounts) => number; tone: 'muted' | 'warning' | 'error' | 'live' | 'problems' };
 /**
  * `loads` is the client method the page cannot work without; the entry hides when the server lacks it.
  * `wholeTarget` pages list the selected target, which needs view on every node in it.
@@ -50,7 +51,7 @@ export const NAV: readonly NavGroup[] = [
 	{
 		section: 'Platform',
 		items: [
-			{ label: 'Locations', href: '/locations', icon: MapPinIcon, loads: 'listLocations', badge: { value: (c) => c.activePlatformEvents, tone: 'error' } },
+			{ label: 'Locations', href: '/locations', icon: MapPinIcon, loads: 'listLocations', badge: { value: (c) => c.activePlatformEvents, tone: 'problems' } },
 			{ label: 'Connections', href: '/connections', icon: PlugIcon, loads: 'listWarehouseConnections' },
 			{ label: 'Providers', href: '/providers', icon: PuzzleIcon, loads: 'listProviders' },
 			{ label: 'Maintenance', href: '/maintenance', icon: WrenchIcon, loads: 'maintenanceHistory', wholeTarget: true }

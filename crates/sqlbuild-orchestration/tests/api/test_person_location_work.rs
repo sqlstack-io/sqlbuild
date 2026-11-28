@@ -1,5 +1,6 @@
 //! Person connection tests and warehouse syncs use live built-ins and the same atomic work queue on both stores.
 
+use crate::api::tests::helpers::check_in;
 use uuid::Uuid;
 
 use crate::api::tests::test_types::LocationWorkTestCase;
@@ -88,6 +89,7 @@ fn given_person_connection_tests_when_retried_and_revoked_then_live_scope_preced
             publish_snapshot(store, &snapshot(location))
                 .await
                 .expect("publish");
+            check_in(store, location, "development").await;
             let assignment = RoleAssignmentRequest {
                 principal_id: person,
                 role: BuiltinRole::Developer.into(),

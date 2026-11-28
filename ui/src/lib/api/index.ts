@@ -7,12 +7,14 @@ import { hugeProject } from "./mock/huge-project";
 import { awkward } from "./mock/awkward";
 import { missingSecrets } from "./mock/missing-secrets";
 import { calm } from "./mock/calm";
+import { SYNC_SCENARIOS, syncScenario, type SyncScenario } from "./mock/sync-scenarios";
 import { replayFetch, type Recording } from "./replay";
 import { LocalChangeBus } from "./signals";
 import { to } from "$lib/paths";
 import type { BuiltInRole } from "./types";
 
 export type { ApiClient } from "./client";
+export type { SyncScenario } from "./mock/sync-scenarios";
 export { ApiError, isRefusal, isUnsupported } from "./client";
 export * from "./types";
 export * from "./signals";
@@ -104,7 +106,22 @@ export function createClient(
     ? missingSecrets(sized, { sink: search.get("secrets") === "sink" })
     : sized;
   const stretched = search.has("awkward") ? awkward(secrets) : secrets;
-  return countedReads(search.has("calm") ? calm(stretched) : stretched);
+  const quiet = search.has("calm") ? calm(stretched) : stretched;
+  // `?scenario=<name>`: the shop location's sync, test and check-ins, and the live feed, in one state of the sync-controls proposal.
+  const scenario = mockScenario(search);
+  return countedReads(scenario ? syncScenario(quiet, scenario) : quiet);
+}
+
+/** The mock is in use: `?mock`, or `VITE_SQB_MOCK=1`. */
+export function isMock(search: URLSearchParams): boolean {
+  return !DEMO && (search.has("mock") || import.meta.env.VITE_SQB_MOCK === "1");
+}
+
+/** The sync-controls scenario `?scenario=` names, with the mock in use; null otherwise. */
+export function mockScenario(search: URLSearchParams): SyncScenario | null {
+  if (!isMock(search)) return null;
+  const name = search.get("scenario");
+  return SYNC_SCENARIOS.find((s) => s === name) ?? null;
 }
 
 /** Calls to each mock client method so far, by name, for the browser suite's work budgets. */

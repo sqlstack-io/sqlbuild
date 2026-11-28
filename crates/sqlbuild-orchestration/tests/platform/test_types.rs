@@ -122,6 +122,57 @@ pub(crate) struct FailingLocationTestCase {
     pub(crate) expected_error: &'static str,
 }
 
+pub(crate) struct SyncStateTestCase {
+    pub(crate) description: &'static str,
+    /// Newest first, as `recent_health` returns them.
+    pub(crate) observations: Vec<crate::platform::models::LocationHealthObservation>,
+    pub(crate) now_minutes: i64,
+    /// When the running sync started and whether it stalled; absent when none runs.
+    pub(crate) expected_running: Option<(DateTime<Utc>, bool)>,
+    pub(crate) expected_failing: bool,
+    pub(crate) expected_stalled_problem: bool,
+}
+
+pub(crate) struct LocationVerdictTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) state: crate::platform::models::LocationState,
+    pub(crate) published: bool,
+    pub(crate) sync: crate::platform::models::WarehouseSyncState,
+    /// When the last connection check was, in minutes from publication; absent when none was.
+    pub(crate) tested_minutes: Option<i64>,
+    /// The target's other open problems, such as an overdue schedule.
+    pub(crate) problems: Vec<crate::platform::models::LocationFact>,
+    pub(crate) expected_fact: crate::platform::models::LocationFact,
+    pub(crate) expected_tier: Option<crate::platform::models::ProblemTier>,
+}
+
+pub(crate) struct SyncHealthTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_silent_refusal: &'static str,
+    pub(crate) expected_stall_tier: crate::platform::models::ProblemTier,
+    pub(crate) expected_connection_tier: crate::platform::models::ProblemTier,
+}
+
+pub(crate) struct ProblemVerdictTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The location whose only open problem is an overdue schedule.
+    pub(crate) expected_overdue: crate::platform::models::LocationVerdict,
+    pub(crate) expected_tick_tier: crate::platform::models::ProblemTier,
+    /// The location with nothing open.
+    pub(crate) expected_calm: crate::platform::models::LocationVerdict,
+}
+
+pub(crate) struct AgedHealthTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The location running a version older than the health history, its connection check pruned.
+    pub(crate) expected_aged: crate::platform::models::LocationVerdict,
+    /// The location published within the health history and never checked.
+    pub(crate) expected_untested: crate::platform::models::LocationVerdict,
+}
+
 pub(crate) struct FailingSyncTestCase {
     pub(crate) description: &'static str,
     /// Newest first, as `recent_health` returns them.

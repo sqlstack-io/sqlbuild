@@ -16,7 +16,7 @@ use chrono::{Duration, Utc};
 use reqwest::StatusCode;
 use uuid::Uuid;
 
-use crate::api::tests::helpers::{start_api, stop_api};
+use crate::api::tests::helpers::{check_in, start_api, stop_api};
 use crate::api::tests::test_types::LocationWorkTestCase;
 use crate::api::tests::work_helpers::execute;
 use crate::credentials::tests::location_helpers::create_location;
@@ -76,6 +76,7 @@ fn given_outbound_work_when_claimed_retried_or_replaced_then_scope_and_immutable
             let mut input = snapshot(location_id);
             input.target.clone_from(&request.target);
             publish_snapshot(store, &input).await.expect("publish");
+            check_in(store, location_id, &request.target).await;
             let invalid_audit = AuditContext {
                 granting_role: String::new(),
                 ..audit.clone()

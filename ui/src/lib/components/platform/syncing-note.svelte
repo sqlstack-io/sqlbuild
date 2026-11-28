@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { firstSyncPending, liveSyncOf } from '$lib/api/http-locations';
-	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 
 	/** Shown above views that read the server's copy of the warehouse while the location's first sync runs. */
@@ -8,7 +7,7 @@
 	let { what }: Props = $props();
 
 	const sync = createResource((client, scope) => (client.supports('getWarehouseSync') ? client.getWarehouseSync(scope) : Promise.resolve(null)), ['warehouse_sync']);
-	const running = $derived(firstSyncPending(sync.data, app.now) ? liveSyncOf(sync.data, app.now) : null);
+	const running = $derived(firstSyncPending(sync.data) ? liveSyncOf(sync.data) : null);
 </script>
 
 {#if running}

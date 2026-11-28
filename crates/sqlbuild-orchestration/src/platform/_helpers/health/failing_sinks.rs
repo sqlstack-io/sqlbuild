@@ -9,8 +9,8 @@ use crate::platform::constants::{
     LOCATION_SINK_KIND, SINK_PROVIDERS, SINK_REPORT_LIMIT, SINK_REPORT_WINDOW_DAYS,
 };
 use crate::platform::models::{
-    ActiveLocation, FailingSink, LocationHealth, LocationSinkRow, SinkReport, SinkReportRow,
-    SinkStreak,
+    ActiveLocation, FailingSink, LocationFact, LocationHealth, LocationSinkRow, SinkReport,
+    SinkReportRow, SinkStreak,
 };
 use crate::runs::constants::SINK_DELIVERIES_EVENT;
 use crate::runs::models::{RunChange, SinkDelivery};
@@ -187,6 +187,7 @@ impl SinkStreak {
                 reason,
                 run_id: report.run_id,
                 last_success_at: None,
+                tier: LocationFact::SinkFailing.problem_tier(),
             })
         })
     }

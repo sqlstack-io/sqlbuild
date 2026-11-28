@@ -8,8 +8,8 @@ use crate::acknowledgements::constants::SKIP_DISMISSED;
 use crate::platform::_helpers::health::event_history::read_event;
 use crate::platform::constants::SKIPPED_TRIGGER_EVENTS;
 use crate::platform::models::{
-    ActiveLocation, DismissedSkip, PlatformEvent, PlatformEventEnvelope, SkippedEvent,
-    StoredPlatformEvent,
+    ActiveLocation, DismissedSkip, LocationFact, PlatformEvent, PlatformEventEnvelope,
+    SkippedEvent, StoredPlatformEvent,
 };
 use crate::store::errors::ControlError;
 use crate::store::main::{decode_row::decode_row, query::query, query_records::query_records};
@@ -65,6 +65,7 @@ pub(crate) async fn recorded_skips(
                 target,
                 skipped_at: skip.occurred_at,
                 reason,
+                tier: LocationFact::EventSkipped.problem_tier(),
             });
         }
     }
