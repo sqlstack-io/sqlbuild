@@ -779,3 +779,13 @@ class LoaderDependencyNamesTestCase:
 
     description: str
     expected_names: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class RollingWindowProjectLimitTestCase:
+    """A rolling-window entry's plan action and whether the project limit rejects its range."""
+
+    description: str
+    action: str
+    reason: str
+    expected_error_fragment: str | None

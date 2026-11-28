@@ -28,6 +28,7 @@ from tests.unit.src.sqlbuild.compiler.planner._helpers._test_types import (
     EffectiveMicrobatchLimitPlanningTestCase,
     MicrobatchLimitPlanningErrorTestCase,
     MicrobatchLimitPlanningTestCase,
+    RollingWindowProjectLimitTestCase,
 )
 
 
@@ -322,3 +323,61 @@ def test_given_excess_planner_owned_range_when_action_is_error_then_planning_fai
             max_batches=test_case.max_batches,
             action=MicrobatchLimitAction(test_case.action),
         )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        RollingWindowProjectLimitTestCase(
+            description="a first build from cursor_start is held to the project limit",
+            action="create_table",
+            reason="first_run",
+            expected_error_fragment="MICROBATCH LIMIT EXCEEDED",
+        ),
+        RollingWindowProjectLimitTestCase(
+            description="a full refresh is held to the project limit",
+            action="create_table",
+            reason="full_refresh",
+            expected_error_fragment="MICROBATCH LIMIT EXCEEDED",
+        ),
+        RollingWindowProjectLimitTestCase(
+            description="an incremental run over the lookback is not limited",
+            action="incremental_delete_insert",
+            reason="normal_incremental",
+            expected_error_fragment=None,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_rolling_window_entry_when_applying_project_limit_then_only_replacing_builds_are_held(
+    test_case: RollingWindowProjectLimitTestCase,
+) -> None:
+    entry: ModelPlanEntry = ModelPlanEntry(
+        key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="events"),
+        name="events",
+        relative_path=Path("sql/models/events.sql"),
+        materialization_type=MaterializationType.INCREMENTAL,
+        action=PlanAction(test_case.action),
+        reason=PlanReason(test_case.reason),
+        destination=CompiledRelationLocation(None, "main", "events", "main.events"),
+        fingerprint_query_sql="SELECT 1",
+        resolved_sql="SELECT 1",
+        logical_ddl="",
+        incremental_mode=IncrementalMode.MICROBATCH,
+        microbatch_strategy="rolling_window",
+        cursor_type="timestamp",
+        batch_size="1d",
+        microbatch_range=CursorBounds(start="2026-01-01T00:00:00", end="2026-02-05T00:00:00"),
+    )
+    inputs: PlanEntryBuildInputs = PlanEntryBuildInputs(
+        max_microbatches=2,
+        max_microbatches_is_override=False,
+        microbatch_limit_action=MicrobatchLimitAction.ERROR,
+    )
+
+    if test_case.expected_error_fragment is not None:
+        with pytest.raises(CompileInputError, match=test_case.expected_error_fragment):
+            apply_configured_microbatch_limits(entry=entry, inputs=inputs)
+        return
+    limited_entry, _ = apply_configured_microbatch_limits(entry=entry, inputs=inputs)
+    assert limited_entry.microbatch_range == entry.microbatch_range
