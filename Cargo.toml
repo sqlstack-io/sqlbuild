@@ -228,7 +228,7 @@ sqlbuild-scopes = { path = "crates/sqlbuild-scopes" }
 sqlbuild-sqltext = { path = "crates/sqlbuild-sqltext" }
 sqlbuild-state = { path = "crates/sqlbuild-state" }
 # SQL lint Rules, quality Rules and the formatter.
-sqlclean = { git = "https://github.com/sqlstack-io/sqlclean.git", rev = "462a98779a2a11ff11884ff79feefbfb190ab8d1" }
+sqlclean = { git = "https://github.com/sqlstack-io/sqlclean.git", rev = "ac9aa4f4f8ef234d4bed3a80dc7e8c1ecac9b81a" }
 # SQL change fingerprints over SQLQuack's tokenizers.
 sqlquack-fingerprint = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "9d74b31a8d4cb14aa98d994345d3c90167646c75", features = ["bigquery", "databricks", "duckdb", "postgres", "snowflake", "sqlite", "sqlserver"] }
 # Scopes, name resolution, types and lineage for the native analysis route.
@@ -298,6 +298,8 @@ tokio-rustls = { version = "0.26", default-features = false }
 tokio-stream = { version = "0.1", default-features = false }
 tokio-util = { version = "0.7", default-features = false }
 toml_writer = { version = "1.1", default-features = false }
+windows-sys-v052 = { package = "windows-sys", version = "0.52", default-features = false }
+windows-sys-v060 = { package = "windows-sys", version = "0.60", default-features = false }
 zerocopy = { version = "0.8", default-features = false }
 zeroize = { version = "1.9", default-features = false }
 zstd-safe = { version = "8.4", default-features = false }
