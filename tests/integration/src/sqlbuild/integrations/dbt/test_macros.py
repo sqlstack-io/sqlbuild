@@ -10,14 +10,14 @@ import pytest
 from sqlbuild._native import run_cli
 from tests.integration.src.sqlbuild.integrations.dbt._test_types import DbtMacroBuildTestCase
 
-_PROJECT_MACROS: str = '''from sqlbuild.dbt import jinja as _jinja, override as _override
+_PROJECT_MACROS: str = '''from sqlbuild.macros import jinja as _jinja, override as _override
 
 
 @_override(replaces="dbt.macro shop.cents_to_dollars")
 def cents_to_dollars(column_name, scale=2):
     return _jinja(r"""round({{ column_name }} / 100, {{ scale }})""", column_name=column_name, scale=scale)
 '''
-_MARTS_MACROS: str = '''from sqlbuild.dbt import jinja as _jinja, override as _override
+_MARTS_MACROS: str = '''from sqlbuild.macros import jinja as _jinja, override as _override
 
 
 @_override(replaces="dbt.macro dbt.concat")
@@ -34,7 +34,7 @@ def customer_label(name_column, tier_column):
 def default__concat(fields):
     return _jinja(r"""{{ fields|join(' || ') }}""", fields=fields)
 '''
-_SHARED_CONCAT: str = '''from sqlbuild.dbt import jinja as _jinja, override as _override
+_SHARED_CONCAT: str = '''from sqlbuild.macros import jinja as _jinja, override as _override
 
 
 @_override(replaces="dbt.macro dbt.concat")
@@ -46,7 +46,7 @@ def concat(fields):
 def default__concat(fields):
     return _jinja(r"""{{ fields|join(' || ') }}""", fields=fields)
 '''
-_MARTS_LABEL: str = '''from sqlbuild.dbt import jinja as _jinja, override as _override
+_MARTS_LABEL: str = '''from sqlbuild.macros import jinja as _jinja, override as _override
 from sql.macros.python.dbt_macros import concat
 
 

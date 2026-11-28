@@ -115,12 +115,12 @@ must return a string.
 ## Write a macro as a Jinja template
 
 A macro converted from dbt can keep its Jinja body. Install the dbt extra with
-`pip install "sqlbuild[dbt]"`, then return `jinja(template, ...)` from `sqlbuild.dbt`, passing the
+`pip install "sqlbuild[dbt]"`, then return `jinja(template, ...)` from `sqlbuild.macros`, passing the
 template's values and every macro it calls by keyword:
 
 ```python
 # sql/models/marts/_sqlbuild/_macros/python/labels.py
-from sqlbuild.dbt import jinja as _jinja, override as _override
+from sqlbuild.macros import jinja as _jinja, override as _override
 from sql.macros.python.strings import concat
 
 @_override(replaces="dbt.macro shop.customer_label")

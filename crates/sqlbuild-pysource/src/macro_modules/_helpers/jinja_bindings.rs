@@ -1,4 +1,4 @@
-//! The module-level names bound to `sqlbuild.dbt.jinja` and nothing else.
+//! The module-level names bound to `sqlbuild.macros.jinja` and nothing else.
 
 use ruff_python_ast::{ExceptHandler, Expr, ExprContext, ModModule, Pattern, Stmt};
 use std::collections::{HashMap, HashSet};
@@ -10,7 +10,7 @@ use crate::macro_modules::constants::{
     JINJA_FUNCTION, JINJA_MODULE, MODULE_SEPARATOR, STAR_IMPORT_NAME,
 };
 
-/// Names `from sqlbuild.dbt import jinja` binds that nothing else rebinds; none after a star import.
+/// Names `from sqlbuild.macros import jinja` binds that nothing rebinds; none after a star import.
 pub(crate) fn jinja_bindings(module: &ModModule) -> HashSet<String> {
     if module.body.iter().any(|statement| {
         matches!(statement, Stmt::ImportFrom(import)
