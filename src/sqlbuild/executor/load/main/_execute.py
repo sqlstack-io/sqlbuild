@@ -15,6 +15,7 @@ from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecord
 from sqlbuild.adapter.relations.main.resolve_qualified_name_parts import (
     resolve_qualified_name_parts,
 )
+from sqlbuild.executor.load._helpers.cursor_window import self_managed_cursor_window
 from sqlbuild.executor.load._helpers.execution import load_resource_kind
 from sqlbuild.executor.load._helpers.loader_invocation import (
     build_loader_context,
@@ -131,6 +132,13 @@ def _execute_source_load(
                 runtime=runtime,
                 sqlbuild=context,
             )
+        cursor_value, cursor_end = self_managed_cursor_window(
+            source_entry=source_entry,
+            runtime=runtime,
+            adapter=adapter,
+            connection=connection,
+            statement_recorder=statement_recorder,
+        )
         with (
             CostContext.resource_scope(
                 resource_type="loader", resource_name=loader_function.name, phase="load"
@@ -145,6 +153,9 @@ def _execute_source_load(
                     source=loader_function.name,
                     connection=Connection({}, {}),
                     logger=context.logger,
+                    cursor_column=source_entry.cursor_column,
+                    cursor_value=cursor_value,
+                    cursor_end=cursor_end,
                     is_reload=runtime.is_reload,
                 ),
                 providers=runtime.providers,

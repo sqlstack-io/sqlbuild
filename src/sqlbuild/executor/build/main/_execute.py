@@ -6,7 +6,7 @@ from contextlib import AbstractContextManager, nullcontext
 from dataclasses import replace
 from typing import Any
 
-from sqlbuild._native import PlanOutput, RetentionPlanPhase, aggregate_build_result
+from sqlbuild._native import PlanOutput, RetentionPlanPhase, SourceEntry, aggregate_build_result
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.relations.main.relation_metadata_cache_scope import (
     relation_metadata_cache_scope,
@@ -39,6 +39,7 @@ from sqlbuild.executor.dynamic_pauses.classes.dynamic_hold import DynamicHold
 from sqlbuild.executor.dynamic_pauses.main.hold_dynamic_models import (
     hold_dynamic_models,
 )
+from sqlbuild.executor.load.main._cursor_window import refuse_loaders_without_cursor
 from sqlbuild.executor.load.models import LoadExecutionResult
 from sqlbuild.executor.migrations.main._apply import apply_model_migrations
 from sqlbuild.executor.migrations.main._apply_columns import apply_column_migrations
@@ -61,6 +62,22 @@ def execute_build_plan(
 ) -> BuildExecutionResult:
     """Execute a build plan with the DAG scheduler, holding the dynamic models it touches."""
 
+    loaded_sources: list[SourceEntry] = [
+        plan.source_map[entry.key.name] for entry in plan.source_load_entries
+    ]
+    _ = refuse_loaders_without_cursor(
+        loaders=(
+            (source.loader, source.cursor_column)
+            for source in loaded_sources
+            if source.loader is not None
+        ),
+        window=(
+            runtime.start_cursor_ts,
+            runtime.end_cursor_ts,
+            runtime.start_cursor_int,
+            runtime.end_cursor_int,
+        ),
+    )
     hold: DynamicHold | None = hold_dynamic_models(
         plan=plan, adapter=adapter, runtime=runtime, connection_config=connection_config
     )

@@ -21,6 +21,7 @@ from sqlbuild._native import (
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.compiler.python_nodes.types import PythonNodeKind, PythonNodeStatus, SkipMode
 from sqlbuild.errors.contracts.exceptions import ExecutorInputError
+from sqlbuild.executor.load.main._cursor_window import refuse_loaders_without_cursor
 from sqlbuild.executor.load.main._execute import execute_source_load
 from sqlbuild.executor.load.main._persist_result import persist_loader_result
 from sqlbuild.executor.load.main._resource_kind import load_resource_kind
@@ -84,14 +85,28 @@ def execute_ingress_python_loader_nodes(
     source_by_loader_name: dict[str, SourceEntry] = {
         source.loader: source for source in source_map.values() if source.loader is not None
     }
+    ingress_loader_names: frozenset[str] = frozenset(
+        name
+        for name in selected_python_names
+        if python_graph.nodes_by_name[name].kind == PythonNodeKind.LOADER
+    )
+    _ = refuse_loaders_without_cursor(
+        loaders=(
+            (name, loader_by_name[name].cursor_column)
+            for name in ingress_loader_names
+            if name in loader_by_name
+        ),
+        window=(
+            runtime.start_cursor_ts,
+            runtime.end_cursor_ts,
+            runtime.start_cursor_int,
+            runtime.end_cursor_int,
+        ),
+    )
     lifecycle_nodes: tuple[LifecycleExecutionNode, ...] = build_ingress_lifecycle_nodes(
         plan=PythonSqlRunLifecyclePlan(
             ingress_python_node_names=selected_python_names,
-            ingress_loader_names=frozenset(
-                name
-                for name in selected_python_names
-                if python_graph.nodes_by_name[name].kind == PythonNodeKind.LOADER
-            ),
+            ingress_loader_names=ingress_loader_names,
             read_side_python_node_names=frozenset(),
         ),
         python_graph=python_graph,

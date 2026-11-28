@@ -72,7 +72,7 @@ own option. `--version` works only directly after `sqb`, as in `sqb --version`:
 | `--concurrency` | Number of worker connections (default: 1) |
 | `--test-timeout <duration>` | Time limit for each unit test the build runs, such as `30s`, or `disabled`; see [Time limits](../concepts/testing-reference.md#time-limits) |
 | `--verbose`, `-v` | Show lifecycle SQL inline after each model |
-| `--start-cursor` | Override the start cursor, typed from the selected incremental models' cursor type; fails with `S303` if the selection mixes timestamp and integer cursors. With no cursor model selected, an integer value is read as an integer cursor and anything else as an ISO timestamp |
+| `--start-cursor` | Override the start cursor, typed from the selected incremental models' cursor type; fails with `S303` if the selection mixes timestamp and integer cursors. With no cursor model selected, an integer value is read as an integer cursor and anything else as an ISO timestamp. Loaders get it as `ctx.cursor_value`; a loaded source whose loader declares no `cursor_column` fails the build before it starts |
 | `--end-cursor` | Override the end cursor, typed the same way as `--start-cursor` |
 | `--start-cursor-ts` | Override start cursor for timestamp incremental models (ISO format); each model fits the window to its own [`cursor_start`](../concepts/incremental.md#explicit-cursor-windows) |
 | `--end-cursor-ts` | Override end cursor for timestamp incremental models (ISO format) |

@@ -236,7 +236,8 @@ def raw_order_events(ctx):
 
 `ctx.cursor_value` is the current `MAX(cursor_column)` of the target, or `None` on the first load,
 so the loader fetches only new or updated data. `--start-cursor` and `--end-cursor` on
-[`sqb load`](../../cli/load.md) and `sqb build` set the window instead. A row outside the window fails
+[`sqb load`](../../cli/load.md) and `sqb build` set the window instead; every loader the run loads
+then needs a `cursor_column`, and one without fails the run before anything loads. A row outside the window fails
 the load, so a loader fetches only what the window covers. The source it fills declares its columns
 as any managed source does:
 
@@ -344,7 +345,7 @@ sources:
         type: VARCHAR
 ```
 
-Self-managed loaders are useful when you want to use adapter-specific SQL (e.g. `COPY INTO`, external tables), call an external ingestion tool, or handle writes in a way that doesn't fit returning rows. SQLLoad doesn't run them, so they have no cursor window, saved state or `ctx.http()`.
+Self-managed loaders are useful when you want to use adapter-specific SQL (e.g. `COPY INTO`, external tables), call an external ingestion tool, or handle writes in a way that doesn't fit returning rows. SQLLoad doesn't run them, so they have no saved state or `ctx.http()`. With a `cursor_column`, they read the same cursor window as other loaders, in `ctx.cursor_value` and `ctx.cursor_end`, and write only that window themselves.
 
 Details:
 

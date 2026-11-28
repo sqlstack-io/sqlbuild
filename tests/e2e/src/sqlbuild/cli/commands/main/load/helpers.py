@@ -468,3 +468,48 @@ def build_native_column_project_files(
             f"    return {rows}\n",
         ),
     )
+
+
+_SELF_MANAGED_CURSOR_LOADER: str = '''from sqlbuild.loaders import loader
+
+
+@loader(cursor_column="load_seq")
+def raw_events(ctx):
+    """Events the loader writes itself, with the window each load saw."""
+    ctx.execute_sql(
+        f"CREATE TABLE IF NOT EXISTS {ctx.destination} "
+        "(load_seq BIGINT, seen_start VARCHAR, seen_end VARCHAR)"
+    )
+    ctx.execute_sql(
+        f"INSERT INTO {ctx.destination} SELECT COALESCE(MAX(load_seq), 0) + 1, "
+        f"'{ctx.cursor_value}', '{ctx.cursor_end}' FROM {ctx.destination}"
+    )
+'''
+
+
+def build_self_managed_cursor_project_files() -> dict[str, str]:
+    """A self-managed loader with a cursor_column that records its window, and a replace loader
+    without one."""
+
+    return build_schema_behavior_project_files(
+        source_yaml=(
+            "sources:\n"
+            "  - name: raw_events\n    description: Events the loader writes itself.\n"
+            "    managed: true\n"
+            "  - name: raw_codes\n    description: Status codes.\n    managed: true\n"
+        ),
+        node_files={
+            "python/nodes/loaders/raw_events/loader.py": _SELF_MANAGED_CURSOR_LOADER,
+            "python/nodes/loaders/raw_codes/loader.py": (
+                "from sqlbuild.loaders import loader\n\n\n"
+                "@loader(write_strategy='replace')\n"
+                "def raw_codes(ctx):\n"
+                "    '''Status codes.'''\n"
+                "    return [{'code': 1}]\n"
+            ),
+            "python/nodes/loaders/__init__.py": (
+                "from .raw_codes.loader import raw_codes\n"
+                "from .raw_events.loader import raw_events\n"
+            ),
+        },
+    )

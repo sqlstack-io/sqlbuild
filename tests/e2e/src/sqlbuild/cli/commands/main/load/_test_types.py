@@ -140,3 +140,24 @@ class NativeColumnTypesE2ETestCase:
     rows: str
     expected_types: tuple[tuple[str, str], ...]
     expected_rows: tuple[tuple[object, ...], ...]
+
+
+@dataclass(frozen=True)
+class SelfManagedCursorWindowE2ETestCase:
+    """Two loads of a self-managed cursor loader, and the window each one saw."""
+
+    description: str
+    first_command: tuple[str, ...]
+    second_command: tuple[str, ...]
+    expected_windows: tuple[tuple[object, ...], ...]
+
+
+@dataclass(frozen=True)
+class LoaderCursorWindowRefusalE2ETestCase:
+    """A window flag on a selection with a loader that declares no cursor_column."""
+
+    description: str
+    command: tuple[str, ...]
+    expected_return_code: int
+    expected_error_fragment: str
+    expected_loaded_tables: tuple[tuple[object, ...], ...]

@@ -24,7 +24,7 @@ sqb --project-dir <path> load [flags]
 | `--exclude` | Selectors to leave out |
 | `--reload` | Reload managed sources from scratch: each table is rebuilt from what its loader returns, with `ctx.is_reload` `True` and `ctx.cursor_value` `None` |
 | `--concurrency` | Number of worker connections (default: from settings or 1) |
-| `--start-cursor` | Where loaders' cursor windows start, as `ctx.cursor_value`: an integer, or an ISO timestamp |
+| `--start-cursor` | Where loaders' cursor windows start, as `ctx.cursor_value`: an integer, or an ISO timestamp. Every selected loader needs a `cursor_column`; otherwise the run fails before loading, naming the loader |
 | `--end-cursor` | Where they end, not included, as `ctx.cursor_end`; typed the same way as `--start-cursor` |
 | `--start-cursor-ts`, `--end-cursor-ts` | The window's bounds as ISO timestamps |
 | `--start-cursor-int`, `--end-cursor-int` | The window's bounds as integers |
