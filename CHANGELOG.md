@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.265.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.264.0...v0.265.0) (2026-11-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* sqlbuild.dbt is removed; import jinja and override from sqlbuild.macros.
+
+### Features
+
+* sqlbuild.dbt is now sqlbuild.macros ([#1645](https://github.com/sqlstack-io/sqlbuild/issues/1645)) ([f21d215](https://github.com/sqlstack-io/sqlbuild/commit/f21d215db173844a3b5928c5c66934bd538220c4))
+
 ## [0.264.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.263.1...v0.264.0) (2026-11-28)
 
 
