@@ -147,8 +147,8 @@ Details:
   renders empty, as in dbt.
 - Only a bare macro name passed as a keyword value counts as a call. Passing a macro
   positionally, or to any other function, fails with `P001`.
-- Importing `sqlbuild.dbt` without the dbt extra fails with an `ImportError` that names
-  `sqlbuild[dbt]`.
+- Without the dbt extra, calling `jinja` fails with an `ImportError` that names `sqlbuild[dbt]`;
+  `override` needs no extra.
 
 ## Macro context
 

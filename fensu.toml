@@ -1577,6 +1577,12 @@ reason = "importlib calls meta-path finders positionally as find_spec(fullname, 
 
 [[targets.python.rule_exceptions]]
 rule = "FFS120"
+path = "src/sqlbuild/integrations/dbt/main/render_jinja.py"
+symbols = ["jinja"]
+reason = "jinja takes its template positional-only so that any name, `template` included, can be passed to the template as a keyword."
+
+[[targets.python.rule_exceptions]]
+rule = "FFS120"
 path = "src/sqlbuild/refs.py"
 symbols = ["job", "tag"]
 reason = "Like model(name), job and tag take the job or tag name positionally, as authors write depends_on=job(\"orders_job\")."

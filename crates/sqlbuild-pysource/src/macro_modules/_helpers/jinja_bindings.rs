@@ -10,8 +10,7 @@ use crate::macro_modules::constants::{
     JINJA_FUNCTION, JINJA_MODULE, MODULE_SEPARATOR, STAR_IMPORT_NAME,
 };
 
-/// The names `from sqlbuild.dbt import jinja` binds that no other module-level binding or
-/// `global` declaration rebinds; none when a module-level star import may rebind any name.
+/// Names `from sqlbuild.dbt import jinja` binds that nothing else rebinds; none after a star import.
 pub(crate) fn jinja_bindings(module: &ModModule) -> HashSet<String> {
     if module.body.iter().any(|statement| {
         matches!(statement, Stmt::ImportFrom(import)
