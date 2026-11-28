@@ -313,6 +313,12 @@ jobs:
           path: dist
           run-id: ${{ inputs.prebuilt-run-id }}
           github-token: ${{ github.token }}
+      # Catches a wheel too large for PyPI on the pull request that grows it; Publish checks every
+      # distribution again before it uploads any.
+      - name: Check wheel sizes against the PyPI upload limit
+        if: inputs.prebuilt-run-id == ''
+        shell: bash
+        run: scripts/check_distribution_sizes.sh dist/*.whl
       - name: Smoke test installed wheels and native console entry points
         shell: bash
         env:
