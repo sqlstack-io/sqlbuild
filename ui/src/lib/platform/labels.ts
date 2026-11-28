@@ -330,9 +330,9 @@ export function stopsRuns(event: Pick<PlatformEvent, 'locationId' | 'stopsRuns'>
 export function problemPhrase(event: Pick<PlatformEvent, 'kind' | 'severity' | 'state'>): string {
 	if (event.kind === 'location_broken') return ' isn’t checking in';
 	if (event.kind === 'connection_test_failed' || (event.kind === 'location_failing' && event.state === 'degraded')) return ' can’t connect';
-	if (event.kind === 'location_failing' && event.state === 'falling_back') return ' is running its previous version';
 	// copy-allow: the banner's "<location>: <problem>" form, as the product owner set it
 	if (event.kind === 'location_failing' && event.severity === 'critical') return ': deploy failed';
+	if (event.kind === 'location_failing' && event.state === 'falling_back') return ' is running its previous version';
 	return `: ${eventKindLabel[event.kind].toLowerCase()}`;
 }
 

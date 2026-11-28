@@ -15,10 +15,13 @@ use crate::platform::main::work::request_location_work::request_location_work;
 use crate::platform::main::work::request_republish::request_republish;
 use crate::platform::models::{
     LocationFact, LocationHealth, LocationHealthReport, LocationVerdict, LocationWork,
-    LocationWorkRequest, PersonWorkRequest, ProblemTier,
+    LocationWorkRequest, PersonWorkRequest, ProblemTier, WarehouseReadFailure,
+    WarehouseSyncFailure,
 };
 use crate::platform::tests::helpers::{one_schedule_snapshot, sync};
-use crate::platform::tests::test_types::{ProblemVerdictTestCase, SyncHealthTestCase};
+use crate::platform::tests::test_types::{
+    AgedHealthTestCase, ProblemVerdictTestCase, SyncHealthTestCase,
+};
 use crate::runs::tests::helpers::snapshot;
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
@@ -388,6 +391,141 @@ fn given_a_location_whose_only_open_problem_is_an_overdue_schedule_when_read_the
                     vec![(late, test_case.expected_tick_tier)],
                 ),
                 "{}: only the location with an open problem needs attention, and its tick says so too",
+                test_case.description
+            );
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_long_running_locations_when_their_history_ages_out_then_a_pruned_check_is_not_untested_and_a_lone_failing_sync_is_listed()
+ {
+    let healthy = LocationVerdict {
+        fact: LocationFact::Healthy,
+        tier: None,
+    };
+    let untested = LocationVerdict {
+        fact: LocationFact::NotTested,
+        tier: Some(ProblemTier::NeedsAttention),
+    };
+    let test_cases = [
+        AgedHealthTestCase {
+            description: "SQLite",
+            backend: Backend::Sqlite,
+            expected_aged: healthy,
+            expected_untested: untested,
+        },
+        AgedHealthTestCase {
+            description: "PostgreSQL",
+            backend: Backend::Postgres,
+            expected_aged: healthy,
+            expected_untested: untested,
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let context = AuditContext {
+                actor: "control-store-owner".into(),
+                granting_role: "control-store-owner".into(),
+                request_id: Uuid::now_v7(),
+                ip_address: None,
+            };
+            let admin = bootstrap_user(store, &context, "orders-admin")
+                .await
+                .expect("admin");
+            let started = chrono::Utc::now() - TimeDelta::days(8);
+            let mut locations = Vec::new();
+            for name in ["orders", "inventory", "fulfillment"] {
+                let location = create_location(store, name, "test-owner")
+                    .await
+                    .expect("location");
+                publish_snapshot(store, &snapshot(location))
+                    .await
+                    .expect("publish");
+                // Each process started 8 days ago, so its startup check has left the history.
+                let session = Uuid::new_v7(uuid::Timestamp::from_unix(
+                    uuid::NoContext,
+                    u64::try_from(started.timestamp()).expect("after 1970"),
+                    0,
+                ));
+                report_location_health(
+                    store,
+                    location,
+                    &LocationHealthReport {
+                        event_id: Uuid::now_v7(),
+                        session_id: session,
+                        target: "development".into(),
+                        health: LocationHealth::Heartbeat {},
+                    },
+                )
+                .await
+                .expect("checking in");
+                locations.push((location, session));
+            }
+            let [(aged, _), (fresh, _), (failing, session)] = locations[..] else {
+                unreachable!("three locations");
+            };
+            let transaction = begin(store, TransactionMode::Write).await.expect("age");
+            let (transaction, _) = query(
+                transaction,
+                "UPDATE sqb_snapshots SET published_at=$1 WHERE location_id IN ($2, $3)",
+                vec![
+                    Parameter::Time(started),
+                    Parameter::Id(aged),
+                    Parameter::Id(failing),
+                ],
+            )
+            .await
+            .expect("published 8 days ago");
+            commit(transaction).await.expect("aged");
+            let mut report = sync(
+                0,
+                Some(WarehouseSyncFailure::Read),
+                (Some(WarehouseReadFailure::Unreachable {}), false),
+            )
+            .report;
+            (report.session_id, report.target) = (session, "development".into());
+            report_location_health(store, failing, &report)
+                .await
+                .expect("failing sync");
+            let caps = ServerPoolCaps::default();
+            let mut verdicts = Vec::new();
+            for location in [aged, fresh] {
+                verdicts.push(
+                    read_person_location_health(
+                        store,
+                        (&context, admin),
+                        (location, "development"),
+                        (DefaultRole::None, &caps),
+                    )
+                    .await
+                    .expect("health")
+                    .verdict,
+                );
+            }
+            let problems = read_person_problems(store, admin, DefaultRole::None)
+                .await
+                .expect("problems");
+            assert_eq!(
+                (
+                    verdicts,
+                    problems
+                        .failing_syncs
+                        .iter()
+                        .map(|sync| sync.location_id)
+                        .collect::<Vec<_>>(),
+                ),
+                (
+                    vec![test_case.expected_aged, test_case.expected_untested],
+                    vec![failing],
+                ),
+                "{}: a version older than the history counts as tested at its publish, an unchecked recent one doesn't, and a failing sync is listed though nothing else is open",
                 test_case.description
             );
             close_test_store(fixture).await;

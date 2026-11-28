@@ -29,9 +29,19 @@ pub async fn read_person_problems(
                 .map(|location| (location.location_id, location.target.clone())),
         )
         .chain(
+            scan.failing_syncs
+                .iter()
+                .map(|sync| (sync.location_id, sync.target.clone())),
+        )
+        .chain(
             scan.stalled_syncs
                 .iter()
                 .map(|sync| (sync.location_id, sync.target.clone())),
+        )
+        .chain(
+            scan.failing_sinks
+                .iter()
+                .map(|sink| (sink.location_id, sink.target.clone())),
         )
         .chain(scan.late_targets.iter().cloned())
         .chain(

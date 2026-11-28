@@ -80,7 +80,7 @@ function initial(scenario: SyncScenario, now: number): State {
 		events: [
 			event('location_failing', fallback ? 'warning' : 'critical', `waffle-shop · prod: latest code failed to load: ${LOAD_ERROR}. ${fallback ? 'Serving generation 43.' : 'Runs are held until a deploy loads.'}`, {
 				id: 'scenario-deploy',
-				state: fallback ? 'falling_back' : 'held',
+				state: 'falling_back',
 				stopsRuns: !fallback,
 				occurredAt: iso(now - 5 * 60_000)
 			})

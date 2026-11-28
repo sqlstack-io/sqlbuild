@@ -45,6 +45,13 @@ pub async fn read_person_location_health(
     let (transaction, requested) = pending_sync(transaction, (location_id, target)).await?;
     warehouse_sync.requested = requested;
     let (transaction, tested_at) = tested_at(transaction, (location_id, target)).await?;
+    // A location checks its connection only when it starts and publishes, so a version older than the health history has had its check pruned, not skipped.
+    let tested_at = tested_at.or_else(|| {
+        snapshot
+            .as_ref()
+            .map(|snapshot| snapshot.published_at)
+            .filter(|at| now - *at > TimeDelta::days(LOCATION_RETENTION_DAYS))
+    });
     let (transaction, problems) =
         location_problems(transaction, Some((location_id, target))).await?;
     let verdict = LocationVerdict::of(

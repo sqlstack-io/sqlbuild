@@ -304,6 +304,9 @@ async fn rejection(response: reqwest::Response, action: &str) -> std::io::Error 
         return std::io::Error::other("CLI session is unavailable or revoked; run sqb login again");
     }
     match response.json::<ApiErrorBody>().await {
+        Ok(body) if status == reqwest::StatusCode::CONFLICT => {
+            std::io::Error::other(format!("{action} refused: {}", body.error))
+        }
         Ok(body) => std::io::Error::other(format!(
             "{action} rejected (HTTP {}{})",
             status.as_u16(),

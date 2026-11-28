@@ -105,3 +105,13 @@ describe('stopsRuns', () => {
 		expect(stopsRuns({ locationId: null, stopsRuns: true })).toBe(false);
 	});
 });
+
+describe('problemPhrase', () => {
+	it('tells a failed deploy with nothing to fall back on from one running its previous version, though the server calls both falling back', async () => {
+		const { problemPhrase } = await import('./labels');
+		expect({
+			held: problemPhrase({ kind: 'location_failing', severity: 'critical', state: 'falling_back' }),
+			previous: problemPhrase({ kind: 'location_failing', severity: 'warning', state: 'falling_back' })
+		}).toEqual({ held: ': deploy failed', previous: ' is running its previous version' });
+	});
+});

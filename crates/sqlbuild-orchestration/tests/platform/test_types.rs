@@ -164,6 +164,15 @@ pub(crate) struct ProblemVerdictTestCase {
     pub(crate) expected_calm: crate::platform::models::LocationVerdict,
 }
 
+pub(crate) struct AgedHealthTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The location running a version older than the health history, its connection check pruned.
+    pub(crate) expected_aged: crate::platform::models::LocationVerdict,
+    /// The location published within the health history and never checked.
+    pub(crate) expected_untested: crate::platform::models::LocationVerdict,
+}
+
 pub(crate) struct FailingSyncTestCase {
     pub(crate) description: &'static str,
     /// Newest first, as `recent_health` returns them.
