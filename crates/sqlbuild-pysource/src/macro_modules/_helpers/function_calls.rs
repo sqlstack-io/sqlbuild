@@ -15,7 +15,7 @@ pub(crate) struct CallNames<'a> {
     /// Local binding to imported macro name.
     pub(crate) imported: &'a HashMap<String, String>,
     pub(crate) functions: &'a HashSet<String>,
-    /// Local bindings of `sqlbuild.dbt.jinja`, whose keyword arguments may pass macros.
+    /// Local bindings of `sqlbuild.macros.jinja`, whose keyword arguments may pass macros.
     pub(crate) jinja: &'a HashSet<String>,
     pub(crate) display: &'a str,
 }

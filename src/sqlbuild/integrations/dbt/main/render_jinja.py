@@ -28,7 +28,7 @@ def _template_render(template: str) -> Callable[..., str]:
         from sqlbuild.integrations.dbt.classes.dbt_name_undefined import DbtNameUndefined
     except ImportError as error:
         raise ImportError(
-            "sqlbuild.dbt.jinja requires Jinja. Install SQLBuild's dbt extra with: "
+            "sqlbuild.macros.jinja requires Jinja. Install SQLBuild's dbt extra with: "
             'pip install "sqlbuild[dbt]"'
         ) from error
     return Template(
