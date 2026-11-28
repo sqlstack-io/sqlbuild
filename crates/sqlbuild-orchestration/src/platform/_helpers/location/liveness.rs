@@ -1,4 +1,4 @@
-//! Liveness is derived across all sessions; an old instance cannot mask a healthy successor.
+//! Liveness is derived across all sessions; an old instance cannot mask a healthy successor, and work for a silent target is refused.
 
 use chrono::TimeDelta;
 use uuid::Uuid;
@@ -6,13 +6,13 @@ use uuid::Uuid;
 use crate::platform::_helpers::health::failing_locations::failing_locations;
 use crate::platform::_helpers::health::observations::observe;
 use crate::platform::constants::LOCATION_SILENCE_SECONDS;
-use crate::platform::models::{PlatformEvent, WatchdogLocation};
+use crate::platform::models::{LastCheckIn, PlatformEvent, WatchdogLocation};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
 use crate::store::main::decode_row::decode_row;
 use crate::store::main::query::query;
-use crate::store::models::{ControlStore, Parameter, TransactionMode};
+use crate::store::models::{ControlStore, ControlTransaction, Parameter, TransactionMode};
 
 /// Locations report every 30 seconds; tolerate two missed reports.
 pub(crate) async fn scan_location_page(
@@ -93,4 +93,41 @@ pub(crate) async fn observe_failing_locations(
     }
     commit(transaction).await?;
     Ok(())
+}
+
+/// Refuse work for a target that isn't checking in, at once and saying since when; `what` is what it can't do.
+pub(crate) async fn require_checking_in(
+    transaction: ControlTransaction,
+    (location_id, target): (Uuid, &str),
+    what: &str,
+) -> Result<ControlTransaction, ControlError> {
+    let now = transaction.now;
+    let (transaction, rows) = query(
+        transaction,
+        "SELECT MAX(last_seen_at) AS last_seen_at FROM sqb_location_instances WHERE location_id=$1 AND target=$2",
+        vec![Parameter::Id(location_id), Parameter::Text(target.to_owned())],
+    )
+    .await?;
+    let seen: Option<LastCheckIn> = rows.into_iter().next().map(decode_row).transpose()?;
+    match seen.and_then(|seen| seen.last_seen_at) {
+        Some(at) if now - at <= TimeDelta::seconds(LOCATION_SILENCE_SECONDS) => Ok(transaction),
+        Some(at) => Err(ControlError::NotCheckingIn(format!(
+            "The location isn't checking in (last check-in {} ago), so it can't {what}. Start it, then try again.",
+            silence_words(now - at)
+        ))),
+        None => Err(ControlError::NotCheckingIn(format!(
+            "The location hasn't checked in yet, so it can't {what}. Start it, then try again."
+        ))),
+    }
+}
+
+/// How long a location has been silent, short: `6m`, `3h`, `2d`.
+fn silence_words(silence: TimeDelta) -> String {
+    if silence < TimeDelta::hours(1) {
+        format!("{}m", silence.num_minutes().max(1))
+    } else if silence < TimeDelta::days(1) {
+        format!("{}h", silence.num_hours())
+    } else {
+        format!("{}d", silence.num_days())
+    }
 }

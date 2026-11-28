@@ -20,7 +20,8 @@ use crate::store::models::ControlStore;
     params(("location_id" = Uuid, Path), ("target" = String, Path), ("x-sqb-csrf" = String, Header)),
     request_body = PersonWorkRequest,
     responses((status = 200, body = MutationResponse), (status = 400, body = crate::api::models::ApiErrorBody),
-        (status = 401, description = "Session rejected"), (status = 403, body = crate::api::models::ApiErrorBody)),
+        (status = 401, description = "Session rejected"), (status = 403, body = crate::api::models::ApiErrorBody),
+        (status = 409, description = "The location isn't checking in", body = crate::api::models::ApiErrorBody)),
     security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn request(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
@@ -42,7 +43,8 @@ pub(crate) async fn request(
     params(("location_id" = Uuid, Path), ("target" = String, Path), ("x-sqb-csrf" = String, Header)),
     request_body = PersonWorkRequest,
     responses((status = 200, body = MutationResponse), (status = 400, body = crate::api::models::ApiErrorBody),
-        (status = 401, description = "Session rejected"), (status = 403, body = crate::api::models::ApiErrorBody)),
+        (status = 401, description = "Session rejected"), (status = 403, body = crate::api::models::ApiErrorBody),
+        (status = 409, description = "The location isn't checking in", body = crate::api::models::ApiErrorBody)),
     security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn request_sync(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),

@@ -583,7 +583,7 @@ describe('locations', () => {
 						overdue_ticks: []
 					});
 				if (path.includes('/targets/preview/')) return Response.json({ error: 'refused' }, { status: 403 });
-				if (path.endsWith('/health')) return Response.json({ state: 'healthy', observations: [report('s-2', 10), report('s-1', 400), report('s-2', 20)] });
+				if (path.endsWith('/health')) return Response.json({ verdict: { fact: 'healthy', tier: null }, warehouse_sync: { failing: false }, state: 'healthy', observations: [report('s-2', 10), report('s-1', 400), report('s-2', 20)] });
 				return Response.json([]);
 			})
 		);
@@ -610,9 +610,9 @@ describe('locations', () => {
 
 	it("counts open problems per location target, with the server's state of each", async () => {
 		const listed = await server().client.listLocations();
-		expect(listed.map((l) => [l.id, l.activeProblems, l.health])).toEqual([
-			['0191f0aa-orders:development', 1, 'healthy'],
-			['0191f0aa-orders:preview', 0, null]
+		expect(listed.map((l) => [l.id, l.activeProblems, l.health, l.verdict])).toEqual([
+			['0191f0aa-orders:development', 1, 'healthy', { fact: 'healthy', stopsRuns: false }],
+			['0191f0aa-orders:preview', 0, null, null]
 		]);
 	});
 });
@@ -1130,7 +1130,7 @@ describe('listWarehouseConnections', () => {
 				if (path.endsWith('/bootstrap')) return Response.json({ login_mode: 'password', access: { name: 'ada', principal_id: 'p', actions: [], locations: [access('development'), access('preview')] } });
 				if (path.endsWith('/health')) {
 					health.push(path);
-					return path.includes('/targets/preview/') ? Response.json({ error: 'refused' }, { status: 403 }) : Response.json({ state: 'healthy', observations: [] });
+					return path.includes('/targets/preview/') ? Response.json({ error: 'refused' }, { status: 403 }) : Response.json({ verdict: { fact: 'healthy', tier: null }, warehouse_sync: { failing: false }, state: 'healthy', observations: [] });
 				}
 				return Response.json([]);
 			})

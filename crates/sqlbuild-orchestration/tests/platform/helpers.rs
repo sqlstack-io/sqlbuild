@@ -89,6 +89,21 @@ pub(crate) fn snapshot(location_id: Uuid) -> SnapshotInput {
     }
 }
 
+/// `snapshot` with one running calendar schedule whose dates last ten days, so only its lateness can be a problem.
+pub(crate) fn one_schedule_snapshot(location_id: Uuid) -> SnapshotInput {
+    let future = Utc::now() + TimeDelta::days(10);
+    let mut input = snapshot(location_id);
+    input.documents.insert(
+        "triggers".into(),
+        json!({"daily_orders": {
+            "description": "Refresh orders", "job_key": "orders",
+            "starts_at": calendar_text(0),
+            "schedule": {"kind": "calendar", "times": [calendar_text(0), future], "refresh_at": future}
+        }}),
+    );
+    input
+}
+
 pub(crate) async fn wait_for_scans(
     store: &ControlStore,
     replicas: &BTreeSet<Uuid>,
@@ -365,6 +380,19 @@ pub(crate) fn sync(
     failure: Option<crate::platform::models::WarehouseSyncFailure>,
     (read, halted): (Option<crate::platform::models::WarehouseReadFailure>, bool),
 ) -> crate::platform::models::LocationHealthObservation {
+    sync_report(minutes, failure, (read, halted, false))
+}
+
+/// A sync report received at `minutes`, failed by `failure` with `read`, stopped or not, its last page or not.
+pub(crate) fn sync_report(
+    minutes: i64,
+    failure: Option<crate::platform::models::WarehouseSyncFailure>,
+    (read, halted, completed): (
+        Option<crate::platform::models::WarehouseReadFailure>,
+        bool,
+        bool,
+    ),
+) -> crate::platform::models::LocationHealthObservation {
     crate::platform::models::LocationHealthObservation {
         received_at: at(minutes),
         report: LocationHealthReport {
@@ -389,7 +417,7 @@ pub(crate) fn sync(
                     kinds: 14,
                     rows: 0,
                     elapsed_millis: 10,
-                    completed: false,
+                    completed,
                     halted,
                 }),
                 next_sync_at: None,
@@ -418,6 +446,7 @@ pub(crate) fn failing_sync_of(
         retry_at: (!halted).then(|| at(4)),
         retry_seconds: (!halted).then_some(60),
         last_success_at: Some(at(-30)),
+        tier: crate::platform::models::ProblemTier::NeedsAttention,
     }
 }
 
@@ -465,6 +494,7 @@ pub(crate) fn failing_sink_of(sink: &str, reason: &str) -> crate::platform::mode
         reason: reason.into(),
         run_id: Some(uuid::Uuid::from_u128(3)),
         last_success_at: None,
+        tier: crate::platform::models::ProblemTier::NeedsAttention,
     }
 }
 
@@ -507,4 +537,24 @@ pub(crate) async fn skip_unreadable(store: &ControlStore) {
     crate::store::main::commit::commit(transaction)
         .await
         .expect("skipped");
+}
+
+/// A target's sync now: failing or not, and running, stalled or not, when `stalled` is present.
+pub(crate) fn sync_now(
+    failing: bool,
+    stalled: Option<bool>,
+) -> crate::platform::models::WarehouseSyncState {
+    crate::platform::models::WarehouseSyncState {
+        requested: None,
+        running: stalled.map(|stalled| crate::platform::models::RunningSync {
+            started_at: at(0),
+            progressed_at: at(1),
+            position: 2,
+            kinds: 14,
+            rows: 500,
+            table: crate::warehouse_metadata::models::WarehouseHistoryKind::ALL[0],
+            stalled,
+        }),
+        failing,
+    }
 }

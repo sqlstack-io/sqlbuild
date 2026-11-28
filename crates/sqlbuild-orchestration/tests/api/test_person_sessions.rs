@@ -4,7 +4,7 @@ use reqwest::{Method, StatusCode};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::api::tests::helpers::stop_api;
+use crate::api::tests::helpers::{check_in, stop_api};
 use crate::api::tests::oidc_helpers::{start_provider, stop_provider};
 use crate::api::tests::person_sessions_helpers::{
     browser_sessions, forged_request, queue_counts, request,
@@ -143,6 +143,7 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                 },
             );
             let published = publish_snapshot(store, &input).await.expect("publication");
+            check_in(store, location, "development").await;
             assert_eq!(
                 published.generation, test_case.expected_generation,
                 "{}",

@@ -1,10 +1,11 @@
-//! Named work requires a trusted owner or live person authority; a pending sync covers a repeated one.
+//! Named work requires a trusted owner or live person authority and a target that checks in; a pending sync covers a repeated one.
 
 use chrono::Duration;
 use uuid::Uuid;
 
 use crate::credentials::models::AuditContext;
 use crate::platform::_helpers::location::connection_tests::authorize_connection_test;
+use crate::platform::_helpers::location::liveness::require_checking_in;
 use crate::platform::main::work::enqueue_location_work::enqueue_location_work;
 use crate::platform::main::work::read_location_work::read_location_work;
 use crate::platform::models::{LocationWork, LocationWorkRequest};
@@ -62,6 +63,12 @@ pub async fn request_location_work(
         commit(transaction).await?;
         return Ok(false);
     }
+    let what = match request.work {
+        LocationWork::SyncWarehouse {} => "sync",
+        _ => "test its connection",
+    };
+    let transaction =
+        require_checking_in(transaction, (request.location_id, &request.target), what).await?;
     let transaction = if matches!(request.work, LocationWork::SyncWarehouse {}) {
         let now = transaction.now;
         let (transaction, pending) = query(transaction,
