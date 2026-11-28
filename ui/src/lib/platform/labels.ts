@@ -1,12 +1,19 @@
 // Labels, tones and pure helpers shared by the Platform and Admin pages.
 
+import { formatAgo, formatIn, formatStamp } from '$lib/format/time';
+import type { SyncNowState } from './sync-now';
+
 import type {
 	AccountSource,
 	AssignmentScope,
+	ConnectionTest,
+	RepublishResult,
 	LocationHealth,
 	Location,
 	LocationSummary,
 	LocationTarget,
+	LocationVerdictFact,
+	PlatformEvent,
 	PlatformEventKind,
 	PlatformEventLink,
 	PlatformEventReaction,
@@ -73,6 +80,7 @@ export const eventKindLabel: Record<PlatformEventKind, string> = {
 	calendar_times_dropped: 'Calendar times dropped',
 	unreadable_event_skipped: 'Stored event skipped',
 	control_session_cut_off: 'Control database session cut off',
+	warehouse_sync_stalled: 'Warehouse sync stalled',
 	scheduler_no_leader: 'Scheduler stopped',
 	location_broken: 'Location not checking in',
 	location_failing: 'Location failing',
@@ -194,3 +202,186 @@ export const discoveredStatusTone: Record<'ok' | 'failed' | 'never', string> = {
 	failed: 'var(--sb-warning)',
 	never: 'var(--sb-text-faint)'
 };
+
+// ---- action status: one set of words for every status that changes on its own ----
+//
+// Each reads "what · progress · age" in lower case after its lead (e.g. "Warehouse ● connected 54s ago"),
+// in one of five tones. "Updated" is page data, "synced" only the warehouse history sync, "tested" a
+// connection and "published" a snapshot.
+
+/** The five tones a status takes. */
+export const actionTone = {
+	ok: 'var(--sb-success)',
+	running: 'var(--sb-running)',
+	warning: 'var(--sb-warning)',
+	failed: 'var(--sb-error)',
+	never: 'var(--sb-text-faint)'
+} as const;
+export type ActionTone = keyof typeof actionTone;
+
+/** One status as a label shows it, with what its tooltip adds. */
+export type ActionWords = { tone: ActionTone; label: string; title: string };
+
+/** How long since `from` (an ISO time or epoch milliseconds), short: `4s`, `12m`, `3h`, `2d`. */
+export function elapsed(from: string | number, now: number): string {
+	const seconds = Math.max(0, Math.round((now - (typeof from === 'number' ? from : Date.parse(from))) / 1000));
+	if (seconds < 60) return `${seconds}s`;
+	if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+	if (seconds < 86_400) return `${Math.floor(seconds / 3600)}h`;
+	return `${Math.floor(seconds / 86_400)}d`;
+}
+
+/** Where a connection test came from, for its tooltip. */
+export function testOrigin(test: Pick<ConnectionTest, 'trigger' | 'by'>): string {
+	if (test.trigger === 'manual') return test.by ? `by ${test.by.name}` : 'by hand';
+	return test.trigger === 'startup' ? 'on startup' : 'on deploy';
+}
+
+/** What a connection test's tooltip says: the last test in full, or that there is none. */
+export function testTitle(test: ConnectionTest | null, deployedAt: string | null, now: number): string {
+	if (!test) return 'The location hasn’t tested its warehouse connection yet. Test connection runs the same check as sqb debug.';
+	// A failure's message is the error, shown once where the failure is listed, not in every tooltip.
+	const when = `Tested ${testOrigin(test)} · ${formatStamp(test.at)} · ${test.durationMs} ms${test.outcome === 'ok' ? `\n${test.message}` : ''}`;
+	if (test.outcome === 'ok' && deployedAt && Date.parse(test.at) < Date.parse(deployedAt)) return `Last connected ${formatAgo(test.at, now)}, before the latest deploy.\n${when}`;
+	return when;
+}
+
+/** The warehouse connection test: connected, couldn't connect, not tested since the last deploy, or never tested. */
+export function testWords(test: ConnectionTest | null, deployedAt: string | null, now: number): ActionWords {
+	const title = testTitle(test, deployedAt, now);
+	if (!test) return { tone: 'never', label: 'not tested yet', title };
+	if (test.outcome === 'failed') return { tone: 'failed', label: `couldn’t connect ${formatAgo(test.at, now)}`, title };
+	if (deployedAt && Date.parse(test.at) < Date.parse(deployedAt)) return { tone: 'warning', label: 'not tested since deploy', title };
+	return { tone: 'ok', label: `connected ${formatAgo(test.at, now)}`, title };
+}
+
+/** What a sync status's tooltip says: who asked and when, what it reads, why it fails, or when it last ran. */
+export function syncTitle(state: SyncNowState, now: number): string {
+	const what = "What's been built, checks and freshness, read back from the warehouse.";
+	switch (state.kind) {
+		case 'requested':
+			return `Requested ${state.by ? `by ${state.by} ` : ''}at ${formatStamp(new Date(state.at).toISOString())}. The location usually takes it within seconds.`;
+		case 'running':
+			return `Reading ${state.running.table.replaceAll('_', ' ')}${state.running.startedAt ? `, running since ${formatStamp(state.running.startedAt)}` : ''}. Last progress ${formatAgo(state.progressAt, now)}.\n${what}`;
+		case 'stalled':
+			return `At ${state.running.position}/${state.running.kinds} (${state.running.table.replaceAll('_', ' ')}) since ${formatStamp(state.progressAt)}, with no report since. The location may have stopped, so check its output, then Sync now.`;
+		case 'failing':
+			return `${state.failing ? `Failing since ${formatStamp(state.failing.since)}. ` : ''}${state.lastSyncedAt ? `Last synced ${formatStamp(state.lastSyncedAt)}.` : 'Not synced yet.'}`;
+		case 'synced':
+			return `Synced ${formatStamp(state.at)}. A sync also follows every run that ends.\n${what}`;
+		case 'never':
+			return what;
+	}
+}
+
+/** The warehouse history sync, from `syncNowState`. */
+export function syncWords(state: SyncNowState, now: number): ActionWords {
+	const title = syncTitle(state, now);
+	switch (state.kind) {
+		case 'requested':
+			return { tone: 'running', label: requestedLabel(state.at, now), title };
+		case 'running': {
+			const r = state.running;
+			return { tone: 'running', label: `syncing · ${r.position}/${r.kinds} kinds · ${r.rows.toLocaleString('en-US')} rows${r.startedAt ? ` · ${elapsed(r.startedAt, now)}` : ''}`, title };
+		}
+		case 'stalled':
+			return { tone: 'warning', label: `sync stalled · ${state.running.position}/${state.running.kinds} · no progress for ${elapsed(state.progressAt, now)}`, title };
+		case 'failing': {
+			const f = state.failing;
+			const since = f ? ` for ${elapsed(f.since, now)}` : '';
+			const retry = f?.halted ? ' · stopped' : f?.retryAt ? ` · retrying ${formatIn(f.retryAt, now)}` : '';
+			return { tone: 'failed', label: `failing${since}${retry}`, title };
+		}
+		case 'synced':
+			return { tone: 'ok', label: `synced ${formatAgo(state.at, now)}`, title };
+		case 'never':
+			return { tone: 'never', label: 'not synced yet', title };
+	}
+}
+
+/** A sync someone asked for that the location hasn't taken yet, with how long ago. */
+export function requestedLabel(at: number, now: number): string {
+	return `requested · waiting for the location · ${elapsed(at, now)}`;
+}
+
+/** What the deploy status's tooltip says. */
+export function publishTitle(result: RepublishResult | null, publishing: number | null, snapshot: { publishedAt: string } | null): string {
+	if (publishing !== null) return 'Compiling and publishing again, running the discover functions.';
+	if (result?.state === 'failed') return result.error ?? 'The publish failed.';
+	if (result?.state === 'expired') return 'The location didn’t take the request in time. Check it is running, then try again.';
+	return snapshot ? `Published ${formatStamp(snapshot.publishedAt)}.` : 'Nothing is deployed to this location yet.';
+}
+
+/** The deployed version, or the latest Republish: publishing, published, failed or expired. */
+export function publishWords(result: RepublishResult | null, publishing: number | null, snapshot: { generation: number; publishedAt: string } | null, now: number): ActionWords {
+	const title = publishTitle(result, publishing, snapshot);
+	if (publishing !== null) return { tone: 'running', label: `publishing · ${elapsed(publishing, now)}`, title };
+	if (result?.state === 'failed') return { tone: 'failed', label: 'publish failed', title };
+	if (result?.state === 'expired') return { tone: 'failed', label: 'request expired', title };
+	if (snapshot) return { tone: 'ok', label: `version ${snapshot.generation} · ${formatAgo(snapshot.publishedAt, now)}`, title };
+	return { tone: 'never', label: 'nothing published yet', title };
+}
+/** Whether an open problem stops a location's runs, as the server says: it isn't checking in, can't connect, or a failed deploy has nothing to fall back on. */
+export function stopsRuns(event: Pick<PlatformEvent, 'locationId' | 'stopsRuns'>): boolean {
+	return event.locationId !== null && event.stopsRuns;
+}
+
+/** A location problem as the banner says it after the location's name: " can't connect", or ": schedule overdue". */
+export function problemPhrase(event: Pick<PlatformEvent, 'kind' | 'severity' | 'state'>): string {
+	if (event.kind === 'location_broken') return ' isn’t checking in';
+	if (event.kind === 'connection_test_failed' || (event.kind === 'location_failing' && event.state === 'degraded')) return ' can’t connect';
+	// copy-allow: the banner's "<location>: <problem>" form, as the product owner set it
+	if (event.kind === 'location_failing' && event.severity === 'critical') return ': deploy failed';
+	if (event.kind === 'location_failing' && event.state === 'falling_back') return ' is running its previous version';
+	return `: ${eventKindLabel[event.kind].toLowerCase()}`;
+}
+
+const verdictLabel: Record<LocationVerdictFact['fact'], string> = {
+	not_checking_in: 'Not checking in',
+	cant_connect: 'Can’t connect',
+	deploy_failed: 'Deploy failed',
+	deploy_failed_on_previous: 'Running previous version',
+	sync_failing: 'Sync failing',
+	sync_stalled: 'Sync stalled',
+	missing_secrets: healthLabel.missing_secrets,
+	change_plan_failed: healthLabel.change_plan_failed,
+	discovery_failed: healthLabel.discovery_failed,
+	schedule_overdue: eventKindLabel.tick_overdue,
+	trigger_skipped: eventKindLabel.trigger_skipped,
+	sink_failing: eventKindLabel.event_sink_failed,
+	calendar_low: eventKindLabel.calendar_horizon_low,
+	calendar_times_dropped: eventKindLabel.calendar_times_dropped,
+	sensor_rechecked: eventKindLabel.sensor_rechecked,
+	event_skipped: eventKindLabel.unreadable_event_skipped,
+	starting: healthLabel.starting,
+	not_tested: 'Not tested',
+	healthy: 'Healthy'
+};
+
+/** The verdict's tier: green only when nothing is open, red when runs can't happen, grey when the person can't read it. */
+export type VerdictTone = 'ok' | 'warning' | 'failed' | 'unknown';
+export const verdictTone: Record<VerdictTone, string> = { ok: 'var(--sb-success)', warning: 'var(--sb-warning)', failed: 'var(--sb-error)', unknown: 'var(--sb-text-faint)' };
+
+/** A location's health everywhere it is shown: the server's verdict, red when runs can't happen; null when the person can't read it. */
+export function locationVerdict(verdict: LocationVerdictFact | null): { tone: VerdictTone; label: string } {
+	if (!verdict) return { tone: 'unknown', label: 'Unknown' };
+	if (verdict.fact === 'healthy') return { tone: 'ok', label: verdictLabel.healthy };
+	return { tone: verdict.stopsRuns ? 'failed' : 'warning', label: verdictLabel[verdict.fact] };
+}
+
+/**
+ * A problem message as a short summary and the error behind it, so the error is shown once, behind
+ * "View error": the text before the first `: ` that follows at least three words, e.g. "Run history
+ * can't reach the warehouse" and "390422 (08001): IP … is not allowed". Short messages stay whole.
+ */
+export function messageParts(message: string): { summary: string; error: string | null } {
+	for (let at = message.indexOf(': '); at > 0; at = message.indexOf(': ', at + 2)) {
+		const head = message.slice(0, at);
+		const words = head.split(/\s+/).filter((w) => /[a-z]/i.test(w)).length;
+		if (words >= 3) {
+			const rest = message.slice(at + 2).trim();
+			return rest ? { summary: head, error: rest } : { summary: message, error: null };
+		}
+	}
+	return { summary: message, error: null };
+}

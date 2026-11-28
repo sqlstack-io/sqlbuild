@@ -1,60 +1,55 @@
 <script lang="ts">
 	import type { RepublishResult, Scope } from '$lib/api';
-	import StatusLabel from '$lib/components/list/status-label.svelte';
-	import { errorMessage } from '$lib/platform/labels';
+	import { formatAgo, formatStamp } from '$lib/format/time';
+	import { errorMessage, publishWords, type ActionWords } from '$lib/platform/labels';
 	import { app } from '$lib/state/app.svelte';
-	import GatedButton from './gated-button.svelte';
+	import ActionStatus from './action-status.svelte';
 
-	/** One line, e.g. "published version 7 [Republish]"; publishing runs the discover functions. */
-	type Props = { scope: Scope; ondone?: () => void };
-	let { scope, ondone }: Props = $props();
+	/** "Deploy ● version 7 · 2h ago [Republish]"; publishing runs the discover functions. */
+	type Props = { scope: Scope; snapshot?: { generation: number; publishedAt: string } | null; ondone?: () => void };
+	let { scope, snapshot = null, ondone }: Props = $props();
 
-	let publishing = $state(false);
+	let publishing = $state<number | null>(null);
 	let result = $state<RepublishResult | null>(null);
-	let failure = $state<string | null>(null);
+	let failure = $state<{ at: number; cause: string } | null>(null);
+	let done = $state<number | null>(null);
+	const words = $derived.by((): ActionWords => {
+		if (failure && publishing === null) return { tone: 'failed', label: 'couldn’t republish', title: failure.cause };
+		if (result?.state === 'published' && done !== null && publishing === null) {
+			const version = result.generation ?? snapshot?.generation;
+			return { tone: 'ok', label: `published${version ? ` version ${version}` : ''} · ${formatAgo(new Date(done).toISOString(), Math.max(app.now, done))}`, title: 'Compiled and published again by you; the discover functions ran.' };
+		}
+		return publishWords(result, publishing, snapshot, app.now);
+	});
+	const cause = $derived(publishing !== null ? null : (failure?.cause ?? (result?.state === 'failed' ? result.error : null)));
 
 	async function republish() {
-		publishing = true;
+		publishing = Date.now();
 		result = null;
 		failure = null;
 		try {
 			result = await app.client.republish(scope);
+			done = Date.now();
 			ondone?.();
 		} catch (error) {
-			failure = errorMessage(error);
+			failure = { at: Date.now(), cause: errorMessage(error) };
 		} finally {
-			publishing = false;
+			publishing = null;
 		}
 	}
 </script>
 
-<div class="republish">
-	{#if publishing}
-		<StatusLabel tone="var(--sb-running)" label="publishing…" />
-	{:else if result?.state === 'published'}
-		<StatusLabel tone="var(--sb-success)" label="published{result.generation ? ` version ${result.generation}` : ''}" />
-	{:else if result?.state === 'failed'}
-		<span title={result.error}><StatusLabel tone="var(--sb-error)" label="publish failed" /></span>
-	{:else if result?.state === 'expired'}
-		<StatusLabel tone="var(--sb-error)" label="request expired" />
-	{/if}
-	{#if failure}<span class="err" title={failure}>{failure}</span>{/if}
-	<GatedButton requires="location.republish" busy={publishing} onclick={republish} title="Compile and publish again, running the discover functions">Republish</GatedButton>
-</div>
-
-<style>
-	.republish {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		min-width: 0;
-		margin-left: 12px;
-	}
-	.err {
-		overflow: hidden;
-		color: var(--sb-error);
-		font-size: 12px;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-</style>
+<ActionStatus
+	lead="Deploy"
+	{words}
+	{cause}
+	testid="republish"
+	action={{
+		label: 'Republish',
+		requires: 'location.republish',
+		onclick: republish,
+		busy: publishing !== null,
+		busyTitle: publishing !== null ? `Publishing since ${formatStamp(new Date(publishing).toISOString())}` : undefined,
+		title: 'Compile and publish again, running the discover functions'
+	}}
+/>

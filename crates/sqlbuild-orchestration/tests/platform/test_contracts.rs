@@ -22,6 +22,10 @@ mod test_problems;
 mod test_provider_secrets;
 #[path = "test_skipped_event_dismissal.rs"]
 mod test_skipped_event_dismissal;
+#[path = "test_sync_health.rs"]
+mod test_sync_health;
+#[path = "test_sync_state.rs"]
+mod test_sync_state;
 #[path = "test_types.rs"]
 mod test_types;
 #[path = "test_unreadable_events.rs"]

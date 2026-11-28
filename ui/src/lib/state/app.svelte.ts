@@ -40,6 +40,10 @@ class AppState {
 	/** Wall clock, ticking every second, for ages and elapsed times. */
 	now = $state(Date.now());
 	connection = $state<ConnectionState>('connecting');
+	/** When live updates last reached the page; while they flow, pages are current, so it only shows once they drop. */
+	updatedAt = $state(Date.now());
+	/** What the page shown reads again on Reconnect; set by the page's `RefreshButton`. */
+	#pageRefresh: (() => void) | null = null;
 	navCounts = $state<NavCounts | null>(null);
 	platformEvents = $state<PlatformEvent[]>([]);
 	warehouseSync = $state<WarehouseSync | null>(null);
@@ -82,6 +86,17 @@ class AppState {
 	/** Ends the session; only the server client has one. */
 	readonly signOut: (() => Promise<void>) | null;
 
+	/** The page's own reread, for Reconnect; null when the page leaves. */
+	setPageRefresh(refresh: (() => void) | null): void {
+		this.#pageRefresh = refresh;
+	}
+
+	/** Follow the change feed again now instead of waiting for its next retry, and read the page again, as it may be behind. */
+	reconnect(): void {
+		this.client.changes.follow(this.scope);
+		this.#pageRefresh?.();
+	}
+
 	can(capability: Capability): boolean {
 		return hasCapability(this.capabilities, capability);
 	}
@@ -96,7 +111,10 @@ class AppState {
 			// The change feed backed off while the server couldn't answer; follow it again now.
 			else if (this.bootstrap) this.client.changes.follow(this.scope);
 		});
-		this.client.changes.onConnectionState((state) => (this.connection = state));
+		this.client.changes.onConnectionState((state) => {
+			if (this.connection === 'live' && state !== 'live') this.updatedAt = Date.now();
+			this.connection = state;
+		});
 		this.client.changes.subscribe((signal) => {
 			if (channelMatches(signal.channel, ['platform_events', 'warehouse_sync', 'location_health'])) void this.#loadPlatformEvents();
 			if (channelMatches(signal.channel, ['warehouse_sync'])) void this.#loadWarehouseSync();

@@ -57,6 +57,7 @@ impl From<ControlError> for ApiError {
         };
         match error {
             ControlError::Invalid(message) => plain(StatusCode::BAD_REQUEST, message, None),
+            ControlError::NotCheckingIn(message) => plain(StatusCode::CONFLICT, message, None),
             ControlError::Denied {
                 reason,
                 decision_id,

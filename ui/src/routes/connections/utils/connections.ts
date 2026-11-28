@@ -2,6 +2,7 @@
 
 import type { ConnectionTest, WarehouseConnection } from '$lib/api';
 import { formatCount, lastFullSync } from '$lib/platform/connections';
+import { testOrigin } from '$lib/platform/labels';
 import { formatAgo, formatIn, formatStamp } from '$lib/format/time';
 
 export type Table = WarehouseConnection['tables'][number];
@@ -12,13 +13,11 @@ export const where = (s: { database: string | null; schema: string }) => (s.data
 /** e.g. "waffle-shop · prod". */
 export const targetName = (c: Pick<WarehouseConnection, 'location' | 'target'>) => `${c.location} · ${c.target}`;
 
-const TRIGGER: Record<ConnectionTest['trigger'], string> = { startup: 'on startup', publish: 'after deploy', manual: 'manual' };
+/** e.g. "connected 3h ago", in the words every page uses. */
+export const checkWords = (t: ConnectionTest, now: number) => `${t.outcome === 'ok' ? 'connected' : 'couldn’t connect'} ${formatAgo(t.at, now)}`;
 
-/** e.g. "Passed 3h ago". */
-export const checkWords = (t: ConnectionTest, now: number) => `${t.outcome === 'ok' ? 'Passed' : 'Failed'} ${formatAgo(t.at, now)}`;
-
-/** e.g. "after deploy · 820 ms". */
-export const checkOrigin = (t: ConnectionTest) => [TRIGGER[t.trigger], t.durationMs > 0 ? `${t.durationMs.toLocaleString('en')} ms` : null].filter(Boolean).join(' · ');
+/** e.g. "on deploy · 820 ms". */
+export const checkOrigin = (t: ConnectionTest) => [testOrigin(t), t.durationMs > 0 ? `${t.durationMs.toLocaleString('en')} ms` : null].filter(Boolean).join(' · ');
 
 /** The tooltip: exact time and the location's own message. */
 export const checkTitle = (t: ConnectionTest) => `${formatStamp(t.at)}\n${t.message}`;
