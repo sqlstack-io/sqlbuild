@@ -50,6 +50,6 @@ class RealDbtInteropPlanTestCase:
 @dataclass(frozen=True)
 class DbtMacroBuildTestCase:
     description: str
-    macro_source: str
-    model_sql: str
+    files: dict[str, str]
+    query: str
     expected_rows: tuple[tuple[object, ...], ...]

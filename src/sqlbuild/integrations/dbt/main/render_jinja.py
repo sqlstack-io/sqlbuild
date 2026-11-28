@@ -1,40 +1,41 @@
-"""Render a Jinja template from a Python macro that can call the macro's sibling macros."""
+"""Render a dbt macro's Jinja template with exactly the values and macros passed to it."""
 
 from __future__ import annotations
 
-import inspect
-from collections.abc import Callable
-from functools import lru_cache
-from types import FrameType
-
 try:
-    from jinja2 import Environment, StrictUndefined, Template
+    from jinja2 import Environment, Template
 except ImportError as error:
     raise ImportError(
-        'sqlbuild.dbt requires Jinja. Install SQLBuild\'s dbt extra with: pip install "sqlbuild[dbt]"'
+        "sqlbuild.dbt requires Jinja. Install SQLBuild's dbt extra with: "
+        'pip install "sqlbuild[dbt]"'
     ) from error
 
+from collections.abc import Callable
+from functools import lru_cache
+from typing import NoReturn
+
+from sqlbuild.integrations.dbt.classes.dbt_name_undefined import DbtNameUndefined
+from sqlbuild.integrations.dbt.exceptions import DbtMacroReturn
+
 _ENVIRONMENT: Environment = Environment(
-    autoescape=False, keep_trailing_newline=True, undefined=StrictUndefined
+    autoescape=False, keep_trailing_newline=True, undefined=DbtNameUndefined
 )
 _COMPILED_TEMPLATE: Callable[[str], Template] = lru_cache(maxsize=1024)(_ENVIRONMENT.from_string)
 
 
-def jinja(template: str, /, **values: object) -> str:
-    """Render `template` with `values`; it calls the caller's other macros by plain name."""
+def jinja(template: str, /, **values: object) -> object:
+    """Render `template` seeing only `values` and dbt's `return`; return what it renders or returns.
 
-    frame: FrameType | None = inspect.currentframe()
-    caller: FrameType | None = frame.f_back if frame is not None else None
+    Pass every macro the template calls by name, as in `concat=concat`, so SQLBuild records the
+    call as a dependency. A name not passed in fails the render; a missing attribute or item
+    renders empty, as in dbt.
+    """
+
     try:
-        scope: dict[str, object] = (
-            {
-                name: value
-                for name, value in caller.f_globals.items()
-                if not name.startswith("_") and inspect.isfunction(value)
-            }
-            if caller is not None
-            else {}
-        )
-    finally:
-        del frame, caller
-    return _COMPILED_TEMPLATE(template).render({**scope, **values})
+        return _COMPILED_TEMPLATE(template).render({**values, "return": _return})
+    except DbtMacroReturn as returned:
+        return returned.value
+
+
+def _return(value: object) -> NoReturn:
+    raise DbtMacroReturn(value)

@@ -413,6 +413,26 @@ rule = 4
 note = "Renders the selected dbt profile output with Jinja, env_var and var as dbt does; as_bool and as_number coercions are native."
 
 [[stays]]
+path = "integrations/dbt/main/render_jinja.py"
+rule = 4
+note = "Jinja glue for sqlbuild.dbt.jinja: renders a translated dbt macro's template with jinja2 against the values and user macros the calling macro passes in, plus dbt's return. The template calls user Python macros, so rendering stays in Python; which macros it may call is read natively from the keywords (macro_modules function_calls.rs)."
+
+[[stays]]
+path = "integrations/dbt/classes/dbt_name_undefined.py"
+rule = 4
+note = "A jinja2.Undefined subclass for sqlbuild.dbt.jinja: a name not passed in fails the render, while a missing attribute or item renders empty as in dbt."
+
+[[stays]]
+path = "integrations/dbt/main/mark_override.py"
+rule = 3
+note = "Public decorator re-exported by sqlbuild.dbt and run when user macro modules are imported: attaches a DbtMacroOverride to the function and returns it unchanged."
+
+[[stays]]
+path = "integrations/dbt/models.py"
+rule = 3
+note = "Rule 3 shape: DbtMacroOverride, the record sqlbuild.dbt.override attaches to a macro."
+
+[[stays]]
 path = "cli/commands/main/entrypoint/_dispatch_with_compute_logs.py"
 rule = 1
 note = "Captures the command's stdout, stderr and logging into the local compute log around user code."
@@ -613,6 +633,11 @@ rule = 3
 note = "Public facade: re-exports plus one-line delegating wrappers (factory, get_factory_definition)."
 
 [[stays]]
+path = "dbt.py"
+rule = 3
+note = "Public facade: re-exports jinja and override for Python macros translated from dbt; needs the dbt extra."
+
+[[stays]]
 path = "functions.py"
 rule = 3
 note = "Public facade: re-exports only."
@@ -745,7 +770,7 @@ note = "Shape rule: data records only (ModuleSources), no logic; consumed by com
 [[stays]]
 path = "integrations/dbt/exceptions.py"
 rule = 4
-note = "Shape rule: data exceptions only (DbtProfileError), no logic; consumed by integrations/dbt/_helpers/profile/load.py, integrations/dbt/_helpers/profile/render.py."
+note = "Shape rule: data exceptions only (DbtProfileError, and DbtMacroReturn, which carries dbt's return value out of a template), no logic; consumed by integrations/dbt/_helpers/profile/load.py, integrations/dbt/_helpers/profile/render.py and integrations/dbt/main/render_jinja.py."
 
 [[stays]]
 path = "diagnostics/constants.py"
