@@ -375,7 +375,8 @@ pub(crate) fn microbatch_range<'py>(
     let strategy = config_str(model, "microbatch_strategy")?;
     if strategy.eq(ROLLING_WINDOW)? {
         let rolling = rolling_window_bounds(model, &inputs.invocation_time)?;
-        if inputs.full_refresh && !rolling.is_none() {
+        // A relation being created or replaced, as on a first build, starts from cursor_start.
+        if (inputs.full_refresh || inputs.replaces_relation) && !rolling.is_none() {
             let cursor_start = config_bound(model, "cursor_start")?;
             if !cursor_start.is_none() {
                 return replace(&rolling, &[("start", cursor_start)]);
