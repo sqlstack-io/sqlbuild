@@ -202,7 +202,8 @@ E2E_DUCKDB_BUILD_INCREMENTAL_PATHS := \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_replay_on_change_full_build.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_seed_watermark_build.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_snapshot_build.py \
-	tests/e2e/src/sqlbuild/cli/commands/main/build/test_snapshot_validity_columns.py
+	tests/e2e/src/sqlbuild/cli/commands/main/build/test_snapshot_validity_columns.py \
+	tests/e2e/src/sqlbuild/cli/commands/main/build/test_snapshot_validity_types.py
 
 
 E2E_DUCKDB_CLI_DATA_PATHS := \

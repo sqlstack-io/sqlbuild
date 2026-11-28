@@ -16,7 +16,7 @@ SQLBuild adds two generated columns to the target table:
 
 A point-in-time query uses the interval `valid_from <= point_in_time < valid_to`.
 
-A current-state timestamp snapshot gives both columns the type of its `updated_at` column, such as `DATE` or `TIMESTAMP WITH TIME ZONE`. A check snapshot stamps both with the run time as a plain timestamp.
+With the default `initial_valid_from`, a current-state timestamp snapshot gives both columns the type of its `updated_at` column, such as `DATE` or `TIMESTAMP WITH TIME ZONE`, and a check snapshot stamps both with the run time as a plain timestamp.
 
 ## Change detection strategies
 

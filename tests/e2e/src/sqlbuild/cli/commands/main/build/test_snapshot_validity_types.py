@@ -93,7 +93,7 @@ def _project(tmp_path: Path, strategy_config: str) -> Path:
     ],
     ids=lambda case: case.description,
 )
-def test_given_a_snapshot_when_building_then_validity_columns_take_dbts_types(
+def test_given_a_snapshot_when_building_then_validity_columns_take_the_strategy_type(
     test_case: SnapshotValidityTypeTestCase, tmp_path: Path
 ) -> None:
     project_dir: Path = _project(tmp_path, test_case.strategy_config)

@@ -123,9 +123,14 @@ class SnapshotSql:
                 left_alias="__history", right_alias="__source", unique_key=target.unique_key
             )
             # A returning key opens at updated_at only after its close, so versions never overlap.
+            comparable: str = self.dialect.comparable_timestamp
+            reopens_later_sql: str = (
+                f"{comparable.format(f'__source.{updated_at_column}')} "
+                f"> {comparable.format('__history.__closed_at')}"
+            )
             version_valid_from_expr = (
                 f"CASE WHEN __active.{first_key} IS NULL AND __history.__closed_at IS NOT NULL "
-                f"AND __source.{updated_at_column} > __history.__closed_at "
+                f"AND {reopens_later_sql} "
                 f"THEN __source.{updated_at_column} "
                 f"WHEN __active.{first_key} IS NULL AND __history.__closed_at IS NOT NULL "
                 f"THEN {current_timestamp} "

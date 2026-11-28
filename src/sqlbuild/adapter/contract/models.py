@@ -305,6 +305,8 @@ class SnapshotSqlDialect:
     historical_insert: HistoricalSnapshotInsertStyle
     # Whether CREATE TABLE AS keeps a column-typed NULL's type; SQLite drops it.
     null_keeps_column_type: bool = True
+    # A timestamp as compared for order; SQLite compares text, so it compares parsed instants.
+    comparable_timestamp: str = "{}"
 
 
 @dataclass(frozen=True)

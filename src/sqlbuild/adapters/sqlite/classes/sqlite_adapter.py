@@ -194,6 +194,7 @@ class SqliteAdapter(
         historical_close=HistoricalSnapshotCloseStyle.CORRELATED,
         historical_insert=HistoricalSnapshotInsertStyle.WITH_INSERT,
         null_keeps_column_type=False,
+        comparable_timestamp="julianday({})",
     )
 
     def __init__(self) -> None:
