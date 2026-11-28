@@ -39,7 +39,7 @@ _SHARED_CONCAT: str = '''from sqlbuild.dbt import jinja as _jinja, override as _
 
 @_override(replaces="dbt.macro dbt.concat")
 def concat(fields):
-    return _jinja(r"""{{ return(default__concat(fields)) }}""", fields=fields, default__concat=default__concat)
+    return _jinja(r"""{% for f in fields %}{% if loop.first %}{% do return(default__concat(fields)) %}{% break %}{% endif %}{% endfor %}""", fields=fields, default__concat=default__concat)
 
 
 @_override(replaces="dbt.macro dbt.default__concat")
@@ -97,7 +97,7 @@ def customer_label(name_column, tier_column):
             expected_rows=((1, "Ada (gold)", 2, 17.0), (2, "Bo (silver)", 1, 25.0)),
         ),
         DbtMacroBuildTestCase(
-            description="a label macro passes on a wider-scope concat it imports",
+            description="a label macro passes on an imported concat that returns with do",
             files={
                 "sql/macros/python/dbt_macros.py": _SHARED_CONCAT,
                 "sql/models/marts/_sqlbuild/_macros/python/dbt_macros.py": _MARTS_LABEL,

@@ -16,12 +16,11 @@ use crate::macro_modules::_helpers::declarations::module_exports;
 use crate::macro_modules::_helpers::function_calls::{
     CallNames, NodeId, function_calls, runtime_nodes, unique, validate_use_locations,
 };
+use crate::macro_modules::_helpers::jinja_bindings::jinja_bindings;
 use crate::macro_modules::_helpers::module_names::{
     import_visible, imported_module_names, is_project_macro_import, resolve_import_from,
 };
-use crate::macro_modules::constants::{
-    CYCLE_SEPARATOR, JINJA_FUNCTION, JINJA_MODULE, STAR_IMPORT_NAME,
-};
+use crate::macro_modules::constants::{CYCLE_SEPARATOR, STAR_IMPORT_NAME};
 use crate::macro_modules::models::MacroModuleSource;
 
 /// One parsed module of the analysed set.
@@ -203,35 +202,6 @@ fn validate_no_nested_project_imports(
         ));
     }
     Ok(())
-}
-
-/// The module-level names `from sqlbuild.dbt import jinja` binds.
-fn jinja_bindings(module: &ModModule) -> HashSet<String> {
-    module
-        .body
-        .iter()
-        .filter_map(|statement| match statement {
-            Stmt::ImportFrom(import)
-                if import.level == 0
-                    && import
-                        .module
-                        .as_ref()
-                        .is_some_and(|name| name.as_str() == JINJA_MODULE) =>
-            {
-                Some(import)
-            }
-            _ => None,
-        })
-        .flat_map(|import| &import.names)
-        .filter(|alias| alias.name.as_str() == JINJA_FUNCTION)
-        .map(|alias| {
-            alias
-                .asname
-                .as_ref()
-                .map_or(JINJA_FUNCTION, |asname| asname.as_str())
-                .to_owned()
-        })
-        .collect()
 }
 
 type ImportedBindings = (HashMap<String, String>, Vec<String>);

@@ -236,6 +236,48 @@ fn given_macro_modules_when_inventoried_then_python_analysis_agrees() {
             expected_modules: None,
         },
         InventoryMacroModulesTestCase {
+            description: "a jinja binding reassigned at module level does not pass macros",
+            sources: &[(
+                "sql/macros/a.py",
+                "from sqlbuild.dbt import jinja as _jinja\n_jinja = print\n\n\ndef cents():\n    return 1\n\n\ndef total():\n    return _jinja('{{ cents() }}', cents=cents)\n",
+            )],
+            expected_exports: &[],
+            expected_faults: &[(
+                0,
+                "Macro module 'sql/macros/a.py' uses local helper 'cents' dynamically; call local \
+                 macros and helpers directly",
+            )],
+            expected_modules: None,
+        },
+        InventoryMacroModulesTestCase {
+            description: "a jinja binding imported again from another module does not pass macros",
+            sources: &[(
+                "sql/macros/a.py",
+                "from sqlbuild.dbt import jinja as _jinja\nfrom templates import render as _jinja\n\n\ndef cents():\n    return 1\n\n\ndef total():\n    return _jinja('{{ cents() }}', cents=cents)\n",
+            )],
+            expected_exports: &[],
+            expected_faults: &[(
+                0,
+                "Macro module 'sql/macros/a.py' uses local helper 'cents' dynamically; call local \
+                 macros and helpers directly",
+            )],
+            expected_modules: None,
+        },
+        InventoryMacroModulesTestCase {
+            description: "a jinja binding declared global in a function does not pass macros",
+            sources: &[(
+                "sql/macros/a.py",
+                "from sqlbuild.dbt import jinja as _jinja\n\n\ndef _setup():\n    global _jinja\n    _jinja = print\n\n\ndef cents():\n    return 1\n\n\ndef total():\n    return _jinja('{{ cents() }}', cents=cents)\n",
+            )],
+            expected_exports: &[],
+            expected_faults: &[(
+                0,
+                "Macro module 'sql/macros/a.py' uses local helper 'cents' dynamically; call local \
+                 macros and helpers directly",
+            )],
+            expected_modules: None,
+        },
+        InventoryMacroModulesTestCase {
             description: "a jinja binding shadowed in the function does not pass macros",
             sources: &[(
                 "sql/macros/a.py",

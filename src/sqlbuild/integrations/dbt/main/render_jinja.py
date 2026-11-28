@@ -17,8 +17,12 @@ from typing import NoReturn
 from sqlbuild.integrations.dbt.classes.dbt_name_undefined import DbtNameUndefined
 from sqlbuild.integrations.dbt.exceptions import DbtMacroReturn
 
+# dbt's templates rely on `{% do %}`, as in `{% do return(x) %}`, and on `{% break %}`.
 _ENVIRONMENT: Environment = Environment(
-    autoescape=False, keep_trailing_newline=True, undefined=DbtNameUndefined
+    autoescape=False,
+    extensions=["jinja2.ext.do", "jinja2.ext.loopcontrols"],
+    keep_trailing_newline=True,
+    undefined=DbtNameUndefined,
 )
 _COMPILED_TEMPLATE: Callable[[str], Template] = lru_cache(maxsize=1024)(_ENVIRONMENT.from_string)
 
