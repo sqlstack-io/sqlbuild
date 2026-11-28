@@ -5,7 +5,7 @@
 	import type { Snippet } from 'svelte';
 	import type { ConnectionState, PlatformEvent } from '$lib/api';
 	import { theme, toggleTheme } from '$lib/theme.svelte';
-	import { formatAgo } from '$lib/format/time';
+	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { pageTitle } from '$lib/format/page-title';
 	import { app } from '$lib/state/app.svelte';
 	import PlatformEventBanner from './shell/platform-event-banner.svelte';
@@ -31,7 +31,7 @@
 		live: 'Pages update as things change.',
 		connecting: 'Connecting for live updates…',
 		reconnecting: 'Lost the live connection; trying again. Pages may be behind.',
-		offline: 'Not receiving live updates. Refresh pages to see changes.'
+		offline: 'Not receiving live updates. Reload to read everything again.'
 	};
 	const connectionLabel: Record<ConnectionState, string> = {
 		live: 'Live',
@@ -55,6 +55,8 @@
 	);
 
 	const snapshot = $derived(app.snapshot);
+	/** Live updates dropped: the page may be behind, so it says since when and offers to catch up. */
+	const dropped = $derived(!serverState && (app.connection === 'reconnecting' || app.connection === 'offline'));
 	const where = $derived(app.location ? `${app.location.name} · ${app.location.target.name}` : '—');
 </script>
 
@@ -63,6 +65,10 @@
 <div class="app-topbar flex h-[52px] shrink-0 items-center gap-3 border-b border-border px-5">
 	<h1 class="text-[15px] font-semibold">{title}</h1>
 	<span class="text-muted-foreground min-w-0 truncate text-[12.5px]" title={where}>{where}</span>
+	{#if app.client.supports('getWarehouseSync')}
+		<span class="text-[var(--sb-text-faint)]">·</span>
+		<WarehouseSyncStatus />
+	{/if}
 	<div class="ml-auto flex items-center gap-2.5">
 		<span
 			class="text-muted-foreground flex items-center gap-[7px] text-[12px]"
@@ -80,9 +86,13 @@
 				<span class="whitespace-nowrap">{snapshot ? `v${snapshot.generation} · ${formatAgo(snapshot.publishedAt, app.now)}` : 'Not deployed'}</span>
 			{/if}
 		</span>
-		{#if app.client.supports('getWarehouseSync')}
-			<span class="text-[var(--sb-text-faint)]">·</span>
-			<WarehouseSyncStatus />
+		{#if dropped}
+			<span class="text-muted-foreground whitespace-nowrap text-[12px]" title="Live updates stopped {formatStamp(new Date(app.updatedAt).toISOString())}; this page may be behind since.">updated {formatAgo(new Date(app.updatedAt).toISOString(), app.now)}</span>
+			{#if app.connection === 'reconnecting'}
+				<Button variant="link" size="inline" class="text-[12px]" data-testid="reconnect" title="Connect for live updates now and read this page again" onclick={() => app.reconnect()}>Reconnect</Button>
+			{:else}
+				<Button variant="link" size="inline" class="text-[12px]" data-testid="reload" title="Load the page again, reading everything afresh" onclick={() => window.location.reload()}>Reload</Button>
+			{/if}
 		{/if}
 		{#if children}<span class="ml-1 flex items-center gap-2.5">{@render children()}</span>{/if}
 		<Button size="icon-bar" class="text-muted-foreground hover:text-foreground" aria-label="Toggle theme" title="Toggle theme" onclick={toggleTheme}>

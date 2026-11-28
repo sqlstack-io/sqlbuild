@@ -683,6 +683,24 @@ def wait_for_idle_sync(process: subprocess.Popen[bytes], log: Path) -> None:
         text = log.read_text()
 
 
+def check_in(api: SnapshotApi, target: str) -> None:
+    """Report a heartbeat for `target`, as a running location does, so it accepts work."""
+    report: dict[str, Any] = {
+        "event_id": str(uuid4()),
+        "session_id": str(uuid4()),
+        "target": target,
+        "health": {"kind": "heartbeat"},
+    }
+    request: Request = Request(
+        f"{api.url}/api/locations/{api.location_id}/health",
+        data=json.dumps(report).encode(),
+        headers={"Authorization": f"Bearer {api.bearer}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    with urlopen(request, timeout=5) as response:
+        assert json.load(response) == {"applied": True}
+
+
 def location_health_reports(api: SnapshotApi) -> list[dict[str, Any]]:
     request: Request = Request(
         f"{api.url}/api/locations/{api.location_id}/health",

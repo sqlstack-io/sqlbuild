@@ -22,6 +22,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     WaitingRepublishTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
+    check_in,
     current_snapshot,
     location_process,
     network_address,
@@ -230,6 +231,9 @@ def test_given_a_saved_login_session_when_republishing_then_the_request_names_th
                 check=False,
             )
             assert published.returncode == 0, published.stderr
+            check_in(
+                SnapshotApi(backend, location["location_id"], credential["bearer"]), "production"
+            )
             client, _ = browser(origin, certificate)
             csrf: str = sign_in(client, origin, "password", person["name"], password)
             common: list[str] = ["--server", origin, "--ca-cert", str(certificate)]

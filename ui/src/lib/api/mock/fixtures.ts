@@ -39,7 +39,8 @@ export function createFixtures(now: number) {
 
 	const idleSync = (minutesAgo: number) => ({
 		lastSyncedAt: ago(minutesAgo),
-		lastError: null
+		lastError: null,
+		stalled: false
 	});
 
 	const locations: Location[] = [
@@ -82,14 +83,14 @@ export function createFixtures(now: number) {
 	];
 
 	const platformEvents: PlatformEvent[] = [
-		{ id: 'pe-1', kind: 'location_broken', severity: 'warning', occurredAt: ago(48), active: true, locationId: LOCATION_MARKETING, subject: 'marketing-analytics', message: 'marketing-analytics stopped checking in, so its scheduled runs aren’t starting.' },
-		{ id: 'pe-2', kind: 'tick_overdue', severity: 'warning', occurredAt: ago(12), active: true, locationId: LOCATION_SHOP, subject: 'segments_hourly', message: 'The segments_hourly schedule should have started a run 12 minutes ago.' },
-		{ id: 'pe-6', kind: 'warehouse_sync_failed', severity: 'warning', occurredAt: ago(95), active: true, locationId: LOCATION_SHOP_STAGING, subject: '_sqlbuild_janitor_events', message: 'Permission denied on _sqlbuild_janitor_events: the catalog connection’s role can’t use schema ARCHIVE, so cleanup history isn’t up to date.' },
-		{ id: 'pe-3', kind: 'heartbeat', severity: 'info', occurredAt: ago(1), active: false, locationId: null, subject: null, message: 'Server heartbeat.' }
+		{ id: 'pe-1', stopsRuns: true, kind: 'location_broken', severity: 'warning', occurredAt: ago(48), active: true, locationId: LOCATION_MARKETING, subject: 'marketing-analytics', message: 'marketing-analytics stopped checking in, so its scheduled runs aren’t starting.' },
+		{ id: 'pe-2', stopsRuns: false, kind: 'tick_overdue', severity: 'warning', occurredAt: ago(12), active: true, locationId: LOCATION_SHOP, subject: 'segments_hourly', message: 'The segments_hourly schedule should have started a run 12 minutes ago.' },
+		{ id: 'pe-6', stopsRuns: false, kind: 'warehouse_sync_failed', severity: 'warning', occurredAt: ago(95), active: true, locationId: LOCATION_SHOP_STAGING, subject: '_sqlbuild_janitor_events', message: 'Permission denied on _sqlbuild_janitor_events: the catalog connection’s role can’t use schema ARCHIVE, so cleanup history isn’t up to date.' },
+		{ id: 'pe-3', stopsRuns: false, kind: 'heartbeat', severity: 'info', occurredAt: ago(1), active: false, locationId: null, subject: null, message: 'Server heartbeat.' }
 	];
 	const extraPlatformEvents: PlatformEvent[] = [
-		{ id: 'pe-4', kind: 'scheduler_no_leader', severity: 'critical', occurredAt: ago(2), active: true, locationId: null, subject: null, message: 'No server is running the scheduler, so schedules and sensors aren’t starting runs.' },
-		{ id: 'pe-5', kind: 'launch_failed', severity: 'critical', occurredAt: ago(6), active: true, locationId: LOCATION_SHOP, subject: 'revenue_refresh', message: 'The last 3 runs couldn’t start: the image couldn’t be downloaded.' }
+		{ id: 'pe-4', stopsRuns: false, kind: 'scheduler_no_leader', severity: 'critical', occurredAt: ago(2), active: true, locationId: null, subject: null, message: 'No server is running the scheduler, so schedules and sensors aren’t starting runs.' },
+		{ id: 'pe-5', stopsRuns: false, kind: 'launch_failed', severity: 'critical', occurredAt: ago(6), active: true, locationId: LOCATION_SHOP, subject: 'revenue_refresh', message: 'The last 3 runs couldn’t start: the image couldn’t be downloaded.' }
 	];
 
 	return { locations, platformEvents, extraPlatformEvents };

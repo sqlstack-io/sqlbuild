@@ -14,6 +14,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     WorkerExecutionTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
+    check_in,
     current_snapshot,
     scheduled_worker,
     worker_result,
@@ -83,6 +84,7 @@ def test_given_published_orders_when_cli_reads_sql_then_only_live_scoped_authori
     ):
         transport["backend"] = worker.api.url.removeprefix("http://")
         _ = worker_result(worker, test_case)
+        check_in(worker.api, "development")
         admin: dict[str, Any] = provision_person(
             tmp_path / "control", "create-user", "orders-admin"
         )

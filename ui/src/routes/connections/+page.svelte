@@ -68,6 +68,10 @@
 			<td>
 				{#if !c.tables.length}
 					<StatusLabel tone="var(--sb-text-faint)" label="Not reported yet" muted />
+				{:else if bad && c.lastTest?.outcome === 'failed'}
+					<!-- One cause, one red: the failed connection check carries it, the sync only says it waits on it. -->
+					<!-- copy-allow: the product owner's wording for a sync waiting on a failed connection check -->
+					<span title="The sync can't run until the connection check passes; {bad} of {c.tables.length} tables failed"><StatusLabel tone="var(--sb-text-faint)" label="blocked: can’t connect" muted /></span>
 				{:else if bad}
 					<StatusLabel tone="var(--sb-error)" label="{bad} of {c.tables.length} failing" />
 				{:else}
@@ -90,7 +94,7 @@
 						</div>
 						<div class="sync">
 							<h3>State history sync</h3>
-							<SyncTables tables={c.tables} />
+							<SyncTables tables={c.tables} blocked={c.lastTest?.outcome === 'failed'} />
 						</div>
 					</div>
 				</td>

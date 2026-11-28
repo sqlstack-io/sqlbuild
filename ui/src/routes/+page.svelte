@@ -18,7 +18,8 @@
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
-	import { errorMessage } from '$lib/platform/labels';
+	import { errorMessage, requestedLabel } from '$lib/platform/labels';
+	import ActionStatus from '$lib/components/platform/action-status.svelte';
 	import RunTimeline from '$lib/components/timeline/run-timeline.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
@@ -95,6 +96,9 @@
 	let acknowledgeError = $state<string | null>(null);
 	/** Acknowledges an item, or undoes that: a run by its ID, a condition as it looks now. */
 	let resuming = $state<string | null>(null);
+	/** Each Resume's outcome where it was clicked: requested at, or why it couldn't be. */
+	let resumed = $state<Record<string, { at: number; cause: string | null }>>({});
+	const resumeTitle = 'The item leaves the list once the sync works.';
 	/** Restart a run-history sync that failed reads stopped; the attention item clears once a sync succeeds. */
 	async function resume(key: string) {
 		const scope = app.scope;
@@ -103,8 +107,9 @@
 		acknowledgeError = null;
 		try {
 			await app.client.requestWarehouseSync(scope);
+			resumed[key] = { at: Date.now(), cause: null };
 		} catch (error) {
-			acknowledgeError = errorMessage(error);
+			resumed[key] = { at: Date.now(), cause: errorMessage(error) };
 		} finally {
 			resuming = null;
 		}
@@ -317,7 +322,21 @@
 											<Button variant="outline" size="sm" title={DISMISS_HELP} disabled={dismissing === view.key} onclick={() => dismissSkips(view.key, storageIds)} data-testid="attention-dismiss">Dismiss</Button>
 										{/if}
 										{#if item.kind === 'platform_event' && item.event.sync?.halted}
-											<GatedButton requires="connection.test" size="sm" variant="outline" busy={resuming === view.key} onclick={() => resume(view.key)} hint="Start the run-history sync again now"><span data-testid="attention-resume">Resume</span></GatedButton>
+											{@const outcome = resumed[view.key]}
+											<span class="resume" data-testid="attention-resume">
+												<ActionStatus
+													size="sm"
+													words={resuming === view.key
+														? { tone: 'running', label: 'requesting…', title: 'Sending the request' }
+														: outcome?.cause
+															? { tone: 'failed', label: 'couldn’t resume', title: outcome.cause }
+															: outcome
+																? { tone: 'running', label: requestedLabel(outcome.at, Math.max(app.now, outcome.at)), title: resumeTitle }
+																: null}
+													cause={resuming === view.key ? null : (outcome?.cause ?? null)}
+													action={{ label: 'Resume', requires: 'connection.test', onclick: () => resume(view.key), busy: resuming === view.key, busyTitle: 'Sending the request…', title: 'Start the run-history sync again now' }}
+												/>
+											</span>
 										{/if}
 										{#if view.build}
 											{@const build = view.build}
@@ -459,9 +478,10 @@
 
 <style>
 	.health, .metric-strip, .surface-panel { box-shadow: var(--panel-shadow); border: 1px solid var(--panel-border); border-radius: 2px; background: var(--card); }
-	.health { overflow: hidden; border-color: color-mix(in srgb, var(--tone) 30%, var(--border)); border-left: 3px solid var(--tone); }
+	/* A list, not an alarm: the panel keeps the usual border, and only the icons carry each item's tone. */
+	.health { overflow: hidden; }
 	.health-head { display: flex; min-height: 49px; align-items: center; padding: 8px 13px; }
-	.issues { border-top: 1px solid color-mix(in srgb, var(--tone) 18%, var(--border)); }
+	.issues { border-top: 1px solid var(--inner-line); }
 	/* Rows share the columns, so times, Acknowledge and links line up down the list. */
 	/* The icon track is max-content so it also holds the rows' left padding, which a subgrid adds to its edge track. */
 	.issues, .handled-rows { display: grid; grid-template-columns: max-content minmax(0, 1fr) auto auto auto; column-gap: 10px; }
@@ -570,5 +590,13 @@
 		.lower-grid { grid-template-columns: 1fr; }
 		.health-facts { display: none; }
 		.metric { padding-right: 12px; padding-left: 12px; }
+	}
+	.resume {
+		display: inline-flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 4px 8px;
+		max-width: 420px;
 	}
 </style>
