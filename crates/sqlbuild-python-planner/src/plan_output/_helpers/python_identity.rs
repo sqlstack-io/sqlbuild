@@ -23,7 +23,7 @@ fn json_object<'py>(raw_json: &Bound<'py, PyAny>) -> PyResult<Option<Bound<'py, 
         }
         Err(error) => return Err(error),
     };
-    let Ok(payload) = payload.downcast_into::<PyDict>() else {
+    let Ok(payload) = payload.cast_into::<PyDict>() else {
         return Ok(None);
     };
     Ok(Some(payload))
@@ -45,12 +45,12 @@ pub(crate) fn dependency_source_text(raw_json: &Bound<'_, PyAny>) -> PyResult<Op
     let Some(dependencies) = payload.get_item("dependencies")? else {
         return Ok(None);
     };
-    let Ok(dependencies) = dependencies.downcast::<PyList>() else {
+    let Ok(dependencies) = dependencies.cast::<PyList>() else {
         return Ok(None);
     };
     let mut keyed: Vec<([String; 3], Option<Bound<'_, PyDict>>)> = Vec::new();
     for dependency in dependencies.iter() {
-        let Ok(dependency) = dependency.downcast_into::<PyDict>() else {
+        let Ok(dependency) = dependency.cast_into::<PyDict>() else {
             keyed.push((Default::default(), None));
             continue;
         };

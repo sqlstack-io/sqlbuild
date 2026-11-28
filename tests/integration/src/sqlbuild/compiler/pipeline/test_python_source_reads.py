@@ -24,12 +24,12 @@ _PROJECT_TOML: str = (
 )
 _PROJECT_FILES: dict[str, str] = {
     "sql/sources/raw.yml": (
-        "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n    managed: true\n    write_strategy: table\n"
-        "    columns:\n      - name: order_id\n        type: INTEGER\n"
+        "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n    managed: true\n"
+        "    columns:\n      - name: order_id\n        type: BIGINT\n"
     ),
     "python/nodes/loaders/raw/loader.py": (
         "from sqlbuild.loaders import loader\n\n\n"
-        "@loader\ndef raw_orders(ctx):\n    '''Test loader raw_orders.'''\n    return [{'order_id': 1}]\n"
+        "@loader(write_strategy='replace')\ndef raw_orders(ctx):\n    '''Test loader raw_orders.'''\n    return [{'order_id': 1}]\n"
     ),
     "sql/models/order_marker.sql": "MODEL (description 'Test model order_marker.', materialized table);\nSELECT 1 AS n\n",
     "python/nodes/tasks/count/asset.py": (

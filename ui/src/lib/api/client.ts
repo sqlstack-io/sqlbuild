@@ -162,6 +162,8 @@ export interface ApiClient extends PlatformApi {
 	/** Acknowledge an ongoing condition as it looks now (`shape`), until it changes, or withdraw that. */
 	/** `automatic` withdraws one acknowledgement, which the server applies only while it is still the latest. */
 	acknowledgeCondition(scope: Scope, key: string, shape: ConditionShape, acknowledged: boolean, automatic?: AutomaticWithdrawal): Promise<void>;
+	/** Dismisses for good the problems of stored events webhooks and sensors skipped as unreadable, by storage ID; they stay in the history. */
+	dismissSkippedEvents(scope: Scope, storageIds: number[]): Promise<void>;
 	/** Writes a `cancel_requested` fact; the scheduler then signals the worker. */
 	cancelRun(scope: Scope, runId: string): Promise<Run>;
 	/** `nodes` is required for `selected` and ignored otherwise. */

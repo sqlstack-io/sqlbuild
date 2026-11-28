@@ -1,32 +1,47 @@
 //! `sqb scenario test`: run the selected scenarios warehouse-direct or replay them locally.
 
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::time::Instant;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple, PyTupleMethods};
-use pyo3::{pyfunction, wrap_pyfunction};
+use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::definition_changes::models::{ExecutedItem, SelectedItem};
-use sqlbuild_core::cli_text::main::format_summary_footer::format_summary_footer;
-use sqlbuild_core::cli_text::models::{CliStyle, SummaryCount};
+use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_core::progress::main::statement_summary_delta::statement_summary_delta;
 use sqlbuild_core::progress::models::StatementSummary;
+use sqlbuild_core::run_on::main::execution_engines::execution_engines;
 use sqlbuild_core::run_on::main::read_run_on_decisions::read_run_on_decisions;
-use sqlbuild_core::run_on::main::render_local_refusals::render_local_refusals;
-use sqlbuild_core::run_on::main::render_warehouse_census::render_warehouse_census;
-use sqlbuild_core::run_on::main::run_on_split::run_on_split;
+use sqlbuild_core::run_on::main::refusal_causes::refusal_causes;
+use sqlbuild_core::run_on::main::render_refusal_report::render_refusal_report;
+use sqlbuild_core::run_on::main::run_on_header::run_on_header;
 use sqlbuild_core::run_on::main::with_run_on_json::with_run_on_json;
 use sqlbuild_core::run_on::models::{RunOn, RunOnDecision};
-use sqlbuild_core::scenario_command::main::render_scenario_failures::render_scenario_failures;
+use sqlbuild_core::run_output::main::render_cant_run_rollup::render_cant_run_rollup;
+use sqlbuild_core::run_output::main::render_failed_list::render_failed_list;
+use sqlbuild_core::run_output::main::render_failures::render_failures;
+use sqlbuild_core::run_output::main::render_run_completion::render_run_completion;
+use sqlbuild_core::run_output::main::render_run_header::render_run_header;
+use sqlbuild_core::run_output::models::{FailureEntry, FailureField, RunCounts, RunHeader};
+use sqlbuild_core::scenario_command::main::render_namespace_line::render_namespace_line;
+use sqlbuild_core::scenario_command::main::render_retained_section::render_retained_section;
+use sqlbuild_core::scenario_command::main::scenario_steps::scenario_steps;
 use sqlbuild_core::scenario_command::main::validate_scenario_test_flags::validate_scenario_test_flags;
 use sqlbuild_core::scenario_command::models::{
-    ScenarioNamespace, ScenarioResultRow, ScenarioTestFlags, SqlAnalysisCommand,
+    CodedText, ScenarioNamespace, ScenarioResultRow, ScenarioTestFlags, SqlAnalysisCommand,
 };
+use sqlbuild_core::test_command::main::test_failure_entry::test_failure_entry;
+use sqlbuild_core::test_command::main::test_name_width::test_name_width;
+use sqlbuild_core::test_command::models::TestFailureFacts;
 use sqlbuild_host::entries::models::ExecutorHost;
-use sqlbuild_host::models::{ExecutionStatus, ScenarioRunResult};
-use sqlbuild_host::types::ResultEnum;
+use sqlbuild_host::models::ScenarioRunResult;
+use sqlbuild_python_base::build_progress::main::progress::current_native_progress_projector::current_native_progress_projector;
+use sqlbuild_python_base::build_progress::main::terminal::known_terminal_columns::known_terminal_columns;
+use sqlbuild_python_base::build_progress::main::terminal::terminal_columns::terminal_columns;
 use sqlbuild_python_output::build_progress::main::local_attempt::local_attempt;
 use sqlbuild_python_output::build_progress::models::LocalAttemptStep;
+use sqlbuild_python_output::build_progress::models::NestedCommandProgressCallbacks;
 use sqlbuild_python_output::result_output::main::results::split_scenario_fallbacks::split_scenario_fallbacks;
 
 use crate::bindings::_helpers::change_selection::base_snapshot::{
@@ -38,13 +53,13 @@ use crate::bindings::_helpers::change_selection::selection::{
 use crate::bindings::_helpers::native_host::statement_report::{StatementReport, StatementSource};
 use crate::bindings::_helpers::scenario_command::conversions::scenario_result_row;
 use crate::bindings::_helpers::scenario_command::presentation::{
-    CompletionKind, RelayContext, SectionStatus, activity, begin_section, connection_hooks,
-    progress_relay, write_completion,
+    CompletionKind, RelayContext, SectionStatus, connection_hooks, progress_relay, quiet_section,
 };
 use crate::bindings::_helpers::scenario_command::setup::{
     CompileInputs, ScenarioProject, boolean, cli_user_error, compile, discover_project, flush, int,
-    optional_text, project_adapter_name, project_connection_config, require_capture_dialect,
-    require_sql_analysis, resolve_adapter, selected_scenarios, style, text, write, write_headers,
+    offline_project_connection_config, optional_text, planning_reporter, project_adapter_name,
+    project_connection_config, require_capture_dialect, require_sql_analysis, resolve_adapter,
+    selected_scenarios, style, text, write, write_execution,
 };
 use crate::bindings::_helpers::scenario_command::snapshot_sync::{LocalSync, sync_local_snapshots};
 use crate::bindings::_helpers::sql_test_command::test_command::timeout_record;
@@ -67,6 +82,7 @@ const TARGET_DIR: &str = "target";
 const RUN_ON_SETTING: &str = "scenario_run_on";
 const SCENARIO_NOUNS: (&str, &str) = ("scenario", "scenarios");
 const JSON_SCENARIO_NAME_KEYS: [&str; 2] = ["scenario_name", "name"];
+const RETAIN_HINT: &str = "Rerun with --retain to inspect scenario-owned artifacts.";
 
 /// The resolved adapters, connection and output settings of one scenario test run.
 pub(crate) struct TestRun<'py> {
@@ -153,6 +169,13 @@ fn prepare<'py>(
     })
 }
 
+/// The reporter that draws a test run's rows and footer, and the scenarios that can't run locally.
+struct RowReporter<'py> {
+    progress: Bound<'py, PyAny>,
+    refused: HashSet<String>,
+    local_only: bool,
+}
+
 /// Where a run sent its scenarios, for the summary, the refusal report and `--json`.
 struct RunOnReport {
     mode: RunOn,
@@ -161,7 +184,19 @@ struct RunOnReport {
     verbose: bool,
 }
 
-/// The run's elapsed summary, refusals, completion line and JSON document.
+/// The longest scenario name, widened so each expected model and assertion name fits under it.
+fn name_width(scenarios: &Bound<'_, PyTuple>) -> PyResult<i64> {
+    let mut labels: Vec<(String, String)> = Vec::new();
+    let mut children: Vec<String> = Vec::new();
+    for scenario in scenarios.iter() {
+        labels.push((native_field(&scenario, "name")?.extract()?, String::new()));
+        children.extend(native_field(&scenario, "expected_model_names")?.extract::<Vec<String>>()?);
+        children.extend(native_field(&scenario, "assertion_names")?.extract::<Vec<String>>()?);
+    }
+    Ok(i64::try_from(test_name_width(&labels, &children)).unwrap_or(i64::MAX))
+}
+
+/// The run's failures, refusals, retained artifacts, failed list and summary, then its JSON document.
 fn finish(
     request: &Bound<'_, PyAny>,
     run: &TestRun<'_>,
@@ -175,51 +210,114 @@ fn finish(
     let py: Python<'_> = request.py();
     section.status.call_method0("close")?;
     let elapsed_seconds: f64 = started.elapsed().as_secs_f64();
-    let mut tallies: [usize; 3] = [0; 3];
-    for result in results {
-        let status: String = match result.local_status {
-            Some(status) => status.value().to_owned(),
-            None if result.status == ExecutionStatus::Success => STATUSES[0].to_owned(),
-            None => STATUSES[1].to_owned(),
-        };
-        if let Some(index) = STATUSES.iter().position(|label| *label == status) {
-            tallies[index] += 1;
-        }
-    }
-    let mut counts: Vec<SummaryCount> = STATUSES
+    let rows: Vec<ScenarioResultRow> = results
         .iter()
-        .zip(tallies)
-        .filter(|(label, value)| **label != STATUSES[2] || *value > 0)
-        .map(|(label, value)| SummaryCount::of(label, value))
-        .collect();
-    counts.push(SummaryCount::of("TOTAL", results.len()));
-    let succeeded: bool = tallies[1] == 0 && tallies[2] == 0;
+        .map(|result| scenario_result_row(py, result))
+        .collect::<PyResult<_>>()?;
+    let mut counts: RunCounts = RunCounts {
+        total: results.len(),
+        ..RunCounts::default()
+    };
+    let mut entries: Vec<FailureEntry> = Vec::new();
+    let mut failed: Vec<(String, String)> = Vec::new();
+    let mut not_run: usize = 0;
+    for (result, row) in results.iter().zip(&rows) {
+        let refused: bool = report.mode == RunOn::Local
+            && (result.local_refusal.is_some()
+                || report
+                    .decisions
+                    .iter()
+                    .any(|decision| decision.name == row.name && !decision.refusals.is_empty()));
+        if refused {
+            counts.not_run += 1;
+            not_run += 1;
+            continue;
+        }
+        if row.status == STATUSES[0] {
+            counts.pass += 1;
+            continue;
+        }
+        counts.fail += 1;
+        let error: Option<&CodedText> =
+            row.error.as_ref().filter(|error| !error.message.is_empty());
+        let (mut entry, reason) = test_failure_entry(&TestFailureFacts {
+            name: row.name.clone(),
+            kind: SCENARIO_NOUNS.0.to_owned(),
+            run_on: if row.local { "local" } else { "warehouse" }.to_owned(),
+            error_code: error.and_then(|error| error.code.clone()),
+            error_message: error.map(|error| error.message.clone()),
+            error_help: error.and_then(|error| error.help.clone()),
+            steps: scenario_steps(row),
+            ..TestFailureFacts::default()
+        });
+        if let Some(path) = &row.local_duckdb_path {
+            entry.fields.push(FailureField::Labelled {
+                label: "duckdb".to_owned(),
+                text: path.clone(),
+            });
+        }
+        let retain_hinted: bool = entry.fields.iter().any(|field| {
+            matches!(field, FailureField::Error { help: Some(help), .. } if help.contains("--retain"))
+        });
+        if error.is_some() && !retain_hinted && !row.retained && !row.local {
+            entry.fields.push(FailureField::Labelled {
+                label: "help".to_owned(),
+                text: RETAIN_HINT.to_owned(),
+            });
+        }
+        failed.push((entry.name.clone(), reason));
+        entries.push(entry);
+    }
+    let columns: Option<usize> = known_terminal_columns(py)?;
+    let mut output: String = String::new();
+    if not_run > 0 {
+        output.push_str(&render_cant_run_rollup(
+            not_run,
+            &refusal_causes(&report.decisions),
+            run.style,
+        ));
+    }
+    output.push_str(&render_failures(&entries, columns, run.style));
+    output.push_str(&match report.mode {
+        RunOn::Warehouse => String::new(),
+        RunOn::Local => render_refusal_report(
+            &report.decisions,
+            (true, report.verbose),
+            SCENARIO_NOUNS,
+            (columns, run.style),
+        ),
+        RunOn::Auto if report.verbose => render_refusal_report(
+            &report.decisions,
+            (false, true),
+            SCENARIO_NOUNS,
+            (columns, run.style),
+        ),
+        RunOn::Auto => String::new(),
+    });
+    output.push_str(&render_retained_section(
+        &rows,
+        (flag(request, "retain")?, report.verbose),
+        run.style,
+    ));
+    output.push_str(&render_failed_list(&failed, report.verbose, run.style));
     let local: usize = results
         .iter()
         .filter(|result| result.local_status.is_some())
         .count();
     let split: (usize, usize) = (local, results.len() - local);
-    write(
-        &run.stream,
-        &format!(
-            "\n{}\n",
-            format_summary_footer(
-                run.style,
-                &counts,
-                Some(&format!(
-                    "{}, {elapsed_seconds:.2}s",
-                    run_on_split(split.0, split.1)
-                ))
-            )
-        ),
-    )?;
-    let rows: Vec<ScenarioResultRow> = results
-        .iter()
-        .map(|result| scenario_result_row(py, result))
-        .collect::<PyResult<_>>()?;
-    let failures: String = render_scenario_failures(&rows, run.style);
-    if !failures.is_empty() {
-        write(&run.stream, &format!("{failures}\n"))?;
+    let mut parts: Vec<String> = Vec::new();
+    if split.0 - not_run.min(split.0) > 0 {
+        parts.push(format!("{} local", split.0 - not_run.min(split.0)));
+    }
+    if split.1 > 0 {
+        parts.push(format!("{} on the warehouse", split.1));
+    }
+    if not_run > 0 {
+        parts.push(format!("{not_run} can't run locally"));
+    }
+    let mut details: Vec<String> = Vec::new();
+    if !parts.is_empty() {
+        details.push(parts.join(", "));
     }
     let statements: Option<StatementReport> = StatementReport::read_excluding(
         py,
@@ -232,21 +330,20 @@ fn finish(
         &report.local_statements,
     )?;
     if let Some(line) = statements.as_ref().and_then(StatementReport::line) {
-        write(&run.stream, &format!("{line}\n"))?;
+        details.push(line);
     }
-    let refusals: String = match report.mode {
-        RunOn::Warehouse => String::new(),
-        RunOn::Local => render_local_refusals(&report.decisions, true, SCENARIO_NOUNS, run.style),
-        RunOn::Auto if report.verbose => {
-            render_local_refusals(&report.decisions, false, SCENARIO_NOUNS, run.style)
-        }
-        RunOn::Auto => render_warehouse_census(&report.decisions, SCENARIO_NOUNS, run.style),
-    };
-    if !refusals.is_empty() {
-        write(&run.stream, &refusals)?;
+    if let Some(value) = &run.project.namespace.value {
+        details.push(format!("namespace {value}"));
     }
+    output.push_str(&render_run_completion(
+        &counts,
+        &details,
+        elapsed_seconds,
+        run.style,
+    ));
+    write(&run.stream, &output)?;
     flush(&run.stream)?;
-    write_completion(&run.stream, (&run.project.namespace, succeeded))?;
+    let succeeded: bool = counts.all_passed();
     let namespace: &ScenarioNamespace = &run.project.namespace;
     let payload: String = with_since_section(
         format_scenario_execution_json_with(
@@ -295,7 +392,7 @@ fn execute_batch<'py>(
     request: &Bound<'py, PyAny>,
     run: &TestRun<'py>,
     (pipeline, scenarios): (&Bound<'py, PyAny>, &Bound<'py, PyTuple>),
-    (section, fallback): (&SectionStatus<'py>, bool),
+    (section, fallback, rows): (&SectionStatus<'py>, bool, &RowReporter<'py>),
 ) -> PyResult<Vec<ScenarioRunResult<Bound<'py, PyAny>>>> {
     let py: Python<'py> = request.py();
     if scenarios.is_empty() {
@@ -314,6 +411,7 @@ fn execute_batch<'py>(
             adapter: &run.adapter,
             kind: CompletionKind::Run { target_dir },
             style: run.style,
+            rows: Some((&rows.progress, rows.refused.clone(), rows.local_only)),
         },
     )?;
     let project_name: Bound<'_, PyAny> = native_field(
@@ -335,6 +433,7 @@ fn execute_batch<'py>(
         arguments.extend([
             ("project_dir", run.project.project_dir.clone()),
             ("replay_source", replay_source(run)?),
+            ("local_test_allow", local_test_allow(run)?),
         ]);
         ExecutorHost::RunScenarioLocalTestPipeline
     } else {
@@ -411,6 +510,7 @@ fn decide<'py>(
             ("project_name", project_name),
             ("replay_source", replay_source(run)?),
             ("run_on", text(py, mode.as_str())),
+            ("local_test_allow", local_test_allow(run)?),
         ],
     )?
     .extract()?;
@@ -465,7 +565,7 @@ fn select_changed<'py>(
     ))
 }
 
-/// A compiled, selected and `--since`-narrowed set of scenarios, and the `--since` JSON.
+/// The project compiled in its own dialect, its selected scenarios and the `--since` JSON.
 fn compiled<'py>(
     request: &Bound<'py, PyAny>,
     run: &TestRun<'py>,
@@ -473,19 +573,22 @@ fn compiled<'py>(
     base: Option<BaseComparison>,
 ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyTuple>, Option<String>)> {
     let py: Python<'py> = request.py();
-    let no_sql_validation: bool = run.local || flag(request, "no_sql_validation")?;
+    let connection_config: Bound<'py, PyAny> = if run.local {
+        offline_project_connection_config(&run.project)?
+    } else {
+        run.connection_config.clone()
+    };
     let compiled: PyResult<Bound<'_, PyAny>> = compile(
         &run.project,
         CompileInputs {
-            adapter: &run.adapter,
+            adapter: &run.project_adapter,
             options: &[
-                ("no_sql_validation", boolean(py, no_sql_validation)),
-                ("source_deferral_enabled", boolean(py, false)),
-                ("connection_config", run.connection_config.clone()),
                 (
-                    "source_lexical_syntax",
-                    native_field(&run.project_adapter, "sql_lexical_syntax")?,
+                    "no_sql_validation",
+                    boolean(py, flag(request, "no_sql_validation")?),
                 ),
+                ("source_deferral_enabled", boolean(py, false)),
+                ("connection_config", connection_config),
             ],
             planning,
         },
@@ -558,19 +661,7 @@ pub(crate) fn run_scenario_test_command(
     })
     .map_err(|error| cli_user_error(py, error))?;
     let mut run: TestRun<'_> = prepare(request, project, mode != RunOn::Warehouse)?;
-    let planning: Bound<'_, PyAny> = write_headers(
-        &run.stream,
-        &run.project,
-        (
-            "sqb scenario test",
-            if mode == RunOn::Local {
-                1
-            } else {
-                run.concurrency
-            },
-            run.style,
-        ),
-    )?;
+    let planning: Bound<'_, PyAny> = planning_reporter(&run.stream, run.style)?;
     let base: Option<BaseComparison> = since_base(request, &run)?;
     let (pipeline, scenarios, since_json) = compiled(request, &run, &planning, base)?;
     run.since_json = since_json;
@@ -589,7 +680,7 @@ pub(crate) fn run_scenario_test_command(
                 Ok(RunOnDecision {
                     name: native_field(&scenario, "name")?.extract()?,
                     run_on: "warehouse".to_owned(),
-                    refusals: Vec::new(),
+                    ..RunOnDecision::default()
                 })
             })
             .collect::<PyResult<_>>()?
@@ -599,15 +690,76 @@ pub(crate) fn run_scenario_test_command(
         .filter(|decision| mode == RunOn::Local || decision.local())
         .map(|decision| decision.name.as_str())
         .collect();
-    let section: SectionStatus<'_> = begin_section(
+    let header: RunHeader = run_on_header(
+        &decisions,
+        (mode, flag(request, "explain")?),
+        ("Scenarios", SCENARIO_NOUNS),
+    );
+    write(
         &run.stream,
-        (
-            &format!("Scenario ({} selected)", scenarios.len()),
-            "",
-            activity("Running scenarios...", &run.project.namespace),
+        &format!(
+            "\n{}{}",
+            render_run_header(&header, terminal_columns(py)?, run.style),
+            render_namespace_line(&run.project.namespace, run.style)
         ),
-        run.style,
     )?;
+    write_execution(
+        &run.stream,
+        &run.project,
+        (
+            "sqb scenario test",
+            (
+                if mode == RunOn::Local {
+                    1
+                } else {
+                    run.concurrency
+                },
+                execution_engines(&decisions, mode, &run.project_adapter_name),
+            ),
+            run.style,
+        ),
+    )?;
+    let section: SectionStatus<'_> = quiet_section(&run.stream, run.style)?;
+    let rows: RowReporter<'_> = RowReporter {
+        progress: Bound::new(
+            py,
+            NestedCommandProgressCallbacks::new(
+                py,
+                Some(keywords(
+                    py,
+                    &[
+                        (
+                            "total",
+                            int(py, i64::try_from(scenarios.len()).unwrap_or(i64::MAX)),
+                        ),
+                        ("label", text(py, "scenario")),
+                        ("stream", run.stream.clone()),
+                        ("use_color", boolean(py, run.style.use_color)),
+                        ("name_width", int(py, name_width(&scenarios)?)),
+                        (
+                            "nouns",
+                            (SCENARIO_NOUNS.0, SCENARIO_NOUNS.1)
+                                .into_pyobject(py)?
+                                .into_any(),
+                        ),
+                        ("verb", text(py, "Running scenarios")),
+                        ("verbose", boolean(py, flag(request, "verbose")?)),
+                    ],
+                )?),
+            )?,
+        )?
+        .into_any(),
+        refused: decisions
+            .iter()
+            .filter(|decision| !decision.refusals.is_empty())
+            .map(|decision| decision.name.clone())
+            .collect(),
+        local_only: mode == RunOn::Local,
+    };
+    let projector: Bound<'_, PyAny> = current_native_progress_projector(py)?;
+    if !projector.is_none() {
+        projector.call_method0("quiet_enriched_resources")?;
+    }
     let started: Instant = Instant::now();
     let mut results: Vec<ScenarioRunResult<Bound<'_, PyAny>>> = Vec::new();
     let mut local_statements: StatementSummary = StatementSummary::default();
@@ -617,7 +769,7 @@ pub(crate) fn run_scenario_test_command(
             request,
             &run,
             (&pipeline, &named(&scenarios, &local_names)?),
-            (&section, mode == RunOn::Auto),
+            (&section, mode == RunOn::Auto, &rows),
         )?;
         results.extend(split_scenario_fallbacks(ran, (&mut decisions, mode))?);
         local_statements = statement_summary_delta(&before, &statement_summary(py)?);
@@ -633,33 +785,18 @@ pub(crate) fn run_scenario_test_command(
                 request,
                 &run,
                 (&pipeline, &named(&scenarios, &warehouse_names)?),
-                (&section, false),
+                (&section, false, &rows),
             )?);
         }
         run
     } else {
-        let mut remote: TestRun<'_> = prepare(request, discover_project(py, request)?, false)?;
-        let quiet: Bound<'_, PyAny> = Bound::new(
-            py,
-            sqlbuild_python_output::build_progress::models::PlanningProgressReporter::new(
-                py,
-                &remote.stream,
-                remote.style.use_color,
-            )?,
-        )?
-        .into_any();
-        let remote_base: Option<BaseComparison> = since_base(request, &remote)?;
-        let (remote_pipeline, remote_scenarios, _remote_since_json) =
-            compiled(request, &remote, &quiet, remote_base)?;
+        let mut remote: TestRun<'_> = prepare(request, run.project.clone(), false)?;
         remote.since_json = run.since_json.clone();
         results.extend(execute_batch(
             request,
             &remote,
-            (
-                &remote_pipeline,
-                &named(&remote_scenarios, &warehouse_names)?,
-            ),
-            (&section, false),
+            (&pipeline, &named(&scenarios, &warehouse_names)?),
+            (&section, false, &rows),
         )?);
         remote
     };
@@ -680,4 +817,12 @@ pub(crate) fn run_scenario_test_command(
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(run_scenario_test_command, module)?)?;
     Ok(())
+}
+
+/// `[testing.local] allow` of the project the scenarios belong to.
+fn local_test_allow<'py>(run: &TestRun<'py>) -> PyResult<Bound<'py, PyAny>> {
+    native_field(
+        &native_field(&run.project.discovered, "project_config")?,
+        "local_test_allow",
+    )
 }

@@ -1,5 +1,6 @@
 //! Compiled project assembly: the project's models, resources, checks and semantic diagnostics.
 
+use crate::compile_driver::_helpers::assembly::assembly_loads::compiled_loads;
 use std::path::PathBuf;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
@@ -156,7 +157,7 @@ pub(crate) fn assembled_project<'py>(
 /// `value.strip()` when `value` is a string with non-blank text, else `None`.
 fn str_or_none<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = value.py();
-    if let Ok(text) = value.downcast::<PyString>()
+    if let Ok(text) = value.cast::<PyString>()
         && let Some(stripped) = configured_namespace(&text.to_cow()?)
     {
         return Ok(PyString::new(py, &stripped).into_any());
@@ -307,6 +308,7 @@ fn project_fields<'py>(
         )?,
     )?;
     fields.set_item("sql_scenarios", compiled_sql_scenarios(inputs)?)?;
+    fields.set_item("loads", compiled_loads(&discovered)?)?;
     for name in ["loader_functions", "hook_functions"] {
         fields.set_item(name, native_field(&discovered, name)?)?;
     }

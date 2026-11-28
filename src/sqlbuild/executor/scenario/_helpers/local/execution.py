@@ -243,15 +243,22 @@ def local_scenario_refusals(
     }.get(snapshot_state.state)
     manifest: ScenarioSnapshotManifest | None = snapshot_state.manifest
     if category is not None or manifest is None:
+        path: str = (
+            snapshot_state.manifest_path.relative_to(project_dir).as_posix()
+            if snapshot_state.manifest_path.is_relative_to(project_dir)
+            else snapshot_state.manifest_path.as_posix()
+        )
+        code, help_text = _snapshot_refusal_guidance(
+            state=snapshot_state, scenario_name=scenario_plan.name
+        )
         return (
             {
                 "category": category or SNAPSHOT_MISSING_CATEGORY,
                 "construct": f"scenario:{scenario_plan.name}",
-                "reason": snapshot_state.error_message
-                or f"{snapshot_state.manifest_path.as_posix()} is not a fresh snapshot",
-                "path": snapshot_state.manifest_path.relative_to(project_dir).as_posix()
-                if snapshot_state.manifest_path.is_relative_to(project_dir)
-                else snapshot_state.manifest_path.as_posix(),
+                "reason": snapshot_state.error_message or f"{path} is not a fresh snapshot",
+                "path": path,
+                "code": code,
+                "help": help_text,
             },
         )
     load_result: ScenarioLocalSnapshotLoadResult = ScenarioLocalSnapshotLoadResult(
@@ -920,3 +927,27 @@ def _has_local_check_error(results: tuple[object, ...]) -> bool:
 def _remove_local_duckdb_files(duckdb_path: Path) -> None:
     duckdb_path.unlink(missing_ok=True)
     duckdb_path.with_name(f"{duckdb_path.name}.wal").unlink(missing_ok=True)
+
+
+def _snapshot_refusal_guidance(
+    *, state: ScenarioSnapshotStateResult, scenario_name: str
+) -> tuple[str, str]:
+    """The code of a snapshot that can't replay, and the capture that makes it replay."""
+
+    guidance: dict[ScenarioSnapshotState, tuple[str, str]] = {
+        ScenarioSnapshotState.STALE: (
+            SCENARIO_LOCAL_SNAPSHOT_STALE,
+            f"Run `sqb scenario capture {scenario_name}` to refresh the snapshot.",
+        ),
+        ScenarioSnapshotState.INVALID: (
+            state.error_code or SCENARIO_LOCAL_MANIFEST_INVALID,
+            "Fix scenario.json or regenerate it with `sqb scenario capture`.",
+        ),
+    }
+    return guidance.get(
+        state.state,
+        (
+            SCENARIO_LOCAL_SNAPSHOT_MISSING,
+            f"Run `sqb scenario capture {scenario_name}` to create the snapshot.",
+        ),
+    )

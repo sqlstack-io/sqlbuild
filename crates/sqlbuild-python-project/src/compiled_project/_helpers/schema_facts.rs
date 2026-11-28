@@ -33,11 +33,11 @@ pub(crate) fn present<'py>(
     Ok(value.filter(|value| !value.is_none()))
 }
 
-pub(crate) fn optional<'py, T: pyo3::FromPyObject<'py>>(
+pub(crate) fn optional<'py, T: pyo3::prelude::FromPyObjectOwned<'py>>(
     spec: &Bound<'py, PyAny>,
     name: &str,
 ) -> PyResult<Option<T>> {
     present(spec, name)?
-        .map(|value| value.extract())
+        .map(|value| value.extract().map_err(Into::into))
         .transpose()
 }

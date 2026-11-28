@@ -3,7 +3,7 @@
 use serde_json::json;
 
 use crate::credentials::models::Action;
-use crate::run_output::_helpers::views::output_index;
+use crate::run_output::_helpers::reads::views::output_index;
 use crate::run_output::models::RunOutputIndex;
 use crate::run_output::types::PersonRunRead;
 use crate::runs::constants::REPEATED_READ_AUDIT;

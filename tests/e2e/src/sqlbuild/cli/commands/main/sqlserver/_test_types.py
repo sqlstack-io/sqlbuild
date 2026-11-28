@@ -12,14 +12,6 @@ class SqlServerBuildE2ETestCase:
 
 
 @dataclass(frozen=True)
-class SqlServerCloneE2ETestCase:
-    description: str
-    expected_stdout_fragments: tuple[str, ...]
-    expected_rows: tuple[tuple[object, ...], ...]
-    expected_return_code: int = 0
-
-
-@dataclass(frozen=True)
 class SqlServerDiffE2ETestCase:
     description: str
     command: tuple[str, ...]
@@ -44,58 +36,6 @@ class SqlServerNodeResultE2ETestCase:
 
 
 @dataclass(frozen=True)
-class SqlServerSourceLoaderE2ETestCase:
-    description: str
-    expected_rows: tuple[tuple[str, ...], ...]
-    expected_return_code: int = 0
-
-
-@dataclass(frozen=True)
-class SqlServerSourceDeferralE2ETestCase:
-    description: str
-    expected_model_rows: tuple[tuple[str, ...], ...]
-    expected_loader_rows: tuple[tuple[str, ...], ...]
-    expected_return_code: int = 0
-
-
-@dataclass(frozen=True)
-class SqlServerLoaderWaffleShopE2ETestCase:
-    description: str
-    expected_rows: tuple[tuple[str, ...], ...]
-    expected_event_count: int
-    expected_return_code: int = 0
-
-
-@dataclass(frozen=True)
-class SqlServerSourceLoaderStrategiesE2ETestCase:
-    description: str
-    expected_countries: tuple[tuple[str, ...], ...]
-    expected_webhook_event_counts: tuple[tuple[str, ...], ...]
-    expected_order_events: tuple[tuple[str, ...], ...]
-    expected_customers: tuple[tuple[str, ...], ...]
-    expected_loader_status: tuple[tuple[str, ...], ...]
-    expected_return_code: int = 0
-
-
-@dataclass(frozen=True)
-class SqlServerIntermediateDagStrategyE2ETestCase:
-    description: str
-    loader_py: str
-    expected_intermediate_rows: tuple[tuple[str, ...], ...]
-    expected_terminal_rows: tuple[tuple[str, ...], ...]
-    command: tuple[str, ...] = ("--no-color", "load", "--select", "+raw_events")
-    expected_return_code: int = 0
-
-
-@dataclass(frozen=True)
-class SqlServerSourceLoaderDagE2ETestCase:
-    description: str
-    command: tuple[str, ...]
-    expected_rows: tuple[tuple[str, ...], ...]
-    expected_return_code: int = 0
-
-
-@dataclass(frozen=True)
 class SqlServerSnapshotE2ETestCase:
     description: str
     expected_current_rows_after_initial_build: tuple[tuple[object, ...], ...]
@@ -112,3 +52,9 @@ class SqlServerSnapshotApplyE2ETestCase:
     expected_current_delete_rows: tuple[tuple[object, ...], ...]
     expected_historical_timestamp_rows: tuple[tuple[object, ...], ...]
     expected_historical_check_rows: tuple[tuple[object, ...], ...]
+
+
+@dataclass(frozen=True)
+class SqlServerLoaderRefusalE2ETestCase:
+    description: str
+    expected_fragment: str

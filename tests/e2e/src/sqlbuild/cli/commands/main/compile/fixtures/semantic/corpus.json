@@ -1178,11 +1178,11 @@
       }
     },
     {
-      "description": "K08: source cursor_column missing",
+      "description": "K08: a loader-filled source sets its loading keys in YAML",
       "category": "config",
       "expected_exit_code": 1,
       "expected_codes": [
-        "B300"
+        "D006"
       ],
       "pending_native": false,
       "repo_files": {

@@ -63,6 +63,7 @@ pub(crate) struct Comparer<'a, 'b, E> {
     pub(crate) warehouse: &'a [(String, String)],
     pub(crate) seen: HashSet<String>,
     pub(crate) findings: Vec<SchemaFindingRow>,
+    /// Whether an expected column type, then a warehouse-listed one, name the same type.
     pub(crate) types_equal: &'b mut dyn FnMut(&str, &str) -> Result<bool, E>,
 }
 
@@ -86,7 +87,7 @@ impl<E> Comparer<'_, '_, E> {
                 )),
                 Some((_, actual)) => {
                     if let Some(expected_type) = kind
-                        && !(self.types_equal)(actual, expected_type)?
+                        && !(self.types_equal)(expected_type, actual)?
                     {
                         self.findings.push(finding(
                             (SchemaChangeKind::ColumnTypeChanged, name, source),

@@ -75,3 +75,11 @@ class CoverageFlagUsageTestCase:
     description: str
     arguments: tuple[str, ...]
     expected_message: str
+
+
+@dataclass(frozen=True)
+class ExcludedFeaturePairTestCase:
+    description: str
+    seeds: range
+    pair: tuple[str, str]
+    expected_any_with_both: bool

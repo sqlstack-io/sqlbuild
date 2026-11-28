@@ -190,7 +190,7 @@ async fn selection_costs(
         }
     }
     let (transaction, nodes) = match &result.snapshot_id {
-        Some(snapshot_id) => read_snapshot_nodes(transaction, *snapshot_id, Some(&keys)).await?,
+        Some(snapshot_id) => read_snapshot_nodes(transaction, *snapshot_id, &keys).await?,
         None => (transaction, BTreeMap::new()),
     };
     commit(transaction).await?;

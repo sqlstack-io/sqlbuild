@@ -1,5 +1,6 @@
 //! Resolve a command against the current publication and freeze it as an ad-hoc run request.
 
+use crate::runs::_helpers::requests::prepared_calls::plan_off_worker;
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::json;
@@ -63,7 +64,11 @@ pub(crate) async fn frozen_publication_request(
     let ids = publication.prepared.run_selector_ids(&request.command);
     let (transaction, past) =
         read_past_runs(transaction, (request.location_id, &request.target), &ids).await?;
-    let plan = match past.and_then(|past| publication.prepared.plan(&request.command, &past)) {
+    let planned = match past {
+        Ok(past) => plan_off_worker(&publication.prepared, &request.command, past).await?,
+        Err(refusal) => Err(refusal),
+    };
+    let plan = match planned {
         Ok(plan) => plan,
         Err(refusal) => return Ok((transaction, Err(refusal))),
     };
@@ -143,10 +148,11 @@ pub(crate) async fn publication_plan(
         cached_publication(transaction, planner, (scope, snapshot_id)).await?;
     let ids = publication.prepared.run_selector_ids(command);
     let (transaction, past) = read_past_runs(transaction, scope, &ids).await?;
-    Ok((
-        transaction,
-        past.and_then(|past| publication.prepared.plan(command, &past)),
-    ))
+    let planned = match past {
+        Ok(past) => plan_off_worker(&publication.prepared, command, past).await?,
+        Err(refusal) => Err(refusal),
+    };
+    Ok((transaction, planned))
 }
 
 /// Every permission launching `frozen` needs, decided as the launch would but without recording a denial.

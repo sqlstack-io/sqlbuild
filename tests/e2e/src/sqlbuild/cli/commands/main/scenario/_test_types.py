@@ -224,6 +224,7 @@ class ScenarioInterruptE2ETestCase:
     args: tuple[str, ...]
     trigger: str
     trigger_stream: str = "stderr"
+    global_args: tuple[str, ...] = ()
     long_model: bool = False
     long_fixture: bool = False
     slow_hook_seconds: float = 0.0
@@ -381,3 +382,15 @@ class GuardedScenarioRunOnTestCase:
     run_on: str
     expected_text: str
     expected_local_lines: int
+
+
+@dataclass(frozen=True)
+class SnowflakeMacroScenarioRunOnTestCase:
+    """A command over a Snowflake project with Snowflake-only macros, and what it reports."""
+
+    description: str
+    command: tuple[str, ...]
+    expected_returncode: int
+    expected_rows: tuple[tuple[str, str, str], ...]
+    expected_absent_rows: tuple[str, ...]
+    expected_fragments: tuple[str, ...]

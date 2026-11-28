@@ -171,7 +171,7 @@ def test_given_existing_rule_failures_when_dry_run_then_baseline_and_result_are_
     )
 
     assert moved.returncode == 0, moved.stdout + moved.stderr
-    assert "Compiled project with 1 existing rule failure" in moved.stdout, moved.stdout
+    assert "Project compiled  1 existing rule failure;" in moved.stdout, moved.stdout
     assert set(test_case.expected_lines) <= set(moved.stdout.splitlines()), moved.stdout
     assert project_text(project_dir) == before
 

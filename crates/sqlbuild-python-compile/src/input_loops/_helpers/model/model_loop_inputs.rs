@@ -37,7 +37,7 @@ pub(crate) fn analysis_override(values: &Bound<'_, PyDict>) -> PyResult<Analysis
         (None, None) => None,
     };
     Ok(
-        match chosen.map(pyo3::types::PyAnyMethods::downcast_into::<PyBool>) {
+        match chosen.map(pyo3::Bound::<pyo3::PyAny>::cast_into::<PyBool>) {
             Some(Ok(flag)) if flag.is_true() => AnalysisOverride::Enabled,
             Some(Ok(_)) => AnalysisOverride::Disabled,
             Some(Err(_)) | None => AnalysisOverride::Inherit,

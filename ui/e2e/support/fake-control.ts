@@ -81,8 +81,8 @@ export class FakeControl {
 		return this.writes.filter((w) => w.path.endsWith('/attention-acknowledgements') && w.body.acknowledged === false && (!target || w.target === target));
 	}
 
-	/** Tells the page something changed, as the server's change feed does, so it reads again. */
-	notify(topic: 'runs' | 'all' = 'runs') {
+	/** Tells the page something changed, as the server's change feed does, so it reads again; e.g. `warehouse_sync:<location id>`. */
+	notify(topic: string = 'runs') {
 		this.#notices.push(topic);
 	}
 

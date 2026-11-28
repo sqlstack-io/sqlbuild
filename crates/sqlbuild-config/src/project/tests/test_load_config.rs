@@ -762,3 +762,35 @@ fn given_invalid_dynamic_section_when_reading_then_it_is_rejected() {
         );
     }
 }
+
+#[test]
+fn given_invalid_testing_section_when_loading_then_it_is_rejected() {
+    let test_cases = [
+        ReviewConfigErrorTestCase {
+            description: "an allowance that is not true or false",
+            project: "name = 'orders'\nadapter = 'snowflake'\n[testing.local]\nallow = { hash = 'yes' }\n",
+            expected_fragment: "[testing.local] allow takes `hash = true` or `false` for a SQLQuack known difference",
+        },
+        ReviewConfigErrorTestCase {
+            description: "a misspelt testing.local key",
+            project: "name = 'orders'\nadapter = 'snowflake'\n[testing.local]\nalow = { hash = true }\n",
+            expected_fragment: "testing.local contains unknown key(s): alow",
+        },
+        ReviewConfigErrorTestCase {
+            description: "a testing table other than local",
+            project: "name = 'orders'\nadapter = 'snowflake'\n[testing.warehouse]\nallow = { hash = true }\n",
+            expected_fragment: "testing contains unknown key(s): warehouse",
+        },
+    ];
+    for test_case in test_cases {
+        let (_directory, paths) = project_directory(test_case.project, "");
+
+        let failure: String = format!("{:?}", first_failure(&paths).expect(test_case.description));
+
+        assert!(
+            failure.contains(test_case.expected_fragment),
+            "{}: {failure}",
+            test_case.description
+        );
+    }
+}

@@ -295,7 +295,7 @@ pub(crate) async fn touched_definitions(
     let mut nodes: BTreeMap<String, SnapshotNode> = BTreeMap::new();
     for batch in keys.chunks(LINEAGE_DEFINITION_BATCH) {
         let batch: BTreeSet<String> = batch.iter().map(|key| (*key).clone()).collect();
-        let (next, loaded) = read_snapshot_nodes(transaction, snapshot_id, Some(&batch)).await?;
+        let (next, loaded) = read_snapshot_nodes(transaction, snapshot_id, &batch).await?;
         transaction = next;
         nodes.extend(loaded);
     }

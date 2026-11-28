@@ -18,6 +18,7 @@ class ExecutionResourceKind(StrEnum):
     TABLE = "table"
     CUSTOM = "custom"
     SNAPSHOT = "snapshot"
+    LOAD = "load"
 
 
 class ConnectionElapsedCallback(Protocol):

@@ -28,6 +28,21 @@ pub(crate) fn validate_loaders(facts: &ProjectFacts) -> Result<(), ValidationFai
              asset, and check names must be globally unique"
         )
     })?;
+    let mut load_paths: Vec<NamedPath> = Vec::new();
+    for file in &facts.sources {
+        if let Some(name) = &file.load {
+            load_paths.push(NamedPath {
+                name: name.clone(),
+                path: file.path.clone(),
+            });
+        }
+    }
+    unique_named(&load_paths, |name, existing, path| {
+        format!(
+            "Duplicate load '{name}' in {existing} and {path}; each sources file declares at \
+             most one load, and load names are unique"
+        )
+    })?;
     source_loader_name_collisions(&facts.sources, &loaders)?;
     validate_loader_dependencies(&facts.nodes)?;
     validate_python_node_dependencies(&facts.nodes)?;
@@ -115,8 +130,9 @@ fn terminal_loader_config_ownership(
                 .is_some_and(|loader| loader.decorator_config);
             if configured {
                 return Err(conflict(format!(
-                    "Source '{}' references loader '{loader}', but terminal source loader write \
-                     and schema config must be declared in source YAML, not the @loader decorator",
+                    "Source '{}' references loader '{loader}', which sets destination or columns; \
+                     the source names its table and declares its columns in its sources file, so \
+                     @loader can't",
                     entry.name
                 )));
             }

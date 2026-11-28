@@ -20,6 +20,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     query_duckdb,
     run_sqb,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 
 def assert_source_only_ingress_dependency_case(
@@ -40,9 +41,9 @@ def assert_source_only_ingress_dependency_case(
                         "from python.nodes.tasks.prepare.asset import prepare_events\n"
                         "\n"
                         "\n"
-                        "@loader(depends_on=[prepare_events], write_strategy='table', columns=[\n"
-                        "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                        "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
+                        "@loader(depends_on=[prepare_events], write_strategy='replace', columns=[\n"
+                        "    {'name': 'event_id', 'type': 'BIGINT'},\n"
+                        "    {'name': 'load_seq', 'type': 'BIGINT'},\n"
                         "])\n"
                         "def fetch_events(ctx):\n"
                         "    '''Test loader fetch_events.'''\n"
@@ -259,48 +260,46 @@ def build_loader_waffle_shop_project_files(*, project_toml: str | None = None) -
             "sources:\n"
             "  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    managed: true\n"
-            "    write_strategy: table\n"
             "    columns:\n"
             "      - name: order_id\n"
-            "        type: INTEGER\n"
+            "        type: BIGINT\n"
             "      - name: customer_id\n"
-            "        type: INTEGER\n"
+            "        type: BIGINT\n"
             "      - name: waffle_type\n"
-            "        type: VARCHAR\n"
+            "        type: TEXT\n"
             "      - name: quantity\n"
-            "        type: INTEGER\n"
+            "        type: BIGINT\n"
             "      - name: price_cents\n"
-            "        type: INTEGER\n"
+            "        type: BIGINT\n"
             "      - name: load_seq\n"
-            "        type: INTEGER\n"
+            "        type: BIGINT\n"
             "  - name: raw_customers\n    description: Test source raw_customers.\n"
             "    managed: true\n"
-            "    write_strategy: table\n"
             "    columns:\n"
             "      - name: customer_id\n"
-            "        type: INTEGER\n"
+            "        type: BIGINT\n"
             "      - name: plan_name\n"
-            "        type: VARCHAR\n"
+            "        type: TEXT\n"
             "      - name: load_seq\n"
-            "        type: INTEGER\n"
+            "        type: BIGINT\n"
         ),
         "python/nodes/loaders/waffle_loaders/fetch_order_events/loader.py": (
             "from sqlbuild.loaders import loader\n"
             "\n"
             "\n"
             "@loader(write_strategy='append', cursor_column='load_seq', columns=[\n"
-            "    {'name': 'order_id', 'type': 'INTEGER'},\n"
-            "    {'name': 'customer_id', 'type': 'INTEGER'},\n"
-            "    {'name': 'waffle_type', 'type': 'VARCHAR'},\n"
-            "    {'name': 'quantity', 'type': 'INTEGER'},\n"
-            "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
+            "    {'name': 'order_id', 'type': 'BIGINT'},\n"
+            "    {'name': 'customer_id', 'type': 'BIGINT'},\n"
+            "    {'name': 'waffle_type', 'type': 'TEXT'},\n"
+            "    {'name': 'quantity', 'type': 'BIGINT'},\n"
+            "    {'name': 'load_seq', 'type': 'BIGINT'},\n"
             "])\n"
             "def fetch_order_events(ctx):\n"
             "    '''Test loader fetch_order_events.'''\n"
-            "    if ctx.current_cursor_value is None:\n"
+            "    if ctx.cursor_value is None:\n"
             "        next_seq = 1\n"
             "    else:\n"
-            "        next_seq = ctx.current_cursor_value + 1\n"
+            "        next_seq = ctx.cursor_value + 1\n"
             "    first_order = (next_seq - 1) * 2 + 1\n"
             "    return [\n"
             "        {\n"
@@ -328,13 +327,13 @@ def build_loader_waffle_shop_project_files(*, project_toml: str | None = None) -
             "    unique_key='customer_id',\n"
             "    cursor_column='load_seq',\n"
             "    columns=[\n"
-            "    {'name': 'customer_id', 'type': 'INTEGER'},\n"
-            "    {'name': 'plan_name', 'type': 'VARCHAR'},\n"
-            "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
+            "    {'name': 'customer_id', 'type': 'BIGINT'},\n"
+            "    {'name': 'plan_name', 'type': 'TEXT'},\n"
+            "    {'name': 'load_seq', 'type': 'BIGINT'},\n"
             "])\n"
             "def fetch_customers(ctx):\n"
             "    '''Test loader fetch_customers.'''\n"
-            "    if ctx.current_cursor_value is None:\n"
+            "    if ctx.cursor_value is None:\n"
             "        return [\n"
             "            {'customer_id': 1, 'plan_name': 'basic', 'load_seq': 1},\n"
             "            {'customer_id': 2, 'plan_name': 'plus', 'load_seq': 1},\n"
@@ -349,13 +348,13 @@ def build_loader_waffle_shop_project_files(*, project_toml: str | None = None) -
             "\n"
             "\n"
             "@loader(write_strategy='delete_insert', cursor_column='load_seq', columns=[\n"
-            "    {'name': 'waffle_type', 'type': 'VARCHAR'},\n"
-            "    {'name': 'price_cents', 'type': 'INTEGER'},\n"
-            "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
+            "    {'name': 'waffle_type', 'type': 'TEXT'},\n"
+            "    {'name': 'price_cents', 'type': 'BIGINT'},\n"
+            "    {'name': 'load_seq', 'type': 'BIGINT'},\n"
             "])\n"
             "def fetch_prices(ctx):\n"
             "    '''Test loader fetch_prices.'''\n"
-            "    classic_price = 600 if ctx.current_cursor_value is None else 650\n"
+            "    classic_price = 600 if ctx.cursor_value is None else 650\n"
             "    return [\n"
             "        {'waffle_type': 'classic', 'price_cents': classic_price, 'load_seq': 1},\n"
             "        {'waffle_type': 'blueberry', 'price_cents': 750, 'load_seq': 1},\n"
@@ -368,7 +367,7 @@ def build_loader_waffle_shop_project_files(*, project_toml: str | None = None) -
             "from python.nodes.loaders.waffle_loaders.fetch_prices.loader import fetch_prices\n"
             "\n"
             "\n"
-            "@loader(depends_on=[fetch_order_events, fetch_prices])\n"
+            "@loader(write_strategy='replace', depends_on=[fetch_order_events, fetch_prices])\n"
             "def raw_orders(ctx):\n"
             "    '''Test loader raw_orders.'''\n"
             "    events = ctx.loader(fetch_order_events)\n"
@@ -397,7 +396,7 @@ def build_loader_waffle_shop_project_files(*, project_toml: str | None = None) -
             "import fetch_customers\n"
             "\n"
             "\n"
-            "@loader(depends_on=[fetch_customers])\n"
+            "@loader(write_strategy='replace', depends_on=[fetch_customers])\n"
             "def raw_customers(ctx):\n"
             "    '''Test loader raw_customers.'''\n"
             "    customers = ctx.loader(fetch_customers)\n"
@@ -442,3 +441,30 @@ def build_loader_waffle_shop_project_files(*, project_toml: str | None = None) -
             "GROUP BY customer_id, COALESCE(plan_name, 'unknown')\n"
         ),
     }
+
+
+def build_native_column_project_files(
+    *, columns: tuple[tuple[str, str], ...], rows: str
+) -> dict[str, str]:
+    """A loader filling `raw_events`, whose sources file declares `columns` as `(name, type)`."""
+
+    declared: str = "".join(
+        f"      - name: {name}\n        type: {column_type}\n" for name, column_type in columns
+    )
+    return build_schema_behavior_project_files(
+        source_yaml=(
+            "sources:\n"
+            "  - name: raw_events\n"
+            "    description: Events with warehouse-native column types.\n"
+            "    managed: true\n"
+            "    columns:\n" + declared
+        ),
+        node_files=node_module_files(
+            "python/nodes/loaders/raw_events.py",
+            "from sqlbuild.loaders import loader\n\n"
+            "@loader(write_strategy='replace')\n"
+            "def raw_events(ctx):\n"
+            "    '''Test loader raw_events.'''\n"
+            f"    return {rows}\n",
+        ),
+    )

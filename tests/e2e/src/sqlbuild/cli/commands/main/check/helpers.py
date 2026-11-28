@@ -126,7 +126,7 @@ database = "terminal_loader_check_project.duckdb"
 from sqlbuild.loaders import loader
 
 
-@loader
+@loader(write_strategy='replace')
 def raw_orders(ctx):
     '''Test loader raw_orders.'''
     return [{"order_id": 1}]
@@ -136,10 +136,9 @@ sources:
   - name: raw_orders
     description: Test source raw_orders.
     managed: true
-    write_strategy: table
     columns:
       - name: order_id
-        type: INTEGER
+        type: BIGINT
 """,
             "python/nodes/checks/raw/checks.py": """
 from sqlbuild.checks import check

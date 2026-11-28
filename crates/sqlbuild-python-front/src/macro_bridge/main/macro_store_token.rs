@@ -28,11 +28,11 @@ pub fn macro_store_token<'py>(
     let loaded: Bound<'py, PyAny> = arguments.value("loaded")?;
     let keyed: PyResult<Option<String>> = (|| {
         let types: CanonicalTypes<'py> = CanonicalTypes::load(py)?;
-        let name: JsonValue = text(native_field(&loaded, "name")?.downcast::<PyString>()?)?;
+        let name: JsonValue = text(native_field(&loaded, "name")?.cast::<PyString>()?)?;
         let path: JsonValue = text(
             native_field(&loaded, "relative_path")?
                 .call_method0("as_posix")?
-                .downcast::<PyString>()?,
+                .cast::<PyString>()?,
         )?;
         let identity: JsonValue = types.canonical(&arguments.value("identity")?, 0)?;
         let raw_source: String = native_field(&loaded, "raw_source")?.extract()?;

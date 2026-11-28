@@ -5,6 +5,7 @@ use crate::test_types::{
     CommandTestCase, OpenApiTestCase, ServiceTestCase, StoreMigrationCommandTestCase,
     TriggerCursorTestCase,
 };
+use sqlbuild_orchestration::tls::main::client_builder::client_builder;
 
 #[test]
 fn given_a_standalone_binary_when_printing_help_or_rejecting_invalid_input_then_python_and_database_access_are_not_required()
@@ -442,7 +443,7 @@ fn given_a_standalone_binary_when_serving_with_or_without_a_scheduler_then_migra
         runtime.block_on(async {
             let mut control = start_control(test_case.arguments);
             let url = api_ready(&mut control).await;
-            let client = reqwest::Client::builder()
+            let client = client_builder()
                 .timeout(std::time::Duration::from_secs(5))
                 .build()
                 .expect("bounded HTTP requests");

@@ -80,8 +80,8 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
             edit=lambda root: replace_project_text(
                 root,
                 "sql/sources/raw.yml",
-                "      - name: quantity\n        type: INTEGER",
                 "      - name: quantity\n        type: BIGINT",
+                "      - name: quantity\n        type: INT8",
             ),
             expected_output_change=False,
         ),
@@ -90,8 +90,8 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
             edit=lambda root: replace_project_text(
                 root,
                 "sql/sources/raw.yml",
-                "      - name: quantity\n        type: INTEGER",
-                "      - name: item_count\n        type: INTEGER",
+                "      - name: quantity\n        type: BIGINT",
+                "      - name: item_count\n        type: BIGINT",
             ),
             expected_failure=True,
         ),

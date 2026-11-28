@@ -11,13 +11,13 @@
      "message": "cursor_column references unknown column 'loaded_at'",
      "resource_type": "source",
      "resource_name": "raw_events",
-     "path": "sql/sources/raw.yml",
-     "line": 21,
-     "column": 20,
+     "path": "python/nodes/loaders/raw_events/loader.py",
+     "line": 4,
+     "column": 49,
      "location": {
-      "path": "sql/sources/raw.yml",
-      "line": 21,
-      "column": 20
+      "path": "python/nodes/loaders/raw_events/loader.py",
+      "line": 4,
+      "column": 49
      },
      "help": "change the metadata column name to an existing output column"
     }
@@ -274,7 +274,7 @@
       "name": "event_id",
       "description": "",
       "meta": {},
-      "data_type": "INTEGER",
+      "data_type": "BIGINT",
       "constraints": [],
       "quote": null,
       "tags": []
@@ -283,7 +283,7 @@
       "name": "load_seq",
       "description": "",
       "meta": {},
-      "data_type": "INTEGER",
+      "data_type": "BIGINT",
       "constraints": [],
       "quote": null,
       "tags": []

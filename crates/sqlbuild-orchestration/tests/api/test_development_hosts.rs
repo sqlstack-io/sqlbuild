@@ -14,6 +14,7 @@ use crate::api::tests::helpers::{start_api_on, stop_api};
 use crate::api::tests::test_types::{DevelopmentHostTestCase, DevelopmentListenerTestCase};
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
+use crate::tls::main::client_builder::client_builder;
 
 #[test]
 fn given_a_development_server_when_a_request_names_a_host_and_origin_then_only_local_and_allowed_names_pass()
@@ -253,7 +254,9 @@ fn given_a_development_server_when_a_request_names_a_host_and_origin_then_only_l
                 value.map(|value| (name, value.replace("{port}", port).parse().expect("header")))
             })
             .collect();
-            let response = reqwest::Client::new()
+            let response = client_builder()
+                .build()
+                .expect("HTTP client")
                 .get(format!("{}/api/control/bootstrap", api.url))
                 .headers(headers)
                 .send()

@@ -12,6 +12,7 @@ use crate::store::main::migrate_store::migrate_store;
 use crate::store::models::ControlStore;
 use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
+use crate::tls::main::client_builder::client_builder;
 
 #[test]
 fn given_statistics_cleanup_when_connection_resets_then_maintenance_and_http_survive() {
@@ -68,7 +69,9 @@ fn given_statistics_cleanup_when_connection_resets_then_maintenance_and_http_sur
                 .execute(pool)
                 .await
                 .expect("remove fault");
-            let response = reqwest::Client::new()
+            let response = client_builder()
+                .build()
+                .expect("HTTP client")
                 .get(format!("{}/api/openapi.json", api.url))
                 .send()
                 .await

@@ -17,7 +17,7 @@ def raw_accounts(ctx: LoaderContext) -> list[dict[str, object]]:
     ]
 
 
-@loader(depends_on=[raw_accounts])
+@loader(write_strategy="replace", depends_on=[raw_accounts])
 def raw_account_metrics(ctx: LoaderContext) -> list[dict[str, object]]:
     """Account metrics."""
     accounts = ctx.loader(raw_accounts)

@@ -52,8 +52,9 @@ fn given_logical_bounds_when_grouping_then_reads_each_relation_once_in_first_ord
     for test_case in test_cases {
         let groups = cursor_query_groups(&test_case.requests);
         let batch: Vec<&PhysicalCursorQuery> = groups.iter().collect();
-        let batch_sql: String =
-            cursor_batch_sql(&batch, &|_query, bound| format!("CAST({bound} AS VARCHAR)"));
+        let batch_sql: String = cursor_batch_sql(&batch, &|query, function| {
+            format!("CAST({function}({}) AS VARCHAR)", query.cursor_column)
+        });
         assert_eq!(
             batch_sql, test_case.expected_batch_sql,
             "{}",
@@ -61,7 +62,11 @@ fn given_logical_bounds_when_grouping_then_reads_each_relation_once_in_first_ord
         );
         let sql: Vec<String> = groups
             .iter()
-            .map(|group| cursor_query_sql(group, &|bound| format!("CAST({bound} AS VARCHAR)")))
+            .map(|group| {
+                cursor_query_sql(group, &|function| {
+                    format!("CAST({function}({}) AS VARCHAR)", group.cursor_column)
+                })
+            })
             .collect();
         let identities: Vec<String> = groups
             .iter()

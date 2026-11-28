@@ -18,6 +18,7 @@ use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
+use crate::tls::main::client_builder::client_builder;
 
 /// Location-scoped reads and the action each needs.
 const READS: [(&str, &str); 14] = [
@@ -109,7 +110,7 @@ fn given_refused_requests_when_people_send_them_then_no_node_is_named_and_unknow
                 },
             )
             .await;
-            let client = reqwest::Client::new();
+            let client = client_builder().build().expect("HTTP client");
             let member = (roles.member.bearer.as_str(), roles.member.csrf.as_str());
             let read = |location: Uuid, path: &str| {
                 format!(

@@ -12,6 +12,11 @@ use crate::build_progress::_helpers::result_text::optional;
 use crate::build_progress::_helpers::result_text::text;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
+/// A load node's resource kind and key prefix; other load results are a source's.
+const LOAD_KIND: &str = "load";
+/// The key prefix of a source a loader fills.
+const SOURCE_KIND: &str = "source";
+
 pub(crate) const RUNTIME_LOGGER: &str = "sqlbuild.executor.runtime";
 pub(crate) const PASS_OUTCOME: &str = "pass";
 pub(crate) const SCHEDULER_DIAGNOSTIC_LIMIT: usize = 50;
@@ -79,7 +84,13 @@ pub(crate) fn resource_identity(result: &Bound<'_, PyAny>) -> PyResult<Option<(S
         }
         ResultKind::Load => {
             let name: String = text(result, "source_name")?;
-            Some((name.clone(), format!("source:{name}")))
+            let kind: String = text(&native_field(result, "resource_kind")?, "value")?;
+            let resource: &str = if kind == LOAD_KIND {
+                LOAD_KIND
+            } else {
+                SOURCE_KIND
+            };
+            Some((name.clone(), format!("{resource}:{name}")))
         }
         ResultKind::PythonNode => {
             let name: String = text(result, "node_name")?;
@@ -143,10 +154,8 @@ pub(crate) fn relay<'py>(
     callbacks: &Bound<'py, PyAny>,
     forward: Forward,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let owned: Py<BuildProgressCallbacks> = callbacks
-        .downcast::<BuildProgressCallbacks>()?
-        .clone()
-        .unbind();
+    let owned: Py<BuildProgressCallbacks> =
+        callbacks.cast::<BuildProgressCallbacks>()?.clone().unbind();
     let call = move |arguments: &Bound<'_, PyTuple>,
                      _keywords: Option<&Bound<'_, PyDict>>|
           -> PyResult<()> { forward(owned.get(), arguments) };

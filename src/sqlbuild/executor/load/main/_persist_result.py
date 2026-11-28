@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from sqlbuild.compiler.python_nodes.types import PythonNodeKind
+from sqlbuild.executor.load.main._persist_node_result import persist_node_result
 from sqlbuild.executor.load.models import LoadExecutionResult
 from sqlbuild.executor.node_results.classes.direct_store import DirectNodeResultStore
-from sqlbuild.executor.node_results.models import NodeResultRecord
 
 
 def persist_loader_result(
@@ -17,26 +17,19 @@ def persist_loader_result(
 ) -> None:
     """Write one loader result to the store's location; do nothing without a live store."""
 
-    if result_store is None or result_store.connection is None:
-        return
-    result_store.write(
-        NodeResultRecord(
-            node_type=PythonNodeKind.LOADER.value,
-            node_name=loader_name,
-            target_database=result_store.database,
-            target_schema=result_store.schema,
-            target_name=None,
-            run_id=run_id,
-            status=result.status.value,
-            payload=result.result_payload,
-            metadata={
+    _ = persist_node_result(
+        result_store=result_store,
+        node=(PythonNodeKind.LOADER.value, loader_name),
+        result=result,
+        run_id=run_id,
+        details=(
+            {
                 "source_name": result.source_name,
                 "loader_name": result.loader_name,
                 "rows_loaded": result.rows_loaded,
                 "target": result.target,
                 **result.result_metadata,
             },
-            error_message=result.error_message or result.skip_reason,
-            materialized=result.result_materialized,
-        )
+            result.error_message or result.skip_reason,
+        ),
     )

@@ -502,6 +502,8 @@ pub enum PlatformEventKind {
     TriggerSkipped,
     SensorRechecked,
     CalendarTimesDropped,
+    UnreadableEventSkipped,
+    ControlSessionCutOff,
 }
 
 impl PlatformEventKind {
@@ -519,6 +521,8 @@ impl PlatformEventKind {
             Self::TriggerSkipped => "trigger_skipped",
             Self::SensorRechecked => "sensor_rechecked",
             Self::CalendarTimesDropped => "calendar_times_dropped",
+            Self::UnreadableEventSkipped => "unreadable_event_skipped",
+            Self::ControlSessionCutOff => "control_session_cut_off",
         }
     }
 }
@@ -582,6 +586,25 @@ pub enum PlatformEvent {
         snapshot_id: Uuid,
         times: Vec<DateTime<Utc>>,
     },
+    /// Webhook delivery or a platform sensor skipped stored event `storage_id`, which this server can't read, and carried on; listed as a problem while the event is kept and still can't be read.
+    UnreadableEventSkipped {
+        storage_id: i64,
+        event_id: Uuid,
+        /// The stored type, such as `platform_run_failed`.
+        event_type: String,
+        /// The location target the event concerns, when it names or leads to one.
+        location_id: Option<Uuid>,
+        target: Option<String>,
+        /// Why the event couldn't be read.
+        reason: String,
+    },
+    /// The control database cut off one of this server's sessions: a statement ran past its limit, or a transaction sat idle past its own, and was rolled back.
+    ControlSessionCutOff {
+        /// The transaction sat idle past its limit, rather than a statement running past its own.
+        idle: bool,
+        cut_at: DateTime<Utc>,
+        error: String,
+    },
 }
 
 /// What a `run_failed` event says: the run, what started it, when, what failed and why, with UI links.
@@ -628,6 +651,8 @@ impl PlatformEvent {
             Self::TriggerSkipped { .. } => PlatformEventKind::TriggerSkipped,
             Self::SensorRechecked { .. } => PlatformEventKind::SensorRechecked,
             Self::CalendarTimesDropped { .. } => PlatformEventKind::CalendarTimesDropped,
+            Self::UnreadableEventSkipped { .. } => PlatformEventKind::UnreadableEventSkipped,
+            Self::ControlSessionCutOff { .. } => PlatformEventKind::ControlSessionCutOff,
         }
     }
 
@@ -645,6 +670,8 @@ impl PlatformEvent {
             Self::TriggerSkipped { .. } => "platform_trigger_skipped",
             Self::SensorRechecked { .. } => "platform_sensor_rechecked",
             Self::CalendarTimesDropped { .. } => "platform_calendar_times_dropped",
+            Self::UnreadableEventSkipped { .. } => "platform_unreadable_event_skipped",
+            Self::ControlSessionCutOff { .. } => "platform_control_session_cut_off",
         }
     }
 }
@@ -688,6 +715,54 @@ pub struct PersonPlatformEventPage {
     pub events: Vec<PersonPlatformEvent>,
     /// The `before` that continues the scan, absent once no older events remain; a page can be empty and still continue.
     pub before: Option<i64>,
+    /// Stored events of this scan that this server can't read, such as a kind or shape from another release; each is listed, never dropped.
+    #[serde(default)]
+    pub unreadable: Vec<UnreadablePlatformEvent>,
+}
+
+/// A stored platform event this server can't read: what is known about it and why reading it failed.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct UnreadablePlatformEvent {
+    pub storage_id: i64,
+    pub event_id: Uuid,
+    pub occurred_at: DateTime<Utc>,
+    /// The stored type, such as `platform_location_failing`.
+    pub event_type: String,
+    /// Why the event couldn't be read.
+    pub error: String,
+    /// The location target the event names, when it names one that can be read.
+    pub location_id: Option<Uuid>,
+    pub target: Option<String>,
+}
+
+/// The location target, trigger or run an unreadable event's payload names, each absent when it can't be read.
+#[derive(Debug, Default, Deserialize)]
+pub(crate) struct PayloadScope {
+    #[serde(default)]
+    pub(crate) location_id: Option<Uuid>,
+    #[serde(default)]
+    pub(crate) target: Option<String>,
+    #[serde(default)]
+    pub(crate) trigger_id: Option<Uuid>,
+    #[serde(default)]
+    pub(crate) run_id: Option<Uuid>,
+}
+
+/// An unreadable stored event and the trigger or run its payload names, whose location target scopes it.
+#[derive(Debug)]
+pub(crate) struct UnreadableRow {
+    pub(crate) event: UnreadablePlatformEvent,
+    pub(crate) scope: Option<Uuid>,
+}
+
+/// A stored platform event row with its payload not yet read, so one row that can't be read never fails the rest.
+#[derive(Debug, Deserialize)]
+pub(crate) struct StoredPlatformEvent {
+    pub(crate) storage_id: i64,
+    pub(crate) event_id: Uuid,
+    pub(crate) occurred_at: DateTime<Utc>,
+    pub(crate) event_type: String,
+    pub(crate) payload: serde_json::Value,
 }
 
 /// The location target a trigger or run belongs to.
@@ -744,6 +819,9 @@ pub struct PlatformProblems {
     /// Sensors checked again from scratch because their last check can't be read, until a check completes.
     #[serde(default)]
     pub rechecked_sensors: Vec<RecheckedSensor>,
+    /// Stored events webhook delivery or a platform sensor skipped because this server can't read them, while they are kept and still can't be read.
+    #[serde(default)]
+    pub skipped_events: Vec<SkippedEvent>,
 }
 
 /// A calendar whose pending past-due times a republish dropped, because its previous definition can't be read; it clears at its next successful tick.
@@ -776,6 +854,29 @@ pub struct RecheckedSensor {
     pub location_name: String,
     pub target: String,
     pub rechecked_at: DateTime<Utc>,
+}
+
+/// A stored event webhook delivery or a platform sensor skipped because this server can't read it; it clears once the event can be read or is pruned.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct SkippedEvent {
+    pub storage_id: i64,
+    pub event_id: Uuid,
+    /// The stored type, such as `platform_run_failed`.
+    pub event_type: String,
+    /// The location target the event concerns; absent when it names none that can be read.
+    pub location_id: Option<Uuid>,
+    pub location_name: Option<String>,
+    pub target: Option<String>,
+    /// When it was first skipped.
+    pub skipped_at: DateTime<Utc>,
+    /// Why the event couldn't be read.
+    pub reason: String,
+}
+
+/// The stored event a dismissal of its skip names, read from the audit event's scope.
+#[derive(Debug, Deserialize)]
+pub(crate) struct DismissedSkip {
+    pub(crate) storage_id: i64,
 }
 
 /// A trigger the scheduler skips because its stored job or pinned snapshot can't be read, or a sensor whose check failed; it clears once its location publishes again or, for a sensor, a later check completes.
@@ -1007,6 +1108,7 @@ pub(crate) struct ProblemScan {
     pub(crate) skipped_triggers: Vec<SkippedTrigger>,
     pub(crate) rechecked_sensors: Vec<RecheckedSensor>,
     pub(crate) dropped_calendar_times: Vec<DroppedCalendarTimes>,
+    pub(crate) skipped_events: Vec<SkippedEvent>,
 }
 
 /// Where the control store keeps its data.

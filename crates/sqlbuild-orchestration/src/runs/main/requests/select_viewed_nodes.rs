@@ -1,5 +1,6 @@
 //! Resolve a selection to every node it picks in the current publication, for a person who may view it.
 
+use crate::runs::_helpers::requests::prepared_calls::evaluate_off_worker;
 use std::collections::BTreeSet;
 
 use uuid::Uuid;
@@ -54,18 +55,20 @@ pub async fn select_viewed_nodes(
         (publication.prepared.as_ref(), select, exclude),
     )
     .await?;
-    Ok(
-        match past.and_then(|past| publication.prepared.evaluate((select, exclude), &past)) {
-            Ok(keys) => ViewedSelection {
-                snapshot_id,
-                keys: Some(keys.into_iter().collect()),
-                error: None,
-            },
-            Err(problem) => ViewedSelection {
-                snapshot_id,
-                keys: Some(BTreeSet::new()),
-                error: Some(*problem),
-            },
+    let evaluated = match past {
+        Ok(past) => evaluate_off_worker(&publication.prepared, (select, exclude), past).await?,
+        Err(problem) => Err(problem),
+    };
+    Ok(match evaluated {
+        Ok(keys) => ViewedSelection {
+            snapshot_id,
+            keys: Some(keys.into_iter().collect()),
+            error: None,
         },
-    )
+        Err(problem) => ViewedSelection {
+            snapshot_id,
+            keys: Some(BTreeSet::new()),
+            error: Some(*problem),
+        },
+    })
 }

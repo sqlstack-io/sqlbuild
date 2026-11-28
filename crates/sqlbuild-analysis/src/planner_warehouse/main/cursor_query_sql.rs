@@ -2,20 +2,17 @@
 
 use crate::planner_warehouse::models::PhysicalCursorQuery;
 
-/// Select the requested bounds of the cursor column as text, each through `as_text`.
-pub fn cursor_query_sql(query: &PhysicalCursorQuery, as_text: &dyn Fn(&str) -> String) -> String {
+/// Select the requested bounds of the cursor column as text, each `MIN` or `MAX` rendered by `bound_text`.
+pub fn cursor_query_sql(
+    query: &PhysicalCursorQuery,
+    bound_text: &dyn Fn(&str) -> String,
+) -> String {
     let mut parts: Vec<String> = Vec::new();
     if !query.min_tags.is_empty() {
-        parts.push(format!(
-            "{} AS _min",
-            as_text(&format!("MIN({})", query.cursor_column))
-        ));
+        parts.push(format!("{} AS _min", bound_text("MIN")));
     }
     if !query.max_tags.is_empty() {
-        parts.push(format!(
-            "{} AS _max",
-            as_text(&format!("MAX({})", query.cursor_column))
-        ));
+        parts.push(format!("{} AS _max", bound_text("MAX")));
     }
     format!("SELECT {} FROM {}", parts.join(", "), query.relation)
 }

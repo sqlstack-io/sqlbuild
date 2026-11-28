@@ -99,7 +99,7 @@ fn with_project_name<'py>(
     project_name: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let translated: Bound<'py, PyDict> = PyDict::new(node.py());
-    translated.update(node.downcast::<PyMapping>()?)?;
+    translated.update(node.cast::<PyMapping>()?)?;
     translated.set_item(PROJECT_NAME_KEY, project_name)?;
     Ok(translated.into_any())
 }

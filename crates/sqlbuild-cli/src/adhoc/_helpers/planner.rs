@@ -20,7 +20,7 @@ use sqlbuild_orchestration::runs::models::{
     SelectionVocabulary,
 };
 use sqlbuild_orchestration::runs::types::PastRuns;
-use sqlbuild_orchestration::runs::types::{CommandPlanner, PreparedPublication};
+use sqlbuild_orchestration::runs::types::{CommandPlanner, PreparedPublication, Preparer};
 
 use crate::adhoc::_helpers::evaluation::{evaluate, vocabulary};
 use crate::adhoc::_helpers::job_pins::{named_job_settings, pinned_jobs};
@@ -54,12 +54,10 @@ impl CliPlanner {
 }
 
 impl CommandPlanner for CliPlanner {
-    fn prepare(
-        &self,
-        resources: Vec<PlannerResource>,
-        jobs: PublishedJobs,
-    ) -> Arc<dyn PreparedPublication> {
-        Arc::new(IndexedPublication::new(resources, jobs))
+    fn preparer(&self) -> Preparer {
+        |resources: Vec<PlannerResource>, jobs: PublishedJobs| -> Arc<dyn PreparedPublication> {
+            Arc::new(IndexedPublication::new(resources, jobs))
+        }
     }
 
     fn publications(&self) -> &PublicationCache {

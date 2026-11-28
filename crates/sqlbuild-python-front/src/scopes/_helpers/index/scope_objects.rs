@@ -36,11 +36,11 @@ pub(crate) fn value_of(item: &Bound<'_, PyAny>, name: &str) -> PyResult<String> 
     native_field(&native_field(item, name)?, "value")?.extract()
 }
 
-pub(crate) fn field<'py, T: pyo3::FromPyObject<'py>>(
+pub(crate) fn field<'py, T: pyo3::prelude::FromPyObjectOwned<'py>>(
     item: &Bound<'py, PyAny>,
     name: &str,
 ) -> PyResult<T> {
-    native_field(item, name)?.extract()
+    native_field(item, name)?.extract().map_err(Into::into)
 }
 
 pub(crate) fn optional_item<'py>(
@@ -545,5 +545,5 @@ pub(crate) fn tuple_attribute<'py>(
     item: &Bound<'py, PyAny>,
     name: &str,
 ) -> PyResult<Bound<'py, PyTuple>> {
-    Ok(native_field(item, name)?.downcast_into::<PyTuple>()?)
+    Ok(native_field(item, name)?.cast_into::<PyTuple>()?)
 }

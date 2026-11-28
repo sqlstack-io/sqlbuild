@@ -389,7 +389,7 @@ impl<'py> FactReplay<'py> {
             .map(|entry| entry.model.clone())
             .collect();
         for model in models {
-            let declarations: Bound<'py, PyAny> = match model.downcast::<NativeCompiledModel>() {
+            let declarations: Bound<'py, PyAny> = match model.cast::<NativeCompiledModel>() {
                 Ok(view) if enums => view.get().enum_declarations(py)?.into_bound(py).into_any(),
                 Ok(view) => view
                     .get()
@@ -420,7 +420,7 @@ impl<'py> FactReplay<'py> {
             return Ok(Err(Raised::new(MISSING_MODEL, text)));
         };
         let model: Bound<'py, PyAny> = self.models()?.entries[index].model.clone();
-        let view: Option<&NativeCompiledModel> = match model.downcast::<NativeCompiledModel>() {
+        let view: Option<&NativeCompiledModel> = match model.cast::<NativeCompiledModel>() {
             Ok(view) => Some(view.get()),
             Err(_) => None,
         };
@@ -489,9 +489,7 @@ impl<'py> FactReplay<'py> {
                     None => record_field(&self.encoder, &model, "enum_columns")?,
                 };
                 let mut pairs: Vec<JsonValue> = Vec::new();
-                for (column, declaration) in
-                    columns.downcast::<PyDict>().map_err(PyErr::from)?.iter()
-                {
+                for (column, declaration) in columns.cast::<PyDict>().map_err(PyErr::from)?.iter() {
                     let column: String = column.extract()?;
                     let name: String =
                         record_field(&self.encoder, &declaration, "name")?.extract()?;
@@ -559,7 +557,7 @@ impl<'py> FactReplay<'py> {
                 continue;
             };
             let target: &Bound<'py, PyAny> = &fields[position];
-            let matched: bool = match target.downcast::<PyString>() {
+            let matched: bool = match target.cast::<PyString>() {
                 Ok(text) => text.to_cow()? == name,
                 Err(_) => target.contains(name).unwrap_or(false),
             };
@@ -683,7 +681,7 @@ pub(crate) fn project_attribute<'py>(
     name: &str,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = project.py();
-    if let Ok(view) = project.downcast::<NativeProjectView>()
+    if let Ok(view) = project.cast::<NativeProjectView>()
         && let Some(field) = view.get().fact_field(py, name)
     {
         return Ok(field.into_bound(py));
@@ -698,7 +696,7 @@ fn project_field<'py>(
     name: &str,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = project.py();
-    if let Ok(view) = project.downcast::<NativeProjectView>()
+    if let Ok(view) = project.cast::<NativeProjectView>()
         && let Some(field) = view.get().fact_field(py, name)
     {
         return Ok(field.into_bound(py));
@@ -722,7 +720,7 @@ fn materialization(entry: &ModelEntry<'_>) -> PyResult<Option<String>> {
         return Ok(None);
     };
     Ok(match values.get_item(MATERIALIZED)? {
-        Some(value) => match value.downcast::<PyString>() {
+        Some(value) => match value.cast::<PyString>() {
             Ok(text) => Some(text.to_string_lossy().into_owned()),
             Err(_) => None,
         },
@@ -764,7 +762,7 @@ fn indexed(entries: Vec<ModelEntry<'_>>) -> Models<'_> {
 /// What the facts read of one model view or `CompiledModel` record.
 fn model_entry<'py>(encoder: &FactEncoder, model: &Bound<'py, PyAny>) -> PyResult<ModelEntry<'py>> {
     let py: Python<'py> = model.py();
-    let (name, path, config, key, deps) = match model.downcast::<NativeCompiledModel>() {
+    let (name, path, config, key, deps) = match model.cast::<NativeCompiledModel>() {
         Ok(view) => {
             let view: &NativeCompiledModel = view.get();
             (
@@ -794,7 +792,7 @@ fn model_entry<'py>(encoder: &FactEncoder, model: &Bound<'py, PyAny>) -> PyResul
     let posix: String =
         String::from_utf8_lossy(&pure_path_posix(Path::new(&path_text))).into_owned();
     let config_values: Option<Bound<'py, PyDict>> = match encoder.field(&config, "values")? {
-        Some(values) => Some(values.downcast_into::<PyDict>().map_err(PyErr::from)?),
+        Some(values) => Some(values.cast_into::<PyDict>().map_err(PyErr::from)?),
         None => None,
     };
     Ok(ModelEntry {
@@ -871,13 +869,13 @@ type ItemFields<'py> = (String, Vec<&'static str>, Vec<Bound<'py, PyAny>>);
 fn item_fields<'py>(encoder: &FactEncoder, item: &Bound<'py, PyAny>) -> PyResult<ItemFields<'py>> {
     let py: Python<'py> = item.py();
     let (record, values): (RecordId, Vec<Bound<'py, PyAny>>) =
-        if let Ok(view) = item.downcast::<NativeCompiledSource>() {
+        if let Ok(view) = item.cast::<NativeCompiledSource>() {
             (RecordId::CompiledSource, view.get().record_values(py)?)
-        } else if let Ok(view) = item.downcast::<NativeCompiledSeed>() {
+        } else if let Ok(view) = item.cast::<NativeCompiledSeed>() {
             (RecordId::CompiledSeed, view.get().record_values(py)?)
-        } else if let Ok(view) = item.downcast::<NativeCompiledFunction>() {
+        } else if let Ok(view) = item.cast::<NativeCompiledFunction>() {
             (RecordId::CompiledFunction, view.get().record_values(py)?)
-        } else if let Ok(view) = item.downcast::<NativeCompiledAudit>() {
+        } else if let Ok(view) = item.cast::<NativeCompiledAudit>() {
             (RecordId::CompiledAudit, view.get().record_values(py)?)
         } else {
             let class: Bound<'py, PyType> = item.get_type();
@@ -893,7 +891,7 @@ fn item_fields<'py>(encoder: &FactEncoder, item: &Bound<'py, PyAny>) -> PyResult
             return Ok((encoder.qualified_name(&class)?, names, values));
         };
     let class: Bound<'py, PyAny> = record_class(py, record)?;
-    let class: &Bound<'py, PyType> = class.downcast::<PyType>()?;
+    let class: &Bound<'py, PyType> = class.cast::<PyType>()?;
     let names: Vec<&'static str> = record_spec(class)?
         .fields
         .iter()

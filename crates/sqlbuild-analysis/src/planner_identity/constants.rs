@@ -70,6 +70,8 @@ pub const MODEL_RESOURCE: &str = "model";
 pub const SEED_RESOURCE: &str = "seed";
 /// Resource type of sources.
 pub const SOURCE_RESOURCE: &str = "source";
+/// A load's key: no relation, and a plan running its sources runs it.
+pub(crate) const LOAD_RESOURCE: &str = "load";
 /// Resource type of scalar functions.
 pub const UDF_RESOURCE: &str = "udf";
 /// Resource type of table functions.

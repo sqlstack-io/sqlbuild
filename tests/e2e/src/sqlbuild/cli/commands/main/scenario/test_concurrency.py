@@ -22,10 +22,10 @@ from tests.e2e.src.sqlbuild.cli.commands.main.scenario.helpers import (
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
 
 _SCENARIO_ROW: re.Pattern[str] = re.compile(
-    r"^order_totals_pass\s+PASS  warehouse  \d+\.\d\ds$", re.M
+    r"scenario\s+order_totals_pass\s+PASS\s+warehouse\s+\d+\.\d\ds$", re.M
 )
 _SUMMARY: re.Pattern[str] = re.compile(
-    r"PASS=2  FAIL=1  TOTAL=3  \(0 local, 3 warehouse, \d+\.\d\ds\)"
+    r"^\s+3 on the warehouse$.*PASS=2  FAIL=1  TOTAL=3", re.M | re.S
 )
 
 
@@ -74,7 +74,9 @@ def test_given_concurrency_when_running_scenarios_then_results_match_sequential_
     assert "(concurrency: 1)" in sequential.stdout
     assert test_case.expected_header in concurrent.stdout
     assert scenario_result_lines(concurrent.stdout) == scenario_result_lines(sequential.stdout)
-    assert "expected order_totals: actual=1 expected=1 mismatched=1" in concurrent.stdout
+    assert "expected rows of order_totals differ: 1 missing, 1 extra" in concurrent.stdout, (
+        concurrent.stdout
+    )
     assert _SCENARIO_ROW.search(concurrent.stdout) is not None, concurrent.stdout
     assert _SUMMARY.search(concurrent.stdout) is not None, concurrent.stdout
     assert list_scenario_relation_names(db_path=concurrent_dir / "scenario_demo.duckdb") == ()

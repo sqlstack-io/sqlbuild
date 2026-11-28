@@ -269,7 +269,7 @@ fn generated_usages<'py>(
     resolved: &Bound<'py, PyDict>,
 ) -> PyResult<Vec<Bound<'py, PyAny>>> {
     let visibility: Bound<'py, PyDict> =
-        native_field(declarations, ENUM_VISIBILITY_ATTRIBUTE)?.downcast_into()?;
+        native_field(declarations, ENUM_VISIBILITY_ATTRIBUTE)?.cast_into()?;
     let mut usages: Vec<Bound<'py, PyAny>> = Vec::new();
     for declaration in resolved.values() {
         let Some(records) = visibility.get_item(native_field(&declaration, NAME_FIELD)?)? else {

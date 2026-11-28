@@ -63,9 +63,15 @@ def parallel_set(
     limit: object = discovered.get("max_parallel")
     if not isinstance(limit, int) or limit < MIN_PARALLEL_ITEMS:
         return None
-    key: str | None = CONNECTION_PRIVATE_MEMORY_DATABASE_KEYS.get(runtime.adapter.adapter_name)
-    if key is not None:
-        database: str = str(runtime.connection_config.get(key, MEMORY_DATABASE))
-        if database == MEMORY_DATABASE:
-            return None
+    if not shares_warehouse(runtime):
+        return None
     return str(discovered["set"]), limit
+
+
+def shares_warehouse(runtime: PythonNodeRuntime) -> bool:
+    """Whether another connection opened from the runtime's settings reaches the same warehouse."""
+
+    key: str | None = CONNECTION_PRIVATE_MEMORY_DATABASE_KEYS.get(runtime.adapter.adapter_name)
+    if key is None:
+        return True
+    return str(runtime.connection_config.get(key, MEMORY_DATABASE)) != MEMORY_DATABASE

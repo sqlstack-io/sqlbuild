@@ -2,20 +2,20 @@
 
 use crate::planner_warehouse::models::PhysicalCursorQuery;
 
-/// One `(_read, _min, _max)` row per query; a missing minimum repeats the maximum, not `NULL`.
+/// One `(_read, _min, _max)` row per query, each `MIN` or `MAX` rendered by `bound_text`; a missing minimum repeats the maximum, not `NULL`.
 pub fn cursor_batch_sql(
     queries: &[&PhysicalCursorQuery],
-    as_text: &dyn Fn(&PhysicalCursorQuery, &str) -> String,
+    bound_text: &dyn Fn(&PhysicalCursorQuery, &str) -> String,
 ) -> String {
     queries
         .iter()
         .enumerate()
         .map(|(read, query)| {
-            let maximum: String = as_text(query, &format!("MAX({})", query.cursor_column));
+            let maximum: String = bound_text(query, "MAX");
             let minimum: String = if query.min_tags.is_empty() {
                 maximum.clone()
             } else {
-                as_text(query, &format!("MIN({})", query.cursor_column))
+                bound_text(query, "MIN")
             };
             format!(
                 "SELECT {read} AS _read, {minimum} AS _min, {maximum} AS _max FROM {}",

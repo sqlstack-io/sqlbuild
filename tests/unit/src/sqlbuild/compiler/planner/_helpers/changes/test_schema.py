@@ -347,6 +347,69 @@ from tests.unit.src.sqlbuild.compiler.planner._helpers.changes._test_types impor
             expected_findings=(),
         ),
         DetectSchemaChangesTestCase(
+            description="clickhouse nullable columns are the types a model infers or declares",
+            yml_columns=(ColumnInfo(name="order_id", type="BIGINT"),),
+            inferred_columns=(
+                InferredColumn(name="waffles_ordered", type="Int64"),
+                InferredColumn(name="activity_hour", type="DateTime"),
+            ),
+            warehouse_columns=(
+                ColumnInfo(name="order_id", type="Nullable(Int64)"),
+                ColumnInfo(name="waffles_ordered", type="Nullable(Int64)"),
+                ColumnInfo(name="activity_hour", type="Nullable(DateTime)"),
+            ),
+            type_enforcement=False,
+            dialect="clickhouse",
+            expected_findings=(),
+        ),
+        DetectSchemaChangesTestCase(
+            description="clickhouse still reports a real type change with or without nullable",
+            yml_columns=(),
+            inferred_columns=(
+                InferredColumn(name="waffles_ordered", type="Int64"),
+                InferredColumn(name="revenue_cents", type="Nullable(Int64)"),
+            ),
+            warehouse_columns=(
+                ColumnInfo(name="waffles_ordered", type="String"),
+                ColumnInfo(name="revenue_cents", type="Nullable(String)"),
+            ),
+            type_enforcement=False,
+            dialect="clickhouse",
+            expected_findings=(
+                SchemaFinding(
+                    kind=SchemaChangeKind.COLUMN_TYPE_CHANGED,
+                    column_name="waffles_ordered",
+                    source=SchemaColumnSource.SQL_ANALYSIS,
+                    expected_type="Int64",
+                    actual_type="String",
+                ),
+                SchemaFinding(
+                    kind=SchemaChangeKind.COLUMN_TYPE_CHANGED,
+                    column_name="revenue_cents",
+                    source=SchemaColumnSource.SQL_ANALYSIS,
+                    expected_type="Nullable(Int64)",
+                    actual_type="Nullable(String)",
+                ),
+            ),
+        ),
+        DetectSchemaChangesTestCase(
+            description="databricks still reports a string written into a bounded varchar",
+            yml_columns=(),
+            inferred_columns=(InferredColumn(name="status", type="STRING"),),
+            warehouse_columns=(ColumnInfo(name="status", type="varchar(10)"),),
+            type_enforcement=False,
+            dialect="databricks",
+            expected_findings=(
+                SchemaFinding(
+                    kind=SchemaChangeKind.COLUMN_TYPE_CHANGED,
+                    column_name="status",
+                    source=SchemaColumnSource.SQL_ANALYSIS,
+                    expected_type="STRING",
+                    actual_type="varchar(10)",
+                ),
+            ),
+        ),
+        DetectSchemaChangesTestCase(
             description="without a dialect aliases and name case still differ",
             yml_columns=(ColumnInfo(name="ORDER_ID", type="INTEGER"),),
             inferred_columns=None,

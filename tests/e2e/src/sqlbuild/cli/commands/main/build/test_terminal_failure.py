@@ -26,7 +26,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
             command=("build", "--select", "daily_revenue"),
             model_replacements=(),
             expected_screen_fragments=(
-                "Inspected warehouse state.",
+                "✓ Warehouse state inspected",
                 "error[S301]: 2 upstream models this build reads don't exist in the warehouse",
             ),
         ),

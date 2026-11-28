@@ -96,7 +96,7 @@ PROJECT_FILES: dict[str, str] = {
         "python/nodes/loaders/raw_api_events.py",
         MARKING_NODE.format(
             decorator="loader",
-            arguments="",
+            arguments="(write_strategy='replace')",
             name="raw_api_events",
             parameter=USES_API,
             body='    return [{"event_id": 1}]\n',
@@ -108,10 +108,9 @@ PROJECT_FILES: dict[str, str] = {
           - name: raw_api_events
             description: Test source raw_api_events.
             managed: true
-            write_strategy: table
             columns:
               - name: event_id
-                type: INTEGER
+                type: BIGINT
         """
     ).strip()
     + "\n",

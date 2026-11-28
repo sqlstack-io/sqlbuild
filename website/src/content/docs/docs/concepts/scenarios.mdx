@@ -319,7 +319,7 @@ sqb scenario test --run-on local
 
 By default (`auto`), a scenario replays locally when its snapshot is fresh and SQLQuack converts
 all of its SQL, and runs on the warehouse otherwise. With `--run-on local`, every scenario replays
-locally, and one that cannot is an `ERROR`. Set the default with `[settings] scenario_run_on` or
+locally, and one that cannot is not run and fails the run. Set the default with `[settings] scenario_run_on` or
 a target's `scenario_run_on`; see [`sqb scenario test`](/docs/cli/scenario#where-scenarios-run).
 
 Local replay:

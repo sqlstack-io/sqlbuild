@@ -373,7 +373,6 @@ def test_given_source_deferral_env_when_building_on_bigquery_then_reads_prod_and
                 "sources:\n"
                 "  - name: raw_orders\n    description: Test source raw_orders.\n"
                 "    managed: true\n"
-                "    write_strategy: table\n"
                 "    columns:\n"
                 "      - name: order_id\n"
                 "        type: INTEGER\n"
@@ -382,7 +381,7 @@ def test_given_source_deferral_env_when_building_on_bigquery_then_reads_prod_and
             ),
             "python/nodes/loaders/raw_orders/loader.py": (
                 "from sqlbuild.loaders import loader\n\n"
-                "@loader\n"
+                "@loader(write_strategy='replace')\n"
                 "def raw_orders(ctx):\n"
                 "    '''Test loader raw_orders.'''\n    return [{'order_id': 7, 'status': 'loaded-dev'}]\n"
             ),
@@ -440,10 +439,10 @@ def test_given_source_deferral_env_when_building_on_bigquery_then_reads_prod_and
             description="runs bigquery scenario remotely and retains inspectable artifacts",
             expected_stdout_fragments=(
                 "remote_event_rollup",
-                "Retained relations:",
-                "source raw_events -> __sqb_",
-                "model  stg_events -> __sqb_",
-                "model  event_rollup -> __sqb_",
+                "Retained (1):",
+                "source    raw_events -> __sqb_",
+                "model     stg_events -> __sqb_",
+                "model     event_rollup -> __sqb_",
                 "PASS=1  FAIL=0  TOTAL=1",
             ),
             expected_retained_suffix_counts={
@@ -949,8 +948,6 @@ def test_given_loader_schema_evolution_project_when_loading_twice_on_bigquery_th
                 "sources:\n"
                 "  - name: raw_events\n    description: Test source raw_events.\n"
                 "    managed: true\n"
-                "    write_strategy: append\n"
-                "    cursor_column: load_seq\n"
                 "    columns:\n"
                 "      - name: event_id\n"
                 "        type: INTEGER\n"
@@ -961,9 +958,9 @@ def test_given_loader_schema_evolution_project_when_loading_twice_on_bigquery_th
                 **node_module_files(
                     "python/nodes/loaders/source_rows.py",
                     "from sqlbuild.loaders import loader\n\n"
-                    "@loader\n"
+                    "@loader(write_strategy='append', cursor_column='load_seq')\n"
                     "def raw_events(ctx):\n"
-                    "    '''Test loader raw_events.'''\n    if ctx.current_cursor_value is None:\n"
+                    "    '''Test loader raw_events.'''\n    if ctx.cursor_value is None:\n"
                     "        return [{'event_id': 1, 'load_seq': 1}]\n"
                     "    return [{'event_id': 2, 'load_seq': 2, 'note': 'late-note'}]\n",
                 )
@@ -1032,7 +1029,6 @@ def test_given_chained_loader_project_when_loading_on_bigquery_then_runs_loader_
                 "sources:\n"
                 "  - name: raw_events\n    description: Test source raw_events.\n"
                 "    managed: true\n"
-                "    write_strategy: table\n"
                 "    columns:\n"
                 "      - name: event_id\n"
                 "        type: INTEGER\n"
@@ -1043,12 +1039,12 @@ def test_given_chained_loader_project_when_loading_on_bigquery_then_runs_loader_
                 **node_module_files(
                     "python/nodes/loaders/source_rows.py",
                     "from sqlbuild.loaders import loader\n\n"
-                    "@loader(write_strategy='table', columns=[\n"
+                    "@loader(write_strategy='replace', columns=[\n"
                     "    {'name': 'event_id', 'type': 'INTEGER'},\n"
                     "])\n"
                     "def fetch_events(ctx):\n"
                     "    '''Test loader fetch_events.'''\n    return [{'event_id': 1}, {'event_id': 2}]\n\n"
-                    "@loader(depends_on=[fetch_events])\n"
+                    "@loader(write_strategy='replace', depends_on=[fetch_events])\n"
                     "def raw_events(ctx):\n"
                     "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
                     "    cursor = ctx.query(\n"
@@ -1108,14 +1104,14 @@ def test_given_chained_loader_project_when_loading_on_bigquery_then_runs_loader_
                 "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
                 "])\n"
                 "def fetch_events(ctx):\n"
-                "    '''Test loader fetch_events.'''\n    if ctx.current_cursor_value is None:\n"
+                "    '''Test loader fetch_events.'''\n    if ctx.cursor_value is None:\n"
                 "        next_seq = 1\n"
                 "    else:\n"
-                "        next_seq = ctx.current_cursor_value + 1\n"
+                "        next_seq = ctx.cursor_value + 1\n"
                 "    return [\n"
                 "        {'event_id': next_seq, 'amount': next_seq * 100, 'load_seq': next_seq}\n"
                 "    ]\n\n"
-                "@loader(depends_on=[fetch_events])\n"
+                "@loader(write_strategy='replace', depends_on=[fetch_events])\n"
                 "def raw_events(ctx):\n"
                 "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
                 "    cursor = ctx.query(\n"
@@ -1143,7 +1139,7 @@ def test_given_chained_loader_project_when_loading_on_bigquery_then_runs_loader_
                 "    ],\n"
                 ")\n"
                 "def fetch_events(ctx):\n"
-                "    '''Test loader fetch_events.'''\n    if ctx.current_cursor_value is None:\n"
+                "    '''Test loader fetch_events.'''\n    if ctx.cursor_value is None:\n"
                 "        return [\n"
                 "            {'event_id': 1, 'amount': 100, 'load_seq': 1},\n"
                 "            {'event_id': 2, 'amount': 200, 'load_seq': 1},\n"
@@ -1152,7 +1148,7 @@ def test_given_chained_loader_project_when_loading_on_bigquery_then_runs_loader_
                 "        {'event_id': 1, 'amount': 150, 'load_seq': 2},\n"
                 "        {'event_id': 3, 'amount': 300, 'load_seq': 2},\n"
                 "    ]\n\n"
-                "@loader(depends_on=[fetch_events])\n"
+                "@loader(write_strategy='replace', depends_on=[fetch_events])\n"
                 "def raw_events(ctx):\n"
                 "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
                 "    cursor = ctx.query(\n"
@@ -1175,7 +1171,7 @@ def test_given_chained_loader_project_when_loading_on_bigquery_then_runs_loader_
                 "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
                 "])\n"
                 "def fetch_events(ctx):\n"
-                "    '''Test loader fetch_events.'''\n    if ctx.current_cursor_value is None:\n"
+                "    '''Test loader fetch_events.'''\n    if ctx.cursor_value is None:\n"
                 "        return [\n"
                 "            {'event_id': 1, 'amount': 100, 'load_seq': 1},\n"
                 "            {'event_id': 2, 'amount': 200, 'load_seq': 1},\n"
@@ -1184,7 +1180,7 @@ def test_given_chained_loader_project_when_loading_on_bigquery_then_runs_loader_
                 "        {'event_id': 2, 'amount': 250, 'load_seq': 1},\n"
                 "        {'event_id': 3, 'amount': 300, 'load_seq': 1},\n"
                 "    ]\n\n"
-                "@loader(depends_on=[fetch_events])\n"
+                "@loader(write_strategy='replace', depends_on=[fetch_events])\n"
                 "def raw_events(ctx):\n"
                 "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
                 "    cursor = ctx.query(\n"
@@ -1213,7 +1209,6 @@ def test_given_intermediate_strategy_project_when_loading_twice_on_bigquery_then
                 "sources:\n"
                 "  - name: raw_events\n    description: Test source raw_events.\n"
                 "    managed: true\n"
-                "    write_strategy: table\n"
                 "    columns:\n"
                 "      - name: event_id\n"
                 "        type: INTEGER\n"

@@ -11,6 +11,7 @@ use crate::credentials::tests::role_helpers::{SUPPORT_ROLE, granting_role, role_
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
+use crate::tls::main::client_builder::client_builder;
 
 #[test]
 fn given_http_sessions_when_custom_role_is_assigned_then_it_applies_at_once() {
@@ -42,7 +43,7 @@ fn given_http_sessions_when_custom_role_is_assigned_then_it_applies_at_once() {
                 },
             )
             .await;
-            let client = reqwest::Client::new();
+            let client = client_builder().build().expect("HTTP client");
             let post = |path: &str, body: Value| {
                 let session = &roles.administrator;
                 client

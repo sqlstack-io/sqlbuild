@@ -20,10 +20,10 @@ pub(crate) fn argument_value(value: &Bound<'_, PyAny>) -> PyResult<ArgumentValue
             value.str()?.to_string_lossy().into_owned(),
         ));
     }
-    if let Ok(text) = value.downcast::<PyString>() {
+    if let Ok(text) = value.cast::<PyString>() {
         return Ok(ArgumentValue::Text(text.to_string_lossy().into_owned()));
     }
-    if let Ok(items) = value.downcast::<PyList>() {
+    if let Ok(items) = value.cast::<PyList>() {
         return Ok(ArgumentValue::List(
             items
                 .iter()
@@ -31,7 +31,7 @@ pub(crate) fn argument_value(value: &Bound<'_, PyAny>) -> PyResult<ArgumentValue
                 .collect::<PyResult<_>>()?,
         ));
     }
-    if let Ok(items) = value.downcast::<PyTuple>() {
+    if let Ok(items) = value.cast::<PyTuple>() {
         return Ok(ArgumentValue::Tuple(
             items
                 .iter()

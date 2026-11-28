@@ -373,7 +373,7 @@ def test_given_prod_target_credentials_when_contract_diffing_then_uses_active_co
     assert "Connecting to duckdb..." in captured.err
     assert "Warehouse connected" in captured.err
     assert "Inspecting 1 contract from target 'prod'..." in captured.err
-    assert "Inspected 1 contract from target 'prod'" in captured.err
+    assert "✓ 1 contract from target 'prod' inspected" in captured.err
 
 
 @pytest.mark.parametrize(

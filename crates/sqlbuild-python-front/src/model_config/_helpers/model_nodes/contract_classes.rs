@@ -25,7 +25,7 @@ const CONTRACT_CLASSES: [(&str, RecordId); 6] = [
     ),
 ];
 
-const YAML_ENTRY_CLASSES: [(&str, RecordId); 9] = [
+const YAML_ENTRY_CLASSES: [(&str, RecordId); 8] = [
     ("schema_seed_entry", RecordId::SchemaSeedEntry),
     ("seed_csv_settings", RecordId::SeedCsvSettings),
     ("source_entry", RecordId::SourceEntry),
@@ -35,7 +35,6 @@ const YAML_ENTRY_CLASSES: [(&str, RecordId); 9] = [
         "source_freshness_age_policy",
         RecordId::SourceFreshnessAgePolicy,
     ),
-    ("source_write_strategy", RecordId::SourceWriteStrategy),
     (
         "source_freshness_strategy",
         RecordId::SourceFreshnessStrategy,

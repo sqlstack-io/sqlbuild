@@ -9,7 +9,7 @@ use uuid::Uuid;
 use crate::authorization::main::people::bootstrap_user::bootstrap_user;
 use crate::credentials::models::AuditContext;
 use crate::credentials::tests::location_helpers::create_location;
-use crate::run_output::_helpers::chunks::level_of;
+use crate::run_output::_helpers::store::chunks::level_of;
 use crate::run_output::main::open_output_store::open_output_store;
 use crate::run_output::models::{
     OutputBatch, OutputLine, OutputPageQuery, OutputRow, OutputSegment, OutputSettings,
@@ -185,4 +185,30 @@ pub(crate) fn platform_path(path: &str) -> std::path::PathBuf {
     let root: &std::path::Path = temporary.ancestors().last().expect("a filesystem root");
     path.strip_prefix('/')
         .map_or_else(|| std::path::PathBuf::from(path), |rest| root.join(rest))
+}
+
+impl crate::run_output::types::NodeLogReport
+    for crate::run_output::tests::test_types::RecordingReport
+{
+    fn report(&self, key: &str, change: &crate::runs::models::RunChange) -> Result<(), String> {
+        std::thread::sleep(std::time::Duration::from_millis(1));
+        self.reported
+            .lock()
+            .expect("reported lines")
+            .push((key.to_owned(), change.clone()));
+        drop(self.arrivals.lock().expect("arrivals").send(key.to_owned()));
+        self.acknowledged
+            .then_some(())
+            .ok_or_else(|| "the fake server refused the line".to_owned())
+    }
+}
+
+/// The node sends its own waiting lines, as it does when it finishes.
+pub(crate) fn flush_node(sender: &crate::run_output::models::NodeLogSender, node: &str) {
+    sender.flush(node);
+}
+
+/// The run closes the sender, which sends what is waiting.
+pub(crate) fn close_sender(sender: &crate::run_output::models::NodeLogSender, _node: &str) {
+    sender.close();
 }

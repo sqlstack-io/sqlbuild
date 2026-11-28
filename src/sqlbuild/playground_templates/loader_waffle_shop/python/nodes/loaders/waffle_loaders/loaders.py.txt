@@ -9,20 +9,20 @@ def waffle_loaders_loaders() -> list[object]:
         write_strategy="append",
         cursor_column="load_seq",
         columns=[
-            {"name": "order_id", "type": "INTEGER"},
-            {"name": "customer_id", "type": "INTEGER"},
+            {"name": "order_id", "type": "BIGINT"},
+            {"name": "customer_id", "type": "BIGINT"},
             {"name": "waffle_type", "type": "VARCHAR"},
-            {"name": "quantity", "type": "INTEGER"},
-            {"name": "load_seq", "type": "INTEGER"},
+            {"name": "quantity", "type": "BIGINT"},
+            {"name": "load_seq", "type": "BIGINT"},
         ],
     )
     def fetch_order_events(ctx):
         """Fetch new order events since the last loaded sequence number."""
 
-        if ctx.current_cursor_value is None:
+        if ctx.cursor_value is None:
             next_seq = 1
         else:
-            next_seq = ctx.current_cursor_value + 1
+            next_seq = ctx.cursor_value + 1
         first_order = (next_seq - 1) * 2 + 1
         return [
             {
@@ -46,15 +46,15 @@ def waffle_loaders_loaders() -> list[object]:
         unique_key="customer_id",
         cursor_column="load_seq",
         columns=[
-            {"name": "customer_id", "type": "INTEGER"},
+            {"name": "customer_id", "type": "BIGINT"},
             {"name": "plan_name", "type": "VARCHAR"},
-            {"name": "load_seq", "type": "INTEGER"},
+            {"name": "load_seq", "type": "BIGINT"},
         ],
     )
     def fetch_customers(ctx):
         """Fetch customer records changed since the last load."""
 
-        if ctx.current_cursor_value is None:
+        if ctx.cursor_value is None:
             return [
                 {"customer_id": 1, "plan_name": "basic", "load_seq": 1},
                 {"customer_id": 2, "plan_name": "plus", "load_seq": 1},
@@ -69,20 +69,20 @@ def waffle_loaders_loaders() -> list[object]:
         cursor_column="load_seq",
         columns=[
             {"name": "waffle_type", "type": "VARCHAR"},
-            {"name": "price_cents", "type": "INTEGER"},
-            {"name": "load_seq", "type": "INTEGER"},
+            {"name": "price_cents", "type": "BIGINT"},
+            {"name": "load_seq", "type": "BIGINT"},
         ],
     )
     def fetch_prices(ctx):
         """Fetch the current waffle price list."""
 
-        classic_price = 600 if ctx.current_cursor_value is None else 650
+        classic_price = 600 if ctx.cursor_value is None else 650
         return [
             {"waffle_type": "classic", "price_cents": classic_price, "load_seq": 1},
             {"waffle_type": "blueberry", "price_cents": 750, "load_seq": 1},
         ]
 
-    @loader(depends_on=[fetch_order_events, fetch_prices])
+    @loader(write_strategy="replace", depends_on=[fetch_order_events, fetch_prices])
     def raw_orders(ctx):
         events = ctx.loader(fetch_order_events)
         prices = ctx.loader(fetch_prices)
@@ -104,7 +104,7 @@ def waffle_loaders_loaders() -> list[object]:
             for row in cursor.fetchall()
         ]
 
-    @loader(depends_on=[fetch_customers])
+    @loader(write_strategy="replace", depends_on=[fetch_customers])
     def raw_customers(ctx):
         customers = ctx.loader(fetch_customers)
         cursor = ctx.query(

@@ -17,3 +17,4 @@ pub mod record_spec;
 pub mod replaced;
 pub mod replaced_keywords;
 pub mod store_cached;
+pub mod tag_texts;

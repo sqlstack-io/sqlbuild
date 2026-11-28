@@ -2412,12 +2412,12 @@ def _physical_cursor_envelope(
         expression=context.adapter.render_identifier(cursor_column),
         cursor_type=context.entry.cursor_type,
     )
+    minimum: str = context.adapter.render_cursor_bound(function="MIN", operand=quoted_cursor)
+    maximum: str = context.adapter.render_cursor_bound(function="MAX", operand=quoted_cursor)
     try:
         cursor: Any = context.adapter.execute(
             connection=context.connection,
-            sql=(
-                f"SELECT MIN({quoted_cursor}), MAX({quoted_cursor}) FROM {targets.target_qualified}"
-            ),
+            sql=f"SELECT {minimum}, {maximum} FROM {targets.target_qualified}",
         )
         row: Any = cursor.fetchone()
     except Exception as exc:

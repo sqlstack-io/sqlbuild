@@ -2,6 +2,8 @@
 
 pub(crate) const MODEL_RESOURCE: &str = "model";
 pub(crate) const SOURCE_RESOURCE: &str = "source";
+/// A load's key `("load", name)`; `load:<name>` selects it.
+pub(crate) const LOAD_RESOURCE: &str = "load";
 pub(crate) const SEED_RESOURCE: &str = "seed";
 pub(crate) const UDF_RESOURCE: &str = "udf";
 pub(crate) const TABLE_FUNCTION_RESOURCE: &str = "table_fn";
@@ -31,8 +33,8 @@ pub const SKIPPED_KIND: &str = "skipped";
 pub const RUN_SELECTOR_KINDS: [&str; 3] = [RUN_KIND, FAILED_KIND, SKIPPED_KIND];
 pub(crate) const NODE_KIND_KIND: &str = "kind";
 /// The node kinds `kind:` selects, as the catalog names them: SQL resources, then Python nodes.
-pub(crate) const SELECTABLE_NODE_KINDS: [&str; 9] = [
-    "model", "source", "seed", "udf", "table_fn", "function", "asset", "loader", "check",
+pub(crate) const SELECTABLE_NODE_KINDS: [&str; 10] = [
+    "model", "source", "load", "seed", "udf", "table_fn", "function", "asset", "loader", "check",
 ];
 /// `kind:function` selects both function kinds.
 pub(crate) const FUNCTION_KIND_ALIAS: &str = "function";

@@ -12,6 +12,7 @@ from scripts.compiler_differential.constants import (
     GENERATOR_DBT_MANIFEST,
     GENERATOR_DBT_MODEL,
     GENERATOR_DBT_REF_ERROR_CODE,
+    GENERATOR_EXCLUDED_FEATURE_PAIRS,
     GENERATOR_FEATURE_BLOCKS,
     GENERATOR_FEATURE_FOLDER,
     GENERATOR_FEATURE_STRIDE,
@@ -89,6 +90,7 @@ class DiscoveryFeatureWriter:
             ),
             "python_hook": self._python_hook,
             "managed_source_loader": self._managed_source_loader,
+            "source_file_load": self._source_file_load,
             "asset_and_check": self._asset_and_check,
             "discovered_set": self._discovered_set,
             "audit_factory": self._audit_factory,
@@ -199,14 +201,13 @@ class DiscoveryFeatureWriter:
             "  - name: loaded_products\n"
             "    description: Products loaded by a project loader.\n"
             "    managed: true\n"
-            "    write_strategy: table\n"
             "    columns:\n"
-            "      - name: id\n        type: INTEGER\n"
+            "      - name: id\n        type: BIGINT\n"
             "      - name: label\n        type: VARCHAR\n"
         )
         self._files["python/nodes/loaders/products/loader.py"] = (
             "from sqlbuild.loaders import loader\n\n\n"
-            "@loader\n"
+            "@loader(write_strategy='replace')\n"
             "def loaded_products(ctx):\n"
             '    """Load the product list."""\n'
             f'    return [{{"id": 1, "label": "{self._label()}"}}, {{"id": 2, "label": "plain"}}]\n'
@@ -331,6 +332,26 @@ class DiscoveryFeatureWriter:
             description=f"Custom copy of {base.name}",
             header="  materialized copy_table,\n",
             body=f'SELECT id, status\nFROM __ref("{base.name}")\n',
+        )
+
+    def _source_file_load(self) -> None:
+        self._features.add("source_file_load")
+        self.config_lines.extend(
+            [
+                'extra_paths = ["landing"]',
+                "",
+                "[connections.landing]",
+                'kind = "filesystem"',
+                'root = "landing"',
+            ]
+        )
+        self._files["landing/orders/day1.csv"] = "id\n1\n2\n"
+        self._files["sql/sources/landing.yml"] = (
+            "load:\n  name: landing\n  kind: files\n  connection: landing\n"
+            "  path: orders/\n  format: csv\n  write_strategy: replace\n"
+            "  table_name: landing__orders\n"
+            "sources:\n  - name: landing__orders\n    description: Orders landed as files.\n"
+            "    columns:\n      - name: id\n        type: BIGINT\n"
         )
 
     def _project_adapter(self) -> None:
@@ -581,7 +602,7 @@ class DiscoveryFeatureWriter:
 
 
 def feature_blocks_for_seed(*, seed: int, rng: random.Random) -> tuple[str, ...]:
-    """Return stride-forced blocks plus a random share of the rest; rare blocks are residue-only."""
+    """Stride-forced blocks and a random share of the rest; rare ones by residue, pairs excluded."""
 
     blocks: list[str] = []
     for index, block in enumerate(GENERATOR_FEATURE_BLOCKS):
@@ -595,4 +616,13 @@ def feature_blocks_for_seed(*, seed: int, rng: random.Random) -> tuple[str, ...]
             )
         if selected:
             blocks.append(block)
-    return tuple(blocks)
+    return without_excluded_pairs(tuple(blocks))
+
+
+def without_excluded_pairs(blocks: tuple[str, ...]) -> tuple[str, ...]:
+    """`blocks` less every block an excluded pair drops because its partner is chosen."""
+
+    excluded: set[str] = {
+        dropped for dropped, chosen in GENERATOR_EXCLUDED_FEATURE_PAIRS if chosen in blocks
+    }
+    return tuple(block for block in blocks if block not in excluded)

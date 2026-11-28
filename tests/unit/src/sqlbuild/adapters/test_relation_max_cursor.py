@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from sqlbuild.adapters.bigquery.classes.bigquery_adapter import BigQueryAdapter
+from sqlbuild.adapters.clickhouse.classes.clickhouse_adapter import ClickHouseAdapter
 from sqlbuild.adapters.databricks.classes.databricks_adapter import DatabricksAdapter
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.adapters.motherduck.classes.motherduck_adapter import MotherDuckAdapter
@@ -79,6 +80,15 @@ from tests.unit.src.sqlbuild.adapters._test_types import (
             True,
             "SELECT MAX(`event``time`) FROM analytics.events "
             "WHERE `event``time` <= CAST('2026-09-01' AS DATE)",
+        ),
+        AdapterEligibleMaxCursorSqlTestCase(
+            "clickhouse maximum is null when no row is at or before the horizon",
+            ClickHouseAdapter(),
+            'event"time',
+            "2026-09-01T12:00:00",
+            False,
+            r'SELECT maxOrNull("event\"time") FROM analytics.events WHERE "event\"time" <= '
+            "parseDateTime64BestEffort('2026-09-01T12:00:00', 6, 'UTC')",
         ),
         AdapterEligibleMaxCursorSqlTestCase(
             "sqlserver timestamp predicate",

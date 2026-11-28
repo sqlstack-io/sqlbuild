@@ -2,6 +2,18 @@
 
 use crate::effective::models::{MergeRule, TargetField};
 
+/// The connection key naming the system a connection reaches; never passed to a warehouse driver.
+pub const CONNECTION_KIND_KEY: &str = "kind";
+/// Settings only `http` connections take, which a warehouse connection refuses.
+pub(crate) const HTTP_ONLY_KEYS: [&str; 6] = [
+    "base_url",
+    "auth",
+    "headers",
+    "rate_limit",
+    "max_in_flight",
+    "retries",
+];
+
 const RETENTION: &[&str] = &[
     "time_travel_retention",
     "time_travel_retention_by_materialization",

@@ -28,7 +28,7 @@ pub fn match_project_selector<'py>(
         tag_index,
         path_index,
     })?;
-    let value: Bound<'py, PyString> = native_field(parsed, "value")?.downcast_into()?;
+    let value: Bound<'py, PyString> = native_field(parsed, "value")?.cast_into()?;
     let carrier: Carrier<'py> = Carrier::new(py, std::slice::from_ref(&value), || {
         Ok(graph_names(graph.graph()))
     })?;

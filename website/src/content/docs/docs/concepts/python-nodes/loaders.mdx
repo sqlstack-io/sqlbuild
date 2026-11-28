@@ -3,13 +3,18 @@ title: "Loaders"
 description: "Load external data into source tables with Python functions."
 ---
 
-Loaders are Python functions that load data into source tables. They replace expression sources and manual ETL scripts with code that lives inside your project, runs as part of the build, and supports incremental write strategies. Loaders are one of the four [Python node](/docs/concepts/python-nodes/overview) kinds, and the only one that writes into a SQL source.
+Loaders are Python functions that load data into source tables. You write a function that returns
+or yields rows, and SQLBuild loads them with [SQLLoad](https://github.com/sqlstack-io/sqlload)'s
+engine as part of the build, with incremental write strategies, cursors and schema changes handled
+for you. Loaders are one of the four [Python node](/docs/concepts/python-nodes/overview) kinds, and
+the only one that writes into a SQL source.
 
 ## How it works
 
 1. Write a Python function under `python/nodes/` decorated with `@loader`
 2. Declare a managed source in `sql/sources/*.yml` with `managed: true` and **the same name as the loader function**
-3. SQLBuild calls the function, writes returned rows to a staging table, then applies the configured write strategy to the target
+3. SQLBuild runs the function as a SQLLoad Python table and loads what it returns or yields into
+   the source's table, with the write strategy set on `@loader`
 
 Loaders participate in the build lifecycle. When `sqb build` runs, managed sources are loaded before any dependent model is materialized.
 
@@ -18,12 +23,11 @@ Loaders participate in the build lifecycle. When `sqb build` runs, managed sourc
 Place Python files under `python/nodes/` in your project directory (the playgrounds use `python/nodes/loaders/`). Each file can contain one or more loader functions:
 
 ```python
-# python/nodes/loaders/raw_sources.py
+# python/nodes/loaders/raw_customers/loader.py
 from sqlbuild.loaders import loader
-from sqlbuild.executor.load.models import LoaderContext
 
-@loader
-def raw_customers(ctx: LoaderContext) -> list[dict[str, object]]:
+@loader(write_strategy="replace")
+def raw_customers(ctx):
     """Load customers from the CRM export."""
     return [
         {"id": 1, "name": "Leslie Knope", "email": "leslie@pawnee.gov"},
@@ -31,7 +35,29 @@ def raw_customers(ctx: LoaderContext) -> list[dict[str, object]]:
     ]
 ```
 
-The function receives a `LoaderContext` and returns rows as a list of dicts, an iterator of dicts, or `None` for self-managed loaders.
+The function receives the [loader context](#loader-context) as `ctx`. It returns rows, or yields
+them in pieces, which keeps memory flat for large loads:
+
+```python
+@loader(write_strategy="append")
+def raw_orders(ctx):
+    """Orders, a page at a time."""
+    for page in fetch_order_pages():
+        yield page
+```
+
+| Return or yield | Loads |
+|-----------------|-------|
+| A list of dicts | One row per dict |
+| A dict (yield only) | One row |
+| Arrow data (yield only): a `pyarrow` table, record batch or reader, or a `polars` or `pandas` frame | Its rows and columns |
+| `sl.json(...)` or `sl.ndjson(...)` from `sqlload_api` (yield only) | The rows SQLLoad parses from the JSON |
+| An [HTTP job](#loading-from-an-http-api), such as `ctx.http().paginate(...)` | Every page's rows, fetched by SQLLoad |
+| `sl.checkpoint(...)` (yield only) | Nothing; SQLLoad commits the rows so far |
+| `None` | Nothing: a [self-managed loader](#self-managed-loaders) writes its own table |
+
+A returned value other than a list or an HTTP job is iterated, so return a dict or Arrow data
+inside a list, or yield it.
 
 ## Binding to a source
 
@@ -42,17 +68,20 @@ sources:
   - name: raw_customers
     description: Customers
     managed: true
-    write_strategy: table
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
       - name: name
         type: VARCHAR
       - name: email
         type: VARCHAR
 ```
 
-Setting `managed: true` makes this a **managed source** - SQLBuild owns both the loading and the schema. The binding is by name: the source `raw_customers` is populated by the `@loader` function named `raw_customers`. SQLBuild raises an error if a managed source has no loader function of the same name.
+Setting `managed: true` makes this a **managed source** - SQLBuild owns both the loading and the schema.
+The source declares the columns and [how the load meets schema changes](#schema-changes); how the
+rows are written is set on `@loader` (see [Write strategies](#write-strategies)). A managed source
+can't set `write_strategy`, `cursor_column`, `unique_key` or `load_batch_size` in its sources file;
+compile stops naming the `@loader` option to use instead. The binding is by name: the source `raw_customers` is populated by the `@loader` function named `raw_customers`. SQLBuild raises an error if a managed source has no loader function of the same name.
 
 Models reference managed sources the same way as any other source:
 
@@ -62,139 +91,215 @@ SELECT id, name FROM __source("raw_customers")
 
 ## Column types
 
-A column declared in the source's `columns` with a `type` gets that type, whatever Python values the
-loader returns for it. SQLBuild infers the type of every other column from its values:
+A column declared in the source's `columns` with a `type` gets that type, and its values are cast
+to it. Declare the type SQLLoad creates for it, in the warehouse's own spelling or a synonym:
+compile fails with the declaration to write when they differ, such as
 
-| Python value | Column type |
-|--------------|-------------|
-| `bool` | Boolean |
-| `int` | 64-bit integer |
-| `float` | Double |
-| `Decimal` | Decimal with the precision and scale of the column's values, up to 38 digits |
-| `str` | String |
-| `datetime` | Timestamp |
-| `date` | Date |
-| `dict` or `list` | JSON |
+```
+@loader 'raw_customers': source 'raw_customers' declares column id as INTEGER, which SQLLoad
+creates as BIGINT in DuckDB; declare `type: BIGINT` in its sources file
+```
 
-For example, `Decimal("12.50")` and `Decimal("1234.5")` in one column give `DECIMAL(6, 2)`, written
-in the adapter's own type, such as `NUMBER(6, 2)` on Snowflake.
+SQLLoad infers the type of every other column from its values:
+
+| Python value | Column type (DuckDB) |
+|--------------|----------------------|
+| `bool` | `BOOLEAN` |
+| `int` | `BIGINT` |
+| `float` | `DOUBLE` |
+| `Decimal` | `DECIMAL` wide enough for the column's values |
+| `str` | `VARCHAR` |
+| `bytes` | `BLOB` |
+| `date` | `DATE` |
+| `datetime` without a time zone | `TIMESTAMP` |
+| `datetime` with a time zone | `TIMESTAMP WITH TIME ZONE` |
+| `dict` or `list` | `JSON` |
+
+Other adapters use their own types for the same values, such as `NUMBER` and `TIMESTAMP_NTZ` on
+Snowflake.
+
+SQLLoad adds two columns to every table it loads: `_sqlload_load_id`, the load that wrote the row,
+and `_sqlload_loaded_at`, when it was written.
 
 Details:
 
-- A value of any other type, such as a `UUID`, `bytes` or `time`, stops the load with an error
-  naming the column and the type. Declare the column's `type`, or convert the value first.
-- Values of different types in one undeclared column, such as `float` and `Decimal`, stop the load.
-- SQLBuild writes rows in batches of `load_batch_size` rows (10,000 by default), and a decimal
-  column's width comes from the first batch that has it. A later value that needs more digits stops
-  the load instead of being rounded; declare the column's `type` to allow it.
+- A value of any other type, such as a `UUID`, loads as its text.
+- An undeclared column holding `int` and `float` values is a `DOUBLE` column. Any other mix, such
+  as `int` and `str`, makes it a text column.
+- A value that can't be cast to the declared type, such as `"two"` in a `BIGINT` column, fails the
+  load, naming the column.
+- An intermediate loader's `columns` are checked the same way. A self-managed loader writes its own
+  table, so its source's types aren't.
 
-## Write strategies
+## Schema changes
 
-The `write_strategy` field controls how returned rows are written to the target table.
-
-### table
-
-Full replace. The target is dropped and recreated from the loader output on every run.
+`on_schema_change` on the source says what a load does when the rows don't match the table:
 
 ```yaml
 sources:
-  - name: raw_countries
-    description: Countries
+  - name: raw_events
+    description: Events
     managed: true
-    write_strategy: table
+    on_schema_change: fail
     columns:
-      - name: country_id
-        type: INTEGER
-      - name: country_code
-        type: VARCHAR
+      - name: event_id
+        type: BIGINT
+```
+
+| `on_schema_change` | A column the rows add | A declared column the rows lack |
+|--------------------|-----------------------|---------------------------------|
+| `append_new_columns` (default) | Added to the table | Loads as NULL, with a warning |
+| `ignore` | Left out | Loads as NULL, with a warning |
+| `fail` | Fails the load | Fails the load |
+
+A column whose values change type, such as `amount` holding numbers in the table and text in the
+new rows, fails the load whatever `on_schema_change` says. SQLLoad's error names the column and
+the type to declare.
+
+Details:
+
+- `on_schema_change` is set on the source, not on `@loader`. Only an
+  [intermediate loader](#loader-dependencies), which fills no source, sets it on `@loader`.
+- A source nothing loads can't set `on_schema_change`; compile stops naming the source.
+- `contract: enforced` checks how models use the source's columns, and doesn't change how it loads.
+
+## Write strategies
+
+`@loader` takes SQLLoad's table options as keyword arguments, and compile checks them as SQLLoad
+reads a Python table's: an option SQLLoad doesn't know, or a value of the wrong kind, stops compile
+naming the `@loader`. The most used are `write_strategy`, `cursor_column` and `unique_key`. The
+source's own sources file declares the columns and `on_schema_change`, and the source names the
+table, so `@loader` can't set `columns`, `on_schema_change`, `table_name` or `destination_path` for
+a source it fills.
+
+`write_strategy` controls how the rows are written to the target table. SQLLoad's rules for
+combining it with a cursor and keys are checked at compile.
+
+### replace
+
+Full replace. The target is recreated from the loader output on every run. It takes no
+`cursor_column`.
+
+```python
+@loader(write_strategy="replace")
+def raw_countries(ctx):
+    """Countries."""
+    return [{"country_id": 1, "country_code": "GB"}]
 ```
 
 ### append
 
 Insert all returned rows into the target. No deduplication.
 
-```yaml
-sources:
-  - name: raw_webhook_events
-    description: Webhook events
-    managed: true
-    write_strategy: append
-    columns:
-      - name: event_id
-        type: INTEGER
-      - name: event_name
-        type: VARCHAR
+```python
+@loader(write_strategy="append")
+def raw_webhook_events(ctx):
+    """Webhook events."""
+    return fetch_new_events()
 ```
 
 ### delete_insert
 
-Delete rows in the cursor range, then insert replacements. Requires `cursor_column`.
+Replace the rows in the cursor window: delete the target's rows from `ctx.cursor_value` up to
+`ctx.cursor_end`, then insert the loader's rows. Needs a `cursor_column`.
+
+```python
+@loader(write_strategy="delete_insert", cursor_column="event_at")
+def raw_order_events(ctx):
+    """Order events."""
+    if ctx.cursor_value is None:
+        return fetch_all_events()
+    return fetch_events_since(ctx.cursor_value)
+```
+
+`ctx.cursor_value` is the current `MAX(cursor_column)` of the target, or `None` on the first load,
+so the loader fetches only new or updated data. `--start-cursor` and `--end-cursor` on
+[`sqb load`](/docs/cli/load) and `sqb build` set the window instead. A row outside the window fails
+the load, so a loader fetches only what the window covers. The source it fills declares its columns
+as any managed source does:
 
 ```yaml
 sources:
   - name: raw_order_events
     description: Order events
     managed: true
-    write_strategy: delete_insert
-    cursor_column: event_at
     columns:
       - name: event_id
-        type: INTEGER
+        type: BIGINT
       - name: event_at
-        type: TIMESTAMP
+        type: TIMESTAMP_TZ
       - name: amount_cents
-        type: INTEGER
-```
-
-The loader receives `ctx.current_cursor_value` with the current `MAX(cursor_column)` from the target, so it can fetch only new or updated data. Its function name matches the source name (`raw_order_events`):
-
-```python
-@loader
-def raw_order_events(ctx: LoaderContext) -> list[dict[str, object]]:
-    """Order events."""
-    if ctx.current_cursor_value is None:
-        return fetch_all_events()
-    return fetch_events_since(ctx.current_cursor_value)
+        type: BIGINT
 ```
 
 ### merge
 
-Upsert based on `unique_key`. Requires both `unique_key` and `cursor_column`.
+Upsert based on `unique_key`, which `merge` needs.
 
-```yaml
-sources:
-  - name: raw_customers
-    description: Customers
-    managed: true
-    write_strategy: merge
-    unique_key: customer_id
-    cursor_column: updated_at
-    columns:
-      - name: customer_id
-        type: INTEGER
-      - name: plan_name
-        type: VARCHAR
-      - name: updated_at
-        type: TIMESTAMP
+```python
+@loader(write_strategy="merge", unique_key="customer_id", cursor_column="updated_at")
+def raw_customers(ctx):
+    """Customers."""
+    return fetch_customers_since(ctx.cursor_value)
 ```
 
 Existing rows matching the unique key are updated; new rows are inserted.
 
-### String values on Snowflake
+### Saved state
 
-Snowflake reads a backslash inside a string literal as an escape, so SQLBuild doubles every
-backslash in the values a loader returns. A value such as `C:\orders\2026` is stored exactly as
-returned. If a `merge` or `delete_insert` unique key, or a value an `append` load is deduplicated
-by, contains a backslash, rows stored with single backslashes won't match newly loaded rows.
-Rewrite or delete those rows before relying on the key.
+A loader whose position isn't a column, such as an API's sync token, keeps it in `ctx.state` with
+`state="logged"`. `ctx.state` is the value the last successful load left, or `None` on the first
+one; set it to the new position, any JSON value, and SQLLoad saves it with the rows:
+
+```python
+@loader(write_strategy="append", state="logged")
+def raw_payments(ctx):
+    """Payments since the last sync."""
+    page = fetch_payments(sync_token=ctx.state)
+    yield page.rows
+    ctx.state = page.next_sync_token
+```
+
+## Loading from an HTTP API
+
+A loader that names an `http` [source connection](/docs/concepts/project-configuration#warehouse-and-source-connections) with
+`connection=` can return or yield `ctx.http()` jobs. SQLLoad sends every request, follows the
+pages and parses the responses itself, with the connection's authentication, rate limits and
+retries:
+
+```toml
+# sqlbuild_project.toml
+[connections.shop]
+kind = "http"
+base_url = "https://shop.example.com/api"
+auth = { kind = "bearer" }
+token = "${env:SHOP_TOKEN}"
+rate_limit = "10/s"
+```
+
+```python
+import sqlload_api as sl
+from sqlbuild.loaders import loader
+
+@loader(connection="shop", write_strategy="merge", unique_key="order_id")
+def raw_orders(ctx):
+    """Orders from the shop API."""
+    return ctx.http().paginate(
+        "/orders", paginator=sl.next_link("$.next"), select="$.items"
+    )
+```
+
+`ctx.http(headers={...})` adds headers to the connection's. `paginate` and `fan_out` take
+SQLLoad's job options. SQLLoad checks every job, and a literal path such as `"/orders"`, before it
+sends the first request. `ctx.http()` without a `connection=` on `@loader` fails the load, saying what it needs.
 
 ## Self-managed loaders
 
-If a loader returns `None`, SQLBuild skips its row-writing pipeline. The loader is responsible for writing data to the target itself, using whatever approach makes sense - `ctx.execute_sql()`, an external library, a subprocess, or anything else:
+If a loader sets no `write_strategy` and returns `None`, it writes the target itself, using whatever approach makes sense - `ctx.execute_sql()`, an external library, a subprocess, or anything else:
 
 ```python
 @loader
-def raw_status(ctx: LoaderContext) -> None:
+def raw_status(ctx):
     """Load the order status lookup."""
     ctx.execute_sql(f"DROP TABLE IF EXISTS {ctx.destination}")
     ctx.execute_sql(
@@ -203,7 +308,7 @@ def raw_status(ctx: LoaderContext) -> None:
     )
 ```
 
-The source is still declared as managed, just without a `write_strategy`:
+The source is still declared as managed:
 
 ```yaml
 sources:
@@ -217,40 +322,53 @@ sources:
         type: VARCHAR
 ```
 
-Self-managed loaders must not declare a `write_strategy`. They are useful when you want to use adapter-specific SQL (e.g. `COPY INTO`, external tables), call an external ingestion tool, or handle writes in a way that doesn't fit the dict-return pattern.
+Self-managed loaders are useful when you want to use adapter-specific SQL (e.g. `COPY INTO`, external tables), call an external ingestion tool, or handle writes in a way that doesn't fit returning rows. SQLLoad doesn't run them, so they have no cursor window, saved state or `ctx.http()`.
+
+Details:
+
+- A loader with a `write_strategy` that returns `None` fails with "Loader 'raw_orders' defines
+  write_strategy but returned no rows; return an empty list to load none".
+- `ctx.skip(reason=...)` skips the loader: nothing loads, and the source keeps its data.
 
 ## Loader context
 
-Every loader function receives a `LoaderContext` as its first argument. It provides access to the destination relation, cursor state, active target, and helper methods.
+Every loader function receives a context as its first argument: SQLLoad's table context, with
+SQLBuild's warehouse, references and results added.
 
-### Properties
+**Coming from SQLLoad.** `ctx.connection` is the warehouse connection, as everywhere in SQLBuild.
+The source connection SQLLoad's `ctx.connection` holds is `ctx.loader_connection`, and
+`ctx.source(name)` references a project source.
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `destination` | `str` | Fully-qualified destination relation name (where rows are written) |
-| `destination_database` | `str \| None` | Destination database |
-| `destination_schema` | `str \| None` | Destination schema |
-| `destination_name` | `str` | Unqualified destination table name |
-| `current_cursor_value` | `object \| None` | Current `MAX(cursor_column)` from the destination, or `None` if the table does not exist or has no cursor column |
-| `run_id` | `str` | Unique identifier for this execution run |
-| `target` | `str \| None` | Active target name (e.g. `dev`, `prod`) |
-| `target_config` | `TargetSettings` | The active target's database, schema and loader schema ([Target settings](/docs/concepts/python-nodes/overview#target-settings)) |
-| `vars` | `dict` | Project variables (merged from project, target, and local config) |
-| `is_reload` | `bool` | `True` when `--reload` was passed |
-| `start_cursor_ts` | `datetime \| None` | Timestamp cursor start override from `--start-cursor-ts` |
-| `end_cursor_ts` | `datetime \| None` | Timestamp cursor end override from `--end-cursor-ts` |
-| `start_cursor_int` | `int \| None` | Integer cursor start override from `--start-cursor-int` |
-| `end_cursor_int` | `int \| None` | Integer cursor end override from `--end-cursor-int` |
-| `adapter` | `BaseAdapter` | The database adapter instance |
-| `connection` | `object` | The active database connection |
-| `logger` | `Logger` | Python logger scoped to the loader |
+### From SQLLoad
 
-### Methods
+| Property / Method | Description |
+|-------------------|-------------|
+| `table` | The loader's table name |
+| `cursor_column` | The `cursor_column` set on `@loader`, or `None` |
+| `cursor_value` | Where to read from: the target's `MAX(cursor_column)`, or the `--start-cursor` value; `None` on a first load or without a cursor |
+| `cursor_end` | Where to stop, not included: the `--end-cursor` value, or `None` for open |
+| `state` | The saved position of a `state="logged"` loader; assign to save a new one ([Saved state](#saved-state)) |
+| `is_reload` | `True` when `--reload` was passed |
+| `logger` | Python logger scoped to the loader |
+| `loader_connection` | The settings of the source connection `@loader(connection=...)` names, a mapping (empty without one); `ctx.loader_connection("other")` looks up another source connection |
+| `http(headers=...)` | HTTP jobs on the loader's connection ([Loading from an HTTP API](#loading-from-an-http-api)) |
 
-| Method | Description |
-|--------|-------------|
-| `execute_sql(sql)` | Execute a SQL statement against the connection |
-| `query(sql)` | Execute a SQL query and return the cursor |
+### From SQLBuild
+
+| Property / Method | Description |
+|-------------------|-------------|
+| `destination` | Fully-qualified destination relation name (where rows are written) |
+| `destination_database` | Destination database |
+| `destination_schema` | Destination schema |
+| `destination_name` | Unqualified destination table name |
+| `run_id` | Unique identifier for this execution run |
+| `target` | Active target name (e.g. `dev`, `prod`) |
+| `target_config` | The active target's database, schema and loader schema ([Target settings](/docs/concepts/python-nodes/overview#target-settings)) |
+| `vars` | Project variables (merged from project, target, and local config) |
+| `adapter` | The database adapter instance |
+| `connection` | The live warehouse connection |
+| `execute_sql(sql)` | Execute a SQL statement against the warehouse |
+| `query(sql)` | Execute a SQL query against the warehouse and return the cursor |
 | `log.info(message)`, `log.warning(message)`, `log.error(message)` | Log a line at that level; it shows with the run's events, while anything the loader prints stays its output |
 | `qualify_name(name)` | Return a fully-qualified relation name in the destination database/schema |
 | `skip(reason, mode=...)` | Skip this loader. `mode` is `"soft"` (default, skip only this loader) or `"hard"` (also block dependents) |
@@ -276,10 +394,9 @@ Loaders can depend on other loaders and assets using `depends_on`. Dependencies 
 
 ```python
 from sqlbuild.loaders import loader
-from sqlbuild.executor.load.models import LoaderContext
 
 @loader
-def raw_accounts(ctx: LoaderContext) -> list[dict[str, object]]:
+def raw_accounts(ctx):
     """Load customer accounts."""
     return [
         {"account_id": 1, "account_name": "Pawnee Parks"},
@@ -287,7 +404,7 @@ def raw_accounts(ctx: LoaderContext) -> list[dict[str, object]]:
     ]
 
 @loader(depends_on=[raw_accounts])
-def raw_account_metrics(ctx: LoaderContext) -> list[dict[str, object]]:
+def raw_account_metrics(ctx):
     """Account metrics."""
     accounts = ctx.loader(raw_accounts)
     rows = ctx.query(f"SELECT account_id FROM {accounts.destination}")
@@ -332,11 +449,13 @@ When the asset reads SQL, directly or through other Python nodes, the loader mak
 must allow with `allow_warehouse_round_trips`. The loader then loads after the SQL the asset reads
 and before the models that read its source, in the same `sqb build`.
 
-Intermediate loaders (those referenced only via `depends_on`, with no managed source of the same name) are given synthetic source entries and write to `__loader__<name>` tables by default. Only the terminal loader - the one whose name matches a managed source - populates that source; intermediate loaders feed it. Use the `destination` parameter on the decorator to override the intermediate relation:
+### Intermediate loaders
+
+Intermediate loaders (those referenced only via `depends_on`, with no managed source of the same name) are given synthetic source entries and write to `__loader__<name>` tables by default. Only the terminal loader - the one whose name matches a managed source - populates that source; intermediate loaders feed it. An intermediate loader without a `write_strategy` that returns rows replaces its table. It declares its own `columns` and `on_schema_change` on `@loader`, as no source declares them. Use the `destination` parameter on the decorator to override the intermediate relation:
 
 ```python
 @loader(destination="staging.shared_accounts")
-def raw_accounts(ctx: LoaderContext):
+def raw_accounts(ctx):
     """Load customer accounts."""
     ...
 ```
@@ -348,18 +467,14 @@ keep, so `compile`, `build` and `load` stop with `S103` until its `destination` 
 
 ## Decorator parameters
 
-The `@loader` decorator accepts optional parameters that can also be set in the source YAML. When both are specified, the YAML takes precedence.
-
 | Parameter | Description |
 |-----------|-------------|
 | `depends_on` | List of loader and asset functions this loader depends on, and [`job()` or `tag()` sets](/docs/concepts/python-nodes/sql-references#depending-on-a-job-or-a-tag), as for assets. Depending on one that reads SQL is a [warehouse round trip](/docs/concepts/python-nodes/overview#warehouse-round-trips) |
-| `destination` | Override the destination relation name (can include schema or database) |
-| `write_strategy` | `table`, `append`, `delete_insert`, or `merge` |
-| `cursor_column` | Column used for incremental cursor tracking |
-| `unique_key` | Column(s) used as the merge key (string or list of strings) |
-| `columns` | Column specifications with name, type, nullable, and description |
-| `contract` | `enforced` or `none` |
+| `connection` | The [source connection](/docs/concepts/project-configuration#warehouse-and-source-connections) the loader reads through, as `ctx.loader_connection` and `ctx.http()`; a target's warehouse connection is refused |
+| `destination` | Override the destination relation name of an intermediate loader (can include schema or database); a loader that fills a managed source can't set it |
+| `columns` | Column specifications of an intermediate loader; a loader that fills a managed source can't set them, as its source declares them |
 | `description` | What the loaded rows are; defaults to the function docstring. Required unless the source YAML entry has a `description` ([Descriptions](/docs/concepts/models/configuration#descriptions)) |
+| any other keyword | One of SQLLoad's table options, such as `write_strategy` (`replace`, `append`, `delete_insert` or `merge`), `cursor_column`, `unique_key` (a column name or a list of them) and `state`, checked at compile |
 
 ## Auto-load during builds
 
@@ -423,10 +538,6 @@ on the same warehouse/database that could write to the same schema.
 `source()` reads. This lets developers test loaders in an isolated schema without making
 development models consume partial development source data.
 
-## Schema evolution
-
-When a loader returns rows with columns not present in the existing target table, SQLBuild detects the schema change and adds the new columns automatically. Type mismatches between the staging table and the existing target raise an error.
-
 ## Project structure
 
 ```
@@ -456,16 +567,16 @@ SQLBuild imports all `.py` files under `python/nodes/` recursively (excluding `_
 | Field | Description |
 |-------|-------------|
 | `managed` | Set to `true` to bind the source to the `@loader` function of the same name |
-| `write_strategy` | `table`, `append`, `delete_insert`, or `merge` (requires `managed: true`) |
-| `cursor_column` | Column for incremental cursor tracking (required for `delete_insert` and `merge`) |
-| `unique_key` | Merge key column(s) (required for `merge`) |
 | `columns` | Column declarations with types |
+| `on_schema_change` | `append_new_columns` (default), `ignore` or `fail` ([Schema changes](#schema-changes)) |
 | `contract` | `enforced` or `none` |
 
-### Validation rules
+How the rows are written (`write_strategy`, `cursor_column`, `unique_key` and SQLLoad's other table
+options) is set on `@loader`, not in the sources file.
 
-- `append` cannot have `unique_key`
-- `merge` requires `unique_key`
-- `table` cannot have `cursor_column` or `unique_key`
-- `delete_insert` requires `cursor_column` and cannot have `unique_key`
-- `cursor_column` requires one of `append`, `delete_insert`, or `merge`
+## Limitations
+
+- Loaders write to DuckDB, MotherDuck, Postgres, Snowflake, BigQuery and ClickHouse warehouses. A
+  project on SQLite, SQL Server or a [custom adapter](/docs/concepts/adapters/custom) can't declare
+  one, and a Databricks loader fails when it runs, as a [Databricks load](/docs/concepts/sources#loads)
+  does.

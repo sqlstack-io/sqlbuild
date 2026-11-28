@@ -7,5 +7,4 @@ pub mod render_format_status;
 pub mod render_help_lines;
 pub mod render_lint_json;
 pub mod render_lint_text;
-pub mod render_violation_block;
 pub mod resolve_lint_paths;

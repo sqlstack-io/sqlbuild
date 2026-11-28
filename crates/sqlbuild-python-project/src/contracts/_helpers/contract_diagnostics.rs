@@ -179,7 +179,7 @@ fn contract_diagnostic<'py>(
 /// The model's enum-typed columns whose enum has only string members, in column order.
 fn string_enum_columns(model: &Bound<'_, PyAny>) -> PyResult<Vec<EnumColumn>> {
     let mut columns: Vec<EnumColumn> = Vec::new();
-    for (name, declaration) in enum_columns(model)?.downcast_into::<PyDict>()?.iter() {
+    for (name, declaration) in enum_columns(model)?.cast_into::<PyDict>()?.iter() {
         let name: String = name.extract()?;
         let mut members: Vec<String> = Vec::new();
         for member in native_field(&declaration, "members")?.try_iter()? {

@@ -402,7 +402,7 @@ fn run(py: Python<'_>, command: &Command<'_>, status: &Status<'_>) -> PyResult<F
         format!("Compiled project. ({elapsed:.2}s)")
     } else {
         format!(
-            "Compiled project with {}; the change may not add or worsen any. ({elapsed:.2}s)",
+            "Compiled project: {}; the change may not add or worsen any. ({elapsed:.2}s)",
             format_count_noun(
                 i64::try_from(existing.len()).unwrap_or(i64::MAX),
                 "existing rule failure",

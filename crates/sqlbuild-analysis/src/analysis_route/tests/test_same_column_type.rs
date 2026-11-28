@@ -130,3 +130,48 @@ fn given_a_dialect_without_a_native_module_when_comparing_then_only_equal_text_m
         );
     }
 }
+
+#[test]
+fn given_declared_and_clickhouse_listed_types_when_comparing_then_aliases_match_what_clickhouse_creates()
+ {
+    let test_cases = [
+        EngineTypeMatchTestCase {
+            description: "BIGINT is the Nullable(Int64) ClickHouse creates for it",
+            declared: "BIGINT",
+            inferred: "Nullable(Int64)",
+            expected_same_type: true,
+        },
+        EngineTypeMatchTestCase {
+            description: "TEXT is Nullable(String)",
+            declared: "TEXT",
+            inferred: "Nullable(String)",
+            expected_same_type: true,
+        },
+        EngineTypeMatchTestCase {
+            description: "DateTime64(6) is Nullable(DateTime64(6))",
+            declared: "DateTime64(6)",
+            inferred: "Nullable(DateTime64(6))",
+            expected_same_type: true,
+        },
+        EngineTypeMatchTestCase {
+            description: "TIMESTAMP is ClickHouse's DateTime, which holds whole seconds",
+            declared: "TIMESTAMP",
+            inferred: "Nullable(DateTime64(6))",
+            expected_same_type: false,
+        },
+        EngineTypeMatchTestCase {
+            description: "INTEGER is Int32, not Int64",
+            declared: "INTEGER",
+            inferred: "Nullable(Int64)",
+            expected_same_type: false,
+        },
+    ];
+    for test_case in test_cases {
+        assert_eq!(
+            same_column_type(Some("clickhouse"), test_case.declared, test_case.inferred),
+            test_case.expected_same_type,
+            "{}",
+            test_case.description
+        );
+    }
+}

@@ -47,6 +47,7 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     cost_telemetry::registration::register(module)?;
     debug_command::registration::register(module)?;
     sqlbuild_python_output::dbt_events::main::register_dbt_events::register_dbt_events(module)?;
+    sqlbuild_python_load::bindings::main::register_loads::register_loads(module)?;
     dbt_interop::registration::register(module)?;
     diff_report::registration::register(module)?;
     review_command::registration::register(module)?;

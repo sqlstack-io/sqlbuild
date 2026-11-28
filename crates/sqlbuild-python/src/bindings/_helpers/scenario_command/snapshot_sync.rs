@@ -176,6 +176,7 @@ pub(crate) fn sync_local_snapshots<'py>(
             adapter: &run.project_adapter,
             kind: CompletionKind::Sync { refresh },
             style: run.style,
+            rows: None,
         },
     )?;
     let settings: Bound<'py, PyAny> = capture_settings(

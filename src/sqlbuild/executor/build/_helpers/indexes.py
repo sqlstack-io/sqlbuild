@@ -39,6 +39,7 @@ def build_execution_indexes(plan: PlanOutput) -> BuildIndexes:
         seed_entries_by_key={entry.key: entry for entry in plan.seed_entries},
         function_entries_by_key={entry.key: entry for entry in plan.function_entries},
         source_load_entries_by_key={entry.key: entry for entry in plan.source_load_entries},
+        load_entries_by_key={entry.key: entry for entry in plan.load_entries},
         test_entries_by_key={entry.key: entry for entry in plan.test_entries},
         source_audits_by_source={k: tuple(v) for k, v in source_audits.items()},
         seed_audits_by_seed={k: tuple(v) for k, v in seed_audits.items()},

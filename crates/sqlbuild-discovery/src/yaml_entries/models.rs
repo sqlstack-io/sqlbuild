@@ -81,18 +81,18 @@ pub struct ParsedSourceEntry<N> {
     /// Whether reads of the source add `FINAL`, so replacing engines return one row per key.
     pub read_final: bool,
     pub loader: Option<String>,
+    /// The name of the file's `load:` that fills this source, when its name is `{load}__{table}`.
+    pub load: Option<String>,
     pub managed: bool,
     pub freshness: Option<ParsedFreshness<N>>,
     /// `append`, `delete_insert`, `merge` or `table`.
-    pub write_strategy: Option<&'static str>,
-    pub load_batch_size: Option<N>,
-    pub cursor_column: Option<N>,
-    pub unique_key: Vec<String>,
     pub expression: Option<N>,
     pub description: Option<N>,
     /// The authored flag, or `True` implied by typed columns.
     pub type_enforcement: Option<bool>,
     pub contract: Option<N>,
+    /// How the load that fills it meets new and missing columns: SQLLoad's `on_schema_change`.
+    pub on_schema_change: Option<N>,
     pub meta: Option<N>,
     pub columns: Vec<ParsedYamlColumn<N>>,
     pub audits: Vec<ParsedAudit<N>>,
@@ -108,19 +108,32 @@ impl<N> ParsedSourceEntry<N> {
             table: None,
             read_final: false,
             loader: None,
+            load: None,
             managed: false,
             freshness: None,
-            write_strategy: None,
-            load_batch_size: None,
-            cursor_column: None,
-            unique_key: Vec::new(),
             expression: None,
             description: None,
             type_enforcement: None,
             contract: None,
+            on_schema_change: None,
             meta: None,
             columns: Vec::new(),
             audits: Vec::new(),
         }
     }
+}
+
+/// A sources file's `load:`: a SQLLoad source under SQLBuild's name, its settings kept as authored for SQLLoad to read.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ParsedLoad<N> {
+    pub name: String,
+    /// The whole `load:` mapping, `name` included.
+    pub block: N,
+}
+
+/// What one sources file declares: its sources, and the load that fills some of them.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ParsedSourcesDocument<N> {
+    pub sources: Vec<ParsedSourceEntry<N>>,
+    pub load: Option<ParsedLoad<N>>,
 }

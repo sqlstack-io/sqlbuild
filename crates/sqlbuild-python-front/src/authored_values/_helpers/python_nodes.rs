@@ -46,7 +46,7 @@ fn below(value: &Bound<'_, PyAny>, bound: i64) -> PyResult<bool> {
 
 /// Whether `value` is an exception class.
 fn exception_class(value: &Bound<'_, PyAny>) -> PyResult<bool> {
-    match value.downcast::<PyType>() {
+    match value.cast::<PyType>() {
         Ok(class) => class.is_subclass_of::<PyBaseException>(),
         Err(_) => Ok(false),
     }
@@ -151,7 +151,7 @@ pub(crate) fn validate_audit_case(request: Option<&Bound<'_, PyDict>>) -> Result
     let minimum_samples: &Bound<'_, PyAny> = &request.get("minimum_samples")?;
     let evidence_limit: &Bound<'_, PyAny> = &request.get("evidence_limit")?;
     let meta: Option<Bound<'_, PyAny>> = request.optional("meta")?;
-    let Ok(text) = name.downcast::<PyString>() else {
+    let Ok(text) = name.cast::<PyString>() else {
         return Err(name_type_error(name)?);
     };
     if !is_lowercase_identifier(&text.to_string_lossy()) {

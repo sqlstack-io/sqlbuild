@@ -251,7 +251,7 @@ impl HeaderValues {
                 let values: &[(String, AuthoredValue)] = self.native.as_deref().unwrap_or_default();
                 map_to_python(py, values)?
                     .into_bound(py)
-                    .downcast_into::<PyDict>()
+                    .cast_into::<PyDict>()
                     .map(Bound::unbind)
                     .map_err(pyo3::PyErr::from)
             })?

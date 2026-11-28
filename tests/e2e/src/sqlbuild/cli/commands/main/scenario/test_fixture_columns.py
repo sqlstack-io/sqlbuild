@@ -49,7 +49,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             command=("--no-color", "scenario", "test", "--run-on", "local"),
             # Fixture checks pass; local runs are strict, so the missing snapshot is an error.
             expected_exit_code=1,
-            expected_stdout_fragments=("missing local snapshot manifest",),
+            expected_stdout_fragments=("error[X601]: snapshot missing",),
         ),
     ),
     ids=lambda case: case.description,
@@ -66,7 +66,9 @@ def test_given_scenario_fixture_when_running_cli_then_requires_only_real_columns
     )
 
     assert result.returncode == test_case.expected_exit_code, result.stdout + result.stderr
-    assert all(fragment in result.stdout for fragment in test_case.expected_stdout_fragments)
+    assert all(fragment in result.stdout for fragment in test_case.expected_stdout_fragments), (
+        result.stdout
+    )
 
 
 if __name__ == "__main__":

@@ -2,7 +2,6 @@ sources:
   - name: raw_customers
     description: Customers the orders loader reads first.
     managed: true
-    write_strategy: table
     table: raw_customers
     columns:
       - name: customer_id
@@ -10,7 +9,6 @@ sources:
   - name: raw_orders
     description: Orders loaded after the customers loader they depend on.
     managed: true
-    write_strategy: table
     table: raw_orders
     columns:
       - name: order_id
@@ -18,7 +16,6 @@ sources:
   - name: raw_returns
     description: Returns that only a model hook reads.
     managed: true
-    write_strategy: table
     table: raw_returns
     columns:
       - name: order_id
@@ -26,7 +23,6 @@ sources:
   - name: raw_inventory
     description: A managed source that nothing the job builds reads.
     managed: true
-    write_strategy: table
     table: raw_inventory
     columns:
       - name: product_id

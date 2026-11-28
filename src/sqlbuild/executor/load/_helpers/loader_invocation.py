@@ -11,7 +11,6 @@ from sqlbuild._native import (
     DiscoveredLoaderFunction,
     HardCodedRelationOwnerKind,
     SourceEntry,
-    SourceWriteStrategy,
 )
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
@@ -40,30 +39,6 @@ from sqlbuild.provider.main.runtime import _empty_provider_container
 from sqlbuild.python_nodes.models import SqlResourceRef
 from sqlbuild.python_nodes.types import SqlResourceRefKind
 from sqlbuild.runtime.contracts.types import ExecutionResourceKind
-
-_SUPPORTED_WRITE_STRATEGIES: frozenset[SourceWriteStrategy] = frozenset(
-    {
-        SourceWriteStrategy.APPEND,
-        SourceWriteStrategy.DELETE_INSERT,
-        SourceWriteStrategy.MERGE,
-        SourceWriteStrategy.TABLE,
-    }
-)
-
-
-def validate_source_write_strategy(source_entry: SourceEntry) -> None:
-    """Reject write strategies that sqb load does not support."""
-
-    if (
-        source_entry.write_strategy is not None
-        and source_entry.write_strategy not in _SUPPORTED_WRITE_STRATEGIES
-    ):
-        raise ExecutorInputError(
-            f"Source '{source_entry.name}' uses write_strategy "
-            f"'{source_entry.write_strategy}', "
-            "but sqb load currently supports only write_strategy append, delete_insert, "
-            "merge, and table"
-        )
 
 
 def build_loader_context(
@@ -98,20 +73,8 @@ def build_loader_context(
         vars=runtime.vars,
         is_reload=runtime.is_reload,
         use_color=runtime.use_color,
-        current_cursor_value=_load_current_cursor_value(
-            adapter=adapter,
-            connection=connection,
-            source_entry=source_entry,
-            target=destination_relation,
-            target_name=destination_name,
-            statement_recorder=statement_recorder,
-        ),
         logger=logging.getLogger(f"sqlbuild.loader.{loader_function.name}"),
         statement_recorder=statement_recorder,
-        start_cursor_ts=runtime.start_cursor_ts,
-        end_cursor_ts=runtime.end_cursor_ts,
-        start_cursor_int=runtime.start_cursor_int,
-        end_cursor_int=runtime.end_cursor_int,
         loader_refs=build_loader_relation_refs(
             adapter=adapter,
             connection=connection,
@@ -246,31 +209,3 @@ def interpret_loader_return(
             "but source has no write_strategy"
         )
     return None
-
-
-def _load_current_cursor_value(
-    *,
-    adapter: BaseAdapter,
-    connection: Any,
-    source_entry: SourceEntry,
-    target: str,
-    target_name: str,
-    statement_recorder: StatementRecorder,
-) -> object | None:
-    if source_entry.cursor_column is None:
-        return None
-    target_exists: bool = adapter.relation_exists(
-        connection=connection,
-        database=source_entry.database,
-        schema=source_entry.schema,
-        name=target_name,
-    )
-    if not target_exists:
-        return None
-    sql: str = f"SELECT MAX({adapter.render_identifier(source_entry.cursor_column)}) FROM {target}"
-    statement_recorder.record(sql)
-    cursor: Any = adapter.execute(connection=connection, sql=sql)
-    row: object | None = cursor.fetchone()
-    if row is None:
-        return None
-    return row[0]

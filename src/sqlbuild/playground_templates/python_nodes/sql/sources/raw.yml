@@ -2,13 +2,12 @@ sources:
   - name: raw_orders
     description: Raw orders loaded by the raw_orders Python loader
     managed: true
-    write_strategy: table
     columns:
       - name: order_id
-        type: INTEGER
+        type: BIGINT
       - name: customer_id
-        type: INTEGER
+        type: BIGINT
       - name: amount_cents
-        type: INTEGER
+        type: BIGINT
       - name: load_batch
-        type: INTEGER
+        type: BIGINT

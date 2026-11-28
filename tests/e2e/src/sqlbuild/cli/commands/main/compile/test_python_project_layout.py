@@ -331,10 +331,9 @@ def test_given_rule_harness_test_when_compiling_then_python_test_path_is_accepte
                     "sources:\n"
                     "  - name: raw_orders\n    description: Test source raw_orders.\n"
                     "    managed: true\n"
-                    "    write_strategy: table\n"
                     "    columns:\n"
                     "      - name: order_id\n"
-                    "        type: INTEGER\n"
+                    "        type: BIGINT\n"
                     "      - name: status\n"
                     "        type: VARCHAR\n"
                 ),
@@ -357,7 +356,7 @@ def test_given_rule_harness_test_when_compiling_then_python_test_path_is_accepte
                 "python/nodes/loaders/raw_orders/loader.py": (
                     "from python.nodes.orders.utils import order_rows\n"
                     "from sqlbuild.loaders import loader\n\n\n"
-                    "@loader\n"
+                    "@loader(write_strategy='replace')\n"
                     "def raw_orders(ctx):\n"
                     "    '''Test loader raw_orders.'''\n    return order_rows()\n"
                 ),

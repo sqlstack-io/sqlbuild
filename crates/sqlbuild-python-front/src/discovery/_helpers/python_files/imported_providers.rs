@@ -52,7 +52,7 @@ fn reject_invalid_identity(
     name: &Bound<'_, PyAny>,
     relative_path: &Bound<'_, PyAny>,
 ) -> PyResult<()> {
-    validate_resource_identity(name.downcast()?, "provider", relative_path, false)
+    validate_resource_identity(name.cast()?, "provider", relative_path, false)
 }
 
 /// The provider's validated name, from its explicit `provider_name` or `name()`.

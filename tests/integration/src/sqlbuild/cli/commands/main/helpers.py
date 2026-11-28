@@ -30,7 +30,9 @@ import sqlbuild._native as native_module
 from sqlbuild._native import (
     CompilerStage,
     CustomHostObserver,
+    LoadCommandRequest,
     PreparedCompileArtifacts,
+    run_load_command,
 )
 from sqlbuild._native import run_cli as main
 from sqlbuild.adapter.contract.exceptions import AdapterUserError
@@ -1349,13 +1351,13 @@ def write_endless_scenario_project(project_dir: Path) -> Path:
 def signalled_scenario_run(
     *, project_dir: Path, sent_signal: signal.Signals
 ) -> tuple[int, str, float]:
-    """Exit code and output of `sqb scenario test` sent `sent_signal` while its model runs, and
-    the seconds it took to stop."""
+    """Exit code, output and seconds to stop of `sqb --debug scenario test` signalled mid-run."""
 
     process: subprocess.Popen[str] = subprocess.Popen(
         [
             str(Path(sys.executable).with_name("sqb")),
             "--no-color",
+            "--debug",
             "--project-dir",
             str(project_dir),
             "scenario",
@@ -1369,13 +1371,15 @@ def signalled_scenario_run(
         env={**os.environ, "PYTHONUNBUFFERED": "1"},
         preexec_fn=_default_interrupt_handling,
     )
-    assert process.stdout is not None
-    started: str = "".join(takewhile(lambda line: "order_totals START" not in line, process.stdout))
+    assert process.stderr is not None
+    started: str = "".join(
+        takewhile(lambda line: "model=order_totals  phase=create" not in line, process.stderr)
+    )
     time.sleep(1.0)
     process.send_signal(sent_signal)
     sent: float = time.monotonic()
     stdout, stderr = process.communicate(timeout=120)
-    return process.returncode, started + stdout + stderr, time.monotonic() - sent
+    return process.returncode, stdout + started + stderr, time.monotonic() - sent
 
 
 def write_prompting_project(project_dir: Path, *, connect: str, files: dict[str, str]) -> Path:
@@ -1576,15 +1580,15 @@ RUN_RECORD_MARTS_FILES: dict[str, str] = {
     ),
     "python/nodes/loaders/events/loader.py": (
         "from sqlbuild.loaders import loader\n\n\n"
-        "@loader\n"
+        "@loader(write_strategy='replace')\n"
         "def landed_events(ctx):\n"
         '    """Load one event."""\n\n'
         '    return [{"event_id": 1}]\n'
     ),
     "sql/sources/landed.yml": (
         "sources:\n  - name: landed_events\n    description: Loaded events.\n    schema: landing\n"
-        "    managed: true\n    write_strategy: table\n    columns:\n"
-        "      - name: event_id\n        type: INTEGER\n"
+        "    managed: true\n    columns:\n"
+        "      - name: event_id\n        type: BIGINT\n"
     ),
     "sql/models/upper/revenue_upper.sql": (
         "MODEL (description 'Revenue under an upper-case schema name.', materialized table);\n"
@@ -1616,7 +1620,7 @@ RUN_RECORD_MARTS_FILES: dict[str, str] = {
     "sql/seeds/regions.csv": "region_id\n1\n",
     "sql/seeds/regions.yml": (
         "seeds:\n  - name: regions\n    description: Regions.\n    columns:\n"
-        "      - name: region_id\n        type: INTEGER\n"
+        "      - name: region_id\n        type: BIGINT\n"
     ),
 }
 
@@ -2169,3 +2173,14 @@ def write_not_run_audit_project(project_dir: Path) -> None:
         destination: Path = project_dir / relative_path
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(contents, encoding="utf-8")
+
+
+def load_assets(*, project_dir: Path) -> dict[str, dict[str, Any]]:
+    """Run `sqb load` in `project_dir`; each asset of its JSON result by name."""
+
+    output: Path = project_dir / "target" / "load.json"
+    _ = run_load_command(
+        request=LoadCommandRequest(project_dir=project_dir, no_color=True, json_output_path=output)
+    )
+    payload: dict[str, Any] = json.loads(output.read_text())
+    return {asset["name"]: asset for asset in payload["assets"]}

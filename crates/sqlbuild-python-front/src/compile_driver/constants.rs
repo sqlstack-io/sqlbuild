@@ -1,0 +1,10 @@
+//! The names a loader's SQLLoad project uses where the project leaves them unset.
+
+/// The target a loader loads into when the project names no target.
+pub(crate) const LOADER_TARGET: &str = "default";
+/// The target's `loader_schema` when the target has no default schema; each run names its own `destination_schema`.
+pub(crate) const LOADER_SCHEMA: &str = "main";
+/// Where a project keeps the SQLQuack overrides its local tests use.
+pub(crate) const LOCAL_OVERRIDES_DIR: &str = "tests/overrides";
+/// The `@loader` option that makes SQLLoad write a loader's rows; without it a loader that fills a source writes its own table.
+pub(crate) const WRITE_STRATEGY_KEY: &str = "write_strategy";

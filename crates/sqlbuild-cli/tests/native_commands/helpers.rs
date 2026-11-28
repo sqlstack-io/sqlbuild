@@ -3,6 +3,7 @@ use std::process::{Command, ExitStatus, Stdio};
 use std::time::Duration;
 
 use crate::test_types::{ServiceTestCase, TestControl};
+use sqlbuild_orchestration::tls::main::client_builder::client_builder;
 
 pub(crate) fn isolated_binary(directory: &Path) -> std::path::PathBuf {
     let binary = directory.join(format!("sqb{}", std::env::consts::EXE_SUFFIX));
@@ -45,7 +46,7 @@ pub(crate) fn spawn_control(
 }
 
 pub(crate) async fn api_ready(control: &mut TestControl) -> String {
-    let client = reqwest::Client::builder()
+    let client = client_builder()
         .timeout(Duration::from_secs(1))
         .build()
         .expect("HTTP client");

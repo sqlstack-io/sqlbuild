@@ -224,16 +224,11 @@
    "FROM __ref(\"stg_billing_0\")",
    ""
   ],
-  "sql/models/features/kept_stg_support_1.sql": [
+  "sql/models/features/kept_stg_support_0.sql": [
    "SELECT id, status, amount * 0.5 AS weighted",
-   "FROM __ref(\"stg_support_1\")",
+   "FROM __ref(\"stg_support_0\")",
    "WHERE status IN ('取消', 'placed')",
    "  AND amount * 1.0 IN (0.5, 1.25, 2500.75) OR id > 0",
-   ""
-  ],
-  "sql/models/features/product_labels.sql": [
-   "SELECT id, label",
-   "FROM __source(\"loaded_products\")",
    ""
   ],
   "sql/models/features/spaced_stg_support_0.sql": [
@@ -1656,22 +1651,22 @@
      ]
     }
    },
-   "model.generated_9.kept_stg_support_1": {
+   "model.generated_9.kept_stg_support_0": {
     "database": null,
     "schema": "ci_checks",
-    "name": "kept_stg_support_1",
+    "name": "kept_stg_support_0",
     "resource_type": "model",
     "package_name": "generated_9",
-    "path": "sql/models/features/kept_stg_support_1.sql",
-    "original_file_path": "sql/models/features/kept_stg_support_1.sql",
-    "unique_id": "model.generated_9.kept_stg_support_1",
+    "path": "sql/models/features/kept_stg_support_0.sql",
+    "original_file_path": "sql/models/features/kept_stg_support_0.sql",
+    "unique_id": "model.generated_9.kept_stg_support_0",
     "fqn": [
      "generated_9",
      "models",
      "features",
-     "kept_stg_support_1"
+     "kept_stg_support_0"
     ],
-    "alias": "kept_stg_support_1",
+    "alias": "kept_stg_support_0",
     "config": {
      "enabled": true,
      "alias": null,
@@ -1704,7 +1699,7 @@
      }
     },
     "tags": [],
-    "description": "Statuses kept from stg_support_1",
+    "description": "Statuses kept from stg_support_0",
     "columns": {},
     "meta": {},
     "group": null,
@@ -1717,80 +1712,11 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "ci_checks.kept_stg_support_1",
+    "relation_name": "ci_checks.kept_stg_support_0",
     "depends_on": {
      "macros": [],
      "nodes": [
-      "model.generated_9.stg_support_1"
-     ]
-    }
-   },
-   "model.generated_9.product_labels": {
-    "database": null,
-    "schema": "ci_checks",
-    "name": "product_labels",
-    "resource_type": "model",
-    "package_name": "generated_9",
-    "path": "sql/models/features/product_labels.sql",
-    "original_file_path": "sql/models/features/product_labels.sql",
-    "unique_id": "model.generated_9.product_labels",
-    "fqn": [
-     "generated_9",
-     "models",
-     "features",
-     "product_labels"
-    ],
-    "alias": "product_labels",
-    "config": {
-     "enabled": true,
-     "alias": null,
-     "schema": "ci_checks",
-     "database": null,
-     "tags": [],
-     "meta": {},
-     "group": null,
-     "materialized": "view",
-     "incremental_strategy": null,
-     "merge_exclude_columns": null,
-     "persist_docs": {},
-     "post-hook": [],
-     "pre-hook": [],
-     "quoting": {},
-     "column_types": {},
-     "full_refresh": null,
-     "unique_key": null,
-     "on_schema_change": "ignore",
-     "on_configuration_change": "apply",
-     "grants": {},
-     "packages": [],
-     "docs": {
-      "show": true,
-      "node_color": null
-     },
-     "contract": {
-      "enforced": false,
-      "alias_types": true
-     }
-    },
-    "tags": [],
-    "description": "Product labels from the loader",
-    "columns": {},
-    "meta": {},
-    "group": null,
-    "docs": {
-     "show": true,
-     "node_color": null
-    },
-    "patch_path": null,
-    "build_path": null,
-    "unrendered_config": {},
-    "config_call_dict": {},
-    "unrendered_config_call_dict": {},
-    "relation_name": "ci_checks.product_labels",
-    "depends_on": {
-     "macros": [],
-     "nodes": [
-      "source.generated_9.loaded_products"
+      "model.generated_9.stg_support_0"
      ]
     }
    },
@@ -2718,62 +2644,6 @@
     "unrendered_config": {},
     "relation_name": null
    },
-   "source.generated_9.loaded_products": {
-    "database": null,
-    "schema": "ci_checks",
-    "name": "loaded_products",
-    "resource_type": "source",
-    "package_name": "generated_9",
-    "path": "sql/sources/managed.yml",
-    "original_file_path": "sql/sources/managed.yml",
-    "unique_id": "source.generated_9.loaded_products",
-    "fqn": [
-     "generated_9",
-     "loaded_products"
-    ],
-    "source_name": "loaded_products",
-    "source_description": "",
-    "loader": "",
-    "identifier": "loaded_products",
-    "quoting": {},
-    "loaded_at_field": null,
-    "freshness": null,
-    "external": null,
-    "description": "Products loaded by a project loader.",
-    "columns": {
-     "id": {
-      "name": "id",
-      "description": "",
-      "meta": {},
-      "data_type": "INTEGER",
-      "constraints": [],
-      "quote": null,
-      "tags": []
-     },
-     "label": {
-      "name": "label",
-      "description": "",
-      "meta": {},
-      "data_type": "VARCHAR",
-      "constraints": [],
-      "quote": null,
-      "tags": []
-     }
-    },
-    "meta": {
-     "sqlbuild": {
-      "loader": "loaded_products",
-      "auto_load": false,
-      "write_strategy": "table"
-     }
-    },
-    "source_meta": {},
-    "tags": [],
-    "config": {},
-    "patch_path": null,
-    "unrendered_config": {},
-    "relation_name": null
-   },
    "source.generated_9.open_events": {
     "database": null,
     "schema": "",
@@ -3124,11 +2994,8 @@
    "model.generated_9.guarded_stg_billing_0": [
     "model.generated_9.stg_billing_0"
    ],
-   "model.generated_9.kept_stg_support_1": [
-    "model.generated_9.stg_support_1"
-   ],
-   "model.generated_9.product_labels": [
-    "source.generated_9.loaded_products"
+   "model.generated_9.kept_stg_support_0": [
+    "model.generated_9.stg_support_0"
    ],
    "model.generated_9.spaced_stg_support_0": [
     "model.generated_9.stg_support_0"
@@ -3163,7 +3030,6 @@
    ],
    "source.generated_9.configured_events": [],
    "source.generated_9.labelled_channels": [],
-   "source.generated_9.loaded_products": [],
    "source.generated_9.open_events": [],
    "source.generated_9.raw_events_0": [],
    "source.generated_9.raw_events_1": [],

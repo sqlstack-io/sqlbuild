@@ -33,7 +33,7 @@ pub(crate) fn expanded_connection<'py>(
     }
     expanded_template_data(
         &connection,
-        (effective_vars.downcast()?, &PyDict::new(py)),
+        (effective_vars.cast()?, &PyDict::new(py)),
         (
             TemplateOptions {
                 allow_context: false,

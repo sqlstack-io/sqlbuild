@@ -86,6 +86,7 @@ pub(crate) fn stream_isatty(stream: &Bound<'_, PyAny>) -> PyResult<bool> {
 }
 
 /// The project, its discovered inputs and the effective scenario namespace.
+#[derive(Clone)]
 pub(crate) struct ScenarioProject<'py> {
     pub(crate) project_dir: Bound<'py, PyAny>,
     pub(crate) discovered: Bound<'py, PyAny>,
@@ -209,6 +210,20 @@ pub(crate) fn require_capture_dialect(
 pub(crate) fn project_connection_config<'py>(
     project: &ScenarioProject<'py>,
 ) -> PyResult<Bound<'py, PyAny>> {
+    connection_config(project, true)
+}
+
+/// The project's connection settings for an offline compile, which needs no warehouse connection.
+pub(crate) fn offline_project_connection_config<'py>(
+    project: &ScenarioProject<'py>,
+) -> PyResult<Bound<'py, PyAny>> {
+    connection_config(project, false)
+}
+
+fn connection_config<'py>(
+    project: &ScenarioProject<'py>,
+    require_connection: bool,
+) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = project.discovered.py();
     resolve_project_connection_config(
         py,
@@ -217,6 +232,7 @@ pub(crate) fn project_connection_config<'py>(
             &[
                 ("discovered_inputs", project.discovered.clone()),
                 ("project_dir", project.project_dir.clone()),
+                ("require_connection", boolean(py, require_connection)),
             ],
         )?),
     )
@@ -227,6 +243,45 @@ pub(crate) fn style(request: &Bound<'_, PyAny>) -> PyResult<CliStyle> {
     let use_color: bool =
         !native_field(request, "no_color")?.is_truthy()? && stdout_supports_color(request.py())?;
     Ok(CliStyle { use_color })
+}
+
+/// The planning reporter a scenario compile reports its phases to.
+pub(crate) fn planning_reporter<'py>(
+    stream: &Bound<'py, PyAny>,
+    style: CliStyle,
+) -> PyResult<Bound<'py, PyAny>> {
+    let py: Python<'py> = stream.py();
+    Ok(Bound::new(
+        py,
+        PlanningProgressReporter::new(py, stream, style.use_color)?,
+    )?
+    .into_any())
+}
+
+/// `Execution  sqb scenario test  (concurrency: N, DuckDB)`, after the run's header.
+pub(crate) fn write_execution<'py>(
+    stream: &Bound<'py, PyAny>,
+    project: &ScenarioProject<'py>,
+    (command, (concurrency, engines), style): (&str, (i64, Option<String>), CliStyle),
+) -> PyResult<()> {
+    let py: Python<'py> = stream.py();
+    let selectors: Vec<String> = project.selectors.extract()?;
+    write(stream, "\n")?;
+    let target: Option<String> = (!selectors.is_empty()).then(|| selectors.join(" "));
+    write_execution_header(
+        py,
+        Some(keywords(
+            py,
+            &[
+                ("stream", stream.clone()),
+                ("command", text(py, command)),
+                ("target", optional_text(py, target.as_deref())),
+                ("concurrency", int(py, concurrency)),
+                ("use_color", boolean(py, style.use_color)),
+                ("engines", optional_text(py, engines.as_deref())),
+            ],
+        )?),
+    )
 }
 
 /// Write the namespace line, then the execution header with the selected target.

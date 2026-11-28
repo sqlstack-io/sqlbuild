@@ -9,24 +9,73 @@ import pytest
 from sqlbuild._native import (
     DiscoveredProjectInputs,
     DiscoveredSqlTestBlock,
+    DiscoveryConflictError,
     ProjectConfigError,
     ProjectLayoutError,
+    SourceEntry,
+    SourceParseError,
+    SourceWriteStrategy,
+    TargetConfig,
     discover_project_inputs,
+    resolve_target_config,
 )
 from sqlbuild.observability import EventDispatcher, LifecycleEvent, dispatcher_scope
 from tests.unit.src.sqlbuild.compiler.discovery._test_helpers import (
     base_repo_files,
+    named_source_entry,
 )
 from tests.unit.src.sqlbuild.compiler.discovery._test_types import (
+    ConnectionRolesTestCase,
     DiscoverFactoryValidationTestCase,
     DiscoverProjectInputsErrorTestCase,
     DiscoverProjectInputsTestCase,
     DiscoverUniqueTestNameTestCase,
     DiscoveryLifecycleTestCase,
     DiscoveryRelevantCountTestCase,
+    LoadDiscoveryTestCase,
+    LoadErrorTestCase,
+    LoaderSettingsTestCase,
     ProjectPythonPathAcceptanceTestCase,
+    SourceConnectionErrorTestCase,
 )
 from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
+
+_SHOP_PROJECT: str = (
+    'name = "demo"\nadapter = "duckdb"\n\n'
+    '[connections.local]\ndatabase = "demo.duckdb"\n\n'
+    '[connections.shop_db]\nkind = "postgres"\nhost = "db"\nuser = "reader"\n'
+    'database = "shop"\npassword = "${ENV:SHOP_PASSWORD_NOT_SET}"\n\n'
+    '[targets.dev]\nconnection = "local"\nschema = "dev"\n'
+)
+_SHOP_LOAD: str = """load:
+  name: shop
+  kind: postgres
+  connection: shop_db
+  include: [public.orders]
+  write_strategy: merge
+  tables:
+    public.orders:
+      unique_key: id
+sources:
+  - name: shop__orders
+    description: Orders
+    columns:
+      - name: id
+        type: BIGINT
+"""
+_CUSTOMER_IDS_MODEL: str = """MODEL (
+  materialized view,
+  description "Customer ids"
+);
+
+select id from __source("shop__customers")
+"""
+_WAREHOUSE_AND_SHOP: str = (
+    'name = "demo"\nadapter = "duckdb"\n\n'
+    '[connections.local]\ndatabase = "demo.duckdb"\n\n'
+    '[connections.shop]\nkind = "http"\nbase_url = "https://shop.example"\n'
+    'auth = { kind = "bearer" }\ntoken = "${env:SHOP_TOKEN_NOT_SET}"\nrate_limit = "10/s"\n\n'
+)
 
 
 @pytest.mark.parametrize(
@@ -763,6 +812,332 @@ def test_given_ambiguous_target_connection_when_discovering_then_config_error_is
     "test_case",
     (
         DiscoverProjectInputsErrorTestCase(
+            description="a target names a source connection",
+            repo_files={
+                "sqlbuild_project.toml": (
+                    'name = "demo"\nadapter = "duckdb"\n\n'
+                    '[connections.local]\ndatabase = "demo.duckdb"\n\n'
+                    '[connections.shop]\nkind = "http"\nbase_url = "https://shop.example"\n\n'
+                    '[targets.dev]\nconnection = "shop"\nschema = "dev"\n'
+                )
+            },
+            expected_error_fragment=(
+                "target 'dev' uses connection 'shop' (http), which can't hold models; this "
+                "project's targets need duckdb connections"
+            ),
+        ),
+        DiscoverProjectInputsErrorTestCase(
+            description="a local override gives a target's connection another kind",
+            repo_files={
+                "sqlbuild_project.toml": (
+                    'name = "demo"\nadapter = "duckdb"\n\n'
+                    '[connections.local]\ndatabase = "demo.duckdb"\n\n'
+                    '[targets.dev]\nconnection = "local"\nschema = "dev"\n'
+                ),
+                "sqlbuild_local.toml": '[connections.local]\nkind = "postgres"\n',
+            },
+            expected_error_fragment="target 'dev' uses connection 'local' (postgres)",
+        ),
+        DiscoverProjectInputsErrorTestCase(
+            description="an http setting on a warehouse connection",
+            repo_files={
+                "sqlbuild_project.toml": (
+                    'name = "demo"\nadapter = "duckdb"\n\n'
+                    '[connections.local]\ndatabase = "demo.duckdb"\nrate_limit = "10/s"\n\n'
+                    '[targets.dev]\nconnection = "local"\nschema = "dev"\n'
+                )
+            },
+            expected_error_fragment=(
+                "connections.local: rate_limit is for http connections; a warehouse "
+                "connection can't take it"
+            ),
+        ),
+        DiscoverProjectInputsErrorTestCase(
+            description="an http setting on the top-level connection",
+            repo_files={
+                "sqlbuild_project.toml": (
+                    'name = "demo"\nadapter = "duckdb"\n\n'
+                    '[connection]\ndatabase = "demo.duckdb"\nheaders = { a = "b" }\n\n'
+                    '[targets.dev]\nschema = "dev"\n'
+                )
+            },
+            expected_error_fragment="the connection of target 'dev': headers is for http",
+        ),
+    ),
+    ids=lambda case: case.description,
+)
+def test_given_target_connection_that_cant_hold_models_when_discovering_then_config_error_is_raised(
+    test_case: DiscoverProjectInputsErrorTestCase,
+    tmp_path: Path,
+    write_repo_files: Callable[[Path, dict[str, str]], None],
+) -> None:
+    write_repo_files(tmp_path, test_case.repo_files)
+
+    with pytest.raises(ProjectConfigError) as error_info:
+        discover_project_inputs(project_dir=tmp_path)
+
+    assert error_info.value.code == "D001"
+    assert test_case.expected_error_fragment in str(error_info.value)
+    assert str(tmp_path / "sqlbuild_project.toml") in str(error_info.value)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        LoadDiscoveryTestCase(
+            description="a load fills the sources the file lists under its name",
+            repo_files={"sqlbuild_project.toml": _SHOP_PROJECT, "sql/sources/shop.yml": _SHOP_LOAD},
+            expected_loads=(("shop__orders", "shop"),),
+        ),
+        LoadDiscoveryTestCase(
+            description="a model reading an unlisted table of a load makes a source it fills",
+            repo_files={
+                "sqlbuild_project.toml": _SHOP_PROJECT,
+                "sql/sources/shop.yml": _SHOP_LOAD.replace(
+                    "include: [public.orders]", "include: [public.orders, public.customers]"
+                ),
+                "sql/models/customer_ids.sql": _CUSTOMER_IDS_MODEL,
+            },
+            expected_loads=(("shop__orders", "shop"), ("shop__customers", "shop")),
+        ),
+        LoadDiscoveryTestCase(
+            description="a commented-out reference makes no source",
+            repo_files={
+                "sqlbuild_project.toml": _SHOP_PROJECT,
+                "sql/sources/shop.yml": _SHOP_LOAD,
+                "sql/models/customer_ids.sql": _CUSTOMER_IDS_MODEL.replace(
+                    'select id from __source("shop__customers")',
+                    '-- __source("shop__customers")\nselect 1 as id',
+                ),
+            },
+            expected_loads=(("shop__orders", "shop"),),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_load_when_discovering_then_its_sources_name_it(
+    test_case: LoadDiscoveryTestCase,
+    tmp_path: Path,
+    write_repo_files: Callable[[Path, dict[str, str]], None],
+) -> None:
+    write_repo_files(tmp_path, test_case.repo_files)
+
+    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
+
+    loads: tuple[tuple[str, str | None], ...] = tuple(
+        (entry.name, entry.load) for entry in discovered.source_files[0].source_entries
+    )
+    assert loads == test_case.expected_loads, test_case.description
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        LoadErrorTestCase(
+            description="SQLLoad refuses a setting, named at its line under load",
+            repo_files={
+                "sqlbuild_project.toml": _SHOP_PROJECT,
+                "sql/sources/shop.yml": _SHOP_LOAD.replace("unique_key: id", "unique_keys: id"),
+            },
+            expected_error_class=SourceParseError,
+            expected_error_fragment=(
+                "shop.yml:9 load 'shop': unknown key \"unique_keys\" in "
+                '[load.tables."public.orders"]'
+            ),
+        ),
+        LoadErrorTestCase(
+            description="a load can't read a warehouse connection",
+            repo_files={
+                "sqlbuild_project.toml": _SHOP_PROJECT,
+                "sql/sources/shop.yml": _SHOP_LOAD.replace(
+                    "connection: shop_db", "connection: local"
+                ),
+            },
+            expected_error_class=SourceParseError,
+            expected_error_fragment=(
+                "shop.yml:4 load 'shop': connection 'local' sets no kind; loads and loaders read "
+                "source connections"
+            ),
+        ),
+        LoadErrorTestCase(
+            description="a listed source the literal include doesn't load",
+            repo_files={
+                "sqlbuild_project.toml": _SHOP_PROJECT,
+                "sql/sources/shop.yml": _SHOP_LOAD
+                + "  - name: shop__carts\n    description: Carts\n",
+            },
+            expected_error_class=SourceParseError,
+            expected_error_fragment=(
+                "shop.yml:5 load 'shop': source 'shop__carts' matches no table the load 'shop' "
+                "includes; its tables load into shop__orders"
+            ),
+        ),
+        LoadErrorTestCase(
+            description="a model reads a table the literal include doesn't load",
+            repo_files={
+                "sqlbuild_project.toml": _SHOP_PROJECT,
+                "sql/sources/shop.yml": _SHOP_LOAD,
+                "sql/models/customer_ids.sql": _CUSTOMER_IDS_MODEL,
+            },
+            expected_error_class=SourceParseError,
+            expected_error_fragment=(
+                "source 'shop__customers' matches no table the load 'shop' includes; its "
+                "tables load into shop__orders"
+            ),
+        ),
+        LoadErrorTestCase(
+            description="two files declare one load",
+            repo_files={
+                "sqlbuild_project.toml": _SHOP_PROJECT,
+                "sql/sources/shop.yml": _SHOP_LOAD,
+                "sql/sources/shop_again.yml": "load:\n  name: shop\n  kind: postgres\n",
+            },
+            expected_error_class=DiscoveryConflictError,
+            expected_error_fragment="Duplicate load 'shop' in sql/sources/shop.yml and sql/sources/shop_again.yml",
+        ),
+        LoadErrorTestCase(
+            description="the project's warehouse can't hold loaded tables",
+            repo_files={
+                "sqlbuild_project.toml": _SHOP_PROJECT.replace(
+                    'adapter = "duckdb"', 'adapter = "sqlite"'
+                ),
+                "sql/sources/shop.yml": _SHOP_LOAD,
+            },
+            expected_error_class=SourceParseError,
+            expected_error_fragment="shop.yml load: loads and loaders can't write to sqlite yet",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_load_sqlload_refuses_when_discovering_then_its_file_and_line_are_named(
+    test_case: LoadErrorTestCase,
+    tmp_path: Path,
+    write_repo_files: Callable[[Path, dict[str, str]], None],
+) -> None:
+    write_repo_files(tmp_path, test_case.repo_files)
+
+    with pytest.raises(test_case.expected_error_class) as error_info:
+        discover_project_inputs(project_dir=tmp_path)
+
+    assert test_case.expected_error_fragment in str(error_info.value), test_case.description
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    (
+        SourceConnectionErrorTestCase(
+            description="an unknown setting on a project source connection",
+            repo_files={
+                "sqlbuild_project.toml": (
+                    'name = "demo"\nadapter = "duckdb"\n\n'
+                    '[connections.shop]\nkind = "http"\nbase_url = "https://shop.example"\n'
+                    'rate_limt = "10/s"\n'
+                )
+            },
+            expected_error_fragment="unknown field `rate_limt`, expected one of `base_url`",
+            expected_file="sqlbuild_project.toml",
+        ),
+        SourceConnectionErrorTestCase(
+            description="an unknown kind on a local source connection",
+            repo_files={
+                "sqlbuild_project.toml": 'name = "demo"\nadapter = "duckdb"\n',
+                "sqlbuild_local.toml": '[connections.files]\nkind = "s4"\nbucket = "landing"\n',
+            },
+            expected_error_fragment="unknown variant `s4`, expected one of `snowflake`",
+            expected_file="sqlbuild_local.toml",
+        ),
+        SourceConnectionErrorTestCase(
+            description="a local override breaks a project source connection",
+            repo_files={
+                "sqlbuild_project.toml": (
+                    'name = "demo"\nadapter = "duckdb"\n\n'
+                    '[connections.erp]\nkind = "postgres"\nhost = "db"\nuser = "reader"\n'
+                    'database = "erp"\n'
+                ),
+                "sqlbuild_local.toml": '[connections.erp]\nport = "${env:ERP_PORT}"\n',
+            },
+            expected_error_fragment=(
+                'invalid type: string "${env:ERP_PORT}", expected u16\nin `connections.erp`'
+            ),
+            expected_file="sqlbuild_project.toml",
+        ),
+    ),
+    ids=lambda case: case.description,
+)
+def test_given_invalid_source_connection_when_discovering_then_sqlloads_message_names_its_file(
+    test_case: SourceConnectionErrorTestCase,
+    tmp_path: Path,
+    write_repo_files: Callable[[Path, dict[str, str]], None],
+) -> None:
+    write_repo_files(tmp_path, test_case.repo_files)
+
+    with pytest.raises(ProjectConfigError) as error_info:
+        discover_project_inputs(project_dir=tmp_path)
+
+    assert error_info.value.code == "D001"
+    assert test_case.expected_error_fragment in str(error_info.value)
+    assert str(tmp_path / test_case.expected_file) in str(error_info.value)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    (
+        ConnectionRolesTestCase(
+            description="the one-connection default skips a source connection",
+            repo_files={
+                "sqlbuild_project.toml": _WAREHOUSE_AND_SHOP + '[targets.dev]\nschema = "dev"\n'
+            },
+            expected_target_connection="local",
+        ),
+        ConnectionRolesTestCase(
+            description="a connection a target names keeps SQLBuild's keys whatever its kind",
+            repo_files={
+                "sqlbuild_project.toml": (
+                    _WAREHOUSE_AND_SHOP
+                    + '[connections.archive]\nkind = "duckdb"\ndatabase = "archive.duckdb"\n'
+                    'extensions = ["httpfs"]\n\n'
+                    '[targets.dev]\nconnection = "archive"\nschema = "dev"\n'
+                )
+            },
+            expected_target_connection="archive",
+        ),
+        ConnectionRolesTestCase(
+            description="a connection Recall names is not a source connection",
+            repo_files={
+                "sqlbuild_project.toml": (
+                    _WAREHOUSE_AND_SHOP
+                    + '[connections.history]\nkind = "clickhouse"\nadapter = "clickhouse"\n'
+                    'host = "ch"\ndatabase = "observability"\n\n'
+                    '[recall]\nread_connection = "history"\n\n'
+                    '[targets.dev]\nschema = "dev"\n'
+                )
+            },
+            expected_target_connection="local",
+        ),
+    ),
+    ids=lambda case: case.description,
+)
+def test_given_connections_by_use_when_discovering_then_sources_are_checked_and_targets_keep_theirs(
+    test_case: ConnectionRolesTestCase,
+    tmp_path: Path,
+    write_repo_files: Callable[[Path, dict[str, str]], None],
+) -> None:
+    write_repo_files(tmp_path, test_case.repo_files)
+
+    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
+    target: TargetConfig = resolve_target_config(
+        project_config=discovered.project_config,
+        local_config=discovered.local_config,
+        target_name="dev",
+    )
+
+    assert target.connection_name == test_case.expected_target_connection
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    (
+        DiscoverProjectInputsErrorTestCase(
             description="non-project directory containing Python",
             repo_files={"application/main.py": "print('hello')\n"},
             expected_error_fragment="Project config not found",
@@ -1275,25 +1650,88 @@ def event_loaders():
             expected_error_fragment="Loader dependency cycle detected",
         ),
         DiscoverProjectInputsErrorTestCase(
-            description="raises when terminal loader owns source config",
+            description="a source a loader fills can't set its write strategy",
             repo_files=base_repo_files()
             | {
-                "sql/sources/raw.yml": """
-sources:
-  - name: raw_orders
-    managed: true
-    write_strategy: table
-""".strip()
-                + "\n",
-                "python/nodes/loaders/raw_orders/loader.py": """
-from sqlbuild.loaders import loader
-
-@loader(write_strategy="table", columns=[{"name": "id", "type": "INTEGER"}])
-def raw_orders(ctx):
-    return []
-""",
+                "sql/sources/raw.yml": "sources:\n  - name: raw_orders\n    managed: true\n    write_strategy: append\n",
+                "python/nodes/loaders/raw_orders/loader.py": (
+                    "from sqlbuild.loaders import loader\n\n"
+                    "@loader\n"
+                    "def raw_orders(ctx):\n    return []\n"
+                ),
             },
-            expected_error_fragment="terminal source loader write and schema config must be declared",
+            expected_error_fragment="is filled by @loader 'raw_orders', so it can't set write_strategy; set write_strategy= on @loader",
+        ),
+        DiscoverProjectInputsErrorTestCase(
+            description="on_schema_change takes one of SQLLoad's policies",
+            repo_files=base_repo_files()
+            | {
+                "sql/sources/raw.yml": (
+                    "sources:\n  - name: raw_orders\n    managed: true\n"
+                    "    on_schema_change: sync_all_columns\n"
+                ),
+                "python/nodes/loaders/raw_orders/loader.py": (
+                    "from sqlbuild.loaders import loader\n\n"
+                    "@loader(write_strategy='append')\n"
+                    "def raw_orders(ctx):\n    return []\n"
+                ),
+            },
+            expected_error_fragment=(
+                "'on_schema_change' must be one of: append_new_columns, ignore, fail"
+            ),
+        ),
+        DiscoverProjectInputsErrorTestCase(
+            description="a source nothing fills can't set on_schema_change",
+            repo_files=base_repo_files()
+            | {
+                "sql/sources/raw.yml": (
+                    "sources:\n  - name: raw_orders\n    on_schema_change: fail\n"
+                ),
+            },
+            expected_error_fragment=(
+                "source 'raw_orders' can't set on_schema_change; it says how the load or "
+                "@loader that fills a source meets new and missing columns, and nothing fills "
+                "this one"
+            ),
+        ),
+        DiscoverProjectInputsErrorTestCase(
+            description="a terminal loader can't declare the source's columns",
+            repo_files=base_repo_files()
+            | {
+                "sql/sources/raw.yml": "sources:\n  - name: raw_orders\n    managed: true\n",
+                "python/nodes/loaders/raw_orders/loader.py": (
+                    "from sqlbuild.loaders import loader\n\n"
+                    "@loader(columns=[{'name': 'id', 'type': 'BIGINT'}])\n"
+                    "def raw_orders(ctx):\n    return []\n"
+                ),
+            },
+            expected_error_fragment="Source 'raw_orders' references loader 'raw_orders', which sets destination or columns",
+        ),
+        DiscoverProjectInputsErrorTestCase(
+            description="SQLLoad refuses an option it doesn't know",
+            repo_files=base_repo_files()
+            | {
+                "sql/sources/raw.yml": "sources:\n  - name: raw_orders\n    managed: true\n",
+                "python/nodes/loaders/raw_orders/loader.py": (
+                    "from sqlbuild.loaders import loader\n\n"
+                    "@loader(cursor_colum='id')\n"
+                    "def raw_orders(ctx):\n    return []\n"
+                ),
+            },
+            expected_error_fragment="@loader 'raw_orders': unknown key \"cursor_colum\"",
+        ),
+        DiscoverProjectInputsErrorTestCase(
+            description="SQLBuild's old name for replacing the table",
+            repo_files=base_repo_files()
+            | {
+                "sql/sources/raw.yml": "sources:\n  - name: raw_orders\n    managed: true\n",
+                "python/nodes/loaders/raw_orders/loader.py": (
+                    "from sqlbuild.loaders import loader\n\n"
+                    "@loader(write_strategy='table')\n"
+                    "def raw_orders(ctx):\n    return []\n"
+                ),
+            },
+            expected_error_fragment='@loader \'raw_orders\': write_strategy "table" is now "replace"',
         ),
         DiscoverProjectInputsErrorTestCase(
             description="raises when task and asset names are duplicated",
@@ -1364,7 +1802,7 @@ seeds:
   - name: export_customers
     columns:
       - name: customer_id
-        type: INTEGER
+        type: BIGINT
 """.strip()
                 + "\n",
                 "sql/seeds/export_customers.csv": "customer_id\n1\n",
@@ -1738,3 +2176,48 @@ def test_given_discovery_conflicts_when_discovering_inputs_then_it_raises_clear_
 
     with pytest.raises(ValueError, match=test_case.expected_error_fragment):
         discover_project_inputs(project_dir=tmp_path)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        LoaderSettingsTestCase(
+            description="a merge on a key, reading from a cursor",
+            decorator="@loader(write_strategy='merge', unique_key='id', cursor_column='updated_at')",
+            expected_entry=(SourceWriteStrategy.MERGE, "updated_at", ("id",)),
+        ),
+        LoaderSettingsTestCase(
+            description="SQLLoad's replace is the table strategy",
+            decorator="@loader(write_strategy='replace')",
+            expected_entry=(SourceWriteStrategy.TABLE, None, ()),
+        ),
+        LoaderSettingsTestCase(
+            description="a loader with no options leaves them unset",
+            decorator="@loader",
+            expected_entry=(None, None, ()),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_loader_options_when_discovering_then_the_source_it_fills_has_them(
+    test_case: LoaderSettingsTestCase,
+    tmp_path: Path,
+    write_repo_files: Callable[[Path, dict[str, str]], None],
+) -> None:
+    write_repo_files(
+        tmp_path,
+        base_repo_files()
+        | {
+            "sql/sources/raw.yml": "sources:\n  - name: raw_orders\n    managed: true\n",
+            "python/nodes/loaders/raw_orders/loader.py": (
+                "from sqlbuild.loaders import loader\n\n"
+                f"{test_case.decorator}\n"
+                "def raw_orders(ctx):\n    return []\n"
+            ),
+        },
+    )
+
+    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
+
+    entry: SourceEntry = named_source_entry(discovered, name="raw_orders")
+    assert (entry.write_strategy, entry.cursor_column, entry.unique_key) == test_case.expected_entry

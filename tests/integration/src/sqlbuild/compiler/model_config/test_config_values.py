@@ -155,7 +155,7 @@ def test_given_python_given_header_when_building_config_then_values_keep_types_a
         ConfigValueRejectionTestCase(
             description="a non-string header key",
             header={1: "x"},
-            expected_error=("TypeError", "'int' object cannot be converted to 'PyString'"),
+            expected_error=("TypeError", "'int' object is not an instance of 'str'"),
         ),
         ConfigValueRejectionTestCase(
             description="a nested macro call",

@@ -312,7 +312,7 @@ fn revalidated<'py>(
     for item in mapping_items(&shapes)?.try_iter()? {
         let (name, columns): (Bound<'py, PyAny>, Bound<'py, PyAny>) = item?.extract()?;
         let copied: Bound<'py, PyDict> = PyDict::new(py);
-        copied.update(columns.downcast::<PyDict>()?.as_mapping())?;
+        copied.update(columns.cast::<PyDict>()?.as_mapping())?;
         unknown.set_item(name, copied)?;
     }
     for (name, column) in poisoned {

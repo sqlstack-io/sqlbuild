@@ -11,18 +11,6 @@ from sqlbuild.python_nodes.types import PythonCheckSeverity
 
 
 @dataclass(frozen=True)
-class PythonNodeSchedulerTestCase:
-    description: str
-    node_names: tuple[str, ...]
-    upstream_names: dict[str, tuple[str, ...]]
-    downstream_names: dict[str, tuple[str, ...]]
-    completion_order: tuple[str, ...]
-    expected_initial_ready: tuple[str, ...]
-    expected_final_ready: tuple[str, ...]
-    expected_final_in_degree: dict[str, int]
-
-
-@dataclass(frozen=True)
 class PythonNodeReturnNormalizationTestCase:
     description: str
     kind: PythonNodeKind
@@ -292,3 +280,15 @@ class DiscoveredItemNodeTestCase:
     expected_args: dict[str, object] | None
     expected_item: str | None
     expected_failure: str | None
+
+
+@dataclass(frozen=True)
+class PythonNodeLiveLogTestCase:
+    """An asset that logs, and what its runtime's `on_log` sees and its result counts."""
+
+    description: str
+    name: str
+    function: Callable[..., object]
+    expected_forwarded: tuple[tuple[str, str, str], ...]
+    expected_forwarded_count: int
+    expected_dropped: int

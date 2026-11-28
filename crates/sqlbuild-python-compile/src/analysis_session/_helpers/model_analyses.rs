@@ -111,7 +111,7 @@ fn declared_rows(
     let Some(declared) = request.declared else {
         return Ok(None);
     };
-    let Ok(binding) = catalog.downcast::<BindingCatalog>() else {
+    let Ok(binding) = catalog.cast::<BindingCatalog>() else {
         return Ok(None);
     };
     let complete: &Shapes = declared.complete.rows();
@@ -389,6 +389,6 @@ fn log_debug(py: Python<'_>, message: &str, failure: &Bound<'_, PyAny>) -> PyRes
 /// `dict(mapping)`.
 fn copied<'py>(mapping: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDict>> {
     let copy: Bound<'py, PyDict> = PyDict::new(mapping.py());
-    copy.update(mapping.downcast()?)?;
+    copy.update(mapping.cast()?)?;
     Ok(copy)
 }

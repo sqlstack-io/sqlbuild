@@ -2,9 +2,9 @@
 
 use uuid::Uuid;
 
-use crate::run_output::_helpers::index::{batch_stored, record_chunk};
-use crate::run_output::_helpers::objects::{chunk_key, delete_chunks, put_chunk};
-use crate::run_output::_helpers::prepare::{checked, prepared};
+use crate::run_output::_helpers::store::index::{batch_stored, record_chunk};
+use crate::run_output::_helpers::store::objects::{chunk_key, delete_chunks, put_chunk};
+use crate::run_output::_helpers::store::prepare::{checked, prepared};
 use crate::run_output::models::{OutputBatch, OutputBatchReceipt, OutputStore};
 use crate::runs::main::execution::require_active_claim::require_active_claim;
 use crate::store::errors::ControlError;

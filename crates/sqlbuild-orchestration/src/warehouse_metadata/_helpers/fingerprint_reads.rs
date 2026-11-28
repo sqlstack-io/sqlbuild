@@ -132,11 +132,12 @@ pub(crate) async fn definition_texts(
     for chunk in hashes.chunks(NODES_PER_STATEMENT) {
         let placeholders: Vec<String> =
             (1..=chunk.len()).map(|index| format!("${index}")).collect();
+        let body = transaction.hex_column("body");
         let found;
         (transaction, found) = query(
             transaction,
             &format!(
-                "SELECT text_hash, body FROM sqb_source_texts WHERE text_hash IN ({})",
+                "SELECT text_hash, {body} AS body FROM sqb_source_texts WHERE text_hash IN ({})",
                 placeholders.join(",")
             ),
             chunk

@@ -139,39 +139,26 @@ from tests.unit.src.sqlbuild.compiler.discovery.helpers import parse_sources_yml
             expected_column_audit_names=(((),),),
         ),
         ParseSourcesYamlTestCase(
-            description="parses source loader metadata and write strategies",
+            description="parses managed sources, each filled by the loader named after it",
             contents="""
         sources:
           - name: raw_events
             managed: true
-            write_strategy: delete_insert
-            cursor_column: event_at
           - name: raw_customers
             managed: true
-            write_strategy: merge
-            unique_key: [customer_id, updated_at]
-            cursor_column: updated_at
-          - name: raw_prices
-            managed: true
-            write_strategy: table
-            load_batch_size: 500
-          - name: raw_webhooks
-            managed: true
-            write_strategy: append
-            cursor_column: received_at
         """,
-            expected_source_names=("raw_events", "raw_customers", "raw_prices", "raw_webhooks"),
-            expected_column_names=((), (), (), ()),
-            expected_type_enforcement_values=(None, None, None, None),
-            expected_contract_values=(None, None, None, None),
-            expected_expressions=(None, None, None, None),
-            expected_loaders=("raw_events", "raw_customers", "raw_prices", "raw_webhooks"),
-            expected_write_strategies=("delete_insert", "merge", "table", "append"),
-            expected_load_batch_sizes=(None, None, 500, None),
-            expected_cursor_columns=("event_at", "updated_at", None, "received_at"),
-            expected_unique_keys=((), ("customer_id", "updated_at"), (), ()),
-            expected_source_audit_names=((), (), (), ()),
-            expected_column_audit_names=((), (), (), ()),
+            expected_source_names=("raw_events", "raw_customers"),
+            expected_column_names=((), ()),
+            expected_type_enforcement_values=(None, None),
+            expected_contract_values=(None, None),
+            expected_expressions=(None, None),
+            expected_loaders=("raw_events", "raw_customers"),
+            expected_write_strategies=(None, None),
+            expected_load_batch_sizes=(None, None),
+            expected_cursor_columns=(None, None),
+            expected_unique_keys=((), ()),
+            expected_source_audit_names=((), ()),
+            expected_column_audit_names=((), ()),
         ),
         ParseSourcesYamlTestCase(
             description="parses source freshness strategies",
@@ -709,143 +696,53 @@ def test_given_sources_yaml_variants_when_parsing_then_it_returns_expected_raw_m
             expected_error_fragment="source 'loader' is not supported",
         ),
         ParseSourcesYamlErrorTestCase(
-            description="raises when write strategy is unknown",
+            description="raises when a managed source sets its write strategy",
             contents="""
         sources:
           - name: raw_orders
             managed: true
-            write_strategy: replace
+            write_strategy: merge
         """,
-            expected_error_fragment="write_strategy must be one of",
+            expected_error_fragment="source 'raw_orders' is filled by @loader 'raw_orders', so it can't set write_strategy; set write_strategy= on @loader",
         ),
         ParseSourcesYamlErrorTestCase(
-            description="raises when write strategy has no loader",
-            contents="""
-        sources:
-          - name: raw_orders
-            write_strategy: table
-        """,
-            expected_error_fragment="defines write_strategy but is not managed",
-        ),
-        ParseSourcesYamlErrorTestCase(
-            description="raises when load batch size is not positive",
+            description="raises when a managed source sets its cursor column",
             contents="""
         sources:
           - name: raw_orders
             managed: true
-            write_strategy: table
-            load_batch_size: 0
-        """,
-            expected_error_fragment="source 'load_batch_size' must be a positive integer",
-        ),
-        ParseSourcesYamlErrorTestCase(
-            description="raises when load batch size is boolean",
-            contents="""
-        sources:
-          - name: raw_orders
-            managed: true
-            write_strategy: table
-            load_batch_size: true
-        """,
-            expected_error_fragment="source 'load_batch_size' must be a positive integer",
-        ),
-        ParseSourcesYamlErrorTestCase(
-            description="raises when cursor column is used with table strategy",
-            contents="""
-        sources:
-          - name: raw_orders
-            managed: true
-            write_strategy: table
             cursor_column: event_at
         """,
-            expected_error_fragment="cursor_column is not supported with write_strategy table",
+            expected_error_fragment="so it can't set cursor_column; set cursor_column= on @loader",
         ),
         ParseSourcesYamlErrorTestCase(
-            description="raises when unique key is used with append strategy",
+            description="raises when a managed source sets its unique key",
             contents="""
         sources:
           - name: raw_orders
             managed: true
-            write_strategy: append
-            unique_key: order_id
+            unique_key: [order_id]
         """,
-            expected_error_fragment="unique_key is not supported with write_strategy append",
+            expected_error_fragment="so it can't set unique_key; set unique_key= on @loader",
         ),
         ParseSourcesYamlErrorTestCase(
-            description="raises when merge has no unique key",
+            description="raises when a managed source sets its load batch size",
             contents="""
         sources:
           - name: raw_orders
             managed: true
-            write_strategy: merge
+            load_batch_size: 500
         """,
-            expected_error_fragment="write_strategy merge requires unique_key",
+            expected_error_fragment="so it can't set load_batch_size; remove it; SQLLoad sizes the batches it commits",
         ),
         ParseSourcesYamlErrorTestCase(
-            description="raises when unique key is used with table strategy",
+            description="raises when a source that isn't loaded sets a write strategy",
             contents="""
         sources:
           - name: raw_orders
-            managed: true
             write_strategy: table
-            unique_key: order_id
         """,
-            expected_error_fragment="unique_key is not supported with write_strategy table",
-        ),
-        ParseSourcesYamlErrorTestCase(
-            description="raises when delete insert has no cursor column",
-            contents="""
-        sources:
-          - name: raw_orders
-            managed: true
-            write_strategy: delete_insert
-        """,
-            expected_error_fragment="write_strategy delete_insert requires cursor_column",
-        ),
-        ParseSourcesYamlErrorTestCase(
-            description="raises when unique key is used with delete insert strategy",
-            contents="""
-        sources:
-          - name: raw_orders
-            managed: true
-            write_strategy: delete_insert
-            cursor_column: event_at
-            unique_key: order_id
-        """,
-            expected_error_fragment="unique_key is not supported with write_strategy delete_insert",
-        ),
-        ParseSourcesYamlErrorTestCase(
-            description="raises when unique key is empty list",
-            contents="""
-        sources:
-          - name: raw_orders
-            managed: true
-            write_strategy: merge
-            unique_key: []
-        """,
-            expected_error_fragment="source 'unique_key' must be non-empty",
-        ),
-        ParseSourcesYamlErrorTestCase(
-            description="raises when unique key list contains non string",
-            contents="""
-        sources:
-          - name: raw_orders
-            managed: true
-            write_strategy: merge
-            unique_key: [order_id, 123]
-        """,
-            expected_error_fragment="source 'unique_key' must contain only non-empty strings",
-        ),
-        ParseSourcesYamlErrorTestCase(
-            description="raises when unique key is wrong type",
-            contents="""
-        sources:
-          - name: raw_orders
-            managed: true
-            write_strategy: merge
-            unique_key: {}
-        """,
-            expected_error_fragment="source 'unique_key' must be a string or list",
+            expected_error_fragment="source 'raw_orders' can't set write_strategy; a source that isn't loaded has no loading settings",
         ),
         ParseSourcesYamlErrorTestCase(
             description="raises when source freshness is not a mapping",

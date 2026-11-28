@@ -8,6 +8,7 @@ use crate::api::models::UiAsset;
 use crate::api::tests::helpers::raw_get;
 use crate::api::tests::test_types::{UiAssetTestCase, UiPathTestCase};
 use crate::store::tests::store_helpers::run;
+use crate::tls::main::client_builder::client_builder;
 
 #[test]
 fn given_embedded_ui_when_requesting_pages_assets_and_api_paths_then_only_ui_paths_serve_ui_files()
@@ -128,7 +129,7 @@ fn given_embedded_ui_when_requesting_pages_assets_and_api_paths_then_only_ui_pat
             .expect("socket");
         let url = format!("http://{}", listener.local_addr().expect("address"));
         let server = tokio::spawn(async move { axum::serve(listener, application).await });
-        let client = reqwest::Client::new();
+        let client = client_builder().build().expect("HTTP client");
         for test_case in test_cases {
             let response = client
                 .request(test_case.method, format!("{url}{}", test_case.path))

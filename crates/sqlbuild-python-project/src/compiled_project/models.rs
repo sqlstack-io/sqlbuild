@@ -90,8 +90,11 @@ pub struct FunctionRow {
     pub contents: Option<String>,
 }
 
-impl<'py> pyo3::FromPyObject<'py> for FunctionRow {
-    fn extract_bound(value: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for FunctionRow {
+    type Error = pyo3::PyErr;
+
+    fn extract(value: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        let value: &pyo3::Bound<'py, pyo3::PyAny> = &value;
         let (file_path, relative_path, name, function_file, header_values, body, contents): (
             String,
             String,
@@ -126,8 +129,11 @@ pub struct FunctionSettings {
     pub dataframe: String,
 }
 
-impl<'py> pyo3::FromPyObject<'py> for FunctionSettings {
-    fn extract_bound(value: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for FunctionSettings {
+    type Error = pyo3::PyErr;
+
+    fn extract(value: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        let value: &pyo3::Bound<'py, pyo3::PyAny> = &value;
         let (adapter_name, validate, defaults, target, inherit, kind, dataframe): FunctionSettingsTuple =
             pyo3::types::PyAnyMethods::extract(value)?;
         Ok(Self {
@@ -154,8 +160,11 @@ pub struct TestBlockRow {
     pub sql_body_span: Option<(usize, usize)>,
 }
 
-impl<'py> pyo3::FromPyObject<'py> for TestBlockRow {
-    fn extract_bound(value: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for TestBlockRow {
+    type Error = pyo3::PyErr;
+
+    fn extract(value: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        let value: &pyo3::Bound<'py, pyo3::PyAny> = &value;
         let (block, name, sql_body, mode, parameters, cases, sql_body_span): TestBlockTuple =
             pyo3::types::PyAnyMethods::extract(value)?;
         Ok(Self {
@@ -181,8 +190,11 @@ pub struct TestFileRow {
     pub blocks: Vec<TestBlockRow>,
 }
 
-impl<'py> pyo3::FromPyObject<'py> for TestFileRow {
-    fn extract_bound(value: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for TestFileRow {
+    type Error = pyo3::PyErr;
+
+    fn extract(value: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        let value: &pyo3::Bound<'py, pyo3::PyAny> = &value;
         let (file_path, relative_path, stem, file, contents, blocks): (
             String,
             String,
@@ -241,8 +253,11 @@ pub struct ScenarioRow {
     pub name: String,
 }
 
-impl<'py> pyo3::FromPyObject<'py> for ScenarioRow {
-    fn extract_bound(value: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for ScenarioRow {
+    type Error = pyo3::PyErr;
+
+    fn extract(value: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        let value: &pyo3::Bound<'py, pyo3::PyAny> = &value;
         let (file_path, relative_path, scenario_file, contents, sql_body, name): (
             String,
             String,
@@ -273,8 +288,11 @@ pub struct AuditBlockRow {
     pub header: Py<PyDict>,
 }
 
-impl<'py> pyo3::FromPyObject<'py> for AuditBlockRow {
-    fn extract_bound(value: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for AuditBlockRow {
+    type Error = pyo3::PyErr;
+
+    fn extract(value: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        let value: &pyo3::Bound<'py, pyo3::PyAny> = &value;
         let (block, name, sql_body, evidence_sql, measurement, header): (
             Py<PyAny>,
             Option<String>,
@@ -326,8 +344,11 @@ pub struct AuditFileRow {
     pub blocks: Vec<AuditBlockRow>,
 }
 
-impl<'py> pyo3::FromPyObject<'py> for AuditFileRow {
-    fn extract_bound(value: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for AuditFileRow {
+    type Error = pyo3::PyErr;
+
+    fn extract(value: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        let value: &pyo3::Bound<'py, pyo3::PyAny> = &value;
         let (file_path, relative_path, stem, file, generic, contents, blocks): (
             String,
             String,
@@ -396,8 +417,11 @@ pub struct PythonResourceRow {
     pub help: String,
 }
 
-impl<'py> pyo3::FromPyObject<'py> for PythonResourceRow {
-    fn extract_bound(value: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for PythonResourceRow {
+    type Error = pyo3::PyErr;
+
+    fn extract(value: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        let value: &pyo3::Bound<'py, pyo3::PyAny> = &value;
         let (kind, name, description, location, help): (
             String,
             String,
@@ -424,8 +448,11 @@ pub struct ScenarioDescriptionRow {
     pub raw: Py<PyAny>,
 }
 
-impl<'py> pyo3::FromPyObject<'py> for ScenarioDescriptionRow {
-    fn extract_bound(value: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for ScenarioDescriptionRow {
+    type Error = pyo3::PyErr;
+
+    fn extract(value: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        let value: &pyo3::Bound<'py, pyo3::PyAny> = &value;
         let (name, path, contents, raw): (String, String, String, Py<PyAny>) =
             pyo3::types::PyAnyMethods::extract(value)?;
         Ok(Self {
@@ -446,8 +473,11 @@ pub struct HookDescriptionRow {
     pub description: Option<String>,
 }
 
-impl<'py> pyo3::FromPyObject<'py> for HookDescriptionRow {
-    fn extract_bound(value: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for HookDescriptionRow {
+    type Error = pyo3::PyErr;
+
+    fn extract(value: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        let value: &pyo3::Bound<'py, pyo3::PyAny> = &value;
         let (name, path, contents, description): (String, String, String, Option<String>) =
             pyo3::types::PyAnyMethods::extract(value)?;
         Ok(Self {
@@ -504,8 +534,11 @@ pub struct ProofPy {
     pub named_families: Vec<NamedType>,
 }
 
-impl<'py> pyo3::FromPyObject<'py> for ProofPy {
-    fn extract_bound(value: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for ProofPy {
+    type Error = pyo3::PyErr;
+
+    fn extract(value: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        let value: &pyo3::Bound<'py, pyo3::PyAny> = &value;
         let (output_proven, bare_dynamic_pivot, families, failure_reason, named_families): (
             bool,
             bool,
@@ -533,8 +566,11 @@ pub struct AnalysisPy {
     pub unchecked: Vec<String>,
 }
 
-impl<'py> pyo3::FromPyObject<'py> for AnalysisPy {
-    fn extract_bound(value: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for AnalysisPy {
+    type Error = pyo3::PyErr;
+
+    fn extract(value: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        let value: &pyo3::Bound<'py, pyo3::PyAny> = &value;
         let (inferred, inferred_columns, nullable_columns, fast_lineage_has_star, unchecked): (
             bool,
             Vec<NamedType>,

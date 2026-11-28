@@ -276,6 +276,7 @@ def test_given_local_scenario_planning_failure_when_running_then_canonical_attem
             adapter=ScenarioLocalPipelineTestAdapter(),
             project_name="waffle_shop",
             replay_source=ScenarioLocalReplaySource(lexical_syntax=SqlLexicalSyntax()),
+            local_test_allow={},
         )
 
     assert results[0].status == ExecutionStatus.FAILED
@@ -385,6 +386,7 @@ def test_given_selected_scenarios_when_running_local_scenario_pipeline_then_load
         adapter=adapter,
         project_name="waffle_shop",
         replay_source=ScenarioLocalReplaySource(lexical_syntax=SqlLexicalSyntax()),
+        local_test_allow={},
     )
 
     result: ScenarioRunResult = results[0]

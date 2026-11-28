@@ -10,6 +10,7 @@ from scripts.compiler_differential.classes.analysis_features import AnalysisFeat
 from scripts.compiler_differential.classes.discovery_features import (
     DiscoveryFeatureWriter,
     feature_blocks_for_seed,
+    without_excluded_pairs,
 )
 from scripts.compiler_differential.classes.render_features import RenderFeatureWriter
 from scripts.compiler_differential.constants import (
@@ -82,7 +83,7 @@ class ProjectBuilder:
         blocks: tuple[str, ...] = (
             feature_blocks_for_seed(seed=self._seed, rng=self._random)
             if self._forced_blocks is None
-            else self._forced_blocks
+            else without_excluded_pairs(self._forced_blocks)
         )
         invalid_kind: str | None = (
             self._random.choice(sorted(GENERATOR_INVALID_CODES))
@@ -214,7 +215,7 @@ class ProjectBuilder:
                 )
         self._features.add("path_defaults_wildcard")
         top_level: list[str] = [line for line in extra_lines if line.startswith("extra_paths")]
-        lines[0:0] = top_level
+        lines[0:0] = merged_extra_paths(top_level)
         lines.extend(line for line in extra_lines if not line.startswith("extra_paths"))
         lines.extend(GENERATOR_SQL_RULE_IGNORES)
         self._files["sqlbuild_project.toml"] = "\n".join(lines) + "\n"
@@ -695,3 +696,13 @@ class ProjectBuilder:
 def _relation(reference: str) -> str:
     kind, name = reference.split(":", 1)
     return f'__{kind}("{name}")'
+
+
+def merged_extra_paths(lines: list[str]) -> list[str]:
+    """One `extra_paths` line holding every path the `extra_paths = [...]` lines list."""
+
+    paths: list[str] = []
+    for line in lines:
+        listed: str = line.split("=", 1)[1].strip().strip("[]")
+        paths.extend(path.strip() for path in listed.split(",") if path.strip())
+    return [f"extra_paths = [{', '.join(paths)}]"] if paths else []

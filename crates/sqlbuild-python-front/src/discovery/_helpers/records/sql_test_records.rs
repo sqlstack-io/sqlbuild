@@ -98,7 +98,7 @@ pub(crate) fn test_blocks<'py>(
         native.push((
             map_to_python(py, &block.header_values)?
                 .into_bound(py)
-                .downcast_into::<PyDict>()?,
+                .cast_into::<PyDict>()?,
             block.sql_body,
             block.body_span.into_bound_py_any(py)?,
         ));
@@ -154,7 +154,7 @@ pub(crate) fn scenario_file<'py>(
     let py: Python<'py> = file_path.py();
     let header_values: Bound<'py, PyDict> = map_to_python(py, &file.header_values)?
         .into_bound(py)
-        .downcast_into::<PyDict>()?;
+        .cast_into::<PyDict>()?;
     let shown: Bound<'py, PyString> = file_path.str()?;
     let failure = |message: String| Err(discovery_error(py, SCENARIO_KIND, message, None));
     if let Some(description) = header_values.get_item(DESCRIPTION_KEY)?
@@ -165,7 +165,7 @@ pub(crate) fn scenario_file<'py>(
         ));
     }
     if let Some(tags) = header_values.get_item(TAGS_KEY)? {
-        let tags_are_strings: bool = match tags.downcast::<PyList>() {
+        let tags_are_strings: bool = match tags.cast::<PyList>() {
             Ok(tags) => tags.iter().all(|tag| tag.is_instance_of::<PyString>()),
             Err(_) => false,
         };

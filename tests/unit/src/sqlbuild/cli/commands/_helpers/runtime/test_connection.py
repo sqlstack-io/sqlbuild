@@ -282,6 +282,37 @@ def test_given_local_only_named_connection_when_resolving_then_it_is_allowed(
     "test_case",
     [
         NamedConnectionBehaviorTestCase(
+            description="kind names the adapter and stays out of the driver's settings",
+            expected_connection={"database": ":memory:"},
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_warehouse_connection_with_kind_when_resolving_then_kind_is_not_passed_on(
+    test_case: NamedConnectionBehaviorTestCase, tmp_path: Path
+) -> None:
+    discovered_inputs: DiscoveredProjectInputs = DiscoveredProjectInputs(
+        project_config=ProjectConfig(
+            name="demo",
+            adapter="duckdb",
+            default_target="dev",
+            targets={"dev": TargetConfig(connection_name="warehouse")},
+            connections={"warehouse": {"kind": "duckdb", "database": ":memory:"}},
+        ),
+        local_config=LocalConfig(),
+    )
+
+    connection: dict[str, object] = resolve_project_connection_config(
+        discovered_inputs=discovered_inputs, project_dir=tmp_path
+    )
+
+    assert connection == test_case.expected_connection
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        NamedConnectionBehaviorTestCase(
             description="unknown effective reference",
             expected_connection={},
             expected_error_fragment="Unknown connection 'missing'.*connections.missing",

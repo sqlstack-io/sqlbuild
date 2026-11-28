@@ -112,7 +112,10 @@ def test_given_same_shape_wrong_upstream_rows_when_testing_chain_then_reports_au
     assert result.returncode == test_case.expected_exit_code, output
     assert "FAIL=1" in output
     assert "orders_1" in output
-    assert "unexpected sample 1: order_id=2; missing sample 1: order_id=1" in output
+    assert (
+        "expected rows of orders_1 differ: 1 missing, 1 extra (1 expected, 1 actual)" in output
+    ), output
+    assert "order_id: expected 1, actual 2" not in output, output
     assert "__sqb_cte_" not in output
 
 

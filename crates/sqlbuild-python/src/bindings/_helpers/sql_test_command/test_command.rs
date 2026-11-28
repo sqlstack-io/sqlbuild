@@ -1,11 +1,13 @@
 //! `sqb test`: compile the selected SQL unit tests, inspect or run them, and report; locally, then run the Python tests.
 
 use sqlbuild_python_base::native_host::models::Dialect;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Instant;
 
+use crate::bindings::_helpers::scenario_command::presentation::child_records;
+use pyo3::IntoPyObject;
 use pyo3::prelude::{
     Bound, Py, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
 };
@@ -14,26 +16,41 @@ use pyo3::{pyclass, pyfunction, pymethods, wrap_pyfunction};
 use sqlbuild_analysis::definition_changes::models::{ExecutedItem, SelectedItem};
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_core::progress::main::statement_summary_delta::statement_summary_delta;
+use sqlbuild_core::progress::models::ExpectationStep;
 use sqlbuild_core::progress::models::StatementSummary;
 use sqlbuild_core::run_on::main::apply_local_refusals::apply_local_refusals;
+use sqlbuild_core::run_on::main::execution_engines::execution_engines;
 use sqlbuild_core::run_on::main::read_run_on_decisions::read_run_on_decisions;
-use sqlbuild_core::run_on::main::render_local_refusals::render_local_refusals;
-use sqlbuild_core::run_on::main::render_warehouse_census::render_warehouse_census;
-use sqlbuild_core::run_on::main::run_on_column::run_on_column;
+use sqlbuild_core::run_on::main::refusal_causes::refusal_causes;
+use sqlbuild_core::run_on::main::relied_on_text::relied_on_text;
+use sqlbuild_core::run_on::main::render_refusal_report::render_refusal_report;
+use sqlbuild_core::run_on::main::run_on_header::run_on_header;
 use sqlbuild_core::run_on::main::with_run_on_json::with_run_on_json;
 use sqlbuild_core::run_on::models::{LocalRefusal, RunOn, RunOnDecision};
-use sqlbuild_core::test_command::main::render_test_completion::render_test_completion;
+use sqlbuild_core::run_output::main::render_cant_run_rollup::render_cant_run_rollup;
+use sqlbuild_core::run_output::main::render_failed_list::render_failed_list;
+use sqlbuild_core::run_output::main::render_failures::render_failures;
+use sqlbuild_core::run_output::main::render_moved_note::render_moved_note;
+use sqlbuild_core::run_output::main::render_run_completion::render_run_completion;
+use sqlbuild_core::run_output::main::render_run_header::render_run_header;
+use sqlbuild_core::run_output::models::{FailureEntry, HeaderCause, RunCounts};
+use sqlbuild_core::test_command::main::expectation_child_rows::expectation_child_rows;
 use sqlbuild_core::test_command::main::render_test_inspection::render_test_inspection;
-use sqlbuild_core::test_command::main::render_test_ready::render_test_ready;
 use sqlbuild_core::test_command::main::test_exit_code::test_exit_code;
+use sqlbuild_core::test_command::main::test_failure_entry::test_failure_entry;
 use sqlbuild_core::test_command::main::test_group_name::test_group_name;
 use sqlbuild_core::test_command::main::test_name_width::test_name_width;
 use sqlbuild_core::test_command::main::test_outcome_status::test_outcome_status;
-use sqlbuild_core::test_command::models::{TestFailure, TestInspectionEntry, TestPlanWarning};
+use sqlbuild_core::test_command::models::{TestFailureFacts, TestInspectionEntry, TestPlanWarning};
 use sqlbuild_host::entries::models::ExecutorHost;
-use sqlbuild_host::models::{SqlTestExecutionResult, SqlTestOutcome};
+use sqlbuild_host::models::{
+    SqlTestColumnDifference, SqlTestDifferenceSample, SqlTestExecutionResult, SqlTestOutcome,
+};
 use sqlbuild_host::types::ResultEnum;
 use sqlbuild_orchestration::runs::models::NodeOutcome;
+use sqlbuild_python_base::build_progress::main::terminal::known_terminal_columns::known_terminal_columns;
+use sqlbuild_python_base::build_progress::main::terminal::terminal_columns::terminal_columns;
+use sqlbuild_python_base::build_progress::models::NativeProgressProjector;
 
 use crate::bindings::_helpers::change_selection::base_snapshot::BaseComparison;
 use crate::bindings::_helpers::change_selection::base_snapshot::base_comparison;
@@ -78,8 +95,6 @@ use sqlbuild_python_compile::compile_outputs::main::planned_sql_test_path::plann
 use sqlbuild_python_compile::compile_outputs::main::write_test_runtime_target::write_test_runtime_target;
 use sqlbuild_python_front::command_runtime::main::resolve_concurrency::resolve_concurrency;
 use sqlbuild_python_front::command_runtime::main::resolve_run_on::resolve_run_on;
-use sqlbuild_python_output::build_progress::main::format_expectation_detail::format_expectation_detail;
-use sqlbuild_python_output::build_progress::main::format_expectation_name::format_expectation_name;
 use sqlbuild_python_output::build_progress::main::local_attempt::local_attempt;
 use sqlbuild_python_output::build_progress::main::test_label::test_label;
 use sqlbuild_python_output::build_progress::main::test_result_label::test_result_label;
@@ -100,7 +115,8 @@ use sqlbuild_python_project::project_snapshot::types::VerifiedRun;
 type SelectionReasons = HashMap<String, Vec<String>>;
 /// What a `--since` selection kept: the narrowed pipeline, reasons by label, and its JSON section.
 type ChangedSelection<'py> = (Bound<'py, PyAny>, SelectionReasons, String);
-const EXPECT_LABEL: &str = "expect";
+/// The error of a test whose expectations failed; its child rows already say which.
+const EXPECTATIONS_FAILED_CODE: &str = "T003";
 const UNKNOWN_GROUP: &str = "(unknown)";
 const EXECUTION_COMMAND: &str = "sqb test";
 const UNKNOWN_CASE_CODE: &str = "S008";
@@ -113,6 +129,7 @@ const CANNOT_RUN_LOCALLY_MESSAGE: &str = "can't run locally";
 const NEEDS_WAREHOUSE_CODE: &str = "T008";
 const NEEDS_WAREHOUSE_MESSAGE: &str = "needs the warehouse (no connection)";
 const COMPILED_TESTS_DIR: &str = "target/run/tests";
+/// The child row name of the expected rows of the model a test is grouped under.
 const JSON_CHECK_NAME_KEYS: [&str; 3] = ["test_name", "name", "resource_name"];
 
 fn text<'py>(py: Python<'py>, value: &str) -> Bound<'py, PyAny> {
@@ -123,30 +140,39 @@ fn strings(values: Bound<'_, PyAny>) -> PyResult<Vec<String>> {
     values.try_iter()?.map(|value| value?.extract()).collect()
 }
 
-/// The shared name column width of test rows and their expectation rows.
+/// The widest name a test row shows: without its group's prefix when the group has a header.
 fn name_width(entries: &Bound<'_, PyAny>) -> PyResult<usize> {
-    let mut labels: Vec<String> = Vec::new();
+    let counts: HashMap<String, usize> = group_counts(entries)?;
+    let mut labels: Vec<(String, String)> = Vec::new();
     let mut children: Vec<String> = Vec::new();
     for entry in entries.try_iter()? {
         let entry: Bound<'_, PyAny> = entry?;
-        labels.push(test_label(&entry, "name")?);
         for step in entry.getattr("chain")?.try_iter()? {
             let step: Bound<'_, PyAny> = step?;
-            if step.getattr("expected_cte_sql")?.is_truthy()? {
-                children.push(format!(
-                    "expected {}",
-                    step.getattr("model_name")?.extract::<String>()?
-                ));
+            if !step.getattr("expected_cte_sql")?.is_none() {
+                children.push(step.getattr("model_name")?.extract()?);
             }
         }
         for assertion in entry.getattr("assertions")?.try_iter()? {
-            children.push(format!(
-                "assertion {}",
-                assertion?.getattr("name")?.extract::<String>()?
-            ));
+            children.push(assertion?.getattr("name")?.extract()?);
         }
+        let group: String = entry_group(&entry)?;
+        let headed: bool = counts.get(&group).copied().unwrap_or(0) > 1;
+        labels.push((
+            test_label(&entry, "name")?,
+            if headed { group } else { String::new() },
+        ));
     }
     Ok(test_name_width(&labels, &children))
+}
+
+/// How many selected tests each group header heads.
+fn group_counts(entries: &Bound<'_, PyAny>) -> PyResult<HashMap<String, usize>> {
+    let mut counts: HashMap<String, usize> = HashMap::new();
+    for entry in entries.try_iter()? {
+        *counts.entry(entry_group(&entry?)?).or_default() += 1;
+    }
+    Ok(counts)
 }
 
 fn outcome_status(outcome: &Bound<'_, PyAny>) -> PyResult<&'static str> {
@@ -162,41 +188,20 @@ fn test_outcome(outcome: &Bound<'_, PyAny>) -> PyResult<Option<SqlTestOutcome>> 
     ))
 }
 
-/// Nested `expect` rows of a completed test, one per step.
+/// One child row per step: `expected rows`, `expected <model>` for another model, or `assertion <name>`.
 fn expectation_rows<'py>(result: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyTuple>> {
-    let py: Python<'py> = result.py();
-    let mut rows: Vec<Bound<'py, PyAny>> = Vec::new();
-    for step in result.getattr("step_results")?.try_iter()? {
-        let step: Bound<'py, PyAny> = step?;
-        rows.push(new_record_with(
-            py,
-            RecordId::NestedProgressChildRow,
-            &[
-                ("label", text(py, EXPECT_LABEL)),
-                (
-                    "name",
-                    text(
-                        py,
-                        &format_expectation_name(&step.getattr("model_name")?.extract::<String>()?),
-                    ),
-                ),
-                (
-                    "status_text",
-                    text(py, outcome_status(&step.getattr("outcome")?)?),
-                ),
-                ("detail", text(py, &format_expectation_detail(&step)?)),
-            ],
-        )?);
-    }
-    PyTuple::new(py, rows)
+    child_records(
+        result.py(),
+        &expectation_child_rows(&expectation_steps(&SqlTestExecutionResult::read(result)?)),
+    )
 }
 
 /// `N real models` for a model test, else empty.
 fn real_model_detail(result: &Bound<'_, PyAny>) -> PyResult<String> {
     let count: Option<usize> = native_field(result, "real_model_count")?.extract()?;
     Ok(match count {
-        Some(1) => "  1 real model".to_owned(),
-        Some(count) => format!("  {count} real models"),
+        Some(1) => "1 real model".to_owned(),
+        Some(count) => format!("{count} real models"),
         None => String::new(),
     })
 }
@@ -220,6 +225,8 @@ struct TestCallbackRelay {
     worker: Option<Arc<WorkerBuild>>,
     /// Where each test runs, by test name; a local test that falls back becomes `warehouse`.
     run_on: Mutex<HashMap<String, String>>,
+    /// What each local test relied on from the project, by test name, for its row.
+    relied_on: HashMap<String, String>,
     /// In `auto`, a local test DuckDB can't run as the warehouse would runs there instead, unreported.
     fallback: bool,
     progress: Py<PyAny>,
@@ -242,6 +249,13 @@ impl TestCallbackRelay {
                 ("canonical_resource_name", entry.getattr("name")?),
             ],
         )?;
+        Ok(())
+    }
+
+    fn on_test_finished(&self, py: Python<'_>, entry: &Bound<'_, PyAny>) -> PyResult<()> {
+        self.progress
+            .bind(py)
+            .call_method1("on_item_finished", (test_label(entry, "name")?,))?;
         Ok(())
     }
 
@@ -273,17 +287,32 @@ impl TestCallbackRelay {
             worker.finish_attached(py, &identity, outcome)?;
         }
         let resource_id: Bound<'_, PyAny> = text(py, &identity);
+        let error_code: Option<String> = result.getattr("error_code")?.extract()?;
+        let not_run: bool = matches!(
+            error_code.as_deref(),
+            Some(CANNOT_RUN_LOCALLY_CODE | NEEDS_WAREHOUSE_CODE)
+        );
+        let children: Bound<'_, PyTuple> = expectation_rows(result)?;
+        let placement: (String, String) = self.placement(result)?;
+        let error = |name: &str| -> PyResult<Bound<'_, PyAny>> {
+            if error_code.as_deref() == Some(EXPECTATIONS_FAILED_CODE) && children.len()? > 0 {
+                return Ok(py.None().into_bound(py));
+            }
+            result.getattr(name)
+        };
         call_with(
             &self.progress.bind(py).getattr("on_item_complete")?,
             &[
                 ("group_name", text(py, &group)),
                 ("item_name", text(py, &test_label(result, "test_name")?)),
                 ("status_text", text(py, status)),
-                ("child_rows", expectation_rows(result)?.into_any()),
-                ("detail", text(py, &self.detail(result)?)),
-                ("error_code", result.getattr("error_code")?),
-                ("error_help", result.getattr("error_help")?),
-                ("error_message", result.getattr("error_message")?),
+                ("child_rows", children.clone().into_any()),
+                ("run_on", text(py, &placement.0)),
+                ("detail", text(py, &placement.1)),
+                ("not_run", PyBool::new(py, not_run).to_owned().into_any()),
+                ("error_code", error("error_code")?),
+                ("error_help", error("error_help")?),
+                ("error_message", error("error_message")?),
                 ("canonical_resource_name", result.getattr("test_name")?),
                 ("canonical_resource_id", resource_id),
             ],
@@ -327,17 +356,25 @@ impl TestCallbackRelay {
 }
 
 impl TestCallbackRelay {
-    /// The run-on column, then `N real models`.
-    fn detail(&self, result: &Bound<'_, PyAny>) -> PyResult<String> {
+    /// Where the test ran (`local`, `warehouse` or undecided), then what it relied on and `N real models`.
+    fn placement(&self, result: &Bound<'_, PyAny>) -> PyResult<(String, String)> {
         let name: String = result.getattr("test_name")?.extract()?;
         let real: String = real_model_detail(result)?;
         let run_on = self.run_on.lock().unwrap_or_else(PoisonError::into_inner);
-        Ok(match run_on.get(&name) {
-            Some(run_on) => format!("  {}{real}", run_on_column(run_on))
-                .trim_end()
-                .to_owned(),
+        let placed: Option<&String> = run_on.get(&name);
+        let relied: Option<&String> = match placed {
+            Some(placed) if placed == LOCAL_RUN_ON => self.relied_on.get(&name),
+            _ => None,
+        };
+        let detail: String = match relied {
+            Some(relied) if real.is_empty() => relied.clone(),
+            Some(relied) => format!("{relied}  {real}"),
             None => real,
-        })
+        };
+        let shown: String = placed.map_or_else(String::new, |run_on| {
+            run_on.split("  ").next().unwrap_or_default().to_owned()
+        });
+        Ok((shown, detail))
     }
 
     fn connection_call(
@@ -593,6 +630,8 @@ pub(crate) struct TestPlacement<'py> {
     warehouse: Vec<Bound<'py, PyAny>>,
     /// Where each test runs, by name, for its row.
     run_on: HashMap<String, String>,
+    /// What each local test relied on from the project, by name, for its row.
+    relied_on: HashMap<String, String>,
     /// In `auto`, warehouse tests without a connection become error rows instead of failing the run.
     warehouse_optional: bool,
 }
@@ -608,25 +647,15 @@ type RanTests<'py> = (
 fn run_tests<'py>(
     invocation: &Bound<'py, PyAny>,
     pipeline: &Bound<'py, PyAny>,
-    (concurrency, timeout, worker): (i64, &RunTimeout, Option<Arc<WorkerBuild>>),
+    ((concurrency, timeout), worker, verbose): ((i64, &RunTimeout), Option<Arc<WorkerBuild>>, bool),
     placement: TestPlacement<'py>,
 ) -> PyResult<RanTests<'py>> {
     let py: Python<'py> = invocation.py();
     let stream: Bound<'py, PyAny> = invocation.getattr("progress_stream")?;
     let use_color: Bound<'py, PyAny> = invocation.getattr("use_color")?;
-    let style: CliStyle = CliStyle {
-        use_color: use_color.is_truthy()?,
-    };
     let plan_output: Bound<'py, PyAny> = pipeline.getattr("plan_output")?;
     let entries: Bound<'py, PyAny> = plan_output.getattr("test_entries")?;
     let test_count: usize = entries.len()?;
-    let mut models: BTreeSet<String> = BTreeSet::new();
-    for entry in entries.try_iter()? {
-        for step in entry?.getattr("chain")?.try_iter()? {
-            models.insert(step?.getattr("model_name")?.extract()?);
-        }
-    }
-    let worker_count: i64 = concurrency.min(i64::try_from(test_count).unwrap_or(i64::MAX));
     let progress: Bound<'py, PyAny> = Bound::new(
         py,
         NestedCommandProgressCallbacks::new(
@@ -642,7 +671,11 @@ fn run_tests<'py>(
                         "name_width",
                         PyInt::new(py, name_width(&entries)?).into_any(),
                     ),
-                    ("concurrency", PyInt::new(py, worker_count).into_any()),
+                    (
+                        "group_counts",
+                        group_counts(&entries)?.into_pyobject(py)?.into_any(),
+                    ),
+                    ("verbose", PyBool::new(py, verbose).to_owned().into_any()),
                 ],
             )?),
         )?,
@@ -650,6 +683,7 @@ fn run_tests<'py>(
     .into_any();
     let projector: Bound<'py, PyAny> = current_native_progress_projector(py)?;
     if !projector.is_none() {
+        projector.call_method0("quiet_enriched_resources")?;
         for entry in entries.try_iter()? {
             call_with(
                 &projector.getattr("expect_resource_enrichment")?,
@@ -657,11 +691,6 @@ fn run_tests<'py>(
             )?;
         }
     }
-    stream.call_method1(
-        "write",
-        (render_test_ready((test_count, models.len()), style),),
-    )?;
-    stream.call_method0("flush")?;
     let connection: Bound<'py, PyAny> = Bound::new(
         py,
         ConnectionProgressReporter::new(
@@ -686,6 +715,7 @@ fn run_tests<'py>(
         local_names,
         mut warehouse,
         run_on,
+        relied_on,
         warehouse_optional,
     } = placement;
     let mut refused_locally: Vec<(String, LocalRefusal)> = Vec::new();
@@ -694,6 +724,7 @@ fn run_tests<'py>(
         TestCallbackRelay {
             worker,
             run_on: Mutex::new(run_on),
+            relied_on,
             fallback: warehouse_optional,
             progress: progress.unbind(),
             event_writer: event_writer.clone().unbind(),
@@ -727,6 +758,7 @@ fn run_tests<'py>(
                     preflight.getattr("report_preflight_progress")?,
                 ),
                 ("on_test_start", relay.getattr("on_test_start")?),
+                ("on_test_finished", relay.getattr("on_test_finished")?),
                 ("on_test_complete", relay.getattr("on_test_complete")?),
             ];
             if reporting_connection {
@@ -902,9 +934,75 @@ struct RunOnReport {
     decisions: Vec<RunOnDecision>,
     local_statements: StatementSummary,
     verbose: bool,
+    /// Each test's compiled SQL under `target/run/tests/`, by name.
+    compiled_paths: HashMap<String, String>,
+    /// The tests the header already said can't run locally, before any ran.
+    header_refused: HashSet<String>,
 }
 
-/// Write the summary, failures, statements and refusals; returns the exit code and the `--json` document.
+/// A differing column as its name, actual and expected value.
+fn column_difference(difference: &SqlTestColumnDifference) -> (String, String, String) {
+    (
+        difference.name.clone(),
+        difference.actual.clone(),
+        difference.expected.clone(),
+    )
+}
+
+/// The cells of each differing row sample.
+fn sample_values(samples: &[SqlTestDifferenceSample]) -> Vec<Vec<(String, String)>> {
+    samples.iter().map(|sample| sample.values.clone()).collect()
+}
+
+/// Each step of a result as the failure detail reads it.
+fn expectation_steps(result: &SqlTestExecutionResult<Bound<'_, PyAny>>) -> Vec<ExpectationStep> {
+    result
+        .step_results
+        .iter()
+        .map(|step| ExpectationStep {
+            model_name: step.model_name.clone(),
+            outcome: step.outcome.value().to_owned(),
+            actual_row_count: step.actual_row_count,
+            expected_row_count: step.expected_row_count,
+            mismatched_row_count: step.mismatched_row_count,
+            unexpected_row_count: step.unexpected_row_count,
+            missing_row_count: step.missing_row_count,
+            unexpected_samples: sample_values(&step.unexpected_samples),
+            missing_samples: sample_values(&step.missing_samples),
+            column_differences: step
+                .column_differences
+                .iter()
+                .map(column_difference)
+                .collect(),
+        })
+        .collect()
+}
+
+/// `path` relative to the project directory when it is inside it, with `/` separators.
+fn project_path(path: &std::path::Path, project_dir: &std::path::Path) -> String {
+    path.strip_prefix(project_dir)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .replace('\\', "/")
+}
+
+/// How many tests ran locally, on the warehouse, and could not run locally.
+fn run_split(report: &RunOnReport) -> (usize, usize, usize) {
+    let refused: usize = report
+        .decisions
+        .iter()
+        .filter(|decision| report.mode == RunOn::Local && !decision.refusals.is_empty())
+        .count();
+    let local: usize = report
+        .decisions
+        .iter()
+        .filter(|decision| decision.run_on == LOCAL_RUN_ON)
+        .count()
+        - refused;
+    (local, report.decisions.len() - local - refused, refused)
+}
+
+/// Write the failures, refusals, failed list, detail and summary lines; returns the exit code and `--json`.
 fn complete(
     invocation: &Bound<'_, PyAny>,
     (results, since_json): (&[SqlTestExecutionResult<Bound<'_, PyAny>>], Option<&str>),
@@ -912,58 +1010,140 @@ fn complete(
     report: &RunOnReport,
 ) -> PyResult<(i32, String)> {
     let py: Python<'_> = invocation.py();
-    let mut failures: Vec<TestFailure> = Vec::new();
-    let mut failed: usize = 0;
+    let project_dir: PathBuf = native_field(invocation, "effective_project_dir")?.extract()?;
+    let projector: Option<Bound<'_, NativeProgressProjector>> =
+        current_projector(py)?.map(|projector| projector.into_bound(py));
+    let mut counts: RunCounts = RunCounts {
+        total: results.len(),
+        ..RunCounts::default()
+    };
+    let mut entries: Vec<FailureEntry> = Vec::new();
+    let mut failed: Vec<(String, String)> = Vec::new();
+    let mut not_run: Vec<&str> = Vec::new();
     for result in results {
         if result.outcome == SqlTestOutcome::Pass {
+            counts.pass += 1;
             continue;
         }
-        failed += 1;
-        if matches!(
-            result.error_code.as_deref(),
-            Some(CANNOT_RUN_LOCALLY_CODE | NEEDS_WAREHOUSE_CODE)
-        ) {
+        if let Some(code @ (CANNOT_RUN_LOCALLY_CODE | NEEDS_WAREHOUSE_CODE)) =
+            result.error_code.as_deref()
+        {
+            counts.not_run += 1;
+            not_run.push(code);
             continue;
         }
-        failures.push(TestFailure {
-            label: test_result_label(result)?,
-            error_message: result.error_message.clone(),
+        let timed_out: bool = result.outcome == SqlTestOutcome::Timeout;
+        if timed_out {
+            counts.timeout += 1;
+        } else {
+            counts.fail += 1;
+        }
+        let statement: Option<(String, String)> = match &projector {
+            Some(projector) => projector.get().failed_statement(&result.test_name)?,
+            None => None,
+        };
+        let facts: TestFailureFacts = TestFailureFacts {
+            name: test_result_label(result)?,
+            kind: TEST_NOUNS.0.to_owned(),
+            run_on: report
+                .decisions
+                .iter()
+                .find(|decision| decision.name == result.test_name)
+                .map_or_else(String::new, |decision| decision.run_on.clone()),
             error_code: result.error_code.clone(),
+            error_message: result.error_message.clone(),
             error_help: result.error_help.clone(),
-        });
+            timed_out,
+            steps: expectation_steps(result),
+            compiled_path: statement
+                .as_ref()
+                .and_then(|_| report.compiled_paths.get(&result.test_name).cloned()),
+            statement,
+            source_path: result
+                .source_path
+                .as_deref()
+                .map(|path| project_path(path, &project_dir)),
+        };
+        let (entry, reason) = test_failure_entry(&facts);
+        failed.push((entry.name.clone(), reason));
+        entries.push(entry);
     }
-    let passed: usize = results.len() - failed;
-    let local: usize = report
-        .decisions
-        .iter()
-        .filter(|decision| decision.run_on == LOCAL_RUN_ON)
-        .count();
-    let split: (usize, usize) = (local, report.decisions.len() - local);
     let stream: Bound<'_, PyAny> = invocation.getattr("progress_stream")?;
     let style: CliStyle = CliStyle {
         use_color: invocation.getattr("use_color")?.is_truthy()?,
     };
-    let completion: String =
-        render_test_completion((passed, results.len()), &failures, Some(split), style);
-    emit(&stream, &completion)?;
+    let columns: Option<usize> = known_terminal_columns(py)?;
+    let mut text: String = String::new();
+    let causes: Vec<HeaderCause> = refusal_causes(&report.decisions);
+    if !not_run.is_empty() && report.mode == RunOn::Local {
+        text.push_str(&render_cant_run_rollup(not_run.len(), &causes, style));
+    }
+    let moved: Vec<RunOnDecision> = report
+        .decisions
+        .iter()
+        .filter(|decision| {
+            report.mode == RunOn::Auto
+                && !decision.refusals.is_empty()
+                && !report.header_refused.contains(&decision.name)
+        })
+        .cloned()
+        .collect();
+    if !moved.is_empty() {
+        text.push_str(&render_moved_note(
+            moved.len(),
+            &refusal_causes(&moved),
+            TEST_NOUNS,
+            style,
+        ));
+    }
+    if not_run.contains(&NEEDS_WAREHOUSE_CODE) {
+        text.push_str(&format!(
+            "\n{}\n",
+            style.muted(&format!(
+                "  Not run ({}): {NEEDS_WAREHOUSE_MESSAGE}",
+                not_run
+                    .iter()
+                    .filter(|code| **code == NEEDS_WAREHOUSE_CODE)
+                    .count()
+            ))
+        ));
+    }
+    text.push_str(&render_failures(&entries, columns, style));
+    text.push_str(&refusal_report(report, (columns, style)));
+    text.push_str(&render_failed_list(&failed, report.verbose, style));
+    let (local, warehouse, refused) = run_split(report);
+    let mut split: Vec<String> = Vec::new();
+    if local > 0 {
+        split.push(format!("{local} local"));
+    }
+    if warehouse > 0 {
+        split.push(format!("{warehouse} on the warehouse"));
+    }
+    if refused > 0 {
+        split.push(format!("{refused} can't run locally"));
+    }
+    let mut details: Vec<String> = vec![split.join(", ")];
     let statements: Option<StatementReport> =
         StatementReport::of_invocation(invocation, started, &report.local_statements)?;
     if let Some(line) = statements.as_ref().and_then(StatementReport::line) {
-        emit(&stream, &format!("\n{line}\n"))?;
+        details.push(line);
     }
-    let refusals: String = refusal_report(report, style);
-    if !refusals.is_empty() {
-        emit(&stream, &refusals)?;
-    }
+    text.push_str(&render_run_completion(
+        &counts,
+        &details,
+        started.elapsed().as_secs_f64(),
+        style,
+    ));
+    emit(&stream, &text)?;
     let payload: String = with_run_on_json(
         &with_since_section(test_execution_json(py, results)?, since_json)?,
         ("checks", &JSON_CHECK_NAME_KEYS),
         &report.decisions,
-        split,
+        (local + refused, warehouse),
     )
     .map_err(value_error)?;
     Ok((
-        test_exit_code(passed, results.len()),
+        test_exit_code(counts.pass, results.len()),
         match statements {
             Some(statements) => statements.with_section(&payload)?,
             None => payload,
@@ -971,15 +1151,23 @@ fn complete(
     ))
 }
 
-/// `local`: every refusal as a diagnostic; `auto`: a census, or the diagnostics with `--verbose`.
-fn refusal_report(report: &RunOnReport, style: CliStyle) -> String {
+/// `local`: every refusal as an error; `auto` with `--verbose`: the same blocks as notes; else nothing.
+fn refusal_report(report: &RunOnReport, (columns, style): (Option<usize>, CliStyle)) -> String {
     match report.mode {
         RunOn::Warehouse => String::new(),
-        RunOn::Local => render_local_refusals(&report.decisions, true, TEST_NOUNS, style),
-        RunOn::Auto if report.verbose => {
-            render_local_refusals(&report.decisions, false, TEST_NOUNS, style)
-        }
-        RunOn::Auto => render_warehouse_census(&report.decisions, TEST_NOUNS, style),
+        RunOn::Local => render_refusal_report(
+            &report.decisions,
+            (true, report.verbose),
+            TEST_NOUNS,
+            (columns, style),
+        ),
+        RunOn::Auto if report.verbose => render_refusal_report(
+            &report.decisions,
+            (false, true),
+            TEST_NOUNS,
+            (columns, style),
+        ),
+        RunOn::Auto => String::new(),
     }
 }
 
@@ -1171,7 +1359,8 @@ fn run_sql_tests<'py>(
     {
         return Err(error.clone_ref(py));
     }
-    let decisions: Vec<RunOnDecision> = decide(invocation, &pipeline, mode)?;
+    let (decisions, compiled_paths): (Vec<RunOnDecision>, HashMap<String, String>) =
+        decide(invocation, &pipeline, mode)?;
     if inspect_only {
         let style: CliStyle = CliStyle {
             use_color: invocation.getattr("use_color")?.is_truthy()?,
@@ -1184,7 +1373,12 @@ fn run_sql_tests<'py>(
         if mode != RunOn::Warehouse {
             emit(
                 &stream,
-                &render_local_refusals(&decisions, mode == RunOn::Local, TEST_NOUNS, style),
+                &render_refusal_report(
+                    &decisions,
+                    (mode == RunOn::Local, true),
+                    TEST_NOUNS,
+                    (Some(terminal_columns(py)?), style),
+                ),
             )?;
         }
         return Ok((code, python_tests, None));
@@ -1210,13 +1404,37 @@ fn run_sql_tests<'py>(
         &request.getattr("selected_target")?,
     )?
     .limit;
-    stream.call_method1("write", ("\n",))?;
+    let (placement, mut decisions): (TestPlacement<'_>, Vec<RunOnDecision>) = place_tests(
+        &pipeline.getattr("plan_output")?.getattr("test_entries")?,
+        (mode, decisions),
+        connection_error.is_some(),
+    )?;
+    let style: CliStyle = CliStyle {
+        use_color: invocation.getattr("use_color")?.is_truthy()?,
+    };
+    let explain: bool = native_field(request, "explain")?.is_truthy()?;
+    stream.call_method1(
+        "write",
+        (format!(
+            "\n{}\n",
+            render_run_header(
+                &run_on_header(&decisions, (mode, explain), ("Tests", TEST_NOUNS)),
+                terminal_columns(py)?,
+                style
+            )
+        ),),
+    )?;
     let header: Bound<'_, PyDict> = PyDict::new(py);
     header.set_item("stream", &stream)?;
     header.set_item("command", EXECUTION_COMMAND)?;
     header.set_item("target", py.None())?;
     header.set_item("concurrency", concurrency)?;
     header.set_item("use_color", invocation.getattr("use_color")?)?;
+    let adapter_name: String = native_field(invocation, "adapter_name")?.extract()?;
+    header.set_item(
+        "engines",
+        execution_engines(&decisions, mode, &adapter_name),
+    )?;
     write_execution_header(py, Some(header))?;
     let timeout: RunTimeout = resolve_run_timeout(
         (
@@ -1226,17 +1444,18 @@ fn run_sql_tests<'py>(
         request.getattr("test_timeout")?.extract()?,
         TimeoutKind::Test,
     )?;
-    let (placement, mut decisions): (TestPlacement<'_>, Vec<RunOnDecision>) = place_tests(
-        &pipeline.getattr("plan_output")?.getattr("test_entries")?,
-        (mode, decisions),
-        connection_error.is_some(),
-    )?;
+    let verbose: bool = native_field(request, "verbose")?.is_truthy()?;
     let (results, local_statements, refused_locally): RanTests<'_> = run_tests(
         invocation,
         &pipeline,
-        (concurrency, &timeout, worker),
+        ((concurrency, &timeout), worker, verbose),
         placement,
     )?;
+    let header_refused: HashSet<String> = decisions
+        .iter()
+        .filter(|decision| !decision.refusals.is_empty())
+        .map(|decision| decision.name.clone())
+        .collect();
     apply_local_refusals(&mut decisions, refused_locally, mode);
     write_test_runtime_target(
         (
@@ -1255,18 +1474,20 @@ fn run_sql_tests<'py>(
             mode,
             decisions,
             local_statements,
-            verbose: native_field(request, "verbose")?.is_truthy()?,
+            verbose,
+            compiled_paths,
+            header_refused,
         },
     )?;
     Ok((code, python_tests, Some(payload)))
 }
 
-/// Each selected test's run-on decision, from the local runner.
+/// Each selected test's run-on decision, from the local runner, and its compiled SQL path by name.
 fn decide(
     invocation: &Bound<'_, PyAny>,
     pipeline: &Bound<'_, PyAny>,
     mode: RunOn,
-) -> PyResult<Vec<RunOnDecision>> {
+) -> PyResult<(Vec<RunOnDecision>, HashMap<String, String>)> {
     let py: Python<'_> = invocation.py();
     let entries: Bound<'_, PyAny> = pipeline.getattr("plan_output")?.getattr("test_entries")?;
     let paths: Bound<'_, PyDict> = PyDict::new(py);
@@ -1288,12 +1509,19 @@ fn decide(
                 "project_dir",
                 native_field(invocation, "effective_project_dir")?,
             ),
-            ("compiled_paths", paths.into_any()),
+            ("compiled_paths", paths.clone().into_any()),
             ("run_on", text(py, mode.as_str())),
+            (
+                "discovered_inputs",
+                native_field(invocation, "discovered_inputs")?,
+            ),
         ],
     )?
     .extract()?;
-    read_run_on_decisions(&json).map_err(value_error)
+    Ok((
+        read_run_on_decisions(&json).map_err(value_error)?,
+        paths.extract()?,
+    ))
 }
 
 /// Split the tests by `mode` and their decisions, and say where each one ran.
@@ -1308,6 +1536,7 @@ fn place_tests<'py>(
         local_names: Vec::new(),
         warehouse: Vec::new(),
         run_on: HashMap::new(),
+        relied_on: HashMap::new(),
         warehouse_optional: mode == RunOn::Auto,
     };
     let mut placed: Vec<RunOnDecision> = Vec::with_capacity(decisions.len());
@@ -1321,7 +1550,7 @@ fn place_tests<'py>(
             .unwrap_or_else(|| RunOnDecision {
                 name: name.clone(),
                 run_on: WAREHOUSE_RUN_ON.to_owned(),
-                refusals: Vec::new(),
+                ..RunOnDecision::default()
             });
         match mode {
             RunOn::Warehouse => {
@@ -1346,6 +1575,9 @@ fn place_tests<'py>(
                     .push((entry, NEEDS_WAREHOUSE_CODE, NEEDS_WAREHOUSE_MESSAGE))
             }
             RunOn::Auto => placement.warehouse.push(entry),
+        }
+        if let Some(relied) = relied_on_text(&decision.relied_on) {
+            placement.relied_on.insert(name.clone(), relied);
         }
         placement.run_on.insert(name, decision.run_on.clone());
         placed.push(decision);
@@ -1392,13 +1624,13 @@ fn format_parameterized_test_label(
     test_label(&item, "name")
 }
 
-/// Resolve one shared width for test rows and nested expectation rows.
+/// The widest name a test row shows, without its group's prefix.
 #[pyfunction]
 fn resolve_test_name_width(test_entries: &Bound<'_, PyAny>) -> PyResult<usize> {
     name_width(test_entries)
 }
 
-/// Build nested expectation rows for a completed SQL unit test.
+/// Build the child rows of a completed SQL unit test.
 #[pyfunction]
 fn build_test_expectation_rows<'py>(result: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyTuple>> {
     expectation_rows(result)

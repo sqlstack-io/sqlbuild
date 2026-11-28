@@ -6,6 +6,8 @@ pub(crate) const MAX_KEY_CHARS: usize = 256;
 pub(crate) const MAX_SHAPE_BYTES: usize = 8 * 1024;
 pub(crate) const ACKNOWLEDGED: &str = "attention.acknowledged";
 pub(crate) const WITHDRAWN: &str = "attention.acknowledgement_withdrawn";
+/// A skipped stored event's problem dismissed for good; the skip stays in the history.
+pub(crate) const SKIP_DISMISSED: &str = "attention.skipped_event_dismissed";
 pub(crate) const MAX_REASON_CHARS: usize = 200;
 /// The `attention_snooze` that removes the time limit.
 pub(crate) const NO_TIME_LIMIT: &str = "0";

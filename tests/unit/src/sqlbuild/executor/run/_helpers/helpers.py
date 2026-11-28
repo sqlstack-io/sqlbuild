@@ -156,6 +156,9 @@ class FakeCursorAdapter:
         del cursor_type
         return expression
 
+    def render_cursor_bound(self, *, function: str, operand: str) -> str:
+        return f"{function}({operand})"
+
 
 class RecordingCursorAdapter(FakeCursorAdapter):
     def __init__(self, *, target_relation_exists: bool) -> None:

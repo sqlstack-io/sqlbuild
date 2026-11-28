@@ -204,7 +204,7 @@ pub(crate) fn read_exporters(
     let mut filters: Vec<ExporterFilter> = Vec::new();
     for exporter in exporters.try_iter()? {
         let exporter: Bound<'_, PyAny> = exporter?;
-        if let Ok(native) = exporter.downcast::<BoundEventExporter>() {
+        if let Ok(native) = exporter.cast::<BoundEventExporter>() {
             let native = native.get();
             filters.push(native.filter.clone());
             bound.push(Arc::new(Exporter {
@@ -335,7 +335,7 @@ pub(crate) fn stop_event_exporter_threads(py: Python<'_>) -> PyResult<()> {
         let Ok(worker) = native_field(&thread, WORKER_ATTRIBUTE) else {
             continue;
         };
-        if let Ok(worker) = worker.downcast::<DispatcherWorker>() {
+        if let Ok(worker) = worker.cast::<DispatcherWorker>() {
             worker.get().shared().stop_for_exit(py)?;
             threads.push(thread);
         }

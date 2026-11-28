@@ -43,7 +43,7 @@ fn integer_value(value: &Bound<'_, PyAny>) -> PyResult<PythonValue> {
 
 /// A mapping key as `json.dumps` writes it, or its `TypeError` message.
 fn key_value(key: &Bound<'_, PyAny>) -> PyResult<PythonKey> {
-    if let Ok(text) = key.downcast::<PyString>() {
+    if let Ok(text) = key.cast::<PyString>() {
         return text
             .to_str()
             .map(|text| PythonKey {
@@ -62,7 +62,7 @@ fn scalar_key_text(key: &Bound<'_, PyAny>) -> PyResult<Result<String, String>> {
     if key.is_none() {
         return Ok(Ok("null".to_owned()));
     }
-    if let Ok(flag) = key.downcast::<PyBool>() {
+    if let Ok(flag) = key.cast::<PyBool>() {
         return Ok(Ok(if flag.is_true() { "true" } else { "false" }.to_owned()));
     }
     if key.is_instance_of::<PyInt>() {
@@ -86,7 +86,7 @@ fn dataclass_value(value: &Bound<'_, PyAny>) -> PyResult<PythonValue> {
     let mut entries: Vec<(PythonKey, PythonValue)> = Vec::new();
     for field in fields.try_iter()? {
         let name: Bound<'_, PyAny> = native_field(&field?, "name")?;
-        let item: Bound<'_, PyAny> = value.getattr(name.downcast::<PyString>()?)?;
+        let item: Bound<'_, PyAny> = value.getattr(name.cast::<PyString>()?)?;
         entries.push((key_value(&name)?, python_value(&item, true)?));
     }
     Ok(PythonValue::Object(entries))
@@ -108,7 +108,7 @@ pub(crate) fn python_value(value: &Bound<'_, PyAny>, dataclasses: bool) -> PyRes
                 .collect::<PyResult<_>>()?,
         ));
     }
-    if let Ok(mapping) = value.downcast::<PyDict>() {
+    if let Ok(mapping) = value.cast::<PyDict>() {
         return Ok(PythonValue::Object(
             mapping
                 .iter()
@@ -116,7 +116,7 @@ pub(crate) fn python_value(value: &Bound<'_, PyAny>, dataclasses: bool) -> PyRes
                 .collect::<PyResult<_>>()?,
         ));
     }
-    if let Ok(flag) = value.downcast::<PyBool>() {
+    if let Ok(flag) = value.cast::<PyBool>() {
         return Ok(PythonValue::Bool(flag.is_true()));
     }
     if value.is_instance_of::<PyInt>() {
@@ -125,7 +125,7 @@ pub(crate) fn python_value(value: &Bound<'_, PyAny>, dataclasses: bool) -> PyRes
     if value.is_instance_of::<PyFloat>() {
         return Ok(PythonValue::Float(value.extract::<f64>()?));
     }
-    if let Ok(text) = value.downcast::<PyString>() {
+    if let Ok(text) = value.cast::<PyString>() {
         return text_value(text);
     }
     Ok(PythonValue::Unencodable(format!(

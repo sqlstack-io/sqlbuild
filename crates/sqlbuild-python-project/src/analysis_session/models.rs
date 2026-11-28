@@ -146,8 +146,11 @@ pub struct FamilyRow {
     pub name_pattern: Option<String>,
 }
 
-impl<'py> pyo3::FromPyObject<'py> for FamilyRow {
-    fn extract_bound(value: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for FamilyRow {
+    type Error = pyo3::PyErr;
+
+    fn extract(value: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        let value: &pyo3::Bound<'py, pyo3::PyAny> = &value;
         let (name, pivot_column, value_column, aggregate, data_type, name_pattern): (
             String,
             String,
@@ -254,8 +257,11 @@ pub struct PivotRequestRow {
     pub models: Vec<PivotModelRow>,
 }
 
-impl<'py> pyo3::FromPyObject<'py> for PivotRequestRow {
-    fn extract_bound(value: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for PivotRequestRow {
+    type Error = pyo3::PyErr;
+
+    fn extract(value: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        let value: &pyo3::Bound<'py, pyo3::PyAny> = &value;
         let (
             dialect,
             column_types,

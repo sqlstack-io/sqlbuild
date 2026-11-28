@@ -31,11 +31,12 @@ class ProjectExpectationTestCase:
 
 @dataclass(frozen=True)
 class DiscoveryCaptureTestCase:
-    """A generated project with every feature block and what its discovery capture must hold."""
+    """Generated projects that together hold every feature block, and what their discovery
+    captures must hold between them."""
 
     description: str
     seed: int
-    blocks: tuple[str, ...]
+    block_sets: tuple[tuple[str, ...], ...]
     expected_collections: frozenset[str]
 
 
@@ -71,11 +72,12 @@ class CoverageFailureTestCase:
 
 @dataclass(frozen=True)
 class RenderCaptureTestCase:
-    """A generated project with every feature block and the render kinds its capture proves."""
+    """Generated projects that together hold every feature block, and the render kinds their
+    captures prove between them."""
 
     description: str
     seed: int
-    blocks: tuple[str, ...]
+    block_sets: tuple[tuple[str, ...], ...]
     command: tuple[str, ...]
     expected_kinds: frozenset[str]
 

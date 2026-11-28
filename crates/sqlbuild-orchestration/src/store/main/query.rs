@@ -1,5 +1,6 @@
 //! Execute inside an owned transaction, without blocking an async runtime on SQLite.
 
+use crate::health::main::note_session_cut_off::note_session_cut_off;
 use crate::store::_helpers::database::{postgres_query, sqlite_query};
 use crate::store::errors::ControlError;
 use crate::store::models::{Connection, ControlTransaction, Parameter};
@@ -29,6 +30,9 @@ pub(crate) async fn query(
         }
         Connection::Postgres(mut connection) => {
             let result = postgres_query(&mut connection, sql, parameters).await;
+            if let Err(ControlError::Database(error)) = &result {
+                note_session_cut_off(&transaction.store, error);
+            }
             transaction.connection = Some(Connection::Postgres(connection));
             result?
         }

@@ -3,8 +3,8 @@
 use serde_json::json;
 
 use crate::credentials::models::Action;
-use crate::run_output::_helpers::pages::{page_neighbours, page_rows, page_start};
-use crate::run_output::_helpers::views::view_line_count;
+use crate::run_output::_helpers::reads::pages::{page_neighbours, page_rows, page_start};
+use crate::run_output::_helpers::reads::views::view_line_count;
 use crate::run_output::constants::{DEFAULT_PAGE_ROWS, MAX_PAGE_ROWS};
 use crate::run_output::models::{OutputPage, OutputPageQuery, OutputStore, OutputView, ViewReader};
 use crate::run_output::types::PersonRunRead;

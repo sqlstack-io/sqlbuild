@@ -16,7 +16,7 @@ pub fn ignores_quoted_case(
         return Ok(false);
     }
     let parameters: Bound<'_, PyAny> = mapping_get(connection, SESSION_PARAMETERS)?;
-    let Ok(parameters) = parameters.downcast::<PyDict>() else {
+    let Ok(parameters) = parameters.cast::<PyDict>() else {
         return Ok(false);
     };
     for (key, value) in parameters.iter() {

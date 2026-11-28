@@ -139,7 +139,7 @@ def test_given_provider_usages_when_planning_then_text_and_json_include_selected
                 from sqlbuild.loaders import loader
 
 
-                @loader
+                @loader(write_strategy='replace')
                 def raw_orders(marker_provider: MarkerProvider):
                     '''Test loader raw_orders.'''
                     return [{"order_id": 1, "amount": 10}]
@@ -201,12 +201,11 @@ def test_given_provider_usages_when_planning_then_text_and_json_include_selected
                   - name: raw_orders
                     description: Test source raw_orders.
                     managed: true
-                    write_strategy: table
                     columns:
                       - name: order_id
-                        type: INTEGER
+                        type: BIGINT
                       - name: amount
-                        type: INTEGER
+                        type: BIGINT
                 """
             ).strip()
             + "\n",
@@ -387,7 +386,7 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
                 from sqlbuild.loaders import loader
 
 
-                @loader
+                @loader(write_strategy='replace')
                 def raw_provider_events(ctx, marker_provider: MarkerProvider):
                     '''Test loader raw_provider_events.'''
                     marker_provider.mark(f"load:{marker_provider.label}")
@@ -402,10 +401,9 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
                   - name: raw_provider_events
                     description: Test source raw_provider_events.
                     managed: true
-                    write_strategy: table
                     columns:
                       - name: event_id
-                        type: INTEGER
+                        type: BIGINT
                       - name: label
                         type: VARCHAR
                 """
@@ -550,7 +548,7 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
                     from sqlbuild.loaders import loader
 
 
-                    @loader
+                    @loader(write_strategy='replace')
                     def raw_provider_events(ctx, marker_provider: MarkerProvider):
                         '''Test loader raw_provider_events.'''
                         marker_provider.mark("load")
@@ -565,10 +563,9 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
                       - name: raw_provider_events
                         description: Test source raw_provider_events.
                         managed: true
-                        write_strategy: table
                         columns:
                           - name: event_id
-                            type: INTEGER
+                            type: BIGINT
                     """
                 ).strip()
                 + "\n",
@@ -843,14 +840,14 @@ def test_given_concurrent_provider_backed_nodes_when_running_command_then_share_
                 from sqlbuild.loaders import loader
 
 
-                @loader
+                @loader(write_strategy='replace')
                 def raw_alpha(ctx, concurrent_marker_provider: ConcurrentMarkerProvider):
                     '''Test loader raw_alpha.'''
                     concurrent_marker_provider.mark("alpha")
                     return [{"event_id": 1}]
 
 
-                @loader
+                @loader(write_strategy='replace')
                 def raw_beta(ctx, concurrent_marker_provider: ConcurrentMarkerProvider):
                     '''Test loader raw_beta.'''
                     concurrent_marker_provider.mark("beta")
@@ -865,17 +862,15 @@ def test_given_concurrent_provider_backed_nodes_when_running_command_then_share_
                   - name: raw_alpha
                     description: Test source raw_alpha.
                     managed: true
-                    write_strategy: table
                     columns:
                       - name: event_id
-                        type: INTEGER
+                        type: BIGINT
                   - name: raw_beta
                     description: Test source raw_beta.
                     managed: true
-                    write_strategy: table
                     columns:
                       - name: event_id
-                        type: INTEGER
+                        type: BIGINT
                 """
             ).strip()
             + "\n",

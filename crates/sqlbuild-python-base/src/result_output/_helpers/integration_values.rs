@@ -26,7 +26,7 @@ pub(crate) fn json_value(value: &Bound<'_, PyAny>) -> PyResult<Option<JsonValue>
     if value.is_none() {
         return Ok(Some(JsonValue::Null));
     }
-    if let Ok(flag) = value.downcast::<PyBool>() {
+    if let Ok(flag) = value.cast::<PyBool>() {
         return Ok(Some(JsonValue::Bool(flag.is_true())));
     }
     if value.is_instance_of::<PyInt>() {
@@ -36,7 +36,7 @@ pub(crate) fn json_value(value: &Bound<'_, PyAny>) -> PyResult<Option<JsonValue>
     if value.is_instance_of::<PyFloat>() {
         return Ok(Some(JsonValue::Float(value.extract()?)));
     }
-    if let Ok(text) = value.downcast::<PyString>() {
+    if let Ok(text) = value.cast::<PyString>() {
         return Ok(Some(JsonValue::String(text.to_string_lossy().into_owned())));
     }
     if value.is_instance_of::<PyList>() || value.is_instance_of::<PyTuple>() {
@@ -49,10 +49,10 @@ pub(crate) fn json_value(value: &Bound<'_, PyAny>) -> PyResult<Option<JsonValue>
         }
         return Ok(Some(JsonValue::Array(items)));
     }
-    if let Ok(mapping) = value.downcast::<PyDict>() {
+    if let Ok(mapping) = value.cast::<PyDict>() {
         let mut entries: Vec<(String, JsonValue)> = Vec::new();
         for (key, item) in mapping.iter() {
-            let Ok(key) = key.downcast::<PyString>() else {
+            let Ok(key) = key.cast::<PyString>() else {
                 return Ok(None);
             };
             let Some(item) = json_value(&item)? else {
@@ -86,7 +86,7 @@ pub(crate) fn bounded_metadata(value: &Bound<'_, PyAny>) -> PyResult<JsonValue> 
 
 /// `value` when it is a string, else `null`.
 pub(crate) fn optional_text(value: &Bound<'_, PyAny>) -> PyResult<JsonValue> {
-    if let Ok(text) = value.downcast::<PyString>() {
+    if let Ok(text) = value.cast::<PyString>() {
         return Ok(JsonValue::String(text.to_string_lossy().into_owned()));
     }
     Ok(JsonValue::Null)

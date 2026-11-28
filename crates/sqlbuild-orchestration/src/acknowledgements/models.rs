@@ -30,6 +30,15 @@ pub struct RunAcknowledgement {
     pub acknowledged_at: DateTime<Utc>,
 }
 
+/// Dismisses the problem of one stored event webhooks and sensors skipped because it can't be read; an event ID applies once.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SkippedEventDismissalRequest {
+    pub event_id: Uuid,
+    /// The skipped stored event's storage ID, as the problem lists it.
+    pub storage_id: i64,
+}
+
 /// Marks an ongoing condition handled as it looks now, or withdraws that; an event ID applies once.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]

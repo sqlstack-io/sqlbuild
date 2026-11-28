@@ -1,9 +1,7 @@
 //! Python's unified selector resolution across SQL resources and Python nodes.
 
 use std::collections::{BTreeSet, HashMap, HashSet};
-use std::convert::Infallible;
 
-use sqlbuild_core::graph_walk::main::breadth_first_reach::breadth_first_reach;
 use sqlbuild_core::text::main::glob_match::glob_match;
 
 use crate::assembly::project::types::ObjectKey;
@@ -11,8 +9,8 @@ use crate::definition_changes::constants::PYTHON_NODE_KINDS;
 use crate::graph::constants::{AUDIT_KIND, RUN_SELECTOR_KINDS};
 use crate::graph::errors::SelectorError;
 use crate::graph::main::build_resources::build_resources;
-use crate::graph::main::edge_keys::edge_keys;
 use crate::graph::main::parse_selector::parse_selector;
+use crate::graph::main::reachable_graph_keys::reachable_graph_keys;
 use crate::graph::main::resolve_selectors::resolve_selectors;
 use crate::graph::models::{BuildResources, EdgeDirection, ParsedSelector};
 use crate::python_selection::_helpers::nodes::{
@@ -22,10 +20,10 @@ use crate::python_selection::_helpers::validation::{
     source_loaders, terminal_loaders, validate_boundaries, validate_selected_dependencies,
 };
 use crate::python_selection::constants::{
-    ASSET_KIND, CHECK_KIND, EXPANSION_MARKER, INTERSECTION_SEPARATOR, JOB_KIND, LOADER_KIND,
-    NAME_KIND, NODE_KIND_KIND, PATH_KIND, PATH_ROOT_CODE, PATH_ROOT_ERROR, PLANNER_DEFAULT_CODE,
-    SEED_KIND, SOURCE_KIND, SOURCE_RESOURCE, SQL_MODEL_PATH_ROOT, TAG_KIND, TEST_KIND,
-    UNKNOWN_NAME_CODE, UNKNOWN_TAG_CODE,
+    ASSET_KIND, CHECK_KIND, EXPANSION_MARKER, INTERSECTION_SEPARATOR, JOB_KIND, LOAD_KIND,
+    LOADER_KIND, NAME_KIND, NODE_KIND_KIND, PATH_KIND, PATH_ROOT_CODE, PATH_ROOT_ERROR,
+    PLANNER_DEFAULT_CODE, SEED_KIND, SOURCE_KIND, SOURCE_RESOURCE, SQL_MODEL_PATH_ROOT, TAG_KIND,
+    TEST_KIND, UNKNOWN_NAME_CODE, UNKNOWN_TAG_CODE,
 };
 use crate::python_selection::models::{Atom, PythonSelectionNode, RunSelection, SelectionContext};
 use sqlbuild_core::constants::PYTHON_NODE_ROOT as PYTHON_NODE_PATH_ROOT;
@@ -258,41 +256,64 @@ fn single(context: &SelectionContext<'_>, raw: &str) -> Resolved {
     }
     if downstream {
         let resolved: Atoms = single_side(context, &format!("{core}{EXPANSION_MARKER}"))?;
-        let dependents: Atoms = sql_dependent_python(context, &resolved);
-        atoms.extend(resolved);
-        atoms.extend(dependents);
+        atoms.extend(downstream_closure(context, resolved));
     }
     Ok(atoms)
 }
 
 /// The SQL resources selected Python nodes declare, with their SQL upstream and loaders.
 fn sql_dependency_upstream(context: &SelectionContext<'_>, atoms: &Atoms) -> Atoms {
-    let starts: BTreeSet<&ObjectKey> = atoms
+    let starts: Vec<ObjectKey> = atoms
         .iter()
         .filter_map(|atom| match atom {
             Atom::Python(name) => context.nodes.node(name),
             Atom::Sql(_) => None,
         })
-        .flat_map(|node| node.sql_deps.iter())
+        .flat_map(|node| node.sql_deps.iter().cloned())
         .collect();
-    if starts.is_empty() {
-        return Atoms::new();
-    }
-    let mut visited: HashSet<&ObjectKey> = starts.iter().copied().collect();
-    let Ok(()) = breadth_first_reach(starts, None, &mut visited, |current| {
-        Ok::<_, Infallible>(edge_keys(
-            context.sql.graph,
-            current,
-            EdgeDirection::Upstream,
-        ))
-    });
-    let selected: Atoms = sql_atoms(visited.into_iter().cloned());
+    let selected: Atoms = sql_atoms(reachable_graph_keys(
+        &starts,
+        context.sql.graph,
+        EdgeDirection::Upstream,
+    ));
     let loaders: Atoms = terminal_loader_atoms(context, &selected);
     selected.into_iter().chain(loaders).collect()
 }
 
 fn declares_any(node: &PythonSelectionNode, keys: &HashSet<&ObjectKey>) -> bool {
     node.sql_deps.iter().any(|key| keys.contains(key))
+}
+
+/// `atoms` with everything downstream across both graphs: the source each terminal loader fills and its SQL downstream, and the Python nodes reading any of it.
+fn downstream_closure(context: &SelectionContext<'_>, mut atoms: Atoms) -> Atoms {
+    loop {
+        let before: usize = atoms.len();
+        let filled: Atoms = filled_source_downstream(context, &atoms);
+        atoms.extend(filled);
+        let dependents: Atoms = sql_dependent_python(context, &atoms);
+        atoms.extend(dependents);
+        if atoms.len() == before {
+            return atoms;
+        }
+    }
+}
+
+/// The sources the selected terminal loaders fill, with every SQL resource downstream of them.
+fn filled_source_downstream(context: &SelectionContext<'_>, atoms: &Atoms) -> Atoms {
+    let terminal: HashMap<&str, &str> = terminal_loaders(context.sql);
+    let starts: Vec<ObjectKey> = atoms
+        .iter()
+        .filter_map(|atom| match atom {
+            Atom::Python(name) => terminal.get(name.as_str()),
+            Atom::Sql(_) => None,
+        })
+        .map(|source| (SOURCE_RESOURCE.to_owned(), (*source).to_owned()))
+        .collect();
+    sql_atoms(reachable_graph_keys(
+        &starts,
+        context.sql.graph,
+        EdgeDirection::Downstream,
+    ))
 }
 
 /// Runnable Python nodes declaring a selected SQL resource, with their downstream nodes.
@@ -343,7 +364,7 @@ fn single_side(context: &SelectionContext<'_>, raw: &str) -> Resolved {
     let atoms: Atoms = match kind.as_str() {
         TEST_KIND => return Err(unit_test_error(raw)),
         PATH_KIND => resolve_path(context, raw, &value)?,
-        SEED_KIND | SOURCE_KIND => resolve_sql(context, raw)?,
+        SEED_KIND | SOURCE_KIND | LOAD_KIND => resolve_sql(context, raw)?,
         JOB_KIND => resolve_job(context, raw)?,
         kind if RUN_SELECTOR_KINDS.contains(&kind) => resolve_job(context, raw)?,
         AUDIT_KIND => resolve_sql(context, raw)?,

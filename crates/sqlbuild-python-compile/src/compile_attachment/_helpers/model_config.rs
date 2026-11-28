@@ -54,11 +54,11 @@ pub(crate) fn native_model_config_session<'py>(
         NativeModelConfigBuilder::new(
             (
                 native_field(&project_config, "defaults")?,
-                native_field(&project_config, "path_defaults")?.downcast_into()?,
+                native_field(&project_config, "path_defaults")?.cast_into()?,
                 hook_entries,
             ),
             (
-                native_field(inputs, "effective_vars")?.downcast_into()?,
+                native_field(inputs, "effective_vars")?.cast_into()?,
                 unicode_environment(py)?,
             ),
             (

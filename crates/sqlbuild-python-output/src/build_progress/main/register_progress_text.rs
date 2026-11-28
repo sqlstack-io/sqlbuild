@@ -1,9 +1,10 @@
 //! Register the progress text functions and classes.
 
 use crate::build_progress::_helpers::progress_text::VerboseInspectionWriter;
+use crate::build_progress::_helpers::progress_text::{
+    format_expectation_detail, format_expectation_name,
+};
 use crate::build_progress::main::format_execution_header::format_execution_header;
-use crate::build_progress::main::format_expectation_detail::format_expectation_detail;
-use crate::build_progress::main::format_expectation_name::format_expectation_name;
 use crate::build_progress::main::write_execution_header::write_execution_header;
 use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
 use pyo3::wrap_pyfunction;

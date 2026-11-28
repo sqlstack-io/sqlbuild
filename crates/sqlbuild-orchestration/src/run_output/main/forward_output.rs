@@ -1,6 +1,6 @@
 //! Hand bytes a process stream accepted to this process's run output, under the node running on this thread.
 
-use crate::run_output::_helpers::upload::{OUTPUT_NODE, attached, read_now};
+use crate::run_output::_helpers::worker::upload::{OUTPUT_NODE, attached, read_now};
 use crate::run_output::models::OutputStream;
 
 /// Never waits: call it under the lock that orders output, then `wait_for_output_room` outside it; a no-op outside a worker.

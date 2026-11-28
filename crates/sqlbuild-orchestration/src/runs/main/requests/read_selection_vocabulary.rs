@@ -1,5 +1,6 @@
 //! The values each selector type takes in the current publication, for a person who may view it.
 
+use crate::runs::_helpers::requests::prepared_calls::vocabulary_off_worker;
 use uuid::Uuid;
 
 use crate::credentials::models::{AuditContext, DefaultRole};
@@ -23,12 +24,11 @@ pub async fn read_selection_vocabulary(
         default_role,
     )
     .await?;
-    Ok(
-        current.map_or_else(SelectionVocabulary::default, |(snapshot, publication)| {
-            SelectionVocabulary {
-                snapshot_id: Some(snapshot.snapshot_id),
-                ..publication.prepared.vocabulary()
-            }
-        }),
-    )
+    let Some((snapshot, publication)) = current else {
+        return Ok(SelectionVocabulary::default());
+    };
+    Ok(SelectionVocabulary {
+        snapshot_id: Some(snapshot.snapshot_id),
+        ..vocabulary_off_worker(&publication.prepared).await?
+    })
 }

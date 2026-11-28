@@ -1,6 +1,7 @@
 pub mod aligned_offset;
 pub mod analysis_route;
 pub mod fast_lineage;
+pub mod names_dialect_type;
 pub mod native_gap;
 pub(crate) mod native_outcomes;
 pub mod native_revalidation;

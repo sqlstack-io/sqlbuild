@@ -212,8 +212,8 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
                     lambda root: replace_project_text(
                         root,
                         "sql/sources/raw.yml",
-                        "      - name: quantity\n        type: INTEGER",
                         "      - name: quantity\n        type: BIGINT",
+                        "      - name: quantity\n        type: INT8",
                     ),
                 ),
                 edit_step("edit_after_source", staging_type_change),

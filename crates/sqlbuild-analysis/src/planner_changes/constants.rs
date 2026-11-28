@@ -14,5 +14,7 @@ pub const FULL_POLICY: &str = "full";
 pub const BOUNDED_POLICY_PREFIX: &str = "bounded-";
 /// The dialect whose unquoted column names fold to lower case for comparison.
 pub const CASE_FOLDING_DIALECT: &str = "snowflake";
+/// The dialect whose listed `Nullable(T)` column is the `T` a model infers or declares.
+pub const NULLABLE_WRAPPER_DIALECT: &str = "clickhouse";
 /// At most this many rename mappings are tried for one query.
 pub const MAX_CANDIDATE_MAPPINGS: usize = 64;

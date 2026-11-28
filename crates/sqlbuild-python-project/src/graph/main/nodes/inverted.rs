@@ -16,7 +16,7 @@ pub fn inverted<'py>(edges: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDict>> 
         for target in targets.try_iter()? {
             let target: Bound<'py, PyAny> = target?;
             let sources: Bound<'py, PyList> = match inverted.get_item(&target)? {
-                Some(sources) => sources.downcast_into()?,
+                Some(sources) => sources.cast_into()?,
                 None => {
                     let sources: Bound<'py, PyList> = PyList::empty(py);
                     inverted.set_item(&target, &sources)?;

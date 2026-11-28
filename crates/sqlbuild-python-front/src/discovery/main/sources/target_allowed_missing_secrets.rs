@@ -14,7 +14,7 @@ pub fn target_allowed_missing_secrets(
         return Ok(Vec::new());
     };
     let targets = field(project_config, "targets")?;
-    let Ok(targets) = targets.downcast::<PyDict>() else {
+    let Ok(targets) = targets.cast::<PyDict>() else {
         return Ok(Vec::new());
     };
     let Some(config) = targets.get_item(target)? else {

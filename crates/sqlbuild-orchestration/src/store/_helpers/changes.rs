@@ -45,7 +45,9 @@ pub(crate) async fn resolve_changes(
         let scope = match &change {
             Change::Snapshot(location_id, target)
             | Change::NodeStatus(location_id, target)
-            | Change::Attention(location_id, target) => ChangedScope {
+            | Change::Attention(location_id, target)
+            | Change::LocationHealth(location_id, target)
+            | Change::WarehouseSync(location_id, target) => ChangedScope {
                 location_id: *location_id,
                 target: target.clone(),
             },
@@ -74,6 +76,8 @@ pub(crate) async fn resolve_changes(
             Change::Snapshot(..) => vec![ChangeTopic::Snapshot, ChangeTopic::NodeStatus],
             Change::NodeStatus(..) => vec![ChangeTopic::NodeStatus],
             Change::Attention(..) => vec![ChangeTopic::Runs],
+            Change::LocationHealth(..) => vec![ChangeTopic::LocationHealth],
+            Change::WarehouseSync(..) => vec![ChangeTopic::WarehouseSync],
             Change::Credentials => continue,
         };
         for topic in topics {

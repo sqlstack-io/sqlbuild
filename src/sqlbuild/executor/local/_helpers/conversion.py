@@ -14,10 +14,10 @@ from pathlib import Path
 from typing import Any
 
 import sqlquack
-from sqlquack import ConvertOptions
 from sqlquack.api.constants import DEFAULT_PATH
 
 from sqlbuild.errors.contracts.exceptions import ExecutorInputError
+from sqlbuild.executor.local._helpers.local_inputs import convert_options, relied_on
 from sqlbuild.executor.local.classes.empty_duckdb import EmptyDuckDb
 from sqlbuild.executor.local.constants import (
     CONVERSION_CACHE_INDEX,
@@ -25,17 +25,22 @@ from sqlbuild.executor.local.constants import (
     TIMEZONE_PARAMETER,
     UTC_TIME_ZONE,
 )
-from sqlbuild.executor.local.models import ConvertedSql, LocalSqlCheck, LocalWorkCounts
+from sqlbuild.executor.local.models import (
+    ConvertedSql,
+    LocalInputs,
+    LocalSqlCheck,
+    LocalWorkCounts,
+)
 
 _PARALLEL_MINIMUM: int = 8
 _MAX_WORKERS: int = 4
 _CHUNKS_PER_WORKER: int = 4
 _IDENTIFIER: re.Pattern[str] = re.compile(r"[A-Za-z_][A-Za-z0-9_$]*")
 
-_CACHE_FORMAT: str = "sqlbuild-local-conversion/1"
+_CACHE_FORMAT: str = "sqlbuild-local-conversion/2"
 
-type _CheckKey = tuple[str, str, str, bool]
-type _CheckJob = tuple[str, dict[str, Any] | None, dict[str, str], bool]
+type _CheckKey = tuple[str, str, str, bool, str]
+type _CheckJob = tuple[str, dict[str, Any] | None, dict[str, str], bool, LocalInputs]
 
 
 class _LocalWork:
@@ -56,6 +61,15 @@ class _LocalWork:
         self._empty: EmptyDuckDb | None = None
         self._cache_dir: Path | None = None
         self._used: set[str] = set()
+        self._inputs: LocalInputs = LocalInputs()
+
+    def use_inputs(self, inputs: LocalInputs) -> None:
+        with self._lock:
+            self._inputs = inputs
+
+    def inputs(self) -> LocalInputs:
+        with self._lock:
+            return self._inputs
 
     def use_cache_dir(self, directory: Path | None) -> None:
         with self._lock:
@@ -164,6 +178,12 @@ def use_conversion_cache(directory: Path | None) -> None:
     _WORK.use_cache_dir(directory)
 
 
+def use_local_inputs(inputs: LocalInputs) -> None:
+    """Convert with the project's allowances and overrides, which key every conversion too."""
+
+    _WORK.use_inputs(inputs)
+
+
 def converted(
     *, sql: str, schema: Mapping[str, Any] | None, time_zone: str | None, path: str
 ) -> ConvertedSql:
@@ -196,6 +216,7 @@ def local_check(
         _WORK.statement_schema(schema=schema, sql=sql),
         _session(time_zone=time_zone),
         convert,
+        _WORK.inputs(),
     )
     stored: LocalSqlCheck | None = _stored(job)
     if stored is not None:
@@ -225,6 +246,7 @@ def check_all(
             _WORK.statement_schema(schema=schema, sql=key[0]),
             _session(time_zone=time_zone),
             convert,
+            _WORK.inputs(),
         )
         for key in missing
     }
@@ -279,7 +301,13 @@ def _quoted_name(relation: str) -> str:
 def _key(
     *, sql: str, schema: Mapping[str, Any] | None, time_zone: str | None, convert: bool
 ) -> _CheckKey:
-    return (sql, _WORK.schema_key(schema), time_zone or UTC_TIME_ZONE, convert)
+    return (
+        sql,
+        _WORK.schema_key(schema),
+        time_zone or UTC_TIME_ZONE,
+        convert,
+        _WORK.inputs().digest,
+    )
 
 
 def _session(*, time_zone: str | None) -> dict[str, str]:
@@ -290,14 +318,12 @@ def _session(*, time_zone: str | None) -> dict[str, str]:
 def _check(*, job: _CheckJob, empty: EmptyDuckDb, path: str) -> LocalSqlCheck:
     """Convert Snowflake SQL, whose unknown names SQLQuack refuses; bind DuckDB SQL as authored."""
 
-    sql, schema, session, convert = job
+    sql, schema, session, convert, inputs = job
     if not convert:
         return LocalSqlCheck(conversion=None, missing=empty.missing_relation(sql=sql, macros=()))
     conversion: Any = sqlquack.convert(
         sql=sql,
-        options=ConvertOptions(
-            no_config=True, schema=schema, session=session, compact=True, bind_check=False
-        ),
+        options=convert_options(inputs=inputs, schema=schema, session=session),
         path=path,
     )
     return LocalSqlCheck(
@@ -307,6 +333,7 @@ def _check(*, job: _CheckJob, empty: EmptyDuckDb, path: str) -> LocalSqlCheck:
             macros=tuple(conversion.macros),
             refusals=tuple(conversion.report["refusals"]),
             rendered=conversion.rendered,
+            relied_on=relied_on(conversion.report),
         ),
         missing=None,
         bound=False,
@@ -317,12 +344,13 @@ def _cache_file(job: _CheckJob) -> Path | None:
     """Where a conversion of `job` is kept: a file named by the hash of everything it reads."""
 
     directory: Path | None = _WORK.cache_dir()
-    sql, schema, session, convert = job
+    sql, schema, session, convert, inputs = job
     if directory is None or not convert:
         return None
     digest: str = hashlib.sha256(
         json.dumps(
-            [_CACHE_FORMAT, sqlquack.__version__, sql, schema, session], sort_keys=True
+            [_CACHE_FORMAT, sqlquack.__version__, sql, schema, session, inputs.digest],
+            sort_keys=True,
         ).encode()
     ).hexdigest()
     return directory / digest[:2] / f"{digest}.json"
@@ -346,6 +374,7 @@ def _stored(job: _CheckJob) -> LocalSqlCheck | None:
             macros=tuple(kept["macros"]),
             refusals=tuple(kept["refusals"]),
             rendered=str(kept["rendered"]),
+            relied_on=tuple(kept["relied_on"]),
         ),
         missing=None,
         bound=False,
@@ -370,6 +399,7 @@ def _keep(*, job: _CheckJob, check: LocalSqlCheck) -> None:
                     "macros": list(conversion.macros),
                     "refusals": list(conversion.refusals),
                     "rendered": conversion.rendered,
+                    "relied_on": list(conversion.relied_on),
                 }
             ),
             encoding="utf-8",

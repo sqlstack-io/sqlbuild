@@ -42,11 +42,12 @@ pub async fn list_person_snapshots(
          WHERE c.snapshot_id IN (SELECT s.snapshot_id FROM sqb_snapshots s WHERE s.location_id=$1 AND s.target=$2 \
            ORDER BY s.generation DESC LIMIT $3) ORDER BY c.snapshot_id, c.change_seq",
         scope.clone()).await?;
+    let body = transaction.hex_column("b.body");
     let (transaction, connected) = query(transaction,
-        &format!("SELECT d.snapshot_id, b.body FROM sqb_snapshot_documents d JOIN sqb_documents b \
+        &format!("SELECT d.snapshot_id, {} AS body FROM sqb_snapshot_documents d JOIN sqb_documents b \
          ON b.document_hash=d.document_hash WHERE d.kind='{CONNECTION_DOCUMENT}' AND d.snapshot_id IN \
          (SELECT s.snapshot_id FROM sqb_snapshots s WHERE s.location_id=$1 AND s.target=$2 \
-           ORDER BY s.generation DESC LIMIT $3)"),
+           ORDER BY s.generation DESC LIMIT $3)", body),
         scope).await?;
     let (transaction, names_roles) = person_assigns_roles(transaction, credentials).await?;
     commit(transaction).await?;

@@ -44,7 +44,7 @@ FIVE_READERS: tuple[str, ...] = ("svc_reporting", "alice", "bob", "carol", "dave
             description="an adapter without a usage source says so once and archives as before",
             janitor_command=APPROVED_JANITOR,
             expected_ordered_lines=(
-                "Inspected warehouse state. (",
+                "Warehouse state inspected  (",
                 "Checking relation usage...",
                 "Relation usage not checked: unsupported adapter. (",
                 "Janitor preview  default",
@@ -133,7 +133,7 @@ def test_given_duckdb_when_running_janitor_json_then_usage_check_is_not_checked(
             },
             expected_ordered_lines=(
                 "Checking relation usage...",
-                "Checked relation usage: 2 of 4 in use. (",
+                "Relation usage checked  2 of 4 in use  (",
                 "  relations to archive   4\n  in use                 2\n",
                 "Relations to archive",
                 "\nIn use\n",
@@ -161,7 +161,7 @@ def test_given_duckdb_when_running_janitor_json_then_usage_check_is_not_checked(
                 "old_orders_view": (("svc_reporting",), 14),
             },
             expected_ordered_lines=(
-                "Checked relation usage: 2 of 4 in use. (",
+                "Relation usage checked  2 of 4 in use  (",
                 "  relations to archive   2\n  kept (in use)          2\n",
                 "\nKept (in use)\n  main.old_orders_000  queried 2026-10-21",
                 "\u2713 Janitor completed  archived 2, deleted 1, pruned 2",
@@ -182,7 +182,7 @@ def test_given_duckdb_when_running_janitor_json_then_usage_check_is_not_checked(
             reads={"old_orders_002": (("alice",), 3)},
             via={"old_orders_002": ("main.orders_report", "main.orders_summary")},
             expected_ordered_lines=(
-                "Checked relation usage: 1 of 4 in use. (",
+                "Relation usage checked  1 of 4 in use  (",
                 "  main.old_orders_002  queried 2026-10-21 by alice via main.orders_report, "
                 "main.orders_summary (3 queries in 7 days); frozen since 2026-09-01, "
                 "still in use\n",

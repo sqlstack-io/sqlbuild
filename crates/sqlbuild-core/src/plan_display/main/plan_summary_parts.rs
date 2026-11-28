@@ -21,6 +21,10 @@ pub fn plan_summary_parts(counts: &PlanSummaryCounts) -> Vec<String> {
             format!("{} to {action}", noun(counts.sources, "source", "sources")),
         ),
         (
+            counts.loads > 0,
+            format!("{} to {action}", noun(counts.loads, "load", "loads")),
+        ),
+        (
             counts.python > 0,
             noun(counts.python, "Python node", "Python nodes"),
         ),

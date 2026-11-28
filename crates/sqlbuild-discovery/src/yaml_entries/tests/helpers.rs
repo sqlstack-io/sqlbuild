@@ -63,13 +63,18 @@ fn seed_line(seed: &ParsedSeedEntry<Node>) -> String {
 
 fn source_line(source: &ParsedSourceEntry<Node>) -> String {
     format!(
-        "{} loader={} managed={} schema={} table={}{}",
+        "{} loader={} managed={} schema={} table={}{}{}",
         source.name.python_str(),
         source.loader.as_deref().unwrap_or("-"),
         source.managed,
         shown(source.schema.as_ref()),
         shown(source.table.as_ref()),
-        if source.read_final { " final" } else { "" }
+        if source.read_final { " final" } else { "" },
+        source
+            .load
+            .as_deref()
+            .map(|load| format!(" load={load}"))
+            .unwrap_or_default()
     )
 }
 
@@ -86,6 +91,24 @@ pub(super) fn schema_outcome(
 /// One line per parsed source, or the parse error's message.
 pub(super) fn sources_outcome(document: &Node) -> Result<Vec<String>, String> {
     parse_sources_document(document, SOURCES_PATH)
-        .map(|sources| sources.iter().map(source_line).collect())
+        .map(|document| {
+            document
+                .load
+                .iter()
+                .map(|load| format!("load {}", load.name))
+                .chain(document.sources.iter().map(source_line))
+                .collect()
+        })
         .map_err(|error| error.message)
+}
+
+/// A sources document with a `load:` block and source entries.
+pub(super) fn loaded_sources(load: Vec<(&str, Node)>, entries: Vec<Vec<(&str, Node)>>) -> Node {
+    map(vec![
+        ("load", map(load)),
+        (
+            "sources",
+            Node::List(entries.into_iter().map(map).collect()),
+        ),
+    ])
 }

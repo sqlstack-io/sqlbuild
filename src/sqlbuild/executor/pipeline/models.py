@@ -45,6 +45,8 @@ class TestPipelineCallbacks:
     on_connection_error: ConnectionElapsedCallback | None = None
     on_progress: Callable[[str], None] | None = None
     on_test_start: Callable[[SqlTestPlanEntry], None] | None = None
+    on_test_finished: Callable[[SqlTestPlanEntry], None] | None = None
+    """Called on the worker once a test has its result, before results are reported in order."""
     on_test_complete: Callable[[SqlTestExecutionResult], None] | None = None
 
 

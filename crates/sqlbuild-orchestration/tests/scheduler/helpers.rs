@@ -166,8 +166,14 @@ pub(crate) async fn store_old_documents(store: &ControlStore, source: &str) {
 
     let documents = rows(
         store,
-        "SELECT b.document_hash, b.body FROM sqb_snapshot_documents d \
-         JOIN sqb_documents b ON b.document_hash=d.document_hash WHERE d.kind IN ('jobs', 'groups')",
+        &format!(
+            "SELECT b.document_hash, {} AS body FROM sqb_snapshot_documents d \
+             JOIN sqb_documents b ON b.document_hash=d.document_hash WHERE d.kind IN ('jobs', 'groups')",
+            match store {
+                crate::store::models::ControlStore::Postgres(_) => "encode(b.body, 'hex')",
+                crate::store::models::ControlStore::Sqlite(_) => "hex(b.body)",
+            }
+        ),
         vec![],
     )
     .await;

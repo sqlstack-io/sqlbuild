@@ -90,7 +90,7 @@ impl BindingCatalog {
             .map(|inner| ProjectCatalog { inner })
             .map_err(PyValueError::new_err)?;
         let schemas: Bound<'_, PyDict> = PyDict::new(py);
-        schemas.update(relations.downcast::<PyMapping>()?)?;
+        schemas.update(relations.cast::<PyMapping>()?)?;
         Ok(Self {
             schemas: schemas.unbind(),
             dialect,
@@ -220,7 +220,7 @@ impl BindingCatalog {
         relations: &Bound<'_, PyAny>,
     ) -> PyResult<Self> {
         let schemas: Bound<'_, PyDict> = self.schemas.bind(py).copy()?;
-        schemas.update(relations.downcast::<PyMapping>()?)?;
+        schemas.update(relations.cast::<PyMapping>()?)?;
         let native: ProjectCatalog = ProjectCatalog {
             inner: self
                 .native
@@ -356,8 +356,11 @@ impl<T> Positional<T> {
     }
 }
 
-impl<'py, T: FromPositional> FromPyObject<'py> for Positional<T> {
-    fn extract_bound(value: &Bound<'py, PyAny>) -> PyResult<Self> {
+impl<'py, T: FromPositional> FromPyObject<'_, 'py> for Positional<T> {
+    type Error = pyo3::PyErr;
+
+    fn extract(value: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> PyResult<Self> {
+        let value: &Bound<'py, PyAny> = &value;
         T::from_positional(value).map(Self)
     }
 }

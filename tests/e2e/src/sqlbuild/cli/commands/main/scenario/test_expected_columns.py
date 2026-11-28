@@ -62,9 +62,8 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             expected_sql="SELECT 'o1' AS order_id, 'shipped' AS status",
             expected_exit_code=1,
             expected_stdout_fragments=(
-                "expected order_flags                               FAIL  1 mismatched, 1 missing",
-                "error[X506]",
-                "expected order_flags: actual=1 expected=1 mismatched=1 missing=1",
+                "FAIL   2 rows differ",
+                "expected rows of order_flags differ: 1 missing, 1 extra (1 expected, 1 actual)",
             ),
             unexpected_stdout_fragments=("X504",),
             expected_json_results=(
@@ -87,7 +86,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             ),
             expected_exit_code=1,
             expected_stdout_fragments=(
-                "expected order_flags: actual=1 expected=2 mismatched=0 missing=1",
+                "expected rows of order_flags differ: 1 missing (2 expected, 1 actual)",
             ),
             expected_json_results=(
                 {
@@ -106,9 +105,9 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             header_options=', expected_columns "all"',
             expected_exit_code=1,
             expected_stdout_fragments=(
-                "error[S512]",
-                "expected output __expected__order_flags does not list columns that model "
-                "'order_flags' outputs: is_cancelled",
+                "[S512]",
+                "does not list columns that",
+                "model 'order_flags' outputs: is_cancelled",
             ),
             unexpected_stdout_fragments=("X504", "mismatched", "actual="),
         ),
@@ -135,8 +134,8 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             ),
             expected_exit_code=1,
             expected_stdout_fragments=(
-                "error[S512]",
-                "lists columns that model 'order_flags' does not output: line_count",
+                "[S512]",
+                "'order_flags' does not output: line_count",
             ),
             unexpected_stdout_fragments=("X504", "mismatched"),
         ),
@@ -147,7 +146,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
                 "CAST('maybe' AS BOOLEAN) AS is_cancelled"
             ),
             expected_exit_code=1,
-            expected_stdout_fragments=("expected order_flags", "ERROR", "error[X504]"),
+            expected_stdout_fragments=("expected  order_flags", "ERROR", "[X504]"),
             unexpected_stdout_fragments=("mismatched", "actual="),
             expected_json_results=(
                 {

@@ -3,7 +3,7 @@
 use crate::model_config::_helpers::config::config_templates::TEMPLATE_OPEN_TOKEN;
 use crate::model_config::models::PythonHost;
 use crate::model_config::models::Stop;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods};
+use pyo3::prelude::{Bound, PyAny};
 use pyo3::types::{
     PyDict, PyDictMethods, PyList, PyListMethods, PyString, PyStringMethods, PyTuple,
     PyTupleMethods,
@@ -18,7 +18,7 @@ pub fn expanded<'py>(
     options: TemplateOptions,
 ) -> Result<Bound<'py, PyAny>, Stop> {
     let py = host.py;
-    if let Ok(text) = value.downcast::<PyString>() {
+    if let Ok(text) = value.cast::<PyString>() {
         let text = text.to_str().map_err(Stop::Python)?;
         if !text.contains(TEMPLATE_OPEN_TOKEN) {
             return Ok(value.clone());
@@ -30,7 +30,7 @@ pub fn expanded<'py>(
             Err(failure) => Err(host.stop(failure)),
         };
     }
-    if let Ok(mapping) = value.downcast::<PyDict>() {
+    if let Ok(mapping) = value.cast::<PyDict>() {
         let result = PyDict::new(py);
         for (key, item) in mapping.iter() {
             result
@@ -39,7 +39,7 @@ pub fn expanded<'py>(
         }
         return Ok(result.into_any());
     }
-    if let Ok(items) = value.downcast::<PyList>() {
+    if let Ok(items) = value.cast::<PyList>() {
         let result = items
             .iter()
             .map(|item| expanded(host, &item, options))
@@ -48,7 +48,7 @@ pub fn expanded<'py>(
             .map(Bound::into_any)
             .map_err(Stop::Python);
     }
-    if let Ok(items) = value.downcast::<PyTuple>() {
+    if let Ok(items) = value.cast::<PyTuple>() {
         let result = items
             .iter()
             .map(|item| expanded(host, &item, options))

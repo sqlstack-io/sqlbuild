@@ -1,5 +1,7 @@
 //! Project discovery: configuration, declaration files and imported project Python, validated.
 
+use crate::compile_driver::_helpers::stages::implicit_sources::with_implicit_load_sources;
+use crate::compile_driver::_helpers::stages::loader_settings::with_loader_settings;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PySet, PySetMethods, PyTuple};
 use pyo3::{IntoPyObject, pyfunction};
@@ -355,6 +357,8 @@ fn discovered_inputs<'py>(
         &lifecycle(py, "discovery_declaration_parse")?,
         |declaration_lifecycle| {
             let declarations: Bound<'py, PyDict> = declaration_files(project_dir, flags)?;
+            let adapter: Option<String> = native_field(project_config, "adapter")?.extract()?;
+            with_implicit_load_sources(&declarations, adapter.as_deref().unwrap_or_default())?;
             let mut item_count: usize = 0;
             for field in DECLARATION_COLLECTIONS {
                 item_count += declarations.as_any().get_item(field)?.len()?;
@@ -487,6 +491,7 @@ fn project_inputs<'py>(
         .into_any())
     };
     let loader_functions: Bound<'py, PyAny> = tuple_of("loaders")?;
+    with_loader_settings(declarations.cast()?, &loader_functions)?;
     let mut fields: Vec<(&str, Bound<'py, PyAny>)> = vec![
         ("project_config", project_config.clone()),
         ("local_config", local_config.clone()),

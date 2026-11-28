@@ -1209,6 +1209,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/skipped-event-dismissals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["dismissSkippedEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/snapshots": {
         parameters: {
             query?: never;
@@ -2361,7 +2377,7 @@ export interface components {
          * @description Which kind of control database failure an error is; the sentence people read follows from it.
          * @enum {string}
          */
-        ControlCauseCase: "name_lookup" | "unreachable" | "login_rejected" | "no_free_connections" | "restarting" | "pool_exhausted" | "locked" | "other";
+        ControlCauseCase: "name_lookup" | "unreachable" | "login_rejected" | "no_free_connections" | "restarting" | "pool_exhausted" | "locked" | "session_cut_off" | "other";
         /** @description One job's estimated query cost on one node: in the period, and in the period before it. */
         CostFactRecord: {
             /** Format: int64 */
@@ -3665,6 +3681,8 @@ export interface components {
              */
             before?: number | null;
             events: components["schemas"]["PersonPlatformEvent"][];
+            /** @description Stored events of this scan that this server can't read, such as a kind or shape from another release; each is listed, never dropped. */
+            unreadable?: components["schemas"]["UnreadablePlatformEvent"][];
         };
         /** @description A role assigned to one person, everywhere or on one location and target. */
         PersonRole: {
@@ -3953,9 +3971,34 @@ export interface components {
             times: string[];
             /** Format: uuid */
             trigger_id: string;
+        } | {
+            /** Format: uuid */
+            event_id: string;
+            /** @description The stored type, such as `platform_run_failed`. */
+            event_type: string;
+            /** @enum {string} */
+            kind: "unreadable_event_skipped";
+            /**
+             * Format: uuid
+             * @description The location target the event concerns, when it names or leads to one.
+             */
+            location_id?: string | null;
+            /** @description Why the event couldn't be read. */
+            reason: string;
+            /** Format: int64 */
+            storage_id: number;
+            target?: string | null;
+        } | {
+            /** Format: date-time */
+            cut_at: string;
+            error: string;
+            /** @description The transaction sat idle past its limit, rather than a statement running past its own. */
+            idle: boolean;
+            /** @enum {string} */
+            kind: "control_session_cut_off";
         };
         /** @enum {string} */
-        PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "location_failing" | "launch_failed" | "run_failed" | "trigger_skipped" | "sensor_rechecked" | "calendar_times_dropped";
+        PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "location_failing" | "launch_failed" | "run_failed" | "trigger_skipped" | "sensor_rechecked" | "calendar_times_dropped" | "unreadable_event_skipped" | "control_session_cut_off";
         /** @description Problems derived from live state when read; nothing here is stored. */
         PlatformProblems: {
             broken_locations: components["schemas"]["BrokenLocation"][];
@@ -3980,6 +4023,8 @@ export interface components {
              * @description When the last scheduler lease ran out, or will run out; absent until a server first leads.
              */
             scheduler_lease_expires_at?: string | null;
+            /** @description Stored events webhook delivery or a platform sensor skipped because this server can't read them, while they are kept and still can't be read. */
+            skipped_events?: components["schemas"]["SkippedEvent"][];
             /** @description Triggers skipped because their stored job or pinned snapshot can't be read, until their location publishes again. */
             skipped_triggers?: components["schemas"]["SkippedTrigger"][];
         };
@@ -5322,6 +5367,39 @@ export interface components {
             failed: number;
             name: string;
         };
+        /** @description A stored event webhook delivery or a platform sensor skipped because this server can't read it; it clears once the event can be read or is pruned. */
+        SkippedEvent: {
+            /** Format: uuid */
+            event_id: string;
+            /** @description The stored type, such as `platform_run_failed`. */
+            event_type: string;
+            /**
+             * Format: uuid
+             * @description The location target the event concerns; absent when it names none that can be read.
+             */
+            location_id?: string | null;
+            location_name?: string | null;
+            /** @description Why the event couldn't be read. */
+            reason: string;
+            /**
+             * Format: date-time
+             * @description When it was first skipped.
+             */
+            skipped_at: string;
+            /** Format: int64 */
+            storage_id: number;
+            target?: string | null;
+        };
+        /** @description Dismisses the problem of one stored event webhooks and sensors skipped because it can't be read; an event ID applies once. */
+        SkippedEventDismissalRequest: {
+            /** Format: uuid */
+            event_id: string;
+            /**
+             * Format: int64
+             * @description The skipped stored event's storage ID, as the problem lists it.
+             */
+            storage_id: number;
+        };
         /** @description A trigger the scheduler skips because its stored job or pinned snapshot can't be read, or a sensor whose check failed; it clears once its location publishes again or, for a sensor, a later check completes. */
         SkippedTrigger: {
             /** Format: uuid */
@@ -5521,6 +5599,25 @@ export interface components {
         };
         /** @enum {string} */
         TriggerStatus: "running" | "paused";
+        /** @description A stored platform event this server can't read: what is known about it and why reading it failed. */
+        UnreadablePlatformEvent: {
+            /** @description Why the event couldn't be read. */
+            error: string;
+            /** Format: uuid */
+            event_id: string;
+            /** @description The stored type, such as `platform_location_failing`. */
+            event_type: string;
+            /**
+             * Format: uuid
+             * @description The location target the event names, when it names one that can be read.
+             */
+            location_id?: string | null;
+            /** Format: date-time */
+            occurred_at: string;
+            /** Format: int64 */
+            storage_id: number;
+            target?: string | null;
+        };
         /** @description One selector value and the number of nodes it selects. */
         VocabularyEntry: {
             /** Format: int64 */
@@ -9227,6 +9324,57 @@ export interface operations {
             };
             /** @description No such sensor, event or matching run, and why */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    dismissSkippedEvent: {
+        parameters: {
+            query?: never;
+            header: {
+                "x-sqb-csrf": string;
+            };
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkippedEventDismissalRequest"];
+            };
+        };
+        responses: {
+            /** @description Whether the skipped stored event's problem was dismissed now; it stays in the history */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            /** @description No such skipped event, one of another target, or the event ID was reused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

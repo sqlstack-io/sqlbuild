@@ -2,11 +2,24 @@
 
 # sqb load
 
-> Load managed sources into the warehouse.
+> Run loads and loaders into the warehouse.
 
 Online: https://sqlbuild.com/docs/cli/load/
 
-Runs source loader functions and writes data into their target tables using the configured write strategy.
+## Contents
+
+- Usage
+- Flags
+- Examples
+- Selection
+- Execution order
+- Output
+- Auto-load during builds
+
+Runs the [loads](../concepts/sources.md#loads) and [loaders](../concepts/python-nodes/loaders.md)
+you select, and nothing else. `sqb load` is a `sqb build` of just the loading nodes the selectors
+reach: loads, loaders and the sources they fill. It compiles and plans the project as `sqb build`
+does, loads in the same order and the same way, and runs no models, unit tests or audits.
 
 ## Usage
 
@@ -18,16 +31,14 @@ sqb --project-dir <path> load [flags]
 
 | Flag | Description |
 |------|-------------|
-| `--select`, `-s` | Select specific sources or loaders by name |
-| `--exclude` | Exclude specific sources or loaders |
-| `--reload` | Pass `is_reload=True` to loader functions |
+| `--select`, `-s` | [Selectors](../concepts/selectors.md), as for `sqb build`; only the loads, loaders and sources they select run |
+| `--exclude` | Selectors to leave out |
+| `--reload` | Reload managed sources from scratch: each table is rebuilt from what its loader returns, with `ctx.is_reload` `True` and `ctx.cursor_value` `None` |
 | `--concurrency` | Number of worker connections (default: from settings or 1) |
-| `--start-cursor` | Override the start cursor; an integer value sets `start_cursor_int`, anything else is read as an ISO timestamp and sets `start_cursor_ts` |
-| `--end-cursor` | Override the end cursor, typed the same way as `--start-cursor` |
-| `--start-cursor-ts` | Override start cursor for timestamp-based loaders (ISO format) |
-| `--end-cursor-ts` | Override end cursor for timestamp-based loaders (ISO format) |
-| `--start-cursor-int` | Override start cursor for integer-based loaders |
-| `--end-cursor-int` | Override end cursor for integer-based loaders |
+| `--start-cursor` | Where loaders' cursor windows start, as `ctx.cursor_value`: an integer, or an ISO timestamp |
+| `--end-cursor` | Where they end, not included, as `ctx.cursor_end`; typed the same way as `--start-cursor` |
+| `--start-cursor-ts`, `--end-cursor-ts` | The window's bounds as ISO timestamps |
+| `--start-cursor-int`, `--end-cursor-int` | The window's bounds as integers |
 | `--json` | Output results as JSON |
 | `--json-output` | Write JSON results to a file path |
 | `--vars` | Override project variables with a JSON object (`--vars '{"key": "value"}'`) |
@@ -36,14 +47,20 @@ sqb --project-dir <path> load [flags]
 ## Examples
 
 ```bash
-# Load all managed sources
+# Run every load and loader
 sqb load
 
-# Load a specific source
+# Load one source: its loader runs, reading any intermediate loader's existing table
 sqb load --select raw_customers
 
-# Load with concurrency
-sqb load --concurrency 4
+# Load one source with the intermediate loaders it depends on
+sqb load --select +raw_customers
+
+# Run an intermediate loader and the sources downstream of it
+sqb load --select fetch_events+
+
+# Run one load
+sqb load --select load:shop
 
 # Reload all sources (full refresh behavior)
 sqb load --reload
@@ -52,31 +69,48 @@ sqb load --reload
 sqb load --start-cursor "2026-05-01T00:00:00"
 ```
 
+## Selection
+
+Selectors mean what they mean for `sqb build`, narrowed to loading nodes:
+
+- A bare name selects only that node. A source whose loader depends on an intermediate loader
+  reads that loader's existing table; if the table doesn't exist yet, the load stops with `S000`
+  and suggests `+source:<name>`. Excluding an intermediate loader the selection needs does the
+  same.
+- `+name` adds the loaders and assets upstream of it, and `name+` the loaders, loads and sources
+  downstream of it.
+- An unknown name fails with `S007`. A selection that reaches nothing that loads succeeds with
+  nothing to do, and a project without any load or `@loader` prints a note and exits.
+
 ## Execution order
 
-Loaders are executed in DAG topological order based on `depends_on` declarations. Independent loaders run concurrently when `--concurrency` is greater than 1.
-
-Intermediate loaders (those referenced only via `depends_on` without a direct source binding) run first, followed by the source-bound loaders that depend on them.
+Loads, loaders and sources run in dependency order, as in `sqb build`: an intermediate loader before
+the sources whose loaders depend on it.
 
 ## Output
 
-```
-Load ready  2 selected
+The output is the build's: the plan, then each loading node as it runs, then the summary.
 
-Sources (2)
-├── raw__customers
-└── raw__orders
+```
+Plan ready  2 sources to load, 1 load to load
+
+Loaders to load (1)
+└── fetch_events         table
+
+Sources to load (1)
+└── raw_events           table
 
 Execution  sqb load  (concurrency: 1)
 
-Connecting to duckdb...
-✓ Warehouse connected  duckdb  (0.05s)
+  1/3  loader    fetch_events         OK     0.04s  rows=2
+  2/3  source    raw_events           OK     0.04s  rows=2
+  3/3  load      shop                 OK     0.19s  rows=4
 
-  1/2  source    raw__customers                 OK 0.04s  rows=5
-  2/2  source    raw__orders                    OK 0.03s  rows=10
-
-✓ Completed successfully  PASS=2  WARN=0  FAIL=0  SKIP=0  TOTAL=2  (0.15s)
+✓ Completed successfully  PASS=3  WARN=0  FAIL=0  INSUFFICIENT=0  SKIP=0  TOTAL=3  (0.78s)
 ```
+
+`--json` writes the build's result document with `"command": "load"`; each load, loader and source
+is an entry under `assets`.
 
 ## Auto-load during builds
 

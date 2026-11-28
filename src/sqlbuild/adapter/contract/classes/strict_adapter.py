@@ -182,6 +182,11 @@ class StrictAdapter(
         del cursor_type
         return expression
 
+    def render_cursor_bound(self, *, function: str, operand: str) -> str:
+        """Optional: the `MIN` or `MAX` of a cursor operand, NULL when no row is read."""
+
+        return f"{function}({operand})"
+
     def render_cursor_text(self, *, expression: str, cursor_type: str) -> str:
         """Optional: a cursor bound expression as the text the planner parses as a cursor value."""
 

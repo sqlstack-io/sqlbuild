@@ -37,7 +37,6 @@ use crate::bindings::_helpers::record_behaviours::lexical::{
 };
 use crate::bindings::_helpers::record_behaviours::macros::{
     context_render_constant, context_render_enum_member, macro_injects_context,
-    project_lineage_graph,
 };
 use crate::bindings::_helpers::record_behaviours::migrations::{
     column_decision_blocks_build, column_decision_label, column_decision_records_event,
@@ -74,6 +73,7 @@ use sqlbuild_python_base::records::types::ClassMethod;
 use sqlbuild_python_base::records::types::ClassProperty;
 use sqlbuild_python_base::records::types::RecordFinish;
 use sqlbuild_python_planner::freshness::main::normalize_observation::normalize_observation;
+use sqlbuild_python_project::graph::main::project::record_lineage_graph::record_lineage_graph;
 use sqlbuild_python_project::lineage::main::facts_eq::facts_eq;
 use sqlbuild_python_project::lineage::main::facts_getitem::facts_getitem;
 use sqlbuild_python_project::lineage::main::facts_iter::facts_iter;
@@ -271,7 +271,7 @@ pub(crate) const BEHAVIOUR_PROPERTIES: &[(&str, &str, ClassProperty)] = &[
 pub(crate) const BEHAVIOUR_CACHED_PROPERTIES: &[(&str, &str, ClassProperty)] = &[
     ("LoadedMacro", "injects_context", macro_injects_context),
     ("CompactLineageFacts", "facts", facts_projected),
-    ("CompiledProject", "lineage_graph", project_lineage_graph),
+    ("CompiledProject", "lineage_graph", record_lineage_graph),
 ];
 /// Methods of compiler shapes.
 pub(crate) const BEHAVIOUR_METHODS: &[(&str, &str, ClassMethod)] = &[

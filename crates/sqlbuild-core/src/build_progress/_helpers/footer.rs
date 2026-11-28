@@ -8,6 +8,8 @@ use crate::build_progress::constants::{
 };
 use crate::build_progress::models::{AuditResultText, BuildResultText, ErrorText, PythonNodeText};
 use crate::cli_text::models::CliStyle;
+use crate::run_output::main::render_failed_list::render_failed_list;
+use crate::run_output::main::short_reason::short_reason;
 
 /// Pass, warn, fail, timeout and skip counts of the footer.
 #[derive(Default)]
@@ -435,4 +437,84 @@ pub(crate) fn skipped_rollup(
         String::new(),
         style.muted(&format!("Skipped ({}): {rendered}", names.len())),
     ]
+}
+
+/// One `(name, short reason)` per failed item, in the order `Failures:` shows them, for `Failed (N):`.
+pub(crate) fn failed_items(
+    result: &BuildResultText,
+    python: &[PythonNodeText],
+) -> Vec<(String, String)> {
+    let reason = |error: &ErrorText| {
+        error
+            .message
+            .as_deref()
+            .map_or_else(String::new, |message| {
+                short_reason(error.code.as_deref(), message)
+            })
+    };
+    let message_reason = |message: Option<&String>| {
+        message.map_or_else(String::new, |text| short_reason(None, text))
+    };
+    let mut items: Vec<(String, String)> = Vec::new();
+    for load in result.loads.iter().filter(|load| load.status == FAILED) {
+        items.push((
+            load.source_name.clone(),
+            message_reason(load.error_message.as_ref()),
+        ));
+    }
+    for seed in result.seeds.iter().filter(|seed| seed.status == FAILED) {
+        items.push((seed.name.clone(), reason(&seed.error)));
+    }
+    for model in result.models.iter().filter(|model| model.status == FAILED) {
+        items.push((model.name.clone(), reason(&model.error)));
+    }
+    for function in result
+        .functions
+        .iter()
+        .filter(|function| function.status == FAILED)
+    {
+        items.push((function.name.clone(), reason(&function.error)));
+    }
+    for test in result.tests.iter().filter(|test| test.outcome != PASS) {
+        items.push((test.label.clone(), reason(&test.error)));
+    }
+    for audit in result.source_audits.iter().chain(result.end_audits.iter()) {
+        if audit.execution_error.is_some() {
+            items.push((
+                audit.audit_name.clone(),
+                message_reason(audit.execution_error.as_ref()),
+            ));
+        }
+    }
+    for node in python.iter().filter(|node| node.status == FAILED) {
+        items.push((
+            node.name.clone(),
+            message_reason(node.error_message.as_ref()),
+        ));
+    }
+    items
+}
+
+/// The sections before the completion line: warnings, failures, not run, skipped, then the failed list.
+pub(crate) fn footer_sections(
+    result: &BuildResultText,
+    python: &[PythonNodeText],
+    style: CliStyle,
+) -> Vec<String> {
+    let mut lines: Vec<String> = warning_details(result, python, style);
+    lines.extend(ignored_failure_details(result, style));
+    lines.extend(failure_details(result, style));
+    lines.extend(python_failure_details(python, style));
+    lines.extend(not_run_details(result, style));
+    lines.extend(skipped_rollup(result, python, style));
+    let failed: Vec<(String, String)> = failed_items(result, python);
+    lines.extend(
+        render_failed_list(&failed, false, style)
+            .lines()
+            .map(str::to_owned),
+    );
+    while lines.last().is_some_and(String::is_empty) {
+        lines.pop();
+    }
+    lines
 }

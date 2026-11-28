@@ -9,6 +9,16 @@ from typing import Any
 
 
 @dataclass(frozen=True)
+class MacroPlace:
+    """The refused construct in a macro's own source file."""
+
+    path: str
+    line: int
+    column: int
+    snippet: str
+
+
+@dataclass(frozen=True)
 class LocalRefusal:
     """One SQLQuack refusal, or one of SQLBuild's own reasons, placed in the file that holds it."""
 
@@ -27,6 +37,10 @@ class LocalRefusal:
     snippet: str | None = None
     snippet_column: int | None = None
     expanded_from: str | None = None
+    macro_name: str | None = None
+    """The macro the refused construct came from, as `@py.<name>` or `@sql.<name>`."""
+    macro_place: MacroPlace | None = None
+    """Where the macro's own source holds the construct; `None` when it can't be found there."""
 
     @property
     def title(self) -> str:
@@ -42,6 +56,7 @@ class RunOnDecision:
     name: str
     run_on: str
     refusals: tuple[LocalRefusal, ...] = field(default_factory=tuple)
+    relied_on: tuple[str, ...] = field(default_factory=tuple)
 
     @property
     def reason(self) -> str | None:
@@ -72,6 +87,8 @@ class TestSources:
     models: Mapping[str, Any]
     chain_sql: Mapping[str, str]
     dialect: str
+    macros: Mapping[str, Any] = field(default_factory=dict)
+    """The project's loaded macros by name, to place a refusal in a macro's own source."""
 
 
 @dataclass(frozen=True)
@@ -99,6 +116,16 @@ class ConvertedSql:
     macros: tuple[str, ...]
     refusals: tuple[Mapping[str, Any], ...]
     rendered: str
+    relied_on: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class LocalInputs:
+    """What a project adds to SQLQuack's conversion of its local test SQL: allowances, overrides."""
+
+    allow: tuple[tuple[str, bool], ...] = ()
+    overrides: str | None = None
+    digest: str = ""
 
 
 @dataclass(frozen=True)

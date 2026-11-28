@@ -1,7 +1,7 @@
 //! Adapter-aware target namespace validation of a compile.
 
-use crate::compile_driver::main::setup::expanded_loader_namespace::expanded_loader_namespace;
-use crate::compile_driver::main::setup::managed_write_schema::managed_write_schema;
+use crate::compile_driver::_helpers::setup::expanded_loader_namespace::expanded_loader_namespace;
+use crate::compile_driver::_helpers::setup::managed_write_schema::managed_write_schema;
 use crate::compile_driver::models::TargetSettingsValues;
 use sqlbuild_python_base::boundary::main::optional_text::optional_text;
 use std::collections::{HashMap, HashSet};

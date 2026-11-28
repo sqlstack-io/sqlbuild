@@ -117,7 +117,7 @@ pub(crate) fn model_relation_key_row(
     relation_key_row(
         MODEL_RELATION_KIND,
         record.name.clone(),
-        values.downcast::<PyDict>()?,
+        values.cast::<PyDict>()?,
         declared,
     )
 }

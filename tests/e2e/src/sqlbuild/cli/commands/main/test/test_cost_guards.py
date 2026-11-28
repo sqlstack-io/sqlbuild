@@ -144,11 +144,9 @@ def test_given_long_unmocked_chain_when_testing_then_real_model_limit_applies(
             expected_exit_code=1,
             expected_output_fragments=(
                 "PASS=0  FAIL=1  TOTAL=1",
-                "unexpected=1; missing=1",
-                "unexpected sample 1: order_id=1, total=10",
-                "missing sample 1: order_id=1, total=11",
-                "differing column total: actual=10, expected=11",
-                "[T003] test 'order_totals_doubles' failed for models: order_totals",
+                "expected rows of order_totals differ: 1 missing, 1 extra (1 expected, 1 actual)",
+                "total: expected 11, actual 10",
+                "order_totals_doubles  (test, warehouse)",
             ),
         ),
     ],
@@ -373,7 +371,7 @@ def test_given_slow_unit_test_when_testing_as_json_then_summary_counts_timeout(
             header_timeout="1s",
             command=("--no-color", "scenario", "test"),
             expected_output_fragments=(
-                "[C417]: Scenario 'order_scans_flow' timed out after",
+                "[C417] Scenario 'order_scans_flow' timed out after",
                 "Limit set by:  SCENARIO() timeout in tests/scenarios/order_scans_flow.sql",
                 "Cancellation:  confirmed; the running statement stopped",
                 "PASS=0  FAIL=1  TOTAL=1",

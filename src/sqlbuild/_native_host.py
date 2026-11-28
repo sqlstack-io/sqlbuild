@@ -22,7 +22,6 @@ _TARGETS: dict[str, tuple[str, str]] = {
     "TableFreshnessRequest": ("sqlbuild.adapter.contract.models", "TableFreshnessRequest"),
     "BuiltinAdapter": ("sqlbuild.adapter.contract.types", "BuiltinAdapter"),
     "FrameworkType": ("sqlbuild.adapter.contract.types", "FrameworkType"),
-    "LifeCycleEventKind": ("sqlbuild.adapter.contract.types", "LifeCycleEventKind"),
     "MigrationTransfer": ("sqlbuild.adapter.contract.types", "MigrationTransfer"),
     "RetentionScope": ("sqlbuild.adapter.contract.types", "RetentionScope"),
     "TableFreshnessStatus": ("sqlbuild.adapter.contract.types", "TableFreshnessStatus"),
@@ -432,10 +431,7 @@ _TARGETS: dict[str, tuple[str, str]] = {
     "JanitorSkippedRelation": ("sqlbuild.executor.janitor.models", "JanitorSkippedRelation"),
     "JanitorSkippedSchema": ("sqlbuild.executor.janitor.models", "JanitorSkippedSchema"),
     "JanitorUsageCheck": ("sqlbuild.executor.janitor.models", "JanitorUsageCheck"),
-    "run_load_pipeline": ("sqlbuild.executor.load.main.run", "run_load_pipeline"),
-    "LoadCallbacks": ("sqlbuild.executor.load.models", "LoadCallbacks"),
     "LoadExecutionResult": ("sqlbuild.executor.load.models", "LoadExecutionResult"),
-    "LoadRuntimeParams": ("sqlbuild.executor.load.models", "LoadRuntimeParams"),
     "is_compatibility_view": (
         "sqlbuild.executor.old_name_views._helpers.janitor",
         "is_compatibility_view",
@@ -459,6 +455,7 @@ _TARGETS: dict[str, tuple[str, str]] = {
         "run_audit_pipeline_with_callbacks",
     ),
     "run_build_pipeline": ("sqlbuild.executor.pipeline.main.run", "run_build_pipeline"),
+    "plan_loads": ("sqlbuild.executor.loads.main.plan_loads", "plan_loads"),
     "run_scenario_capture_pipeline": (
         "sqlbuild.executor.pipeline.main.run",
         "run_scenario_capture_pipeline",
@@ -484,6 +481,10 @@ _TARGETS: dict[str, tuple[str, str]] = {
     "report_unplaced_sql_tests": (
         "sqlbuild.executor.local.main._report_unplaced_sql_tests",
         "report_unplaced_sql_tests",
+    ),
+    "check_local_test_inputs": (
+        "sqlbuild.executor.local.main._check_local_test_inputs",
+        "check_local_test_inputs",
     ),
     "decide_scenario_run_on": ("sqlbuild.executor.pipeline.main.run", "decide_scenario_run_on"),
     "select_scenario_snapshot_capture_candidates": (

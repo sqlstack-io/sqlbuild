@@ -9,7 +9,7 @@ import queue
 import sys
 import threading
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping
 from concurrent.futures import Future, wait
 from contextlib import contextmanager
 from contextvars import Context, copy_context
@@ -44,6 +44,7 @@ from sqlbuild.executor.local.constants import (
     STATEMENT_CONSTRUCT,
 )
 from sqlbuild.executor.local.main._convert_local_sql import session_time_zone
+from sqlbuild.executor.local.main._use_local_test_inputs import use_local_test_inputs
 from sqlbuild.executor.pipeline._helpers.connections import (
     close_connections,
     open_worker_connections,
@@ -297,6 +298,7 @@ def run_scenario_local_test_pipeline(
     adapter: BaseAdapter,
     project_name: str,
     replay_source: ScenarioLocalReplaySource,
+    local_test_allow: Mapping[str, bool],
     on_scenario_start: Callable[[CompiledSqlScenario], None] | None = None,
     on_scenario_complete: Callable[
         [CompiledSqlScenario, ScenarioExecutionPlan | None, ScenarioRunResult], None
@@ -310,6 +312,7 @@ def run_scenario_local_test_pipeline(
     )
     running: RunningScenarios = RunningScenarios(adapter=adapter)
     conversion: LocalConversion = local_conversion(pipeline_result)
+    use_local_test_inputs(project_dir=project_dir, allow=local_test_allow)
 
     def execute(scenario_plan: ScenarioExecutionPlan) -> ScenarioRunResult:
         return execute_local_scenario_load_only_run(
@@ -361,10 +364,12 @@ def decide_scenario_run_on(
     project_name: str,
     replay_source: ScenarioLocalReplaySource,
     run_on: str,
+    local_test_allow: Mapping[str, bool],
 ) -> str:
     """Each scenario's decision as JSON: local with a fresh snapshot whose SQL converts."""
 
     conversion: LocalConversion = local_conversion(pipeline_result)
+    use_local_test_inputs(project_dir=project_dir, allow=local_test_allow)
     decisions: list[dict[str, object]] = []
     scenario: CompiledSqlScenario
     for scenario in scenarios:

@@ -39,7 +39,7 @@ from tests.unit.src.sqlbuild.integrations.dbt.profile.helpers import write_duckd
             args=(),
             expected_stdout_fragments=(
                 "Compiling dbt project...",
-                "Generated dbt interop plan.",
+                "dbt interop plan generated",
                 "Plan ready",
             ),
             expected_stderr_fragments=(),
@@ -50,7 +50,7 @@ from tests.unit.src.sqlbuild.integrations.dbt.profile.helpers import write_duckd
             expected_stdout_fragments=('"command": "plan"',),
             expected_stderr_fragments=(
                 "Compiling dbt project...",
-                "Generated dbt interop plan.",
+                "dbt interop plan generated",
             ),
         ),
     ],

@@ -16,6 +16,7 @@ use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
+use crate::tls::main::client_builder::client_builder;
 
 #[test]
 fn given_a_failed_run_when_a_person_acknowledges_it_then_everyone_reads_who_did_until_it_is_withdrawn()
@@ -79,7 +80,7 @@ fn given_a_failed_run_when_a_person_acknowledges_it_then_everyone_reads_who_did_
                 },
             )
             .await;
-            let client = reqwest::Client::new();
+            let client = client_builder().build().expect("HTTP client");
             let administrator = (
                 roles.administrator.bearer.as_str(),
                 roles.administrator.csrf.as_str(),

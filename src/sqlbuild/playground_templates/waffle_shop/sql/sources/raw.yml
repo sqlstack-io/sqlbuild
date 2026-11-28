@@ -3,10 +3,9 @@ sources:
     description: Raw customer records loaded by the Python loader
     contract: enforced
     managed: true
-    write_strategy: table
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
       - name: first_name
         type: VARCHAR
       - name: last_name
@@ -20,17 +19,15 @@ sources:
     description: Raw order records loaded by the Python loader
     contract: enforced
     managed: true
-    write_strategy: delete_insert
-    cursor_column: ordered_at
     columns:
       - name: id
-        type: INTEGER
+        type: BIGINT
       - name: customer_id
-        type: INTEGER
+        type: BIGINT
       - name: waffle_type_id
-        type: INTEGER
+        type: BIGINT
       - name: quantity
-        type: INTEGER
+        type: BIGINT
       - name: ordered_at
         type: TIMESTAMP
       - name: status
