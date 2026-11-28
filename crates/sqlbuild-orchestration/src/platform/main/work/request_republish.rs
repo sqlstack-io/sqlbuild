@@ -5,6 +5,7 @@ use uuid::Uuid;
 
 use crate::authorization::main::decisions::authorize_person::authorize_person;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
+use crate::platform::_helpers::location::liveness::require_checking_in;
 use crate::platform::constants::REPUBLISH_EXPIRY_SECONDS;
 use crate::platform::main::work::enqueue_location_work::enqueue_location_work;
 use crate::platform::main::work::read_location_work::read_location_work;
@@ -13,7 +14,7 @@ use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
 use crate::store::main::query::query;
-use crate::store::models::{ControlStore, Parameter, TransactionMode};
+use crate::store::models::{ControlStore, ControlTransaction, Parameter, TransactionMode};
 
 /// Queue a republish of `target`; `false` when this request ID was already queued by the same caller.
 pub async fn request_republish(
@@ -28,7 +29,46 @@ pub async fn request_republish(
         ));
     }
     let transaction = begin(store, TransactionMode::Write).await?;
-    let (transaction, context, requested_by) = match credentials {
+    let (transaction, context, requested_by) =
+        requester(transaction, (context, credentials), (location_id, target)).await?;
+    let work = LocationWorkRequest {
+        request_id: request.request_id,
+        location_id,
+        target: target.to_owned(),
+        reason: request.reason.clone(),
+        work: LocationWork::Republish { requested_by },
+    };
+    let (transaction, previous) = read_location_work(transaction, request.request_id).await?;
+    if let Some(previous) = previous {
+        if previous.record.request_json != work || previous.record.requested_by != context.actor {
+            return Err(ControlError::Invalid(
+                "location work ID already has different content or actor".into(),
+            ));
+        }
+        commit(transaction).await?;
+        return Ok(false);
+    }
+    let transaction = require_checking_in(transaction, (location_id, target), "publish").await?;
+    commit(
+        enqueue_location_work(
+            transaction,
+            &context,
+            &work,
+            Duration::seconds(REPUBLISH_EXPIRY_SECONDS),
+        )
+        .await?,
+    )
+    .await?;
+    Ok(true)
+}
+
+/// Who asks: a person once authorized to republish, by name, or the trusted owner by its actor.
+async fn requester(
+    transaction: ControlTransaction,
+    (context, credentials): (&AuditContext, Option<Uuid>),
+    (location_id, target): (Uuid, &str),
+) -> Result<(ControlTransaction, AuditContext, String), ControlError> {
+    let requester = match credentials {
         Some(principal_id) => {
             let (transaction, context) = authorize_person(
                 transaction,
@@ -51,32 +91,5 @@ pub async fn request_republish(
         }
         None => (transaction, context.clone(), context.actor.clone()),
     };
-    let work = LocationWorkRequest {
-        request_id: request.request_id,
-        location_id,
-        target: target.to_owned(),
-        reason: request.reason.clone(),
-        work: LocationWork::Republish { requested_by },
-    };
-    let (transaction, previous) = read_location_work(transaction, request.request_id).await?;
-    if let Some(previous) = previous {
-        if previous.record.request_json != work || previous.record.requested_by != context.actor {
-            return Err(ControlError::Invalid(
-                "location work ID already has different content or actor".into(),
-            ));
-        }
-        commit(transaction).await?;
-        return Ok(false);
-    }
-    commit(
-        enqueue_location_work(
-            transaction,
-            &context,
-            &work,
-            Duration::seconds(REPUBLISH_EXPIRY_SECONDS),
-        )
-        .await?,
-    )
-    .await?;
-    Ok(true)
+    Ok(requester)
 }

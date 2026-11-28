@@ -175,7 +175,7 @@ export function toBootstrap(wire: Wire['ControlBootstrap']): Bootstrap {
 				health: null,
 				lastSeenAt: null,
 				target: { name: location.target, adapter: null, connectionSummary: null },
-				warehouseSync: { lastSyncedAt: null, lastError: null },
+				warehouseSync: { lastSyncedAt: null, lastError: null, stalled: false },
 				capabilities: location.actions as Capability[]
 			})
 		)
@@ -784,7 +784,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/health', { params: { path: { location_id: locationId, target } } });
 			if (response.status === 401) onUnauthorized();
 			if (!data) throw new ApiError(errorText(error, response), response.status);
-			return warehouseSyncOf(data.observations);
+			return warehouseSyncOf(data.observations, data.warehouse_sync);
 		},
 		/** The location takes the request within seconds; the sync's result arrives as a `warehouse_sync` change. */
 		async requestWarehouseSync(scope: Scope): Promise<void> {

@@ -20,7 +20,8 @@ use crate::store::models::ControlStore;
         ("wait" = Option<u64>, Query, description = "Seconds to wait for the new snapshot or the publish error, at most 60; 0 or absent returns at once")),
     request_body = PersonWorkRequest,
     responses((status = 200, body = RepublishStatus), (status = 400, body = crate::api::models::ApiErrorBody),
-        (status = 401, description = "Session rejected"), (status = 403, body = crate::api::models::ApiErrorBody)),
+        (status = 401, description = "Session rejected"), (status = 403, body = crate::api::models::ApiErrorBody),
+        (status = 409, description = "The location isn't checking in", body = crate::api::models::ApiErrorBody)),
     security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn request(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),

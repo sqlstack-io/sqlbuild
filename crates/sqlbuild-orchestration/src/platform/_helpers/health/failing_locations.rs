@@ -1,15 +1,15 @@
-//! Checking-in locations whose latest load, plan of what changed, discovery or connection check failed.
+//! Checking-in locations whose latest load, plan of what changed, discovery or connection check failed, or whose sync fails or stalled.
 
 use chrono::TimeDelta;
 use uuid::Uuid;
 
 use crate::discovered_sets::models::DiscoveredSetStatus;
-use crate::platform::_helpers::health::failing_syncs::failing_sync;
+use crate::platform::_helpers::health::failing_syncs::{failing_sync, stalled_sync};
 use crate::platform::_helpers::health::recent_health::recent_health;
 use crate::platform::constants::LOCATION_SILENCE_SECONDS;
 use crate::platform::models::{
-    DiscoveryHealth, FailingLocation, FailingSync, LocationFailures, LocationHealth,
-    LocationHealthObservation, LocationState,
+    DiscoveryHealth, FailingLocation, FailingSync, LocationFact, LocationFailures, LocationHealth,
+    LocationHealthObservation, LocationState, StalledSync,
 };
 use crate::snapshots::main::reads::read_current_record::read_current_record;
 use crate::store::errors::ControlError;
@@ -37,6 +37,7 @@ pub(crate) async fn failing_locations(
     .await?;
     let mut failing: Vec<FailingLocation> = Vec::new();
     let mut syncs: Vec<FailingSync> = Vec::new();
+    let mut stalled: Vec<StalledSync> = Vec::new();
     for row in rows {
         let LiveTarget {
             location_id,
@@ -50,12 +51,18 @@ pub(crate) async fn failing_locations(
             &observations,
             (location_id, &location_name, target),
         ));
+        stalled.extend(stalled_sync(
+            &observations,
+            (location_id, &location_name, target),
+            now,
+        ));
         let state = LocationState::of(&observations, (target, now));
         let Some((failed_at, error)) = deciding_report(&observations, state) else {
             continue;
         };
         let serving;
         (transaction, serving) = read_current_record(transaction, (location_id, target)).await?;
+        let tier = LocationFact::of_state(state, serving.is_some()).problem_tier();
         failing.push(FailingLocation {
             location_id,
             location_name,
@@ -64,6 +71,7 @@ pub(crate) async fn failing_locations(
             failed_at,
             error,
             serving,
+            tier,
         });
     }
     Ok((
@@ -71,6 +79,7 @@ pub(crate) async fn failing_locations(
         LocationFailures {
             locations: failing,
             syncs,
+            stalled,
         },
     ))
 }

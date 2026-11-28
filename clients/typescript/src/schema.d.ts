@@ -2079,6 +2079,8 @@ export interface components {
             location_id: string;
             location_name: string;
             target: string;
+            /** @description Always `stops_runs`, by `LocationFact::tier`. */
+            tier: components["schemas"]["ProblemTier"];
         };
         /** @enum {string} */
         BuiltinRole: "viewer" | "operator" | "developer" | "admin";
@@ -2622,6 +2624,8 @@ export interface components {
             location_name: string;
             name: string;
             target: string;
+            /** @description Always `needs_attention`, by `LocationFact::problem_tier`. */
+            tier: components["schemas"]["ProblemTier"];
             /** @description The times that were due by the republish but never ticked, oldest first. */
             times: string[];
             /** Format: uuid */
@@ -2668,6 +2672,8 @@ export interface components {
             /** @description `falling_back`, `change_plan_failed`, `discovery_failed` or `degraded`. */
             state: components["schemas"]["LocationState"];
             target: string;
+            /** @description Whether the failure stops runs, by `LocationFact::tier` of `state`. */
+            tier: components["schemas"]["ProblemTier"];
         };
         /** @description A lifecycle event sink whose runs lose events: since its first lossy run in a row, and why. */
         FailingSink: {
@@ -2694,6 +2700,8 @@ export interface components {
             /** @description The sink's name in the project. */
             sink: string;
             target: string;
+            /** @description Always `needs_attention`, by `LocationFact::problem_tier`. */
+            tier: components["schemas"]["ProblemTier"];
         };
         /** @description A checking-in location whose run-history sync is failing: since when, why, and when it tries again. */
         FailingSync: {
@@ -2722,6 +2730,8 @@ export interface components {
              */
             since: string;
             target: string;
+            /** @description Always `needs_attention`, by `LocationFact::tier`. */
+            tier: components["schemas"]["ProblemTier"];
             /** @description The location couldn't reach the warehouse, so no compute ran. */
             unreachable: boolean;
         };
@@ -2920,6 +2930,11 @@ export interface components {
             name: string;
             target: string;
         };
+        /**
+         * @description A location target's open fact, worst first: its health names the worst wherever it is shown.
+         * @enum {string}
+         */
+        LocationFact: "not_checking_in" | "cant_connect" | "deploy_failed" | "deploy_failed_on_previous" | "sync_failing" | "sync_stalled" | "missing_secrets" | "change_plan_failed" | "discovery_failed" | "schedule_overdue" | "trigger_skipped" | "sink_failing" | "calendar_low" | "calendar_times_dropped" | "sensor_rechecked" | "event_skipped" | "starting" | "not_tested" | "healthy";
         /** @description Locations report bounded facts, never connection strings; a failed warehouse read carries only its redacted error text. */
         LocationHealth: {
             /** @enum {string} */
@@ -3056,6 +3071,11 @@ export interface components {
          * @enum {string}
          */
         LocationState: "starting" | "healthy" | "degraded" | "falling_back" | "change_plan_failed" | "missing_secrets" | "discovery_failed" | "broken";
+        /** @description A target's health verdict: its worst open fact and its tier, none when nothing is open. */
+        LocationVerdict: {
+            fact: components["schemas"]["LocationFact"];
+            tier?: null | components["schemas"]["ProblemTier"];
+        };
         /** @description Only named location operations cross this boundary, never arbitrary SQL or Python. */
         LocationWork: {
             /** @enum {string} */
@@ -3202,6 +3222,8 @@ export interface components {
              */
             refresh_at: string;
             target: string;
+            /** @description Always `needs_attention`, by `LocationFact::problem_tier`. */
+            tier: components["schemas"]["ProblemTier"];
             /** Format: uuid */
             trigger_id: string;
         };
@@ -3609,6 +3631,8 @@ export interface components {
             /** Format: date-time */
             scheduled_for: string;
             target: string;
+            /** @description Always `needs_attention`, by `LocationFact::problem_tier`. */
+            tier: components["schemas"]["ProblemTier"];
             /** Format: uuid */
             trigger_id: string;
         };
@@ -3659,6 +3683,10 @@ export interface components {
             /** @description Newest first, with this server's pool-cap warning on the current snapshot. */
             observations: components["schemas"]["LocationHealthObservation"][];
             state: components["schemas"]["LocationState"];
+            /** @description The target's health as every page shows it: its worst open fact, and whether it stops runs. */
+            verdict: components["schemas"]["LocationVerdict"];
+            /** @description The run-history sync now: a request waiting for the location, the sync running, and whether it stalled. */
+            warehouse_sync: components["schemas"]["WarehouseSyncState"];
         };
         /** @description A stored platform event a person may see; the location target is absent for server-wide events. */
         PersonPlatformEvent: {
@@ -4027,6 +4055,8 @@ export interface components {
             skipped_events?: components["schemas"]["SkippedEvent"][];
             /** @description Triggers skipped because their stored job or pinned snapshot can't be read, until their location publishes again. */
             skipped_triggers?: components["schemas"]["SkippedTrigger"][];
+            /** @description Checking-in locations whose run-history sync reported no progress for ten minutes, until it moves, completes or fails. */
+            stalled_syncs?: components["schemas"]["StalledSync"][];
         };
         /** @description A job or group asking for more of a pool than this server's cap, so it runs alone in that pool. */
         PoolCapWarning: {
@@ -4113,6 +4143,11 @@ export interface components {
          * @enum {string}
          */
         PrincipalKind: "person" | "service";
+        /**
+         * @description How serious a location's open problem is: whether its runs can happen at all.
+         * @enum {string}
+         */
+        ProblemTier: "stops_runs" | "needs_attention";
         /** @description Code that injects a provider: a node (`loader`, `asset`, `check`, `hook` or `materialization`, keyed `kind:name`), an `event_exporter` or a `sink`. */
         ProviderConsumer: {
             kind: string;
@@ -4274,6 +4309,8 @@ export interface components {
             /** Format: date-time */
             rechecked_at: string;
             target: string;
+            /** @description Always `needs_attention`, by `LocationFact::problem_tier`. */
+            tier: components["schemas"]["ProblemTier"];
             /** Format: uuid */
             trigger_id: string;
         };
@@ -4939,6 +4976,25 @@ export interface components {
             /** Format: int64 */
             start: number;
         };
+        /** @description The sync running now: when it started, when it last moved forward, and how far it has got. */
+        RunningSync: {
+            /** Format: int64 */
+            kinds: number;
+            /** Format: int64 */
+            position: number;
+            /**
+             * Format: date-time
+             * @description The newest report, each of which moves the sync forward by a page.
+             */
+            progressed_at: string;
+            /** Format: int64 */
+            rows: number;
+            /** @description No progress for `SYNC_STALL_SECONDS`: a problem until it moves again, completes or fails. */
+            stalled: boolean;
+            /** Format: date-time */
+            started_at: string;
+            table: components["schemas"]["WarehouseHistoryKind"];
+        };
         Schedule: {
             expression: string;
             /** @enum {string} */
@@ -5389,6 +5445,8 @@ export interface components {
             /** Format: int64 */
             storage_id: number;
             target?: string | null;
+            /** @description Always `needs_attention`, by `LocationFact::problem_tier`. */
+            tier: components["schemas"]["ProblemTier"];
         };
         /** @description Dismisses the problem of one stored event webhooks and sensors skipped because it can't be read; an event ID applies once. */
         SkippedEventDismissalRequest: {
@@ -5413,6 +5471,8 @@ export interface components {
              */
             skipped_at: string;
             target: string;
+            /** @description Always `needs_attention`, by `LocationFact::problem_tier`. */
+            tier: components["schemas"]["ProblemTier"];
             /** Format: uuid */
             trigger_id: string;
         };
@@ -5469,6 +5529,25 @@ export interface components {
             /** @enum {string} */
             status: "unknown";
         };
+        /** @description A checking-in location whose run-history sync reported no progress for `SYNC_STALL_SECONDS`. */
+        StalledSync: {
+            /** Format: int64 */
+            kinds: number;
+            /** Format: uuid */
+            location_id: string;
+            location_name: string;
+            /** Format: int64 */
+            position: number;
+            /**
+             * Format: date-time
+             * @description The last progress report.
+             */
+            progressed_at: string;
+            table: components["schemas"]["WarehouseHistoryKind"];
+            target: string;
+            /** @description Always `needs_attention`, by `LocationFact::tier`. */
+            tier: components["schemas"]["ProblemTier"];
+        };
         StartedLogin: {
             browser_code: string;
             /** Format: date-time */
@@ -5506,6 +5585,12 @@ export interface components {
          * @enum {string}
          */
         StorageKind: "sqlite" | "postgresql";
+        /** @description Who asked for a sync, and when. */
+        SyncRequest: {
+            /** Format: date-time */
+            requested_at: string;
+            requested_by: string;
+        };
         /**
          * @description The tables Recall writes.
          * @enum {string}
@@ -5879,6 +5964,13 @@ export interface components {
              * @description Records the server mirrors of this table for the target, counted after a read's last page.
              */
             mirrored_records?: number | null;
+        };
+        /** @description A target's run-history sync now, as people read it. */
+        WarehouseSyncState: {
+            /** @description The newest report is a failure. */
+            failing: boolean;
+            requested?: null | components["schemas"]["SyncRequest"];
+            running?: null | components["schemas"]["RunningSync"];
         };
         /** @description Derive progress from committed mirror rows, scoped to the active physical reader. */
         WarehouseWatermarkRead: {
@@ -7366,6 +7458,15 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
+            /** @description The location isn't checking in */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
         };
     };
     readConnectionTest: {
@@ -8407,6 +8508,15 @@ export interface operations {
                 content?: never;
             };
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description The location isn't checking in */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -9703,6 +9813,15 @@ export interface operations {
                 content?: never;
             };
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description The location isn't checking in */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

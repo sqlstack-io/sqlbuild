@@ -1,5 +1,6 @@
 //! A republish needs its permission, names who asked, reports its publish and reads its sets back.
 
+use crate::api::tests::helpers::check_in;
 use std::collections::BTreeMap;
 
 use serde_json::json;
@@ -86,6 +87,7 @@ fn given_a_republish_when_requested_claimed_and_completed_then_it_is_authorized_
                 .expect("location");
             let mut input = snapshot(location);
             publish_snapshot(store, &input).await.expect("publish");
+            check_in(store, location, "development").await;
             let viewer = person(
                 store,
                 (&context, admin),

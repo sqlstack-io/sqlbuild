@@ -175,6 +175,14 @@ export type LocationDetail = {
 	poolCapWarnings: PoolCapWarning[];
 	/** Providers the location's environment leaves required secrets unset for, from its newest publication. */
 	missingSecrets: MissingProviderSecrets[];
+	/** The server's verdict on the target; null when the person can't read its health. */
+	verdict: LocationVerdictFact | null;
+};
+
+/** A target's worst open fact as the server names it, any of its open problems included, and whether it stops runs. */
+export type LocationVerdictFact = {
+	fact: 'not_checking_in' | 'cant_connect' | 'deploy_failed' | 'deploy_failed_on_previous' | 'sync_failing' | 'sync_stalled' | 'missing_secrets' | 'change_plan_failed' | 'discovery_failed' | 'schedule_overdue' | 'trigger_skipped' | 'sink_failing' | 'calendar_low' | 'calendar_times_dropped' | 'sensor_rechecked' | 'event_skipped' | 'starting' | 'not_tested' | 'healthy';
+	stopsRuns: boolean;
 };
 
 /** A provider whose required secrets the location's environment leaves unset; names only, never values. */
@@ -192,7 +200,7 @@ export type MissingProviderSecrets = {
 /** A job or group asking a pool for more than this server's cap, so it takes the whole pool. */
 export type PoolCapWarning = { jobKey: string; kind: 'job' | 'group'; pool: string; amount: number; cap: number; message: string };
 
-export type LocationSummary = Pick<LocationDetail, 'id' | 'name' | 'failedDeploy' | 'target' | 'snapshot' | 'connectionTest'> & {
+export type LocationSummary = Pick<LocationDetail, 'id' | 'name' | 'failedDeploy' | 'target' | 'snapshot' | 'connectionTest' | 'verdict'> & {
 	/** Null when the server can't report it to this person. */
 	health: LocationHealth | null;
 	/** Null when the server doesn't report the policy. */

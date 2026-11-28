@@ -135,7 +135,7 @@ export class FakeControl {
 				failing_syncs: (Object.keys(LOCATIONS) as TargetName[]).flatMap((name) => {
 					const failing = this.targets[name].failingSync;
 					if (!failing) return [];
-					return [{ location_id: LOCATIONS[name], location_name: name, target: 'dev', since: SYNC_FAILING_SINCE, reason: SYNC_REASON, unreachable: failing.unreachable, halted: failing.halted, retry_at: failing.halted ? null : new Date(Date.now() + 40_000).toISOString(), retry_seconds: failing.halted ? null : 60, last_success_at: '2026-11-01T00:00:00Z' }];
+					return [{ location_id: LOCATIONS[name], location_name: name, target: 'dev', since: SYNC_FAILING_SINCE, reason: SYNC_REASON, unreachable: failing.unreachable, halted: failing.halted, retry_at: failing.halted ? null : new Date(Date.now() + 40_000).toISOString(), retry_seconds: failing.halted ? null : 60, last_success_at: '2026-11-01T00:00:00Z' , tier: 'needs_attention'}];
 				})
 			};
 			const delay = Math.max(...Object.values(this.targets).map((t) => t.readDelayMs));
@@ -263,7 +263,7 @@ export class FakeControl {
 				retry_at: failing.halted ? null : new Date(Date.now() + 40_000).toISOString(),
 				retry_seconds: failing.halted ? null : 60
 			};
-			return { state: 'healthy', observations: [{ received_at: at, report: { event_id: '0190d1a0-0000-7000-8000-0000000000de', session_id: '0190d1a0-0000-7000-8000-0000000000ee', target: 'dev', health: report } }] };
+			return { state: 'healthy', ...serverSync(true, null), observations: [{ received_at: at, report: { event_id: '0190d1a0-0000-7000-8000-0000000000de', session_id: '0190d1a0-0000-7000-8000-0000000000ee', target: 'dev', health: report } }] };
 		}
 		const health = {
 			kind: 'warehouse_sync',
@@ -275,8 +275,9 @@ export class FakeControl {
 			elapsed_millis: 10,
 			progress: { position: target.sync === 'running' ? 1 : 2, kinds: 2, rows: 5, elapsed_millis: 20, completed: target.sync !== 'running' }
 		};
-		// The server computes the state; a sync report alone leaves the target healthy.
-		return { state: 'healthy', observations: [{ received_at: at, report: { event_id: '0190d1a0-0000-7000-8000-0000000000dd', session_id: '0190d1a0-0000-7000-8000-0000000000ee', target: 'dev', health } }] };
+		// The server computes the state; a sync report alone leaves the target healthy, untested as no connection check was reported.
+		const running = target.sync === 'running' ? { started_at: at, progressed_at: at, position: 1, kinds: 2, rows: 5, table: 'catalog', stalled: false } : null;
+		return { state: 'healthy', ...serverSync(target.sync === 'failed', running), observations: [{ received_at: at, report: { event_id: '0190d1a0-0000-7000-8000-0000000000dd', session_id: '0190d1a0-0000-7000-8000-0000000000ee', target: 'dev', health } }] };
 	}
 
 	#failedRun(name: TargetName) {
@@ -290,4 +291,9 @@ export class FakeControl {
 			ignored_audit_failures: 0, last_event_storage_id: 1, narrowing: null
 		};
 	}
+}
+
+/** The server's verdict and sync on the health read: the sync failing, or else no connection check reported. */
+function serverSync(failing: boolean, running: object | null) {
+	return { verdict: { fact: failing ? 'sync_failing' : 'not_tested', tier: 'needs_attention' }, warehouse_sync: { failing, requested: null, running } };
 }

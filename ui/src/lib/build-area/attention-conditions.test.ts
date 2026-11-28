@@ -10,6 +10,7 @@ const event = (extra: Partial<PlatformEvent> = {}): PlatformEvent => ({
 	id: 'ev-1',
 	kind: 'tick_overdue',
 	severity: 'warning',
+	stopsRuns: false,
 	occurredAt: iso(-1),
 	active: true,
 	locationId: 'loc-1',
@@ -76,7 +77,7 @@ describe('acknowledging a condition until it changes', () => {
 
 describe('server problems, whose event IDs are fixed per problem', () => {
 	type Problems = Parameters<typeof toPlatformEvents>[0];
-	const place = { location_id: '0190a000-0000-7000-8000-000000000001', location_name: 'shop', target: 'prod' };
+	const place = { location_id: '0190a000-0000-7000-8000-000000000001', location_name: 'shop', target: 'prod', tier: 'needs_attention' as const };
 	const tick = (trigger: string) => ({ ...place, trigger_id: trigger, name: trigger, scheduled_for: iso(-1) });
 	const problems = (over: Partial<Problems>): Problems => ({ scheduler_leader: true, scheduler_lease_expires_at: null, broken_locations: [], overdue_ticks: [], low_calendars: [], ...over }) as Problems;
 	const item = (over: Partial<Problems>): AttentionItem => ({ kind: 'platform_event', event: toPlatformEvents(problems(over), now)[0] });
@@ -172,7 +173,7 @@ describe('acknowledgements of conditions that cleared', () => {
 		const secrets = ack('event:location_missing_secrets:loc-1:dev:');
 		const healthy = (acks: AttentionAcknowledgement[], events: PlatformEvent[] = []) =>
 			overviewOf({ runs: [], checks: [], nodes: [built([])], changes: [], events, triggers: [], acknowledgements: new Map(), conditions: { snoozeSeconds: 86_400, acknowledgements: acks }, now, scopeKey: 'loc-1:dev', healthRead: true });
-		const stillMissing: PlatformEvent = { id: 'secrets:loc-1:dev', kind: 'location_missing_secrets', severity: 'warning', occurredAt: iso(-1), active: true, locationId: 'loc-1:dev', subject: null, message: 'orders_api is missing ORDERS_API_KEY', members: ['ORDERS_API_KEY'] };
+		const stillMissing: PlatformEvent = { id: 'secrets:loc-1:dev', kind: 'location_missing_secrets', severity: 'warning', stopsRuns: false, occurredAt: iso(-1), active: true, locationId: 'loc-1:dev', subject: null, message: 'orders_api is missing ORDERS_API_KEY', members: ['ORDERS_API_KEY'] };
 		expect(read([built([])], [secrets]).clearedAcknowledgements).toEqual([]);
 		expect(healthy([secrets]).clearedAcknowledgements).toEqual([secrets]);
 		expect(healthy([secrets], [stillMissing]).clearedAcknowledgements).toEqual([]);

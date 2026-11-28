@@ -11,6 +11,7 @@ Online: https://sqlbuild.com/docs/cli/server/
 - Configure the server
 - Stop the server
 - Check the server's health
+- See a location's health
 - Serve over HTTPS
 - Add people who sign in with passwords
 - Administer the server with sqb admin
@@ -166,6 +167,36 @@ links to **Status**, which shows every part without signing in. While the contro
 unavailable, every page keeps its address and says it isn't available, with the reason, since
 when and the parts, and loads by itself when the database is back. While a part is degraded, pages
 work and a banner names it.
+
+## See a location's health
+
+The Locations page and each location's page show one verdict per location target. It names the
+location's worst open problem:
+
+- **Healthy** (green): nothing is open for the location.
+- Red: runs can't happen. **Not checking in** means no instance has checked in for 90 seconds.
+  **Can't connect** means the warehouse connection check after the last load failed. **Deploy
+  failed** means the latest deploy didn't load and no earlier version is published to run instead.
+- Amber: runs still happen, but something needs a look. Examples are **Running previous version**,
+  **Sync failing**, **Sync stalled** and **Not tested**, which means no connection check since the
+  running version was published.
+
+Every open problem listed for the location counts, not only its own state. An overdue schedule, a
+calendar running out of dates, a skipped trigger, a sensor checked again from scratch, an event sink
+losing events or a stored event that can't be read each turns the verdict amber.
+
+The full error is shown once, under the location's **Problems**, behind **View error**. The verdict,
+lists and banner name only the problem. When one cause has several effects, only the cause is red:
+while the location can't connect, its sync shows **blocked: can't connect**.
+
+Every page except the Overview shows one banner line for all open problems. It names the worst
+with its location, such as `waffle-shop can't connect · 1 more problem · View`, or counts them, such
+as `3 locations have problems · View`. It is red when anything stops runs, and amber otherwise.
+
+Scripts read the same verdict. The `verdict` of
+`GET /api/control/locations/{location_id}/targets/{target}/health` has the `fact` and its `tier`,
+`stops_runs` or `needs_attention`, and every location problem in `/api/control/platform/problems`
+carries its `tier`.
 
 ## Serve over HTTPS
 
@@ -932,6 +963,13 @@ Details:
   location is not one you can view, it prints `Warehouse sync skipped:` and the reason.
 - Requests that arrive while a sync is running, from builds, **Sync now**, ended runs or the
   interval, add one more sync after it, not one each.
+- A location that isn't checking in can't take a request, so the server refuses **Sync now**,
+  `sqb control sync`, a connection test and a republish at once with HTTP 409 and the reason, such
+  as `The location isn't checking in (last check-in 6m ago), so it can't sync. Start it, then try
+  again.` Nothing is queued.
+- While a request waits, the location's page shows who asked and when. A running sync that reports
+  no progress for 10 minutes is listed under Problems as **Sync stalled**, which needs a look but
+  doesn't stop runs, until it moves again, completes or fails.
 - The interval restarts after every completed sync, so a location that syncs often for other
   reasons never syncs extra.
 - A sync reads the warehouse and writes only to the dynamic pause table: on Snowflake, after it
