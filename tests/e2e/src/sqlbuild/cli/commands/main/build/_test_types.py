@@ -1807,3 +1807,13 @@ class LiveLogBuildTestCase:
     description: str
     expected_live_line: str
     expected_later_line: str
+
+
+@dataclass(frozen=True)
+class RollingWindowBuildTestCase:
+    """A rolling-window model's rows after a first build and a rebuild, by days before today."""
+
+    description: str
+    cursor_start_days_ago: int | None
+    expected_first_build: dict[int, int]
+    expected_second_build: dict[int, int]
