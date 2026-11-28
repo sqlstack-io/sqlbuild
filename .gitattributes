@@ -13,3 +13,6 @@ clients/typescript/scripts/** linguist-documentation
 # The control-store SQL is embedded in the binaries and checksummed; keep it LF on every checkout.
 crates/sqlbuild-orchestration/src/store/*.sql text eol=lf
 crates/sqlbuild-orchestration/tests/store/schema/baseline/*.sql text eol=lf
+
+# Shell scripts run directly on the Windows runners too, where a CRLF checkout breaks them.
+*.sh text eol=lf
