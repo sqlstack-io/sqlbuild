@@ -29,7 +29,6 @@ const ERROR_ACTION: &str = "error";
 const SKIP_ACTION: &str = "skip";
 const CREATE_TABLE_ACTION: &str = "create_table";
 const ROLLING_WINDOW_STRATEGY: &str = "rolling_window";
-const FULL_REFRESH_REASON: &str = "full_refresh";
 
 /// A planned entry and the warning its limit raised.
 type LimitedEntry<'py> = (Bound<'py, PyAny>, Option<Bound<'py, PyAny>>);
@@ -202,14 +201,14 @@ pub(crate) fn with_warnings<'py>(
     PyTuple::new(py, [entry, PyTuple::new(py, warnings)?.into_any()])
 }
 
-/// The default limit: none for an incremental rolling window, else the model's limit or the configured ceiling.
+/// The default limit: none for a rolling window that keeps its table, since its window is only the lookback; else the model's limit or the configured ceiling.
 pub(crate) fn default_limit<'py>(
     entry: &Bound<'py, PyAny>,
     configured: Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = entry.py();
     if native_field(entry, "microbatch_strategy")?.eq(ROLLING_WINDOW_STRATEGY)?
-        && !native_field(entry, "reason")?.eq(FULL_REFRESH_REASON)?
+        && !native_field(entry, "action")?.eq(CREATE_TABLE_ACTION)?
         && native_field(entry, "start_cursor_override")?.is_none()
         && native_field(entry, "end_cursor_override")?.is_none()
     {

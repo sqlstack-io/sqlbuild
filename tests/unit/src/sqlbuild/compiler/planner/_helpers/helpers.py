@@ -34,6 +34,7 @@ from sqlbuild._native import (
     CompileSqlReference,
     CompileSqlScenarioCte,
     CompileSqlTestCte,
+    CursorBounds,
     DefaultsConfig,
     DiscoveredAuditBlock,
     DiscoveredAuditFile,
@@ -46,6 +47,12 @@ from sqlbuild._native import (
     DiscoveredSqlTestFile,
     Fingerprint,
     FunctionArgument,
+    IncrementalMode,
+    MaterializationType,
+    MicrobatchLimitAction,
+    ModelPlanEntry,
+    PlanAction,
+    PlanEntryBuildInputs,
     PlannerChangeResults,
     PlannerScope,
     PlanOutput,
@@ -1413,3 +1420,32 @@ def detect_function_reason(
     )
     reason: PlanReason = changes.functions[function.name].reason
     return reason
+
+
+def rolling_window_plan_entry(*, action: str, reason: str) -> ModelPlanEntry:
+    """A daily rolling-window microbatch entry over 35 days with `action` and `reason`."""
+
+    return ModelPlanEntry(
+        key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="events"),
+        name="events",
+        relative_path=Path("sql/models/events.sql"),
+        materialization_type=MaterializationType.INCREMENTAL,
+        action=PlanAction(action),
+        reason=PlanReason(reason),
+        destination=CompiledRelationLocation(None, "main", "events", "main.events"),
+        fingerprint_query_sql="SELECT 1",
+        resolved_sql="SELECT 1",
+        logical_ddl="",
+        incremental_mode=IncrementalMode.MICROBATCH,
+        microbatch_strategy="rolling_window",
+        cursor_type="timestamp",
+        batch_size="1d",
+        microbatch_range=CursorBounds(start="2026-01-01T00:00:00", end="2026-02-05T00:00:00"),
+    )
+
+
+ROLLING_WINDOW_PROJECT_LIMIT: PlanEntryBuildInputs = PlanEntryBuildInputs(
+    max_microbatches=2,
+    max_microbatches_is_override=False,
+    microbatch_limit_action=MicrobatchLimitAction.ERROR,
+)

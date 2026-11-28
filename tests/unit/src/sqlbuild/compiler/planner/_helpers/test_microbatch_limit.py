@@ -28,6 +28,12 @@ from tests.unit.src.sqlbuild.compiler.planner._helpers._test_types import (
     EffectiveMicrobatchLimitPlanningTestCase,
     MicrobatchLimitPlanningErrorTestCase,
     MicrobatchLimitPlanningTestCase,
+    RollingWindowProjectLimitTestCase,
+    RollingWindowUnlimitedTestCase,
+)
+from tests.unit.src.sqlbuild.compiler.planner._helpers.helpers import (
+    ROLLING_WINDOW_PROJECT_LIMIT,
+    rolling_window_plan_entry,
 )
 
 
@@ -322,3 +328,60 @@ def test_given_excess_planner_owned_range_when_action_is_error_then_planning_fai
             max_batches=test_case.max_batches,
             action=MicrobatchLimitAction(test_case.action),
         )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        RollingWindowProjectLimitTestCase(
+            description="a first build from cursor_start is held to the project limit",
+            action="create_table",
+            reason="first_run",
+            expected_error_fragment="MICROBATCH LIMIT EXCEEDED",
+        ),
+        RollingWindowProjectLimitTestCase(
+            description="a full refresh is held to the project limit",
+            action="create_table",
+            reason="full_refresh",
+            expected_error_fragment="MICROBATCH LIMIT EXCEEDED",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_rolling_window_entry_replacing_its_relation_when_applying_project_limit_then_it_is_held(
+    test_case: RollingWindowProjectLimitTestCase,
+) -> None:
+    entry: ModelPlanEntry = rolling_window_plan_entry(
+        action=test_case.action, reason=test_case.reason
+    )
+
+    with pytest.raises(CompileInputError, match=test_case.expected_error_fragment):
+        apply_configured_microbatch_limits(entry=entry, inputs=ROLLING_WINDOW_PROJECT_LIMIT)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        RollingWindowUnlimitedTestCase(
+            description="an incremental run over the lookback is not limited",
+            action="incremental_delete_insert",
+            reason="normal_incremental",
+            expected_range=("2026-01-01T00:00:00", "2026-02-05T00:00:00"),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_rolling_window_entry_running_incrementally_when_applying_project_limit_then_it_is_not_held(
+    test_case: RollingWindowUnlimitedTestCase,
+) -> None:
+    entry: ModelPlanEntry = rolling_window_plan_entry(
+        action=test_case.action, reason=test_case.reason
+    )
+
+    limited_entry, _ = apply_configured_microbatch_limits(
+        entry=entry, inputs=ROLLING_WINDOW_PROJECT_LIMIT
+    )
+
+    assert limited_entry.microbatch_range == CursorBounds(
+        start=test_case.expected_range[0], end=test_case.expected_range[1]
+    )

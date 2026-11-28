@@ -17,6 +17,6 @@ pub(crate) const SYNTHETIC_PACKAGE_PREFIX: &str = "_sqlbuild_project_macros_";
 /// Hex digits of the content digest naming the synthetic package.
 pub(crate) const SYNTHETIC_DIGEST_LENGTH: usize = 16;
 /// The module of the Jinja helper whose keyword arguments may pass macros to a template.
-pub(crate) const JINJA_MODULE: &str = "sqlbuild.dbt";
+pub(crate) const JINJA_MODULE: &str = "sqlbuild.macros";
 /// The Jinja helper's name in `JINJA_MODULE`.
 pub(crate) const JINJA_FUNCTION: &str = "jinja";

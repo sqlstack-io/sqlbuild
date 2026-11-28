@@ -325,7 +325,9 @@ Choose an explicit strategy:
 | Strategy | Window source |
 |----------|---------------|
 | `watermark` | Declared input availability; supports timestamp and integer cursors |
-| `rolling_window` | A timestamp window relative to the current run rather than input maxima |
+| `rolling_window` | The run's time rather than input maxima: the `lookback` periods before the current one, and the current period |
+
+A `rolling_window` window is counted in `cursor_grain` periods and ends at the end of the current period, so every run replaces the partial current period along with the `lookback` periods before it. A model that should hold only complete periods filters the current one out in its own SQL. When the destination is created or replaced, as on a first build or `--full-refresh`, a model with `cursor_start` builds from `cursor_start` through the current period.
 
 Each batch has its own audit cycle: create delta, run delta audits, apply DML, and clean up.
 
