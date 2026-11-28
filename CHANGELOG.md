@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.263.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.262.0...v0.263.0) (2026-11-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* @loader runs on SQLLoad's engine through SQLBuild's warehouse connections (SQLLoad 0.89.1, pyo3 0.29)
+* loads and @loader run on SQLLoad, local tests allow known differences, readable test output, live logs and a server that survives a republish ([#1632](https://github.com/sqlstack-io/sqlbuild/issues/1632))
+
+### Features
+
+* [@loader](https://github.com/loader) runs on SQLLoad's engine through SQLBuild's warehouse connections (SQLLoad 0.89.1, pyo3 0.29) ([5addf4d](https://github.com/sqlstack-io/sqlbuild/commit/5addf4dccb85f83096d0088a93be8e19ef6c37f8))
+* [testing.local] allow and tests/overrides/ in local unit tests and scenarios (SQLQuack 0.25.0) ([5addf4d](https://github.com/sqlstack-io/sqlbuild/commit/5addf4dccb85f83096d0088a93be8e19ef6c37f8))
+* a sources file's load: block, checked by SQLLoad at compile; a load is a graph node its sources depend on ([5addf4d](https://github.com/sqlstack-io/sqlbuild/commit/5addf4dccb85f83096d0088a93be8e19ef6c37f8))
+* loads and [@loader](https://github.com/loader) run on SQLLoad, local tests allow known differences, readable test output, live logs and a server that survives a republish ([#1632](https://github.com/sqlstack-io/sqlbuild/issues/1632)) ([5addf4d](https://github.com/sqlstack-io/sqlbuild/commit/5addf4dccb85f83096d0088a93be8e19ef6c37f8))
+* **load:** warehouse-native declared types pass to SQLLoad as native("...") ([5addf4d](https://github.com/sqlstack-io/sqlbuild/commit/5addf4dccb85f83096d0088a93be8e19ef6c37f8))
+* on_schema_change on loaded sources, ctx.http for loaders, ctx.loader_connection ([5addf4d](https://github.com/sqlstack-io/sqlbuild/commit/5addf4dccb85f83096d0088a93be8e19ef6c37f8))
+* readable sqb test and sqb scenario test output ([5addf4d](https://github.com/sqlstack-io/sqlbuild/commit/5addf4dccb85f83096d0088a93be8e19ef6c37f8))
+
+
+### Bug Fixes
+
+* **analysis:** a declared ClickHouse BIGINT matches the Nullable(Int64) the warehouse lists ([5addf4d](https://github.com/sqlstack-io/sqlbuild/commit/5addf4dccb85f83096d0088a93be8e19ef6c37f8))
+* **clickhouse:** cursor bounds of an empty table are NULL, so incremental models no longer replan from 1970 ([5addf4d](https://github.com/sqlstack-io/sqlbuild/commit/5addf4dccb85f83096d0088a93be8e19ef6c37f8))
+* **load:** one-table files loads pass their source's declared types to SQLLoad ([5addf4d](https://github.com/sqlstack-io/sqlbuild/commit/5addf4dccb85f83096d0088a93be8e19ef6c37f8))
+* **planner:** a ClickHouse Nullable column is the type its model infers, not a schema change ([5addf4d](https://github.com/sqlstack-io/sqlbuild/commit/5addf4dccb85f83096d0088a93be8e19ef6c37f8))
+* **platform:** skip stored events webhooks and sensors can't read, list them as dismissible problems ([5addf4d](https://github.com/sqlstack-io/sqlbuild/commit/5addf4dccb85f83096d0088a93be8e19ef6c37f8))
+* **progress:** phase lines and names print in full when output isn't a terminal ([5addf4d](https://github.com/sqlstack-io/sqlbuild/commit/5addf4dccb85f83096d0088a93be8e19ef6c37f8))
+* **python-nodes:** send ctx.log lines while the node runs ([5addf4d](https://github.com/sqlstack-io/sqlbuild/commit/5addf4dccb85f83096d0088a93be8e19ef6c37f8))
+* **scenario:** compile local and auto scenario runs in the project's dialect ([5addf4d](https://github.com/sqlstack-io/sqlbuild/commit/5addf4dccb85f83096d0088a93be8e19ef6c37f8))
+* **server:** read snapshots within a memory budget, keep slow work off the accept loop, and cut off stuck control database sessions ([5addf4d](https://github.com/sqlstack-io/sqlbuild/commit/5addf4dccb85f83096d0088a93be8e19ef6c37f8))
+* **test:** names, errors and notes in full when output isn't a terminal ([5addf4d](https://github.com/sqlstack-io/sqlbuild/commit/5addf4dccb85f83096d0088a93be8e19ef6c37f8))
+* **ui:** update a location's health, check-in and warehouse sync live ([5addf4d](https://github.com/sqlstack-io/sqlbuild/commit/5addf4dccb85f83096d0088a93be8e19ef6c37f8))
+
 ## [0.262.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.261.0...v0.262.0) (2026-11-26)
 
 
