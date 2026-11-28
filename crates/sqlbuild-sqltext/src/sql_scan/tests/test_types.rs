@@ -80,3 +80,9 @@ pub(crate) struct GeneratedBoundaryTestCase {
     /// Splices that gained or lost code, or changed although they read right.
     pub(crate) expected_failures: &'static [&'static str],
 }
+
+pub(crate) struct CandidateSkipTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) syntax: LexicalSyntax,
+    pub(crate) expected_ranges: fn(&str, &LexicalSyntax) -> Vec<(usize, usize)>,
+}

@@ -58,6 +58,13 @@ pub(crate) fn non_code_ranges(sql: &str, syntax: &LexicalSyntax) -> Vec<(usize, 
     let mut ranges: Vec<(usize, usize)> = Vec::new();
     let mut index = 0;
     while index < bytes.len() {
+        match bytes[index..]
+            .iter()
+            .position(|byte| may_open_non_code(*byte, syntax))
+        {
+            Some(offset) => index += offset,
+            None => break,
+        }
         match non_code_end(bytes, index, syntax) {
             Ok(Some(end)) => {
                 ranges.push((index, end));

@@ -3,6 +3,7 @@
 use crate::sql_scan::_helpers::dollar::dollar_quote_end;
 use crate::sql_scan::main::bounded_expansions::bounded_expansions;
 use crate::sql_scan::main::comment_end::comment_end;
+use crate::sql_scan::main::dialect_non_code_end::dialect_non_code_end;
 use crate::sql_scan::main::dialect_non_code_ranges::dialect_non_code_ranges;
 use crate::sql_scan::main::quote_end::quote_end;
 use crate::sql_scan::models::{LexicalSyntax, QuotePolicy, Unclosed};
@@ -286,4 +287,33 @@ pub(crate) fn generated_failures(syntax: &LexicalSyntax) -> Vec<String> {
             wrong.then(|| format!("{template:?} with {values:?} gave {bounded:?}"))
         })
         .collect()
+}
+
+/// Every text of up to `rounds` of `pieces` in a row.
+pub(crate) fn piece_texts(pieces: &[&str], rounds: usize) -> Vec<String> {
+    let mut texts: Vec<String> = vec![String::new()];
+    for _ in 0..rounds {
+        texts = texts
+            .iter()
+            .flat_map(|text| pieces.iter().map(move |piece| format!("{text}{piece}")))
+            .chain(texts.iter().cloned())
+            .collect();
+    }
+    texts
+}
+
+/// The non-code ranges of `sql` found by asking `dialect_non_code_end` about every byte in turn.
+pub(crate) fn ranges_byte_by_byte(sql: &str, syntax: &LexicalSyntax) -> Vec<(usize, usize)> {
+    let bytes: &[u8] = sql.as_bytes();
+    let step = |index: usize| -> (usize, Option<(usize, usize)>) {
+        dialect_non_code_end(bytes, index, syntax)
+            .map_or((bytes.len(), Some((index, bytes.len()))), |end| {
+                end.map_or((index + 1, None), |end| (end, Some((index, end))))
+            })
+    };
+    std::iter::successors(Some((0, None)), |(index, _)| {
+        (*index < bytes.len()).then(|| step(*index))
+    })
+    .filter_map(|(_, range)| range)
+    .collect()
 }

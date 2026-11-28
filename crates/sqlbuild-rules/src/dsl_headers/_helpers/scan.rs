@@ -1,7 +1,7 @@
 //! Line-leading parenthesized DSL regions, found past comments and SQL strings.
 
 use sqlbuild_core::text::main::python_isspace::python_isspace;
-use sqlbuild_sqltext::header_strings::main::header_quoted_end::header_quoted_end;
+use sqlbuild_sqltext::header_strings::models::DescriptionKeys;
 
 use crate::dsl_headers::_helpers::text::{find, is_word};
 use crate::dsl_headers::constants::QUOTES;
@@ -73,12 +73,13 @@ fn header_end(text: &[char], body_start: usize) -> Option<usize> {
         return None;
     }
     let mut depth: i64 = 0;
+    let mut description_keys: DescriptionKeys<'_, char> = DescriptionKeys::new(text);
     loop {
         index = (index..text.len())
             .find(|position| matches!(text[*position], '(' | ')' | '\'' | '"'))?;
         let character: char = text[index];
         if QUOTES.contains(&character) {
-            index = header_quoted_end(text, index)?;
+            index = description_keys.quoted_end(index)?;
             continue;
         }
         if character == '(' {

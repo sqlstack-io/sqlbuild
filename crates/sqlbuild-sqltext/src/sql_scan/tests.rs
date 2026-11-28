@@ -1,5 +1,7 @@
 #[path = "tests/test_bounded_expansions.rs"]
 mod bounded_expansions;
+#[path = "tests/test_candidate_skip.rs"]
+mod candidate_skip;
 #[path = "tests/test_dialect_scan.rs"]
 mod dialect_scan;
 #[path = "tests/helpers.rs"]
